@@ -38,37 +38,37 @@
 
 namespace mongo {
 
-    class MessageHandler {
-    public:
-        virtual ~MessageHandler() {}
-        
-        /**
-         * called once when a socket is connected
-         */
-        virtual void connected( AbstractMessagingPort* p ) = 0;
+class MessageHandler {
+public:
+    virtual ~MessageHandler() {}
 
-        /**
-         * called every time a message comes in
-         * handler is responsible for responding to client
-         */
-        virtual void process(Message& m, AbstractMessagingPort* p) = 0;
+    /**
+     * called once when a socket is connected
+     */
+    virtual void connected(AbstractMessagingPort* p) = 0;
+
+    /**
+     * called every time a message comes in
+     * handler is responsible for responding to client
+     */
+    virtual void process(Message& m, AbstractMessagingPort* p) = 0;
+};
+
+class MessageServer {
+public:
+    struct Options {
+        int port;            // port to bind to
+        std::string ipList;  // addresses to bind to
+
+        Options() : port(0), ipList("") {}
     };
 
-    class MessageServer {
-    public:
-        struct Options {
-            int port;                   // port to bind to
-            std::string ipList;             // addresses to bind to
+    virtual ~MessageServer() {}
+    virtual void run() = 0;
+    virtual void setAsTimeTracker() = 0;
+    virtual void setupSockets() = 0;
+};
 
-            Options() : port(0), ipList("") {}
-        };
-
-        virtual ~MessageServer() {}
-        virtual void run() = 0;
-        virtual void setAsTimeTracker() = 0;
-        virtual void setupSockets() = 0;
-    };
-
-    // TODO use a factory here to decide between port and asio variations
-    MessageServer * createServer( const MessageServer::Options& opts , MessageHandler * handler );
+// TODO use a factory here to decide between port and asio variations
+MessageServer* createServer(const MessageServer::Options& opts, MessageHandler* handler);
 }

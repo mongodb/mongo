@@ -38,26 +38,26 @@
 
 namespace mongo {
 
-    /**
-     * This is the access method for "hashed" indices.
-     */
-    class HashAccessMethod : public IndexAccessMethod {
-    public:
-        HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
+/**
+ * This is the access method for "hashed" indices.
+ */
+class HashAccessMethod : public IndexAccessMethod {
+public:
+    HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 
-    private:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
+private:
+    virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
-        // Only one of our fields is hashed.  This is the field name for it.
-        std::string _hashedField;
+    // Only one of our fields is hashed.  This is the field name for it.
+    std::string _hashedField;
 
-        // _seed defaults to zero.
-        HashSeed _seed;
+    // _seed defaults to zero.
+    HashSeed _seed;
 
-        // _hashVersion defaults to zero.
-        int _hashVersion;
+    // _hashVersion defaults to zero.
+    int _hashVersion;
 
-        BSONObj _missingKey;
-    };
+    BSONObj _missingKey;
+};
 
 }  // namespace mongo

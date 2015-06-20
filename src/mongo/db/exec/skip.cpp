@@ -33,103 +33,102 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::vector;
+using std::unique_ptr;
+using std::vector;
 
-    // static
-    const char* SkipStage::kStageType = "SKIP";
+// static
+const char* SkipStage::kStageType = "SKIP";
 
-    SkipStage::SkipStage(int toSkip, WorkingSet* ws, PlanStage* child)
-        : _ws(ws), _child(child), _toSkip(toSkip), _commonStats(kStageType) { }
+SkipStage::SkipStage(int toSkip, WorkingSet* ws, PlanStage* child)
+    : _ws(ws), _child(child), _toSkip(toSkip), _commonStats(kStageType) {}
 
-    SkipStage::~SkipStage() { }
+SkipStage::~SkipStage() {}
 
-    bool SkipStage::isEOF() { return _child->isEOF(); }
+bool SkipStage::isEOF() {
+    return _child->isEOF();
+}
 
-    PlanStage::StageState SkipStage::work(WorkingSetID* out) {
-        ++_commonStats.works;
+PlanStage::StageState SkipStage::work(WorkingSetID* out) {
+    ++_commonStats.works;
 
-        // Adds the amount of time taken by work() to executionTimeMillis.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
+    // Adds the amount of time taken by work() to executionTimeMillis.
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        WorkingSetID id = WorkingSet::INVALID_ID;
-        StageState status = _child->work(&id);
+    WorkingSetID id = WorkingSet::INVALID_ID;
+    StageState status = _child->work(&id);
 
-        if (PlanStage::ADVANCED == status) {
-            // If we're still skipping results...
-            if (_toSkip > 0) {
-                // ...drop the result.
-                --_toSkip;
-                _ws->free(id);
-                ++_commonStats.needTime;
-                return PlanStage::NEED_TIME;
-            }
-
-            *out = id;
-            ++_commonStats.advanced;
-            return PlanStage::ADVANCED;
-        }
-        else if (PlanStage::FAILURE == status || PlanStage::DEAD == status) {
-            *out = id;
-            // If a stage fails, it may create a status WSM to indicate why it
-            // failed, in which case 'id' is valid.  If ID is invalid, we
-            // create our own error message.
-            if (WorkingSet::INVALID_ID == id) {
-                mongoutils::str::stream ss;
-                ss << "skip stage failed to read in results from child";
-                Status status(ErrorCodes::InternalError, ss);
-                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
-            }
-            return status;
-        }
-        else if (PlanStage::NEED_TIME == status) {
+    if (PlanStage::ADVANCED == status) {
+        // If we're still skipping results...
+        if (_toSkip > 0) {
+            // ...drop the result.
+            --_toSkip;
+            _ws->free(id);
             ++_commonStats.needTime;
-        }
-        else if (PlanStage::NEED_YIELD == status) {
-            ++_commonStats.needYield;
-            *out = id;
+            return PlanStage::NEED_TIME;
         }
 
-        // NEED_TIME, NEED_YIELD, ERROR, IS_EOF
+        *out = id;
+        ++_commonStats.advanced;
+        return PlanStage::ADVANCED;
+    } else if (PlanStage::FAILURE == status || PlanStage::DEAD == status) {
+        *out = id;
+        // If a stage fails, it may create a status WSM to indicate why it
+        // failed, in which case 'id' is valid.  If ID is invalid, we
+        // create our own error message.
+        if (WorkingSet::INVALID_ID == id) {
+            mongoutils::str::stream ss;
+            ss << "skip stage failed to read in results from child";
+            Status status(ErrorCodes::InternalError, ss);
+            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
+        }
         return status;
+    } else if (PlanStage::NEED_TIME == status) {
+        ++_commonStats.needTime;
+    } else if (PlanStage::NEED_YIELD == status) {
+        ++_commonStats.needYield;
+        *out = id;
     }
 
-    void SkipStage::saveState() {
-        ++_commonStats.yields;
-        _child->saveState();
-    }
+    // NEED_TIME, NEED_YIELD, ERROR, IS_EOF
+    return status;
+}
 
-    void SkipStage::restoreState(OperationContext* opCtx) {
-        ++_commonStats.unyields;
-        _child->restoreState(opCtx);
-    }
+void SkipStage::saveState() {
+    ++_commonStats.yields;
+    _child->saveState();
+}
 
-    void SkipStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-        ++_commonStats.invalidates;
-        _child->invalidate(txn, dl, type);
-    }
+void SkipStage::restoreState(OperationContext* opCtx) {
+    ++_commonStats.unyields;
+    _child->restoreState(opCtx);
+}
 
-    vector<PlanStage*> SkipStage::getChildren() const {
-        vector<PlanStage*> children;
-        children.push_back(_child.get());
-        return children;
-    }
+void SkipStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    ++_commonStats.invalidates;
+    _child->invalidate(txn, dl, type);
+}
 
-    PlanStageStats* SkipStage::getStats() {
-        _commonStats.isEOF = isEOF();
-        _specificStats.skip = _toSkip;
-        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SKIP));
-        ret->specific.reset(new SkipStats(_specificStats));
-        ret->children.push_back(_child->getStats());
-        return ret.release();
-    }
+vector<PlanStage*> SkipStage::getChildren() const {
+    vector<PlanStage*> children;
+    children.push_back(_child.get());
+    return children;
+}
 
-    const CommonStats* SkipStage::getCommonStats() const {
-        return &_commonStats;
-    }
+PlanStageStats* SkipStage::getStats() {
+    _commonStats.isEOF = isEOF();
+    _specificStats.skip = _toSkip;
+    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SKIP));
+    ret->specific.reset(new SkipStats(_specificStats));
+    ret->children.push_back(_child->getStats());
+    return ret.release();
+}
 
-    const SpecificStats* SkipStage::getSpecificStats() const {
-        return &_specificStats;
-    }
+const CommonStats* SkipStage::getCommonStats() const {
+    return &_commonStats;
+}
+
+const SpecificStats* SkipStage::getSpecificStats() const {
+    return &_specificStats;
+}
 
 }  // namespace mongo

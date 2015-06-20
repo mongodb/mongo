@@ -32,64 +32,65 @@
 #include "mongo/rpc/protocol.h"
 
 namespace mongo {
-    class BSONObj;
-    class Message;
-    class StringData;
+class BSONObj;
+class Message;
+class StringData;
 
 namespace rpc {
-    class DocumentRange;
+class DocumentRange;
+
+/**
+ * An immutable view of an RPC message.
+ */
+class RequestInterface {
+    MONGO_DISALLOW_COPYING(RequestInterface);
+
+public:
+    virtual ~RequestInterface() = default;
 
     /**
-     * An immutable view of an RPC message.
+     * Gets the database that the command is to be executed on.
      */
-    class RequestInterface {
-        MONGO_DISALLOW_COPYING(RequestInterface);
-    public:
-        virtual ~RequestInterface() = default;
+    virtual StringData getDatabase() const = 0;
 
-        /**
-         * Gets the database that the command is to be executed on.
-         */
-        virtual StringData getDatabase() const = 0;
+    /**
+     * Gets the name of the command to execute.
+     */
+    virtual StringData getCommandName() const = 0;
 
-        /**
-         * Gets the name of the command to execute.
-         */
-        virtual StringData getCommandName() const = 0;
+    /**
+     * Gets the metadata associated with the command request. This is information that is
+     * independent of any specific command, i.e. auditing information. See metadata.h for
+     * further details.
+     */
+    virtual const BSONObj& getMetadata() const = 0;
 
-        /**
-         * Gets the metadata associated with the command request. This is information that is
-         * independent of any specific command, i.e. auditing information. See metadata.h for
-         * further details.
-         */
-        virtual const BSONObj& getMetadata() const = 0;
+    /**
+     * Gets the arguments to the command - this is passed to the command's run() method.
+     */
+    virtual const BSONObj& getCommandArgs() const = 0;
 
-        /**
-         * Gets the arguments to the command - this is passed to the command's run() method.
-         */
-        virtual const BSONObj& getCommandArgs() const = 0;
+    /**
+     * A variable number of BSON documents to pass to the command. It is valid for
+     * the returned range to be empty.
+     *
+     * Example usage:
+     *
+     * for (auto&& doc : req.getInputDocs()) {
+     *    ... do stuff with doc
+     * }
+     */
+    virtual DocumentRange getInputDocs() const = 0;
 
-        /**
-         * A variable number of BSON documents to pass to the command. It is valid for
-         * the returned range to be empty.
-         *
-         * Example usage:
-         *
-         * for (auto&& doc : req.getInputDocs()) {
-         *    ... do stuff with doc
-         * }
-         */
-        virtual DocumentRange getInputDocs() const = 0;
+    /**
+     * Gets the RPC protocol used to deserialize this message. This should only be used for
+     * asserts, and not for runtime behavior changes, which should be handled with polymorphism.
+     */
+    virtual Protocol getProtocol() const = 0;
 
-        /**
-         * Gets the RPC protocol used to deserialize this message. This should only be used for
-         * asserts, and not for runtime behavior changes, which should be handled with polymorphism.
-         */
-        virtual Protocol getProtocol() const = 0;
-
-    protected:
-        RequestInterface() = default;
-    };
+protected:
+    RequestInterface() = default;
+};
 
 }  // namespace rpc
 }  // namespace mongo

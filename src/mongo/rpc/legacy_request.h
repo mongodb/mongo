@@ -36,71 +36,71 @@
 #include "mongo/rpc/request_interface.h"
 
 namespace mongo {
-    class Message;
+class Message;
 
 namespace rpc {
 
+/**
+ * An immutable view of an OP_QUERY command request. The underlying bytes are owned
+ * by a mongo::Message, which must outlive any LegacyRequest instances created from it.
+ *
+ */
+class LegacyRequest : public RequestInterface {
+public:
     /**
-     * An immutable view of an OP_QUERY command request. The underlying bytes are owned
-     * by a mongo::Message, which must outlive any LegacyRequest instances created from it.
-     *
+     * Construct a Request from a Message. Underlying message MUST outlive the Request.
+     * Required fields are parsed eagerly, inputDocs are parsed lazily.
      */
-    class LegacyRequest : public RequestInterface {
-    public:
-        /**
-         * Construct a Request from a Message. Underlying message MUST outlive the Request.
-         * Required fields are parsed eagerly, inputDocs are parsed lazily.
-         */
-        explicit LegacyRequest(const Message* message);
+    explicit LegacyRequest(const Message* message);
 
-        ~LegacyRequest() final;
+    ~LegacyRequest() final;
 
-        /**
-         * The database that the command is to be executed on.
-         */
-        StringData getDatabase() const final;
+    /**
+     * The database that the command is to be executed on.
+     */
+    StringData getDatabase() const final;
 
-        /**
-         * The name of the command to execute.
-         */
-        StringData getCommandName() const final;
+    /**
+     * The name of the command to execute.
+     */
+    StringData getCommandName() const final;
 
-        /**
-         * The metadata associated with the command request. This is information that is
-         * independent of any specific command, i.e. auditing information.
-         */
-        const BSONObj& getMetadata() const final;
+    /**
+     * The metadata associated with the command request. This is information that is
+     * independent of any specific command, i.e. auditing information.
+     */
+    const BSONObj& getMetadata() const final;
 
-        /**
-         * The arguments to the command - this is passed to the command's run() method.
-         */
-        const BSONObj& getCommandArgs() const final;
+    /**
+     * The arguments to the command - this is passed to the command's run() method.
+     */
+    const BSONObj& getCommandArgs() const final;
 
-        /**
-         * A variable number of BSON documents to pass to the command. It is valid for
-         * the returned range to be empty.
-         *
-         * Example usage:
-         *
-         * for (auto&& doc : req.getInputDocs()) {
-         *    ... do stuff with doc
-         * }
-         */
-        DocumentRange getInputDocs() const final;
+    /**
+     * A variable number of BSON documents to pass to the command. It is valid for
+     * the returned range to be empty.
+     *
+     * Example usage:
+     *
+     * for (auto&& doc : req.getInputDocs()) {
+     *    ... do stuff with doc
+     * }
+     */
+    DocumentRange getInputDocs() const final;
 
-        Protocol getProtocol() const final;
+    Protocol getProtocol() const final;
 
-    private:
-        const Message* _message;
-        // TODO: metadata will be handled in SERVER-18236
-        // for now getMetadata() is a no op
-        DbMessage _dbMessage;
-        QueryMessage _queryMessage;
-        StringData _database;
+private:
+    const Message* _message;
+    // TODO: metadata will be handled in SERVER-18236
+    // for now getMetadata() is a no op
+    DbMessage _dbMessage;
+    QueryMessage _queryMessage;
+    StringData _database;
 
-        BSONObj _upconvertedMetadata;
-        BSONObj _upconvertedCommandArgs;
-    };
+    BSONObj _upconvertedMetadata;
+    BSONObj _upconvertedCommandArgs;
+};
 
 }  // namespace rpc
 }  // namespace mongo

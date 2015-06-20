@@ -36,98 +36,98 @@
 namespace mongo {
 namespace {
 
-    TEST(CountRequest, ParseDefaults) {
-        const auto countRequestStatus =
-            CountRequest::parseFromBSON("TestDB",
-                                        BSON("count" << "TestColl" <<
-                                             "query" << BSON("a" << BSON("$lte" << 10))));
+TEST(CountRequest, ParseDefaults) {
+    const auto countRequestStatus =
+        CountRequest::parseFromBSON("TestDB",
+                                    BSON("count"
+                                         << "TestColl"
+                                         << "query" << BSON("a" << BSON("$lte" << 10))));
 
-        ASSERT_OK(countRequestStatus.getStatus());
+    ASSERT_OK(countRequestStatus.getStatus());
 
-        const CountRequest& countRequest = countRequestStatus.getValue();
+    const CountRequest& countRequest = countRequestStatus.getValue();
 
-        ASSERT_EQUALS(countRequest.getNs(), "TestDB.TestColl");
-        ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
+    ASSERT_EQUALS(countRequest.getNs(), "TestDB.TestColl");
+    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
 
-        // Defaults
-        ASSERT_EQUALS(countRequest.getLimit(), 0);
-        ASSERT_EQUALS(countRequest.getSkip(), 0);
-        ASSERT(countRequest.getHint().isEmpty());
-    }
+    // Defaults
+    ASSERT_EQUALS(countRequest.getLimit(), 0);
+    ASSERT_EQUALS(countRequest.getSkip(), 0);
+    ASSERT(countRequest.getHint().isEmpty());
+}
 
-    TEST(CountRequest, ParseComplete) {
-        const auto countRequestStatus =
-            CountRequest::parseFromBSON("TestDB",
-                                        BSON("count" << "TestColl" <<
-                                             "query" << BSON("a" << BSON("$gte" << 11)) <<
-                                             "limit" << 100 <<
-                                             "skip" << 1000 <<
-                                             "hint" << BSON("b" << 5)));
+TEST(CountRequest, ParseComplete) {
+    const auto countRequestStatus =
+        CountRequest::parseFromBSON("TestDB",
+                                    BSON("count"
+                                         << "TestColl"
+                                         << "query" << BSON("a" << BSON("$gte" << 11)) << "limit"
+                                         << 100 << "skip" << 1000 << "hint" << BSON("b" << 5)));
 
-        ASSERT_OK(countRequestStatus.getStatus());
+    ASSERT_OK(countRequestStatus.getStatus());
 
-        const CountRequest& countRequest = countRequestStatus.getValue();
+    const CountRequest& countRequest = countRequestStatus.getValue();
 
-        ASSERT_EQUALS(countRequest.getNs(), "TestDB.TestColl");
-        ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
-        ASSERT_EQUALS(countRequest.getLimit(), 100);
-        ASSERT_EQUALS(countRequest.getSkip(), 1000);
-        ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
-    }
+    ASSERT_EQUALS(countRequest.getNs(), "TestDB.TestColl");
+    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
+    ASSERT_EQUALS(countRequest.getLimit(), 100);
+    ASSERT_EQUALS(countRequest.getSkip(), 1000);
+    ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
+}
 
-    TEST(CountRequest, ParseNegativeLimit) {
-        const auto countRequestStatus =
-            CountRequest::parseFromBSON("TestDB",
-                                        BSON("count" << "TestColl" <<
-                                             "query" << BSON("a" << BSON("$gte" << 11)) <<
-                                             "limit" << -100 <<
-                                             "skip" << 1000 <<
-                                             "hint" << BSON("b" << 5)));
+TEST(CountRequest, ParseNegativeLimit) {
+    const auto countRequestStatus =
+        CountRequest::parseFromBSON("TestDB",
+                                    BSON("count"
+                                         << "TestColl"
+                                         << "query" << BSON("a" << BSON("$gte" << 11)) << "limit"
+                                         << -100 << "skip" << 1000 << "hint" << BSON("b" << 5)));
 
-        ASSERT_OK(countRequestStatus.getStatus());
+    ASSERT_OK(countRequestStatus.getStatus());
 
-        const CountRequest& countRequest = countRequestStatus.getValue();
+    const CountRequest& countRequest = countRequestStatus.getValue();
 
-        ASSERT_EQUALS(countRequest.getNs(), "TestDB.TestColl");
-        ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
-        ASSERT_EQUALS(countRequest.getLimit(), 100);
-        ASSERT_EQUALS(countRequest.getSkip(), 1000);
-        ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
-    }
+    ASSERT_EQUALS(countRequest.getNs(), "TestDB.TestColl");
+    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
+    ASSERT_EQUALS(countRequest.getLimit(), 100);
+    ASSERT_EQUALS(countRequest.getSkip(), 1000);
+    ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
+}
 
-    TEST(CountRequest, FailParseMissingNS) {
-        const auto countRequestStatus =
-            CountRequest::parseFromBSON("TestDB",
-                                        BSON("query" << BSON("a" << BSON("$gte" << 11))));
+TEST(CountRequest, FailParseMissingNS) {
+    const auto countRequestStatus =
+        CountRequest::parseFromBSON("TestDB", BSON("query" << BSON("a" << BSON("$gte" << 11))));
 
-        ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::BadValue);
-    }
+    ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::BadValue);
+}
 
-    TEST(CountRequest, FailParseBadSkipValue) {
-        const auto countRequestStatus =
-            CountRequest::parseFromBSON("TestDB",
-                                        BSON("count" << "TestColl" <<
-                                             "query" << BSON("a" << BSON("$gte" << 11)) <<
-                                             "skip" << -1000));
+TEST(CountRequest, FailParseBadSkipValue) {
+    const auto countRequestStatus =
+        CountRequest::parseFromBSON("TestDB",
+                                    BSON("count"
+                                         << "TestColl"
+                                         << "query" << BSON("a" << BSON("$gte" << 11)) << "skip"
+                                         << -1000));
 
-        ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::BadValue);
-    }
+    ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::BadValue);
+}
 
-    TEST(CountRequest, ToBSON) {
-        CountRequest countRequest("TestDB.TestColl", BSON("a" << BSON("$gte" << 11)));
-        countRequest.setLimit(100);
-        countRequest.setSkip(1000);
-        countRequest.setHint(BSON("b" << 5));
+TEST(CountRequest, ToBSON) {
+    CountRequest countRequest("TestDB.TestColl", BSON("a" << BSON("$gte" << 11)));
+    countRequest.setLimit(100);
+    countRequest.setSkip(1000);
+    countRequest.setHint(BSON("b" << 5));
 
-        BSONObj actualObj = countRequest.toBSON();
-        BSONObj expectedObj(fromjson("{ count : 'TestDB.TestColl',"
-                                     "  query : { a : { '$gte' : 11 } },"
-                                     "  limit : 100,"
-                                     "  skip : 1000,"
-                                     "  hint : { b : 5 } }"));
+    BSONObj actualObj = countRequest.toBSON();
+    BSONObj expectedObj(fromjson(
+        "{ count : 'TestDB.TestColl',"
+        "  query : { a : { '$gte' : 11 } },"
+        "  limit : 100,"
+        "  skip : 1000,"
+        "  hint : { b : 5 } }"));
 
-        ASSERT_EQUALS(actualObj, expectedObj);
-    }
+    ASSERT_EQUALS(actualObj, expectedObj);
+}
 
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

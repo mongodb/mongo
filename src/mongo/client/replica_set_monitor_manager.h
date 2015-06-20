@@ -37,54 +37,55 @@
 
 namespace mongo {
 
-    class BSONObjBuilder;
-    class ConnectionString;
-    class ReplicaSetMonitor;
+class BSONObjBuilder;
+class ConnectionString;
+class ReplicaSetMonitor;
+
+/**
+ * Manages the lifetime of a set of replica set monitors.
+ */
+class ReplicaSetMonitorManager {
+    MONGO_DISALLOW_COPYING(ReplicaSetMonitorManager);
+
+public:
+    ReplicaSetMonitorManager();
+    ~ReplicaSetMonitorManager();
 
     /**
-     * Manages the lifetime of a set of replica set monitors.
+     * Create or retrieve a monitor for a particular replica set. The getter method returns
+     * nullptr if there is no monitor registered for the particular replica set.
      */
-    class ReplicaSetMonitorManager {
-        MONGO_DISALLOW_COPYING(ReplicaSetMonitorManager);
-    public:
-        ReplicaSetMonitorManager();
-        ~ReplicaSetMonitorManager();
+    std::shared_ptr<ReplicaSetMonitor> getMonitor(StringData setName);
+    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const ConnectionString& connStr);
 
-        /**
-         * Create or retrieve a monitor for a particular replica set. The getter method returns
-         * nullptr if there is no monitor registered for the particular replica set.
-         */
-        std::shared_ptr<ReplicaSetMonitor> getMonitor(StringData setName);
-        std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const ConnectionString& connStr);
+    /**
+     * Retrieves the names of all sets tracked by this manager.
+     */
+    std::vector<std::string> getAllSetNames();
 
-        /**
-         * Retrieves the names of all sets tracked by this manager.
-         */
-        std::vector<std::string> getAllSetNames();
+    /**
+     * Removes the specified replica set monitor from being tracked, if it exists. Otherwise
+     * does nothing. Once all shared_ptr references to that monitor are released, the monitor
+     * will be destroyed and will no longer be tracked.
+     */
+    void removeMonitor(StringData setName);
 
-        /**
-         * Removes the specified replica set monitor from being tracked, if it exists. Otherwise
-         * does nothing. Once all shared_ptr references to that monitor are released, the monitor
-         * will be destroyed and will no longer be tracked.
-         */
-        void removeMonitor(StringData setName);
+    /**
+     * Removes and destroys all replica set monitors.
+     */
+    void removeAllMonitors();
 
-        /**
-         * Removes and destroys all replica set monitors.
-         */
-        void removeAllMonitors();
+    /**
+     * Reports information about the replica sets tracked by us, for diagnostic purposes.
+     */
+    void report(BSONObjBuilder* builder);
 
-        /**
-         * Reports information about the replica sets tracked by us, for diagnostic purposes.
-         */
-        void report(BSONObjBuilder* builder);
+private:
+    using ReplicaSetMonitorsMap = StringMap<std::shared_ptr<ReplicaSetMonitor>>;
 
-    private:
-        using ReplicaSetMonitorsMap = StringMap<std::shared_ptr<ReplicaSetMonitor>>;
+    // Protects access to the replica set monitors
+    stdx::mutex _mutex;
+    ReplicaSetMonitorsMap _monitors;
+};
 
-        // Protects access to the replica set monitors
-        stdx::mutex _mutex;
-        ReplicaSetMonitorsMap _monitors;
-    };
-
-} // namespace mongo
+}  // namespace mongo

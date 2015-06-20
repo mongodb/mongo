@@ -36,42 +36,39 @@
 
 namespace mongo {
 
-    static const auto oneDay = stdx::chrono::hours(24);
+static const auto oneDay = stdx::chrono::hours(24);
 
-    CertificateExpirationMonitor::CertificateExpirationMonitor(Date_t date)
-        : _certExpiration(date)
-        , _lastCheckTime(Date_t::now()) {
+CertificateExpirationMonitor::CertificateExpirationMonitor(Date_t date)
+    : _certExpiration(date), _lastCheckTime(Date_t::now()) {}
+
+std::string CertificateExpirationMonitor::taskName() const {
+    return "CertificateExpirationMonitor";
+}
+
+void CertificateExpirationMonitor::taskDoWork() {
+    const Milliseconds timeSinceLastCheck = Date_t::now() - _lastCheckTime;
+
+    if (timeSinceLastCheck < oneDay)
+        return;
+
+    const Date_t now = Date_t::now();
+    _lastCheckTime = now;
+
+    if (_certExpiration <= now) {
+        // The certificate has expired.
+        warning() << "Server certificate is now invalid. It expired on "
+                  << dateToISOStringUTC(_certExpiration);
+        return;
     }
 
-    std::string CertificateExpirationMonitor::taskName() const {
-        return "CertificateExpirationMonitor";
+    const auto remainingValidDuration = _certExpiration - now;
+
+    if (remainingValidDuration <= 30 * oneDay) {
+        // The certificate will expire in the next 30 days.
+        warning() << "Server certificate will expire on " << dateToISOStringUTC(_certExpiration)
+                  << " in " << durationCount<stdx::chrono::hours>(remainingValidDuration) / 24
+                  << " days.";
     }
-
-    void CertificateExpirationMonitor::taskDoWork() {
-        const Milliseconds timeSinceLastCheck = Date_t::now() - _lastCheckTime;
-
-        if (timeSinceLastCheck < oneDay)
-            return;
-
-        const Date_t now = Date_t::now();
-        _lastCheckTime = now;
-
-        if (_certExpiration <= now) {
-            // The certificate has expired.
-            warning() << "Server certificate is now invalid. It expired on "
-                      << dateToISOStringUTC(_certExpiration);
-            return;
-        }
-
-        const auto remainingValidDuration = _certExpiration - now;
-
-        if (remainingValidDuration <= 30 * oneDay) {
-            // The certificate will expire in the next 30 days.
-            warning() << "Server certificate will expire on "
-                      << dateToISOStringUTC(_certExpiration) << " in "
-                      << durationCount<stdx::chrono::hours>(remainingValidDuration) / 24
-                      << " days.";
-        }
-    }
+}
 
 }  // namespace mongo

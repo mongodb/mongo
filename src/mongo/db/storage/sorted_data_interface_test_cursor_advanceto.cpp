@@ -37,614 +37,620 @@
 
 namespace mongo {
 
-    // Insert multiple single-field keys and advance to each of them
-    // using a forward cursor by specifying their exact key. When
-    // advanceTo() is called on a duplicate key, the cursor is
-    // positioned at the first occurrence of that key in ascending
-    // order by RecordId.
-    TEST( SortedDataInterface, AdvanceTo ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+// Insert multiple single-field keys and advance to each of them
+// using a forward cursor by specifying their exact key. When
+// advanceTo() is called on a duplicate key, the cursor is
+// positioned at the first occurrence of that key in ascending
+// order by RecordId.
+TEST(SortedDataInterface, AdvanceTo) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc2, true /* allow duplicates */ ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc3, true /* allow duplicates */ ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc4, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc5, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 5, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
-
-            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.keyPrefix = key1;
-            seekPoint.prefixLen = 1;
-            seekPoint.prefixExclusive = false;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
-
-            seekPoint.keyPrefix = key2;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc4));
-
-            seekPoint.keyPrefix = key3;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
-
-            seekPoint.keyPrefix = key4;
-            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc2, true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc3, true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc4, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc5, true));
+            uow.commit();
         }
     }
 
-    // Insert multiple single-field keys and advance to each of them
-    // using a reverse cursor by specifying their exact key. When
-    // advanceTo() is called on a duplicate key, the cursor is
-    // positioned at the first occurrence of that key in descending
-    // order by RecordId (last occurrence in index order).
-    TEST( SortedDataInterface, AdvanceToReversed ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(5, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+
+        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.keyPrefix = key1;
+        seekPoint.prefixLen = 1;
+        seekPoint.prefixExclusive = false;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+
+        seekPoint.keyPrefix = key2;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc4));
+
+        seekPoint.keyPrefix = key3;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
+
+        seekPoint.keyPrefix = key4;
+        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+    }
+}
+
+// Insert multiple single-field keys and advance to each of them
+// using a reverse cursor by specifying their exact key. When
+// advanceTo() is called on a duplicate key, the cursor is
+// positioned at the first occurrence of that key in descending
+// order by RecordId (last occurrence in index order).
+TEST(SortedDataInterface, AdvanceToReversed) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc3, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc4, true /* allow duplicates */ ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc5, true /* allow duplicates */ ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 5, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
-
-            ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc5));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.keyPrefix = key3;
-            seekPoint.prefixLen = 1;
-            seekPoint.prefixExclusive = false;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
-
-            seekPoint.keyPrefix = key2;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
-
-            seekPoint.keyPrefix = key1;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
-
-            seekPoint.keyPrefix = key0;
-            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc3, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc4, true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc5, true /* allow duplicates */));
+            uow.commit();
         }
     }
 
-    // Insert two single-field keys, then seek a forward cursor to the larger one then seek behind
-    // the smaller one.  Ending position is on the smaller one since a seek describes where to go
-    // and should not be effected by current position.
-    TEST( SortedDataInterface, AdvanceToKeyBeforeCursorPosition ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(5, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), false));
+
+        ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc5));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.keyPrefix = key3;
+        seekPoint.prefixLen = 1;
+        seekPoint.prefixExclusive = false;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
+
+        seekPoint.keyPrefix = key2;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
+
+        seekPoint.keyPrefix = key1;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+
+        seekPoint.keyPrefix = key0;
+        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+    }
+}
+
+// Insert two single-field keys, then seek a forward cursor to the larger one then seek behind
+// the smaller one.  Ending position is on the smaller one since a seek describes where to go
+// and should not be effected by current position.
+TEST(SortedDataInterface, AdvanceToKeyBeforeCursorPosition) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
-
-            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.keyPrefix = key0;
-            seekPoint.prefixLen = 1;
-            seekPoint.prefixExclusive = false;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
-
-            seekPoint.prefixExclusive = true;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, true));
+            uow.commit();
         }
     }
 
-    // Insert two single-field keys, then seek a reverse cursor to the smaller one then seek behind
-    // the larger one.  Ending position is on the larger one since a seek describes where to go
-    // and should not be effected by current position.
-    TEST( SortedDataInterface, AdvanceToKeyAfterCursorPositionReversed ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+
+        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.keyPrefix = key0;
+        seekPoint.prefixLen = 1;
+        seekPoint.prefixExclusive = false;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+
+        seekPoint.prefixExclusive = true;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+    }
+}
+
+// Insert two single-field keys, then seek a reverse cursor to the smaller one then seek behind
+// the larger one.  Ending position is on the larger one since a seek describes where to go
+// and should not be effected by current position.
+TEST(SortedDataInterface, AdvanceToKeyAfterCursorPositionReversed) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
-
-            ASSERT_EQ(cursor->seek(key2, true), IndexKeyEntry(key2, loc2));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.keyPrefix = key3;
-            seekPoint.prefixLen = 1;
-            seekPoint.prefixExclusive = false;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
-
-            seekPoint.prefixExclusive = true;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, true));
+            uow.commit();
         }
     }
 
-    // Insert a single-field key and advance to EOF using a forward cursor
-    // by specifying that exact key. When seek() is called with the key
-    // where the cursor is positioned (and it is the first entry for that key),
-    // the cursor should remain at its current position. An exclusive seek will
-    // position the cursor on the next position, which may be EOF.
-    TEST( SortedDataInterface, AdvanceToKeyAtCursorPosition ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), false));
+
+        ASSERT_EQ(cursor->seek(key2, true), IndexKeyEntry(key2, loc2));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.keyPrefix = key3;
+        seekPoint.prefixLen = 1;
+        seekPoint.prefixExclusive = false;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
+
+        seekPoint.prefixExclusive = true;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
+    }
+}
+
+// Insert a single-field key and advance to EOF using a forward cursor
+// by specifying that exact key. When seek() is called with the key
+// where the cursor is positioned (and it is the first entry for that key),
+// the cursor should remain at its current position. An exclusive seek will
+// position the cursor on the next position, which may be EOF.
+TEST(SortedDataInterface, AdvanceToKeyAtCursorPosition) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
-
-            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.keyPrefix = key1;
-            seekPoint.prefixLen = 1;
-            seekPoint.prefixExclusive = false;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
-
-            seekPoint.prefixExclusive = true;
-            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            uow.commit();
         }
     }
 
-    // Insert a single-field key and advance to EOF using a reverse cursor
-    // by specifying that exact key. When seek() is called with the key
-    // where the cursor is positioned (and it is the first entry for that key),
-    // the cursor should remain at its current position. An exclusive seek will
-    // position the cursor on the next position, which may be EOF.
-    TEST( SortedDataInterface, AdvanceToKeyAtCursorPositionReversed ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+
+        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.keyPrefix = key1;
+        seekPoint.prefixLen = 1;
+        seekPoint.prefixExclusive = false;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+
+        seekPoint.prefixExclusive = true;
+        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+    }
+}
+
+// Insert a single-field key and advance to EOF using a reverse cursor
+// by specifying that exact key. When seek() is called with the key
+// where the cursor is positioned (and it is the first entry for that key),
+// the cursor should remain at its current position. An exclusive seek will
+// position the cursor on the next position, which may be EOF.
+TEST(SortedDataInterface, AdvanceToKeyAtCursorPositionReversed) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
-
-            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.keyPrefix = key1;
-            seekPoint.prefixLen = 1;
-            seekPoint.prefixExclusive = false;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
-
-            seekPoint.prefixExclusive = true;
-            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            uow.commit();
         }
     }
 
-    // Insert multiple single-field keys and advance to each of them using
-    // a forward cursor by specifying a key that comes immediately before.
-    // When advanceTo() is called in non-inclusive mode, the cursor is
-    // positioned at the key that comes after the one specified.
-    TEST( SortedDataInterface, AdvanceToExclusive ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), false));
+
+        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.keyPrefix = key1;
+        seekPoint.prefixLen = 1;
+        seekPoint.prefixExclusive = false;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+
+        seekPoint.prefixExclusive = true;
+        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+    }
+}
+
+// Insert multiple single-field keys and advance to each of them using
+// a forward cursor by specifying a key that comes immediately before.
+// When advanceTo() is called in non-inclusive mode, the cursor is
+// positioned at the key that comes after the one specified.
+TEST(SortedDataInterface, AdvanceToExclusive) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc2, true /* allow duplicates */ ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc3, true /* allow duplicates */ ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc4, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc5, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 5, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
-
-            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.keyPrefix = key1;
-            seekPoint.prefixLen = 1;
-            seekPoint.prefixExclusive = true;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc4));
-
-            seekPoint.keyPrefix = key2;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
-
-            seekPoint.keyPrefix = key3;
-            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
-
-            seekPoint.keyPrefix = key4;
-            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc2, true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc3, true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc4, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc5, true));
+            uow.commit();
         }
     }
 
-    // Insert multiple single-field keys and advance to each of them using
-    // a reverse cursor by specifying a key that comes immediately after.
-    // When advanceTo() is called in non-inclusive mode, the cursor is
-    // positioned at the key that comes before the one specified.
-    TEST( SortedDataInterface, AdvanceToExclusiveReversed ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(5, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+
+        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.keyPrefix = key1;
+        seekPoint.prefixLen = 1;
+        seekPoint.prefixExclusive = true;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc4));
+
+        seekPoint.keyPrefix = key2;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
+
+        seekPoint.keyPrefix = key3;
+        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+
+        seekPoint.keyPrefix = key4;
+        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+    }
+}
+
+// Insert multiple single-field keys and advance to each of them using
+// a reverse cursor by specifying a key that comes immediately after.
+// When advanceTo() is called in non-inclusive mode, the cursor is
+// positioned at the key that comes before the one specified.
+TEST(SortedDataInterface, AdvanceToExclusiveReversed) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc3, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc4, true /* allow duplicates */ ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc5, true /* allow duplicates */ ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 5, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
-
-            ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc5));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.keyPrefix = key3;
-            seekPoint.prefixLen = 1;
-            seekPoint.prefixExclusive = true;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
-
-            seekPoint.keyPrefix = key2;
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
-
-            seekPoint.keyPrefix = key1;
-            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
-
-            seekPoint.keyPrefix = key0;
-            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc3, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc4, true /* allow duplicates */));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc5, true /* allow duplicates */));
+            uow.commit();
         }
     }
 
-    // Insert multiple, non-consecutive, single-field keys and advance to
-    // each of them using a forward cursor by specifying a key between their
-    // exact key and the current position of the cursor.
-    TEST( SortedDataInterface, AdvanceToIndirect ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(5, sorted->numEntries(opCtx.get()));
+    }
 
-        BSONObj unusedKey = key6; // larger than any inserted key
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), false));
 
+        ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc5));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.keyPrefix = key3;
+        seekPoint.prefixLen = 1;
+        seekPoint.prefixExclusive = true;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
+
+        seekPoint.keyPrefix = key2;
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+
+        seekPoint.keyPrefix = key1;
+        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+
+        seekPoint.keyPrefix = key0;
+        ASSERT_EQ(cursor->seek(seekPoint), boost::none);
+    }
+}
+
+// Insert multiple, non-consecutive, single-field keys and advance to
+// each of them using a forward cursor by specifying a key between their
+// exact key and the current position of the cursor.
+TEST(SortedDataInterface, AdvanceToIndirect) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    BSONObj unusedKey = key6;  // larger than any inserted key
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
-
-            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.prefixLen = 0;
-            BSONElement suffix0;
-            seekPoint.keySuffix = {&suffix0};
-            seekPoint.suffixInclusive = {true};
-
-            suffix0 = key2.firstElement();
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
-
-            suffix0 = key4.firstElement();
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc2, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key5, loc3, true));
+            uow.commit();
         }
     }
 
-    // Insert multiple, non-consecutive, single-field keys and advance to
-    // each of them using a reverse cursor by specifying a key between their
-    // exact key and the current position of the cursor.
-    TEST( SortedDataInterface, AdvanceToIndirectReversed ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
+    }
 
-        BSONObj unusedKey = key0; // smaller than any inserted key
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
 
+        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.prefixLen = 0;
+        BSONElement suffix0;
+        seekPoint.keySuffix = {&suffix0};
+        seekPoint.suffixInclusive = {true};
+
+        suffix0 = key2.firstElement();
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
+
+        suffix0 = key4.firstElement();
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
+    }
+}
+
+// Insert multiple, non-consecutive, single-field keys and advance to
+// each of them using a reverse cursor by specifying a key between their
+// exact key and the current position of the cursor.
+TEST(SortedDataInterface, AdvanceToIndirectReversed) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    BSONObj unusedKey = key0;  // smaller than any inserted key
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
-
-            ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.prefixLen = 0;
-            BSONElement suffix0;
-            seekPoint.keySuffix = {&suffix0};
-            seekPoint.suffixInclusive = {true};
-
-            suffix0 = key4.firstElement();
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
-
-            suffix0 = key2.firstElement();
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc2, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key5, loc3, true));
+            uow.commit();
         }
     }
 
-    // Insert multiple, non-consecutive, single-field keys and advance to
-    // each of them using a forward cursor by specifying a key between their
-    // exact key and the current position of the cursor. When advanceTo()
-    // is called in non-inclusive mode, the cursor is positioned at the key
-    // that comes after the one specified.
-    TEST( SortedDataInterface, AdvanceToIndirectExclusive ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
+    }
 
-        BSONObj unusedKey = key6; // larger than any inserted key
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), false));
 
+        ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.prefixLen = 0;
+        BSONElement suffix0;
+        seekPoint.keySuffix = {&suffix0};
+        seekPoint.suffixInclusive = {true};
+
+        suffix0 = key4.firstElement();
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
+
+        suffix0 = key2.firstElement();
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+    }
+}
+
+// Insert multiple, non-consecutive, single-field keys and advance to
+// each of them using a forward cursor by specifying a key between their
+// exact key and the current position of the cursor. When advanceTo()
+// is called in non-inclusive mode, the cursor is positioned at the key
+// that comes after the one specified.
+TEST(SortedDataInterface, AdvanceToIndirectExclusive) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    BSONObj unusedKey = key6;  // larger than any inserted key
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
-
-            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.prefixLen = 0;
-            BSONElement suffix0;
-            seekPoint.keySuffix = {&suffix0};
-            seekPoint.suffixInclusive = {false};
-
-            suffix0 = key2.firstElement();
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
-
-            suffix0 = key4.firstElement();
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
-
-            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
-
-            suffix0 = key3.firstElement();
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc2, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key5, loc3, true));
+            uow.commit();
         }
     }
 
-    // Insert multiple, non-consecutive, single-field keys and advance to
-    // each of them using a reverse cursor by specifying a key between their
-    // exact key and the current position of the cursor. When advanceTo()
-    // is called in non-inclusive mode, the cursor is positioned at the key
-    // that comes before the one specified.
-    TEST( SortedDataInterface, AdvanceToIndirectExclusiveReversed ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
+    }
 
-        BSONObj unusedKey = key0; // smaller than any inserted key
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
 
+        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.prefixLen = 0;
+        BSONElement suffix0;
+        seekPoint.keySuffix = {&suffix0};
+        seekPoint.suffixInclusive = {false};
+
+        suffix0 = key2.firstElement();
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
+
+        suffix0 = key4.firstElement();
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
+
+        ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+
+        suffix0 = key3.firstElement();
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
+    }
+}
+
+// Insert multiple, non-consecutive, single-field keys and advance to
+// each of them using a reverse cursor by specifying a key between their
+// exact key and the current position of the cursor. When advanceTo()
+// is called in non-inclusive mode, the cursor is positioned at the key
+// that comes before the one specified.
+TEST(SortedDataInterface, AdvanceToIndirectExclusiveReversed) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    BSONObj unusedKey = key0;  // smaller than any inserted key
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
-
-            ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
-
-            IndexSeekPoint seekPoint;
-            seekPoint.prefixLen = 0;
-            BSONElement suffix0;
-            seekPoint.keySuffix = {&suffix0};
-            seekPoint.suffixInclusive = {false};
-
-            suffix0 = key4.firstElement();
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
-
-            suffix0 = key2.firstElement();
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
-
-            ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
-
-            suffix0 = key3.firstElement();
-            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc2, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key5, loc3, true));
+            uow.commit();
         }
     }
 
-} // namespace mongo
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), false));
+
+        ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
+
+        IndexSeekPoint seekPoint;
+        seekPoint.prefixLen = 0;
+        BSONElement suffix0;
+        seekPoint.keySuffix = {&suffix0};
+        seekPoint.suffixInclusive = {false};
+
+        suffix0 = key4.firstElement();
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
+
+        suffix0 = key2.firstElement();
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+
+        ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
+
+        suffix0 = key3.firstElement();
+        ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
+    }
+}
+
+}  // namespace mongo

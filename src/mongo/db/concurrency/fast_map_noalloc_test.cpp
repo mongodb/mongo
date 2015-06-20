@@ -36,127 +36,125 @@
 
 namespace mongo {
 
-    struct TestStruct {
-
-        void initNew(int newId, const std::string& newValue) {
-            id = newId;
-            value = newValue;
-        }
-
-        int id;
-        std::string value;
-    };
-
-    typedef class FastMapNoAlloc<ResourceId, TestStruct, 6> TestFastMapNoAlloc;
-
-
-    TEST(FastMapNoAlloc, Empty) {
-        TestFastMapNoAlloc map;
-        ASSERT(map.empty());
-
-        TestFastMapNoAlloc::Iterator it = map.begin();
-        ASSERT(it.finished());
+struct TestStruct {
+    void initNew(int newId, const std::string& newValue) {
+        id = newId;
+        value = newValue;
     }
 
-    TEST(FastMapNoAlloc, NotEmpty) {
-        TestFastMapNoAlloc map;
+    int id;
+    std::string value;
+};
 
-        map.insert(ResourceId(RESOURCE_COLLECTION, 1))->initNew(101, "Item101");
-        map.insert(ResourceId(RESOURCE_COLLECTION, 2))->initNew(102, "Item102");
-        ASSERT(!map.empty());
+typedef class FastMapNoAlloc<ResourceId, TestStruct, 6> TestFastMapNoAlloc;
 
-        TestFastMapNoAlloc::Iterator it = map.begin();
-        ASSERT(!it.finished());
-        ASSERT(!!it);
 
-        ASSERT(it->id == 101);
-        ASSERT(it->value == "Item101");
+TEST(FastMapNoAlloc, Empty) {
+    TestFastMapNoAlloc map;
+    ASSERT(map.empty());
 
-        it.next();
-        ASSERT(!it.finished());
-        ASSERT(!!it);
+    TestFastMapNoAlloc::Iterator it = map.begin();
+    ASSERT(it.finished());
+}
 
-        ASSERT(it->id == 102);
-        ASSERT(it->value == "Item102");
+TEST(FastMapNoAlloc, NotEmpty) {
+    TestFastMapNoAlloc map;
 
-        // We are at the last element
-        it.next();
-        ASSERT(it.finished());
-        ASSERT(!it);
+    map.insert(ResourceId(RESOURCE_COLLECTION, 1))->initNew(101, "Item101");
+    map.insert(ResourceId(RESOURCE_COLLECTION, 2))->initNew(102, "Item102");
+    ASSERT(!map.empty());
+
+    TestFastMapNoAlloc::Iterator it = map.begin();
+    ASSERT(!it.finished());
+    ASSERT(!!it);
+
+    ASSERT(it->id == 101);
+    ASSERT(it->value == "Item101");
+
+    it.next();
+    ASSERT(!it.finished());
+    ASSERT(!!it);
+
+    ASSERT(it->id == 102);
+    ASSERT(it->value == "Item102");
+
+    // We are at the last element
+    it.next();
+    ASSERT(it.finished());
+    ASSERT(!it);
+}
+
+TEST(FastMapNoAlloc, FindNonExisting) {
+    TestFastMapNoAlloc map;
+
+    ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 0)));
+}
+
+TEST(FastMapNoAlloc, FindAndRemove) {
+    TestFastMapNoAlloc map;
+
+    for (int i = 0; i < 6; i++) {
+        map.insert(ResourceId(RESOURCE_COLLECTION, i))
+            ->initNew(i, "Item" + boost::lexical_cast<std::string>(i));
     }
 
-    TEST(FastMapNoAlloc, FindNonExisting) {
-        TestFastMapNoAlloc map;
+    for (int i = 0; i < 6; i++) {
+        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, i)).finished());
 
-        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 0)));
+        ASSERT_EQUALS(i, map.find(ResourceId(RESOURCE_COLLECTION, i))->id);
+
+        ASSERT_EQUALS("Item" + boost::lexical_cast<std::string>(i),
+                      map.find(ResourceId(RESOURCE_COLLECTION, i))->value);
     }
 
-    TEST(FastMapNoAlloc, FindAndRemove) {
-        TestFastMapNoAlloc map;
+    // Remove a middle entry
+    map.find(ResourceId(RESOURCE_COLLECTION, 2)).remove();
+    ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 2)));
 
-        for (int i = 0; i < 6; i++) {
-            map.insert(ResourceId(RESOURCE_COLLECTION, i))->initNew(
-                                                i, "Item" + boost::lexical_cast<std::string>(i));
-        }
+    // Remove entry after first
+    map.find(ResourceId(RESOURCE_COLLECTION, 1)).remove();
+    ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 1)));
 
-        for (int i = 0; i < 6; i++) {
-            ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, i)).finished());
+    // Remove entry before last
+    map.find(ResourceId(RESOURCE_COLLECTION, 4)).remove();
+    ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 4)));
 
-            ASSERT_EQUALS(i, map.find(ResourceId(RESOURCE_COLLECTION, i))->id);
+    // Remove first entry
+    map.find(ResourceId(RESOURCE_COLLECTION, 0)).remove();
+    ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 0)));
 
-            ASSERT_EQUALS("Item" + boost::lexical_cast<std::string>(i),
-                          map.find(ResourceId(RESOURCE_COLLECTION, i))->value);
-        }
+    // Remove last entry
+    map.find(ResourceId(RESOURCE_COLLECTION, 5)).remove();
+    ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 5)));
 
-        // Remove a middle entry
-        map.find(ResourceId(RESOURCE_COLLECTION, 2)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 2)));
+    // Remove final entry
+    map.find(ResourceId(RESOURCE_COLLECTION, 3)).remove();
+    ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 3)));
+}
 
-        // Remove entry after first
-        map.find(ResourceId(RESOURCE_COLLECTION, 1)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 1)));
+TEST(FastMapNoAlloc, RemoveAll) {
+    TestFastMapNoAlloc map;
+    unordered_map<ResourceId, TestStruct> checkMap;
 
-        // Remove entry before last
-        map.find(ResourceId(RESOURCE_COLLECTION, 4)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 4)));
+    for (int i = 1; i <= 6; i++) {
+        map.insert(ResourceId(RESOURCE_COLLECTION, i))
+            ->initNew(i, "Item" + boost::lexical_cast<std::string>(i));
 
-        // Remove first entry
-        map.find(ResourceId(RESOURCE_COLLECTION, 0)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 0)));
-
-        // Remove last entry
-        map.find(ResourceId(RESOURCE_COLLECTION, 5)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 5)));
-
-        // Remove final entry
-        map.find(ResourceId(RESOURCE_COLLECTION, 3)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 3)));
+        checkMap[ResourceId(RESOURCE_COLLECTION, i)].initNew(
+            i, "Item" + boost::lexical_cast<std::string>(i));
     }
 
-    TEST(FastMapNoAlloc, RemoveAll) {
-        TestFastMapNoAlloc map;
-        unordered_map<ResourceId, TestStruct> checkMap;
+    TestFastMapNoAlloc::Iterator it = map.begin();
+    while (!it.finished()) {
+        ASSERT_EQUALS(it->id, checkMap[it.key()].id);
+        ASSERT_EQUALS("Item" + boost::lexical_cast<std::string>(it->id), checkMap[it.key()].value);
 
-        for (int i = 1; i <= 6; i++) {
-            map.insert(ResourceId(RESOURCE_COLLECTION, i))->initNew(
-                                                i, "Item" + boost::lexical_cast<std::string>(i));
-
-            checkMap[ResourceId(RESOURCE_COLLECTION, i)].initNew(
-                                                i, "Item" + boost::lexical_cast<std::string>(i));
-        }
-
-        TestFastMapNoAlloc::Iterator it = map.begin();
-        while (!it.finished()) {
-            ASSERT_EQUALS(it->id, checkMap[it.key()].id);
-            ASSERT_EQUALS(
-                "Item" + boost::lexical_cast<std::string>(it->id), checkMap[it.key()].value);
-
-            checkMap.erase(it.key());
-            it.remove();
-        }
-
-        ASSERT(map.empty());
-        ASSERT(checkMap.empty());
+        checkMap.erase(it.key());
+        it.remove();
     }
 
-} // namespace mongo
+    ASSERT(map.empty());
+    ASSERT(checkMap.empty());
+}
+
+}  // namespace mongo

@@ -35,43 +35,42 @@
 
 namespace mongo {
 
-    /**
-     * Similar to static_cast, but in debug builds uses RTTI to confirm that the cast
-     * is legal at runtime.
-     */
-    template<bool>
-    struct checked_cast_impl;
+/**
+ * Similar to static_cast, but in debug builds uses RTTI to confirm that the cast
+ * is legal at runtime.
+ */
+template <bool>
+struct checked_cast_impl;
 
-    template<>
-    struct checked_cast_impl<false> {
-        template<typename T, typename U>
-        static T cast(const U& u) {
-            return static_cast<T>(u);
+template <>
+struct checked_cast_impl<false> {
+    template <typename T, typename U>
+    static T cast(const U& u) {
+        return static_cast<T>(u);
+    }
+};
+
+template <>
+struct checked_cast_impl<true> {
+    template <typename T, typename U>
+    static T cast(U* u) {
+        if (!u) {
+            return NULL;
         }
-    };
+        T t = dynamic_cast<T>(u);
+        invariant(t);
+        return t;
+    }
 
-    template<>
-    struct checked_cast_impl<true> {
-        template<typename T, typename U>
-        static T cast(U* u) {
-            if (!u) {
-                return NULL;
-            }
-            T t = dynamic_cast<T>(u);
-            invariant(t);
-            return t;
-        }
+    template <typename T, typename U>
+    static T cast(const U& u) {
+        return dynamic_cast<T>(u);
+    }
+};
 
-        template<typename T, typename U>
-        static T cast(const U& u) {
-            return dynamic_cast<T>(u);
-        }
+template <typename T, typename U>
+T checked_cast(const U& u) {
+    return checked_cast_impl<kDebugBuild>::cast<T>(u);
+};
 
-    };
-
-    template<typename T, typename U>
-    T checked_cast(const U& u) {
-        return checked_cast_impl<kDebugBuild>::cast<T>(u);
-    };
-
-} // namespace mongo
+}  // namespace mongo

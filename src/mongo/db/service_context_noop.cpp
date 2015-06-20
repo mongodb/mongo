@@ -36,60 +36,60 @@
 
 namespace mongo {
 
-    StorageEngine* ServiceContextNoop::getGlobalStorageEngine() {
-        return NULL;
-    }
+StorageEngine* ServiceContextNoop::getGlobalStorageEngine() {
+    return NULL;
+}
 
-    void ServiceContextNoop::initializeGlobalStorageEngine() {
-    }
+void ServiceContextNoop::initializeGlobalStorageEngine() {}
 
-    void ServiceContextNoop::shutdownGlobalStorageEngineCleanly() {
-    }
+void ServiceContextNoop::shutdownGlobalStorageEngineCleanly() {}
 
-    void ServiceContextNoop::registerStorageEngine(const std::string& name,
-                                                   const StorageEngine::Factory* factory) {
-        // Takes ownership of 'factory' and deletes it because we don't need it.
-        delete factory;
-    }
+void ServiceContextNoop::registerStorageEngine(const std::string& name,
+                                               const StorageEngine::Factory* factory) {
+    // Takes ownership of 'factory' and deletes it because we don't need it.
+    delete factory;
+}
 
-    bool ServiceContextNoop::isRegisteredStorageEngine(const std::string& name) {
-        return false;
-    }
+bool ServiceContextNoop::isRegisteredStorageEngine(const std::string& name) {
+    return false;
+}
 
-    StorageFactoriesIterator* ServiceContextNoop::makeStorageFactoriesIterator() {
-        class EmptySFI : public StorageFactoriesIterator {
-        public:
-            virtual bool more() const { return false; }
-            virtual const StorageEngine::Factory* next() { invariant(false); }
-        };
-        return new EmptySFI();
-    }
+StorageFactoriesIterator* ServiceContextNoop::makeStorageFactoriesIterator() {
+    class EmptySFI : public StorageFactoriesIterator {
+    public:
+        virtual bool more() const {
+            return false;
+        }
+        virtual const StorageEngine::Factory* next() {
+            invariant(false);
+        }
+    };
+    return new EmptySFI();
+}
 
-    void ServiceContextNoop::setKillAllOperations() { }
+void ServiceContextNoop::setKillAllOperations() {}
 
-    void ServiceContextNoop::unsetKillAllOperations() { }
+void ServiceContextNoop::unsetKillAllOperations() {}
 
-    bool ServiceContextNoop::getKillAllOperations() {
-        return false;
-    }
+bool ServiceContextNoop::getKillAllOperations() {
+    return false;
+}
 
-    bool ServiceContextNoop::killOperation(unsigned int opId) {
-        return false;
-    }
+bool ServiceContextNoop::killOperation(unsigned int opId) {
+    return false;
+}
 
-    void ServiceContextNoop::killAllUserOperations(const OperationContext* txn) {}
+void ServiceContextNoop::killAllUserOperations(const OperationContext* txn) {}
 
-    void ServiceContextNoop::registerKillOpListener(KillOpListenerInterface* listener) {
-    }
+void ServiceContextNoop::registerKillOpListener(KillOpListenerInterface* listener) {}
 
-    std::unique_ptr<OperationContext> ServiceContextNoop::_newOpCtx(Client* client) {
-        return stdx::make_unique<OperationContextNoop>(client, _nextOpId.fetchAndAdd(1));
-    }
+std::unique_ptr<OperationContext> ServiceContextNoop::_newOpCtx(Client* client) {
+    return stdx::make_unique<OperationContextNoop>(client, _nextOpId.fetchAndAdd(1));
+}
 
-    void ServiceContextNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
-    }
+void ServiceContextNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {}
 
-    OpObserver* ServiceContextNoop::getOpObserver() {
-        return nullptr;
-    }
+OpObserver* ServiceContextNoop::getOpObserver() {
+    return nullptr;
+}
 }  // namespace mongo

@@ -36,59 +36,58 @@
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
-    class BatchedRequestMetadata : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(BatchedRequestMetadata);
-    public:
+class BatchedRequestMetadata : public BSONSerializable {
+    MONGO_DISALLOW_COPYING(BatchedRequestMetadata);
 
-        static const BSONField<std::string> shardName;
-        static const BSONField<ChunkVersion> shardVersion;
-        static const BSONField<long long> session;
+public:
+    static const BSONField<std::string> shardName;
+    static const BSONField<ChunkVersion> shardVersion;
+    static const BSONField<long long> session;
 
-        BatchedRequestMetadata();
-        virtual ~BatchedRequestMetadata();
+    BatchedRequestMetadata();
+    virtual ~BatchedRequestMetadata();
 
-        //
-        // bson serializable interface implementation
-        //
+    //
+    // bson serializable interface implementation
+    //
 
-        virtual bool isValid(std::string* errMsg) const;
-        virtual BSONObj toBSON() const;
-        virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-        virtual void clear();
-        virtual std::string toString() const;
+    virtual bool isValid(std::string* errMsg) const;
+    virtual BSONObj toBSON() const;
+    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
+    virtual void clear();
+    virtual std::string toString() const;
 
-        void cloneTo(BatchedRequestMetadata* other) const;
+    void cloneTo(BatchedRequestMetadata* other) const;
 
-        //
-        // individual field accessors
-        //
+    //
+    // individual field accessors
+    //
 
-        void setShardName(StringData shardName);
-        void unsetShardName();
-        bool isShardNameSet() const;
-        const std::string& getShardName() const;
+    void setShardName(StringData shardName);
+    void unsetShardName();
+    bool isShardNameSet() const;
+    const std::string& getShardName() const;
 
-        void setShardVersion(const ChunkVersion& shardVersion);
-        void unsetShardVersion();
-        bool isShardVersionSet() const;
-        const ChunkVersion& getShardVersion() const;
+    void setShardVersion(const ChunkVersion& shardVersion);
+    void unsetShardVersion();
+    bool isShardVersionSet() const;
+    const ChunkVersion& getShardVersion() const;
 
-        void setSession(long long session);
-        void unsetSession();
-        bool isSessionSet() const;
-        long long getSession() const;
+    void setSession(long long session);
+    void unsetSession();
+    bool isSessionSet() const;
+    long long getSession() const;
 
-    private:
+private:
+    // (O)  shard name we're sending this batch to
+    std::string _shardName;
+    bool _isShardNameSet;
 
-        // (O)  shard name we're sending this batch to
-        std::string _shardName;
-        bool _isShardNameSet;
+    // (O)  version for this collection on a given shard
+    std::unique_ptr<ChunkVersion> _shardVersion;
 
-        // (O)  version for this collection on a given shard
-        std::unique_ptr<ChunkVersion> _shardVersion;
-
-        // (O)  session number the inserts belong to
-        long long _session;
-        bool _isSessionSet;
-    };
+    // (O)  session number the inserts belong to
+    long long _session;
+    bool _isSessionSet;
+};
 }

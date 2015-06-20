@@ -40,219 +40,208 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        using namespace mongoutils;
+using namespace mongoutils;
 
-        using std::set;
-        using std::string;
-        using std::stringstream;
-        using std::vector;
+using std::set;
+using std::string;
+using std::stringstream;
+using std::vector;
 
-        const bool FTSQuery::caseSensitiveDefault = false;
+const bool FTSQuery::caseSensitiveDefault = false;
 
-        Status FTSQuery::parse(const string& query, StringData language, bool caseSensitive,
-                               TextIndexVersion textIndexVersion) {
-            StatusWithFTSLanguage swl = FTSLanguage::make( language, textIndexVersion );
-            if ( !swl.getStatus().isOK() ) {
-                return swl.getStatus();
-            }
-            _language = swl.getValue();
-            _caseSensitive = caseSensitive;
+Status FTSQuery::parse(const string& query,
+                       StringData language,
+                       bool caseSensitive,
+                       TextIndexVersion textIndexVersion) {
+    StatusWithFTSLanguage swl = FTSLanguage::make(language, textIndexVersion);
+    if (!swl.getStatus().isOK()) {
+        return swl.getStatus();
+    }
+    _language = swl.getValue();
+    _caseSensitive = caseSensitive;
 
-            // Build a space delimited list of words to have the FtsTokenizer tokenize
-            string positiveTermSentence;
-            string negativeTermSentence;
+    // Build a space delimited list of words to have the FtsTokenizer tokenize
+    string positiveTermSentence;
+    string negativeTermSentence;
 
-            bool inNegation = false;
-            bool inPhrase = false;
+    bool inNegation = false;
+    bool inPhrase = false;
 
-            unsigned quoteOffset = 0;
+    unsigned quoteOffset = 0;
 
-            FTSQueryParser i(query);
-            while ( i.more() ) {
-                QueryToken t = i.next();
+    FTSQueryParser i(query);
+    while (i.more()) {
+        QueryToken t = i.next();
 
-                if ( t.type == QueryToken::TEXT ) {
-                    string s = t.data.toString();
+        if (t.type == QueryToken::TEXT) {
+            string s = t.data.toString();
 
-                    if ( inPhrase && inNegation ) {
-                        // don't add term
-                    }
-                    else {
-                        if (inNegation) {
-                            negativeTermSentence.append(s);
-                            negativeTermSentence.push_back(' ');
-                        }
-                        else {
-                            positiveTermSentence.append(s);
-                            positiveTermSentence.push_back(' ');
-                        }
-                    }
-
-                    if ( inNegation && !inPhrase )
-                        inNegation = false;
-                }
-                else if ( t.type == QueryToken::DELIMITER ) {
-                    char c = t.data[0];
-                    if ( c == '-' ) {
-                        if ( !inPhrase && t.previousWhiteSpace ) {
-                            // phrases can be negated, and terms not in phrases can be negated.
-                            // terms in phrases can not be negated.
-                            inNegation = true;
-                        }
-                    }
-                    else if ( c == '"' ) {
-                        if ( inPhrase ) {
-                            // end of a phrase
-                            unsigned phraseStart = quoteOffset + 1;
-                            unsigned phraseLength = t.offset - phraseStart;
-                            StringData phrase = StringData( query ).substr( phraseStart,
-                                                                            phraseLength );
-                            if ( inNegation )
-                                _negatedPhrases.push_back( normalizeString( phrase ) );
-                            else
-                                _positivePhrases.push_back( normalizeString( phrase ) );
-                            inNegation = false;
-                            inPhrase = false;
-                        }
-                        else {
-                            // start of a phrase
-                            inPhrase = true;
-                            quoteOffset = t.offset;
-                        }
-                    }
-                }
-                else {
-                    invariant( false );
+            if (inPhrase && inNegation) {
+                // don't add term
+            } else {
+                if (inNegation) {
+                    negativeTermSentence.append(s);
+                    negativeTermSentence.push_back(' ');
+                } else {
+                    positiveTermSentence.append(s);
+                    positiveTermSentence.push_back(' ');
                 }
             }
 
-            std::unique_ptr<FTSTokenizer> tokenizer(_language->createTokenizer());
-
-            _addTerms(tokenizer.get(), positiveTermSentence, false);
-            _addTerms(tokenizer.get(), negativeTermSentence, true);
-
-            return Status::OK();
-        }
-
-        void FTSQuery::_addTerms( FTSTokenizer* tokenizer,
-                                 const string& sentence,
-                                 bool negated ) {
-
-            tokenizer->reset(sentence.c_str(), FTSTokenizer::FilterStopWords);
-
-            auto& activeTerms = negated ? _negatedTerms : _positiveTerms;
-
-            // First, get all the terms for indexing, ie, lower cased words
-            // If we are case-insensitive, we can also used this for positive, and negative terms
-            // Some terms may be expanded into multiple words in some non-English languages
-            while (tokenizer->moveNext()) {
-
-                string word = tokenizer->get().toString();
-
-                if (!negated) {
-                    _termsForBounds.insert(word);
+            if (inNegation && !inPhrase)
+                inNegation = false;
+        } else if (t.type == QueryToken::DELIMITER) {
+            char c = t.data[0];
+            if (c == '-') {
+                if (!inPhrase && t.previousWhiteSpace) {
+                    // phrases can be negated, and terms not in phrases can be negated.
+                    // terms in phrases can not be negated.
+                    inNegation = true;
                 }
-
-                // Compute the string corresponding to 'token' that will be used for the matcher.
-                // For case-insensitive queries, this is the same string as 'boundsTerm' computed
-                // above.
-                if (!_caseSensitive) {
-                    activeTerms.insert(word);
-                }
-            }
-
-            if (!_caseSensitive) {
-                return;
-            }
-
-            tokenizer->reset(sentence.c_str(), static_cast<FTSTokenizer::Options>(
-                FTSTokenizer::FilterStopWords
-                | FTSTokenizer::GenerateCaseSensitiveTokens));
-
-            // If we want case-sensitivity, get the case-sensitive token
-            while (tokenizer->moveNext()) {
-
-                string word = tokenizer->get().toString();
-
-                activeTerms.insert(word);
-            }
-        }
-
-        string FTSQuery::normalizeString(StringData str) const {
-            if (_caseSensitive) {
-                return str.toString();
-            }
-            return tolowerString(str);
-        }
-
-        namespace {
-            void _debugHelp( stringstream& ss, const set<string>& s, const string& sep ) {
-                bool first = true;
-                for ( set<string>::const_iterator i = s.begin(); i != s.end(); ++i ) {
-                    if ( first )
-                        first = false;
+            } else if (c == '"') {
+                if (inPhrase) {
+                    // end of a phrase
+                    unsigned phraseStart = quoteOffset + 1;
+                    unsigned phraseLength = t.offset - phraseStart;
+                    StringData phrase = StringData(query).substr(phraseStart, phraseLength);
+                    if (inNegation)
+                        _negatedPhrases.push_back(normalizeString(phrase));
                     else
-                        ss << sep;
-                    ss << *i;
+                        _positivePhrases.push_back(normalizeString(phrase));
+                    inNegation = false;
+                    inPhrase = false;
+                } else {
+                    // start of a phrase
+                    inPhrase = true;
+                    quoteOffset = t.offset;
                 }
             }
-
-            void _debugHelp( stringstream& ss, const vector<string>& v, const string& sep ) {
-                set<string> s( v.begin(), v.end() );
-                _debugHelp( ss, s, sep );
-            }
-
-        }
-
-        string FTSQuery::toString() const {
-            stringstream ss;
-            ss << "FTSQuery\n";
-
-            ss << "  terms: ";
-            _debugHelp( ss, getPositiveTerms(), ", " );
-            ss << "\n";
-
-            ss << "  negated terms: ";
-            _debugHelp( ss, getNegatedTerms(), ", " );
-            ss << "\n";
-
-            ss << "  phrases: ";
-            _debugHelp( ss, getPositivePhr(), ", " );
-            ss << "\n";
-
-            ss << "  negated phrases: ";
-            _debugHelp( ss, getNegatedPhr(), ", " );
-            ss << "\n";
-
-            return ss.str();
-        }
-
-        string FTSQuery::debugString() const {
-            stringstream ss;
-
-            _debugHelp( ss, getPositiveTerms(), "|" );
-            ss << "||";
-
-            _debugHelp( ss, getNegatedTerms(), "|" );
-            ss << "||";
-
-            _debugHelp( ss, getPositivePhr(), "|" );
-            ss << "||";
-
-            _debugHelp( ss, getNegatedPhr(), "|" );
-
-            return ss.str();
-        }
-
-        BSONObj FTSQuery::toBSON() const {
-            BSONObjBuilder bob;
-            bob.append( "terms", getPositiveTerms() );
-            bob.append( "negatedTerms", getNegatedTerms() );
-            bob.append( "phrases", getPositivePhr() );
-            bob.append( "negatedPhrases", getNegatedPhr() );
-            return bob.obj();
+        } else {
+            invariant(false);
         }
     }
+
+    std::unique_ptr<FTSTokenizer> tokenizer(_language->createTokenizer());
+
+    _addTerms(tokenizer.get(), positiveTermSentence, false);
+    _addTerms(tokenizer.get(), negativeTermSentence, true);
+
+    return Status::OK();
+}
+
+void FTSQuery::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bool negated) {
+    tokenizer->reset(sentence.c_str(), FTSTokenizer::FilterStopWords);
+
+    auto& activeTerms = negated ? _negatedTerms : _positiveTerms;
+
+    // First, get all the terms for indexing, ie, lower cased words
+    // If we are case-insensitive, we can also used this for positive, and negative terms
+    // Some terms may be expanded into multiple words in some non-English languages
+    while (tokenizer->moveNext()) {
+        string word = tokenizer->get().toString();
+
+        if (!negated) {
+            _termsForBounds.insert(word);
+        }
+
+        // Compute the string corresponding to 'token' that will be used for the matcher.
+        // For case-insensitive queries, this is the same string as 'boundsTerm' computed
+        // above.
+        if (!_caseSensitive) {
+            activeTerms.insert(word);
+        }
+    }
+
+    if (!_caseSensitive) {
+        return;
+    }
+
+    tokenizer->reset(sentence.c_str(),
+                     static_cast<FTSTokenizer::Options>(FTSTokenizer::FilterStopWords |
+                                                        FTSTokenizer::GenerateCaseSensitiveTokens));
+
+    // If we want case-sensitivity, get the case-sensitive token
+    while (tokenizer->moveNext()) {
+        string word = tokenizer->get().toString();
+
+        activeTerms.insert(word);
+    }
+}
+
+string FTSQuery::normalizeString(StringData str) const {
+    if (_caseSensitive) {
+        return str.toString();
+    }
+    return tolowerString(str);
+}
+
+namespace {
+void _debugHelp(stringstream& ss, const set<string>& s, const string& sep) {
+    bool first = true;
+    for (set<string>::const_iterator i = s.begin(); i != s.end(); ++i) {
+        if (first)
+            first = false;
+        else
+            ss << sep;
+        ss << *i;
+    }
+}
+
+void _debugHelp(stringstream& ss, const vector<string>& v, const string& sep) {
+    set<string> s(v.begin(), v.end());
+    _debugHelp(ss, s, sep);
+}
+}
+
+string FTSQuery::toString() const {
+    stringstream ss;
+    ss << "FTSQuery\n";
+
+    ss << "  terms: ";
+    _debugHelp(ss, getPositiveTerms(), ", ");
+    ss << "\n";
+
+    ss << "  negated terms: ";
+    _debugHelp(ss, getNegatedTerms(), ", ");
+    ss << "\n";
+
+    ss << "  phrases: ";
+    _debugHelp(ss, getPositivePhr(), ", ");
+    ss << "\n";
+
+    ss << "  negated phrases: ";
+    _debugHelp(ss, getNegatedPhr(), ", ");
+    ss << "\n";
+
+    return ss.str();
+}
+
+string FTSQuery::debugString() const {
+    stringstream ss;
+
+    _debugHelp(ss, getPositiveTerms(), "|");
+    ss << "||";
+
+    _debugHelp(ss, getNegatedTerms(), "|");
+    ss << "||";
+
+    _debugHelp(ss, getPositivePhr(), "|");
+    ss << "||";
+
+    _debugHelp(ss, getNegatedPhr(), "|");
+
+    return ss.str();
+}
+
+BSONObj FTSQuery::toBSON() const {
+    BSONObjBuilder bob;
+    bob.append("terms", getPositiveTerms());
+    bob.append("negatedTerms", getNegatedTerms());
+    bob.append("phrases", getPositivePhr());
+    bob.append("negatedPhrases", getNegatedPhr());
+    return bob.obj();
+}
+}
 }

@@ -36,38 +36,37 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-    class StringData;
-    class ServiceContext;
+class StringData;
+class ServiceContext;
 
-    class WiredTigerCustomizationHooks {
-    public:
-        static void set(ServiceContext* service,
-                        std::unique_ptr<WiredTigerCustomizationHooks> custHooks);
+class WiredTigerCustomizationHooks {
+public:
+    static void set(ServiceContext* service,
+                    std::unique_ptr<WiredTigerCustomizationHooks> custHooks);
 
-        static WiredTigerCustomizationHooks* get(ServiceContext* service);
+    static WiredTigerCustomizationHooks* get(ServiceContext* service);
 
-        virtual ~WiredTigerCustomizationHooks() = default;
+    virtual ~WiredTigerCustomizationHooks() = default;
 
-        /**
-         *  Appends additional configuration sub object(s) to the BSONObjbuilder builder.
-         */
-        virtual void appendUID(BSONObjBuilder* builder) = 0;
+    /**
+     *  Appends additional configuration sub object(s) to the BSONObjbuilder builder.
+     */
+    virtual void appendUID(BSONObjBuilder* builder) = 0;
 
-        /**
-         *  Gets the WiredTiger encryption configuration string for the
-         *  provided table name
-         */
-        virtual std::string getOpenConfig(StringData tableName) = 0;
-    };
+    /**
+     *  Gets the WiredTiger encryption configuration string for the
+     *  provided table name
+     */
+    virtual std::string getOpenConfig(StringData tableName) = 0;
+};
 
-    // Empty default implementation of the abstract class WiredTigerCustomizationHooks
-    class EmptyWiredTigerCustomizationHooks : public WiredTigerCustomizationHooks {
+// Empty default implementation of the abstract class WiredTigerCustomizationHooks
+class EmptyWiredTigerCustomizationHooks : public WiredTigerCustomizationHooks {
+public:
+    ~EmptyWiredTigerCustomizationHooks() override;
 
-    public:
-        ~EmptyWiredTigerCustomizationHooks() override;
+    void appendUID(BSONObjBuilder* builder) override;
 
-        void appendUID(BSONObjBuilder* builder) override;
-
-        std::string getOpenConfig(StringData tableName) override;
-    };
-} // namespace mongo
+    std::string getOpenConfig(StringData tableName) override;
+};
+}  // namespace mongo

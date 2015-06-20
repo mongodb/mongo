@@ -35,34 +35,34 @@
 namespace mongo {
 namespace {
 
-    TEST( RecordId, HashEqual ) {
-        RecordId locA( 1, 2 );
-        RecordId locB;
-        locB = locA;
-        ASSERT_EQUALS( locA, locB );
-        RecordId::Hasher hasher;
-        ASSERT_EQUALS( hasher( locA ), hasher( locB ) );
-    }
+TEST(RecordId, HashEqual) {
+    RecordId locA(1, 2);
+    RecordId locB;
+    locB = locA;
+    ASSERT_EQUALS(locA, locB);
+    RecordId::Hasher hasher;
+    ASSERT_EQUALS(hasher(locA), hasher(locB));
+}
 
-    TEST( RecordId, HashNotEqual ) {
-        RecordId original( 1, 2 );
-        RecordId diffFile( 10, 2 );
-        RecordId diffOfs( 1, 20 );
-        RecordId diffBoth( 10, 20 );
-        RecordId reversed( 2, 1 );
-        ASSERT_NOT_EQUALS( original, diffFile );
-        ASSERT_NOT_EQUALS( original, diffOfs );
-        ASSERT_NOT_EQUALS( original, diffBoth );
-        ASSERT_NOT_EQUALS( original, reversed );
-        
-        // Unequal DiskLocs need not produce unequal hashes.  But unequal hashes are likely, and
-        // assumed here for sanity checking of the custom hash implementation.
-        RecordId::Hasher hasher;
-        ASSERT_NOT_EQUALS( hasher( original ), hasher( diffFile ) );
-        ASSERT_NOT_EQUALS( hasher( original ), hasher( diffOfs ) );
-        ASSERT_NOT_EQUALS( hasher( original ), hasher( diffBoth ) );
-        ASSERT_NOT_EQUALS( hasher( original ), hasher( reversed ) );
-    }
-    
-} // namespace
-} // namespace mongo
+TEST(RecordId, HashNotEqual) {
+    RecordId original(1, 2);
+    RecordId diffFile(10, 2);
+    RecordId diffOfs(1, 20);
+    RecordId diffBoth(10, 20);
+    RecordId reversed(2, 1);
+    ASSERT_NOT_EQUALS(original, diffFile);
+    ASSERT_NOT_EQUALS(original, diffOfs);
+    ASSERT_NOT_EQUALS(original, diffBoth);
+    ASSERT_NOT_EQUALS(original, reversed);
+
+    // Unequal DiskLocs need not produce unequal hashes.  But unequal hashes are likely, and
+    // assumed here for sanity checking of the custom hash implementation.
+    RecordId::Hasher hasher;
+    ASSERT_NOT_EQUALS(hasher(original), hasher(diffFile));
+    ASSERT_NOT_EQUALS(hasher(original), hasher(diffOfs));
+    ASSERT_NOT_EQUALS(hasher(original), hasher(diffBoth));
+    ASSERT_NOT_EQUALS(hasher(original), hasher(reversed));
+}
+
+}  // namespace
+}  // namespace mongo

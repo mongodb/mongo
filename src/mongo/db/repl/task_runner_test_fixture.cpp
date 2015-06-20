@@ -39,69 +39,76 @@
 namespace mongo {
 namespace repl {
 
-    using namespace mongo;
-    using namespace mongo::repl;
+using namespace mongo;
+using namespace mongo::repl;
 
 namespace {
 
-    const int kNumThreads = 3;
+const int kNumThreads = 3;
 
-    AtomicInt32 _nextId;
+AtomicInt32 _nextId;
 
-    class TaskRunnerOperationContext : public OperationContextNoop {
-    public:
-        TaskRunnerOperationContext() : _id(_nextId.fetchAndAdd(1)) { }
-        int getId() const { return _id; }
-    private:
-        int _id;
-    };
-
-
-} // namespace
-
-    Status TaskRunnerTest::getDetectableErrorStatus() {
-        return Status(ErrorCodes::InternalError, "Not mutated");
+class TaskRunnerOperationContext : public OperationContextNoop {
+public:
+    TaskRunnerOperationContext() : _id(_nextId.fetchAndAdd(1)) {}
+    int getId() const {
+        return _id;
     }
 
-    int TaskRunnerTest::getOperationContextId(OperationContext* txn) {
-        if (!txn) { return -1; }
-        TaskRunnerOperationContext* taskRunnerTxn = dynamic_cast<TaskRunnerOperationContext*>(txn);
-        if (!taskRunnerTxn) { return -2; }
-        return taskRunnerTxn->getId();
-    }
+private:
+    int _id;
+};
 
-    OperationContext* TaskRunnerTest::createOperationContext() const {
-        return new TaskRunnerOperationContext();
-    }
 
-    TaskRunner& TaskRunnerTest::getTaskRunner() const {
-        ASSERT(_taskRunner.get());
-        return *_taskRunner;
-    }
+}  // namespace
 
-    OldThreadPool& TaskRunnerTest::getThreadPool() const {
-        ASSERT(_threadPool.get());
-        return *_threadPool;
-    }
+Status TaskRunnerTest::getDetectableErrorStatus() {
+    return Status(ErrorCodes::InternalError, "Not mutated");
+}
 
-    void TaskRunnerTest::resetTaskRunner(TaskRunner* taskRunner) {
-        _taskRunner.reset(taskRunner);
+int TaskRunnerTest::getOperationContextId(OperationContext* txn) {
+    if (!txn) {
+        return -1;
     }
-
-    void TaskRunnerTest::destroyTaskRunner() {
-        _taskRunner.reset();
+    TaskRunnerOperationContext* taskRunnerTxn = dynamic_cast<TaskRunnerOperationContext*>(txn);
+    if (!taskRunnerTxn) {
+        return -2;
     }
+    return taskRunnerTxn->getId();
+}
 
-    void TaskRunnerTest::setUp() {
-        _threadPool.reset(new OldThreadPool(kNumThreads, "TaskRunnerTest-"));
-        resetTaskRunner(new TaskRunner(_threadPool.get(),
-                                       stdx::bind(&TaskRunnerTest::createOperationContext, this)));
-    }
+OperationContext* TaskRunnerTest::createOperationContext() const {
+    return new TaskRunnerOperationContext();
+}
 
-    void TaskRunnerTest::tearDown() {
-        destroyTaskRunner();
-        _threadPool.reset();
-    }
+TaskRunner& TaskRunnerTest::getTaskRunner() const {
+    ASSERT(_taskRunner.get());
+    return *_taskRunner;
+}
 
-} // namespace repl
-} // namespace mongo
+OldThreadPool& TaskRunnerTest::getThreadPool() const {
+    ASSERT(_threadPool.get());
+    return *_threadPool;
+}
+
+void TaskRunnerTest::resetTaskRunner(TaskRunner* taskRunner) {
+    _taskRunner.reset(taskRunner);
+}
+
+void TaskRunnerTest::destroyTaskRunner() {
+    _taskRunner.reset();
+}
+
+void TaskRunnerTest::setUp() {
+    _threadPool.reset(new OldThreadPool(kNumThreads, "TaskRunnerTest-"));
+    resetTaskRunner(new TaskRunner(_threadPool.get(),
+                                   stdx::bind(&TaskRunnerTest::createOperationContext, this)));
+}
+
+void TaskRunnerTest::tearDown() {
+    destroyTaskRunner();
+    _threadPool.reset();
+}
+
+}  // namespace repl
+}  // namespace mongo

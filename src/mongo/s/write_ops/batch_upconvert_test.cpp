@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/dbclientinterface.h" // for write constants
+#include "mongo/client/dbclientinterface.h"  // for write constants
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
@@ -41,112 +41,109 @@
 
 namespace {
 
-    using std::string;
-    using std::vector;
+using std::string;
+using std::vector;
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(WriteBatchUpconvert, BasicInsert) {
+TEST(WriteBatchUpconvert, BasicInsert) {
+    // Tests that an insert message is correctly upconverted to a batch insert
 
-        // Tests that an insert message is correctly upconverted to a batch insert
+    const string ns = "foo.bar";
+    const BSONObj doc = BSON("hello"
+                             << "world");
 
-        const string ns = "foo.bar";
-        const BSONObj doc = BSON( "hello" << "world" );
+    Message insertMsg;
+    BufBuilder insertMsgB;
 
-        Message insertMsg;
-        BufBuilder insertMsgB;
+    int reservedFlags = InsertOption_ContinueOnError;
+    insertMsgB.appendNum(reservedFlags);
+    insertMsgB.appendStr(ns);
+    doc.appendSelfToBufBuilder(insertMsgB);
+    insertMsg.setData(dbInsert, insertMsgB.buf(), insertMsgB.len());
 
-        int reservedFlags = InsertOption_ContinueOnError;
-        insertMsgB.appendNum( reservedFlags );
-        insertMsgB.appendStr( ns );
-        doc.appendSelfToBufBuilder( insertMsgB );
-        insertMsg.setData( dbInsert, insertMsgB.buf(), insertMsgB.len() );
+    OwnedPointerVector<BatchedCommandRequest> requestsOwned;
+    vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
+    msgToBatchRequests(insertMsg, &requests);
 
-        OwnedPointerVector<BatchedCommandRequest> requestsOwned;
-        vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
-        msgToBatchRequests( insertMsg, &requests );
+    BatchedCommandRequest* request = requests.back();
+    ASSERT_EQUALS(request->getBatchType(), BatchedCommandRequest::BatchType_Insert);
+    string errMsg;
+    ASSERT(request->isValid(&errMsg));
+    ASSERT_EQUALS(request->getNS(), ns);
+    ASSERT(!request->getOrdered());
+    ASSERT_EQUALS(request->sizeWriteOps(), 1u);
+    bool isSameDoc = doc.woCompare(request->getInsertRequest()->getDocumentsAt(0)) == 0;
+    ASSERT(isSameDoc);
+    ASSERT(request->getWriteConcern().woCompare(WriteConcernOptions::Acknowledged) == 0);
+}
 
-        BatchedCommandRequest* request = requests.back();
-        ASSERT_EQUALS( request->getBatchType(), BatchedCommandRequest::BatchType_Insert );
-        string errMsg;
-        ASSERT( request->isValid( &errMsg ) );
-        ASSERT_EQUALS( request->getNS(), ns );
-        ASSERT( !request->getOrdered() );
-        ASSERT_EQUALS( request->sizeWriteOps(), 1u );
-        bool isSameDoc = doc.woCompare( request->getInsertRequest()->getDocumentsAt( 0 ) ) == 0;
-        ASSERT( isSameDoc );
-        ASSERT( request->getWriteConcern().woCompare( WriteConcernOptions::Acknowledged ) == 0 );
-    }
+TEST(WriteBatchUpconvert, BasicUpdate) {
+    // Tests that an update message is correctly upconverted to a batch update
 
-    TEST(WriteBatchUpconvert, BasicUpdate) {
+    const string ns = "foo.bar";
+    const BSONObj query = BSON("hello"
+                               << "world");
+    const BSONObj update = BSON("$set" << BSON("hello"
+                                               << "world"));
 
-        // Tests that an update message is correctly upconverted to a batch update
+    Message updateMsg;
+    BufBuilder updateMsgB;
 
-        const string ns = "foo.bar";
-        const BSONObj query = BSON( "hello" << "world" );
-        const BSONObj update = BSON( "$set" << BSON( "hello" << "world" ) );
+    int reservedFlags = 0;
+    updateMsgB.appendNum(reservedFlags);
+    updateMsgB.appendStr(ns);
+    updateMsgB.appendNum(UpdateOption_Upsert);
+    query.appendSelfToBufBuilder(updateMsgB);
+    update.appendSelfToBufBuilder(updateMsgB);
+    updateMsg.setData(dbUpdate, updateMsgB.buf(), updateMsgB.len());
 
-        Message updateMsg;
-        BufBuilder updateMsgB;
+    OwnedPointerVector<BatchedCommandRequest> requestsOwned;
+    vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
+    msgToBatchRequests(updateMsg, &requests);
 
-        int reservedFlags = 0;
-        updateMsgB.appendNum( reservedFlags );
-        updateMsgB.appendStr( ns );
-        updateMsgB.appendNum( UpdateOption_Upsert );
-        query.appendSelfToBufBuilder( updateMsgB );
-        update.appendSelfToBufBuilder( updateMsgB );
-        updateMsg.setData( dbUpdate, updateMsgB.buf(), updateMsgB.len() );
+    BatchedCommandRequest* request = requests.back();
+    ASSERT_EQUALS(request->getBatchType(), BatchedCommandRequest::BatchType_Update);
+    string errMsg;
+    ASSERT(request->isValid(&errMsg));
+    ASSERT_EQUALS(request->getNS(), ns);
+    ASSERT_EQUALS(request->sizeWriteOps(), 1u);
+    ASSERT(query.woCompare(request->getUpdateRequest()->getUpdatesAt(0)->getQuery()) == 0);
+    ASSERT(update.woCompare(request->getUpdateRequest()->getUpdatesAt(0)->getUpdateExpr()) == 0);
+    ASSERT(request->getUpdateRequest()->getUpdatesAt(0)->getUpsert());
+    ASSERT(!request->getUpdateRequest()->getUpdatesAt(0)->getMulti());
+    ASSERT(request->getWriteConcern().woCompare(WriteConcernOptions::Acknowledged) == 0);
+}
 
-        OwnedPointerVector<BatchedCommandRequest> requestsOwned;
-        vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
-        msgToBatchRequests( updateMsg, &requests );
+TEST(WriteBatchUpconvert, BasicDelete) {
+    // Tests that an remove message is correctly upconverted to a batch delete
 
-        BatchedCommandRequest* request = requests.back();
-        ASSERT_EQUALS( request->getBatchType(), BatchedCommandRequest::BatchType_Update );
-        string errMsg;
-        ASSERT( request->isValid( &errMsg ) );
-        ASSERT_EQUALS( request->getNS(), ns );
-        ASSERT_EQUALS( request->sizeWriteOps(), 1u );
-        ASSERT( query.woCompare(
-                request->getUpdateRequest()->getUpdatesAt( 0 )->getQuery() ) == 0 );
-        ASSERT( update.woCompare(
-                request->getUpdateRequest()->getUpdatesAt( 0 )->getUpdateExpr() ) == 0 );
-        ASSERT( request->getUpdateRequest()->getUpdatesAt( 0 )->getUpsert() );
-        ASSERT( !request->getUpdateRequest()->getUpdatesAt( 0 )->getMulti() );
-        ASSERT( request->getWriteConcern().woCompare( WriteConcernOptions::Acknowledged ) == 0 );
-    }
+    const string ns = "foo.bar";
+    const BSONObj query = BSON("hello"
+                               << "world");
 
-    TEST(WriteBatchUpconvert, BasicDelete) {
+    Message deleteMsg;
+    BufBuilder deleteMsgB;
 
-        // Tests that an remove message is correctly upconverted to a batch delete
+    int reservedFlags = 0;
+    deleteMsgB.appendNum(reservedFlags);
+    deleteMsgB.appendStr(ns);
+    deleteMsgB.appendNum(RemoveOption_JustOne);
+    query.appendSelfToBufBuilder(deleteMsgB);
+    deleteMsg.setData(dbDelete, deleteMsgB.buf(), deleteMsgB.len());
 
-        const string ns = "foo.bar";
-        const BSONObj query = BSON( "hello" << "world" );
+    OwnedPointerVector<BatchedCommandRequest> requestsOwned;
+    vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
+    msgToBatchRequests(deleteMsg, &requests);
 
-        Message deleteMsg;
-        BufBuilder deleteMsgB;
-
-        int reservedFlags = 0;
-        deleteMsgB.appendNum( reservedFlags );
-        deleteMsgB.appendStr( ns );
-        deleteMsgB.appendNum( RemoveOption_JustOne );
-        query.appendSelfToBufBuilder( deleteMsgB );
-        deleteMsg.setData( dbDelete, deleteMsgB.buf(), deleteMsgB.len() );
-
-        OwnedPointerVector<BatchedCommandRequest> requestsOwned;
-        vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
-        msgToBatchRequests( deleteMsg, &requests );
-
-        BatchedCommandRequest* request = requests.back();
-        ASSERT_EQUALS( request->getBatchType(), BatchedCommandRequest::BatchType_Delete );
-        string errMsg;
-        ASSERT( request->isValid( &errMsg ) );
-        ASSERT_EQUALS( request->getNS(), ns );
-        ASSERT_EQUALS( request->sizeWriteOps(), 1u );
-        ASSERT( query.woCompare(
-                request->getDeleteRequest()->getDeletesAt( 0 )->getQuery() ) == 0 );
-        ASSERT( request->getDeleteRequest()->getDeletesAt( 0 )->getLimit() == 1 );
-        ASSERT( request->getWriteConcern().woCompare( WriteConcernOptions::Acknowledged ) == 0 );
-    }
-
+    BatchedCommandRequest* request = requests.back();
+    ASSERT_EQUALS(request->getBatchType(), BatchedCommandRequest::BatchType_Delete);
+    string errMsg;
+    ASSERT(request->isValid(&errMsg));
+    ASSERT_EQUALS(request->getNS(), ns);
+    ASSERT_EQUALS(request->sizeWriteOps(), 1u);
+    ASSERT(query.woCompare(request->getDeleteRequest()->getDeletesAt(0)->getQuery()) == 0);
+    ASSERT(request->getDeleteRequest()->getDeletesAt(0)->getLimit() == 1);
+    ASSERT(request->getWriteConcern().woCompare(WriteConcernOptions::Acknowledged) == 0);
+}
 }

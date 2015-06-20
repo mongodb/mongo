@@ -40,47 +40,48 @@
 
 namespace mongo {
 
-    // see also mongoutils/str.h - perhaps move these there?
-    // see also text.h
+// see also mongoutils/str.h - perhaps move these there?
+// see also text.h
 
-    void splitStringDelim( const std::string& str , std::vector<std::string>* res , char delim );
+void splitStringDelim(const std::string& str, std::vector<std::string>* res, char delim);
 
-    void joinStringDelim( const std::vector<std::string>& strs , std::string* res , char delim );
+void joinStringDelim(const std::vector<std::string>& strs, std::string* res, char delim);
 
-    inline std::string tolowerString( StringData input ) {
-        std::string::size_type sz = input.size();
+inline std::string tolowerString(StringData input) {
+    std::string::size_type sz = input.size();
 
-        std::unique_ptr<char[]> line(new char[sz+1]);
-        char * copy = line.get();
+    std::unique_ptr<char[]> line(new char[sz + 1]);
+    char* copy = line.get();
 
-        for ( std::string::size_type i=0; i<sz; i++ ) {
-            char c = input[i];
-            copy[i] = (char)tolower( (int)c );
-        }
-        copy[sz] = 0;
-        return copy;
+    for (std::string::size_type i = 0; i < sz; i++) {
+        char c = input[i];
+        copy[i] = (char)tolower((int)c);
     }
+    copy[sz] = 0;
+    return copy;
+}
 
-    /** Functor for combining lexical and numeric comparisons. */
-    class LexNumCmp {
-    public:
-        /** @param lexOnly - compare all characters lexically, including digits. */
-        LexNumCmp( bool lexOnly );
-        /**
-         * Non numeric characters are compared lexicographically; numeric substrings
-         * are compared numerically; dots separate ordered comparable subunits.
-         * For convenience, character 255 is greater than anything else.
-         * @param lexOnly - compare all characters lexically, including digits.
-         */
-        static int cmp( StringData s1, StringData s2, bool lexOnly );
-        int cmp( StringData s1, StringData s2 ) const;
-        bool operator()( StringData s1, StringData s2 ) const;
-    private:
-        bool _lexOnly;
-    };
-    
-    // TODO: Sane-ify core std::string functionality
-    // For now, this needs to be near the LexNumCmp or else
-    int versionCmp(const StringData rhs, const StringData lhs);
+/** Functor for combining lexical and numeric comparisons. */
+class LexNumCmp {
+public:
+    /** @param lexOnly - compare all characters lexically, including digits. */
+    LexNumCmp(bool lexOnly);
+    /**
+     * Non numeric characters are compared lexicographically; numeric substrings
+     * are compared numerically; dots separate ordered comparable subunits.
+     * For convenience, character 255 is greater than anything else.
+     * @param lexOnly - compare all characters lexically, including digits.
+     */
+    static int cmp(StringData s1, StringData s2, bool lexOnly);
+    int cmp(StringData s1, StringData s2) const;
+    bool operator()(StringData s1, StringData s2) const;
 
-} // namespace mongo
+private:
+    bool _lexOnly;
+};
+
+// TODO: Sane-ify core std::string functionality
+// For now, this needs to be near the LexNumCmp or else
+int versionCmp(const StringData rhs, const StringData lhs);
+
+}  // namespace mongo

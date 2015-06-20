@@ -43,88 +43,86 @@
 
 namespace mongo {
 
-    class ServiceContext;
+class ServiceContext;
 
-    class ReplSetDistLockManager final : public DistLockManager {
-    public:
-        ReplSetDistLockManager(ServiceContext* globalContext,
-                               StringData processID,
-                               std::unique_ptr<DistLockCatalog> catalog,
-                               stdx::chrono::milliseconds pingInterval,
-                               stdx::chrono::milliseconds lockExpiration);
+class ReplSetDistLockManager final : public DistLockManager {
+public:
+    ReplSetDistLockManager(ServiceContext* globalContext,
+                           StringData processID,
+                           std::unique_ptr<DistLockCatalog> catalog,
+                           stdx::chrono::milliseconds pingInterval,
+                           stdx::chrono::milliseconds lockExpiration);
 
-        virtual ~ReplSetDistLockManager();
+    virtual ~ReplSetDistLockManager();
 
-        virtual void startUp() override;
-        virtual void shutDown() override;
+    virtual void startUp() override;
+    virtual void shutDown() override;
 
-        virtual StatusWith<DistLockManager::ScopedDistLock> lock(
-                StringData name,
-                StringData whyMessage,
-                stdx::chrono::milliseconds waitFor,
-                stdx::chrono::milliseconds lockTryInterval) override;
+    virtual StatusWith<DistLockManager::ScopedDistLock> lock(
+        StringData name,
+        StringData whyMessage,
+        stdx::chrono::milliseconds waitFor,
+        stdx::chrono::milliseconds lockTryInterval) override;
 
-    protected:
+protected:
+    virtual void unlock(const DistLockHandle& lockSessionID) override;
 
-        virtual void unlock(const DistLockHandle& lockSessionID) override;
+    virtual Status checkStatus(const DistLockHandle& lockSessionID) override;
 
-        virtual Status checkStatus(const DistLockHandle& lockSessionID) override;
+private:
+    /**
+     * Queue a lock to be unlocked asynchronously with retry until it doesn't error.
+     */
+    void queueUnlock(const DistLockHandle& lockSessionID);
 
-    private:
+    /**
+     * Periodically pings and checks if there are locks queued that needs unlocking.
+     */
+    void doTask();
 
-        /**
-         * Queue a lock to be unlocked asynchronously with retry until it doesn't error.
-         */
-        void queueUnlock(const DistLockHandle& lockSessionID);
+    /**
+     * Returns true if shutDown was called.
+     */
+    bool isShutDown();
 
-        /**
-         * Periodically pings and checks if there are locks queued that needs unlocking.
-         */
-        void doTask();
+    /**
+     * Returns true if the current process that owns the lock has no fresh pings since
+     * the lock expiration threshold.
+     */
+    StatusWith<bool> canOvertakeLock(const LocksType lockDoc);
 
-        /**
-         * Returns true if shutDown was called.
-         */
-        bool isShutDown();
+    //
+    // All member variables are labeled with one of the following codes indicating the
+    // synchronization rules for accessing them.
+    //
+    // (F) Self synchronizing.
+    // (M) Must hold _mutex for access.
+    // (I) Immutable, no synchronization needed.
+    // (S) Can only be called inside startUp/shutDown.
+    //
 
-        /**
-         * Returns true if the current process that owns the lock has no fresh pings since
-         * the lock expiration threshold.
-         */
-        StatusWith<bool> canOvertakeLock(const LocksType lockDoc);
+    ServiceContext* const _serviceContext;  // (F)
 
-        //
-        // All member variables are labeled with one of the following codes indicating the
-        // synchronization rules for accessing them.
-        //
-        // (F) Self synchronizing.
-        // (M) Must hold _mutex for access.
-        // (I) Immutable, no synchronization needed.
-        // (S) Can only be called inside startUp/shutDown.
-        //
+    const std::string _processID;                      // (I)
+    const std::unique_ptr<DistLockCatalog> _catalog;   // (I)
+    const stdx::chrono::milliseconds _pingInterval;    // (I)
+    const stdx::chrono::milliseconds _lockExpiration;  // (I)
 
-        ServiceContext* const _serviceContext;                                          // (F)
+    stdx::mutex _mutex;
+    std::unique_ptr<stdx::thread> _execThread;  // (S)
 
-        const std::string _processID;                                                   // (I)
-        const std::unique_ptr<DistLockCatalog> _catalog;                                // (I)
-        const stdx::chrono::milliseconds _pingInterval;                                 // (I)
-        const stdx::chrono::milliseconds _lockExpiration;                               // (I)
+    // Contains the list of locks queued for unlocking. Cases when unlock operation can
+    // be queued include:
+    // 1. First attempt on unlocking resulted in an error.
+    // 2. Attempting to grab or overtake a lock resulted in an error where we are uncertain
+    //    whether the modification was actually applied or not, and call unlock to make
+    //    sure that it was cleaned up.
+    std::deque<DistLockHandle> _unlockList;  // (M)
 
-        stdx::mutex _mutex;
-        std::unique_ptr<stdx::thread> _execThread;                                      // (S)
+    bool _isShutDown = false;              // (M)
+    stdx::condition_variable _shutDownCV;  // (M)
 
-        // Contains the list of locks queued for unlocking. Cases when unlock operation can
-        // be queued include:
-        // 1. First attempt on unlocking resulted in an error.
-        // 2. Attempting to grab or overtake a lock resulted in an error where we are uncertain
-        //    whether the modification was actually applied or not, and call unlock to make
-        //    sure that it was cleaned up.
-        std::deque<DistLockHandle> _unlockList;                                         // (M)
-
-        bool _isShutDown = false;                                                       // (M)
-        stdx::condition_variable _shutDownCV;                                           // (M)
-
-        // Map of lockName to last ping information.
-        std::unordered_map<std::string, DistLockPingInfo> _pingHistory;                 // (M)
-    };
+    // Map of lockName to last ping information.
+    std::unordered_map<std::string, DistLockPingInfo> _pingHistory;  // (M)
+};
 }

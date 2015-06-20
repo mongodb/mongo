@@ -32,28 +32,26 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
 namespace repl {
 
+/**
+ * Storage interface used by used by the ReplicationExecutor inside mongod for supporting
+ * ReplicationExectutor's ability to take database locks.
+ */
+class StorageInterface {
+public:
+    virtual ~StorageInterface();
+
     /**
-     * Storage interface used by used by the ReplicationExecutor inside mongod for supporting
-     * ReplicationExectutor's ability to take database locks.
+     * Creates an operation context for running database operations.
      */
-    class StorageInterface {
-    public:
-        virtual ~StorageInterface();
+    virtual OperationContext* createOperationContext() = 0;
 
-        /**
-         * Creates an operation context for running database operations.
-         */
-        virtual OperationContext* createOperationContext() = 0;
-
-    protected:
-
-        StorageInterface();
-
-    };
+protected:
+    StorageInterface();
+};
 
 }  // namespace repl
-} // namespace mongo
+}  // namespace mongo

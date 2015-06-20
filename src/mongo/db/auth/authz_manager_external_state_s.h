@@ -40,31 +40,32 @@
 
 namespace mongo {
 
-    /**
-     * The implementation of AuthzManagerExternalState functionality for mongos.
-     */
-    class AuthzManagerExternalStateMongos : public AuthzManagerExternalState{
-        MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMongos);
+/**
+ * The implementation of AuthzManagerExternalState functionality for mongos.
+ */
+class AuthzManagerExternalStateMongos : public AuthzManagerExternalState {
+    MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMongos);
 
-    public:
-        AuthzManagerExternalStateMongos();
-        virtual ~AuthzManagerExternalStateMongos();
+public:
+    AuthzManagerExternalStateMongos();
+    virtual ~AuthzManagerExternalStateMongos();
 
-        virtual Status initialize(OperationContext* txn);
-        std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
-                AuthorizationManager* authzManager) override;
-        virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion);
-        virtual Status getUserDescription(
-                            OperationContext* txn, const UserName& userName, BSONObj* result);
-        virtual Status getRoleDescription(const RoleName& roleName,
-                                          bool showPrivileges,
-                                          BSONObj* result);
-        virtual Status getRoleDescriptionsForDB(const std::string dbname,
-                                                bool showPrivileges,
-                                                bool showBuiltinRoles,
-                                                std::vector<BSONObj>* result);
+    virtual Status initialize(OperationContext* txn);
+    std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
+        AuthorizationManager* authzManager) override;
+    virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion);
+    virtual Status getUserDescription(OperationContext* txn,
+                                      const UserName& userName,
+                                      BSONObj* result);
+    virtual Status getRoleDescription(const RoleName& roleName,
+                                      bool showPrivileges,
+                                      BSONObj* result);
+    virtual Status getRoleDescriptionsForDB(const std::string dbname,
+                                            bool showPrivileges,
+                                            bool showBuiltinRoles,
+                                            std::vector<BSONObj>* result);
 
-        bool hasAnyPrivilegeDocuments(OperationContext* txn) override;
-    };
+    bool hasAnyPrivilegeDocuments(OperationContext* txn) override;
+};
 
-} // namespace mongo
+}  // namespace mongo

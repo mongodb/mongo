@@ -32,54 +32,53 @@
 #include <memory>
 
 namespace mongo {
-    class Collection;
-    class DocumentSourceCursor;
-    struct ExpressionContext;
-    class OperationContext;
-    class Pipeline;
-    class PlanExecutor;
+class Collection;
+class DocumentSourceCursor;
+struct ExpressionContext;
+class OperationContext;
+class Pipeline;
+class PlanExecutor;
 
-    /*
-      PipelineD is an extension of the Pipeline class, but with additional
-      material that references symbols that are not available in mongos,
-      where the remainder of the Pipeline class also functions.  PipelineD
-      is a friend of Pipeline so that it can have equal access to Pipeline's
-      members.
+/*
+  PipelineD is an extension of the Pipeline class, but with additional
+  material that references symbols that are not available in mongos,
+  where the remainder of the Pipeline class also functions.  PipelineD
+  is a friend of Pipeline so that it can have equal access to Pipeline's
+  members.
 
-      See the friend declaration in Pipeline.
+  See the friend declaration in Pipeline.
+ */
+class PipelineD {
+public:
+    /**
+     * Create a Cursor wrapped in a DocumentSourceCursor, which is suitable
+     * to be the first source for a pipeline to begin with.  This source
+     * will feed the execution of the pipeline.
+     *
+     * This method looks for early pipeline stages that can be folded into
+     * the underlying cursor, and when a cursor can absorb those, they
+     * are removed from the head of the pipeline.  For example, an
+     * early match can be removed and replaced with a Cursor that will
+     * do an index scan.
+     *
+     * The cursor is added to the front of the pipeline's sources.
+     *
+     * Must have a AutoGetCollectionForRead before entering.
+     *
+     * If the returned PlanExecutor is non-null, you are responsible for ensuring
+     * it receives appropriate invalidate and kill messages.
+     *
+     * @param pPipeline the logical "this" for this operation
+     * @param pExpCtx the expression context for this pipeline
      */
-    class PipelineD {
-    public:
+    static std::shared_ptr<PlanExecutor> prepareCursorSource(
+        OperationContext* txn,
+        Collection* collection,
+        const boost::intrusive_ptr<Pipeline>& pPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-        /**
-         * Create a Cursor wrapped in a DocumentSourceCursor, which is suitable
-         * to be the first source for a pipeline to begin with.  This source
-         * will feed the execution of the pipeline.
-         *
-         * This method looks for early pipeline stages that can be folded into
-         * the underlying cursor, and when a cursor can absorb those, they
-         * are removed from the head of the pipeline.  For example, an
-         * early match can be removed and replaced with a Cursor that will
-         * do an index scan.
-         *
-         * The cursor is added to the front of the pipeline's sources.
-         *
-         * Must have a AutoGetCollectionForRead before entering.
-         *
-         * If the returned PlanExecutor is non-null, you are responsible for ensuring
-         * it receives appropriate invalidate and kill messages.
-         *
-         * @param pPipeline the logical "this" for this operation
-         * @param pExpCtx the expression context for this pipeline
-         */
-        static std::shared_ptr<PlanExecutor> prepareCursorSource(
-            OperationContext* txn,
-            Collection* collection,
-            const boost::intrusive_ptr<Pipeline> &pPipeline,
-            const boost::intrusive_ptr<ExpressionContext> &pExpCtx);
+private:
+    PipelineD();  // does not exist:  prevent instantiation
+};
 
-    private:
-        PipelineD(); // does not exist:  prevent instantiation
-    };
-
-} // namespace mongo
+}  // namespace mongo

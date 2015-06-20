@@ -32,57 +32,63 @@
 
 namespace mongo {
 
-    class TickSource;
+class TickSource;
+
+/**
+ * Time tracking object.
+ */
+class Timer /*copyable*/ {
+public:
+    /**
+     * Creates a timer with the system default tick source. Should not be created before
+     * global initialization completes.
+     */
+    Timer();
 
     /**
-     * Time tracking object.
+     * Creates a timer using the specified tick source. Caller retains ownership of
+     * TickSource, and must keep it in scope until Timer goes out of scope.
      */
-    class Timer /*copyable*/ {
-    public:
-        /**
-         * Creates a timer with the system default tick source. Should not be created before
-         * global initialization completes.
-         */
-        Timer();
+    explicit Timer(TickSource* tickSource);
 
-        /**
-         * Creates a timer using the specified tick source. Caller retains ownership of
-         * TickSource, and must keep it in scope until Timer goes out of scope.
-         */
-        explicit Timer(TickSource* tickSource);
+    int seconds() const {
+        return static_cast<int>(micros() / 1000000);
+    }
+    int millis() const {
+        return static_cast<int>(micros() / 1000);
+    }
+    int minutes() const {
+        return seconds() / 60;
+    }
 
-        int seconds() const { return static_cast<int>(micros() / 1000000); }
-        int millis() const { return static_cast<int>(micros() / 1000); }
-        int minutes() const { return seconds() / 60; }
+    /** Get the time interval and reset at the same time.
+     *  @return time in milliseconds.
+     */
+    inline int millisReset() {
+        const long long nextNow = now();
+        const long long deltaMicros = static_cast<long long>((nextNow - _old) * _microsPerCount);
 
-        /** Get the time interval and reset at the same time.
-         *  @return time in milliseconds.
-         */
-        inline int millisReset() {
-            const long long nextNow = now();
-            const long long deltaMicros =
-                    static_cast<long long>((nextNow - _old) * _microsPerCount);
+        _old = nextNow;
+        return static_cast<int>(deltaMicros / 1000);
+    }
 
-            _old = nextNow;
-            return static_cast<int>(deltaMicros / 1000);
-        }
+    inline long long micros() const {
+        return static_cast<long long>((now() - _old) * _microsPerCount);
+    }
 
-        inline long long micros() const {
-            return static_cast<long long>((now() - _old) * _microsPerCount);
-        }
+    inline void reset() {
+        _old = now();
+    }
 
-        inline void reset() { _old = now(); }
+private:
+    TickSource* const _tickSource;
 
-    private:
+    // Derived value from _countsPerSecond. This represents the conversion ratio
+    // from clock ticks to microseconds.
+    const double _microsPerCount;
 
-        TickSource* const _tickSource;
+    long long now() const;
 
-        // Derived value from _countsPerSecond. This represents the conversion ratio
-        // from clock ticks to microseconds.
-        const double _microsPerCount;
-
-        long long now() const;
-
-        long long _old;
-    };
+    long long _old;
+};
 }  // namespace mongo

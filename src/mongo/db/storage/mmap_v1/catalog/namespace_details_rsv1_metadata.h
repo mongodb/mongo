@@ -38,70 +38,65 @@
 
 namespace mongo {
 
-    class RecordStore;
+class RecordStore;
 
-    /*
-     * NOTE: NamespaceDetails will become a struct
-     *      all dur, etc... will move here
-     */
-    class NamespaceDetailsRSV1MetaData : public RecordStoreV1MetaData {
-    public:
-        explicit NamespaceDetailsRSV1MetaData( StringData ns, NamespaceDetails* details);
+/*
+ * NOTE: NamespaceDetails will become a struct
+ *      all dur, etc... will move here
+ */
+class NamespaceDetailsRSV1MetaData : public RecordStoreV1MetaData {
+public:
+    explicit NamespaceDetailsRSV1MetaData(StringData ns, NamespaceDetails* details);
 
-        virtual ~NamespaceDetailsRSV1MetaData(){}
+    virtual ~NamespaceDetailsRSV1MetaData() {}
 
-        virtual const DiskLoc& capExtent() const;
-        virtual void setCapExtent( OperationContext* txn, const DiskLoc& loc );
+    virtual const DiskLoc& capExtent() const;
+    virtual void setCapExtent(OperationContext* txn, const DiskLoc& loc);
 
-        virtual const DiskLoc& capFirstNewRecord() const;
-        virtual void setCapFirstNewRecord( OperationContext* txn, const DiskLoc& loc );
+    virtual const DiskLoc& capFirstNewRecord() const;
+    virtual void setCapFirstNewRecord(OperationContext* txn, const DiskLoc& loc);
 
-        virtual bool capLooped() const;
+    virtual bool capLooped() const;
 
-        virtual long long dataSize() const;
-        virtual long long numRecords() const;
+    virtual long long dataSize() const;
+    virtual long long numRecords() const;
 
-        virtual void incrementStats( OperationContext* txn,
-                                     long long dataSizeIncrement,
-                                     long long numRecordsIncrement );
+    virtual void incrementStats(OperationContext* txn,
+                                long long dataSizeIncrement,
+                                long long numRecordsIncrement);
 
-        virtual void setStats( OperationContext* txn,
-                               long long dataSize,
-                               long long numRecords );
+    virtual void setStats(OperationContext* txn, long long dataSize, long long numRecords);
 
-        virtual DiskLoc deletedListEntry( int bucket ) const;
-        virtual void setDeletedListEntry( OperationContext* txn,
-                                          int bucket,
-                                          const DiskLoc& loc );
+    virtual DiskLoc deletedListEntry(int bucket) const;
+    virtual void setDeletedListEntry(OperationContext* txn, int bucket, const DiskLoc& loc);
 
-        virtual DiskLoc deletedListLegacyGrabBag() const;
-        virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc);
+    virtual DiskLoc deletedListLegacyGrabBag() const;
+    virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc);
 
-        virtual void orphanDeletedList(OperationContext* txn);
+    virtual void orphanDeletedList(OperationContext* txn);
 
-        virtual const DiskLoc& firstExtent( OperationContext* txn ) const;
-        virtual void setFirstExtent( OperationContext* txn, const DiskLoc& loc );
+    virtual const DiskLoc& firstExtent(OperationContext* txn) const;
+    virtual void setFirstExtent(OperationContext* txn, const DiskLoc& loc);
 
-        virtual const DiskLoc& lastExtent( OperationContext* txn ) const;
-        virtual void setLastExtent( OperationContext* txn, const DiskLoc& loc );
+    virtual const DiskLoc& lastExtent(OperationContext* txn) const;
+    virtual void setLastExtent(OperationContext* txn, const DiskLoc& loc);
 
-        virtual bool isCapped() const;
+    virtual bool isCapped() const;
 
-        virtual bool isUserFlagSet( int flag ) const;
-        virtual int userFlags() const;
-        virtual bool setUserFlag( OperationContext* txn, int flag );
-        virtual bool clearUserFlag( OperationContext* txn, int flag );
-        virtual bool replaceUserFlags( OperationContext* txn, int flags );
+    virtual bool isUserFlagSet(int flag) const;
+    virtual int userFlags() const;
+    virtual bool setUserFlag(OperationContext* txn, int flag);
+    virtual bool clearUserFlag(OperationContext* txn, int flag);
+    virtual bool replaceUserFlags(OperationContext* txn, int flags);
 
-        virtual int lastExtentSize( OperationContext* txn ) const;
-        virtual void setLastExtentSize( OperationContext* txn, int newMax );
+    virtual int lastExtentSize(OperationContext* txn) const;
+    virtual void setLastExtentSize(OperationContext* txn, int newMax);
 
-        virtual long long maxCappedDocs() const;
+    virtual long long maxCappedDocs() const;
 
-    private:
-        std::string _ns;
-        NamespaceDetails* _details;
-        RecordStore* _namespaceRecordStore;
-    };
-
+private:
+    std::string _ns;
+    NamespaceDetails* _details;
+    RecordStore* _namespaceRecordStore;
+};
 }

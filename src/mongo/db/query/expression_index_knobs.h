@@ -30,18 +30,18 @@
 
 namespace mongo {
 
-    //
-    // Geo Query knobs
-    //
+//
+// Geo Query knobs
+//
 
-    /**
-     * The maximum number of cells to use for 2D geo query covering for predicate queries
-     */
-    extern int internalGeoPredicateQuery2DMaxCoveringCells;
+/**
+ * The maximum number of cells to use for 2D geo query covering for predicate queries
+ */
+extern int internalGeoPredicateQuery2DMaxCoveringCells;
 
-    /**
-     * The maximum number of cells to use for 2D geo query covering for predicate queries
-     */
-    extern int internalGeoNearQuery2DMaxCoveringCells;
+/**
+ * The maximum number of cells to use for 2D geo query covering for predicate queries
+ */
+extern int internalGeoNearQuery2DMaxCoveringCells;
 
 }  // namespace mongo

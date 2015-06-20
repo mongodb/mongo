@@ -41,19 +41,19 @@
 
 namespace mongo {
 
-    /**
-     * Create a vector of strings from varargs of C-style strings.
-     *
-     * WARNING: Only intended for use by MONGO_MAKE_STRING_VECTOR macro, defined above.  Aborts
-     * ungracefully if you misuse it, so stick to the macro.
-     *
-     * The first parameter is ignored in all circumstances. The subsequent parameters must be
-     * const char* C-style strings, or NULL. Of these parameters, at least one must be
-     * NULL. Parameters at and beyond the NULL are not inserted. Typically, the NULL will be
-     * the last parameter. The MONGO_MAKE_STRING_VECTOR macro enforces this.
-     *
-     * Returns a vector of std::strings.
-     */
-    std::vector<std::string> _makeStringVector(int ignored, ...);
+/**
+ * Create a vector of strings from varargs of C-style strings.
+ *
+ * WARNING: Only intended for use by MONGO_MAKE_STRING_VECTOR macro, defined above.  Aborts
+ * ungracefully if you misuse it, so stick to the macro.
+ *
+ * The first parameter is ignored in all circumstances. The subsequent parameters must be
+ * const char* C-style strings, or NULL. Of these parameters, at least one must be
+ * NULL. Parameters at and beyond the NULL are not inserted. Typically, the NULL will be
+ * the last parameter. The MONGO_MAKE_STRING_VECTOR macro enforces this.
+ *
+ * Returns a vector of std::strings.
+ */
+std::vector<std::string> _makeStringVector(int ignored, ...);
 
 }  // namespace mongo

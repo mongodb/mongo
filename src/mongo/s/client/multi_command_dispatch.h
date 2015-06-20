@@ -35,53 +35,50 @@
 
 namespace mongo {
 
+/**
+ * A MultiCommandDispatch is a send/recv operation for multiple commands at once.
+ *
+ * The commands are first registered with an endpoint and serializable request.  Commands are
+ * sent out without waiting for responses, and then responses are read later one-at-a-time.
+ *
+ * If context must be tracked alongside these requests, it can be associated with the endpoint
+ * object.
+ */
+class MultiCommandDispatch {
+public:
+    virtual ~MultiCommandDispatch() {}
+
     /**
-     * A MultiCommandDispatch is a send/recv operation for multiple commands at once.
+     * Adds a command to this multi-command dispatch.  Commands are registered with a
+     * ConnectionString endpoint and a serializable request.
      *
-     * The commands are first registered with an endpoint and serializable request.  Commands are
-     * sent out without waiting for responses, and then responses are read later one-at-a-time.
-     *
-     * If context must be tracked alongside these requests, it can be associated with the endpoint
-     * object.
+     * Commands are not sent immediately, they are sent on sendAll.
      */
-    class MultiCommandDispatch {
-    public:
+    virtual void addCommand(const ConnectionString& endpoint,
+                            StringData dbName,
+                            const BSONSerializable& request) = 0;
 
-        virtual ~MultiCommandDispatch() {
-        }
+    /**
+     * Sends all the commands in this dispatch to their endpoints, in undefined order and
+     * without waiting for responses.  May block on full send queue (though this should be
+     * rare).
+     *
+     * Any error which occurs during sendAll will be reported on recvAny, *does not throw.*
+     */
+    virtual void sendAll() = 0;
 
-        /**
-         * Adds a command to this multi-command dispatch.  Commands are registered with a
-         * ConnectionString endpoint and a serializable request.
-         *
-         * Commands are not sent immediately, they are sent on sendAll.
-         */
-        virtual void addCommand( const ConnectionString& endpoint,
-                                 StringData dbName,
-                                 const BSONSerializable& request ) = 0;
+    /**
+     * Returns the number of sent requests that are still waiting to be recv'd.
+     */
+    virtual int numPending() const = 0;
 
-        /**
-         * Sends all the commands in this dispatch to their endpoints, in undefined order and
-         * without waiting for responses.  May block on full send queue (though this should be
-         * rare).
-         *
-         * Any error which occurs during sendAll will be reported on recvAny, *does not throw.*
-         */
-        virtual void sendAll() = 0;
-
-        /**
-         * Returns the number of sent requests that are still waiting to be recv'd.
-         */
-        virtual int numPending() const = 0;
-
-        /**
-         * Blocks until a command response has come back.  Any outstanding command response may be
-         * returned with associated endpoint.
-         *
-         * Returns !OK on send/recv/parse failure, otherwise command-level errors are returned in
-         * the response object itself.
-         */
-        virtual Status recvAny( ConnectionString* endpoint, BSONSerializable* response ) = 0;
-    };
-
+    /**
+     * Blocks until a command response has come back.  Any outstanding command response may be
+     * returned with associated endpoint.
+     *
+     * Returns !OK on send/recv/parse failure, otherwise command-level errors are returned in
+     * the response object itself.
+     */
+    virtual Status recvAny(ConnectionString* endpoint, BSONSerializable* response) = 0;
+};
 }

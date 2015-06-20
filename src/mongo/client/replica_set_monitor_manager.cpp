@@ -38,74 +38,74 @@
 
 namespace mongo {
 
-    using std::shared_ptr;
-    using std::set;
-    using std::string;
-    using std::vector;
+using std::shared_ptr;
+using std::set;
+using std::string;
+using std::vector;
 
-    ReplicaSetMonitorManager::ReplicaSetMonitorManager() = default;
+ReplicaSetMonitorManager::ReplicaSetMonitorManager() = default;
 
-    ReplicaSetMonitorManager::~ReplicaSetMonitorManager() = default;
+ReplicaSetMonitorManager::~ReplicaSetMonitorManager() = default;
 
-    shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData setName) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData setName) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-        return mapFindWithDefault(_monitors, setName, shared_ptr<ReplicaSetMonitor>());
+    return mapFindWithDefault(_monitors, setName, shared_ptr<ReplicaSetMonitor>());
+}
+
+shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
+    const ConnectionString& connStr) {
+    invariant(connStr.type() == ConnectionString::SET);
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    shared_ptr<ReplicaSetMonitor>& monitor = _monitors[connStr.getSetName()];
+    if (!monitor) {
+        const std::set<HostAndPort> servers(connStr.getServers().begin(),
+                                            connStr.getServers().end());
+
+        monitor = std::make_shared<ReplicaSetMonitor>(connStr.getSetName(), servers);
     }
 
-    shared_ptr<ReplicaSetMonitor>
-    ReplicaSetMonitorManager::getOrCreateMonitor(const ConnectionString& connStr) {
-        invariant(connStr.type() == ConnectionString::SET);
+    return monitor;
+}
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+vector<string> ReplicaSetMonitorManager::getAllSetNames() {
+    vector<string> allNames;
 
-        shared_ptr<ReplicaSetMonitor>& monitor = _monitors[connStr.getSetName()];
-        if (!monitor) {
-            const std::set<HostAndPort> servers(connStr.getServers().begin(),
-                                                connStr.getServers().end());
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-            monitor = std::make_shared<ReplicaSetMonitor>(connStr.getSetName(), servers);
-        }
-
-        return monitor;
+    for (const auto& entry : _monitors) {
+        allNames.push_back(entry.first);
     }
 
-    vector<string> ReplicaSetMonitorManager::getAllSetNames() {
-        vector<string> allNames;
+    return allNames;
+}
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-        for (const auto& entry : _monitors) {
-            allNames.push_back(entry.first);
-        }
-
-        return allNames;
+    ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
+    if (it != _monitors.end()) {
+        _monitors.erase(it);
     }
+}
 
-    void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+void ReplicaSetMonitorManager::removeAllMonitors() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-        ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
-        if (it != _monitors.end()) {
-            _monitors.erase(it);
-        }
+    // Reset the StringMap, which will release all registered monitors
+    _monitors = ReplicaSetMonitorsMap();
+}
+
+void ReplicaSetMonitorManager::report(BSONObjBuilder* builder) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    for (const auto& monitorPair : _monitors) {
+        BSONObjBuilder monitorInfo(builder->subobjStart(monitorPair.first));
+        monitorPair.second->appendInfo(monitorInfo);
+        monitorInfo.done();
     }
-
-    void ReplicaSetMonitorManager::removeAllMonitors() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-        // Reset the StringMap, which will release all registered monitors
-        _monitors = ReplicaSetMonitorsMap();
-    }
-
-    void ReplicaSetMonitorManager::report(BSONObjBuilder* builder) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-        for (const auto& monitorPair : _monitors) {
-            BSONObjBuilder monitorInfo(builder->subobjStart(monitorPair.first));
-            monitorPair.second->appendInfo(monitorInfo);
-            monitorInfo.done();
-        }
-    }
+}
 
 }  // namespace mongo

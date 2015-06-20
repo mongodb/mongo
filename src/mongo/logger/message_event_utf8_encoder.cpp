@@ -36,76 +36,74 @@
 namespace mongo {
 namespace logger {
 
-    static MessageEventDetailsEncoder::DateFormatter _dateFormatter = outputDateAsISOStringLocal;
+static MessageEventDetailsEncoder::DateFormatter _dateFormatter = outputDateAsISOStringLocal;
 
-    void MessageEventDetailsEncoder::setDateFormatter(DateFormatter dateFormatter) {
-        _dateFormatter = dateFormatter;
+void MessageEventDetailsEncoder::setDateFormatter(DateFormatter dateFormatter) {
+    _dateFormatter = dateFormatter;
+}
+
+MessageEventDetailsEncoder::DateFormatter MessageEventDetailsEncoder::getDateFormatter() {
+    return _dateFormatter;
+}
+
+MessageEventDetailsEncoder::~MessageEventDetailsEncoder() {}
+std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& event,
+                                                 std::ostream& os) {
+    static const size_t maxLogLine = 10 * 1024;
+
+    _dateFormatter(os, event.getDate());
+    os << ' ';
+
+    os << event.getSeverity().toChar();
+    os << ' ';
+
+    LogComponent component = event.getComponent();
+    os << component;
+    os << ' ';
+
+    StringData contextName = event.getContextName();
+    if (!contextName.empty()) {
+        os << '[' << contextName << "] ";
     }
 
-    MessageEventDetailsEncoder::DateFormatter MessageEventDetailsEncoder::getDateFormatter() {
-        return _dateFormatter;
+    StringData msg = event.getMessage();
+    if (msg.size() > maxLogLine) {
+        os << "warning: log line attempted (" << msg.size() / 1024 << "k) over max size ("
+           << maxLogLine / 1024 << "k), printing beginning and end ... ";
+        os << msg.substr(0, maxLogLine / 3);
+        os << " .......... ";
+        os << msg.substr(msg.size() - (maxLogLine / 3));
+    } else {
+        os << msg;
     }
+    if (!msg.endsWith(StringData("\n", StringData::LiteralTag())))
+        os << '\n';
+    return os;
+}
 
-    MessageEventDetailsEncoder::~MessageEventDetailsEncoder() {}
-    std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& event,
-                                                     std::ostream &os) {
-
-        static const size_t maxLogLine = 10 * 1024;
-
-        _dateFormatter(os, event.getDate());
-        os << ' ';
-
-        os << event.getSeverity().toChar();
-        os << ' ';
-
-        LogComponent component = event.getComponent();
-        os << component;
-        os << ' ';
-
-        StringData contextName = event.getContextName();
-        if (!contextName.empty()) {
-            os << '[' << contextName << "] ";
-        }
-
-        StringData msg = event.getMessage();
-        if (msg.size() > maxLogLine) {
-            os << "warning: log line attempted (" << msg.size() / 1024 << "k) over max size (" <<
-                maxLogLine / 1024 << "k), printing beginning and end ... ";
-            os << msg.substr(0, maxLogLine / 3);
-            os << " .......... ";
-            os << msg.substr(msg.size() - (maxLogLine / 3));
-        }
-        else {
-            os << msg;
-        }
-        if (!msg.endsWith(StringData("\n", StringData::LiteralTag())))
-            os << '\n';
-        return os;
+MessageEventWithContextEncoder::~MessageEventWithContextEncoder() {}
+std::ostream& MessageEventWithContextEncoder::encode(const MessageEventEphemeral& event,
+                                                     std::ostream& os) {
+    StringData contextName = event.getContextName();
+    if (!contextName.empty()) {
+        os << '[' << contextName << "] ";
     }
+    StringData message = event.getMessage();
+    os << message;
+    if (!message.endsWith("\n"))
+        os << '\n';
+    return os;
+}
 
-    MessageEventWithContextEncoder::~MessageEventWithContextEncoder() {}
-    std::ostream& MessageEventWithContextEncoder::encode(const MessageEventEphemeral& event,
-                                                         std::ostream& os) {
-        StringData contextName = event.getContextName();
-        if (!contextName.empty()) {
-            os << '[' << contextName << "] ";
-        }
-        StringData message = event.getMessage();
-        os << message;
-        if (!message.endsWith("\n"))
-            os << '\n';
-        return os;
-    }
-
-    MessageEventUnadornedEncoder::~MessageEventUnadornedEncoder() {}
-    std::ostream& MessageEventUnadornedEncoder::encode(const MessageEventEphemeral& event,
-                                                       std::ostream& os) {
-        StringData message = event.getMessage();
-        os << message;
-        if (!message.endsWith("\n"))
-            os << '\n';
-        return os;
-    }
+MessageEventUnadornedEncoder::~MessageEventUnadornedEncoder() {}
+std::ostream& MessageEventUnadornedEncoder::encode(const MessageEventEphemeral& event,
+                                                   std::ostream& os) {
+    StringData message = event.getMessage();
+    os << message;
+    if (!message.endsWith("\n"))
+        os << '\n';
+    return os;
+}
 
 }  // namespace logger
 }  // namespace mongo

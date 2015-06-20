@@ -35,143 +35,125 @@
 
 namespace mongo {
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
+
+/**
+ * Thrown whenever your config info for a given shard/chunk is out of date.
+ */
+class StaleConfigException : public AssertionException {
+public:
+    StaleConfigException(const std::string& ns,
+                         const std::string& raw,
+                         int code,
+                         ChunkVersion received,
+                         ChunkVersion wanted)
+        : AssertionException(stream() << raw << " ( ns : " << ns
+                                      << ", received : " << received.toString()
+                                      << ", wanted : " << wanted.toString() << ", "
+                                      << (code == SendStaleConfigCode ? "send" : "recv") << " )",
+                             code),
+          _ns(ns),
+          _received(received),
+          _wanted(wanted) {}
+
+    /** Preferred if we're rebuilding this from a thrown exception */
+    StaleConfigException(const std::string& raw, int code, const BSONObj& error)
+        : AssertionException(
+              stream() << raw
+                       << " ( ns : " << (error["ns"].type() == String ? error["ns"].String()
+                                                                      : std::string("<unknown>"))
+                       << ", received : " << ChunkVersion::fromBSON(error, "vReceived").toString()
+                       << ", wanted : " << ChunkVersion::fromBSON(error, "vWanted").toString()
+                       << ", " << (code == SendStaleConfigCode ? "send" : "recv") << " )",
+              code),
+          // For legacy reasons, we may not always get a namespace here
+          _ns(error["ns"].type() == String ? error["ns"].String() : ""),
+          _received(ChunkVersion::fromBSON(error, "vReceived")),
+          _wanted(ChunkVersion::fromBSON(error, "vWanted")) {}
 
     /**
-     * Thrown whenever your config info for a given shard/chunk is out of date.
+     * Needs message so when we trace all exceptions on construction we get a useful
+     * message
      */
-    class StaleConfigException : public AssertionException {
-    public:
-        StaleConfigException(const std::string& ns,
+    StaleConfigException()
+        : AssertionException("initializing empty stale config exception object", 0) {}
+
+    virtual ~StaleConfigException() throw() {}
+
+    virtual void appendPrefix(std::stringstream& ss) const {
+        ss << "stale sharding config exception: ";
+    }
+
+    std::string getns() const {
+        return _ns;
+    }
+
+    /**
+     * true if this exception would require a full reload of config data to resolve
+     */
+    bool requiresFullReload() const {
+        return !_received.hasEqualEpoch(_wanted) || _received.isSet() != _wanted.isSet();
+    }
+
+    static bool parse(const std::string& big, std::string& ns, std::string& raw) {
+        std::string::size_type start = big.find('[');
+        if (start == std::string::npos)
+            return false;
+        std::string::size_type end = big.find(']', start);
+        if (end == std::string::npos)
+            return false;
+
+        ns = big.substr(start + 1, (end - start) - 1);
+        raw = big.substr(end + 1);
+        return true;
+    }
+
+    ChunkVersion getVersionReceived() const {
+        return _received;
+    }
+
+    ChunkVersion getVersionWanted() const {
+        return _wanted;
+    }
+
+    StaleConfigException& operator=(const StaleConfigException& elem) {
+        this->_ei.msg = elem._ei.msg;
+        this->_ei.code = elem._ei.code;
+        this->_ns = elem._ns;
+        this->_received = elem._received;
+        this->_wanted = elem._wanted;
+
+        return *this;
+    }
+
+private:
+    std::string _ns;
+    ChunkVersion _received;
+    ChunkVersion _wanted;
+};
+
+class SendStaleConfigException : public StaleConfigException {
+public:
+    SendStaleConfigException(const std::string& ns,
                              const std::string& raw,
-                             int code,
                              ChunkVersion received,
                              ChunkVersion wanted)
-            : AssertionException(stream() << raw << " ( ns : " << ns
-                                          << ", received : " << received.toString()
-                                          << ", wanted : " << wanted.toString()
-                                          << ", " << ( code == SendStaleConfigCode ?
-                                                       "send" : "recv" ) << " )",
-                                 code),
-              _ns(ns),
-              _received( received ),
-              _wanted( wanted ) {
-        }
+        : StaleConfigException(ns, raw, SendStaleConfigCode, received, wanted) {}
 
-        /** Preferred if we're rebuilding this from a thrown exception */
-        StaleConfigException( const std::string& raw,
-                              int code,
-                              const BSONObj& error)
-            : AssertionException( stream() << raw << " ( ns : "
-                                           << ( error["ns"].type() == String ?
-                                                error["ns"].String() : std::string("<unknown>") )
-                                           << ", received : "
-                                           << ChunkVersion::fromBSON( error, "vReceived" ).toString()
-                                           << ", wanted : "
-                                           << ChunkVersion::fromBSON( error, "vWanted" ).toString()
-                                           << ", "
-                                           << ( code == SendStaleConfigCode ?
-                                                "send" : "recv" ) << " )",
-                                  code ),
-              // For legacy reasons, we may not always get a namespace here
-              _ns( error["ns"].type() == String ? error["ns"].String() : "" ),
-              _received( ChunkVersion::fromBSON( error, "vReceived" ) ),
-              _wanted( ChunkVersion::fromBSON( error, "vWanted" ) ) {
-        }
+    SendStaleConfigException(const std::string& raw, const BSONObj& error)
+        : StaleConfigException(raw, SendStaleConfigCode, error) {}
+};
 
-        /**
-         * Needs message so when we trace all exceptions on construction we get a useful
-         * message
-         */
-        StaleConfigException() :
-            AssertionException( "initializing empty stale config exception object", 0 ) {
-        }
+class RecvStaleConfigException : public StaleConfigException {
+public:
+    RecvStaleConfigException(const std::string& ns,
+                             const std::string& raw,
+                             ChunkVersion received,
+                             ChunkVersion wanted)
+        : StaleConfigException(ns, raw, RecvStaleConfigCode, received, wanted) {}
 
-        virtual ~StaleConfigException() throw() {}
+    RecvStaleConfigException(const std::string& raw, const BSONObj& error)
+        : StaleConfigException(raw, RecvStaleConfigCode, error) {}
+};
 
-        virtual void appendPrefix( std::stringstream& ss ) const {
-            ss << "stale sharding config exception: ";
-        }
-
-        std::string getns() const { return _ns; }
-
-        /**
-         * true if this exception would require a full reload of config data to resolve
-         */
-        bool requiresFullReload() const {
-            return ! _received.hasEqualEpoch( _wanted ) ||
-                     _received.isSet() != _wanted.isSet();
-        }
-
-        static bool parse( const std::string& big , std::string& ns , std::string& raw ) {
-            std::string::size_type start = big.find( '[' );
-            if ( start == std::string::npos )
-                return false;
-            std::string::size_type end = big.find( ']' ,start );
-            if ( end == std::string::npos )
-                return false;
-
-            ns = big.substr( start + 1 , ( end - start ) - 1 );
-            raw = big.substr( end + 1 );
-            return true;
-        }
-
-        ChunkVersion getVersionReceived() const {
-            return _received;
-        }
-
-        ChunkVersion getVersionWanted() const {
-            return _wanted;
-        }
-
-        StaleConfigException& operator=(const StaleConfigException& elem) {
-            this->_ei.msg = elem._ei.msg;
-            this->_ei.code = elem._ei.code;
-            this->_ns = elem._ns;
-            this->_received = elem._received;
-            this->_wanted = elem._wanted;
-
-            return *this;
-        }
-
-    private:
-        std::string _ns;
-        ChunkVersion _received;
-        ChunkVersion _wanted;
-    };
-
-    class SendStaleConfigException : public StaleConfigException {
-    public:
-        SendStaleConfigException(const std::string& ns,
-                                 const std::string& raw,
-                                 ChunkVersion received,
-                                 ChunkVersion wanted)
-            : StaleConfigException(ns, raw, SendStaleConfigCode, received, wanted) {
-
-        }
-
-        SendStaleConfigException( const std::string& raw,
-                                  const BSONObj& error)
-            : StaleConfigException(raw, SendStaleConfigCode, error) {
-
-        }
-    };
-
-    class RecvStaleConfigException : public StaleConfigException {
-    public:
-        RecvStaleConfigException(const std::string& ns,
-                                 const std::string& raw,
-                                 ChunkVersion received,
-                                 ChunkVersion wanted)
-            : StaleConfigException(ns, raw, RecvStaleConfigCode, received, wanted) {
-
-        }
-
-        RecvStaleConfigException(const std::string& raw,
-                                 const BSONObj& error)
-            : StaleConfigException(raw, RecvStaleConfigCode, error) {
-
-        }
-    };
-
-} // namespace mongo
+}  // namespace mongo

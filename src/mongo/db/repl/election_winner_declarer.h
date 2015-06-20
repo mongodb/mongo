@@ -39,89 +39,90 @@
 
 namespace mongo {
 
-    class Status;
+class Status;
 
 namespace repl {
 
-    class ScatterGatherRunner;
-    class ReplSetDeclareElectionWinnerArgs;
+class ScatterGatherRunner;
+class ReplSetDeclareElectionWinnerArgs;
 
-    class ElectionWinnerDeclarer {
-        MONGO_DISALLOW_COPYING(ElectionWinnerDeclarer);
+class ElectionWinnerDeclarer {
+    MONGO_DISALLOW_COPYING(ElectionWinnerDeclarer);
+
+public:
+    class Algorithm : public ScatterGatherAlgorithm {
     public:
-
-        class Algorithm : public ScatterGatherAlgorithm {
-        public:
-            Algorithm(const std::string& setName,
-                      long long winnerId,
-                      long long term,
-                      const std::vector<HostAndPort>& targets);
-            virtual ~Algorithm();
-            virtual std::vector<RemoteCommandRequest> getRequests() const;
-            virtual void processResponse(
-                    const RemoteCommandRequest& request,
-                    const ResponseStatus& response);
-            virtual bool hasReceivedSufficientResponses() const;
-
-            /**
-             * Returns a Status indicating what if anything went wrong while declaring the
-             * election winner.
-             *
-             * It is invalid to call this before hasReceivedSufficeintResponses returns true.
-             */
-            Status getStatus() const { return _status; }
-
-        private:
-            const std::string _setName;
-            const long long _winnerId;
-            const long long _term;
-            const std::vector<HostAndPort> _targets;
-            bool _failed = false;
-            long long _responsesProcessed = 0;
-            Status _status = Status::OK();
-        };
-
-        ElectionWinnerDeclarer();
-        virtual ~ElectionWinnerDeclarer();
+        Algorithm(const std::string& setName,
+                  long long winnerId,
+                  long long term,
+                  const std::vector<HostAndPort>& targets);
+        virtual ~Algorithm();
+        virtual std::vector<RemoteCommandRequest> getRequests() const;
+        virtual void processResponse(const RemoteCommandRequest& request,
+                                     const ResponseStatus& response);
+        virtual bool hasReceivedSufficientResponses() const;
 
         /**
-         * Begins the process of sending replSetDeclareElectionWinner commands to all non-DOWN nodes
-         * in currentConfig, with the intention of alerting them of a new primary.
+         * Returns a Status indicating what if anything went wrong while declaring the
+         * election winner.
          *
-         * evh can be used to schedule a callback when the process is complete.
-         * This function must be run in the executor, as it must be synchronous with the command
-         * callbacks that it schedules.
-         * If this function returns Status::OK(), evh is then guaranteed to be signaled.
-         **/
-        StatusWith<ReplicationExecutor::EventHandle> start(
-            ReplicationExecutor* executor,
-            const std::string& setName,
-            long long winnerId,
-            long long term,
-            const std::vector<HostAndPort>& targets,
-            const stdx::function<void ()>& onCompletion = stdx::function<void ()>());
-
-        /**
-         * Informs the ElectionWinnerDeclarer to cancel further processing.  The "executor"
-         * argument must point to the same executor passed to "start()".
-         *
-         * Like start(), this method must run in the executor context.
+         * It is invalid to call this before hasReceivedSufficeintResponses returns true.
          */
-        void cancel(ReplicationExecutor* executor);
-
-        /**
-         * Returns a Status from the ElectionWinnerDeclarer::algorithm which indicates what 
-         * if anything went wrong while declaring the election winner.
-         *
-         * It is invalid to call this before the ElectionWinnerDeclarer::algorithm finishes running.
-         */
-        Status getStatus() const;
+        Status getStatus() const {
+            return _status;
+        }
 
     private:
-        std::unique_ptr<Algorithm> _algorithm;
-        std::unique_ptr<ScatterGatherRunner> _runner;
-        bool _isCanceled = false;
+        const std::string _setName;
+        const long long _winnerId;
+        const long long _term;
+        const std::vector<HostAndPort> _targets;
+        bool _failed = false;
+        long long _responsesProcessed = 0;
+        Status _status = Status::OK();
     };
+
+    ElectionWinnerDeclarer();
+    virtual ~ElectionWinnerDeclarer();
+
+    /**
+     * Begins the process of sending replSetDeclareElectionWinner commands to all non-DOWN nodes
+     * in currentConfig, with the intention of alerting them of a new primary.
+     *
+     * evh can be used to schedule a callback when the process is complete.
+     * This function must be run in the executor, as it must be synchronous with the command
+     * callbacks that it schedules.
+     * If this function returns Status::OK(), evh is then guaranteed to be signaled.
+     **/
+    StatusWith<ReplicationExecutor::EventHandle> start(
+        ReplicationExecutor* executor,
+        const std::string& setName,
+        long long winnerId,
+        long long term,
+        const std::vector<HostAndPort>& targets,
+        const stdx::function<void()>& onCompletion = stdx::function<void()>());
+
+    /**
+     * Informs the ElectionWinnerDeclarer to cancel further processing.  The "executor"
+     * argument must point to the same executor passed to "start()".
+     *
+     * Like start(), this method must run in the executor context.
+     */
+    void cancel(ReplicationExecutor* executor);
+
+    /**
+     * Returns a Status from the ElectionWinnerDeclarer::algorithm which indicates what
+     * if anything went wrong while declaring the election winner.
+     *
+     * It is invalid to call this before the ElectionWinnerDeclarer::algorithm finishes running.
+     */
+    Status getStatus() const;
+
+private:
+    std::unique_ptr<Algorithm> _algorithm;
+    std::unique_ptr<ScatterGatherRunner> _runner;
+    bool _isCanceled = false;
+};
 
 }  // namespace repl
 }  // namespace mongo

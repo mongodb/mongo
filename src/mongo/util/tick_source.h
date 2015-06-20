@@ -32,23 +32,23 @@
 
 namespace mongo {
 
+/**
+ * Interface for objects generating ticks that roughly represents the passage of time.
+ */
+class TickSource {
+public:
+    using Tick = int64_t;
+
+    virtual ~TickSource() = default;
+
     /**
-     * Interface for objects generating ticks that roughly represents the passage of time.
+     * Returns the current tick count from this source.
      */
-    class TickSource {
-    public:
-        using Tick = int64_t;
+    virtual Tick getTicks() = 0;
 
-        virtual ~TickSource() = default;
-
-        /**
-         * Returns the current tick count from this source.
-         */
-        virtual Tick getTicks() = 0;
-
-        /**
-         * Returns the conversion ratio from ticks to seconds.
-         */
-        virtual Tick getTicksPerSecond() = 0;
-    };
-} // namespace mongo
+    /**
+     * Returns the conversion ratio from ticks to seconds.
+     */
+    virtual Tick getTicksPerSecond() = 0;
+};
+}  // namespace mongo

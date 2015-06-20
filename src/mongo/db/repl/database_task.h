@@ -36,40 +36,36 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
 namespace repl {
 
-    class DatabaseTask{
-    private:
-        DatabaseTask();
+class DatabaseTask {
+private:
+    DatabaseTask();
 
-    public:
+public:
+    using Task = TaskRunner::Task;
 
-        using Task = TaskRunner::Task;
+    /**
+     * Creates a task wrapper that runs the target task inside a global exclusive lock.
+     */
+    static Task makeGlobalExclusiveLockTask(const Task& task);
 
-        /**
-         * Creates a task wrapper that runs the target task inside a global exclusive lock.
-         */
-        static Task makeGlobalExclusiveLockTask(const Task& task);
+    /**
+     * Creates a task wrapper that runs the target task inside a database lock.
+     */
+    static Task makeDatabaseLockTask(const Task& task,
+                                     const std::string& databaseName,
+                                     LockMode mode);
 
-        /**
-         * Creates a task wrapper that runs the target task inside a database lock.
-         */
-        static Task makeDatabaseLockTask(const Task& task,
-                                         const std::string& databaseName,
-                                         LockMode mode);
+    /**
+     * Creates a task wrapper that runs the target task inside a collection lock.
+     * Task acquires database lock before attempting to lock collection. Do not
+     * use in combination with makeDatabaseLockTask().
+     */
+    static Task makeCollectionLockTask(const Task& task, const NamespaceString& nss, LockMode mode);
+};
 
-        /**
-         * Creates a task wrapper that runs the target task inside a collection lock.
-         * Task acquires database lock before attempting to lock collection. Do not
-         * use in combination with makeDatabaseLockTask().
-         */
-        static Task makeCollectionLockTask(const Task& task,
-                                           const NamespaceString& nss,
-                                           LockMode mode);
-
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

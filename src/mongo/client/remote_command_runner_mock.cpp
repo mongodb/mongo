@@ -36,37 +36,35 @@
 namespace mongo {
 
 namespace {
-    void noCheckerSet(const RemoteCommandRequest& request) {
-        FAIL(str::stream() << "runCommand not expected to be called. request: "
-                           << request.toString());
-    }
+void noCheckerSet(const RemoteCommandRequest& request) {
+    FAIL(str::stream() << "runCommand not expected to be called. request: " << request.toString());
+}
 }
 
-    RemoteCommandRunnerMock::RemoteCommandRunnerMock():
-            _runCommandChecker(noCheckerSet),
-            _response(Status(ErrorCodes::InternalError, "response not set")) {
-    }
+RemoteCommandRunnerMock::RemoteCommandRunnerMock()
+    : _runCommandChecker(noCheckerSet),
+      _response(Status(ErrorCodes::InternalError, "response not set")) {}
 
-    RemoteCommandRunnerMock::~RemoteCommandRunnerMock() = default;
+RemoteCommandRunnerMock::~RemoteCommandRunnerMock() = default;
 
-    RemoteCommandRunnerMock* RemoteCommandRunnerMock::get(RemoteCommandRunner* runner) {
-        auto mock = dynamic_cast<RemoteCommandRunnerMock*>(runner);
-        invariant(mock);
+RemoteCommandRunnerMock* RemoteCommandRunnerMock::get(RemoteCommandRunner* runner) {
+    auto mock = dynamic_cast<RemoteCommandRunnerMock*>(runner);
+    invariant(mock);
 
-        return mock;
-    }
+    return mock;
+}
 
-    StatusWith<RemoteCommandResponse> RemoteCommandRunnerMock::runCommand(
-            const RemoteCommandRequest& request) {
-        _runCommandChecker(request);
-        _runCommandChecker = noCheckerSet;
-        return _response;
-    }
+StatusWith<RemoteCommandResponse> RemoteCommandRunnerMock::runCommand(
+    const RemoteCommandRequest& request) {
+    _runCommandChecker(request);
+    _runCommandChecker = noCheckerSet;
+    return _response;
+}
 
-    void RemoteCommandRunnerMock::setNextExpectedCommand(
-            stdx::function<void (const RemoteCommandRequest& request)> checkerFunc,
-            StatusWith<RemoteCommandResponse> returnThis) {
-        _runCommandChecker = checkerFunc;
-        _response = std::move(returnThis);
-    }
+void RemoteCommandRunnerMock::setNextExpectedCommand(
+    stdx::function<void(const RemoteCommandRequest& request)> checkerFunc,
+    StatusWith<RemoteCommandResponse> returnThis) {
+    _runCommandChecker = checkerFunc;
+    _response = std::move(returnThis);
+}
 }

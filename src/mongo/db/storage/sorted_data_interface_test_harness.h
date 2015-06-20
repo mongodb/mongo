@@ -42,90 +42,99 @@
 
 namespace mongo {
 
-    const BSONObj key0 = BSON( "" << 0 );
-    const BSONObj key1 = BSON( "" << 1 );
-    const BSONObj key2 = BSON( "" << 2 );
-    const BSONObj key3 = BSON( "" << 3 );
-    const BSONObj key4 = BSON( "" << 4 );
-    const BSONObj key5 = BSON( "" << 5 );
-    const BSONObj key6 = BSON( "" << 6 );
+const BSONObj key0 = BSON("" << 0);
+const BSONObj key1 = BSON("" << 1);
+const BSONObj key2 = BSON("" << 2);
+const BSONObj key3 = BSON("" << 3);
+const BSONObj key4 = BSON("" << 4);
+const BSONObj key5 = BSON("" << 5);
+const BSONObj key6 = BSON("" << 6);
 
-    const BSONObj compoundKey1a = BSON( "" << 1 << "" << "a" );
-    const BSONObj compoundKey1b = BSON( "" << 1 << "" << "b" );
-    const BSONObj compoundKey1c = BSON( "" << 1 << "" << "c" );
-    const BSONObj compoundKey1d = BSON( "" << 1 << "" << "d" );
-    const BSONObj compoundKey2a = BSON( "" << 2 << "" << "a" );
-    const BSONObj compoundKey2b = BSON( "" << 2 << "" << "b" );
-    const BSONObj compoundKey2c = BSON( "" << 2 << "" << "c" );
-    const BSONObj compoundKey3a = BSON( "" << 3 << "" << "a" );
-    const BSONObj compoundKey3b = BSON( "" << 3 << "" << "b" );
-    const BSONObj compoundKey3c = BSON( "" << 3 << "" << "c" );
+const BSONObj compoundKey1a = BSON("" << 1 << ""
+                                      << "a");
+const BSONObj compoundKey1b = BSON("" << 1 << ""
+                                      << "b");
+const BSONObj compoundKey1c = BSON("" << 1 << ""
+                                      << "c");
+const BSONObj compoundKey1d = BSON("" << 1 << ""
+                                      << "d");
+const BSONObj compoundKey2a = BSON("" << 2 << ""
+                                      << "a");
+const BSONObj compoundKey2b = BSON("" << 2 << ""
+                                      << "b");
+const BSONObj compoundKey2c = BSON("" << 2 << ""
+                                      << "c");
+const BSONObj compoundKey3a = BSON("" << 3 << ""
+                                      << "a");
+const BSONObj compoundKey3b = BSON("" << 3 << ""
+                                      << "b");
+const BSONObj compoundKey3c = BSON("" << 3 << ""
+                                      << "c");
 
-    const RecordId loc1( 0, 42 );
-    const RecordId loc2( 0, 44 );
-    const RecordId loc3( 0, 46 );
-    const RecordId loc4( 0, 48 );
-    const RecordId loc5( 0, 50 );
-    const RecordId loc6( 0, 52 );
-    const RecordId loc7( 0, 54 );
-    const RecordId loc8( 0, 56 );
+const RecordId loc1(0, 42);
+const RecordId loc2(0, 44);
+const RecordId loc3(0, 46);
+const RecordId loc4(0, 48);
+const RecordId loc5(0, 50);
+const RecordId loc6(0, 52);
+const RecordId loc7(0, 54);
+const RecordId loc8(0, 56);
 
-    class RecoveryUnit;
+class RecoveryUnit;
 
-    class HarnessHelper {
-    public:
-        HarnessHelper(){}
-        virtual ~HarnessHelper() = default;
+class HarnessHelper {
+public:
+    HarnessHelper() {}
+    virtual ~HarnessHelper() = default;
 
-        virtual std::unique_ptr<SortedDataInterface> newSortedDataInterface( bool unique ) = 0;
-        virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
+    virtual std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) = 0;
+    virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
 
-        virtual std::unique_ptr<OperationContext> newOperationContext() {
-            return stdx::make_unique<OperationContextNoop>(newRecoveryUnit().release());
-        }
-
-        /**
-         * Creates a new SDI with some initial data.
-         *
-         * For clarity to readers, toInsert must be sorted.
-         */
-        std::unique_ptr<SortedDataInterface> newSortedDataInterface(
-            bool unique,
-            std::initializer_list<IndexKeyEntry> toInsert);
-    };
-
-    /**
-     * Inserts all entries in toInsert into index.
-     * ASSERT_OKs the inserts.
-     * Always uses dupsAllowed=true.
-     *
-     * Should be used for declaring and changing conditions, not for testing inserts.
-     */
-    void insertToIndex(unowned_ptr<OperationContext> txn,
-                       unowned_ptr<SortedDataInterface> index,
-                       std::initializer_list<IndexKeyEntry> toInsert);
-
-    inline void insertToIndex(unowned_ptr<HarnessHelper> harness,
-                              unowned_ptr<SortedDataInterface> index,
-                              std::initializer_list<IndexKeyEntry> toInsert) {
-        insertToIndex(harness->newOperationContext(), index, toInsert);
+    virtual std::unique_ptr<OperationContext> newOperationContext() {
+        return stdx::make_unique<OperationContextNoop>(newRecoveryUnit().release());
     }
 
     /**
-     * Removes all entries in toRemove from index.
-     * Always uses dupsAllowed=true.
+     * Creates a new SDI with some initial data.
      *
-     * Should be used for declaring and changing conditions, not for testing removes.
+     * For clarity to readers, toInsert must be sorted.
      */
-    void removeFromIndex(unowned_ptr<OperationContext> txn,
-                         unowned_ptr<SortedDataInterface> index,
-                         std::initializer_list<IndexKeyEntry> toRemove);
+    std::unique_ptr<SortedDataInterface> newSortedDataInterface(
+        bool unique, std::initializer_list<IndexKeyEntry> toInsert);
+};
 
-    inline void removeFromIndex(unowned_ptr<HarnessHelper> harness,
-                                unowned_ptr<SortedDataInterface> index,
-                                std::initializer_list<IndexKeyEntry> toRemove) {
-        removeFromIndex(harness->newOperationContext(), index, toRemove);
-    }
+/**
+ * Inserts all entries in toInsert into index.
+ * ASSERT_OKs the inserts.
+ * Always uses dupsAllowed=true.
+ *
+ * Should be used for declaring and changing conditions, not for testing inserts.
+ */
+void insertToIndex(unowned_ptr<OperationContext> txn,
+                   unowned_ptr<SortedDataInterface> index,
+                   std::initializer_list<IndexKeyEntry> toInsert);
 
-    std::unique_ptr<HarnessHelper> newHarnessHelper();
+inline void insertToIndex(unowned_ptr<HarnessHelper> harness,
+                          unowned_ptr<SortedDataInterface> index,
+                          std::initializer_list<IndexKeyEntry> toInsert) {
+    insertToIndex(harness->newOperationContext(), index, toInsert);
+}
+
+/**
+ * Removes all entries in toRemove from index.
+ * Always uses dupsAllowed=true.
+ *
+ * Should be used for declaring and changing conditions, not for testing removes.
+ */
+void removeFromIndex(unowned_ptr<OperationContext> txn,
+                     unowned_ptr<SortedDataInterface> index,
+                     std::initializer_list<IndexKeyEntry> toRemove);
+
+inline void removeFromIndex(unowned_ptr<HarnessHelper> harness,
+                            unowned_ptr<SortedDataInterface> index,
+                            std::initializer_list<IndexKeyEntry> toRemove) {
+    removeFromIndex(harness->newOperationContext(), index, toRemove);
+}
+
+std::unique_ptr<HarnessHelper> newHarnessHelper();
 }

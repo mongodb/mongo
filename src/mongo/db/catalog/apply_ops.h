@@ -29,17 +29,17 @@
 #include "mongo/base/status.h"
 
 namespace mongo {
-    class BSONObj;
-    class BSONObjBuilder;
-    class OperationContext;
+class BSONObj;
+class BSONObjBuilder;
+class OperationContext;
 
-    /**
-     * Applies ops contained in "applyOpCmd" and populates fields in "result" to be returned to the
-     * user.
-     */
-    Status applyOps(OperationContext* txn,
-                    const std::string& dbName,
-                    const BSONObj& applyOpCmd,
-                    BSONObjBuilder* result);
+/**
+ * Applies ops contained in "applyOpCmd" and populates fields in "result" to be returned to the
+ * user.
+ */
+Status applyOps(OperationContext* txn,
+                const std::string& dbName,
+                const BSONObj& applyOpCmd,
+                BSONObjBuilder* result);
 
-} // namespace mongo
+}  // namespace mongo

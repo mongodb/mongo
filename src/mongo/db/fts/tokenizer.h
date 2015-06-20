@@ -38,41 +38,37 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        struct Token {
-            enum Type { WHITESPACE, DELIMITER, TEXT, INVALID };
-            Token( Type type, StringData data, unsigned offset)
-                : type( type ),
-                  data( data ),
-                  offset( offset )
-                  {}
+struct Token {
+    enum Type { WHITESPACE, DELIMITER, TEXT, INVALID };
+    Token(Type type, StringData data, unsigned offset) : type(type), data(data), offset(offset) {}
 
-            bool ok() const { return type != INVALID; }
-
-            Type type;
-            StringData data;
-            unsigned offset;
-        };
-
-        class Tokenizer {
-            MONGO_DISALLOW_COPYING( Tokenizer );
-        public:
-
-            Tokenizer( const FTSLanguage* language, StringData str);
-
-            bool more() const;
-            Token next();
-
-        private:
-            Token::Type _type( char c ) const;
-            bool _skipWhitespace();
-
-            unsigned _pos;
-            const StringData _raw;
-            bool _english;
-        };
-
+    bool ok() const {
+        return type != INVALID;
     }
-}
 
+    Type type;
+    StringData data;
+    unsigned offset;
+};
+
+class Tokenizer {
+    MONGO_DISALLOW_COPYING(Tokenizer);
+
+public:
+    Tokenizer(const FTSLanguage* language, StringData str);
+
+    bool more() const;
+    Token next();
+
+private:
+    Token::Type _type(char c) const;
+    bool _skipWhitespace();
+
+    unsigned _pos;
+    const StringData _raw;
+    bool _english;
+};
+}
+}

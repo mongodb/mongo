@@ -39,61 +39,57 @@
 
 namespace mongo {
 
-    class LogBuilder;
+class LogBuilder;
 
-    class ModifierBit : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(ModifierBit);
+class ModifierBit : public ModifierInterface {
+    MONGO_DISALLOW_COPYING(ModifierBit);
 
-    public:
+public:
+    ModifierBit();
+    virtual ~ModifierBit();
 
-        ModifierBit();
-        virtual ~ModifierBit();
+    /**
+     * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $bit mod such as
+     * {$bit: {<field: { [and|or] : <value>}}. init() extracts the field name, the
+     * operation subtype, and the value to be assigned to it from 'modExpr'. It returns OK
+     * if successful or a status describing the error.
+     */
+    virtual Status init(const BSONElement& modExpr, const Options& opts, bool* positional = NULL);
 
-        /**
-         * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $bit mod such as
-         * {$bit: {<field: { [and|or] : <value>}}. init() extracts the field name, the
-         * operation subtype, and the value to be assigned to it from 'modExpr'. It returns OK
-         * if successful or a status describing the error.
-         */
-        virtual Status init(const BSONElement& modExpr, const Options& opts,
-                            bool* positional = NULL);
+    /** Validates the potential application of the init'ed mod to the given Element and
+     *  configures the internal state of the mod as necessary.
+     */
+    virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
-        /** Validates the potential application of the init'ed mod to the given Element and
-         *  configures the internal state of the mod as necessary.
-         */
-        virtual Status prepare(mutablebson::Element root,
-                               StringData matchedField,
-                               ExecInfo* execInfo);
+    /** Updates the Element used in prepare with the effects of the $bit operation */
+    virtual Status apply() const;
 
-        /** Updates the Element used in prepare with the effects of the $bit operation */
-        virtual Status apply() const;
+    /** Converts the effects of this $bit into an equivalent $set */
+    virtual Status log(LogBuilder* logBuilder) const;
 
-        /** Converts the effects of this $bit into an equivalent $set */
-        virtual Status log(LogBuilder* logBuilder) const;
+private:
+    SafeNum apply(SafeNum value) const;
 
-    private:
-        SafeNum apply(SafeNum value) const;
+    // Access to each component of fieldName that's the target of this mod.
+    FieldRef _fieldRef;
 
-        // Access to each component of fieldName that's the target of this mod.
-        FieldRef _fieldRef;
+    // 0 or index for $-positional in _fieldRef.
+    size_t _posDollar;
 
-        // 0 or index for $-positional in _fieldRef.
-        size_t _posDollar;
+    // The operator on SafeNum that we will invoke.
+    typedef SafeNum (SafeNum::*SafeNumOp)(const SafeNum&) const;
 
-        // The operator on SafeNum that we will invoke.
-        typedef SafeNum (SafeNum::* SafeNumOp)(const SafeNum&) const;
-
-        struct OpEntry {
-            SafeNum val;
-            SafeNumOp op;
-        };
-
-        typedef std::vector<OpEntry> OpEntries;
-
-        OpEntries _ops;
-
-        struct PreparedState;
-        std::unique_ptr<PreparedState> _preparedState;
+    struct OpEntry {
+        SafeNum val;
+        SafeNumOp op;
     };
 
-} // namespace mongo
+    typedef std::vector<OpEntry> OpEntries;
+
+    OpEntries _ops;
+
+    struct PreparedState;
+    std::unique_ptr<PreparedState> _preparedState;
+};
+
+}  // namespace mongo

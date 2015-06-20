@@ -42,6 +42,6 @@
  *        ...
  *    };
  */
-#define MONGO_DISALLOW_COPYING(CLASS)        \
-    CLASS(const CLASS&) = delete;            \
+#define MONGO_DISALLOW_COPYING(CLASS) \
+    CLASS(const CLASS&) = delete;     \
     CLASS& operator=(const CLASS&) = delete

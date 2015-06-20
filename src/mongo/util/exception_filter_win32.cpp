@@ -45,152 +45,150 @@
 
 namespace mongo {
 
-        namespace {
-        /* create a process dump.
-            To use, load up windbg.  Set your symbol and source path.
-            Open the crash dump file.  To see the crashing context, use .ecxr in windbg
-            TODO: consider using WER local dumps in the future
-            */
-        void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
-            WCHAR moduleFileName[MAX_PATH];
+namespace {
+/* create a process dump.
+    To use, load up windbg.  Set your symbol and source path.
+    Open the crash dump file.  To see the crashing context, use .ecxr in windbg
+    TODO: consider using WER local dumps in the future
+    */
+void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
+    WCHAR moduleFileName[MAX_PATH];
 
-            DWORD ret = GetModuleFileNameW(NULL, &moduleFileName[0], ARRAYSIZE(moduleFileName));
-            if (ret == 0) {
-                int gle = GetLastError();
-                log() << "GetModuleFileName failed " << errnoWithDescription(gle);
+    DWORD ret = GetModuleFileNameW(NULL, &moduleFileName[0], ARRAYSIZE(moduleFileName));
+    if (ret == 0) {
+        int gle = GetLastError();
+        log() << "GetModuleFileName failed " << errnoWithDescription(gle);
 
-                // Fallback name
-                wcscpy_s(moduleFileName, L"mongo");
-            }
-            else {
-                WCHAR* dotStr = wcschr(&moduleFileName[0], L'.');
-                if (dotStr != NULL) {
-                    *dotStr = L'\0';
-                }
-            }
-
-            std::wstring dumpName(moduleFileName);
-
-            std::string currentTime = terseCurrentTime(false);
-
-            dumpName += L".";
-
-            dumpName += toWideString(currentTime.c_str());
-
-            dumpName += L".mdmp";
-
-            HANDLE hFile = CreateFileW(dumpName.c_str(),
-                GENERIC_WRITE,
-                0,
-                NULL,
-                CREATE_ALWAYS,
-                FILE_ATTRIBUTE_NORMAL,
-                NULL);
-            if ( INVALID_HANDLE_VALUE == hFile ) {
-                DWORD lasterr = GetLastError();
-                log() << "failed to open minidump file " << toUtf8String(dumpName.c_str()) << " : "
-                      << errnoWithDescription( lasterr ) << std::endl;
-                return;
-            }
-
-            MINIDUMP_EXCEPTION_INFORMATION aMiniDumpInfo;
-            aMiniDumpInfo.ThreadId = GetCurrentThreadId();
-            aMiniDumpInfo.ExceptionPointers = exceptionInfo;
-            aMiniDumpInfo.ClientPointers = FALSE;
-
-            MINIDUMP_TYPE miniDumpType =
-    #ifdef MONGO_CONFIG_DEBUG_BUILD
-                MiniDumpWithFullMemory;
-    #else
-                static_cast<MINIDUMP_TYPE>(
-                MiniDumpNormal
-                | MiniDumpWithIndirectlyReferencedMemory
-                | MiniDumpWithProcessThreadData);
-    #endif
-            log() << "writing minidump diagnostic file " << toUtf8String(dumpName.c_str()) << std::endl;
-
-            BOOL bstatus = MiniDumpWriteDump(GetCurrentProcess(),
-                GetCurrentProcessId(),
-                hFile,
-                miniDumpType,
-                exceptionInfo != NULL ? &aMiniDumpInfo : NULL,
-                NULL,
-                NULL);
-            if ( FALSE == bstatus ) {
-                DWORD lasterr = GetLastError();
-                log() << "failed to create minidump : "
-                      << errnoWithDescription( lasterr ) << std::endl;
-            }
-
-            CloseHandle(hFile);
-        }
-
-        LONG WINAPI exceptionFilter( struct _EXCEPTION_POINTERS *excPointers ) {
-            char exceptionString[128];
-            sprintf_s( exceptionString, sizeof( exceptionString ),
-                    ( excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ) ?
-                    "(access violation)" : "0x%08X", excPointers->ExceptionRecord->ExceptionCode );
-            char addressString[32];
-            sprintf_s( addressString, sizeof( addressString ), "0x%p",
-                     excPointers->ExceptionRecord->ExceptionAddress );
-            log() << "*** unhandled exception " << exceptionString
-                  << " at " << addressString << ", terminating" << std::endl;
-            if ( excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ) {
-                ULONG acType = excPointers->ExceptionRecord->ExceptionInformation[0];
-                const char* acTypeString;
-                switch ( acType ) {
-                case 0:
-                    acTypeString = "read from";
-                    break;
-                case 1:
-                    acTypeString = "write to";
-                    break;
-                case 8:
-                    acTypeString = "DEP violation at";
-                    break;
-                default:
-                    acTypeString = "unknown violation at";
-                    break;
-                }
-                sprintf_s( addressString, sizeof( addressString ), " 0x%p",
-                         excPointers->ExceptionRecord->ExceptionInformation[1] );
-                log() << "*** access violation was a " << acTypeString << addressString << std::endl;
-            }
-
-            log() << "*** stack trace for unhandled exception:" << std::endl;
-
-            // Create a copy of context record because printWindowsStackTrace will mutate it.
-            CONTEXT contextCopy(*(excPointers->ContextRecord));
-
-            printWindowsStackTrace( contextCopy );
-
-            doMinidumpWithException(excPointers);
-
-            // Don't go through normal shutdown procedure. It may make things worse.
-            log() << "*** immediate exit due to unhandled exception" << std::endl;
-            quickExit(EXIT_ABRUPT);
-
-            // We won't reach here
-            return EXCEPTION_EXECUTE_HANDLER;
+        // Fallback name
+        wcscpy_s(moduleFileName, L"mongo");
+    } else {
+        WCHAR* dotStr = wcschr(&moduleFileName[0], L'.');
+        if (dotStr != NULL) {
+            *dotStr = L'\0';
         }
     }
 
-    void doMinidump() {
-        doMinidumpWithException(NULL);
+    std::wstring dumpName(moduleFileName);
+
+    std::string currentTime = terseCurrentTime(false);
+
+    dumpName += L".";
+
+    dumpName += toWideString(currentTime.c_str());
+
+    dumpName += L".mdmp";
+
+    HANDLE hFile = CreateFileW(
+        dumpName.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (INVALID_HANDLE_VALUE == hFile) {
+        DWORD lasterr = GetLastError();
+        log() << "failed to open minidump file " << toUtf8String(dumpName.c_str()) << " : "
+              << errnoWithDescription(lasterr) << std::endl;
+        return;
     }
 
-    LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
+    MINIDUMP_EXCEPTION_INFORMATION aMiniDumpInfo;
+    aMiniDumpInfo.ThreadId = GetCurrentThreadId();
+    aMiniDumpInfo.ExceptionPointers = exceptionInfo;
+    aMiniDumpInfo.ClientPointers = FALSE;
 
-    void setWindowsUnhandledExceptionFilter() {
-        filtLast = SetUnhandledExceptionFilter(exceptionFilter);
+    MINIDUMP_TYPE miniDumpType =
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+        MiniDumpWithFullMemory;
+#else
+        static_cast<MINIDUMP_TYPE>(MiniDumpNormal | MiniDumpWithIndirectlyReferencedMemory |
+                                   MiniDumpWithProcessThreadData);
+#endif
+    log() << "writing minidump diagnostic file " << toUtf8String(dumpName.c_str()) << std::endl;
+
+    BOOL bstatus = MiniDumpWriteDump(GetCurrentProcess(),
+                                     GetCurrentProcessId(),
+                                     hFile,
+                                     miniDumpType,
+                                     exceptionInfo != NULL ? &aMiniDumpInfo : NULL,
+                                     NULL,
+                                     NULL);
+    if (FALSE == bstatus) {
+        DWORD lasterr = GetLastError();
+        log() << "failed to create minidump : " << errnoWithDescription(lasterr) << std::endl;
     }
 
-} // namespace mongo
+    CloseHandle(hFile);
+}
+
+LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
+    char exceptionString[128];
+    sprintf_s(exceptionString,
+              sizeof(exceptionString),
+              (excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION)
+                  ? "(access violation)"
+                  : "0x%08X",
+              excPointers->ExceptionRecord->ExceptionCode);
+    char addressString[32];
+    sprintf_s(addressString,
+              sizeof(addressString),
+              "0x%p",
+              excPointers->ExceptionRecord->ExceptionAddress);
+    log() << "*** unhandled exception " << exceptionString << " at " << addressString
+          << ", terminating" << std::endl;
+    if (excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
+        ULONG acType = excPointers->ExceptionRecord->ExceptionInformation[0];
+        const char* acTypeString;
+        switch (acType) {
+            case 0:
+                acTypeString = "read from";
+                break;
+            case 1:
+                acTypeString = "write to";
+                break;
+            case 8:
+                acTypeString = "DEP violation at";
+                break;
+            default:
+                acTypeString = "unknown violation at";
+                break;
+        }
+        sprintf_s(addressString,
+                  sizeof(addressString),
+                  " 0x%p",
+                  excPointers->ExceptionRecord->ExceptionInformation[1]);
+        log() << "*** access violation was a " << acTypeString << addressString << std::endl;
+    }
+
+    log() << "*** stack trace for unhandled exception:" << std::endl;
+
+    // Create a copy of context record because printWindowsStackTrace will mutate it.
+    CONTEXT contextCopy(*(excPointers->ContextRecord));
+
+    printWindowsStackTrace(contextCopy);
+
+    doMinidumpWithException(excPointers);
+
+    // Don't go through normal shutdown procedure. It may make things worse.
+    log() << "*** immediate exit due to unhandled exception" << std::endl;
+    quickExit(EXIT_ABRUPT);
+
+    // We won't reach here
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+}
+
+void doMinidump() {
+    doMinidumpWithException(NULL);
+}
+
+LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
+
+void setWindowsUnhandledExceptionFilter() {
+    filtLast = SetUnhandledExceptionFilter(exceptionFilter);
+}
+
+}  // namespace mongo
 
 #else
 
 namespace mongo {
-    void setWindowsUnhandledExceptionFilter() { }
+void setWindowsUnhandledExceptionFilter() {}
 }
 
-#endif // _WIN32
+#endif  // _WIN32

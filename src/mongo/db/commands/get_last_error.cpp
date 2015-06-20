@@ -44,264 +44,267 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
+using std::string;
+using std::stringstream;
 
-    /* reset any errors so that getlasterror comes back clean.
+/* reset any errors so that getlasterror comes back clean.
 
-       useful before performing a long series of operations where we want to
-       see if any of the operations triggered an error, but don't want to check
-       after each op as that woudl be a client/server turnaround.
-    */
-    class CmdResetError : public Command {
-    public:
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
-        virtual void help( stringstream& help ) const {
-            help << "reset error state (used with getpreverror)";
-        }
-        CmdResetError() : Command("resetError", false, "reseterror") {}
-        bool run(OperationContext* txn,
-                 const string& db,
-                 BSONObj& cmdObj,
-                 int,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            LastError::get(txn->getClient()).reset();
-            return true;
-        }
-    } cmdResetError;
+   useful before performing a long series of operations where we want to
+   see if any of the operations triggered an error, but don't want to check
+   after each op as that woudl be a client/server turnaround.
+*/
+class CmdResetError : public Command {
+public:
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {}  // No auth required
+    virtual void help(stringstream& help) const {
+        help << "reset error state (used with getpreverror)";
+    }
+    CmdResetError() : Command("resetError", false, "reseterror") {}
+    bool run(OperationContext* txn,
+             const string& db,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        LastError::get(txn->getClient()).reset();
+        return true;
+    }
+} cmdResetError;
 
-    class CmdGetLastError : public Command {
-    public:
-        CmdGetLastError() : Command("getLastError", false, "getlasterror") { }
-        virtual bool isWriteCommandForConfigServer() const      { return false; }
-        virtual bool slaveOk() const      { return true;  }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
-        virtual void help( stringstream& help ) const {
-            LastError::get(cc()).disable(); // SERVER-11492
-            help << "return error status of the last operation on this connection\n"
-                 << "options:\n"
-                 << "  { fsync:true } - fsync before returning, or wait for journal commit if running with --journal\n"
-                 << "  { j:true } - wait for journal commit if running with --journal\n"
-                 << "  { w:n } - await replication to n servers (including self) before returning\n"
-                 << "  { w:'majority' } - await replication to majority of set\n"
-                 << "  { wtimeout:m} - timeout for w in m milliseconds";
-        }
+class CmdGetLastError : public Command {
+public:
+    CmdGetLastError() : Command("getLastError", false, "getlasterror") {}
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {}  // No auth required
+    virtual void help(stringstream& help) const {
+        LastError::get(cc()).disable();  // SERVER-11492
+        help << "return error status of the last operation on this connection\n"
+             << "options:\n"
+             << "  { fsync:true } - fsync before returning, or wait for journal commit if running "
+                "with --journal\n"
+             << "  { j:true } - wait for journal commit if running with --journal\n"
+             << "  { w:n } - await replication to n servers (including self) before returning\n"
+             << "  { w:'majority' } - await replication to majority of set\n"
+             << "  { wtimeout:m} - timeout for w in m milliseconds";
+    }
 
-        bool run(OperationContext* txn, const string& dbname,
-                  BSONObj& cmdObj,
-                  int,
-                  string& errmsg,
-                  BSONObjBuilder& result) {
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        //
+        // Correct behavior here is very finicky.
+        //
+        // 1.  The first step is to append the error that occurred on the previous operation.
+        // This adds an "err" field to the command, which is *not* the command failing.
+        //
+        // 2.  Next we parse and validate write concern options.  If these options are invalid
+        // the command fails no matter what, even if we actually had an error earlier.  The
+        // reason for checking here is to match legacy behavior on these kind of failures -
+        // we'll still get an "err" field for the write error.
+        //
+        // 3.  If we had an error on the previous operation, we then return immediately.
+        //
+        // 4.  Finally, we actually enforce the write concern.  All errors *except* timeout are
+        // reported with ok : 0.0, to match legacy behavior.
+        //
+        // There is a special case when "wOpTime" and "wElectionId" are explicitly provided by
+        // the client (mongos) - in this case we *only* enforce the write concern if it is
+        // valid.
+        //
+        // We always need to either report "err" (if ok : 1) or "errmsg" (if ok : 0), even if
+        // err is null.
+        //
 
-            //
-            // Correct behavior here is very finicky.
-            //
-            // 1.  The first step is to append the error that occurred on the previous operation.
-            // This adds an "err" field to the command, which is *not* the command failing.
-            //
-            // 2.  Next we parse and validate write concern options.  If these options are invalid
-            // the command fails no matter what, even if we actually had an error earlier.  The
-            // reason for checking here is to match legacy behavior on these kind of failures -
-            // we'll still get an "err" field for the write error.
-            //
-            // 3.  If we had an error on the previous operation, we then return immediately.
-            //
-            // 4.  Finally, we actually enforce the write concern.  All errors *except* timeout are
-            // reported with ok : 0.0, to match legacy behavior.
-            //
-            // There is a special case when "wOpTime" and "wElectionId" are explicitly provided by 
-            // the client (mongos) - in this case we *only* enforce the write concern if it is 
-            // valid.
-            //
-            // We always need to either report "err" (if ok : 1) or "errmsg" (if ok : 0), even if
-            // err is null.
-            //
+        LastError* le = &LastError::get(txn->getClient());
+        le->disable();
 
-            LastError *le = &LastError::get(txn->getClient());
-            le->disable();
-
-            // Always append lastOp and connectionId
-            Client& c = *txn->getClient();
-            if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
-                repl::ReplicationCoordinator::modeReplSet) {
-                const repl::OpTime lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
-                if (!lastOp.isNull()) {
-                    result.append("lastOp", lastOp.getTimestamp());
-                    // TODO(siyuan) Add "lastOpTerm"
-                }
+        // Always append lastOp and connectionId
+        Client& c = *txn->getClient();
+        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+            repl::ReplicationCoordinator::modeReplSet) {
+            const repl::OpTime lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
+            if (!lastOp.isNull()) {
+                result.append("lastOp", lastOp.getTimestamp());
+                // TODO(siyuan) Add "lastOpTerm"
             }
+        }
 
-            // for sharding; also useful in general for debugging
-            result.appendNumber( "connectionId" , c.getConnectionId() );
+        // for sharding; also useful in general for debugging
+        result.appendNumber("connectionId", c.getConnectionId());
 
-            Timestamp lastTimestamp;
-            BSONField<Timestamp> wOpTimeField("wOpTime");
-            FieldParser::FieldState extracted = FieldParser::extract(cmdObj, wOpTimeField, 
-                                                                     &lastTimestamp, &errmsg);
-            if (!extracted) {
-                result.append("badGLE", cmdObj);
-                appendCommandStatus(result, false, errmsg);
-                return false;
-            }
+        Timestamp lastTimestamp;
+        BSONField<Timestamp> wOpTimeField("wOpTime");
+        FieldParser::FieldState extracted =
+            FieldParser::extract(cmdObj, wOpTimeField, &lastTimestamp, &errmsg);
+        if (!extracted) {
+            result.append("badGLE", cmdObj);
+            appendCommandStatus(result, false, errmsg);
+            return false;
+        }
 
-            repl::OpTime lastOpTime;
-            bool lastOpTimePresent = extracted != FieldParser::FIELD_NONE;
-            if (!lastOpTimePresent) {
-                // Use the client opTime if no wOpTime is specified
-                lastOpTime = repl::ReplClientInfo::forClient(c).getLastOp();
-                // TODO(siyuan) Fix mongos to supply wOpTimeTerm, then parse out that value here
+        repl::OpTime lastOpTime;
+        bool lastOpTimePresent = extracted != FieldParser::FIELD_NONE;
+        if (!lastOpTimePresent) {
+            // Use the client opTime if no wOpTime is specified
+            lastOpTime = repl::ReplClientInfo::forClient(c).getLastOp();
+            // TODO(siyuan) Fix mongos to supply wOpTimeTerm, then parse out that value here
+        } else {
+            // TODO(siyuan) Don't use the default term after fixing mongos.
+            lastOpTime = repl::OpTime(lastTimestamp, repl::OpTime::kDefaultTerm);
+        }
+
+        OID electionId;
+        BSONField<OID> wElectionIdField("wElectionId");
+        extracted = FieldParser::extract(cmdObj, wElectionIdField, &electionId, &errmsg);
+        if (!extracted) {
+            result.append("badGLE", cmdObj);
+            appendCommandStatus(result, false, errmsg);
+            return false;
+        }
+
+        bool electionIdPresent = extracted != FieldParser::FIELD_NONE;
+        bool errorOccurred = false;
+
+        // Errors aren't reported when wOpTime is used
+        if (!lastOpTimePresent) {
+            if (le->getNPrev() != 1) {
+                errorOccurred = LastError::noError.appendSelf(result, false);
             } else {
-                // TODO(siyuan) Don't use the default term after fixing mongos.
-                lastOpTime = repl::OpTime(lastTimestamp, repl::OpTime::kDefaultTerm);
+                errorOccurred = le->appendSelf(result, false);
             }
-            
-            OID electionId;
-            BSONField<OID> wElectionIdField("wElectionId");
-            extracted = FieldParser::extract(cmdObj, wElectionIdField, 
-                                             &electionId, &errmsg);
-            if (!extracted) {
-                result.append("badGLE", cmdObj);
-                appendCommandStatus(result, false, errmsg);
-                return false;
-            }
-
-            bool electionIdPresent = extracted != FieldParser::FIELD_NONE;
-            bool errorOccurred = false;
-
-            // Errors aren't reported when wOpTime is used
-            if ( !lastOpTimePresent ) {
-                if ( le->getNPrev() != 1 ) {
-                    errorOccurred = LastError::noError.appendSelf( result, false );
-                }
-                else {
-                    errorOccurred = le->appendSelf( result, false );
-                }
-            }
-
-            BSONObj writeConcernDoc = cmdObj;
-            // Use the default options if we have no gle options aside from wOpTime/wElectionId
-            const int nFields = cmdObj.nFields();
-            bool useDefaultGLEOptions = (nFields == 1) || 
-                (nFields == 2 && lastOpTimePresent) ||
-                (nFields == 3 && lastOpTimePresent && electionIdPresent);
-
-            WriteConcernOptions writeConcern;
-
-            if (useDefaultGLEOptions) {
-                writeConcern = repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
-            }
-
-            Status status = writeConcern.parse( writeConcernDoc );
-
-            //
-            // Validate write concern no matter what, this matches 2.4 behavior
-            //
-
-
-            if ( status.isOK() ) {
-                // Ensure options are valid for this host
-                status = validateWriteConcern( writeConcern );
-            }
-
-            if ( !status.isOK() ) {
-                result.append( "badGLE", writeConcernDoc );
-                return appendCommandStatus( result, status );
-            }
-
-            // Don't wait for replication if there was an error reported - this matches 2.4 behavior
-            if ( errorOccurred ) {
-                dassert( !lastOpTimePresent );
-                return true;
-            }
-
-            // No error occurred, so we won't duplicate these fields with write concern errors
-            dassert( result.asTempObj()["err"].eoo() );
-            dassert( result.asTempObj()["code"].eoo() );
-
-            // If we got an electionId, make sure it matches
-            if (electionIdPresent) {
-                if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
-                        repl::ReplicationCoordinator::modeReplSet) {
-                    // Ignore electionIds of 0 from mongos.
-                    if (electionId != OID()) {
-                        errmsg = "wElectionId passed but no replication active";
-                        result.append("code", ErrorCodes::BadValue);
-                        return false;
-                    }
-                } 
-                else {
-                    if (electionId != repl::getGlobalReplicationCoordinator()->getElectionId()) {
-                        LOG(3) << "oid passed in is " << electionId
-                               << ", but our id is "
-                               << repl::getGlobalReplicationCoordinator()->getElectionId();
-                        errmsg = "election occurred after write";
-                        result.append("code", ErrorCodes::WriteConcernFailed);
-                        return false;
-                    }
-                }
-            }
-
-            txn->setWriteConcern(writeConcern);
-            {
-                stdx::lock_guard<Client> lk(*txn->getClient());
-                txn->setMessage_inlock( "waiting for write concern" );
-            }
-
-            WriteConcernResult wcResult;
-            status = waitForWriteConcern( txn, lastOpTime, &wcResult );
-            wcResult.appendTo( writeConcern, &result );
-
-            // For backward compatibility with 2.4, wtimeout returns ok : 1.0
-            if ( wcResult.wTimedOut ) {
-                dassert( !wcResult.err.empty() ); // so we always report err
-                dassert( !status.isOK() );
-                result.append( "errmsg", "timed out waiting for slaves" );
-                result.append( "code", status.code() );
-                return true;
-            }
-
-            return appendCommandStatus( result, status );
         }
 
-    } cmdGetLastError;
+        BSONObj writeConcernDoc = cmdObj;
+        // Use the default options if we have no gle options aside from wOpTime/wElectionId
+        const int nFields = cmdObj.nFields();
+        bool useDefaultGLEOptions = (nFields == 1) || (nFields == 2 && lastOpTimePresent) ||
+            (nFields == 3 && lastOpTimePresent && electionIdPresent);
 
-    class CmdGetPrevError : public Command {
-    public:
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void help( stringstream& help ) const {
-            help << "check for errors since last reseterror commandcal";
+        WriteConcernOptions writeConcern;
+
+        if (useDefaultGLEOptions) {
+            writeConcern = repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
         }
-        virtual bool slaveOk() const {
+
+        Status status = writeConcern.parse(writeConcernDoc);
+
+        //
+        // Validate write concern no matter what, this matches 2.4 behavior
+        //
+
+
+        if (status.isOK()) {
+            // Ensure options are valid for this host
+            status = validateWriteConcern(writeConcern);
+        }
+
+        if (!status.isOK()) {
+            result.append("badGLE", writeConcernDoc);
+            return appendCommandStatus(result, status);
+        }
+
+        // Don't wait for replication if there was an error reported - this matches 2.4 behavior
+        if (errorOccurred) {
+            dassert(!lastOpTimePresent);
             return true;
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
-        CmdGetPrevError() : Command("getPrevError", false, "getpreverror") {}
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            LastError *le = &LastError::get(txn->getClient());
-            le->disable();
-            le->appendSelf(result, true);
-            if (le->isValid())
-                result.append("nPrev", le->getNPrev());
-            else
-                result.append("nPrev", -1);
+
+        // No error occurred, so we won't duplicate these fields with write concern errors
+        dassert(result.asTempObj()["err"].eoo());
+        dassert(result.asTempObj()["code"].eoo());
+
+        // If we got an electionId, make sure it matches
+        if (electionIdPresent) {
+            if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+                repl::ReplicationCoordinator::modeReplSet) {
+                // Ignore electionIds of 0 from mongos.
+                if (electionId != OID()) {
+                    errmsg = "wElectionId passed but no replication active";
+                    result.append("code", ErrorCodes::BadValue);
+                    return false;
+                }
+            } else {
+                if (electionId != repl::getGlobalReplicationCoordinator()->getElectionId()) {
+                    LOG(3) << "oid passed in is " << electionId << ", but our id is "
+                           << repl::getGlobalReplicationCoordinator()->getElectionId();
+                    errmsg = "election occurred after write";
+                    result.append("code", ErrorCodes::WriteConcernFailed);
+                    return false;
+                }
+            }
+        }
+
+        txn->setWriteConcern(writeConcern);
+        {
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            txn->setMessage_inlock("waiting for write concern");
+        }
+
+        WriteConcernResult wcResult;
+        status = waitForWriteConcern(txn, lastOpTime, &wcResult);
+        wcResult.appendTo(writeConcern, &result);
+
+        // For backward compatibility with 2.4, wtimeout returns ok : 1.0
+        if (wcResult.wTimedOut) {
+            dassert(!wcResult.err.empty());  // so we always report err
+            dassert(!status.isOK());
+            result.append("errmsg", "timed out waiting for slaves");
+            result.append("code", status.code());
             return true;
         }
-    } cmdGetPrevError;
 
+        return appendCommandStatus(result, status);
+    }
+
+} cmdGetLastError;
+
+class CmdGetPrevError : public Command {
+public:
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual void help(stringstream& help) const {
+        help << "check for errors since last reseterror commandcal";
+    }
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {}  // No auth required
+    CmdGetPrevError() : Command("getPrevError", false, "getpreverror") {}
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        LastError* le = &LastError::get(txn->getClient());
+        le->disable();
+        le->appendSelf(result, true);
+        if (le->isValid())
+            result.append("nPrev", le->getNPrev());
+        else
+            result.append("nPrev", -1);
+        return true;
+    }
+} cmdGetPrevError;
 }

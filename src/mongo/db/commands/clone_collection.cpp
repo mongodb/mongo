@@ -57,105 +57,106 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::string;
-    using std::stringstream;
-    using std::endl;
+using std::unique_ptr;
+using std::string;
+using std::stringstream;
+using std::endl;
 
-    class CmdCloneCollection : public Command {
-    public:
-        CmdCloneCollection() : Command("cloneCollection") { }
+class CmdCloneCollection : public Command {
+public:
+    CmdCloneCollection() : Command("cloneCollection") {}
 
-        virtual bool slaveOk() const {
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+        return parseNsFullyQualified(dbname, cmdObj);
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        std::string ns = parseNs(dbname, cmdObj);
+
+        ActionSet actions;
+        actions.addAction(ActionType::insert);
+        actions.addAction(ActionType::createIndex);  // SERVER-11418
+        if (shouldBypassDocumentValidationForCommand(cmdObj)) {
+            actions.addAction(ActionType::bypassDocumentValidation);
+        }
+
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(NamespaceString(ns)), actions)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+        return Status::OK();
+    }
+
+    virtual void help(stringstream& help) const {
+        help << "{ cloneCollection: <collection>, from: <host> [,query: <query_filter>] "
+                "[,copyIndexes:<bool>] }"
+                "\nCopies a collection from one server to another. Do not use on a single server "
+                "as the destination "
+                "is placed at the same db.collection (namespace) as the source.\n";
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const string& dbname,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
+        boost::optional<DisableDocumentValidation> maybeDisableValidation;
+        if (shouldBypassDocumentValidationForCommand(cmdObj))
+            maybeDisableValidation.emplace(txn);
+
+        string fromhost = cmdObj.getStringField("from");
+        if (fromhost.empty()) {
+            errmsg = "missing 'from' parameter";
             return false;
         }
 
-        virtual bool isWriteCommandForConfigServer() const {
+        {
+            HostAndPort h(fromhost);
+            if (repl::isSelf(h)) {
+                errmsg = "can't cloneCollection from self";
+                return false;
+            }
+        }
+
+        string collection = parseNs(dbname, cmdObj);
+        Status allowedWriteStatus = userAllowedWriteNS(dbname, collection);
+        if (!allowedWriteStatus.isOK()) {
+            return appendCommandStatus(result, allowedWriteStatus);
+        }
+
+        BSONObj query = cmdObj.getObjectField("query");
+        if (query.isEmpty())
+            query = BSONObj();
+
+        BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
+        bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
+
+        log() << "cloneCollection.  db:" << dbname << " collection:" << collection
+              << " from: " << fromhost << " query: " << query << " "
+              << (copyIndexes ? "" : ", not copying indexes") << endl;
+
+        Cloner cloner;
+        unique_ptr<DBClientConnection> myconn;
+        myconn.reset(new DBClientConnection());
+        if (!myconn->connect(HostAndPort(fromhost), errmsg))
             return false;
-        }
 
-        virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-            return parseNsFullyQualified(dbname, cmdObj);
-        }
+        cloner.setConnection(myconn.release());
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            std::string ns = parseNs(dbname, cmdObj);
+        return cloner.copyCollection(txn, collection, query, errmsg, true, false, copyIndexes);
+    }
 
-            ActionSet actions;
-            actions.addAction(ActionType::insert);
-            actions.addAction(ActionType::createIndex); // SERVER-11418
-            if (shouldBypassDocumentValidationForCommand(cmdObj)) {
-                actions.addAction(ActionType::bypassDocumentValidation);
-            }
+} cmdCloneCollection;
 
-            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(NamespaceString(ns)), actions)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-            return Status::OK();
-        }
-
-        virtual void help( stringstream &help ) const {
-            help << "{ cloneCollection: <collection>, from: <host> [,query: <query_filter>] [,copyIndexes:<bool>] }"
-                 "\nCopies a collection from one server to another. Do not use on a single server as the destination "
-                 "is placed at the same db.collection (namespace) as the source.\n"
-                 ;
-        }
-
-        virtual bool run(OperationContext* txn,
-                         const string& dbname,
-                         BSONObj& cmdObj,
-                         int,
-                         string& errmsg,
-                         BSONObjBuilder& result) {
-
-            boost::optional<DisableDocumentValidation> maybeDisableValidation;
-            if (shouldBypassDocumentValidationForCommand(cmdObj))
-                maybeDisableValidation.emplace(txn);
-
-            string fromhost = cmdObj.getStringField("from");
-            if ( fromhost.empty() ) {
-                errmsg = "missing 'from' parameter";
-                return false;
-            }
-
-            {
-                HostAndPort h(fromhost);
-                if (repl::isSelf(h)) {
-                    errmsg = "can't cloneCollection from self";
-                    return false;
-                }
-            }
-
-            string collection = parseNs(dbname, cmdObj);
-            Status allowedWriteStatus = userAllowedWriteNS(dbname, collection);
-            if (!allowedWriteStatus.isOK()) {
-                return appendCommandStatus(result, allowedWriteStatus);
-            }
-
-            BSONObj query = cmdObj.getObjectField("query");
-            if ( query.isEmpty() )
-                query = BSONObj();
-
-            BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
-            bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
-
-            log() << "cloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost
-                  << " query: " << query << " " << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
-
-            Cloner cloner;
-            unique_ptr<DBClientConnection> myconn;
-            myconn.reset( new DBClientConnection() );
-            if ( ! myconn->connect( HostAndPort(fromhost) , errmsg ) )
-                return false;
-
-            cloner.setConnection( myconn.release() );
-
-            return cloner.copyCollection(txn, collection, query, errmsg, true, false, copyIndexes);
-        }
-
-    } cmdCloneCollection;
-
-} // namespace mongo
+}  // namespace mongo

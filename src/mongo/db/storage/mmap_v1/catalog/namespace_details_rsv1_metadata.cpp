@@ -35,169 +35,165 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::numeric_limits;
+using std::unique_ptr;
+using std::numeric_limits;
 
-    BOOST_STATIC_ASSERT(RecordStoreV1Base::Buckets
-                        == NamespaceDetails::SmallBuckets + NamespaceDetails::LargeBuckets);
+BOOST_STATIC_ASSERT(RecordStoreV1Base::Buckets ==
+                    NamespaceDetails::SmallBuckets + NamespaceDetails::LargeBuckets);
 
-    NamespaceDetailsRSV1MetaData::NamespaceDetailsRSV1MetaData( StringData ns,
-                                                                NamespaceDetails* details )
-        : _ns( ns.toString() ),
-          _details( details ) {
+NamespaceDetailsRSV1MetaData::NamespaceDetailsRSV1MetaData(StringData ns, NamespaceDetails* details)
+    : _ns(ns.toString()), _details(details) {}
+
+const DiskLoc& NamespaceDetailsRSV1MetaData::capExtent() const {
+    return _details->capExtent;
+}
+
+void NamespaceDetailsRSV1MetaData::setCapExtent(OperationContext* txn, const DiskLoc& loc) {
+    *txn->recoveryUnit()->writing(&_details->capExtent) = loc;
+}
+
+const DiskLoc& NamespaceDetailsRSV1MetaData::capFirstNewRecord() const {
+    return _details->capFirstNewRecord;
+}
+
+void NamespaceDetailsRSV1MetaData::setCapFirstNewRecord(OperationContext* txn, const DiskLoc& loc) {
+    *txn->recoveryUnit()->writing(&_details->capFirstNewRecord) = loc;
+}
+
+bool NamespaceDetailsRSV1MetaData::capLooped() const {
+    return _details->capFirstNewRecord.isValid();
+}
+
+long long NamespaceDetailsRSV1MetaData::dataSize() const {
+    return _details->stats.datasize;
+}
+long long NamespaceDetailsRSV1MetaData::numRecords() const {
+    return _details->stats.nrecords;
+}
+
+void NamespaceDetailsRSV1MetaData::incrementStats(OperationContext* txn,
+                                                  long long dataSizeIncrement,
+                                                  long long numRecordsIncrement) {
+    // durability todo : this could be a bit annoying / slow to record constantly
+    NamespaceDetails::Stats* s = txn->recoveryUnit()->writing(&_details->stats);
+    s->datasize += dataSizeIncrement;
+    s->nrecords += numRecordsIncrement;
+}
+
+void NamespaceDetailsRSV1MetaData::setStats(OperationContext* txn,
+                                            long long dataSize,
+                                            long long numRecords) {
+    NamespaceDetails::Stats* s = txn->recoveryUnit()->writing(&_details->stats);
+    s->datasize = dataSize;
+    s->nrecords = numRecords;
+}
+
+DiskLoc NamespaceDetailsRSV1MetaData::deletedListEntry(int bucket) const {
+    invariant(bucket >= 0 && bucket < RecordStoreV1Base::Buckets);
+    const DiskLoc head = (bucket < NamespaceDetails::SmallBuckets)
+        ? _details->deletedListSmall[bucket]
+        : _details->deletedListLarge[bucket - NamespaceDetails::SmallBuckets];
+
+    if (head == DiskLoc(0, 0)) {
+        // This will happen the first time we use a "large" bucket since they were previously
+        // zero-initialized.
+        return DiskLoc();
     }
 
-    const DiskLoc& NamespaceDetailsRSV1MetaData::capExtent() const {
-        return _details->capExtent;
+    return head;
+}
+
+void NamespaceDetailsRSV1MetaData::setDeletedListEntry(OperationContext* txn,
+                                                       int bucket,
+                                                       const DiskLoc& loc) {
+    DiskLoc* head = (bucket < NamespaceDetails::SmallBuckets)
+        ? &_details->deletedListSmall[bucket]
+        : &_details->deletedListLarge[bucket - NamespaceDetails::SmallBuckets];
+    *txn->recoveryUnit()->writing(head) = loc;
+}
+
+DiskLoc NamespaceDetailsRSV1MetaData::deletedListLegacyGrabBag() const {
+    return _details->deletedListLegacyGrabBag;
+}
+
+void NamespaceDetailsRSV1MetaData::setDeletedListLegacyGrabBag(OperationContext* txn,
+                                                               const DiskLoc& loc) {
+    *txn->recoveryUnit()->writing(&_details->deletedListLegacyGrabBag) = loc;
+}
+
+void NamespaceDetailsRSV1MetaData::orphanDeletedList(OperationContext* txn) {
+    for (int i = 0; i < RecordStoreV1Base::Buckets; i++) {
+        setDeletedListEntry(txn, i, DiskLoc());
     }
+    setDeletedListLegacyGrabBag(txn, DiskLoc());
+}
 
-    void NamespaceDetailsRSV1MetaData::setCapExtent( OperationContext* txn, const DiskLoc& loc ) {
-        *txn->recoveryUnit()->writing( &_details->capExtent ) = loc;
-    }
+const DiskLoc& NamespaceDetailsRSV1MetaData::firstExtent(OperationContext* txn) const {
+    return _details->firstExtent;
+}
 
-    const DiskLoc& NamespaceDetailsRSV1MetaData::capFirstNewRecord() const {
-        return _details->capFirstNewRecord;
-    }
+void NamespaceDetailsRSV1MetaData::setFirstExtent(OperationContext* txn, const DiskLoc& loc) {
+    *txn->recoveryUnit()->writing(&_details->firstExtent) = loc;
+}
 
-    void NamespaceDetailsRSV1MetaData::setCapFirstNewRecord( OperationContext* txn,
-                                                             const DiskLoc& loc ) {
-        *txn->recoveryUnit()->writing( &_details->capFirstNewRecord ) = loc;
-    }
+const DiskLoc& NamespaceDetailsRSV1MetaData::lastExtent(OperationContext* txn) const {
+    return _details->lastExtent;
+}
 
-    bool NamespaceDetailsRSV1MetaData::capLooped() const {
-        return _details->capFirstNewRecord.isValid();
-    }
+void NamespaceDetailsRSV1MetaData::setLastExtent(OperationContext* txn, const DiskLoc& loc) {
+    *txn->recoveryUnit()->writing(&_details->lastExtent) = loc;
+}
 
-    long long NamespaceDetailsRSV1MetaData::dataSize() const {
-        return _details->stats.datasize;
-    }
-    long long NamespaceDetailsRSV1MetaData::numRecords() const {
-        return _details->stats.nrecords;
-    }
+bool NamespaceDetailsRSV1MetaData::isCapped() const {
+    return _details->isCapped;
+}
 
-    void NamespaceDetailsRSV1MetaData::incrementStats( OperationContext* txn,
-                                                       long long dataSizeIncrement,
-                                                       long long numRecordsIncrement ) {
-        // durability todo : this could be a bit annoying / slow to record constantly
-        NamespaceDetails::Stats* s = txn->recoveryUnit()->writing( &_details->stats );
-        s->datasize += dataSizeIncrement;
-        s->nrecords += numRecordsIncrement;
-    }
+bool NamespaceDetailsRSV1MetaData::isUserFlagSet(int flag) const {
+    return _details->userFlags & flag;
+}
 
-    void NamespaceDetailsRSV1MetaData::setStats( OperationContext* txn,
-                                                 long long dataSize,
-                                                 long long numRecords ) {
-        NamespaceDetails::Stats* s = txn->recoveryUnit()->writing( &_details->stats );
-        s->datasize = dataSize;
-        s->nrecords = numRecords;
-    }
+int NamespaceDetailsRSV1MetaData::userFlags() const {
+    return _details->userFlags;
+}
 
-    DiskLoc NamespaceDetailsRSV1MetaData::deletedListEntry( int bucket ) const {
-        invariant(bucket >= 0 && bucket < RecordStoreV1Base::Buckets);
-        const DiskLoc head = (bucket < NamespaceDetails::SmallBuckets)
-                              ? _details->deletedListSmall[bucket]
-                              : _details->deletedListLarge[bucket - NamespaceDetails::SmallBuckets];
+bool NamespaceDetailsRSV1MetaData::setUserFlag(OperationContext* txn, int flag) {
+    if ((_details->userFlags & flag) == flag)
+        return false;
 
-        if (head == DiskLoc(0,0)) {
-            // This will happen the first time we use a "large" bucket since they were previously
-            // zero-initialized.
-            return DiskLoc();
-        }
+    txn->recoveryUnit()->writingInt(_details->userFlags) |= flag;
+    return true;
+}
 
-        return head;
-    }
+bool NamespaceDetailsRSV1MetaData::clearUserFlag(OperationContext* txn, int flag) {
+    if ((_details->userFlags & flag) == 0)
+        return false;
 
-    void NamespaceDetailsRSV1MetaData::setDeletedListEntry( OperationContext* txn,
-                                                            int bucket,
-                                                            const DiskLoc& loc ) {
-        DiskLoc* head = (bucket < NamespaceDetails::SmallBuckets)
-                        ? &_details->deletedListSmall[bucket]
-                        : &_details->deletedListLarge[bucket - NamespaceDetails::SmallBuckets];
-        *txn->recoveryUnit()->writing( head ) = loc;
-    }
+    txn->recoveryUnit()->writingInt(_details->userFlags) &= ~flag;
+    return true;
+}
 
-    DiskLoc NamespaceDetailsRSV1MetaData::deletedListLegacyGrabBag() const {
-        return _details->deletedListLegacyGrabBag;
-    }
+bool NamespaceDetailsRSV1MetaData::replaceUserFlags(OperationContext* txn, int flags) {
+    if (_details->userFlags == flags)
+        return false;
 
-    void NamespaceDetailsRSV1MetaData::setDeletedListLegacyGrabBag(OperationContext* txn,
-                                                                   const DiskLoc& loc) {
-        *txn->recoveryUnit()->writing(&_details->deletedListLegacyGrabBag) = loc;
-    }
+    txn->recoveryUnit()->writingInt(_details->userFlags) = flags;
+    return true;
+}
 
-    void NamespaceDetailsRSV1MetaData::orphanDeletedList( OperationContext* txn ) {
-        for( int i = 0; i < RecordStoreV1Base::Buckets; i++ ) {
-            setDeletedListEntry( txn, i, DiskLoc() );
-        }
-        setDeletedListLegacyGrabBag(txn, DiskLoc());
-    }
+int NamespaceDetailsRSV1MetaData::lastExtentSize(OperationContext* txn) const {
+    return _details->lastExtentSize;
+}
 
-    const DiskLoc& NamespaceDetailsRSV1MetaData::firstExtent( OperationContext* txn ) const {
-        return _details->firstExtent;
-    }
+void NamespaceDetailsRSV1MetaData::setLastExtentSize(OperationContext* txn, int newMax) {
+    if (_details->lastExtentSize == newMax)
+        return;
+    txn->recoveryUnit()->writingInt(_details->lastExtentSize) = newMax;
+}
 
-    void NamespaceDetailsRSV1MetaData::setFirstExtent( OperationContext* txn, const DiskLoc& loc ) {
-        *txn->recoveryUnit()->writing( &_details->firstExtent ) = loc;
-    }
-
-    const DiskLoc& NamespaceDetailsRSV1MetaData::lastExtent( OperationContext* txn ) const {
-        return _details->lastExtent;
-    }
-
-    void NamespaceDetailsRSV1MetaData::setLastExtent( OperationContext* txn, const DiskLoc& loc ) {
-        *txn->recoveryUnit()->writing( &_details->lastExtent ) = loc;
-    }
-
-    bool NamespaceDetailsRSV1MetaData::isCapped() const {
-        return _details->isCapped;
-    }
-
-    bool NamespaceDetailsRSV1MetaData::isUserFlagSet( int flag ) const {
-        return _details->userFlags & flag;
-    }
-
-    int NamespaceDetailsRSV1MetaData::userFlags() const {
-        return _details->userFlags;
-    }
-
-    bool NamespaceDetailsRSV1MetaData::setUserFlag( OperationContext* txn, int flag ) {
-        if ( ( _details->userFlags & flag ) == flag )
-            return false;
-
-        txn->recoveryUnit()->writingInt( _details->userFlags) |= flag;
-        return true;
-    }
-
-    bool NamespaceDetailsRSV1MetaData::clearUserFlag( OperationContext* txn, int flag ) {
-        if ( ( _details->userFlags & flag ) == 0 )
-            return false;
-
-        txn->recoveryUnit()->writingInt(_details->userFlags) &= ~flag;
-        return true;
-    }
-
-    bool NamespaceDetailsRSV1MetaData::replaceUserFlags( OperationContext* txn, int flags ) {
-        if ( _details->userFlags == flags )
-            return false;
-
-        txn->recoveryUnit()->writingInt(_details->userFlags) = flags;
-        return true;
-    }
-
-    int NamespaceDetailsRSV1MetaData::lastExtentSize( OperationContext* txn ) const {
-        return _details->lastExtentSize;
-    }
-
-    void NamespaceDetailsRSV1MetaData::setLastExtentSize( OperationContext* txn, int newMax ) {
-        if ( _details->lastExtentSize == newMax )
-            return;
-        txn->recoveryUnit()->writingInt(_details->lastExtentSize) = newMax;
-    }
-
-    long long NamespaceDetailsRSV1MetaData::maxCappedDocs() const {
-        invariant( _details->isCapped );
-        if ( _details->maxDocsInCapped == 0x7fffffff )
-            return numeric_limits<long long>::max();
-        return _details->maxDocsInCapped;
-    }
+long long NamespaceDetailsRSV1MetaData::maxCappedDocs() const {
+    invariant(_details->isCapped);
+    if (_details->maxDocsInCapped == 0x7fffffff)
+        return numeric_limits<long long>::max();
+    return _details->maxDocsInCapped;
+}
 }

@@ -29,10 +29,10 @@
 #include "mongo/base/status.h"
 
 namespace mongo {
-    class OperationContext;
+class OperationContext;
 
-    /**
-     * Drops the database "dbName".
-     */
-    Status dropDatabase(OperationContext* txn, const std::string& dbName);
-} // namespace mongo
+/**
+ * Drops the database "dbName".
+ */
+Status dropDatabase(OperationContext* txn, const std::string& dbName);
+}  // namespace mongo

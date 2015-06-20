@@ -33,130 +33,133 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    using mongoutils::str::stream;
-        const BSONField<BSONObj> BatchedDeleteDocument::query("q");
-        const BSONField<int> BatchedDeleteDocument::limit("limit");
+using mongoutils::str::stream;
+const BSONField<BSONObj> BatchedDeleteDocument::query("q");
+const BSONField<int> BatchedDeleteDocument::limit("limit");
 
-    BatchedDeleteDocument::BatchedDeleteDocument() {
-        clear();
+BatchedDeleteDocument::BatchedDeleteDocument() {
+    clear();
+}
+
+BatchedDeleteDocument::~BatchedDeleteDocument() {}
+
+bool BatchedDeleteDocument::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    BatchedDeleteDocument::~BatchedDeleteDocument() {
+    // All the mandatory fields must be present.
+    if (!_isQuerySet) {
+        *errMsg = stream() << "missing " << query.name() << " field";
+        return false;
     }
 
-    bool BatchedDeleteDocument::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
-
-        // All the mandatory fields must be present.
-        if (!_isQuerySet) {
-            *errMsg = stream() << "missing " << query.name() << " field";
-            return false;
-        }
-
-        if (!_isLimitSet) {
-            *errMsg = stream() << "missing " << limit.name() << " field";
-            return false;
-        }
-
-        if (_limit != 0 && _limit != 1) {
-            *errMsg = stream() << "specify either a 0 to delete all"
-                               << "matching documents or 1 to delete a single document";
-            return false;
-        }
-
-        return true;
+    if (!_isLimitSet) {
+        *errMsg = stream() << "missing " << limit.name() << " field";
+        return false;
     }
 
-    BSONObj BatchedDeleteDocument::toBSON() const {
-        BSONObjBuilder builder;
-
-        if (_isQuerySet) builder.append(query(), _query);
-
-        if (_isLimitSet) builder.append(limit(), _limit);
-
-        return builder.obj();
+    if (_limit != 0 && _limit != 1) {
+        *errMsg = stream() << "specify either a 0 to delete all"
+                           << "matching documents or 1 to delete a single document";
+        return false;
     }
 
-    bool BatchedDeleteDocument::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+    return true;
+}
 
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
+BSONObj BatchedDeleteDocument::toBSON() const {
+    BSONObjBuilder builder;
 
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, query, &_query, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isQuerySet = fieldState == FieldParser::FIELD_SET;
+    if (_isQuerySet)
+        builder.append(query(), _query);
 
-        fieldState = FieldParser::extractNumber(source, limit, &_limit, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isLimitSet = fieldState == FieldParser::FIELD_SET;
+    if (_isLimitSet)
+        builder.append(limit(), _limit);
 
-        return true;
-    }
+    return builder.obj();
+}
 
-    void BatchedDeleteDocument::clear() {
-        _query = BSONObj();
-        _isQuerySet = false;
+bool BatchedDeleteDocument::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-        _limit = 0;
-        _isLimitSet = false;
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-    }
+    FieldParser::FieldState fieldState;
+    fieldState = FieldParser::extract(source, query, &_query, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isQuerySet = fieldState == FieldParser::FIELD_SET;
 
-    void BatchedDeleteDocument::cloneTo(BatchedDeleteDocument* other) const {
-        other->clear();
+    fieldState = FieldParser::extractNumber(source, limit, &_limit, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isLimitSet = fieldState == FieldParser::FIELD_SET;
 
-        other->_query = _query;
-        other->_isQuerySet = _isQuerySet;
+    return true;
+}
 
-        other->_limit = _limit;
-        other->_isLimitSet = _isLimitSet;
-    }
+void BatchedDeleteDocument::clear() {
+    _query = BSONObj();
+    _isQuerySet = false;
 
-    std::string BatchedDeleteDocument::toString() const {
-        return toBSON().toString();
-    }
+    _limit = 0;
+    _isLimitSet = false;
+}
 
-    void BatchedDeleteDocument::setQuery(const BSONObj& query) {
-        _query = query.getOwned();
-        _isQuerySet = true;
-    }
+void BatchedDeleteDocument::cloneTo(BatchedDeleteDocument* other) const {
+    other->clear();
 
-    void BatchedDeleteDocument::unsetQuery() {
-         _isQuerySet = false;
-     }
+    other->_query = _query;
+    other->_isQuerySet = _isQuerySet;
 
-    bool BatchedDeleteDocument::isQuerySet() const {
-         return _isQuerySet;
-    }
+    other->_limit = _limit;
+    other->_isLimitSet = _isLimitSet;
+}
 
-    const BSONObj& BatchedDeleteDocument::getQuery() const {
-        dassert(_isQuerySet);
-        return _query;
-    }
+std::string BatchedDeleteDocument::toString() const {
+    return toBSON().toString();
+}
 
-    void BatchedDeleteDocument::setLimit(int limit) {
-        _limit = limit;
-        _isLimitSet = true;
-    }
+void BatchedDeleteDocument::setQuery(const BSONObj& query) {
+    _query = query.getOwned();
+    _isQuerySet = true;
+}
 
-    void BatchedDeleteDocument::unsetLimit() {
-         _isLimitSet = false;
-     }
+void BatchedDeleteDocument::unsetQuery() {
+    _isQuerySet = false;
+}
 
-    bool BatchedDeleteDocument::isLimitSet() const {
-         return _isLimitSet;
-    }
+bool BatchedDeleteDocument::isQuerySet() const {
+    return _isQuerySet;
+}
 
-    int BatchedDeleteDocument::getLimit() const {
-        dassert(_isLimitSet);
-        return _limit;
-    }
+const BSONObj& BatchedDeleteDocument::getQuery() const {
+    dassert(_isQuerySet);
+    return _query;
+}
 
-} // namespace mongo
+void BatchedDeleteDocument::setLimit(int limit) {
+    _limit = limit;
+    _isLimitSet = true;
+}
+
+void BatchedDeleteDocument::unsetLimit() {
+    _isLimitSet = false;
+}
+
+bool BatchedDeleteDocument::isLimitSet() const {
+    return _isLimitSet;
+}
+
+int BatchedDeleteDocument::getLimit() const {
+    dassert(_isLimitSet);
+    return _limit;
+}
+
+}  // namespace mongo

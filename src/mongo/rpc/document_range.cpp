@@ -42,74 +42,67 @@
 namespace mongo {
 namespace rpc {
 
-    DocumentRange::DocumentRange(const char* begin, const char* end)
-        : _range{begin, end}
-    {}
+DocumentRange::DocumentRange(const char* begin, const char* end) : _range{begin, end} {}
 
-    DocumentRange::const_iterator DocumentRange::begin() const {
-        return const_iterator{ConstDataRangeCursor{_range}};
-    }
+DocumentRange::const_iterator DocumentRange::begin() const {
+    return const_iterator{ConstDataRangeCursor{_range}};
+}
 
-    DocumentRange::const_iterator DocumentRange::end() const {
-        return const_iterator{};
-    }
+DocumentRange::const_iterator DocumentRange::end() const {
+    return const_iterator{};
+}
 
-    ConstDataRange DocumentRange::data() const {
-        return _range;
-    }
+ConstDataRange DocumentRange::data() const {
+    return _range;
+}
 
-    bool operator==(const DocumentRange& lhs, const DocumentRange& rhs) {
-        // We might want to change this to use std::equal in the future if
-        // we ever allow non-contigious document ranges
-        return (lhs._range.length() == rhs._range.length()) &&
-               (std::memcmp(lhs._range.data(), rhs._range.data(), lhs._range.length()) == 0);
-    }
+bool operator==(const DocumentRange& lhs, const DocumentRange& rhs) {
+    // We might want to change this to use std::equal in the future if
+    // we ever allow non-contigious document ranges
+    return (lhs._range.length() == rhs._range.length()) &&
+        (std::memcmp(lhs._range.data(), rhs._range.data(), lhs._range.length()) == 0);
+}
 
-    bool operator!=(const DocumentRange& lhs, const DocumentRange& rhs) {
-        return !(lhs == rhs);
-    }
+bool operator!=(const DocumentRange& lhs, const DocumentRange& rhs) {
+    return !(lhs == rhs);
+}
 
-    DocumentRange::const_iterator::const_iterator(ConstDataRangeCursor cursor)
-        : _cursor{cursor} {
-        operator++();
-    }
+DocumentRange::const_iterator::const_iterator(ConstDataRangeCursor cursor) : _cursor{cursor} {
+    operator++();
+}
 
-    DocumentRange::const_iterator::reference
-    DocumentRange::const_iterator::operator*() const {
-        return _obj;
-    }
+DocumentRange::const_iterator::reference DocumentRange::const_iterator::operator*() const {
+    return _obj;
+}
 
-    DocumentRange::const_iterator::pointer
-    DocumentRange::const_iterator::operator->() const {
-        return &_obj;
-    }
+DocumentRange::const_iterator::pointer DocumentRange::const_iterator::operator->() const {
+    return &_obj;
+}
 
-    DocumentRange::const_iterator&
-    DocumentRange::const_iterator::operator++() {
-        if (_cursor.length() == 0) {
-            *this = const_iterator{};
-        } else {
-            _obj = std::move(uassertStatusOK(_cursor.readAndAdvance<Validated<BSONObj>>()).val);
-        }
-        return *this;
+DocumentRange::const_iterator& DocumentRange::const_iterator::operator++() {
+    if (_cursor.length() == 0) {
+        *this = const_iterator{};
+    } else {
+        _obj = std::move(uassertStatusOK(_cursor.readAndAdvance<Validated<BSONObj>>()).val);
     }
+    return *this;
+}
 
-    DocumentRange::const_iterator
-    DocumentRange::const_iterator::operator++(int) {
-        auto pre = const_iterator{_cursor};
-        operator++();
-        return pre;
-    }
+DocumentRange::const_iterator DocumentRange::const_iterator::operator++(int) {
+    auto pre = const_iterator{_cursor};
+    operator++();
+    return pre;
+}
 
-    bool operator==(const DocumentRange::const_iterator& lhs,
-                    const DocumentRange::const_iterator& rhs) {
-        return lhs._cursor == rhs._cursor;
-    }
+bool operator==(const DocumentRange::const_iterator& lhs,
+                const DocumentRange::const_iterator& rhs) {
+    return lhs._cursor == rhs._cursor;
+}
 
-    bool operator!=(const DocumentRange::const_iterator& lhs,
-                    const DocumentRange::const_iterator& rhs) {
-        return !(lhs == rhs);
-    }
+bool operator!=(const DocumentRange::const_iterator& lhs,
+                const DocumentRange::const_iterator& rhs) {
+    return !(lhs == rhs);
+}
 
 }  // namespace rpc
 }  // namespace mongo

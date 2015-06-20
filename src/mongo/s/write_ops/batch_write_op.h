@@ -44,260 +44,244 @@
 
 namespace mongo {
 
-    class TargetedWriteBatch;
-    struct ShardError;
-    struct ShardWCError;
-    class TrackedErrors;
-    struct BatchWriteStats;
+class TargetedWriteBatch;
+struct ShardError;
+struct ShardWCError;
+class TrackedErrors;
+struct BatchWriteStats;
 
-    /**
-     * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
-     * item in a batch is tracked via a WriteOp, and the function of the BatchWriteOp is to
-     * aggregate the dispatched requests and responses for the underlying WriteOps.
-     *
-     * Overall, the BatchWriteOp lifecycle is similar to the WriteOp lifecycle, with the following
-     * stages:
-     *
-     * 0) Client request comes in, batch write op is initialized
-     *
-     * 1a) One or more ops in the batch are targeted using targetBatch, resulting in
-     *     TargetedWriteBatches for these ops.
-     * 1b) There are targeting errors, and the batch must be retargeted after refreshing the
-     *     NSTargeter.
-     *
-     * 2) (Child BatchCommandRequests are be built for each TargetedWriteBatch before sending)
-     *
-     * 3) Responses for sent TargetedWriteBatches are noted, errors are stored and aggregated per-
-     *    write-op.  Errors the caller is interested in are returned.
-     *
-     * 4) If the batch write is not finished, goto 0
-     *
-     * 5) When all responses come back for all write ops, errors are aggregated and returned in
-     *    a client response
-     *
-     */
-    class BatchWriteOp {
+/**
+ * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
+ * item in a batch is tracked via a WriteOp, and the function of the BatchWriteOp is to
+ * aggregate the dispatched requests and responses for the underlying WriteOps.
+ *
+ * Overall, the BatchWriteOp lifecycle is similar to the WriteOp lifecycle, with the following
+ * stages:
+ *
+ * 0) Client request comes in, batch write op is initialized
+ *
+ * 1a) One or more ops in the batch are targeted using targetBatch, resulting in
+ *     TargetedWriteBatches for these ops.
+ * 1b) There are targeting errors, and the batch must be retargeted after refreshing the
+ *     NSTargeter.
+ *
+ * 2) (Child BatchCommandRequests are be built for each TargetedWriteBatch before sending)
+ *
+ * 3) Responses for sent TargetedWriteBatches are noted, errors are stored and aggregated per-
+ *    write-op.  Errors the caller is interested in are returned.
+ *
+ * 4) If the batch write is not finished, goto 0
+ *
+ * 5) When all responses come back for all write ops, errors are aggregated and returned in
+ *    a client response
+ *
+ */
+class BatchWriteOp {
     MONGO_DISALLOW_COPYING(BatchWriteOp);
-    public:
 
-        BatchWriteOp();
+public:
+    BatchWriteOp();
 
-        ~BatchWriteOp();
-
-        /**
-         * Initializes the BatchWriteOp from a client batch request.
-         */
-        void initClientRequest( const BatchedCommandRequest* clientRequest );
-
-        /**
-         * Targets one or more of the next write ops in this batch op using a NSTargeter.  The
-         * resulting TargetedWrites are aggregated together in the returned TargetedWriteBatches.
-         *
-         * If 'recordTargetErrors' is false, any targeting error will abort all current batches and
-         * the method will return the targeting error.  No targetedBatches will be returned on
-         * error.
-         *
-         * Otherwise, if 'recordTargetErrors' is true, targeting errors will be recorded for each
-         * write op that fails to target, and the method will return OK.
-         *
-         * (The idea here is that if we are sure our NSTargeter is up-to-date we should record
-         * targeting errors, but if not we should refresh once first.)
-         *
-         * Returned TargetedWriteBatches are owned by the caller.
-         */
-        Status targetBatch( const NSTargeter& targeter,
-                            bool recordTargetErrors,
-                            std::vector<TargetedWriteBatch*>* targetedBatches );
-
-        /**
-         * Fills a BatchCommandRequest from a TargetedWriteBatch for this BatchWriteOp.
-         */
-        void buildBatchRequest( const TargetedWriteBatch& targetedBatch,
-                                BatchedCommandRequest* request ) const;
-
-        /**
-         * Stores a response from one of the outstanding TargetedWriteBatches for this BatchWriteOp.
-         * The response may be in any form, error or not.
-         *
-         * There is an additional optional 'trackedErrors' parameter, which can be used to return
-         * copies of any write errors in the response that the caller is interested in (specified by
-         * errCode).  (This avoids external callers needing to know much about the response format.)
-         */
-        void noteBatchResponse( const TargetedWriteBatch& targetedBatch,
-                                const BatchedCommandResponse& response,
-                                TrackedErrors* trackedErrors );
-
-        /**
-         * Stores an error that occurred trying to send/recv a TargetedWriteBatch for this
-         * BatchWriteOp.
-         */
-        void noteBatchError( const TargetedWriteBatch& targetedBatch,
-                             const WriteErrorDetail& error );
-
-        /**
-         * Aborts any further writes in the batch with the provided error.  There must be no pending
-         * ops awaiting results when a batch is aborted.
-         *
-         * Batch is finished immediately after aborting.
-         */
-        void abortBatch( const WriteErrorDetail& error );
-
-        /**
-         * Returns false if the batch write op needs more processing.
-         */
-        bool isFinished();
-
-        /**
-         * Fills a batch response to send back to the client.
-         */
-        void buildClientResponse( BatchedCommandResponse* batchResp );
-
-        //
-        // Accessors
-        //
-
-        int numWriteOps() const;
-
-        int numWriteOpsIn( WriteOpState state ) const;
-
-    private:
-
-        // Incoming client request, not owned here
-        const BatchedCommandRequest* _clientRequest;
-
-        // Array of ops being processed from the client request
-        WriteOp* _writeOps;
-
-        // Current outstanding batch op write requests
-        // Not owned here but tracked for reporting
-        std::set<const TargetedWriteBatch*> _targeted;
-
-        // Write concern responses from all write batches so far
-        OwnedPointerVector<ShardWCError> _wcErrors;
-
-        // Upserted ids for the whole write batch
-        OwnedPointerVector<BatchedUpsertDetail> _upsertedIds;
-
-        // Stats for the entire batch op
-        std::unique_ptr<BatchWriteStats> _stats;
-    };
-
-    struct BatchWriteStats {
-
-        BatchWriteStats();
-
-        int numInserted;
-        int numUpserted;
-        int numMatched;
-        int numModified;
-        int numDeleted;
-
-        std::string toString() const {
-            StringBuilder str;
-            str << "numInserted: " << numInserted
-                << " numUpserted: " << numUpserted
-                << " numMatched: " << numMatched
-                << " numModified: " << numModified
-                << " numDeleted: " << numDeleted;
-            return str.str();
-        }
-
-    };
+    ~BatchWriteOp();
 
     /**
-     * Data structure representing the information needed to make a batch request, along with
-     * pointers to where the resulting responses should be placed.
-     *
-     * Internal support for storage as a doubly-linked list, to allow the TargetedWriteBatch to
-     * efficiently be registered for reporting.
+     * Initializes the BatchWriteOp from a client batch request.
      */
-    class TargetedWriteBatch {
+    void initClientRequest(const BatchedCommandRequest* clientRequest);
+
+    /**
+     * Targets one or more of the next write ops in this batch op using a NSTargeter.  The
+     * resulting TargetedWrites are aggregated together in the returned TargetedWriteBatches.
+     *
+     * If 'recordTargetErrors' is false, any targeting error will abort all current batches and
+     * the method will return the targeting error.  No targetedBatches will be returned on
+     * error.
+     *
+     * Otherwise, if 'recordTargetErrors' is true, targeting errors will be recorded for each
+     * write op that fails to target, and the method will return OK.
+     *
+     * (The idea here is that if we are sure our NSTargeter is up-to-date we should record
+     * targeting errors, but if not we should refresh once first.)
+     *
+     * Returned TargetedWriteBatches are owned by the caller.
+     */
+    Status targetBatch(const NSTargeter& targeter,
+                       bool recordTargetErrors,
+                       std::vector<TargetedWriteBatch*>* targetedBatches);
+
+    /**
+     * Fills a BatchCommandRequest from a TargetedWriteBatch for this BatchWriteOp.
+     */
+    void buildBatchRequest(const TargetedWriteBatch& targetedBatch,
+                           BatchedCommandRequest* request) const;
+
+    /**
+     * Stores a response from one of the outstanding TargetedWriteBatches for this BatchWriteOp.
+     * The response may be in any form, error or not.
+     *
+     * There is an additional optional 'trackedErrors' parameter, which can be used to return
+     * copies of any write errors in the response that the caller is interested in (specified by
+     * errCode).  (This avoids external callers needing to know much about the response format.)
+     */
+    void noteBatchResponse(const TargetedWriteBatch& targetedBatch,
+                           const BatchedCommandResponse& response,
+                           TrackedErrors* trackedErrors);
+
+    /**
+     * Stores an error that occurred trying to send/recv a TargetedWriteBatch for this
+     * BatchWriteOp.
+     */
+    void noteBatchError(const TargetedWriteBatch& targetedBatch, const WriteErrorDetail& error);
+
+    /**
+     * Aborts any further writes in the batch with the provided error.  There must be no pending
+     * ops awaiting results when a batch is aborted.
+     *
+     * Batch is finished immediately after aborting.
+     */
+    void abortBatch(const WriteErrorDetail& error);
+
+    /**
+     * Returns false if the batch write op needs more processing.
+     */
+    bool isFinished();
+
+    /**
+     * Fills a batch response to send back to the client.
+     */
+    void buildClientResponse(BatchedCommandResponse* batchResp);
+
+    //
+    // Accessors
+    //
+
+    int numWriteOps() const;
+
+    int numWriteOpsIn(WriteOpState state) const;
+
+private:
+    // Incoming client request, not owned here
+    const BatchedCommandRequest* _clientRequest;
+
+    // Array of ops being processed from the client request
+    WriteOp* _writeOps;
+
+    // Current outstanding batch op write requests
+    // Not owned here but tracked for reporting
+    std::set<const TargetedWriteBatch*> _targeted;
+
+    // Write concern responses from all write batches so far
+    OwnedPointerVector<ShardWCError> _wcErrors;
+
+    // Upserted ids for the whole write batch
+    OwnedPointerVector<BatchedUpsertDetail> _upsertedIds;
+
+    // Stats for the entire batch op
+    std::unique_ptr<BatchWriteStats> _stats;
+};
+
+struct BatchWriteStats {
+    BatchWriteStats();
+
+    int numInserted;
+    int numUpserted;
+    int numMatched;
+    int numModified;
+    int numDeleted;
+
+    std::string toString() const {
+        StringBuilder str;
+        str << "numInserted: " << numInserted << " numUpserted: " << numUpserted
+            << " numMatched: " << numMatched << " numModified: " << numModified
+            << " numDeleted: " << numDeleted;
+        return str.str();
+    }
+};
+
+/**
+ * Data structure representing the information needed to make a batch request, along with
+ * pointers to where the resulting responses should be placed.
+ *
+ * Internal support for storage as a doubly-linked list, to allow the TargetedWriteBatch to
+ * efficiently be registered for reporting.
+ */
+class TargetedWriteBatch {
     MONGO_DISALLOW_COPYING(TargetedWriteBatch);
-    public:
 
-        TargetedWriteBatch( const ShardEndpoint& endpoint ) :
-            _endpoint( endpoint ) {
-        }
+public:
+    TargetedWriteBatch(const ShardEndpoint& endpoint) : _endpoint(endpoint) {}
 
-        const ShardEndpoint& getEndpoint() const {
-            return _endpoint;
-        }
-
-        /**
-         * TargetedWrite is owned here once given to the TargetedWriteBatch
-         */
-        void addWrite( TargetedWrite* targetedWrite ) {
-            _writes.mutableVector().push_back( targetedWrite );
-        }
-
-        const std::vector<TargetedWrite*>& getWrites() const {
-            return _writes.vector();
-        }
-
-    private:
-
-        // Where to send the batch
-        const ShardEndpoint _endpoint;
-
-        // Where the responses go
-        // TargetedWrite*s are owned by the TargetedWriteBatch
-        OwnedPointerVector<TargetedWrite> _writes;
-    };
+    const ShardEndpoint& getEndpoint() const {
+        return _endpoint;
+    }
 
     /**
-     * Simple struct for storing an error with an endpoint.
-     *
-     * Certain types of errors are not stored in WriteOps or must be returned to a caller.
+     * TargetedWrite is owned here once given to the TargetedWriteBatch
      */
-    struct ShardError {
+    void addWrite(TargetedWrite* targetedWrite) {
+        _writes.mutableVector().push_back(targetedWrite);
+    }
 
-        ShardError( const ShardEndpoint& endpoint, const WriteErrorDetail& error ) :
-            endpoint( endpoint ) {
-            error.cloneTo( &this->error );
-        }
+    const std::vector<TargetedWrite*>& getWrites() const {
+        return _writes.vector();
+    }
 
-        const ShardEndpoint endpoint;
-        WriteErrorDetail error;
-    };
+private:
+    // Where to send the batch
+    const ShardEndpoint _endpoint;
 
-    /**
-     * Simple struct for storing a write concern error with an endpoint.
-     *
-     * Certain types of errors are not stored in WriteOps or must be returned to a caller.
-     */
-    struct ShardWCError {
+    // Where the responses go
+    // TargetedWrite*s are owned by the TargetedWriteBatch
+    OwnedPointerVector<TargetedWrite> _writes;
+};
 
-        ShardWCError( const ShardEndpoint& endpoint, const WCErrorDetail& error ) :
-            endpoint( endpoint ) {
-            error.cloneTo( &this->error );
-        }
+/**
+ * Simple struct for storing an error with an endpoint.
+ *
+ * Certain types of errors are not stored in WriteOps or must be returned to a caller.
+ */
+struct ShardError {
+    ShardError(const ShardEndpoint& endpoint, const WriteErrorDetail& error) : endpoint(endpoint) {
+        error.cloneTo(&this->error);
+    }
 
-        const ShardEndpoint endpoint;
-        WCErrorDetail error;
-    };
+    const ShardEndpoint endpoint;
+    WriteErrorDetail error;
+};
 
-    /**
-     * Helper class for tracking certain errors from batch operations
-     */
-    class TrackedErrors {
-    public:
+/**
+ * Simple struct for storing a write concern error with an endpoint.
+ *
+ * Certain types of errors are not stored in WriteOps or must be returned to a caller.
+ */
+struct ShardWCError {
+    ShardWCError(const ShardEndpoint& endpoint, const WCErrorDetail& error) : endpoint(endpoint) {
+        error.cloneTo(&this->error);
+    }
 
-        ~TrackedErrors();
+    const ShardEndpoint endpoint;
+    WCErrorDetail error;
+};
 
-        void startTracking( int errCode );
+/**
+ * Helper class for tracking certain errors from batch operations
+ */
+class TrackedErrors {
+public:
+    ~TrackedErrors();
 
-        bool isTracking( int errCode ) const;
+    void startTracking(int errCode);
 
-        void addError( ShardError* error );
+    bool isTracking(int errCode) const;
 
-        const std::vector<ShardError*>& getErrors( int errCode ) const;
+    void addError(ShardError* error);
 
-        void clear();
+    const std::vector<ShardError*>& getErrors(int errCode) const;
 
-    private:
+    void clear();
 
-        typedef unordered_map<int, std::vector<ShardError*> > TrackedErrorMap;
-        TrackedErrorMap _errorMap;
-    };
-
+private:
+    typedef unordered_map<int, std::vector<ShardError*>> TrackedErrorMap;
+    TrackedErrorMap _errorMap;
+};
 }

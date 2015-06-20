@@ -29,39 +29,39 @@
 #pragma once
 
 namespace mongo {
-    class BSONObj;
-    class OperationContext;
+class BSONObj;
+class OperationContext;
 
 namespace repl {
-    class OpTime;
+class OpTime;
 
-    /**
-     * Helper functions for maintaining local.replset.minvalid collection contents.
-     *
-     * When a member reaches its minValid optime it is in a consistent state.  Thus, minValid is
-     * set as the last step in initial sync.  At the beginning of initial sync, _initialSyncFlag
-     * is appended onto minValid to indicate that initial sync was started but has not yet 
-     * completed.
-     * minValid is also used during "normal" sync: the last op in each batch is used to set 
-     * minValid, to indicate that we are in a consistent state when the batch has been fully 
-     * applied.
-     */
+/**
+ * Helper functions for maintaining local.replset.minvalid collection contents.
+ *
+ * When a member reaches its minValid optime it is in a consistent state.  Thus, minValid is
+ * set as the last step in initial sync.  At the beginning of initial sync, _initialSyncFlag
+ * is appended onto minValid to indicate that initial sync was started but has not yet
+ * completed.
+ * minValid is also used during "normal" sync: the last op in each batch is used to set
+ * minValid, to indicate that we are in a consistent state when the batch has been fully
+ * applied.
+ */
 
-    /**
-     * The initial sync flag is used to durably record the state of an initial sync; its boolean
-     * value is true when an initial sync is in progress and hasn't yet completed.  The flag
-     * is stored as part of the local.replset.minvalid collection.
-     */
-    void clearInitialSyncFlag(OperationContext* txn);
-    void setInitialSyncFlag(OperationContext* txn);
-    bool getInitialSyncFlag();
+/**
+ * The initial sync flag is used to durably record the state of an initial sync; its boolean
+ * value is true when an initial sync is in progress and hasn't yet completed.  The flag
+ * is stored as part of the local.replset.minvalid collection.
+ */
+void clearInitialSyncFlag(OperationContext* txn);
+void setInitialSyncFlag(OperationContext* txn);
+bool getInitialSyncFlag();
 
-    /**
-     * The minValid value is the earliest (minimum) Timestamp that must be applied in order to
-     * consider the dataset consistent.  Do not allow client reads if our last applied operation is
-     * before the minValid time.
-     */
-    void setMinValid(OperationContext* ctx, const OpTime& opTime);
-    OpTime getMinValid(OperationContext* txn);
+/**
+ * The minValid value is the earliest (minimum) Timestamp that must be applied in order to
+ * consider the dataset consistent.  Do not allow client reads if our last applied operation is
+ * before the minValid time.
+ */
+void setMinValid(OperationContext* ctx, const OpTime& opTime);
+OpTime getMinValid(OperationContext* txn);
 }
 }

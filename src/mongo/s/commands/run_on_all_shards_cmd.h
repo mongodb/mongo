@@ -36,62 +36,68 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class BSONObjBuilder;
-    class OperationContext;
+class BSONObj;
+class BSONObjBuilder;
+class OperationContext;
 
-    /**
-     * Logic for commands that simply map out to all shards then fold the results into
-     * a single response.
-     *
-     * All shards are contacted in parallel.
-     *
-     * When extending, don't override run() - but rather aggregateResults(). If you need
-     * to implement some kind of fall back logic for multiversion clusters,
-     * override specialErrorHandler().
-     */
-    class RunOnAllShardsCommand : public Command {
-    public:
-        RunOnAllShardsCommand(const char* name,
-                              const char* oldName=NULL,
-                              bool useShardConn=false,
-                              bool implicitCreateDb=false);
+/**
+ * Logic for commands that simply map out to all shards then fold the results into
+ * a single response.
+ *
+ * All shards are contacted in parallel.
+ *
+ * When extending, don't override run() - but rather aggregateResults(). If you need
+ * to implement some kind of fall back logic for multiversion clusters,
+ * override specialErrorHandler().
+ */
+class RunOnAllShardsCommand : public Command {
+public:
+    RunOnAllShardsCommand(const char* name,
+                          const char* oldName = NULL,
+                          bool useShardConn = false,
+                          bool implicitCreateDb = false);
 
-        bool slaveOk() const override { return true; }
-        bool adminOnly() const override { return false; }
-        bool isWriteCommandForConfigServer() const override { return false; }
+    bool slaveOk() const override {
+        return true;
+    }
+    bool adminOnly() const override {
+        return false;
+    }
+    bool isWriteCommandForConfigServer() const override {
+        return false;
+    }
 
-        // The StringData contains the shard ident.
-        // This can be used to create an instance of Shard
-        using ShardAndReply = std::tuple<StringData, BSONObj>;
+    // The StringData contains the shard ident.
+    // This can be used to create an instance of Shard
+    using ShardAndReply = std::tuple<StringData, BSONObj>;
 
-        virtual void aggregateResults(const std::vector<ShardAndReply>& results,
-                                      BSONObjBuilder& output);
+    virtual void aggregateResults(const std::vector<ShardAndReply>& results,
+                                  BSONObjBuilder& output);
 
-        // The default implementation is the identity function.
-        virtual BSONObj specialErrorHandler(const std::string& server,
-                                            const std::string& db,
-                                            const BSONObj& cmdObj,
-                                            const BSONObj& originalResult) const;
+    // The default implementation is the identity function.
+    virtual BSONObj specialErrorHandler(const std::string& server,
+                                        const std::string& db,
+                                        const BSONObj& cmdObj,
+                                        const BSONObj& originalResult) const;
 
-        // The default implementation uses all shards.
-        virtual void getShardIds(const std::string& db,
-                                 BSONObj& cmdObj,
-                                 std::vector<ShardId>& shardIds);
+    // The default implementation uses all shards.
+    virtual void getShardIds(const std::string& db,
+                             BSONObj& cmdObj,
+                             std::vector<ShardId>& shardIds);
 
-        bool run(OperationContext* txn,
-                 const std::string& db,
-                 BSONObj& cmdObj,
-                 int options,
-                 std::string& errmsg,
-                 BSONObjBuilder& output) final;
+    bool run(OperationContext* txn,
+             const std::string& db,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& output) final;
 
-    private:
-        // Use ShardConnection as opposed to ScopedDbConnection
-        const bool _useShardConn;
+private:
+    // Use ShardConnection as opposed to ScopedDbConnection
+    const bool _useShardConn;
 
-        // Whether the requested database should be created implicitly
-        const bool _implicitCreateDb;
-    };
+    // Whether the requested database should be created implicitly
+    const bool _implicitCreateDb;
+};
 
 }  // namespace mongo

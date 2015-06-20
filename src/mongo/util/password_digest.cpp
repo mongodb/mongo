@@ -32,22 +32,17 @@
 
 namespace mongo {
 
-    std::string createPasswordDigest(StringData username,
-                                     StringData clearTextPassword) {
-
-        md5digest d;
-        {
-            md5_state_t st;
-            md5_init(&st);
-            md5_append(&st, (const md5_byte_t *) username.rawData(), username.size());
-            md5_append(&st, (const md5_byte_t *) ":mongo:", 7 );
-            md5_append(&st, (const md5_byte_t *) clearTextPassword.rawData(),
-                       clearTextPassword.size());
-            md5_finish(&st, d);
-        }
-        return digestToString( d );
-
-
+std::string createPasswordDigest(StringData username, StringData clearTextPassword) {
+    md5digest d;
+    {
+        md5_state_t st;
+        md5_init(&st);
+        md5_append(&st, (const md5_byte_t*)username.rawData(), username.size());
+        md5_append(&st, (const md5_byte_t*)":mongo:", 7);
+        md5_append(&st, (const md5_byte_t*)clearTextPassword.rawData(), clearTextPassword.size());
+        md5_finish(&st, d);
     }
+    return digestToString(d);
+}
 
-} // namespace mongo
+}  // namespace mongo

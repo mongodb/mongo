@@ -38,1014 +38,1029 @@
 
 namespace {
 
-    using namespace mongo;
-    using std::set;
-    using std::vector;
+using namespace mongo;
+using std::set;
+using std::vector;
 
-    // Pull nested types to top-level scope
-    typedef ReplicaSetMonitor::SetState SetState;
-    typedef SetState::Node Node;
+// Pull nested types to top-level scope
+typedef ReplicaSetMonitor::SetState SetState;
+typedef SetState::Node Node;
 
-    HostAndPort selectNode(const vector<Node>& nodes,
-                           ReadPreference pref,
-                           const TagSet& tagSet,
-                           int latencyThresholdMillis,
-                           bool* isPrimarySelected) {
+HostAndPort selectNode(const vector<Node>& nodes,
+                       ReadPreference pref,
+                       const TagSet& tagSet,
+                       int latencyThresholdMillis,
+                       bool* isPrimarySelected) {
+    invariant(!nodes.empty());
 
-        invariant(!nodes.empty());
+    set<HostAndPort> seeds;
+    seeds.insert(nodes.front().host);
 
-        set<HostAndPort> seeds;
-        seeds.insert(nodes.front().host);
+    SetState set("name", seeds);
+    set.nodes = nodes;
+    set.latencyThresholdMicros = latencyThresholdMillis * 1000;
 
-        SetState set("name", seeds);
-        set.nodes = nodes;
-        set.latencyThresholdMicros = latencyThresholdMillis * 1000;
-
-        ReadPreferenceSetting criteria(pref, tagSet);
-        HostAndPort out = set.getMatchingHost(criteria);
-        if (isPrimarySelected) {
-            *isPrimarySelected = !out.empty() && set.findNode(out)->isMaster;
-        }
-
-        return out;
+    ReadPreferenceSetting criteria(pref, tagSet);
+    HostAndPort out = set.getMatchingHost(criteria);
+    if (isPrimarySelected) {
+        *isPrimarySelected = !out.empty() && set.findNode(out)->isMaster;
     }
 
-    vector<Node> getThreeMemberWithTags() {
-        vector<Node> nodes;
-
-        nodes.push_back(Node(HostAndPort("a")));
-        nodes.push_back(Node(HostAndPort("b")));
-        nodes.push_back(Node(HostAndPort("c")));
-
-        nodes[0].isUp = true;
-        nodes[1].isUp = true;
-        nodes[2].isUp = true;
-
-        nodes[0].isMaster = false;
-        nodes[1].isMaster = true;
-        nodes[2].isMaster = false;
-
-        nodes[0].tags = BSON("dc" << "nyc" << "p" << "1");
-        nodes[1].tags = BSON("dc" << "sf");
-        nodes[2].tags = BSON("dc" << "nyc" << "p" << "2");
-
-        return nodes;
-    }
-
-    BSONArray getDefaultTagSet() {
-        BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSONObj());
-        return arrayBuilder.arr();
-    }
-
-    BSONArray getP2TagSet() {
-        BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSON("p" << "2"));
-        return arrayBuilder.arr();
-    }
-
-    BSONArray getSingleNoMatchTag() {
-        BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSON("k" << "x"));
-        return arrayBuilder.arr();
-    }
-
-    BSONArray getMultiNoMatchTag() {
-        BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSON("mongo" << "db"));
-        arrayBuilder.append(BSON("by" << "10gen"));
-        return arrayBuilder.arr();
-    }
-
-    TEST(ReplSetMonitorReadPref, PrimaryOnly) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryOnly, tags, 3,
-            &isPrimarySelected);
-
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
-
-    TEST(ReplSetMonitorReadPref, PrimaryOnlyPriNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
-
-        nodes[1].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryOnly, tags, 3,
-            &isPrimarySelected);
-
-        ASSERT(host.empty());
-    }
-
-    TEST(ReplSetMonitorReadPref, PrimaryMissing) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
-
-        nodes[1].isMaster = false;
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryOnly, tags, 3,
-            &isPrimarySelected);
-
-        ASSERT(host.empty());
-    }
-
-    TEST(ReplSetMonitorReadPref, PriPrefWithPriOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, tags, 1,
-            &isPrimarySelected);
-
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
-
-    TEST(ReplSetMonitorReadPref, PriPrefWithPriNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
+    return out;
+}
+
+vector<Node> getThreeMemberWithTags() {
+    vector<Node> nodes;
+
+    nodes.push_back(Node(HostAndPort("a")));
+    nodes.push_back(Node(HostAndPort("b")));
+    nodes.push_back(Node(HostAndPort("c")));
+
+    nodes[0].isUp = true;
+    nodes[1].isUp = true;
+    nodes[2].isUp = true;
+
+    nodes[0].isMaster = false;
+    nodes[1].isMaster = true;
+    nodes[2].isMaster = false;
+
+    nodes[0].tags = BSON("dc"
+                         << "nyc"
+                         << "p"
+                         << "1");
+    nodes[1].tags = BSON("dc"
+                         << "sf");
+    nodes[2].tags = BSON("dc"
+                         << "nyc"
+                         << "p"
+                         << "2");
+
+    return nodes;
+}
+
+BSONArray getDefaultTagSet() {
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSONObj());
+    return arrayBuilder.arr();
+}
+
+BSONArray getP2TagSet() {
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("p"
+                             << "2"));
+    return arrayBuilder.arr();
+}
+
+BSONArray getSingleNoMatchTag() {
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("k"
+                             << "x"));
+    return arrayBuilder.arr();
+}
+
+BSONArray getMultiNoMatchTag() {
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("mongo"
+                             << "db"));
+    arrayBuilder.append(BSON("by"
+                             << "10gen"));
+    return arrayBuilder.arr();
+}
+
+TEST(ReplSetMonitorReadPref, PrimaryOnly) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
+
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
+
+TEST(ReplSetMonitorReadPref, PrimaryOnlyPriNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
+
+    nodes[1].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
+
+    ASSERT(host.empty());
+}
+
+TEST(ReplSetMonitorReadPref, PrimaryMissing) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
+
+    nodes[1].isMaster = false;
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
+
+    ASSERT(host.empty());
+}
+
+TEST(ReplSetMonitorReadPref, PriPrefWithPriOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
 
-        nodes[1].markFailed();
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 1, &isPrimarySelected);
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, tags, 1,
-            &isPrimarySelected);
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
 
-        ASSERT(!isPrimarySelected);
-        ASSERT(host.host() == "a" || host.host() == "c");
-    }
+TEST(ReplSetMonitorReadPref, PriPrefWithPriNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
 
-    TEST(ReplSetMonitorReadPref, SecOnly) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
+    nodes[1].markFailed();
 
-        nodes[2].markFailed();
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 1, &isPrimarySelected);
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, tags, 1,
-            &isPrimarySelected);
+    ASSERT(!isPrimarySelected);
+    ASSERT(host.host() == "a" || host.host() == "c");
+}
 
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
+TEST(ReplSetMonitorReadPref, SecOnly) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
 
-    TEST(ReplSetMonitorReadPref, SecOnlyOnlyPriOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
+    nodes[2].markFailed();
 
-        nodes[0].markFailed();
-        nodes[2].markFailed();
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryOnly, tags, 1, &isPrimarySelected);
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, tags, 1,
-            &isPrimarySelected);
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
 
-        ASSERT(host.empty());
-    }
-
-    TEST(ReplSetMonitorReadPref, SecPref) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
+TEST(ReplSetMonitorReadPref, SecOnlyOnlyPriOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
 
-        nodes[2].markFailed();
+    nodes[0].markFailed();
+    nodes[2].markFailed();
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, tags, 1,
-            &isPrimarySelected);
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryOnly, tags, 1, &isPrimarySelected);
 
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
+    ASSERT(host.empty());
+}
 
-    TEST(ReplSetMonitorReadPref, SecPrefWithNoSecOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
+TEST(ReplSetMonitorReadPref, SecPref) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
 
-        nodes[0].markFailed();
-        nodes[2].markFailed();
+    nodes[2].markFailed();
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, tags, 1,
-            &isPrimarySelected);
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 1, &isPrimarySelected);
 
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
 
-    TEST(ReplSetMonitorReadPref, SecPrefWithNoNodeOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
+TEST(ReplSetMonitorReadPref, SecPrefWithNoSecOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
 
-        nodes[0].markFailed();
-        nodes[1].markFailed();
-        nodes[2].markFailed();
+    nodes[0].markFailed();
+    nodes[2].markFailed();
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, tags, 1,
-            &isPrimarySelected);
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 1, &isPrimarySelected);
 
-        ASSERT(host.empty());
-    }
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
 
-    TEST(ReplSetMonitorReadPref, NearestAllLocal) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
+TEST(ReplSetMonitorReadPref, SecPrefWithNoNodeOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
 
-        nodes[0].latencyMicros = 1 * 1000;
-        nodes[1].latencyMicros = 2 * 1000;
-        nodes[2].latencyMicros = 3 * 1000;
+    nodes[0].markFailed();
+    nodes[1].markFailed();
+    nodes[2].markFailed();
 
-        bool isPrimarySelected = 0;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, tags, 3,
-            &isPrimarySelected);
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 1, &isPrimarySelected);
 
-        // Any host is ok
-        ASSERT(!host.empty());
-        ASSERT_EQUALS(isPrimarySelected, host.host() == "b");
-    }
+    ASSERT(host.empty());
+}
 
-    TEST(ReplSetMonitorReadPref, NearestOneLocal) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getDefaultTagSet());
+TEST(ReplSetMonitorReadPref, NearestAllLocal) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
 
-        nodes[0].latencyMicros = 10 * 1000;
-        nodes[1].latencyMicros = 20 * 1000;
-        nodes[2].latencyMicros = 30 * 1000;
+    nodes[0].latencyMicros = 1 * 1000;
+    nodes[1].latencyMicros = 2 * 1000;
+    nodes[2].latencyMicros = 3 * 1000;
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, tags, 3,
-            &isPrimarySelected);
+    bool isPrimarySelected = 0;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
-        ASSERT_EQUALS("a", host.host());
-        ASSERT(!isPrimarySelected);
-    }
+    // Any host is ok
+    ASSERT(!host.empty());
+    ASSERT_EQUALS(isPrimarySelected, host.host() == "b");
+}
 
-    TEST(ReplSetMonitorReadPref, PriOnlyWithTagsNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getP2TagSet());
+TEST(ReplSetMonitorReadPref, NearestOneLocal) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getDefaultTagSet());
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryOnly, tags, 3,
-            &isPrimarySelected);
+    nodes[0].latencyMicros = 10 * 1000;
+    nodes[1].latencyMicros = 20 * 1000;
+    nodes[2].latencyMicros = 30 * 1000;
 
-        ASSERT(isPrimarySelected);
-        // Note: PrimaryOnly ignores tag
-        ASSERT_EQUALS("b", host.host());
-    }
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
-    TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTags) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getP2TagSet());
+    ASSERT_EQUALS("a", host.host());
+    ASSERT(!isPrimarySelected);
+}
 
-        nodes[1].markFailed();
+TEST(ReplSetMonitorReadPref, PriOnlyWithTagsNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getP2TagSet());
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, tags, 3,
-            &isPrimarySelected);
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
 
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("c", host.host());
-    }
+    ASSERT(isPrimarySelected);
+    // Note: PrimaryOnly ignores tag
+    ASSERT_EQUALS("b", host.host());
+}
 
-    TEST(ReplSetMonitorReadPref, PriPrefPriOkWithTagsNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getSingleNoMatchTag());
+TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTags) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getP2TagSet());
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, tags, 3,
-            &isPrimarySelected);
+    nodes[1].markFailed();
 
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
 
-    TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTagsNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getSingleNoMatchTag());
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("c", host.host());
+}
 
-        nodes[1].markFailed();
+TEST(ReplSetMonitorReadPref, PriPrefPriOkWithTagsNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getSingleNoMatchTag());
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, tags, 3,
-            &isPrimarySelected);
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
 
-        ASSERT(host.empty());
-    }
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
 
-    TEST(ReplSetMonitorReadPref, SecOnlyWithTags) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getP2TagSet());
+TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTagsNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getSingleNoMatchTag());
 
-        bool isPrimarySelected;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, tags, 3,
-            &isPrimarySelected);
+    nodes[1].markFailed();
 
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("c", host.host());
-    }
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
 
-    TEST(ReplSetMonitorReadPref, SecOnlyWithTagsMatchOnlyPri) {
-        vector<Node> nodes = getThreeMemberWithTags();
+    ASSERT(host.empty());
+}
 
-        BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSON("dc" << "sf"));
-        TagSet tags(arrayBuilder.arr());
+TEST(ReplSetMonitorReadPref, SecOnlyWithTags) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getP2TagSet());
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, tags, 3,
-            &isPrimarySelected);
+    bool isPrimarySelected;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryOnly, tags, 3, &isPrimarySelected);
 
-        ASSERT(host.empty());
-    }
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("c", host.host());
+}
 
-    TEST(ReplSetMonitorReadPref, SecPrefWithTags) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getP2TagSet());
+TEST(ReplSetMonitorReadPref, SecOnlyWithTagsMatchOnlyPri) {
+    vector<Node> nodes = getThreeMemberWithTags();
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, tags, 3,
-            &isPrimarySelected);
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("dc"
+                             << "sf"));
+    TagSet tags(arrayBuilder.arr());
 
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("c", host.host());
-    }
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryOnly, tags, 3, &isPrimarySelected);
 
-    TEST(ReplSetMonitorReadPref, SecPrefSecNotOkWithTags) {
-        vector<Node> nodes = getThreeMemberWithTags();
+    ASSERT(host.empty());
+}
 
-        BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSON("dc" << "nyc"));
-        TagSet tags(arrayBuilder.arr());
+TEST(ReplSetMonitorReadPref, SecPrefWithTags) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getP2TagSet());
 
-        nodes[2].markFailed();
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, tags, 3,
-            &isPrimarySelected);
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("c", host.host());
+}
 
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
+TEST(ReplSetMonitorReadPref, SecPrefSecNotOkWithTags) {
+    vector<Node> nodes = getThreeMemberWithTags();
 
-    TEST(ReplSetMonitorReadPref, SecPrefPriOkWithTagsNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getSingleNoMatchTag());
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("dc"
+                             << "nyc"));
+    TagSet tags(arrayBuilder.arr());
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, tags, 3,
-            &isPrimarySelected);
+    nodes[2].markFailed();
 
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
-    TEST(ReplSetMonitorReadPref, SecPrefPriNotOkWithTagsNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getSingleNoMatchTag());
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
 
-        nodes[1].markFailed();
+TEST(ReplSetMonitorReadPref, SecPrefPriOkWithTagsNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getSingleNoMatchTag());
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, tags, 3,
-            &isPrimarySelected);
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
-        ASSERT(host.empty());
-    }
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
 
-    TEST(ReplSetMonitorReadPref, SecPrefPriOkWithSecNotMatchTag) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getSingleNoMatchTag());
+TEST(ReplSetMonitorReadPref, SecPrefPriNotOkWithTagsNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getSingleNoMatchTag());
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, tags, 3,
-            &isPrimarySelected);
+    nodes[1].markFailed();
 
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
-    TEST(ReplSetMonitorReadPref, NearestWithTags) {
-        vector<Node> nodes = getThreeMemberWithTags();
+    ASSERT(host.empty());
+}
 
-        BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSON("p" << "1"));
-        TagSet tags(arrayBuilder.arr());
+TEST(ReplSetMonitorReadPref, SecPrefPriOkWithSecNotMatchTag) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getSingleNoMatchTag());
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, tags, 3,
-            &isPrimarySelected);
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
 
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
 
-    TEST(ReplSetMonitorReadPref, NearestWithTagsNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getSingleNoMatchTag());
+TEST(ReplSetMonitorReadPref, NearestWithTags) {
+    vector<Node> nodes = getThreeMemberWithTags();
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, tags, 3,
-            &isPrimarySelected);
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("p"
+                             << "1"));
+    TagSet tags(arrayBuilder.arr());
 
-        ASSERT(host.empty());
-    }
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
-    TEST(ReplSetMonitorReadPref, MultiPriOnlyTag) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getMultiNoMatchTag());
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryOnly, tags, 3,
-            &isPrimarySelected);
+TEST(ReplSetMonitorReadPref, NearestWithTagsNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getSingleNoMatchTag());
 
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
 
-    TEST(ReplSetMonitorReadPref, MultiPriOnlyPriNotOkTag) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getMultiNoMatchTag());
+    ASSERT(host.empty());
+}
 
-        nodes[1].markFailed();
+TEST(ReplSetMonitorReadPref, MultiPriOnlyTag) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getMultiNoMatchTag());
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryOnly, tags, 3,
-            &isPrimarySelected);
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
 
-        ASSERT(host.empty());
-    }
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
 
-    TEST(ReplSetMonitorReadPref, PriPrefPriOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
+TEST(ReplSetMonitorReadPref, MultiPriOnlyPriNotOkTag) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getMultiNoMatchTag());
 
-        BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSON("p" << "1"));
-        arrayBuilder.append(BSON("p" << "2"));
+    nodes[1].markFailed();
 
-        TagSet tags(arrayBuilder.arr());
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryOnly, tags, 3, &isPrimarySelected);
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, tags, 3,
-            &isPrimarySelected);
+    ASSERT(host.empty());
+}
 
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
+TEST(ReplSetMonitorReadPref, PriPrefPriOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
 
-    class MultiTags : public mongo::unittest::Test {
-    public:
-        const TagSet& getMatchesFirstTagSet() {
-            if (matchFirstTags.get() != NULL) {
-                return *matchFirstTags;
-            }
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("p"
+                             << "1"));
+    arrayBuilder.append(BSON("p"
+                             << "2"));
 
-            BSONArrayBuilder arrayBuilder;
-            arrayBuilder.append(BSON("p" << "1"));
-            arrayBuilder.append(BSON("p" << "2"));
-            matchFirstTags.reset(new TagSet(arrayBuilder.arr()));
+    TagSet tags(arrayBuilder.arr());
 
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
+
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
+
+class MultiTags : public mongo::unittest::Test {
+public:
+    const TagSet& getMatchesFirstTagSet() {
+        if (matchFirstTags.get() != NULL) {
             return *matchFirstTags;
         }
 
-        const TagSet& getMatchesSecondTagSet() {
-            if (matchSecondTags.get() != NULL) {
-                return *matchSecondTags;
-            }
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append(BSON("p"
+                                 << "1"));
+        arrayBuilder.append(BSON("p"
+                                 << "2"));
+        matchFirstTags.reset(new TagSet(arrayBuilder.arr()));
 
-            BSONArrayBuilder arrayBuilder;
-            arrayBuilder.append(BSON("p" << "3"));
-            arrayBuilder.append(BSON("p" << "2"));
-            arrayBuilder.append(BSON("p" << "1"));
-            matchSecondTags.reset(new TagSet(arrayBuilder.arr()));
+        return *matchFirstTags;
+    }
 
+    const TagSet& getMatchesSecondTagSet() {
+        if (matchSecondTags.get() != NULL) {
             return *matchSecondTags;
         }
 
-        const TagSet& getMatchesLastTagSet() {
-            if (matchLastTags.get() != NULL) {
-                return *matchLastTags;
-            }
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append(BSON("p"
+                                 << "3"));
+        arrayBuilder.append(BSON("p"
+                                 << "2"));
+        arrayBuilder.append(BSON("p"
+                                 << "1"));
+        matchSecondTags.reset(new TagSet(arrayBuilder.arr()));
 
-            BSONArrayBuilder arrayBuilder;
-            arrayBuilder.append(BSON("p" << "12"));
-            arrayBuilder.append(BSON("p" << "23"));
-            arrayBuilder.append(BSON("p" << "19"));
-            arrayBuilder.append(BSON("p" << "34"));
-            arrayBuilder.append(BSON("p" << "1"));
-            matchLastTags.reset(new TagSet(arrayBuilder.arr()));
+        return *matchSecondTags;
+    }
 
+    const TagSet& getMatchesLastTagSet() {
+        if (matchLastTags.get() != NULL) {
             return *matchLastTags;
         }
 
-        const TagSet& getMatchesPriTagSet() {
-            if (matchPriTags.get() != NULL) {
-                return *matchPriTags;
-            }
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append(BSON("p"
+                                 << "12"));
+        arrayBuilder.append(BSON("p"
+                                 << "23"));
+        arrayBuilder.append(BSON("p"
+                                 << "19"));
+        arrayBuilder.append(BSON("p"
+                                 << "34"));
+        arrayBuilder.append(BSON("p"
+                                 << "1"));
+        matchLastTags.reset(new TagSet(arrayBuilder.arr()));
 
-            BSONArrayBuilder arrayBuilder;
-            arrayBuilder.append(BSON("dc" << "sf"));
-            arrayBuilder.append(BSON("p" << "1"));
-            matchPriTags.reset(new TagSet(arrayBuilder.arr()));
+        return *matchLastTags;
+    }
 
+    const TagSet& getMatchesPriTagSet() {
+        if (matchPriTags.get() != NULL) {
             return *matchPriTags;
         }
 
-    private:
-        std::unique_ptr<TagSet> matchFirstTags;
-        std::unique_ptr<TagSet> matchSecondTags;
-        std::unique_ptr<TagSet> matchLastTags;
-        std::unique_ptr<TagSet> matchPriTags;
-    };
-
-    TEST_F(MultiTags, MultiTagsMatchesFirst) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[1].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-                                      mongo::ReadPreference::PrimaryPreferred,
-                                      getMatchesFirstTagSet(),
-                                      3,
-                                      &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST_F(MultiTags, PriPrefPriNotOkMatchesFirstNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[0].markFailed();
-        nodes[1].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, getMatchesFirstTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("c", host.host());
-    }
-
-    TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondTest) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[1].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-                                      mongo::ReadPreference::PrimaryPreferred,
-                                      getMatchesSecondTagSet(),
-                                      3,
-                                      &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("c", host.host());
-    }
-
-    TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondNotOkTest) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[1].markFailed();
-        nodes[2].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, getMatchesSecondTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST_F(MultiTags, PriPrefPriNotOkMatchesLastTest) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[1].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, getMatchesLastTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST_F(MultiTags, PriPrefPriNotOkMatchesLastNotOkTest) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[0].markFailed();
-        nodes[1].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, getMatchesLastTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(host.empty());
-    }
-
-    TEST(MultiTags, PriPrefPriOkNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        TagSet tags(getMultiNoMatchTag());
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, tags, 3,
-            &isPrimarySelected);
-
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
-
-    TEST(MultiTags, PriPrefPriNotOkNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getMultiNoMatchTag());
-
-        nodes[1].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::PrimaryPreferred, tags, 3,
-            &isPrimarySelected);
-
-        ASSERT(host.empty());
-    }
-
-    TEST_F(MultiTags, SecOnlyMatchesFirstTest) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, getMatchesFirstTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST_F(MultiTags, SecOnlyMatchesFirstNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[0].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, getMatchesFirstTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("c", host.host());
-    }
-
-    TEST_F(MultiTags, SecOnlyMatchesSecond) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, getMatchesSecondTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("c", host.host());
-    }
-
-    TEST_F(MultiTags, SecOnlyMatchesSecondNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[2].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, getMatchesSecondTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST_F(MultiTags, SecOnlyMatchesLast) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST_F(MultiTags, SecOnlyMatchesLastNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[0].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(host.empty());
-    }
-
-    TEST_F(MultiTags, SecOnlyMultiTagsWithPriMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, getMatchesPriTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST_F(MultiTags, SecOnlyMultiTagsNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getMultiNoMatchTag());
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryOnly, tags, 3,
-            &isPrimarySelected);
-
-        ASSERT(host.empty());
-    }
-
-    TEST_F(MultiTags, SecPrefMatchesFirst) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, getMatchesFirstTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST_F(MultiTags, SecPrefMatchesFirstNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[0].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, getMatchesFirstTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("c", host.host());
-    }
-
-    TEST_F(MultiTags, SecPrefMatchesSecond) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, getMatchesSecondTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("c", host.host());
-    }
-
-    TEST_F(MultiTags, SecPrefMatchesSecondNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[2].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, getMatchesSecondTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST_F(MultiTags, SecPrefMatchesLast) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, getMatchesLastTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST_F(MultiTags, SecPrefMatchesLastNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        nodes[0].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, getMatchesLastTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
-
-    TEST_F(MultiTags, SecPrefMultiTagsWithPriMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, getMatchesPriTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST(MultiTags, SecPrefMultiTagsNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getMultiNoMatchTag());
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, tags, 3,
-            &isPrimarySelected);
-
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
-
-    TEST(MultiTags, SecPrefMultiTagsNoMatchPriNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getMultiNoMatchTag());
-
-        nodes[1].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::SecondaryPreferred, tags, 3,
-            &isPrimarySelected);
-
-        ASSERT(host.empty());
-    }
-
-    TEST_F(MultiTags, NearestMatchesFirst) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, getMatchesFirstTagSet(),
-            3, &isPrimarySelected);
-
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
-
-    TEST(MultiTags, NearestMatchesFirstNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
-
         BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSON("p" << "1"));
-        arrayBuilder.append(BSON("dc" << "sf"));
+        arrayBuilder.append(BSON("dc"
+                                 << "sf"));
+        arrayBuilder.append(BSON("p"
+                                 << "1"));
+        matchPriTags.reset(new TagSet(arrayBuilder.arr()));
 
-        TagSet tags(arrayBuilder.arr());
-
-        nodes[0].markFailed();
-
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-                                      mongo::ReadPreference::Nearest,
-                                      tags,
-                                      3,
-                                      &isPrimarySelected);
-
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
+        return *matchPriTags;
     }
 
-    TEST_F(MultiTags, NearestMatchesSecond) {
-        vector<Node> nodes = getThreeMemberWithTags();
+private:
+    std::unique_ptr<TagSet> matchFirstTags;
+    std::unique_ptr<TagSet> matchSecondTags;
+    std::unique_ptr<TagSet> matchLastTags;
+    std::unique_ptr<TagSet> matchPriTags;
+};
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, getMatchesSecondTagSet(), 3,
-            &isPrimarySelected);
+TEST_F(MultiTags, MultiTagsMatchesFirst) {
+    vector<Node> nodes = getThreeMemberWithTags();
 
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("c", host.host());
-    }
+    nodes[1].markFailed();
 
-    TEST_F(MultiTags, NearestMatchesSecondNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::PrimaryPreferred,
+                                  getMatchesFirstTagSet(),
+                                  3,
+                                  &isPrimarySelected);
 
-        BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSON("z" << "2"));
-        arrayBuilder.append(BSON("p" << "2"));
-        arrayBuilder.append(BSON("dc" << "sf"));
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
 
-        TagSet tags(arrayBuilder.arr());
+TEST_F(MultiTags, PriPrefPriNotOkMatchesFirstNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
 
-        nodes[2].markFailed();
+    nodes[0].markFailed();
+    nodes[1].markFailed();
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, tags, 3,
-            &isPrimarySelected);
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::PrimaryPreferred,
+                                  getMatchesFirstTagSet(),
+                                  3,
+                                  &isPrimarySelected);
 
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("c", host.host());
+}
 
-    TEST_F(MultiTags, NearestMatchesLast) {
-        vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondTest) {
+    vector<Node> nodes = getThreeMemberWithTags();
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, getMatchesLastTagSet(), 3,
-            &isPrimarySelected);
+    nodes[1].markFailed();
 
-        ASSERT(!isPrimarySelected);
-        ASSERT_EQUALS("a", host.host());
-    }
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::PrimaryPreferred,
+                                  getMatchesSecondTagSet(),
+                                  3,
+                                  &isPrimarySelected);
 
-    TEST_F(MultiTags, NeatestMatchesLastNotOk) {
-        vector<Node> nodes = getThreeMemberWithTags();
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("c", host.host());
+}
 
-        nodes[0].markFailed();
+TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondNotOkTest) {
+    vector<Node> nodes = getThreeMemberWithTags();
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, getMatchesLastTagSet(), 3,
-            &isPrimarySelected);
+    nodes[1].markFailed();
+    nodes[2].markFailed();
 
-        ASSERT(host.empty());
-    }
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::PrimaryPreferred,
+                                  getMatchesSecondTagSet(),
+                                  3,
+                                  &isPrimarySelected);
 
-    TEST_F(MultiTags, NearestMultiTagsWithPriMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, getMatchesPriTagSet(), 3,
-            &isPrimarySelected);
+TEST_F(MultiTags, PriPrefPriNotOkMatchesLastTest) {
+    vector<Node> nodes = getThreeMemberWithTags();
 
-        ASSERT(isPrimarySelected);
-        ASSERT_EQUALS("b", host.host());
-    }
+    nodes[1].markFailed();
 
-    TEST(MultiTags, NearestMultiTagsNoMatch) {
-        vector<Node> nodes = getThreeMemberWithTags();
-        TagSet tags(getMultiNoMatchTag());
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::PrimaryPreferred,
+                                  getMatchesLastTagSet(),
+                                  3,
+                                  &isPrimarySelected);
 
-        bool isPrimarySelected = false;
-        HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference::Nearest, tags, 3,
-            &isPrimarySelected);
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
 
-        ASSERT(host.empty());
-    }
+TEST_F(MultiTags, PriPrefPriNotOkMatchesLastNotOkTest) {
+    vector<Node> nodes = getThreeMemberWithTags();
 
-    TEST(TagSet, DefaultConstructorMatchesAll) {
-        TagSet tags;
-        ASSERT_EQUALS(tags.getTagBSON(), BSON_ARRAY(BSONObj()));
-    }
+    nodes[0].markFailed();
+    nodes[1].markFailed();
 
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::PrimaryPreferred,
+                                  getMatchesLastTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(host.empty());
+}
+
+TEST(MultiTags, PriPrefPriOkNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    TagSet tags(getMultiNoMatchTag());
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
+
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
+
+TEST(MultiTags, PriPrefPriNotOkNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getMultiNoMatchTag());
+
+    nodes[1].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::PrimaryPreferred, tags, 3, &isPrimarySelected);
+
+    ASSERT(host.empty());
+}
+
+TEST_F(MultiTags, SecOnlyMatchesFirstTest) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryOnly,
+                                  getMatchesFirstTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
+
+TEST_F(MultiTags, SecOnlyMatchesFirstNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    nodes[0].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryOnly,
+                                  getMatchesFirstTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("c", host.host());
+}
+
+TEST_F(MultiTags, SecOnlyMatchesSecond) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryOnly,
+                                  getMatchesSecondTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("c", host.host());
+}
+
+TEST_F(MultiTags, SecOnlyMatchesSecondNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    nodes[2].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryOnly,
+                                  getMatchesSecondTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
+
+TEST_F(MultiTags, SecOnlyMatchesLast) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(
+        nodes, mongo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(), 3, &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
+
+TEST_F(MultiTags, SecOnlyMatchesLastNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    nodes[0].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(
+        nodes, mongo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(), 3, &isPrimarySelected);
+
+    ASSERT(host.empty());
+}
+
+TEST_F(MultiTags, SecOnlyMultiTagsWithPriMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(
+        nodes, mongo::ReadPreference::SecondaryOnly, getMatchesPriTagSet(), 3, &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
+
+TEST_F(MultiTags, SecOnlyMultiTagsNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getMultiNoMatchTag());
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryOnly, tags, 3, &isPrimarySelected);
+
+    ASSERT(host.empty());
+}
+
+TEST_F(MultiTags, SecPrefMatchesFirst) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryPreferred,
+                                  getMatchesFirstTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
+
+TEST_F(MultiTags, SecPrefMatchesFirstNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    nodes[0].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryPreferred,
+                                  getMatchesFirstTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("c", host.host());
+}
+
+TEST_F(MultiTags, SecPrefMatchesSecond) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryPreferred,
+                                  getMatchesSecondTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("c", host.host());
+}
+
+TEST_F(MultiTags, SecPrefMatchesSecondNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    nodes[2].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryPreferred,
+                                  getMatchesSecondTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
+
+TEST_F(MultiTags, SecPrefMatchesLast) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryPreferred,
+                                  getMatchesLastTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
+
+TEST_F(MultiTags, SecPrefMatchesLastNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    nodes[0].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryPreferred,
+                                  getMatchesLastTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
+
+TEST_F(MultiTags, SecPrefMultiTagsWithPriMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryPreferred,
+                                  getMatchesPriTagSet(),
+                                  3,
+                                  &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
+
+TEST(MultiTags, SecPrefMultiTagsNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getMultiNoMatchTag());
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
+
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
+
+TEST(MultiTags, SecPrefMultiTagsNoMatchPriNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getMultiNoMatchTag());
+
+    nodes[1].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::SecondaryPreferred, tags, 3, &isPrimarySelected);
+
+    ASSERT(host.empty());
+}
+
+TEST_F(MultiTags, NearestMatchesFirst) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(
+        nodes, mongo::ReadPreference::Nearest, getMatchesFirstTagSet(), 3, &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
+
+TEST(MultiTags, NearestMatchesFirstNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("p"
+                             << "1"));
+    arrayBuilder.append(BSON("dc"
+                             << "sf"));
+
+    TagSet tags(arrayBuilder.arr());
+
+    nodes[0].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
+
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
+
+TEST_F(MultiTags, NearestMatchesSecond) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(
+        nodes, mongo::ReadPreference::Nearest, getMatchesSecondTagSet(), 3, &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("c", host.host());
+}
+
+TEST_F(MultiTags, NearestMatchesSecondNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    BSONArrayBuilder arrayBuilder;
+    arrayBuilder.append(BSON("z"
+                             << "2"));
+    arrayBuilder.append(BSON("p"
+                             << "2"));
+    arrayBuilder.append(BSON("dc"
+                             << "sf"));
+
+    TagSet tags(arrayBuilder.arr());
+
+    nodes[2].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
+
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
+
+TEST_F(MultiTags, NearestMatchesLast) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(
+        nodes, mongo::ReadPreference::Nearest, getMatchesLastTagSet(), 3, &isPrimarySelected);
+
+    ASSERT(!isPrimarySelected);
+    ASSERT_EQUALS("a", host.host());
+}
+
+TEST_F(MultiTags, NeatestMatchesLastNotOk) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    nodes[0].markFailed();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(
+        nodes, mongo::ReadPreference::Nearest, getMatchesLastTagSet(), 3, &isPrimarySelected);
+
+    ASSERT(host.empty());
+}
+
+TEST_F(MultiTags, NearestMultiTagsWithPriMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+
+    bool isPrimarySelected = false;
+    HostAndPort host = selectNode(
+        nodes, mongo::ReadPreference::Nearest, getMatchesPriTagSet(), 3, &isPrimarySelected);
+
+    ASSERT(isPrimarySelected);
+    ASSERT_EQUALS("b", host.host());
+}
+
+TEST(MultiTags, NearestMultiTagsNoMatch) {
+    vector<Node> nodes = getThreeMemberWithTags();
+    TagSet tags(getMultiNoMatchTag());
+
+    bool isPrimarySelected = false;
+    HostAndPort host =
+        selectNode(nodes, mongo::ReadPreference::Nearest, tags, 3, &isPrimarySelected);
+
+    ASSERT(host.empty());
+}
+
+TEST(TagSet, DefaultConstructorMatchesAll) {
+    TagSet tags;
+    ASSERT_EQUALS(tags.getTagBSON(), BSON_ARRAY(BSONObj()));
+}
 }

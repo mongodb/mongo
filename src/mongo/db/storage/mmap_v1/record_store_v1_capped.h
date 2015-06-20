@@ -38,95 +38,92 @@
 
 namespace mongo {
 
-    class CappedRecordStoreV1 final : public RecordStoreV1Base {
-    public:
-        CappedRecordStoreV1( OperationContext* txn,
-                             CappedDocumentDeleteCallback* collection,
-                             StringData ns,
-                             RecordStoreV1MetaData* details,
-                             ExtentManager* em,
-                             bool isSystemIndexes );
+class CappedRecordStoreV1 final : public RecordStoreV1Base {
+public:
+    CappedRecordStoreV1(OperationContext* txn,
+                        CappedDocumentDeleteCallback* collection,
+                        StringData ns,
+                        RecordStoreV1MetaData* details,
+                        ExtentManager* em,
+                        bool isSystemIndexes);
 
-        ~CappedRecordStoreV1() final;
+    ~CappedRecordStoreV1() final;
 
-        const char* name() const final { return "CappedRecordStoreV1"; }
+    const char* name() const final {
+        return "CappedRecordStoreV1";
+    }
 
-        Status truncate(OperationContext* txn) final;
+    Status truncate(OperationContext* txn) final;
 
-        /**
-         * Truncate documents newer than the document at 'end' from the capped
-         * collection.  The collection cannot be completely emptied using this
-         * function.  An assertion will be thrown if that is attempted.
-         * @param inclusive - Truncate 'end' as well iff true
-         * XXX: this will go away soon, just needed to move for now
-         */
-        void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) final;
+    /**
+     * Truncate documents newer than the document at 'end' from the capped
+     * collection.  The collection cannot be completely emptied using this
+     * function.  An assertion will be thrown if that is attempted.
+     * @param inclusive - Truncate 'end' as well iff true
+     * XXX: this will go away soon, just needed to move for now
+     */
+    void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) final;
 
-        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
+    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
 
-        std::vector<std::unique_ptr<RecordCursor>> getManyCursors(
-            OperationContext* txn) const final;
+    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const final;
 
-        // Start from firstExtent by default.
-        DiskLoc firstRecord( OperationContext* txn,
-                             const DiskLoc &startExtent = DiskLoc() ) const;
-        // Start from lastExtent by default.
-        DiskLoc lastRecord( OperationContext* txn,
-                            const DiskLoc &startExtent = DiskLoc() ) const;
+    // Start from firstExtent by default.
+    DiskLoc firstRecord(OperationContext* txn, const DiskLoc& startExtent = DiskLoc()) const;
+    // Start from lastExtent by default.
+    DiskLoc lastRecord(OperationContext* txn, const DiskLoc& startExtent = DiskLoc()) const;
 
-    protected:
+protected:
+    bool isCapped() const final {
+        return true;
+    }
+    bool shouldPadInserts() const final {
+        return false;
+    }
 
-        bool isCapped() const final { return true; }
-        bool shouldPadInserts() const final { return false; }
+    void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) final {
+        _deleteCallback = cb;
+    }
 
-        void setCappedDeleteCallback( CappedDocumentDeleteCallback* cb ) final {
-            _deleteCallback = cb;
-        }
+    StatusWith<DiskLoc> allocRecord(OperationContext* txn,
+                                    int lengthWithHeaders,
+                                    bool enforceQuota) final;
 
-        StatusWith<DiskLoc> allocRecord( OperationContext* txn,
-                                                 int lengthWithHeaders,
-                                                 bool enforceQuota ) final;
+    void addDeletedRec(OperationContext* txn, const DiskLoc& dloc) final;
 
-        void addDeletedRec(OperationContext* txn, const DiskLoc& dloc) final;
+private:
+    // -- start copy from cap.cpp --
+    void _compact(OperationContext* txn);
+    DiskLoc cappedFirstDeletedInCurExtent() const;
+    void setFirstDeletedInCurExtent(OperationContext* txn, const DiskLoc& loc);
+    void cappedCheckMigrate(OperationContext* txn);
+    DiskLoc __capAlloc(OperationContext* txn, int len);
+    bool inCapExtent(const DiskLoc& dl) const;
+    DiskLoc cappedListOfAllDeletedRecords() const;
+    DiskLoc cappedLastDelRecLastExtent() const;
+    void setListOfAllDeletedRecords(OperationContext* txn, const DiskLoc& loc);
+    void setLastDelRecLastExtent(OperationContext* txn, const DiskLoc& loc);
+    Extent* theCapExtent() const;
+    bool nextIsInCapExtent(const DiskLoc& dl) const;
+    void advanceCapExtent(OperationContext* txn, StringData ns);
+    void cappedTruncateLastDelUpdate(OperationContext* txn);
 
-    private:
-        // -- start copy from cap.cpp --
-        void _compact(OperationContext* txn);
-        DiskLoc cappedFirstDeletedInCurExtent() const;
-        void setFirstDeletedInCurExtent( OperationContext* txn, const DiskLoc& loc );
-        void cappedCheckMigrate(OperationContext* txn);
-        DiskLoc __capAlloc( OperationContext* txn, int len );
-        bool inCapExtent( const DiskLoc &dl ) const;
-        DiskLoc cappedListOfAllDeletedRecords() const;
-        DiskLoc cappedLastDelRecLastExtent() const;
-        void setListOfAllDeletedRecords( OperationContext* txn, const DiskLoc& loc );
-        void setLastDelRecLastExtent( OperationContext* txn, const DiskLoc& loc );
-        Extent *theCapExtent() const;
-        bool nextIsInCapExtent( const DiskLoc &dl ) const;
-        void advanceCapExtent( OperationContext* txn, StringData ns );
-        void cappedTruncateLastDelUpdate(OperationContext* txn);
+    /**
+     * Truncate documents newer than the document at 'end' from the capped
+     * collection.  The collection cannot be completely emptied using this
+     * function.  An assertion will be thrown if that is attempted.
+     * @param inclusive - Truncate 'end' as well iff true
+     */
+    void cappedTruncateAfter(OperationContext* txn, const char* ns, DiskLoc end, bool inclusive);
 
-        /**
-         * Truncate documents newer than the document at 'end' from the capped
-         * collection.  The collection cannot be completely emptied using this
-         * function.  An assertion will be thrown if that is attempted.
-         * @param inclusive - Truncate 'end' as well iff true
-         */
-        void cappedTruncateAfter(OperationContext* txn,
-                                 const char* ns,
-                                 DiskLoc end,
-                                 bool inclusive);
+    void _maybeComplain(OperationContext* txn, int len) const;
 
-        void _maybeComplain( OperationContext* txn, int len ) const;
+    // -- end copy from cap.cpp --
 
-        // -- end copy from cap.cpp --
+    CappedDocumentDeleteCallback* _deleteCallback;
 
-        CappedDocumentDeleteCallback* _deleteCallback;
+    OwnedPointerVector<ExtentManager::CacheHint> _extentAdvice;
 
-        OwnedPointerVector<ExtentManager::CacheHint> _extentAdvice;
-
-        friend class CappedRecordStoreV1Iterator;
-    };
-
-
+    friend class CappedRecordStoreV1Iterator;
+};
 }

@@ -41,97 +41,92 @@
 namespace mongo {
 namespace {
 
-    class TcmallocNumericPropertyServerParameter : public ServerParameter {
-        MONGO_DISALLOW_COPYING(TcmallocNumericPropertyServerParameter);
-    public:
-        explicit TcmallocNumericPropertyServerParameter(
-                const std::string& serverParameterName,
-                const std::string& tcmallocPropertyName);
+class TcmallocNumericPropertyServerParameter : public ServerParameter {
+    MONGO_DISALLOW_COPYING(TcmallocNumericPropertyServerParameter);
 
-        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
-        virtual Status set(const BSONElement& newValueElement);
-        virtual Status setFromString(const std::string& str);
+public:
+    explicit TcmallocNumericPropertyServerParameter(const std::string& serverParameterName,
+                                                    const std::string& tcmallocPropertyName);
 
-    private:
-        const std::string _tcmallocPropertyName;
-    };
- 
-    TcmallocNumericPropertyServerParameter::TcmallocNumericPropertyServerParameter(
-            const std::string& serverParameterName,
-            const std::string& tcmallocPropertyName) :
-        ServerParameter(ServerParameterSet::getGlobal(),
-                        serverParameterName,
-                        true /* change at startup */,
-                        true /* change at runtime */),
-        _tcmallocPropertyName(tcmallocPropertyName) {
+    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual Status set(const BSONElement& newValueElement);
+    virtual Status setFromString(const std::string& str);
+
+private:
+    const std::string _tcmallocPropertyName;
+};
+
+TcmallocNumericPropertyServerParameter::TcmallocNumericPropertyServerParameter(
+    const std::string& serverParameterName, const std::string& tcmallocPropertyName)
+    : ServerParameter(ServerParameterSet::getGlobal(),
+                      serverParameterName,
+                      true /* change at startup */,
+                      true /* change at runtime */),
+      _tcmallocPropertyName(tcmallocPropertyName) {}
+
+void TcmallocNumericPropertyServerParameter::append(OperationContext* txn,
+                                                    BSONObjBuilder& b,
+                                                    const std::string& name) {
+    size_t value;
+    if (MallocExtension::instance()->GetNumericProperty(_tcmallocPropertyName.c_str(), &value)) {
+        b.appendNumber(name, value);
     }
+}
 
-    void TcmallocNumericPropertyServerParameter::append(
-            OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-        size_t value;
-        if (MallocExtension::instance()->GetNumericProperty(_tcmallocPropertyName.c_str(),
-                                                            &value)) {
-            b.appendNumber(name, value);
-        }
+Status TcmallocNumericPropertyServerParameter::set(const BSONElement& newValueElement) {
+    if (!newValueElement.isNumber()) {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "Expected server parameter " << newValueElement.fieldName()
+                                    << " to have numeric type, but found "
+                                    << newValueElement.toString(false) << " of type "
+                                    << typeName(newValueElement.type()));
     }
+    long long valueAsLongLong = newValueElement.safeNumberLong();
+    if (valueAsLongLong < 0 ||
+        static_cast<unsigned long long>(valueAsLongLong) > std::numeric_limits<size_t>::max()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "Value " << newValueElement.toString(false) << " is out of range for "
+                          << newValueElement.fieldName() << "; expected a value between 0 and "
+                          << std::min<unsigned long long>(std::numeric_limits<size_t>::max(),
+                                                          std::numeric_limits<long long>::max()));
+    }
+    if (!MallocExtension::instance()->SetNumericProperty(_tcmallocPropertyName.c_str(),
+                                                         static_cast<size_t>(valueAsLongLong))) {
+        return Status(ErrorCodes::InternalError,
+                      str::stream() << "Failed to set internal tcmalloc property "
+                                    << _tcmallocPropertyName);
+    }
+    return Status::OK();
+}
 
-    Status TcmallocNumericPropertyServerParameter::set(const BSONElement& newValueElement) {
-        if (!newValueElement.isNumber()) {
-            return Status(ErrorCodes::TypeMismatch, str::stream() <<
-                          "Expected server parameter " << newValueElement.fieldName() <<
-                          " to have numeric type, but found " << newValueElement.toString(false) <<
-                          " of type " << typeName(newValueElement.type()));
-        }
-        long long valueAsLongLong = newValueElement.safeNumberLong();
-        if (valueAsLongLong < 0 ||
-            static_cast<unsigned long long>(valueAsLongLong) > std::numeric_limits<size_t>::max()) {
+Status TcmallocNumericPropertyServerParameter::setFromString(const std::string& str) {
+    long long valueAsLongLong;
+    Status status = parseNumberFromString(str, &valueAsLongLong);
+    if (!status.isOK()) {
+        return status;
+    }
+    BSONObjBuilder builder;
+    builder.append(name(), valueAsLongLong);
+    return set(builder.done().firstElement());
+}
 
-            return Status(ErrorCodes::BadValue, str::stream() <<
-                          "Value " << newValueElement.toString(false) <<
-                          " is out of range for " << newValueElement.fieldName() <<
-                          "; expected a value between 0 and " <<
-                          std::min<unsigned long long>(std::numeric_limits<size_t>::max(),
-                                                       std::numeric_limits<long long>::max()));
-        }
-        if (!MallocExtension::instance()->SetNumericProperty(
-                    _tcmallocPropertyName.c_str(),
-                    static_cast<size_t>(valueAsLongLong))) {
-            return Status(ErrorCodes::InternalError, str::stream() <<
-                          "Failed to set internal tcmalloc property " << _tcmallocPropertyName);
-        }
+TcmallocNumericPropertyServerParameter tcmallocMaxTotalThreadCacheBytesParameter(
+    "tcmallocMaxTotalThreadCacheBytes", "tcmalloc.max_total_thread_cache_bytes");
+
+TcmallocNumericPropertyServerParameter tcmallocAggressiveMemoryDecommit(
+    "tcmallocAggressiveMemoryDecommit", "tcmalloc.aggressive_memory_decommit");
+
+MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults,
+                          MONGO_NO_PREREQUISITES,
+                          ("BeginStartupOptionHandling"))(InitializerContext*) {
+    // Before processing the command line options, if the user has not specified a value in via
+    // the environment, set tcmalloc.max_total_thread_cache_bytes to its default value.
+    if (getenv("TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES")) {
         return Status::OK();
     }
-
-    Status TcmallocNumericPropertyServerParameter::setFromString(const std::string& str) {
-        long long valueAsLongLong;
-        Status status = parseNumberFromString(str, &valueAsLongLong);
-        if (!status.isOK()) {
-            return status;
-        }
-        BSONObjBuilder builder;
-        builder.append(name(), valueAsLongLong);
-        return set(builder.done().firstElement());
-    }
-
-    TcmallocNumericPropertyServerParameter tcmallocMaxTotalThreadCacheBytesParameter(
-            "tcmallocMaxTotalThreadCacheBytes",
-            "tcmalloc.max_total_thread_cache_bytes");
-
-    TcmallocNumericPropertyServerParameter tcmallocAggressiveMemoryDecommit(
-            "tcmallocAggressiveMemoryDecommit",
-            "tcmalloc.aggressive_memory_decommit");
-
-    MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults,
-                              MONGO_NO_PREREQUISITES,
-                              ("BeginStartupOptionHandling"))(InitializerContext*) {
-
-        // Before processing the command line options, if the user has not specified a value in via
-        // the environment, set tcmalloc.max_total_thread_cache_bytes to its default value.
-        if (getenv("TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES")) {
-            return Status::OK();
-        }
-        return tcmallocMaxTotalThreadCacheBytesParameter.setFromString("0x40000000" /* 1024MB */);
-    }
+    return tcmallocMaxTotalThreadCacheBytesParameter.setFromString("0x40000000" /* 1024MB */);
+}
 
 }  // namespace
 }  // namespace mongo

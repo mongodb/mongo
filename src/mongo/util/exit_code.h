@@ -34,41 +34,42 @@
 
 namespace mongo {
 
-    enum ExitCode {
-        EXIT_CLEAN = 0 ,
-        EXIT_BADOPTIONS = 2 ,
-        EXIT_REPLICATION_ERROR = 3 ,
-        EXIT_NEED_UPGRADE = 4 ,
-        EXIT_SHARDING_ERROR = 5 ,
-        EXIT_KILL = 12 ,
-        EXIT_ABRUPT = 14 ,
-        EXIT_NTSERVICE_ERROR = 20 ,
-        EXIT_JAVA = 21 ,
-        EXIT_OOM_MALLOC = 42 ,
-        EXIT_OOM_REALLOC = 43 ,
-        EXIT_FS = 45 ,
-        EXIT_CLOCK_SKEW = 47 , // OpTime clock skew, deprecated
-        EXIT_NET_ERROR = 48 ,
-        EXIT_WINDOWS_SERVICE_STOP = 49 ,
-        EXIT_POSSIBLE_CORRUPTION = 60 , // this means we detected a possible corruption situation, like a buf overflow
-        EXIT_UNCAUGHT = 100 , // top level exception that wasn't caught
-        EXIT_TEST = 101
-    };
+enum ExitCode {
+    EXIT_CLEAN = 0,
+    EXIT_BADOPTIONS = 2,
+    EXIT_REPLICATION_ERROR = 3,
+    EXIT_NEED_UPGRADE = 4,
+    EXIT_SHARDING_ERROR = 5,
+    EXIT_KILL = 12,
+    EXIT_ABRUPT = 14,
+    EXIT_NTSERVICE_ERROR = 20,
+    EXIT_JAVA = 21,
+    EXIT_OOM_MALLOC = 42,
+    EXIT_OOM_REALLOC = 43,
+    EXIT_FS = 45,
+    EXIT_CLOCK_SKEW = 47,  // OpTime clock skew, deprecated
+    EXIT_NET_ERROR = 48,
+    EXIT_WINDOWS_SERVICE_STOP = 49,
+    EXIT_POSSIBLE_CORRUPTION =
+        60,  // this means we detected a possible corruption situation, like a buf overflow
+    EXIT_UNCAUGHT = 100,  // top level exception that wasn't caught
+    EXIT_TEST = 101
+};
 
-    /**
-     * Exit the current executable doing whatever cleanup is necessary.
-     * Defined differently in different executables.
-     * No database locks must be held by the thread when this function is called.
-     */
-    void exitCleanly(ExitCode code);
+/**
+ * Exit the current executable doing whatever cleanup is necessary.
+ * Defined differently in different executables.
+ * No database locks must be held by the thread when this function is called.
+ */
+void exitCleanly(ExitCode code);
 
-    /**
-     * Signal main or  ServiceMain thread to exit
-     * Important for the ServiceMain thread to do the exit when mongod/s are running as NT Services
-     * on Windows.
-     * It is not required to be called before exitCleanly in the general case, only for
-     * proper NT Service shutdown.
-     */
-    void signalShutdown();
+/**
+ * Signal main or  ServiceMain thread to exit
+ * Important for the ServiceMain thread to do the exit when mongod/s are running as NT Services
+ * on Windows.
+ * It is not required to be called before exitCleanly in the general case, only for
+ * proper NT Service shutdown.
+ */
+void signalShutdown();
 
 }  // namespace mongo

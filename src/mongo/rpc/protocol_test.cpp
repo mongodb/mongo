@@ -34,33 +34,33 @@
 
 namespace {
 
-    using namespace mongo::rpc;
+using namespace mongo::rpc;
 
-    // Checks if negotiation of the first to protocol sets results in the 'proto'
-    const auto assert_negotiated = [](ProtocolSet fst, ProtocolSet snd, Protocol proto) {
-        auto negotiated = negotiate(fst, snd);
-        ASSERT_TRUE(negotiated.isOK());
-        ASSERT_TRUE(negotiated.getValue() == proto);
-    };
+// Checks if negotiation of the first to protocol sets results in the 'proto'
+const auto assert_negotiated = [](ProtocolSet fst, ProtocolSet snd, Protocol proto) {
+    auto negotiated = negotiate(fst, snd);
+    ASSERT_TRUE(negotiated.isOK());
+    ASSERT_TRUE(negotiated.getValue() == proto);
+};
 
-    TEST(Protocol, SuccessfulNegotiation) {
-        assert_negotiated(supports::kAll, supports::kAll, Protocol::kOpCommandV1);
-        assert_negotiated(supports::kAll, supports::kOpCommandOnly, Protocol::kOpCommandV1);
-        assert_negotiated(supports::kAll, supports::kOpQueryOnly, Protocol::kOpQuery);
-    }
+TEST(Protocol, SuccessfulNegotiation) {
+    assert_negotiated(supports::kAll, supports::kAll, Protocol::kOpCommandV1);
+    assert_negotiated(supports::kAll, supports::kOpCommandOnly, Protocol::kOpCommandV1);
+    assert_negotiated(supports::kAll, supports::kOpQueryOnly, Protocol::kOpQuery);
+}
 
-    // Checks that negotiation fails
-    const auto assert_not_negotiated = [](ProtocolSet fst, ProtocolSet snd) {
-        auto proto = negotiate(fst, snd);
-        ASSERT_TRUE(!proto.isOK());
-        ASSERT_TRUE(proto.getStatus().code() == mongo::ErrorCodes::RPCProtocolNegotiationFailed);
-    };
+// Checks that negotiation fails
+const auto assert_not_negotiated = [](ProtocolSet fst, ProtocolSet snd) {
+    auto proto = negotiate(fst, snd);
+    ASSERT_TRUE(!proto.isOK());
+    ASSERT_TRUE(proto.getStatus().code() == mongo::ErrorCodes::RPCProtocolNegotiationFailed);
+};
 
-    TEST(Protocol, FailedNegotiation) {
-        assert_not_negotiated(supports::kOpQueryOnly, supports::kOpCommandOnly);
-        assert_not_negotiated(supports::kAll, supports::kNone);
-        assert_not_negotiated(supports::kOpQueryOnly, supports::kNone);
-        assert_not_negotiated(supports::kOpCommandOnly, supports::kNone);
-    }
+TEST(Protocol, FailedNegotiation) {
+    assert_not_negotiated(supports::kOpQueryOnly, supports::kOpCommandOnly);
+    assert_not_negotiated(supports::kAll, supports::kNone);
+    assert_not_negotiated(supports::kOpQueryOnly, supports::kNone);
+    assert_not_negotiated(supports::kOpCommandOnly, supports::kNone);
+}
 
 }  // namespace

@@ -48,77 +48,74 @@
 namespace mongo {
 namespace {
 
-    class EnableShardingCmd : public Command {
-    public:
-        EnableShardingCmd() : Command("enableSharding", false, "enablesharding") { }
+class EnableShardingCmd : public Command {
+public:
+    EnableShardingCmd() : Command("enableSharding", false, "enablesharding") {}
 
-        virtual bool slaveOk() const {
-            return true;
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(std::stringstream& help) const {
+        help << "Enable sharding for a database. "
+             << "(Use 'shardcollection' command afterwards.)\n"
+             << "  { enablesharding : \"<dbname>\" }\n";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)),
+                ActionType::enableSharding)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
-        virtual bool adminOnly() const {
-            return true;
-        }
+        return Status::OK();
+    }
 
-        virtual bool isWriteCommandForConfigServer() const {
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+        return cmdObj.firstElement().str();
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname_unused,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        const std::string dbname = parseNs("", cmdObj);
+
+        if (dbname.empty() || !nsIsDbOnly(dbname)) {
+            errmsg = "invalid db name specified: " + dbname;
             return false;
         }
 
-        virtual void help(std::stringstream& help) const {
-            help << "Enable sharding for a database. "
-                 << "(Use 'shardcollection' command afterwards.)\n"
-                 << "  { enablesharding : \"<dbname>\" }\n";
+        if (dbname == "admin" || dbname == "config" || dbname == "local") {
+            errmsg = "can't shard " + dbname + " database";
+            return false;
         }
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-
-            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                                                        ResourcePattern::forDatabaseName(
-                                                                        parseNs(dbname, cmdObj)),
-                                                        ActionType::enableSharding)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-
-            return Status::OK();
+        Status status = grid.catalogManager()->enableSharding(dbname);
+        if (status.isOK()) {
+            audit::logEnableSharding(ClientBasic::getCurrent(), dbname);
         }
 
-        virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-            return cmdObj.firstElement().str();
-        }
+        // Make sure to force update of any stale metadata
+        grid.catalogCache()->invalidate(dbname);
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname_unused,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
+        return appendCommandStatus(result, status);
+    }
 
-            const std::string dbname = parseNs("", cmdObj);
+} enableShardingCmd;
 
-            if (dbname.empty() || !nsIsDbOnly(dbname)) {
-                errmsg = "invalid db name specified: " + dbname;
-                return false;
-            }
-
-            if (dbname == "admin" || dbname == "config" || dbname == "local") {
-                errmsg = "can't shard " + dbname + " database";
-                return false;
-            }
-
-            Status status = grid.catalogManager()->enableSharding(dbname);
-            if (status.isOK()) {
-                audit::logEnableSharding(ClientBasic::getCurrent(), dbname);
-            }
-
-            // Make sure to force update of any stale metadata
-            grid.catalogCache()->invalidate(dbname);
-
-            return appendCommandStatus(result, status);
-        }
-
-    } enableShardingCmd;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

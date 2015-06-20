@@ -35,224 +35,222 @@
 
 namespace mongo {
 
-    Status ArrayMatchingMatchExpression::initPath( StringData path ) {
-        _path = path;
-        Status s = _elementPath.init( _path );
-        _elementPath.setTraverseLeafArray( false );
-        return s;
+Status ArrayMatchingMatchExpression::initPath(StringData path) {
+    _path = path;
+    Status s = _elementPath.init(_path);
+    _elementPath.setTraverseLeafArray(false);
+    return s;
+}
+
+bool ArrayMatchingMatchExpression::matches(const MatchableDocument* doc,
+                                           MatchDetails* details) const {
+    MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
+
+    while (cursor->more()) {
+        ElementIterator::Context e = cursor->next();
+        if (e.element().type() != Array)
+            continue;
+
+        bool amIRoot = e.arrayOffset().eoo();
+
+        if (!matchesArray(e.element().Obj(), amIRoot ? details : NULL))
+            continue;
+
+        if (!amIRoot && details && details->needRecord() && !e.arrayOffset().eoo()) {
+            details->setElemMatchKey(e.arrayOffset().fieldName());
+        }
+        return true;
     }
+    return false;
+}
 
-    bool ArrayMatchingMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        MatchableDocument::IteratorHolder cursor( doc, &_elementPath );
+bool ArrayMatchingMatchExpression::matchesSingleElement(const BSONElement& e) const {
+    if (e.type() != Array)
+        return false;
+    return matchesArray(e.Obj(), NULL);
+}
 
-        while ( cursor->more() ) {
-            ElementIterator::Context e = cursor->next();
-            if ( e.element().type() != Array )
-                continue;
 
-            bool amIRoot = e.arrayOffset().eoo();
+bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) const {
+    if (matchType() != other->matchType())
+        return false;
 
-            if ( !matchesArray( e.element().Obj(), amIRoot ? details : NULL ) )
-                continue;
+    const ArrayMatchingMatchExpression* realOther =
+        static_cast<const ArrayMatchingMatchExpression*>(other);
 
-            if ( !amIRoot && details && details->needRecord() && !e.arrayOffset().eoo() ) {
-                details->setElemMatchKey( e.arrayOffset().fieldName() );
+    if (_path != realOther->_path)
+        return false;
+
+    if (numChildren() != realOther->numChildren())
+        return false;
+
+    for (unsigned i = 0; i < numChildren(); i++)
+        if (!getChild(i)->equivalent(realOther->getChild(i)))
+            return false;
+    return true;
+}
+
+
+// -------
+
+Status ElemMatchObjectMatchExpression::init(StringData path, MatchExpression* sub) {
+    _sub.reset(sub);
+    return initPath(path);
+}
+
+bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
+                                                  MatchDetails* details) const {
+    BSONObjIterator i(anArray);
+    while (i.more()) {
+        BSONElement inner = i.next();
+        if (!inner.isABSONObj())
+            continue;
+        if (_sub->matchesBSON(inner.Obj(), NULL)) {
+            if (details && details->needRecord()) {
+                details->setElemMatchKey(inner.fieldName());
             }
             return true;
         }
-        return false;
     }
+    return false;
+}
 
-    bool ArrayMatchingMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        if ( e.type() != Array )
-            return false;
-        return matchesArray( e.Obj(), NULL );
+void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << path() << " $elemMatch (obj)";
+
+    MatchExpression::TagData* td = getTag();
+    if (NULL != td) {
+        debug << " ";
+        td->debugString(&debug);
     }
+    debug << "\n";
+    _sub->debugString(debug, level + 1);
+}
 
-
-    bool ArrayMatchingMatchExpression::equivalent( const MatchExpression* other ) const {
-        if ( matchType() != other->matchType() )
-            return false;
-
-        const ArrayMatchingMatchExpression* realOther =
-            static_cast<const ArrayMatchingMatchExpression*>( other );
-
-        if ( _path != realOther->_path )
-            return false;
-
-        if ( numChildren() != realOther->numChildren() )
-            return false;
-
-        for ( unsigned i = 0; i < numChildren(); i++ )
-            if ( !getChild(i)->equivalent( realOther->getChild(i) ) )
-                return false;
-        return true;
+void ElemMatchObjectMatchExpression::toBSON(BSONObjBuilder* out) const {
+    BSONObjBuilder subBob;
+    _sub->toBSON(&subBob);
+    if (path().empty()) {
+        out->append("$elemMatch", subBob.obj());
+    } else {
+        out->append(path(), BSON("$elemMatch" << subBob.obj()));
     }
+}
 
 
-    // -------
+// -------
 
-    Status ElemMatchObjectMatchExpression::init( StringData path, MatchExpression* sub ) {
-        _sub.reset( sub );
-        return initPath( path );
-    }
+ElemMatchValueMatchExpression::~ElemMatchValueMatchExpression() {
+    for (unsigned i = 0; i < _subs.size(); i++)
+        delete _subs[i];
+    _subs.clear();
+}
 
-    bool ElemMatchObjectMatchExpression::matchesArray( const BSONObj& anArray, MatchDetails* details ) const {
-        BSONObjIterator i( anArray );
-        while ( i.more() ) {
-            BSONElement inner = i.next();
-            if ( !inner.isABSONObj() )
-                continue;
-            if ( _sub->matchesBSON( inner.Obj(), NULL ) ) {
-                if ( details && details->needRecord() ) {
-                    details->setElemMatchKey( inner.fieldName() );
-                }
-                return true;
+Status ElemMatchValueMatchExpression::init(StringData path, MatchExpression* sub) {
+    init(path);
+    add(sub);
+    return Status::OK();
+}
+
+Status ElemMatchValueMatchExpression::init(StringData path) {
+    return initPath(path);
+}
+
+
+void ElemMatchValueMatchExpression::add(MatchExpression* sub) {
+    verify(sub);
+    _subs.push_back(sub);
+}
+
+bool ElemMatchValueMatchExpression::matchesArray(const BSONObj& anArray,
+                                                 MatchDetails* details) const {
+    BSONObjIterator i(anArray);
+    while (i.more()) {
+        BSONElement inner = i.next();
+
+        if (_arrayElementMatchesAll(inner)) {
+            if (details && details->needRecord()) {
+                details->setElemMatchKey(inner.fieldName());
             }
-        }
-        return false;
-    }
-
-    void ElemMatchObjectMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << path() << " $elemMatch (obj)";
-
-        MatchExpression::TagData* td = getTag();
-        if (NULL != td) {
-            debug << " ";
-            td->debugString(&debug);
-        }
-        debug << "\n";
-        _sub->debugString( debug, level + 1 );
-    }
-
-    void ElemMatchObjectMatchExpression::toBSON(BSONObjBuilder* out) const {
-        BSONObjBuilder subBob;
-        _sub->toBSON(&subBob);
-        if (path().empty()) {
-            out->append("$elemMatch", subBob.obj());
-        }
-        else {
-            out->append(path(), BSON("$elemMatch" << subBob.obj()));
+            return true;
         }
     }
+    return false;
+}
 
-
-    // -------
-
-    ElemMatchValueMatchExpression::~ElemMatchValueMatchExpression() {
-        for ( unsigned i = 0; i < _subs.size(); i++ )
-            delete _subs[i];
-        _subs.clear();
-    }
-
-    Status ElemMatchValueMatchExpression::init( StringData path, MatchExpression* sub ) {
-        init( path );
-        add( sub );
-        return Status::OK();
-    }
-
-    Status ElemMatchValueMatchExpression::init( StringData path ) {
-        return initPath( path );
-    }
-
-
-    void ElemMatchValueMatchExpression::add( MatchExpression* sub ) {
-        verify( sub );
-        _subs.push_back( sub );
-    }
-
-    bool ElemMatchValueMatchExpression::matchesArray( const BSONObj& anArray, MatchDetails* details ) const {
-        BSONObjIterator i( anArray );
-        while ( i.more() ) {
-            BSONElement inner = i.next();
-
-            if ( _arrayElementMatchesAll( inner ) ) {
-                if ( details && details->needRecord() ) {
-                    details->setElemMatchKey( inner.fieldName() );
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool ElemMatchValueMatchExpression::_arrayElementMatchesAll( const BSONElement& e ) const {
-        for ( unsigned i = 0; i < _subs.size(); i++ ) {
-            if ( !_subs[i]->matchesSingleElement( e ) )
-                return false;
-        }
-        return true;
-    }
-
-    void ElemMatchValueMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << path() << " $elemMatch (value)";
-
-        MatchExpression::TagData* td = getTag();
-        if (NULL != td) {
-            debug << " ";
-            td->debugString(&debug);
-        }
-        debug << "\n";
-        for ( unsigned i = 0; i < _subs.size(); i++ ) {
-            _subs[i]->debugString( debug, level + 1 );
-        }
-    }
-
-    void ElemMatchValueMatchExpression::toBSON(BSONObjBuilder* out) const {
-        BSONObjBuilder emBob;
-        for ( unsigned i = 0; i < _subs.size(); i++ ) {
-            _subs[i]->toBSON(&emBob);
-        }
-        if (path().empty()) {
-            out->append("$elemMatch", emBob.obj());
-        }
-        else {
-            out->append(path(), BSON("$elemMatch" << emBob.obj()));
-        }
-    }
-
-
-    // ---------
-
-    Status SizeMatchExpression::init( StringData path, int size ) {
-        _size = size;
-        return initPath( path );
-    }
-
-    bool SizeMatchExpression::matchesArray( const BSONObj& anArray, MatchDetails* details ) const {
-        if ( _size < 0 )
+bool ElemMatchValueMatchExpression::_arrayElementMatchesAll(const BSONElement& e) const {
+    for (unsigned i = 0; i < _subs.size(); i++) {
+        if (!_subs[i]->matchesSingleElement(e))
             return false;
-        return anArray.nFields() == _size;
     }
+    return true;
+}
 
-    void SizeMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << path() << " $size : " << _size << "\n";
+void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << path() << " $elemMatch (value)";
 
-        MatchExpression::TagData* td = getTag();
-        if (NULL != td) {
-            debug << " ";
-            td->debugString(&debug);
-        }
+    MatchExpression::TagData* td = getTag();
+    if (NULL != td) {
+        debug << " ";
+        td->debugString(&debug);
     }
-
-    void SizeMatchExpression::toBSON(BSONObjBuilder* out) const {
-        out->append(path(), BSON("$size" << _size));
+    debug << "\n";
+    for (unsigned i = 0; i < _subs.size(); i++) {
+        _subs[i]->debugString(debug, level + 1);
     }
+}
 
-    bool SizeMatchExpression::equivalent( const MatchExpression* other ) const {
-        if ( matchType() != other->matchType() )
-            return false;
-
-        const SizeMatchExpression* realOther = static_cast<const SizeMatchExpression*>( other );
-        return path() == realOther->path() && _size == realOther->_size;
+void ElemMatchValueMatchExpression::toBSON(BSONObjBuilder* out) const {
+    BSONObjBuilder emBob;
+    for (unsigned i = 0; i < _subs.size(); i++) {
+        _subs[i]->toBSON(&emBob);
     }
+    if (path().empty()) {
+        out->append("$elemMatch", emBob.obj());
+    } else {
+        out->append(path(), BSON("$elemMatch" << emBob.obj()));
+    }
+}
 
 
-    // ------------------
+// ---------
+
+Status SizeMatchExpression::init(StringData path, int size) {
+    _size = size;
+    return initPath(path);
+}
+
+bool SizeMatchExpression::matchesArray(const BSONObj& anArray, MatchDetails* details) const {
+    if (_size < 0)
+        return false;
+    return anArray.nFields() == _size;
+}
+
+void SizeMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << path() << " $size : " << _size << "\n";
+
+    MatchExpression::TagData* td = getTag();
+    if (NULL != td) {
+        debug << " ";
+        td->debugString(&debug);
+    }
+}
+
+void SizeMatchExpression::toBSON(BSONObjBuilder* out) const {
+    out->append(path(), BSON("$size" << _size));
+}
+
+bool SizeMatchExpression::equivalent(const MatchExpression* other) const {
+    if (matchType() != other->matchType())
+        return false;
+
+    const SizeMatchExpression* realOther = static_cast<const SizeMatchExpression*>(other);
+    return path() == realOther->path() && _size == realOther->_size;
+}
 
 
-
+// ------------------
 }

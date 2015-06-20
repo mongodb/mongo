@@ -35,173 +35,155 @@
 namespace mongo {
 namespace {
 
-    TEST(FindAndModifyRequest, BasicUpdate) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj update(BSON("y" << 1));
-        auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"),
-                                                        query,
-                                                        update);
+TEST(FindAndModifyRequest, BasicUpdate) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 }
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, UpdateWithUpsert) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj update(BSON("y" << 1));
-        auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"),
-                                                        query,
-                                                        update);
-        request.setUpsert(true);
+TEST(FindAndModifyRequest, UpdateWithUpsert) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setUpsert(true);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 },
             upsert: true
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, UpdateWithUpsertFalse) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj update(BSON("y" << 1));
-        auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"),
-                                                        query,
-                                                        update);
-        request.setUpsert(false);
+TEST(FindAndModifyRequest, UpdateWithUpsertFalse) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setUpsert(false);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 },
             upsert: false
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, UpdateWithProjection) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj update(BSON("y" << 1));
-        const BSONObj field(BSON("z" << 1));
+TEST(FindAndModifyRequest, UpdateWithProjection) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+    const BSONObj field(BSON("z" << 1));
 
-        auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"),
-                                                        query,
-                                                        update);
-        request.setFieldProjection(field);
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setFieldProjection(field);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 },
             fields: { z: 1 }
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, UpdateWithNewTrue) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj update(BSON("y" << 1));
+TEST(FindAndModifyRequest, UpdateWithNewTrue) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
 
-        auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"),
-                                                        query,
-                                                        update);
-        request.setShouldReturnNew(true);
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setShouldReturnNew(true);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 },
             new: true
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, UpdateWithNewFalse) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj update(BSON("y" << 1));
+TEST(FindAndModifyRequest, UpdateWithNewFalse) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
 
-        auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"),
-                                                        query,
-                                                        update);
-        request.setShouldReturnNew(false);
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setShouldReturnNew(false);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 },
             new: false
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, UpdateWithSort) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj update(BSON("y" << 1));
-        const BSONObj sort(BSON("z" << -1));
+TEST(FindAndModifyRequest, UpdateWithSort) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+    const BSONObj sort(BSON("z" << -1));
 
-        auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"),
-                                                        query,
-                                                        update);
-        request.setSort(sort);
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setSort(sort);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 },
             sort: { z: -1 }
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, UpdateWithWriteConcern) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj update(BSON("y" << 1));
-        const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
+TEST(FindAndModifyRequest, UpdateWithWriteConcern) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+    const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
 
-        auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"),
-                                                        query,
-                                                        update);
-        request.setWriteConcern(writeConcern);
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setWriteConcern(writeConcern);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 },
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, UpdateWithFullSpec) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj update(BSON("y" << 1));
-        const BSONObj sort(BSON("z" << -1));
-        const BSONObj field(BSON("x" << 1 << "y" << 1));
-        const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
+TEST(FindAndModifyRequest, UpdateWithFullSpec) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+    const BSONObj sort(BSON("z" << -1));
+    const BSONObj field(BSON("x" << 1 << "y" << 1));
+    const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
 
-        auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"),
-                                                        query,
-                                                        update);
-        request.setFieldProjection(field);
-        request.setShouldReturnNew(true);
-        request.setSort(sort);
-        request.setWriteConcern(writeConcern);
-        request.setUpsert(true);
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setFieldProjection(field);
+    request.setShouldReturnNew(true);
+    request.setSort(sort);
+    request.setWriteConcern(writeConcern);
+    request.setUpsert(true);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 },
@@ -212,85 +194,85 @@ namespace {
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, BasicRemove) {
-        const BSONObj query(BSON("x" << 1));
-        auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
+TEST(FindAndModifyRequest, BasicRemove) {
+    const BSONObj query(BSON("x" << 1));
+    auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             remove: true
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, RemoveWithProjection) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj field(BSON("z" << 1));
+TEST(FindAndModifyRequest, RemoveWithProjection) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj field(BSON("z" << 1));
 
-        auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
-        request.setFieldProjection(field);
+    auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
+    request.setFieldProjection(field);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             remove: true,
             fields: { z: 1 }
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, RemoveWithSort) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj sort(BSON("z" << -1));
+TEST(FindAndModifyRequest, RemoveWithSort) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj sort(BSON("z" << -1));
 
-        auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
-        request.setSort(sort);
+    auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
+    request.setSort(sort);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             remove: true,
             sort: { z: -1 }
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, RemoveWithWriteConcern) {
-        const BSONObj query(BSON("x" << 1));
-        const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
+TEST(FindAndModifyRequest, RemoveWithWriteConcern) {
+    const BSONObj query(BSON("x" << 1));
+    const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
 
-        auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
-        request.setWriteConcern(writeConcern);
+    auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
+    request.setWriteConcern(writeConcern);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             remove: true,
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, RemoveWithFullSpec) {
-        const BSONObj query(BSON("x" << 1));
-        const BSONObj sort(BSON("z" << -1));
-        const BSONObj field(BSON("x" << 1 << "y" << 1));
-        const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
+TEST(FindAndModifyRequest, RemoveWithFullSpec) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj sort(BSON("z" << -1));
+    const BSONObj field(BSON("x" << 1 << "y" << 1));
+    const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
 
-        auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
-        request.setFieldProjection(field);
-        request.setSort(sort);
-        request.setWriteConcern(writeConcern);
+    auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
+    request.setFieldProjection(field);
+    request.setSort(sort);
+    request.setWriteConcern(writeConcern);
 
-        BSONObj expectedObj(fromjson(R"json({
+    BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             remove: true,
@@ -299,31 +281,31 @@ namespace {
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
 
-        ASSERT_EQUALS(expectedObj, request.toBSON());
-    }
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
 
-    TEST(FindAndModifyRequest, ParseWithUpdateOnlyRequiredFields) {
-        BSONObj cmdObj(fromjson(R"json({
+TEST(FindAndModifyRequest, ParseWithUpdateOnlyRequiredFields) {
+    BSONObj cmdObj(fromjson(R"json({
             query: { x: 1 },
             update: { y: 1 }
         })json"));
 
-        auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
-        ASSERT_OK(parseStatus.getStatus());
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_OK(parseStatus.getStatus());
 
-        auto request = parseStatus.getValue();
-        ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
-        ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
-        ASSERT_EQUALS(BSON("y" << 1), request.getUpdateObj());
-        ASSERT_EQUALS(false, request.isUpsert());
-        ASSERT_EQUALS(false, request.isRemove());
-        ASSERT_EQUALS(BSONObj(), request.getFields());
-        ASSERT_EQUALS(BSONObj(), request.getSort());
-        ASSERT_EQUALS(false, request.shouldReturnNew());
-    }
+    auto request = parseStatus.getValue();
+    ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
+    ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
+    ASSERT_EQUALS(BSON("y" << 1), request.getUpdateObj());
+    ASSERT_EQUALS(false, request.isUpsert());
+    ASSERT_EQUALS(false, request.isRemove());
+    ASSERT_EQUALS(BSONObj(), request.getFields());
+    ASSERT_EQUALS(BSONObj(), request.getSort());
+    ASSERT_EQUALS(false, request.shouldReturnNew());
+}
 
-    TEST(FindAndModifyRequest, ParseWithUpdateFullSpec) {
-        BSONObj cmdObj(fromjson(R"json({
+TEST(FindAndModifyRequest, ParseWithUpdateFullSpec) {
+    BSONObj cmdObj(fromjson(R"json({
             query: { x: 1 },
             update: { y: 1 },
             upsert: true,
@@ -332,42 +314,42 @@ namespace {
             new: true
         })json"));
 
-        auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
-        ASSERT_OK(parseStatus.getStatus());
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_OK(parseStatus.getStatus());
 
-        auto request = parseStatus.getValue();
-        ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
-        ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
-        ASSERT_EQUALS(BSON("y" << 1), request.getUpdateObj());
-        ASSERT_EQUALS(true, request.isUpsert());
-        ASSERT_EQUALS(false, request.isRemove());
-        ASSERT_EQUALS(BSON("x" << 1 << "y" << 1), request.getFields());
-        ASSERT_EQUALS(BSON("z" << -1), request.getSort());
-        ASSERT_EQUALS(true, request.shouldReturnNew());
-    }
+    auto request = parseStatus.getValue();
+    ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
+    ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
+    ASSERT_EQUALS(BSON("y" << 1), request.getUpdateObj());
+    ASSERT_EQUALS(true, request.isUpsert());
+    ASSERT_EQUALS(false, request.isRemove());
+    ASSERT_EQUALS(BSON("x" << 1 << "y" << 1), request.getFields());
+    ASSERT_EQUALS(BSON("z" << -1), request.getSort());
+    ASSERT_EQUALS(true, request.shouldReturnNew());
+}
 
-    TEST(FindAndModifyRequest, ParseWithRemoveOnlyRequiredFields) {
-        BSONObj cmdObj(fromjson(R"json({
+TEST(FindAndModifyRequest, ParseWithRemoveOnlyRequiredFields) {
+    BSONObj cmdObj(fromjson(R"json({
             query: { x: 1 },
             remove: true
         })json"));
 
-        auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
-        ASSERT_OK(parseStatus.getStatus());
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_OK(parseStatus.getStatus());
 
-        auto request = parseStatus.getValue();
-        ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
-        ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
-        ASSERT_EQUALS(BSONObj(), request.getUpdateObj());
-        ASSERT_EQUALS(false, request.isUpsert());
-        ASSERT_EQUALS(true, request.isRemove());
-        ASSERT_EQUALS(BSONObj(), request.getFields());
-        ASSERT_EQUALS(BSONObj(), request.getSort());
-        ASSERT_EQUALS(false, request.shouldReturnNew());
-    }
+    auto request = parseStatus.getValue();
+    ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
+    ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
+    ASSERT_EQUALS(BSONObj(), request.getUpdateObj());
+    ASSERT_EQUALS(false, request.isUpsert());
+    ASSERT_EQUALS(true, request.isRemove());
+    ASSERT_EQUALS(BSONObj(), request.getFields());
+    ASSERT_EQUALS(BSONObj(), request.getSort());
+    ASSERT_EQUALS(false, request.shouldReturnNew());
+}
 
-    TEST(FindAndModifyRequest, ParseWithRemoveFullSpec) {
-        BSONObj cmdObj(fromjson(R"json({
+TEST(FindAndModifyRequest, ParseWithRemoveFullSpec) {
+    BSONObj cmdObj(fromjson(R"json({
             query: { x: 1 },
             remove: true,
             fields: { x: 1, y: 1 },
@@ -375,65 +357,65 @@ namespace {
             new: false
         })json"));
 
-        auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
-        ASSERT_OK(parseStatus.getStatus());
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_OK(parseStatus.getStatus());
 
-        auto request = parseStatus.getValue();
-        ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
-        ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
-        ASSERT_EQUALS(BSONObj(), request.getUpdateObj());
-        ASSERT_EQUALS(false, request.isUpsert());
-        ASSERT_EQUALS(true, request.isRemove());
-        ASSERT_EQUALS(BSON("x" << 1 << "y" << 1), request.getFields());
-        ASSERT_EQUALS(BSON("z" << -1), request.getSort());
-        ASSERT_EQUALS(false, request.shouldReturnNew());
-    }
+    auto request = parseStatus.getValue();
+    ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
+    ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
+    ASSERT_EQUALS(BSONObj(), request.getUpdateObj());
+    ASSERT_EQUALS(false, request.isUpsert());
+    ASSERT_EQUALS(true, request.isRemove());
+    ASSERT_EQUALS(BSON("x" << 1 << "y" << 1), request.getFields());
+    ASSERT_EQUALS(BSON("z" << -1), request.getSort());
+    ASSERT_EQUALS(false, request.shouldReturnNew());
+}
 
-    TEST(FindAndModifyRequest, ParseWithIncompleteSpec) {
-        BSONObj cmdObj(fromjson(R"json({
+TEST(FindAndModifyRequest, ParseWithIncompleteSpec) {
+    BSONObj cmdObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 }
         })json"));
 
-        auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
-        ASSERT_NOT_OK(parseStatus.getStatus());
-    }
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_NOT_OK(parseStatus.getStatus());
+}
 
-    TEST(FindAndModifyRequest, ParseWithAmbiguousUpdateRemove) {
-        BSONObj cmdObj(fromjson(R"json({
+TEST(FindAndModifyRequest, ParseWithAmbiguousUpdateRemove) {
+    BSONObj cmdObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             update: { y: 1 },
             remove: true
         })json"));
 
-        auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
-        ASSERT_NOT_OK(parseStatus.getStatus());
-    }
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_NOT_OK(parseStatus.getStatus());
+}
 
-    TEST(FindAndModifyRequest, ParseWithRemovePlusUpsert) {
-        BSONObj cmdObj(fromjson(R"json({
+TEST(FindAndModifyRequest, ParseWithRemovePlusUpsert) {
+    BSONObj cmdObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             remove: true,
             upsert: true
         })json"));
 
-        auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
-        ASSERT_NOT_OK(parseStatus.getStatus());
-    }
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_NOT_OK(parseStatus.getStatus());
+}
 
-    TEST(FindAndModifyRequest, ParseWithRemoveAndReturnNew) {
-        BSONObj cmdObj(fromjson(R"json({
+TEST(FindAndModifyRequest, ParseWithRemoveAndReturnNew) {
+    BSONObj cmdObj(fromjson(R"json({
             findAndModify: 'user',
             query: { x: 1 },
             remove: true,
             new: true
         })json"));
 
-        auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
-        ASSERT_NOT_OK(parseStatus.getStatus());
-    }
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_NOT_OK(parseStatus.getStatus());
+}
 
-} // unnamed namespace
-} // namespace mongo
+}  // unnamed namespace
+}  // namespace mongo

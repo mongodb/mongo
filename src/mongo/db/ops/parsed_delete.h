@@ -34,85 +34,85 @@
 
 namespace mongo {
 
-    class CanonicalQuery;
-    class Database;
-    class DeleteRequest;
-    class OperationContext;
+class CanonicalQuery;
+class Database;
+class DeleteRequest;
+class OperationContext;
+
+/**
+ * This class takes a pointer to a DeleteRequest, and converts that request into a parsed form
+ * via the parseRequest() method. A ParsedDelete can then be used to retrieve a PlanExecutor
+ * capable of executing the delete.
+ *
+ * It is invalid to request that the DeleteStage return the deleted document during a
+ * multi-remove. It is also invalid to request that a ProjectionStage be applied to the
+ * DeleteStage if the DeleteStage would not return the deleted document.
+ *
+ * A delete request is parsed to a CanonicalQuery, so this class is a thin, delete-specific
+ * wrapper around canonicalization.
+ *
+ * No locks need to be held during parsing.
+ */
+class ParsedDelete {
+    MONGO_DISALLOW_COPYING(ParsedDelete);
+
+public:
+    /**
+     * Constructs a parsed delete.
+     *
+     * The object pointed to by "request" must stay in scope for the life of the constructed
+     * ParsedDelete.
+     */
+    ParsedDelete(OperationContext* txn, const DeleteRequest* request);
 
     /**
-     * This class takes a pointer to a DeleteRequest, and converts that request into a parsed form
-     * via the parseRequest() method. A ParsedDelete can then be used to retrieve a PlanExecutor
-     * capable of executing the delete.
-     *
-     * It is invalid to request that the DeleteStage return the deleted document during a
-     * multi-remove. It is also invalid to request that a ProjectionStage be applied to the
-     * DeleteStage if the DeleteStage would not return the deleted document.
-     *
-     * A delete request is parsed to a CanonicalQuery, so this class is a thin, delete-specific
-     * wrapper around canonicalization.
-     *
-     * No locks need to be held during parsing.
+     * Parses the delete request to a canonical query. On success, the parsed delete can be
+     * used to create a PlanExecutor capable of executing this delete.
      */
-    class ParsedDelete {
-        MONGO_DISALLOW_COPYING(ParsedDelete);
-    public:
-        /**
-         * Constructs a parsed delete.
-         *
-         * The object pointed to by "request" must stay in scope for the life of the constructed
-         * ParsedDelete.
-         */
-        ParsedDelete(OperationContext* txn, const DeleteRequest* request);
+    Status parseRequest();
 
-        /**
-         * Parses the delete request to a canonical query. On success, the parsed delete can be
-         * used to create a PlanExecutor capable of executing this delete.
-         */
-        Status parseRequest();
+    /**
+     * As an optimization, we do not create a canonical query if the predicate is a simple
+     * _id equality. This method can be used to force full parsing to a canonical query,
+     * as a fallback if the idhack path is not available (e.g. no _id index).
+     */
+    Status parseQueryToCQ();
 
-        /**
-         * As an optimization, we do not create a canonical query if the predicate is a simple
-         * _id equality. This method can be used to force full parsing to a canonical query,
-         * as a fallback if the idhack path is not available (e.g. no _id index).
-         */
-        Status parseQueryToCQ();
+    /**
+     * Get the raw request.
+     */
+    const DeleteRequest* getRequest() const;
 
-        /**
-         * Get the raw request.
-         */
-        const DeleteRequest* getRequest() const;
+    /**
+     * Is this delete allowed to yield?
+     */
+    bool canYield() const;
 
-        /**
-         * Is this delete allowed to yield?
-         */
-        bool canYield() const;
+    /**
+     * Is this update supposed to be isolated?
+     */
+    bool isIsolated() const;
 
-        /**
-         * Is this update supposed to be isolated?
-         */
-        bool isIsolated() const;
+    /**
+     * As an optimization, we don't create a canonical query for updates with simple _id
+     * queries. Use this method to determine whether or not we actually parsed the query.
+     */
+    bool hasParsedQuery() const;
 
-        /**
-         * As an optimization, we don't create a canonical query for updates with simple _id
-         * queries. Use this method to determine whether or not we actually parsed the query.
-         */
-        bool hasParsedQuery() const;
+    /**
+     * Releases ownership of the canonical query to the caller.
+     */
+    CanonicalQuery* releaseParsedQuery();
 
-        /**
-         * Releases ownership of the canonical query to the caller.
-         */
-        CanonicalQuery* releaseParsedQuery();
+private:
+    // Transactional context.  Not owned by us.
+    OperationContext* _txn;
 
-    private:
-        // Transactional context.  Not owned by us.
-        OperationContext* _txn;
+    // Unowned pointer to the request object that this executor will process.
+    const DeleteRequest* const _request;
 
-        // Unowned pointer to the request object that this executor will process.
-        const DeleteRequest* const _request;
-
-        // Parsed query object, or NULL if the query proves to be an id hack query.
-        std::unique_ptr<CanonicalQuery> _canonicalQuery;
-
-    };
+    // Parsed query object, or NULL if the query proves to be an id hack query.
+    std::unique_ptr<CanonicalQuery> _canonicalQuery;
+};
 
 }  // namespace mongo

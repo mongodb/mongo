@@ -36,169 +36,184 @@
 
 namespace mongo {
 
+/**
+ * This class represents the layout and contents of documents contained in the
+ * config.actionlog collection. All manipulation of documents coming from that
+ * collection should be done with this class.
+ *
+ * Usage Example:
+ *
+ *     // Contact the config. 'conn' has been obtained before.
+ *     DBClientBase* conn;
+ *     BSONObj query = QUERY(ActionLogType::exampleField("exampleFieldName"));
+ *     exampleDoc = conn->findOne(ActionLogType::ConfigNS, query);
+ *
+ *     // Process the response.
+ *     ActionLogType exampleType;
+ *     std::string errMsg;
+ *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+ *         // Can't use 'exampleType'. Take action.
+ *     }
+ *     // use 'exampleType'
+ *
+ */
+class ActionLogType {
+    MONGO_DISALLOW_COPYING(ActionLogType);
+
+public:
+    //
+    // schema declarations
+    //
+
+    // Name of the actionlog collection in the config server.
+    static const std::string ConfigNS;
+
+    // Field names and types in the actionlog collection type.
+    static const BSONField<std::string> server;
+    static const BSONField<std::string> what;
+    static const BSONField<Date_t> time;
+    static const BSONField<BSONObj> details;
+
+    // Common field names included under details
+    static const BSONField<int> candidateChunks;
+    static const BSONField<int> chunksMoved;
+    static const BSONField<bool> didError;
+    static const BSONField<long long> executionTimeMicros;
+    static const BSONField<std::string> errmsg;
+
+
+    //
+    // actionlog type methods
+    //
+
+    ActionLogType();
+    ~ActionLogType();
+
     /**
-     * This class represents the layout and contents of documents contained in the
-     * config.actionlog collection. All manipulation of documents coming from that
-     * collection should be done with this class.
-     *
-     * Usage Example:
-     *
-     *     // Contact the config. 'conn' has been obtained before.
-     *     DBClientBase* conn;
-     *     BSONObj query = QUERY(ActionLogType::exampleField("exampleFieldName"));
-     *     exampleDoc = conn->findOne(ActionLogType::ConfigNS, query);
-     *
-     *     // Process the response.
-     *     ActionLogType exampleType;
-     *     std::string errMsg;
-     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
-     *         // Can't use 'exampleType'. Take action.
-     *     }
-     *     // use 'exampleType'
-     *
+     * Returns true if all the mandatory fields are present and have valid
+     * representations. Otherwise returns false and fills in the optional 'errMsg' string.
      */
-    class ActionLogType {
-        MONGO_DISALLOW_COPYING(ActionLogType);
-    public:
+    bool isValid(std::string* errMsg) const;
 
-        //
-        // schema declarations
-        //
+    /**
+     * Returns the BSON representation of the entry.
+     */
+    BSONObj toBSON() const;
 
-        // Name of the actionlog collection in the config server.
-        static const std::string ConfigNS;
+    void buildDetails();
 
-        // Field names and types in the actionlog collection type.
-        static const BSONField<std::string> server;
-        static const BSONField<std::string> what;
-        static const BSONField<Date_t> time;
-        static const BSONField<BSONObj> details;
+    /**
+     * Clears and populates the internal state using the 'source' BSON object if the
+     * latter contains valid values. Otherwise sets errMsg and returns false.
+     */
+    bool parseBSON(const BSONObj& source, std::string* errMsg);
 
-        // Common field names included under details
-        static const BSONField<int> candidateChunks;
-        static const BSONField<int> chunksMoved;
-        static const BSONField<bool> didError;
-        static const BSONField<long long> executionTimeMicros;
-        static const BSONField<std::string> errmsg;
+    /**
+     * Clears the internal state.
+     */
+    void clear();
 
+    /**
+     * Copies all the fields present in 'this' to 'other'.
+     */
+    void cloneTo(ActionLogType* other) const;
 
-        //
-        // actionlog type methods
-        //
+    /**
+     * Returns a std::string representation of the current internal state.
+     */
+    std::string toString() const;
 
-        ActionLogType();
-        ~ActionLogType();
+    //
+    // individual field accessors
+    //
 
-        /**
-         * Returns true if all the mandatory fields are present and have valid
-         * representations. Otherwise returns false and fills in the optional 'errMsg' string.
-         */
-        bool isValid(std::string* errMsg) const;
+    void setServer(StringData server) {
+        _server = server.toString();
+        _isServerSet = true;
+    }
 
-        /**
-         * Returns the BSON representation of the entry.
-         */
-        BSONObj toBSON() const;
+    void unsetServer() {
+        _isServerSet = false;
+    }
 
-        void buildDetails();
+    bool isServerSet() const {
+        return _isServerSet;
+    }
 
-        /**
-         * Clears and populates the internal state using the 'source' BSON object if the
-         * latter contains valid values. Otherwise sets errMsg and returns false.
-         */
-        bool parseBSON(const BSONObj& source, std::string* errMsg);
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string& getServer() const {
+        dassert(_isServerSet);
+        return _what;
+    }
 
-        /**
-         * Clears the internal state.
-         */
-        void clear();
+    void setWhat(StringData what) {
+        _what = what.toString();
+        _isWhatSet = true;
+    }
 
-        /**
-         * Copies all the fields present in 'this' to 'other'.
-         */
-        void cloneTo(ActionLogType* other) const;
+    void unsetWhat() {
+        _isWhatSet = false;
+    }
 
-        /**
-         * Returns a std::string representation of the current internal state.
-         */
-        std::string toString() const;
+    bool isWhatSet() const {
+        return _isWhatSet;
+    }
 
-        //
-        // individual field accessors
-        //
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string& getWhat() const {
+        dassert(_isWhatSet);
+        return _what;
+    }
 
-        void setServer(StringData server) {
-            _server = server.toString();
-            _isServerSet = true;
-        }
+    void setTime(const Date_t time) {
+        _time = time;
+        _isTimeSet = true;
+    }
 
-        void unsetServer() { _isServerSet = false; }
+    void unsetTime() {
+        _isTimeSet = false;
+    }
 
-        bool isServerSet() const { return _isServerSet; }
+    bool isTimeSet() const {
+        return _isTimeSet;
+    }
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getServer() const {
-            dassert(_isServerSet);
-            return _what;
-        }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const Date_t getTime() const {
+        dassert(_isTimeSet);
+        return _time;
+    }
 
-        void setWhat(StringData what) {
-            _what = what.toString();
-            _isWhatSet = true;
-        }
+    void setDetails(const BSONObj& details) {
+        _details = details.getOwned();
+        _isDetailsSet = true;
+    }
 
-        void unsetWhat() { _isWhatSet = false; }
+    void unsetDetails() {
+        _isDetailsSet = false;
+    }
 
-        bool isWhatSet() const { return _isWhatSet; }
+    bool isDetailsSet() const {
+        return _isDetailsSet;
+    }
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getWhat() const {
-            dassert(_isWhatSet);
-            return _what;
-        }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const BSONObj getDetails() const {
+        dassert(_isDetailsSet);
+        return _details;
+    }
 
-        void setTime(const Date_t time) {
-            _time = time;
-            _isTimeSet = true;
-        }
+private:
+    // Convention: (M)andatory, (O)ptional, (S)pecial rule.
+    std::string _server;  // (M)  hostname of server that we are making the change on.
+                          // Does not include port.
+    bool _isServerSet;
+    std::string _what;  // (M)  what the action being performed was.
+    bool _isWhatSet;
+    Date_t _time;  // (M)  time this change was made
+    bool _isTimeSet;
+    BSONObj _details;  // (M)  A BSONObj containing extra information about some operations
+    bool _isDetailsSet;
+};
 
-        void unsetTime() { _isTimeSet = false; }
-
-        bool isTimeSet() const { return _isTimeSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const Date_t getTime() const {
-            dassert(_isTimeSet);
-            return _time;
-        }
-
-        void setDetails(const BSONObj& details) {
-            _details = details.getOwned();
-            _isDetailsSet = true;
-        }
-
-        void unsetDetails() { _isDetailsSet = false; }
-
-        bool isDetailsSet() const { return _isDetailsSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const BSONObj getDetails() const {
-            dassert(_isDetailsSet);
-            return _details;
-        }
-
-    private:
-        // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _server;     // (M)  hostname of server that we are making the change on.
-                                 // Does not include port.
-        bool _isServerSet;
-        std::string _what;     // (M)  what the action being performed was.
-        bool _isWhatSet;
-        Date_t _time;     // (M)  time this change was made
-        bool _isTimeSet;
-        BSONObj _details;     // (M)  A BSONObj containing extra information about some operations
-        bool _isDetailsSet;
-
-    };
-
-} // namespace mongo
+}  // namespace mongo

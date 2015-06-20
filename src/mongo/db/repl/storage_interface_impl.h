@@ -33,18 +33,17 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
 namespace repl {
 
-    class StorageInterfaceImpl : public StorageInterface {
-    public:
-        explicit StorageInterfaceImpl();
-        virtual ~StorageInterfaceImpl();
+class StorageInterfaceImpl : public StorageInterface {
+public:
+    explicit StorageInterfaceImpl();
+    virtual ~StorageInterfaceImpl();
 
-        OperationContext* createOperationContext() override;
-
-    };
+    OperationContext* createOperationContext() override;
+};
 
 }  // namespace repl
-} // namespace mongo
+}  // namespace mongo

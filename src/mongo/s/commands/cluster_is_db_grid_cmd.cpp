@@ -34,38 +34,36 @@
 namespace mongo {
 namespace {
 
-    class IsDbGridCmd : public Command {
-    public:
-        IsDbGridCmd() : Command("isdbgrid") { }
+class IsDbGridCmd : public Command {
+public:
+    IsDbGridCmd() : Command("isdbgrid") {}
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
-        }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+    virtual bool slaveOk() const {
+        return true;
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        // No auth required
+    }
 
-            // No auth required
-        }
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        result.append("isdbgrid", 1);
+        result.append("hostname", getHostNameCached());
+        return true;
+    }
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
+} isdbGrid;
 
-            result.append("isdbgrid", 1);
-            result.append("hostname", getHostNameCached());
-            return true;
-        }
-
-    } isdbGrid;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

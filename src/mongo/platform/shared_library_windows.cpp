@@ -40,47 +40,46 @@
 
 namespace mongo {
 
-    SharedLibrary::~SharedLibrary() {
-        if (_handle) {
-            if (FreeLibrary(static_cast<HMODULE>(_handle)) == 0) {
-                DWORD lasterror = GetLastError();
-                LOG(2) << "Load library close failed: " << errnoWithDescription(lasterror);
-            }
+SharedLibrary::~SharedLibrary() {
+    if (_handle) {
+        if (FreeLibrary(static_cast<HMODULE>(_handle)) == 0) {
+            DWORD lasterror = GetLastError();
+            LOG(2) << "Load library close failed: " << errnoWithDescription(lasterror);
         }
     }
+}
 
-    StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
-        const boost::filesystem::path& full_path) {
+StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
+    const boost::filesystem::path& full_path) {
+    LOG(1) << "Loading library: " << toUtf8String(full_path.c_str());
 
-        LOG(1) << "Loading library: " << toUtf8String(full_path.c_str());
-
-        HMODULE handle = LoadLibraryW(full_path.c_str());
-        if (handle == nullptr) {
-            return StatusWith<std::unique_ptr<SharedLibrary>>(ErrorCodes::InternalError,
-                str::stream() << "Load library failed: " << errnoWithDescription());
-        }
-
+    HMODULE handle = LoadLibraryW(full_path.c_str());
+    if (handle == nullptr) {
         return StatusWith<std::unique_ptr<SharedLibrary>>(
-                std::unique_ptr<SharedLibrary>(new SharedLibrary(handle)));
+            ErrorCodes::InternalError,
+            str::stream() << "Load library failed: " << errnoWithDescription());
     }
 
-    StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
-        // StringData is not assued to be null-terminated
-        std::string symbolName = name.toString();
+    return StatusWith<std::unique_ptr<SharedLibrary>>(
+        std::unique_ptr<SharedLibrary>(new SharedLibrary(handle)));
+}
 
-        void* function = GetProcAddress(static_cast<HMODULE>(_handle), symbolName.c_str());
+StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
+    // StringData is not assued to be null-terminated
+    std::string symbolName = name.toString();
 
-        if (function == nullptr) {
-            DWORD gle = GetLastError();
-            if (gle != ERROR_PROC_NOT_FOUND) {
-                return StatusWith<void*>(ErrorCodes::InternalError,
-                    str::stream() << "GetProcAddress failed for symbol: "
-                        << errnoWithDescription());
-            }
+    void* function = GetProcAddress(static_cast<HMODULE>(_handle), symbolName.c_str());
+
+    if (function == nullptr) {
+        DWORD gle = GetLastError();
+        if (gle != ERROR_PROC_NOT_FOUND) {
+            return StatusWith<void*>(
+                ErrorCodes::InternalError,
+                str::stream() << "GetProcAddress failed for symbol: " << errnoWithDescription());
         }
-
-        return StatusWith<void*>(function);
     }
+
+    return StatusWith<void*>(function);
+}
 
 }  // namespace mongo
-

@@ -34,77 +34,77 @@
 
 namespace mongo {
 
-    class Collection;
+class Collection;
 
-    class QueryPlannerAnalysis {
-    public:
-        /**
-         * Takes an index key pattern and returns an object describing the "maximal sort" that this
-         * index can provide.  Returned object is in normalized sort form (all elements have value 1
-         * or -1).
-         *
-         * Examples:
-         * - {a: 1, b: -1} => {a: 1, b: -1}
-         * - {a: true} => {a: 1}
-         * - {a: "hashed"} => {}
-         * - {a: 1, b: "text", c: 1} => {a: 1}
-         */
-        static BSONObj getSortPattern(const BSONObj& indexKeyPattern);
+class QueryPlannerAnalysis {
+public:
+    /**
+     * Takes an index key pattern and returns an object describing the "maximal sort" that this
+     * index can provide.  Returned object is in normalized sort form (all elements have value 1
+     * or -1).
+     *
+     * Examples:
+     * - {a: 1, b: -1} => {a: 1, b: -1}
+     * - {a: true} => {a: 1}
+     * - {a: "hashed"} => {}
+     * - {a: 1, b: "text", c: 1} => {a: 1}
+     */
+    static BSONObj getSortPattern(const BSONObj& indexKeyPattern);
 
-        /**
-         * In brief: performs sort and covering analysis.
-         *
-         * The solution rooted at 'solnRoot' provides data for the query, whether through some
-         * configuration of indices or through a collection scan.  Additional stages may be required
-         * to perform sorting, projection, or other operations that are independent of the source
-         * of the data.  These stages are added atop 'solnRoot'.
-         *
-         * 'taggedRoot' is a copy of the parse tree.  Nodes in 'solnRoot' may point into it.
-         *
-         * Takes ownership of 'solnRoot' and 'taggedRoot'.
-         *
-         * Returns NULL if a solution cannot be constructed given the requirements in 'params'.
-         *
-         * Caller owns the returned QuerySolution.
-         */
-        static QuerySolution* analyzeDataAccess(const CanonicalQuery& query,
-                                                const QueryPlannerParams& params,
-                                                QuerySolutionNode* solnRoot);
+    /**
+     * In brief: performs sort and covering analysis.
+     *
+     * The solution rooted at 'solnRoot' provides data for the query, whether through some
+     * configuration of indices or through a collection scan.  Additional stages may be required
+     * to perform sorting, projection, or other operations that are independent of the source
+     * of the data.  These stages are added atop 'solnRoot'.
+     *
+     * 'taggedRoot' is a copy of the parse tree.  Nodes in 'solnRoot' may point into it.
+     *
+     * Takes ownership of 'solnRoot' and 'taggedRoot'.
+     *
+     * Returns NULL if a solution cannot be constructed given the requirements in 'params'.
+     *
+     * Caller owns the returned QuerySolution.
+     */
+    static QuerySolution* analyzeDataAccess(const CanonicalQuery& query,
+                                            const QueryPlannerParams& params,
+                                            QuerySolutionNode* solnRoot);
 
-        /**
-         * Sort the results, if there is a sort required.
-         */
-        static QuerySolutionNode* analyzeSort(const CanonicalQuery& query,
-                                              const QueryPlannerParams& params,
-                                              QuerySolutionNode* solnRoot,
-                                              bool* blockingSortOut);
+    /**
+     * Sort the results, if there is a sort required.
+     */
+    static QuerySolutionNode* analyzeSort(const CanonicalQuery& query,
+                                          const QueryPlannerParams& params,
+                                          QuerySolutionNode* solnRoot,
+                                          bool* blockingSortOut);
 
-        /**
-         * Internal helper function used by analyzeSort.
-         *
-         * Rewrites an index scan over many point intervals as an OR of many index scans in order to
-         * obtain an indexed sort.  For full details, see SERVER-1205.
-         *
-         * Here is an example:
-         *
-         * Consider the query find({a: {$in: [1,2]}}).sort({b: 1}) with using the index {a:1, b:1}.
-         *
-         * Our default solution will be to construct one index scan with the bounds a:[[1,1],[2,2]]
-         * and b: [MinKey, MaxKey].
-         *
-         * However, this is logically equivalent to the union of the following scans:
-         * a:[1,1], b:[MinKey, MaxKey]
-         * a:[2,2], b:[MinKey, MaxKey]
-         *
-         * Since the bounds on 'a' are a point, each scan provides the sort order {b:1} in addition
-         * to {a:1, b:1}.
-         *
-         * If we union these scans with a merge sort instead of a normal hashing OR, we can preserve
-         * the sort order that each scan provides.
-         */
-        static bool explodeForSort(const CanonicalQuery& query,
-                                   const QueryPlannerParams& params,
-                                   QuerySolutionNode** solnRoot);
-    };
+    /**
+     * Internal helper function used by analyzeSort.
+     *
+     * Rewrites an index scan over many point intervals as an OR of many index scans in order to
+     * obtain an indexed sort.  For full details, see SERVER-1205.
+     *
+     * Here is an example:
+     *
+     * Consider the query find({a: {$in: [1,2]}}).sort({b: 1}) with using the index {a:1, b:1}.
+     *
+     * Our default solution will be to construct one index scan with the bounds a:[[1,1],[2,2]]
+     * and b: [MinKey, MaxKey].
+     *
+     * However, this is logically equivalent to the union of the following scans:
+     * a:[1,1], b:[MinKey, MaxKey]
+     * a:[2,2], b:[MinKey, MaxKey]
+     *
+     * Since the bounds on 'a' are a point, each scan provides the sort order {b:1} in addition
+     * to {a:1, b:1}.
+     *
+     * If we union these scans with a merge sort instead of a normal hashing OR, we can preserve
+     * the sort order that each scan provides.
+     */
+    static bool explodeForSort(const CanonicalQuery& query,
+                               const QueryPlannerParams& params,
+                               QuerySolutionNode** solnRoot);
+};
 
 }  // namespace mongo

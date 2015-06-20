@@ -34,45 +34,45 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class BSONObjBuilder;
+class BSONObj;
+class BSONObjBuilder;
 
 namespace repl {
 
-    class ReplSetDeclareElectionWinnerArgs {
-    public:
-        Status initialize(const BSONObj& argsObj);
+class ReplSetDeclareElectionWinnerArgs {
+public:
+    Status initialize(const BSONObj& argsObj);
 
-        std::string getReplSetName() const;
-        long long getTerm() const;
-        long long getWinnerId() const;
+    std::string getReplSetName() const;
+    long long getTerm() const;
+    long long getWinnerId() const;
 
-        void addToBSON(BSONObjBuilder* builder) const;
-        BSONObj toBSON() const;
+    void addToBSON(BSONObjBuilder* builder) const;
+    BSONObj toBSON() const;
 
-    private:
-        std::string _setName;
-        long long _term = -1; // The term for which the winner is being declared.
-        long long _winnerId = -1; // replSet id of the member who was the winner.
-    };
+private:
+    std::string _setName;
+    long long _term = -1;      // The term for which the winner is being declared.
+    long long _winnerId = -1;  // replSet id of the member who was the winner.
+};
 
-    class ReplSetDeclareElectionWinnerResponse {
-    public:
-        Status initialize(const BSONObj& argsObj);
-        
-        bool getOk() const;
-        long long getTerm() const;
-        long long getErrorCode() const;
-        const std::string& getErrorMsg() const;
+class ReplSetDeclareElectionWinnerResponse {
+public:
+    Status initialize(const BSONObj& argsObj);
 
-        void addToBSON(BSONObjBuilder* builder) const;
+    bool getOk() const;
+    long long getTerm() const;
+    long long getErrorCode() const;
+    const std::string& getErrorMsg() const;
 
-    private:
-        bool _ok = false;
-        long long _term = -1;
-        long long _code = ErrorCodes::OK;
-        std::string _errmsg;
-    };
+    void addToBSON(BSONObjBuilder* builder) const;
 
-} // namespace repl
-} // namespace mongo
+private:
+    bool _ok = false;
+    long long _term = -1;
+    long long _code = ErrorCodes::OK;
+    std::string _errmsg;
+};
+
+}  // namespace repl
+}  // namespace mongo

@@ -34,51 +34,49 @@
 namespace mongo {
 namespace repl {
 
+/**
+ * Used by cloner test fixture to centralize life cycle testing.
+ *
+ * Life cycle interface for collection and database cloners.
+ */
+class BaseCloner {
+public:
     /**
-     * Used by cloner test fixture to centralize life cycle testing.
-     *
-     * Life cycle interface for collection and database cloners.
+     * Callback function to report final status of cloning.
      */
-    class BaseCloner {
-    public:
+    using CallbackFn = stdx::function<void(const Status&)>;
 
-        /**
-         * Callback function to report final status of cloning.
-         */
-        using CallbackFn = stdx::function<void (const Status&)>;
+    virtual ~BaseCloner() {}
 
-        virtual ~BaseCloner() { }
+    /**
+     * Returns diagnostic information.
+     */
+    virtual std::string getDiagnosticString() const = 0;
 
-        /**
-         * Returns diagnostic information.
-         */
-        virtual std::string getDiagnosticString() const = 0;
+    /**
+     * Returns true if the cloner has been started (but has not completed).
+     */
+    virtual bool isActive() const = 0;
 
-        /**
-         * Returns true if the cloner has been started (but has not completed).
-         */
-        virtual bool isActive() const = 0;
+    /**
+     * Starts cloning by scheduling initial command to be run by the executor.
+     */
+    virtual Status start() = 0;
 
-        /**
-         * Starts cloning by scheduling initial command to be run by the executor.
-         */
-        virtual Status start() = 0;
+    /**
+     * Cancels current remote command request.
+     * Returns immediately if cloner is not active.
+     *
+     * Callback function may be invoked with an ErrorCodes::CallbackCanceled status.
+     */
+    virtual void cancel() = 0;
 
-        /**
-         * Cancels current remote command request.
-         * Returns immediately if cloner is not active.
-         *
-         * Callback function may be invoked with an ErrorCodes::CallbackCanceled status.
-         */
-        virtual void cancel() = 0;
+    /**
+     * Waits for active remote commands and database worker to complete.
+     * Returns immediately if cloner is not active.
+     */
+    virtual void wait() = 0;
+};
 
-        /**
-         * Waits for active remote commands and database worker to complete.
-         * Returns immediately if cloner is not active.
-         */
-        virtual void wait() = 0;
-
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

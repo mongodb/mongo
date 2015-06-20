@@ -39,32 +39,32 @@
 
 namespace mongo {
 
-    class CatalogManager;
-    class ConnectionString;
-    class OID;
-    class Status;
-    class VersionType;
+class CatalogManager;
+class ConnectionString;
+class OID;
+class Status;
+class VersionType;
 
-    /**
-     * Checks whether an unsuccessful upgrade was performed last time and also checks whether
-     * the mongos in the current cluster have the mimimum version required. Returns not ok if
-     * the check failed and the upgrade should not proceed.
-     *
-     * Note: There is also a special case for ManualInterventionRequired error where the
-     * message will be empty.
-     */
-    Status preUpgradeCheck(CatalogManager* catalogManager,
-                           const VersionType& lastVersionInfo,
-                           std::string minMongosVersion);
+/**
+ * Checks whether an unsuccessful upgrade was performed last time and also checks whether
+ * the mongos in the current cluster have the mimimum version required. Returns not ok if
+ * the check failed and the upgrade should not proceed.
+ *
+ * Note: There is also a special case for ManualInterventionRequired error where the
+ * message will be empty.
+ */
+Status preUpgradeCheck(CatalogManager* catalogManager,
+                       const VersionType& lastVersionInfo,
+                       std::string minMongosVersion);
 
-    /**
-     * Informs the config server that the upgrade task was completed by bumping the version.
-     * This also clears all upgrade state effectively leaving the critical section if the
-     * upgrade process did enter it.
-     */
-    Status commitConfigUpgrade(CatalogManager* catalogManager,
-                               int currentVersion,
-                               int minCompatibleVersion,
-                               int newVersion);
+/**
+ * Informs the config server that the upgrade task was completed by bumping the version.
+ * This also clears all upgrade state effectively leaving the critical section if the
+ * upgrade process did enter it.
+ */
+Status commitConfigUpgrade(CatalogManager* catalogManager,
+                           int currentVersion,
+                           int minCompatibleVersion,
+                           int newVersion);
 
-} // namespace mongo
+}  // namespace mongo

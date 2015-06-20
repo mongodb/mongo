@@ -41,123 +41,119 @@
 
 namespace mongo {
 
-    User::User(const UserName& name) :
-        _name(name),
-        _refCount(0),
-        _isValid(1) {}
+User::User(const UserName& name) : _name(name), _refCount(0), _isValid(1) {}
 
-    User::~User() {
-        dassert(_refCount == 0);
-    }
+User::~User() {
+    dassert(_refCount == 0);
+}
 
-    const UserName& User::getName() const {
-        return _name;
-    }
+const UserName& User::getName() const {
+    return _name;
+}
 
-    RoleNameIterator User::getRoles() const {
-        return makeRoleNameIteratorForContainer(_roles);
-    }
+RoleNameIterator User::getRoles() const {
+    return makeRoleNameIteratorForContainer(_roles);
+}
 
-    RoleNameIterator User::getIndirectRoles() const {
-         return makeRoleNameIteratorForContainer(_indirectRoles);
-    }
+RoleNameIterator User::getIndirectRoles() const {
+    return makeRoleNameIteratorForContainer(_indirectRoles);
+}
 
-    bool User::hasRole(const RoleName& roleName) const {
-        return _roles.count(roleName);
-    }
+bool User::hasRole(const RoleName& roleName) const {
+    return _roles.count(roleName);
+}
 
-    const User::CredentialData& User::getCredentials() const {
-        return _credentials;
-    }
+const User::CredentialData& User::getCredentials() const {
+    return _credentials;
+}
 
-    bool User::isValid() const {
-        return _isValid.loadRelaxed() == 1;
-    }
+bool User::isValid() const {
+    return _isValid.loadRelaxed() == 1;
+}
 
-    uint32_t User::getRefCount() const {
-        return _refCount;
-    }
+uint32_t User::getRefCount() const {
+    return _refCount;
+}
 
-    const ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
-        unordered_map<ResourcePattern, Privilege>::const_iterator it = _privileges.find(resource);
-        if (it == _privileges.end()) {
-            return ActionSet();
-        }
-        return it->second.getActions();
+const ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
+    unordered_map<ResourcePattern, Privilege>::const_iterator it = _privileges.find(resource);
+    if (it == _privileges.end()) {
+        return ActionSet();
     }
+    return it->second.getActions();
+}
 
-    User* User::clone() const {
-        std::unique_ptr<User> result(new User(_name));
-        result->_privileges = _privileges;
-        result->_roles = _roles;
-        result->_credentials = _credentials;
-        return result.release();
-    }
+User* User::clone() const {
+    std::unique_ptr<User> result(new User(_name));
+    result->_privileges = _privileges;
+    result->_roles = _roles;
+    result->_credentials = _credentials;
+    return result.release();
+}
 
-    void User::setCredentials(const CredentialData& credentials) {
-        _credentials = credentials;
-    }
+void User::setCredentials(const CredentialData& credentials) {
+    _credentials = credentials;
+}
 
-    void User::setRoles(RoleNameIterator roles) {
-        _roles.clear();
-        while (roles.more()) {
-            _roles.insert(roles.next());
-        }
+void User::setRoles(RoleNameIterator roles) {
+    _roles.clear();
+    while (roles.more()) {
+        _roles.insert(roles.next());
     }
+}
 
-    void User::setIndirectRoles(RoleNameIterator indirectRoles) {
-        _indirectRoles.clear();
-        while (indirectRoles.more()) {
-            _indirectRoles.push_back(indirectRoles.next());
-        }
+void User::setIndirectRoles(RoleNameIterator indirectRoles) {
+    _indirectRoles.clear();
+    while (indirectRoles.more()) {
+        _indirectRoles.push_back(indirectRoles.next());
     }
+}
 
-    void User::setPrivileges(const PrivilegeVector& privileges) {
-        _privileges.clear();
-        for (size_t i = 0; i < privileges.size(); ++i) {
-            const Privilege& privilege = privileges[i];
-            _privileges[privilege.getResourcePattern()] = privilege;
-        }
+void User::setPrivileges(const PrivilegeVector& privileges) {
+    _privileges.clear();
+    for (size_t i = 0; i < privileges.size(); ++i) {
+        const Privilege& privilege = privileges[i];
+        _privileges[privilege.getResourcePattern()] = privilege;
     }
+}
 
-    void User::addRole(const RoleName& roleName) {
-        _roles.insert(roleName);
-    }
+void User::addRole(const RoleName& roleName) {
+    _roles.insert(roleName);
+}
 
-    void User::addRoles(const std::vector<RoleName>& roles) {
-        for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
-            addRole(*it);
-        }
+void User::addRoles(const std::vector<RoleName>& roles) {
+    for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
+        addRole(*it);
     }
+}
 
-    void User::addPrivilege(const Privilege& privilegeToAdd) {
-        ResourcePrivilegeMap::iterator it = _privileges.find(privilegeToAdd.getResourcePattern());
-        if (it == _privileges.end()) {
-            // No privilege exists yet for this resource
-            _privileges.insert(std::make_pair(privilegeToAdd.getResourcePattern(), privilegeToAdd));
-        } else {
-            dassert(it->first == privilegeToAdd.getResourcePattern());
-            it->second.addActions(privilegeToAdd.getActions());
-        }
+void User::addPrivilege(const Privilege& privilegeToAdd) {
+    ResourcePrivilegeMap::iterator it = _privileges.find(privilegeToAdd.getResourcePattern());
+    if (it == _privileges.end()) {
+        // No privilege exists yet for this resource
+        _privileges.insert(std::make_pair(privilegeToAdd.getResourcePattern(), privilegeToAdd));
+    } else {
+        dassert(it->first == privilegeToAdd.getResourcePattern());
+        it->second.addActions(privilegeToAdd.getActions());
     }
+}
 
-    void User::addPrivileges(const PrivilegeVector& privileges) {
-        for (PrivilegeVector::const_iterator it = privileges.begin();
-                it != privileges.end(); ++it) {
-            addPrivilege(*it);
-        }
+void User::addPrivileges(const PrivilegeVector& privileges) {
+    for (PrivilegeVector::const_iterator it = privileges.begin(); it != privileges.end(); ++it) {
+        addPrivilege(*it);
     }
+}
 
-    void User::invalidate() {
-        _isValid.store(0);
-    }
+void User::invalidate() {
+    _isValid.store(0);
+}
 
-    void User::incrementRefCount() {
-        ++_refCount;
-    }
+void User::incrementRefCount() {
+    ++_refCount;
+}
 
-    void User::decrementRefCount() {
-        dassert(_refCount > 0);
-        --_refCount;
-    }
-} // namespace mongo
+void User::decrementRefCount() {
+    dassert(_refCount > 0);
+    --_refCount;
+}
+}  // namespace mongo

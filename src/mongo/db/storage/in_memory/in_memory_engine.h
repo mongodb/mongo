@@ -36,60 +36,64 @@
 
 namespace mongo {
 
-    class InMemoryEngine : public KVEngine {
-    public:
-        virtual RecoveryUnit* newRecoveryUnit();
+class InMemoryEngine : public KVEngine {
+public:
+    virtual RecoveryUnit* newRecoveryUnit();
 
-        virtual Status createRecordStore( OperationContext* opCtx,
-                                          StringData ns,
-                                          StringData ident,
-                                          const CollectionOptions& options );
+    virtual Status createRecordStore(OperationContext* opCtx,
+                                     StringData ns,
+                                     StringData ident,
+                                     const CollectionOptions& options);
 
-        virtual RecordStore* getRecordStore( OperationContext* opCtx,
-                                             StringData ns,
+    virtual RecordStore* getRecordStore(OperationContext* opCtx,
+                                        StringData ns,
+                                        StringData ident,
+                                        const CollectionOptions& options);
+
+    virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
-                                             const CollectionOptions& options );
+                                             const IndexDescriptor* desc);
 
-        virtual Status createSortedDataInterface( OperationContext* opCtx,
-                                                  StringData ident,
-                                                  const IndexDescriptor* desc );
+    virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
+                                                        StringData ident,
+                                                        const IndexDescriptor* desc);
 
-        virtual SortedDataInterface* getSortedDataInterface( OperationContext* opCtx,
-                                                             StringData ident,
-                                                             const IndexDescriptor* desc );
+    virtual Status dropIdent(OperationContext* opCtx, StringData ident);
 
-        virtual Status dropIdent( OperationContext* opCtx,
-                                  StringData ident );
+    virtual bool supportsDocLocking() const {
+        return false;
+    }
 
-        virtual bool supportsDocLocking() const { return false; }
+    virtual bool supportsDirectoryPerDB() const {
+        return false;
+    }
 
-        virtual bool supportsDirectoryPerDB() const { return false; }
+    /**
+     * This is sort of strange since "durable" has no meaning...
+     */
+    virtual bool isDurable() const {
+        return true;
+    }
 
-        /**
-         * This is sort of strange since "durable" has no meaning...
-         */
-        virtual bool isDurable() const { return true; }
+    virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident);
 
-        virtual int64_t getIdentSize( OperationContext* opCtx,
-                                      StringData ident );
+    virtual Status repairIdent(OperationContext* opCtx, StringData ident) {
+        return Status::OK();
+    }
 
-        virtual Status repairIdent( OperationContext* opCtx,
-                                    StringData ident ) {
-            return Status::OK();
-        }
+    virtual void cleanShutdown(){};
 
-        virtual void cleanShutdown() {};
+    virtual bool hasIdent(OperationContext* opCtx, StringData ident) const {
+        return _dataMap.find(ident) != _dataMap.end();
+        ;
+    }
 
-        virtual bool hasIdent(OperationContext* opCtx, StringData ident) const {
-            return _dataMap.find(ident) != _dataMap.end();;
-        }
+    std::vector<std::string> getAllIdents(OperationContext* opCtx) const;
 
-        std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
-    private:
-        typedef StringMap<std::shared_ptr<void> > DataMap;
+private:
+    typedef StringMap<std::shared_ptr<void>> DataMap;
 
-        mutable stdx::mutex _mutex;
-        DataMap _dataMap; // All actual data is owned in here
-    };
-
+    mutable stdx::mutex _mutex;
+    DataMap _dataMap;  // All actual data is owned in here
+};
 }

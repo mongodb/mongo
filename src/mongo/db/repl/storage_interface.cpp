@@ -35,8 +35,8 @@
 namespace mongo {
 namespace repl {
 
-    StorageInterface::StorageInterface() {}
-    StorageInterface::~StorageInterface() {}
+StorageInterface::StorageInterface() {}
+StorageInterface::~StorageInterface() {}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

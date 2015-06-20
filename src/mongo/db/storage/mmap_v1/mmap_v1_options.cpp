@@ -35,65 +35,65 @@
 
 namespace mongo {
 
-    MMAPV1Options mmapv1GlobalOptions;
+MMAPV1Options mmapv1GlobalOptions;
 
-    /**
-     * Specify an integer between 1 and 500 signifying the number of milliseconds (ms)
-     * between journal commits.
-     */
-    class JournalCommitIntervalSetting : public ServerParameter {
-    public:
-        JournalCommitIntervalSetting() :
-            ServerParameter(ServerParameterSet::getGlobal(), "journalCommitInterval",
-                    false, // allowedToChangeAtStartup
-                    true // allowedToChangeAtRuntime
-                    ) {}
+/**
+ * Specify an integer between 1 and 500 signifying the number of milliseconds (ms)
+ * between journal commits.
+ */
+class JournalCommitIntervalSetting : public ServerParameter {
+public:
+    JournalCommitIntervalSetting()
+        : ServerParameter(ServerParameterSet::getGlobal(),
+                          "journalCommitInterval",
+                          false,  // allowedToChangeAtStartup
+                          true    // allowedToChangeAtRuntime
+                          ) {}
 
-        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-            b << name << mmapv1GlobalOptions.journalCommitInterval;
+    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+        b << name << mmapv1GlobalOptions.journalCommitInterval;
+    }
+
+    virtual Status set(const BSONElement& newValueElement) {
+        long long newValue;
+        if (!newValueElement.isNumber()) {
+            StringBuilder sb;
+            sb << "Expected number type for journalCommitInterval via setParameter command: "
+               << newValueElement;
+            return Status(ErrorCodes::BadValue, sb.str());
         }
-
-        virtual Status set(const BSONElement& newValueElement) {
-            long long newValue;
-            if (!newValueElement.isNumber()) {
-                StringBuilder sb;
-                sb << "Expected number type for journalCommitInterval via setParameter command: "
-                   << newValueElement;
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            if (newValueElement.type() == NumberDouble &&
-                (newValueElement.numberDouble() - newValueElement.numberLong()) > 0) {
-                StringBuilder sb;
-                sb << "journalCommitInterval must be a whole number: "
-                   << newValueElement;
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            newValue = newValueElement.numberLong();
-            if (newValue <= 1 || newValue >= 500) {
-                StringBuilder sb;
-                sb << "journalCommitInterval must be between 1 and 500, but attempted to set to: "
-                   << newValue;
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            mmapv1GlobalOptions.journalCommitInterval = static_cast<unsigned>(newValue);
-            return Status::OK();
+        if (newValueElement.type() == NumberDouble &&
+            (newValueElement.numberDouble() - newValueElement.numberLong()) > 0) {
+            StringBuilder sb;
+            sb << "journalCommitInterval must be a whole number: " << newValueElement;
+            return Status(ErrorCodes::BadValue, sb.str());
         }
-
-        virtual Status setFromString(const std::string& str) {
-            unsigned newValue;
-            Status status = parseNumberFromString(str, &newValue);
-            if (!status.isOK()) {
-                return status;
-            }
-            if (newValue <= 1 || newValue >= 500) {
-                StringBuilder sb;
-                sb << "journalCommitInterval must be between 1 and 500, but attempted to set to: "
-                   << newValue;
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            mmapv1GlobalOptions.journalCommitInterval = newValue;
-            return Status::OK();
+        newValue = newValueElement.numberLong();
+        if (newValue <= 1 || newValue >= 500) {
+            StringBuilder sb;
+            sb << "journalCommitInterval must be between 1 and 500, but attempted to set to: "
+               << newValue;
+            return Status(ErrorCodes::BadValue, sb.str());
         }
-    } journalCommitIntervalSetting;
+        mmapv1GlobalOptions.journalCommitInterval = static_cast<unsigned>(newValue);
+        return Status::OK();
+    }
 
-} // namespace mongo
+    virtual Status setFromString(const std::string& str) {
+        unsigned newValue;
+        Status status = parseNumberFromString(str, &newValue);
+        if (!status.isOK()) {
+            return status;
+        }
+        if (newValue <= 1 || newValue >= 500) {
+            StringBuilder sb;
+            sb << "journalCommitInterval must be between 1 and 500, but attempted to set to: "
+               << newValue;
+            return Status(ErrorCodes::BadValue, sb.str());
+        }
+        mmapv1GlobalOptions.journalCommitInterval = newValue;
+        return Status::OK();
+    }
+} journalCommitIntervalSetting;
+
+}  // namespace mongo

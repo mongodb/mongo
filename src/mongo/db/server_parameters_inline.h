@@ -32,25 +32,24 @@
 
 namespace mongo {
 
-    template<typename T>
-    inline Status ExportedServerParameter<T>::set( const BSONElement& newValueElement ) {
-        T newValue;
+template <typename T>
+inline Status ExportedServerParameter<T>::set(const BSONElement& newValueElement) {
+    T newValue;
 
-        if ( !newValueElement.coerce( &newValue) )
-            return Status( ErrorCodes::BadValue, "can't set value" );
+    if (!newValueElement.coerce(&newValue))
+        return Status(ErrorCodes::BadValue, "can't set value");
 
-        return set( newValue );
-    }
+    return set(newValue);
+}
 
-    template<typename T>
-    inline Status ExportedServerParameter<T>::set( const T& newValue ) {
+template <typename T>
+inline Status ExportedServerParameter<T>::set(const T& newValue) {
+    Status v = validate(newValue);
+    if (!v.isOK())
+        return v;
 
-        Status v = validate( newValue );
-        if ( !v.isOK() )
-            return v;
-
-        *_value = newValue;
-        return Status::OK();
-    }
+    *_value = newValue;
+    return Status::OK();
+}
 
 }  // namespace mongo

@@ -33,46 +33,52 @@
 
 namespace mongo {
 
-    template <>
-    struct DataType::Handler<StringData> {
-        static Status load(StringData* sdata, const char* ptr, size_t length, size_t* advanced,
-                           std::ptrdiff_t debug_offset) {
-            if (sdata) {
-                *sdata = StringData(ptr, length);
-            }
-
-            if (advanced) {
-                *advanced = length;
-            }
-
-            return Status::OK();
+template <>
+struct DataType::Handler<StringData> {
+    static Status load(StringData* sdata,
+                       const char* ptr,
+                       size_t length,
+                       size_t* advanced,
+                       std::ptrdiff_t debug_offset) {
+        if (sdata) {
+            *sdata = StringData(ptr, length);
         }
 
-        static Status store(const StringData& sdata, char* ptr, size_t length, size_t* advanced,
-                            std::ptrdiff_t debug_offset) {
-            if (sdata.size() > length) {
-                return makeStoreStatus(sdata, length, debug_offset);
-            }
-
-            if (ptr) {
-                std::memcpy(ptr, sdata.rawData(), sdata.size());
-            }
-
-            if (advanced) {
-                *advanced = sdata.size();
-            }
-
-            return Status::OK();
+        if (advanced) {
+            *advanced = length;
         }
 
-        static StringData defaultConstruct() {
-            return StringData();
+        return Status::OK();
+    }
+
+    static Status store(const StringData& sdata,
+                        char* ptr,
+                        size_t length,
+                        size_t* advanced,
+                        std::ptrdiff_t debug_offset) {
+        if (sdata.size() > length) {
+            return makeStoreStatus(sdata, length, debug_offset);
         }
 
-    private:
-        static Status makeStoreStatus(const StringData& sdata, size_t length,
-                                      std::ptrdiff_t debug_offset);
+        if (ptr) {
+            std::memcpy(ptr, sdata.rawData(), sdata.size());
+        }
 
-    };
+        if (advanced) {
+            *advanced = sdata.size();
+        }
 
-} // namespace mongo
+        return Status::OK();
+    }
+
+    static StringData defaultConstruct() {
+        return StringData();
+    }
+
+private:
+    static Status makeStoreStatus(const StringData& sdata,
+                                  size_t length,
+                                  std::ptrdiff_t debug_offset);
+};
+
+}  // namespace mongo

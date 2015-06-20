@@ -35,62 +35,62 @@
 
 namespace mongo {
 namespace scram {
-    const unsigned int hashSize = 20;
+const unsigned int hashSize = 20;
 
-    const std::string serverKeyConst = "Server Key";
-    const std::string clientKeyConst = "Client Key";
+const std::string serverKeyConst = "Server Key";
+const std::string clientKeyConst = "Client Key";
 
-    const std::string iterationCountFieldName = "iterationCount";
-    const std::string saltFieldName = "salt";
-    const std::string storedKeyFieldName = "storedKey";
-    const std::string serverKeyFieldName = "serverKey";
+const std::string iterationCountFieldName = "iterationCount";
+const std::string saltFieldName = "salt";
+const std::string storedKeyFieldName = "storedKey";
+const std::string serverKeyFieldName = "serverKey";
 
-    /*
-     * Computes the SaltedPassword from password, salt and iterationCount.
-     */
-    void generateSaltedPassword(StringData hashedPassword,
-                                const unsigned char* salt,
-                                const int saltLen,
-                                const int iterationCount,
-                                unsigned char saltedPassword[hashSize]);
+/*
+ * Computes the SaltedPassword from password, salt and iterationCount.
+ */
+void generateSaltedPassword(StringData hashedPassword,
+                            const unsigned char* salt,
+                            const int saltLen,
+                            const int iterationCount,
+                            unsigned char saltedPassword[hashSize]);
 
-    /*
-     * Computes the SCRAM secrets storedKey and serverKey using the salt 'salt'
-     * and iteration count 'iterationCount' as defined in RFC5802 (server side). 
-     */
-    void generateSecrets(const std::string& hashedPassword,
-                         const unsigned char salt[],
-                         size_t saltLen,
-                         size_t iterationCount,
-                         unsigned char storedKey[hashSize],
-                         unsigned char serverKey[hashSize]); 
+/*
+ * Computes the SCRAM secrets storedKey and serverKey using the salt 'salt'
+ * and iteration count 'iterationCount' as defined in RFC5802 (server side).
+ */
+void generateSecrets(const std::string& hashedPassword,
+                     const unsigned char salt[],
+                     size_t saltLen,
+                     size_t iterationCount,
+                     unsigned char storedKey[hashSize],
+                     unsigned char serverKey[hashSize]);
 
-    /*
-     * Generates the user salt and the SCRAM secrets storedKey and serverKey as
-     * defined in RFC5802 (server side).
-     */
-    BSONObj generateCredentials(const std::string& hashedPassword, int iterationCount);
+/*
+ * Generates the user salt and the SCRAM secrets storedKey and serverKey as
+ * defined in RFC5802 (server side).
+ */
+BSONObj generateCredentials(const std::string& hashedPassword, int iterationCount);
 
-    /*
-     * Computes the ClientProof from SaltedPassword and authMessage (client side).
-     */
-    std::string generateClientProof(const unsigned char saltedPassword[hashSize],
-                                    const std::string& authMessage);
+/*
+ * Computes the ClientProof from SaltedPassword and authMessage (client side).
+ */
+std::string generateClientProof(const unsigned char saltedPassword[hashSize],
+                                const std::string& authMessage);
 
-    /*
-     * Validates that the provided password 'hashedPassword' generates the serverKey
-     * 'serverKey' given iteration count 'iterationCount' and salt 'salt'.
-     */
-    bool validatePassword(const std::string& hashedPassword,
-                          int iterationCount,
-                          const std::string& salt,
-                          const std::string& storedKey);
+/*
+ * Validates that the provided password 'hashedPassword' generates the serverKey
+ * 'serverKey' given iteration count 'iterationCount' and salt 'salt'.
+ */
+bool validatePassword(const std::string& hashedPassword,
+                      int iterationCount,
+                      const std::string& salt,
+                      const std::string& storedKey);
 
-    /*
-     * Verifies ServerSignature (client side).
-     */
-    bool verifyServerSignature(const unsigned char saltedPassword[hashSize],
-                               const std::string& authMessage,
-                               const std::string& serverSignature);
-} // namespace scram
-} // namespace mongo
+/*
+ * Verifies ServerSignature (client side).
+ */
+bool verifyServerSignature(const unsigned char saltedPassword[hashSize],
+                           const std::string& authMessage,
+                           const std::string& serverSignature);
+}  // namespace scram
+}  // namespace mongo

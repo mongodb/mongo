@@ -36,62 +36,64 @@
 
 namespace mongo {
 
-    /**
-     * This stage outputs the union of its children.  It optionally deduplicates on RecordId.
-     *
-     * Preconditions: Valid RecordId.
-     *
-     * If we're deduping, we may fail to dedup any invalidated RecordId properly.
-     */
-    class OrStage : public PlanStage {
-    public:
-        OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter);
-        virtual ~OrStage();
+/**
+ * This stage outputs the union of its children.  It optionally deduplicates on RecordId.
+ *
+ * Preconditions: Valid RecordId.
+ *
+ * If we're deduping, we may fail to dedup any invalidated RecordId properly.
+ */
+class OrStage : public PlanStage {
+public:
+    OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter);
+    virtual ~OrStage();
 
-        void addChild(PlanStage* child);
+    void addChild(PlanStage* child);
 
-        virtual bool isEOF();
+    virtual bool isEOF();
 
-        virtual StageState work(WorkingSetID* out);
+    virtual StageState work(WorkingSetID* out);
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual StageType stageType() const { return STAGE_OR; }
+    virtual StageType stageType() const {
+        return STAGE_OR;
+    }
 
-        virtual PlanStageStats* getStats();
+    virtual PlanStageStats* getStats();
 
-        virtual const CommonStats* getCommonStats() const;
+    virtual const CommonStats* getCommonStats() const;
 
-        virtual const SpecificStats* getSpecificStats() const;
+    virtual const SpecificStats* getSpecificStats() const;
 
-        static const char* kStageType;
+    static const char* kStageType;
 
-    private:
-        // Not owned by us.
-        WorkingSet* _ws;
+private:
+    // Not owned by us.
+    WorkingSet* _ws;
 
-        // The filter is not owned by us.
-        const MatchExpression* _filter;
+    // The filter is not owned by us.
+    const MatchExpression* _filter;
 
-        // Owned by us.
-        std::vector<PlanStage*> _children;
+    // Owned by us.
+    std::vector<PlanStage*> _children;
 
-        // Which of _children are we calling work(...) on now?
-        size_t _currentChild;
+    // Which of _children are we calling work(...) on now?
+    size_t _currentChild;
 
-        // True if we dedup on RecordId, false otherwise.
-        bool _dedup;
+    // True if we dedup on RecordId, false otherwise.
+    bool _dedup;
 
-        // Which RecordIds have we returned?
-        unordered_set<RecordId, RecordId::Hasher> _seen;
+    // Which RecordIds have we returned?
+    unordered_set<RecordId, RecordId::Hasher> _seen;
 
-        // Stats
-        CommonStats _commonStats;
-        OrStats _specificStats;
-    };
+    // Stats
+    CommonStats _commonStats;
+    OrStats _specificStats;
+};
 
 }  // namespace mongo

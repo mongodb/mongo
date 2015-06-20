@@ -38,194 +38,179 @@
 
 namespace {
 
-    using namespace mongo;
-    using std::vector;
-    using std::deque;
+using namespace mongo;
+using std::vector;
+using std::deque;
 
-    //
-    // Tests for parsing GLE responses into write errors and write concern errors for write
-    // commands.  These tests essentially document our expected 2.4 GLE behaviors.
-    //
+//
+// Tests for parsing GLE responses into write errors and write concern errors for write
+// commands.  These tests essentially document our expected 2.4 GLE behaviors.
+//
 
-    TEST(GLEParsing, Empty) {
+TEST(GLEParsing, Empty) {
+    const BSONObj gleResponse = fromjson("{ok: 1.0, err: null}");
 
-        const BSONObj gleResponse = fromjson( "{ok: 1.0, err: null}" );
+    GLEErrors errors;
+    ASSERT_OK(extractGLEErrors(gleResponse, &errors));
+    ASSERT(!errors.writeError.get());
+    ASSERT(!errors.wcError.get());
+}
 
-        GLEErrors errors;
-        ASSERT_OK( extractGLEErrors( gleResponse, &errors ) );
-        ASSERT( !errors.writeError.get() );
-        ASSERT( !errors.wcError.get() );
-    }
+TEST(GLEParsing, WriteErr) {
+    const BSONObj gleResponse = fromjson("{ok: 1.0, err: 'message', code: 1000}");
 
-    TEST(GLEParsing, WriteErr) {
+    GLEErrors errors;
+    ASSERT_OK(extractGLEErrors(gleResponse, &errors));
+    ASSERT(errors.writeError.get());
+    ASSERT_EQUALS(errors.writeError->getErrMessage(), "message");
+    ASSERT_EQUALS(errors.writeError->getErrCode(), 1000);
+    ASSERT(!errors.wcError.get());
+}
 
-        const BSONObj gleResponse = fromjson( "{ok: 1.0, err: 'message', code: 1000}" );
+TEST(GLEParsing, JournalFail) {
+    const BSONObj gleResponse = fromjson("{ok: 1.0, err: null, jnote: 'message'}");
 
-        GLEErrors errors;
-        ASSERT_OK( extractGLEErrors( gleResponse, &errors ) );
-        ASSERT( errors.writeError.get() );
-        ASSERT_EQUALS( errors.writeError->getErrMessage(), "message" );
-        ASSERT_EQUALS( errors.writeError->getErrCode(), 1000 );
-        ASSERT( !errors.wcError.get() );
-    }
+    GLEErrors errors;
+    ASSERT_OK(extractGLEErrors(gleResponse, &errors));
+    ASSERT(!errors.writeError.get());
+    ASSERT(errors.wcError.get());
+    ASSERT_EQUALS(errors.wcError->getErrMessage(), "message");
+    ASSERT_EQUALS(errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed);
+}
 
-    TEST(GLEParsing, JournalFail) {
+TEST(GLEParsing, ReplErr) {
+    const BSONObj gleResponse = fromjson("{ok: 1.0, err: 'norepl', wnote: 'message'}");
 
-        const BSONObj gleResponse = fromjson( "{ok: 1.0, err: null, jnote: 'message'}" );
+    GLEErrors errors;
+    ASSERT_OK(extractGLEErrors(gleResponse, &errors));
+    ASSERT(!errors.writeError.get());
+    ASSERT(errors.wcError.get());
+    ASSERT_EQUALS(errors.wcError->getErrMessage(), "message");
+    ASSERT_EQUALS(errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed);
+}
 
-        GLEErrors errors;
-        ASSERT_OK( extractGLEErrors( gleResponse, &errors ) );
-        ASSERT( !errors.writeError.get() );
-        ASSERT( errors.wcError.get() );
-        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
-        ASSERT_EQUALS( errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed );
-    }
+TEST(GLEParsing, ReplTimeoutErr) {
+    const BSONObj gleResponse =
+        fromjson("{ok: 1.0, err: 'timeout', errmsg: 'message', wtimeout: true}");
 
-    TEST(GLEParsing, ReplErr) {
+    GLEErrors errors;
+    ASSERT_OK(extractGLEErrors(gleResponse, &errors));
+    ASSERT(!errors.writeError.get());
+    ASSERT(errors.wcError.get());
+    ASSERT_EQUALS(errors.wcError->getErrMessage(), "message");
+    ASSERT(errors.wcError->getErrInfo()["wtimeout"].trueValue());
+    ASSERT_EQUALS(errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed);
+}
 
-        const BSONObj gleResponse = fromjson( "{ok: 1.0, err: 'norepl', wnote: 'message'}" );
+TEST(GLEParsing, GLEFail) {
+    const BSONObj gleResponse = fromjson("{ok: 0.0, err: null, errmsg: 'message', code: 1000}");
 
-        GLEErrors errors;
-        ASSERT_OK( extractGLEErrors( gleResponse, &errors ) );
-        ASSERT( !errors.writeError.get() );
-        ASSERT( errors.wcError.get() );
-        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
-        ASSERT_EQUALS( errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed );
-    }
+    GLEErrors errors;
+    Status status = extractGLEErrors(gleResponse, &errors);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(status.reason(), "message");
+    ASSERT_EQUALS(status.code(), 1000);
+}
 
-    TEST(GLEParsing, ReplTimeoutErr) {
+TEST(GLEParsing, GLEFailNoCode) {
+    const BSONObj gleResponse = fromjson("{ok: 0.0, err: null, errmsg: 'message'}");
 
-        const BSONObj gleResponse =
-            fromjson( "{ok: 1.0, err: 'timeout', errmsg: 'message', wtimeout: true}" );
+    GLEErrors errors;
+    Status status = extractGLEErrors(gleResponse, &errors);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(status.reason(), "message");
+    ASSERT_EQUALS(status.code(), ErrorCodes::UnknownError);
+}
 
-        GLEErrors errors;
-        ASSERT_OK( extractGLEErrors( gleResponse, &errors ) );
-        ASSERT( !errors.writeError.get() );
-        ASSERT( errors.wcError.get() );
-        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
-        ASSERT( errors.wcError->getErrInfo()["wtimeout"].trueValue() );
-        ASSERT_EQUALS( errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed );
-    }
+TEST(GLEParsing, NotMasterGLEFail) {
+    // Not master code in response
+    const BSONObj gleResponse = fromjson("{ok: 0.0, err: null, errmsg: 'message', code: 10990}");
 
-    TEST(GLEParsing, GLEFail) {
+    GLEErrors errors;
+    ASSERT_OK(extractGLEErrors(gleResponse, &errors));
+    ASSERT(!errors.writeError.get());
+    ASSERT(errors.wcError.get());
+    ASSERT_EQUALS(errors.wcError->getErrMessage(), "message");
+    ASSERT_EQUALS(errors.wcError->getErrCode(), 10990);
+}
 
-        const BSONObj gleResponse =
-            fromjson( "{ok: 0.0, err: null, errmsg: 'message', code: 1000}" );
+TEST(GLEParsing, WriteErrWithStats) {
+    const BSONObj gleResponse = fromjson("{ok: 1.0, n: 2, err: 'message', code: 1000}");
 
-        GLEErrors errors;
-        Status status = extractGLEErrors( gleResponse, &errors );
-        ASSERT_NOT_OK( status );
-        ASSERT_EQUALS( status.reason(), "message" );
-        ASSERT_EQUALS( status.code(), 1000 );
-    }
+    GLEErrors errors;
+    ASSERT_OK(extractGLEErrors(gleResponse, &errors));
+    ASSERT(errors.writeError.get());
+    ASSERT_EQUALS(errors.writeError->getErrMessage(), "message");
+    ASSERT_EQUALS(errors.writeError->getErrCode(), 1000);
+    ASSERT(!errors.wcError.get());
+}
 
-    TEST(GLEParsing, GLEFailNoCode) {
+TEST(GLEParsing, ReplTimeoutErrWithStats) {
+    const BSONObj gleResponse = fromjson(
+        "{ok: 1.0, err: 'timeout', errmsg: 'message', wtimeout: true,"
+        " n: 1, upserted: 'abcde'}");
 
-        const BSONObj gleResponse = fromjson( "{ok: 0.0, err: null, errmsg: 'message'}" );
+    GLEErrors errors;
+    ASSERT_OK(extractGLEErrors(gleResponse, &errors));
+    ASSERT(!errors.writeError.get());
+    ASSERT(errors.wcError.get());
+    ASSERT_EQUALS(errors.wcError->getErrMessage(), "message");
+    ASSERT(errors.wcError->getErrInfo()["wtimeout"].trueValue());
+    ASSERT_EQUALS(errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed);
+}
 
-        GLEErrors errors;
-        Status status = extractGLEErrors( gleResponse, &errors );
-        ASSERT_NOT_OK( status );
-        ASSERT_EQUALS( status.reason(), "message" );
-        ASSERT_EQUALS( status.code(), ErrorCodes::UnknownError );
-    }
+//
+// Tests of processing and suppressing non-WC related fields from legacy GLE responses
+//
 
-    TEST(GLEParsing, NotMasterGLEFail) {
+TEST(LegacyGLESuppress, Basic) {
+    const BSONObj gleResponse = fromjson("{ok: 1.0, err: null}");
 
-        // Not master code in response
-        const BSONObj gleResponse =
-            fromjson( "{ok: 0.0, err: null, errmsg: 'message', code: 10990}" );
+    BSONObj stripped = stripNonWCInfo(gleResponse);
+    ASSERT_EQUALS(stripped.nFields(), 2);  // with err, ok : true
+    ASSERT(stripped["ok"].trueValue());
+}
 
-        GLEErrors errors;
-        ASSERT_OK( extractGLEErrors( gleResponse, &errors ) );
-        ASSERT( !errors.writeError.get() );
-        ASSERT( errors.wcError.get() );
-        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
-        ASSERT_EQUALS( errors.wcError->getErrCode(), 10990 );
-    }
+TEST(LegacyGLESuppress, BasicStats) {
+    const BSONObj gleResponse = fromjson(
+        "{ok: 0.0, err: 'message',"
+        " n: 1, nModified: 1, upserted: 'abc', updatedExisting: true}");
 
-    TEST(GLEParsing, WriteErrWithStats) {
-        const BSONObj gleResponse = fromjson( "{ok: 1.0, n: 2, err: 'message', code: 1000}" );
+    BSONObj stripped = stripNonWCInfo(gleResponse);
+    ASSERT_EQUALS(stripped.nFields(), 1);
+    ASSERT(!stripped["ok"].trueValue());
+}
 
-        GLEErrors errors;
-        ASSERT_OK( extractGLEErrors( gleResponse, &errors ) );
-        ASSERT( errors.writeError.get() );
-        ASSERT_EQUALS( errors.writeError->getErrMessage(), "message" );
-        ASSERT_EQUALS( errors.writeError->getErrCode(), 1000 );
-        ASSERT( !errors.wcError.get() );
-    }
+TEST(LegacyGLESuppress, ReplError) {
+    const BSONObj gleResponse = fromjson("{ok: 0.0, err: 'norepl', n: 1, wcField: true}");
 
-    TEST(GLEParsing, ReplTimeoutErrWithStats) {
-        const BSONObj gleResponse =
-            fromjson( "{ok: 1.0, err: 'timeout', errmsg: 'message', wtimeout: true,"
-                      " n: 1, upserted: 'abcde'}" );
+    BSONObj stripped = stripNonWCInfo(gleResponse);
+    ASSERT_EQUALS(stripped.nFields(), 3);
+    ASSERT(!stripped["ok"].trueValue());
+    ASSERT_EQUALS(stripped["err"].str(), "norepl");
+    ASSERT(stripped["wcField"].trueValue());
+}
 
-        GLEErrors errors;
-        ASSERT_OK( extractGLEErrors( gleResponse, &errors ) );
-        ASSERT( !errors.writeError.get() );
-        ASSERT( errors.wcError.get() );
-        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
-        ASSERT( errors.wcError->getErrInfo()["wtimeout"].trueValue() );
-        ASSERT_EQUALS( errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed );
-    }
+TEST(LegacyGLESuppress, StripCode) {
+    const BSONObj gleResponse = fromjson("{ok: 1.0, err: 'message', code: 12345}");
 
-    //
-    // Tests of processing and suppressing non-WC related fields from legacy GLE responses
-    //
+    BSONObj stripped = stripNonWCInfo(gleResponse);
+    ASSERT_EQUALS(stripped.nFields(), 2);  // with err, ok : true
+    ASSERT(stripped["ok"].trueValue());
+}
 
-    TEST(LegacyGLESuppress, Basic) {
+TEST(LegacyGLESuppress, TimeoutDupError24) {
+    const BSONObj gleResponse = BSON("ok" << 0.0 << "err"
+                                          << "message"
+                                          << "code" << 12345 << "err"
+                                          << "timeout"
+                                          << "code" << 56789 << "wtimeout" << true);
 
-        const BSONObj gleResponse = fromjson( "{ok: 1.0, err: null}" );
-
-        BSONObj stripped = stripNonWCInfo( gleResponse );
-        ASSERT_EQUALS( stripped.nFields(), 2 ); // with err, ok : true
-        ASSERT( stripped["ok"].trueValue() );
-    }
-
-    TEST(LegacyGLESuppress, BasicStats) {
-
-        const BSONObj gleResponse =
-            fromjson( "{ok: 0.0, err: 'message',"
-                      " n: 1, nModified: 1, upserted: 'abc', updatedExisting: true}" );
-
-        BSONObj stripped = stripNonWCInfo( gleResponse );
-        ASSERT_EQUALS( stripped.nFields(), 1 );
-        ASSERT( !stripped["ok"].trueValue() );
-    }
-
-    TEST(LegacyGLESuppress, ReplError) {
-
-        const BSONObj gleResponse =
-            fromjson( "{ok: 0.0, err: 'norepl', n: 1, wcField: true}" );
-
-        BSONObj stripped = stripNonWCInfo( gleResponse );
-        ASSERT_EQUALS( stripped.nFields(), 3 );
-        ASSERT( !stripped["ok"].trueValue() );
-        ASSERT_EQUALS( stripped["err"].str(), "norepl" );
-        ASSERT( stripped["wcField"].trueValue() );
-    }
-
-    TEST(LegacyGLESuppress, StripCode) {
-
-        const BSONObj gleResponse =
-            fromjson( "{ok: 1.0, err: 'message', code: 12345}" );
-
-        BSONObj stripped = stripNonWCInfo( gleResponse );
-        ASSERT_EQUALS( stripped.nFields(), 2 ); // with err, ok : true
-        ASSERT( stripped["ok"].trueValue() );
-    }
-
-    TEST(LegacyGLESuppress, TimeoutDupError24) {
-
-        const BSONObj gleResponse =
-            BSON( "ok" << 0.0 << "err" << "message" << "code" << 12345
-                       << "err" << "timeout" << "code" << 56789 << "wtimeout" << true );
-
-        BSONObj stripped = stripNonWCInfo( gleResponse );
-        ASSERT_EQUALS( stripped.nFields(), 4 );
-        ASSERT( !stripped["ok"].trueValue() );
-        ASSERT_EQUALS( stripped["err"].str(), "timeout" );
-        ASSERT_EQUALS( stripped["code"].numberInt(), 56789 );
-        ASSERT( stripped["wtimeout"].trueValue() );
-    }
+    BSONObj stripped = stripNonWCInfo(gleResponse);
+    ASSERT_EQUALS(stripped.nFields(), 4);
+    ASSERT(!stripped["ok"].trueValue());
+    ASSERT_EQUALS(stripped["err"].str(), "timeout");
+    ASSERT_EQUALS(stripped["code"].numberInt(), 56789);
+    ASSERT(stripped["wtimeout"].trueValue());
+}
 }

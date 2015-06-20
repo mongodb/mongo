@@ -49,192 +49,181 @@
 namespace mongo {
 namespace {
 
-    using std::shared_ptr;
-    using std::string;
-    using std::vector;
+using std::shared_ptr;
+using std::string;
+using std::vector;
 
-    class FindAndModifyCmd : public Command {
-    public:
-        FindAndModifyCmd() : Command("findAndModify", false, "findandmodify") { }
+class FindAndModifyCmd : public Command {
+public:
+    FindAndModifyCmd() : Command("findAndModify", false, "findandmodify") {}
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+    virtual bool slaveOk() const {
+        return true;
+    }
 
-        virtual bool adminOnly() const {
-            return false;
-        }
+    virtual bool adminOnly() const {
+        return false;
+    }
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
-        }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
+    }
 
-            find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
-        }
+    virtual Status explain(OperationContext* txn,
+                           const std::string& dbName,
+                           const BSONObj& cmdObj,
+                           ExplainCommon::Verbosity verbosity,
+                           BSONObjBuilder* out) const {
+        const string ns = parseNsCollectionRequired(dbName, cmdObj);
 
-        virtual Status explain(OperationContext* txn,
-                               const std::string& dbName,
-                               const BSONObj& cmdObj,
-                               ExplainCommon::Verbosity verbosity,
-                               BSONObjBuilder* out) const {
+        auto status = grid.catalogCache()->getDatabase(dbName);
+        uassertStatusOK(status);
 
-            const string ns = parseNsCollectionRequired(dbName, cmdObj);
+        shared_ptr<DBConfig> conf = status.getValue();
 
-            auto status = grid.catalogCache()->getDatabase(dbName);
-            uassertStatusOK(status);
+        shared_ptr<Shard> shard;
 
-            shared_ptr<DBConfig> conf = status.getValue();
-
-            shared_ptr<Shard> shard;
-
-            if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-                shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
-            }
-            else {
-                shared_ptr<ChunkManager> chunkMgr = _getChunkManager(conf, ns);
-
-                const BSONObj query = cmdObj.getObjectField("query");
-
-                StatusWith<BSONObj> status = _getShardKey(chunkMgr, query);
-                if (!status.isOK()) {
-                    return status.getStatus();
-                }
-
-                BSONObj shardKey = status.getValue();
-                ChunkPtr chunk = chunkMgr->findIntersectingChunk(shardKey);
-
-                shard = grid.shardRegistry()->getShard(chunk->getShardId());
-            }
-
-            BSONObjBuilder explainCmd;
-            ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmd);
-
-            // Time how long it takes to run the explain command on the shard.
-            Timer timer;
-
-            BSONObjBuilder result;
-            bool ok = _runCommand(conf, shard->getId(), ns, explainCmd.obj(), result);
-            long long millisElapsed = timer.millis();
-
-            if (!ok) {
-                BSONObj res = result.obj();
-                return Status(ErrorCodes::OperationFailed,
-                              str::stream() << "Explain for findAndModify failed: " << res);
-            }
-
-            Strategy::CommandResult cmdResult;
-            cmdResult.shardTargetId = shard->getId();
-            cmdResult.target = shard->getConnString();
-            cmdResult.result = result.obj();
-
-            vector<Strategy::CommandResult> shardResults;
-            shardResults.push_back(cmdResult);
-
-            return ClusterExplain::buildExplainResult(shardResults,
-                                                      ClusterExplain::kSingleShard,
-                                                      millisElapsed,
-                                                      out);
-        }
-
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbName,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
-
-            const string ns = parseNsCollectionRequired(dbName, cmdObj);
-
-            // findAndModify should only be creating database if upsert is true, but this would
-            // require that the parsing be pulled into this function.
-            auto conf = uassertStatusOK(grid.implicitCreateDb(dbName));
-            if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-                return _runCommand(conf, conf->getPrimaryId(), ns, cmdObj, result);
-            }
-
+        if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
+            shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
+        } else {
             shared_ptr<ChunkManager> chunkMgr = _getChunkManager(conf, ns);
 
             const BSONObj query = cmdObj.getObjectField("query");
 
             StatusWith<BSONObj> status = _getShardKey(chunkMgr, query);
             if (!status.isOK()) {
-                // Bad query
-                return appendCommandStatus(result, status.getStatus());
+                return status.getStatus();
             }
 
             BSONObj shardKey = status.getValue();
             ChunkPtr chunk = chunkMgr->findIntersectingChunk(shardKey);
 
-            bool ok = _runCommand(conf, chunk->getShardId(), ns, cmdObj, result);
-            if (ok) {
-                // check whether split is necessary (using update object for size heuristic)
-                if (Chunk::ShouldAutoSplit) {
-                    chunk->splitIfShould(cmdObj.getObjectField("update").objsize());
-                }
-            }
-
-            return ok;
+            shard = grid.shardRegistry()->getShard(chunk->getShardId());
         }
 
-    private:
-        shared_ptr<ChunkManager> _getChunkManager(shared_ptr<DBConfig> conf,
-                                                  const string& ns) const {
+        BSONObjBuilder explainCmd;
+        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmd);
 
-            shared_ptr<ChunkManager> chunkMgr = conf->getChunkManager(ns);
-            massert(13002, "shard internal error chunk manager should never be null", chunkMgr);
+        // Time how long it takes to run the explain command on the shard.
+        Timer timer;
 
-            return chunkMgr;
+        BSONObjBuilder result;
+        bool ok = _runCommand(conf, shard->getId(), ns, explainCmd.obj(), result);
+        long long millisElapsed = timer.millis();
+
+        if (!ok) {
+            BSONObj res = result.obj();
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "Explain for findAndModify failed: " << res);
         }
 
-        StatusWith<BSONObj> _getShardKey(shared_ptr<ChunkManager> chunkMgr,
-                                         const BSONObj& query) const {
+        Strategy::CommandResult cmdResult;
+        cmdResult.shardTargetId = shard->getId();
+        cmdResult.target = shard->getConnString();
+        cmdResult.result = result.obj();
 
-            // Verify that the query has an equality predicate using the shard key
-            StatusWith<BSONObj> status =
-                chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(query);
+        vector<Strategy::CommandResult> shardResults;
+        shardResults.push_back(cmdResult);
 
-            if (!status.isOK()) {
-                return status;
-            }
+        return ClusterExplain::buildExplainResult(
+            shardResults, ClusterExplain::kSingleShard, millisElapsed, out);
+    }
 
-            BSONObj shardKey = status.getValue();
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbName,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        const string ns = parseNsCollectionRequired(dbName, cmdObj);
 
-            if (shardKey.isEmpty()) {
-                return Status(ErrorCodes::ShardKeyNotFound,
-                              "query for sharded findAndModify must have shardkey");
-            }
-
-            return shardKey;
+        // findAndModify should only be creating database if upsert is true, but this would
+        // require that the parsing be pulled into this function.
+        auto conf = uassertStatusOK(grid.implicitCreateDb(dbName));
+        if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
+            return _runCommand(conf, conf->getPrimaryId(), ns, cmdObj, result);
         }
 
-        bool _runCommand(DBConfigPtr conf,
-                         const ShardId& shardId,
-                         const string& ns,
-                         const BSONObj& cmdObj,
-                         BSONObjBuilder& result) const {
+        shared_ptr<ChunkManager> chunkMgr = _getChunkManager(conf, ns);
 
-            BSONObj res;
+        const BSONObj query = cmdObj.getObjectField("query");
 
-            const auto shard = grid.shardRegistry()->getShard(shardId);
-            ShardConnection conn(shard->getConnString(), ns);
-            bool ok = conn->runCommand(conf->name(), cmdObj, res);
-            conn.done();
-
-            // RecvStaleConfigCode is the code for RecvStaleConfigException.
-            if (!ok && res.getIntField("code") == RecvStaleConfigCode) {
-                // Command code traps this exception and re-runs
-                throw RecvStaleConfigException("FindAndModify", res);
-            }
-
-            result.appendElements(res);
-            return ok;
+        StatusWith<BSONObj> status = _getShardKey(chunkMgr, query);
+        if (!status.isOK()) {
+            // Bad query
+            return appendCommandStatus(result, status.getStatus());
         }
 
-    } findAndModifyCmd;
+        BSONObj shardKey = status.getValue();
+        ChunkPtr chunk = chunkMgr->findIntersectingChunk(shardKey);
 
-} // namespace
-} // namespace mongo
+        bool ok = _runCommand(conf, chunk->getShardId(), ns, cmdObj, result);
+        if (ok) {
+            // check whether split is necessary (using update object for size heuristic)
+            if (Chunk::ShouldAutoSplit) {
+                chunk->splitIfShould(cmdObj.getObjectField("update").objsize());
+            }
+        }
+
+        return ok;
+    }
+
+private:
+    shared_ptr<ChunkManager> _getChunkManager(shared_ptr<DBConfig> conf, const string& ns) const {
+        shared_ptr<ChunkManager> chunkMgr = conf->getChunkManager(ns);
+        massert(13002, "shard internal error chunk manager should never be null", chunkMgr);
+
+        return chunkMgr;
+    }
+
+    StatusWith<BSONObj> _getShardKey(shared_ptr<ChunkManager> chunkMgr,
+                                     const BSONObj& query) const {
+        // Verify that the query has an equality predicate using the shard key
+        StatusWith<BSONObj> status = chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(query);
+
+        if (!status.isOK()) {
+            return status;
+        }
+
+        BSONObj shardKey = status.getValue();
+
+        if (shardKey.isEmpty()) {
+            return Status(ErrorCodes::ShardKeyNotFound,
+                          "query for sharded findAndModify must have shardkey");
+        }
+
+        return shardKey;
+    }
+
+    bool _runCommand(DBConfigPtr conf,
+                     const ShardId& shardId,
+                     const string& ns,
+                     const BSONObj& cmdObj,
+                     BSONObjBuilder& result) const {
+        BSONObj res;
+
+        const auto shard = grid.shardRegistry()->getShard(shardId);
+        ShardConnection conn(shard->getConnString(), ns);
+        bool ok = conn->runCommand(conf->name(), cmdObj, res);
+        conn.done();
+
+        // RecvStaleConfigCode is the code for RecvStaleConfigException.
+        if (!ok && res.getIntField("code") == RecvStaleConfigCode) {
+            // Command code traps this exception and re-runs
+            throw RecvStaleConfigException("FindAndModify", res);
+        }
+
+        result.appendElements(res);
+        return ok;
+    }
+
+} findAndModifyCmd;
+
+}  // namespace
+}  // namespace mongo

@@ -41,219 +41,249 @@
 
 namespace mongo {
 
-    class BSONObj;
+class BSONObj;
 
 namespace repl {
 
+/**
+ * Representation of the configuration information about a particular replica set.
+ */
+class ReplicaSetConfig {
+public:
+    typedef std::vector<MemberConfig>::const_iterator MemberIterator;
+
+    static const std::string kVersionFieldName;
+    static const std::string kMajorityWriteConcernModeName;
+
+    static const size_t kMaxMembers = 50;
+    static const size_t kMaxVotingMembers = 7;
+    static const Seconds kDefaultHeartbeatTimeoutPeriod;
+
+    ReplicaSetConfig();
+    std::string asBson() {
+        return "";
+    }
     /**
-     * Representation of the configuration information about a particular replica set.
+     * Initializes this ReplicaSetConfig from the contents of "cfg".
      */
-    class ReplicaSetConfig {
-    public:
-        typedef std::vector<MemberConfig>::const_iterator MemberIterator;
+    Status initialize(const BSONObj& cfg);
 
-        static const std::string kVersionFieldName;
-        static const std::string kMajorityWriteConcernModeName;
+    /**
+     * Returns true if this object has been successfully initialized or copied from
+     * an initialized object.
+     */
+    bool isInitialized() const {
+        return _isInitialized;
+    }
 
-        static const size_t kMaxMembers = 50;
-        static const size_t kMaxVotingMembers = 7;
-        static const Seconds kDefaultHeartbeatTimeoutPeriod;
+    /**
+     * Performs basic consistency checks on the replica set configuration.
+     */
+    Status validate() const;
 
-        ReplicaSetConfig();
-        std::string asBson() { return ""; }
-        /**
-         * Initializes this ReplicaSetConfig from the contents of "cfg".
-         */
-        Status initialize(const BSONObj& cfg);
+    /**
+     * Checks if this configuration can satisfy the given write concern.
+     *
+     * Things that are taken into consideration include:
+     * 1. If the set has enough data-bearing members.
+     * 2. If the write concern mode exists.
+     * 3. If there are enough members for the write concern mode specified.
+     */
+    Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions& writeConcern) const;
 
-        /**
-         * Returns true if this object has been successfully initialized or copied from
-         * an initialized object.
-         */
-        bool isInitialized() const { return _isInitialized; }
+    /**
+     * Gets the version of this configuration.
+     *
+     * The version number sequences configurations of the replica set, so that
+     * nodes may distinguish between "older" and "newer" configurations.
+     */
+    long long getConfigVersion() const {
+        return _version;
+    }
 
-        /**
-         * Performs basic consistency checks on the replica set configuration.
-         */
-        Status validate() const;
+    /**
+     * Gets the name (_id field value) of the replica set described by this configuration.
+     */
+    const std::string& getReplSetName() const {
+        return _replSetName;
+    }
 
-        /**
-         * Checks if this configuration can satisfy the given write concern.
-         *
-         * Things that are taken into consideration include:
-         * 1. If the set has enough data-bearing members.
-         * 2. If the write concern mode exists.
-         * 3. If there are enough members for the write concern mode specified.
-         */
-        Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions& writeConcern) const;
+    /**
+     * Gets the number of members in this configuration.
+     */
+    int getNumMembers() const {
+        return _members.size();
+    }
 
-        /**
-         * Gets the version of this configuration.
-         *
-         * The version number sequences configurations of the replica set, so that
-         * nodes may distinguish between "older" and "newer" configurations.
-         */
-        long long getConfigVersion() const { return _version; }
+    /**
+     * Gets a begin iterator over the MemberConfigs stored in this ReplicaSetConfig.
+     */
+    MemberIterator membersBegin() const {
+        return _members.begin();
+    }
 
-        /**
-         * Gets the name (_id field value) of the replica set described by this configuration.
-         */
-        const std::string& getReplSetName() const { return _replSetName; }
+    /**
+     * Gets an end iterator over the MemberConfigs stored in this ReplicaSetConfig.
+     */
+    MemberIterator membersEnd() const {
+        return _members.end();
+    }
 
-        /**
-         * Gets the number of members in this configuration.
-         */
-        int getNumMembers() const { return _members.size(); }
+    /**
+     * Access a MemberConfig element by index.
+     */
+    const MemberConfig& getMemberAt(size_t i) const;
 
-        /**
-         * Gets a begin iterator over the MemberConfigs stored in this ReplicaSetConfig.
-         */
-        MemberIterator membersBegin() const { return _members.begin(); }
+    /**
+     * Returns a pointer to the MemberConfig corresponding to the member with the given _id in
+     * the config, or NULL if there is no member with that ID.
+     */
+    const MemberConfig* findMemberByID(int id) const;
 
-        /**
-         * Gets an end iterator over the MemberConfigs stored in this ReplicaSetConfig.
-         */
-        MemberIterator membersEnd() const { return _members.end(); }
+    /**
+     * Returns a pointer to the MemberConfig corresponding to the member with the given
+     * HostAndPort in the config, or NULL if there is no member with that address.
+     */
+    const MemberConfig* findMemberByHostAndPort(const HostAndPort& hap) const;
 
-        /**
-         * Access a MemberConfig element by index.
-         */
-        const MemberConfig& getMemberAt(size_t i) const;
+    /**
+     * Returns a MemberConfig index position corresponding to the member with the given
+     * HostAndPort in the config, or -1 if there is no member with that address.
+     */
+    const int findMemberIndexByHostAndPort(const HostAndPort& hap) const;
 
-        /**
-         * Returns a pointer to the MemberConfig corresponding to the member with the given _id in
-         * the config, or NULL if there is no member with that ID.
-         */
-        const MemberConfig* findMemberByID(int id) const;
+    /**
+     * Returns a MemberConfig index position corresponding to the member with the given
+     * _id in the config, or -1 if there is no member with that address.
+     */
+    const int findMemberIndexByConfigId(long long configId) const;
 
-        /**
-         * Returns a pointer to the MemberConfig corresponding to the member with the given
-         * HostAndPort in the config, or NULL if there is no member with that address.
-         */
-        const MemberConfig* findMemberByHostAndPort(const HostAndPort& hap) const;
+    /**
+     * Gets the default write concern for the replica set described by this configuration.
+     */
+    const WriteConcernOptions& getDefaultWriteConcern() const {
+        return _defaultWriteConcern;
+    }
 
-        /**
-         * Returns a MemberConfig index position corresponding to the member with the given
-         * HostAndPort in the config, or -1 if there is no member with that address.
-         */
-        const int findMemberIndexByHostAndPort(const HostAndPort& hap) const;
+    /**
+     * Gets the amount of time to wait for a response to hearbeats sent to other
+     * nodes in the replica set.
+     */
+    Seconds getHeartbeatTimeoutPeriod() const {
+        return _heartbeatTimeoutPeriod;
+    }
 
-        /**
-         * Returns a MemberConfig index position corresponding to the member with the given
-         * _id in the config, or -1 if there is no member with that address.
-         */
-        const int findMemberIndexByConfigId(long long configId) const;
+    /**
+     * Gets the amount of time to wait for a response to hearbeats sent to other
+     * nodes in the replica set, as above, but returns a Milliseconds instead of
+     * Seconds object.
+     */
+    Milliseconds getHeartbeatTimeoutPeriodMillis() const {
+        return _heartbeatTimeoutPeriod;
+    }
 
-        /**
-         * Gets the default write concern for the replica set described by this configuration.
-         */
-        const WriteConcernOptions& getDefaultWriteConcern() const { return _defaultWriteConcern; }
+    /**
+     * Gets the number of votes required to win an election.
+     */
+    int getMajorityVoteCount() const {
+        return _majorityVoteCount;
+    }
 
-        /**
-         * Gets the amount of time to wait for a response to hearbeats sent to other
-         * nodes in the replica set.
-         */
-        Seconds getHeartbeatTimeoutPeriod() const { return _heartbeatTimeoutPeriod; }
+    /**
+     * Gets the number of voters.
+     */
+    int getTotalVotingMembers() const {
+        return _totalVotingMembers;
+    }
 
-        /**
-         * Gets the amount of time to wait for a response to hearbeats sent to other
-         * nodes in the replica set, as above, but returns a Milliseconds instead of
-         * Seconds object.
-         */
-        Milliseconds getHeartbeatTimeoutPeriodMillis() const {
-            return _heartbeatTimeoutPeriod;
-        }
+    /**
+     * Returns true if automatic (not explicitly set) chaining is allowed.
+     */
+    bool isChainingAllowed() const {
+        return _chainingAllowed;
+    }
 
-        /**
-         * Gets the number of votes required to win an election.
-         */
-        int getMajorityVoteCount() const { return _majorityVoteCount; }
+    /**
+     * Returns a ReplicaSetTag with the given "key" and "value", or an invalid
+     * tag if the configuration describes no such tag.
+     */
+    ReplicaSetTag findTag(StringData key, StringData value) const;
 
-        /**
-         * Gets the number of voters.
-         */
-        int getTotalVotingMembers() const { return _totalVotingMembers; }
+    /**
+     * Returns the pattern corresponding to "patternName" in this configuration.
+     * If "patternName" is not a valid pattern in this configuration, returns
+     * ErrorCodes::NoSuchKey.
+     */
+    StatusWith<ReplicaSetTagPattern> findCustomWriteMode(StringData patternName) const;
 
-        /**
-         * Returns true if automatic (not explicitly set) chaining is allowed.
-         */
-        bool isChainingAllowed() const { return _chainingAllowed; }
+    /**
+     * Returns the "tags configuration" for this replicaset.
+     *
+     * NOTE(schwerin): Not clear if this should be used other than for reporting/debugging.
+     */
+    const ReplicaSetTagConfig& getTagConfig() const {
+        return _tagConfig;
+    }
 
-        /**
-         * Returns a ReplicaSetTag with the given "key" and "value", or an invalid
-         * tag if the configuration describes no such tag.
-         */
-        ReplicaSetTag findTag(StringData key, StringData value) const;
+    /**
+     * Returns the config as a BSONObj.
+     */
+    BSONObj toBSON() const;
 
-        /**
-         * Returns the pattern corresponding to "patternName" in this configuration.
-         * If "patternName" is not a valid pattern in this configuration, returns
-         * ErrorCodes::NoSuchKey.
-         */
-        StatusWith<ReplicaSetTagPattern> findCustomWriteMode(StringData patternName) const;
+    /**
+     * Returns a vector of strings which are the names of the WriteConcernModes.
+     * Currently used in unit tests to compare two configs.
+     */
+    std::vector<std::string> getWriteConcernNames() const;
 
-        /**
-         * Returns the "tags configuration" for this replicaset.
-         *
-         * NOTE(schwerin): Not clear if this should be used other than for reporting/debugging.
-         */
-        const ReplicaSetTagConfig& getTagConfig() const { return _tagConfig; }
+    /**
+     * Returns the number of voting data-bearing members that must acknowledge a write
+     * in order to satisfy a write concern of {w: "majority"}.
+     */
+    int getWriteMajority() const {
+        return _writeMajority;
+    }
 
-        /**
-         * Returns the config as a BSONObj.
-         */
-        BSONObj toBSON() const;
+    /**
+     * Gets the protocol version for this configuration.
+     *
+     * The protocol version number currently determines what election protocol is used by the
+     * cluster; 0 is the default and indicates the old 3.0 election protocol.
+     */
+    long long getProtocolVersion() const {
+        return _protocolVersion;
+    }
 
-        /**
-         * Returns a vector of strings which are the names of the WriteConcernModes.
-         * Currently used in unit tests to compare two configs.
-         */
-        std::vector<std::string> getWriteConcernNames() const;
+private:
+    /**
+     * Parses the "settings" subdocument of a replica set configuration.
+     */
+    Status _parseSettingsSubdocument(const BSONObj& settings);
 
-        /**
-         * Returns the number of voting data-bearing members that must acknowledge a write
-         * in order to satisfy a write concern of {w: "majority"}.
-         */
-        int getWriteMajority() const { return _writeMajority; }
+    /**
+     * Calculates and stores the majority for electing a primary (_majorityVoteCount).
+     */
+    void _calculateMajorities();
 
-        /**
-         * Gets the protocol version for this configuration.
-         *
-         * The protocol version number currently determines what election protocol is used by the
-         * cluster; 0 is the default and indicates the old 3.0 election protocol.
-         */
-        long long getProtocolVersion() const { return _protocolVersion; }
+    /**
+     * Adds internal write concern modes to the getLastErrorModes list.
+     */
+    void _addInternalWriteConcernModes();
 
-    private:
-        /**
-         * Parses the "settings" subdocument of a replica set configuration.
-         */
-        Status _parseSettingsSubdocument(const BSONObj& settings);
-
-        /**
-         * Calculates and stores the majority for electing a primary (_majorityVoteCount).
-         */
-        void _calculateMajorities();
-
-        /**
-         * Adds internal write concern modes to the getLastErrorModes list.
-         */
-        void _addInternalWriteConcernModes();
-
-        bool _isInitialized;
-        long long _version;
-        std::string _replSetName;
-        std::vector<MemberConfig> _members;
-        WriteConcernOptions _defaultWriteConcern;
-        Seconds _heartbeatTimeoutPeriod;
-        bool _chainingAllowed;
-        int _majorityVoteCount;
-        int _writeMajority;
-        int _totalVotingMembers;
-        ReplicaSetTagConfig _tagConfig;
-        StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
-        long long _protocolVersion;
-    };
+    bool _isInitialized;
+    long long _version;
+    std::string _replSetName;
+    std::vector<MemberConfig> _members;
+    WriteConcernOptions _defaultWriteConcern;
+    Seconds _heartbeatTimeoutPeriod;
+    bool _chainingAllowed;
+    int _majorityVoteCount;
+    int _writeMajority;
+    int _totalVotingMembers;
+    ReplicaSetTagConfig _tagConfig;
+    StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
+    long long _protocolVersion;
+};
 
 
 }  // namespace repl

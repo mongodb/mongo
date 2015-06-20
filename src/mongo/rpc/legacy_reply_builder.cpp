@@ -38,91 +38,88 @@
 namespace mongo {
 namespace rpc {
 
-    LegacyReplyBuilder::LegacyReplyBuilder()
-        : LegacyReplyBuilder(stdx::make_unique<Message>())
-    {}
+LegacyReplyBuilder::LegacyReplyBuilder() : LegacyReplyBuilder(stdx::make_unique<Message>()) {}
 
-    LegacyReplyBuilder::LegacyReplyBuilder(std::unique_ptr<Message> message)
-        : _message{std::move(message)} {
-        _builder.skip(sizeof(QueryResult::Value));
+LegacyReplyBuilder::LegacyReplyBuilder(std::unique_ptr<Message> message)
+    : _message{std::move(message)} {
+    _builder.skip(sizeof(QueryResult::Value));
+}
+
+LegacyReplyBuilder::~LegacyReplyBuilder() {}
+
+LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(BSONObj metadata) {
+    invariant(_state == State::kMetadata);
+    _metadata = std::move(metadata);
+    _state = State::kCommandReply;
+    return *this;
+}
+
+LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(BSONObj commandReply) {
+    invariant(_state == State::kCommandReply);
+    BSONObj downconvertedCommandReply = uassertStatusOK(
+        rpc::downconvertReplyMetadata(std::move(commandReply), std::move(_metadata)));
+    downconvertedCommandReply.appendSelfToBufBuilder(_builder);
+    _state = State::kOutputDocs;
+    return *this;
+}
+
+LegacyReplyBuilder& LegacyReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
+    invariant(_state == State::kOutputDocs);
+    // no op
+    return *this;
+}
+
+LegacyReplyBuilder& LegacyReplyBuilder::addOutputDoc(BSONObj outputDoc) {
+    invariant(_state == State::kOutputDocs);
+    // no op
+    return *this;
+}
+
+ReplyBuilderInterface::State LegacyReplyBuilder::getState() const {
+    return _state;
+}
+
+Protocol LegacyReplyBuilder::getProtocol() const {
+    return rpc::Protocol::kOpQuery;
+}
+
+void LegacyReplyBuilder::reset() {
+    // If we are in State::kMetadata, we are already in the 'start' state, so by
+    // immediately returning, we save a heap allocation.
+    if (_state == State::kMetadata) {
+        return;
     }
-
-    LegacyReplyBuilder::~LegacyReplyBuilder() {}
-
-    LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(BSONObj metadata) {
-        invariant(_state == State::kMetadata);
-        _metadata = std::move(metadata);
-        _state = State::kCommandReply;
-        return *this;
-    }
-
-    LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(BSONObj commandReply) {
-        invariant(_state == State::kCommandReply);
-        BSONObj downconvertedCommandReply = uassertStatusOK(
-            rpc::downconvertReplyMetadata(std::move(commandReply), std::move(_metadata))
-        );
-        downconvertedCommandReply.appendSelfToBufBuilder(_builder);
-        _state = State::kOutputDocs;
-        return *this;
-    }
-
-    LegacyReplyBuilder& LegacyReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
-        invariant(_state == State::kOutputDocs);
-        // no op
-        return *this;
-    }
-
-    LegacyReplyBuilder& LegacyReplyBuilder::addOutputDoc(BSONObj outputDoc) {
-        invariant(_state == State::kOutputDocs);
-        // no op
-        return *this;
-    }
-
-    ReplyBuilderInterface::State LegacyReplyBuilder::getState() const {
-        return _state;
-    }
-
-    Protocol LegacyReplyBuilder::getProtocol() const {
-        return rpc::Protocol::kOpQuery;
-    }
-
-    void LegacyReplyBuilder::reset() {
-        // If we are in State::kMetadata, we are already in the 'start' state, so by
-        // immediately returning, we save a heap allocation.
-        if (_state == State::kMetadata) {
-            return;
-        }
-        _builder.reset();
-        _metadata = BSONObj();
-        _message = stdx::make_unique<Message>();
-        _state = State::kMetadata;
-    }
+    _builder.reset();
+    _metadata = BSONObj();
+    _message = stdx::make_unique<Message>();
+    _state = State::kMetadata;
+}
 
 
-    std::unique_ptr<Message> LegacyReplyBuilder::done() {
-        invariant(_state == State::kOutputDocs);
-        std::unique_ptr<Message> message = stdx::make_unique<Message>();
+std::unique_ptr<Message> LegacyReplyBuilder::done() {
+    invariant(_state == State::kOutputDocs);
+    std::unique_ptr<Message> message = stdx::make_unique<Message>();
 
-        QueryResult::View qr = _builder.buf();
-        qr.setResultFlagsToOk();
-        qr.msgdata().setLen(_builder.len());
-        qr.msgdata().setOperation(opReply);
-        qr.setCursorId(0);
-        qr.setStartingFrom(0);
-        qr.setNReturned(1);
-        _builder.decouple();
+    QueryResult::View qr = _builder.buf();
+    qr.setResultFlagsToOk();
+    qr.msgdata().setLen(_builder.len());
+    qr.msgdata().setOperation(opReply);
+    qr.setCursorId(0);
+    qr.setStartingFrom(0);
+    qr.setNReturned(1);
+    _builder.decouple();
 
-        message->setData(qr.view2ptr(), true);
+    message->setData(qr.view2ptr(), true);
 
-        _state = State::kDone;
-        return std::move(message);
-    }
+    _state = State::kDone;
+    return std::move(message);
+}
 
-    std::size_t LegacyReplyBuilder::availableSpaceForOutputDocs() const {
-        invariant (State::kDone != _state);
-        // LegacyReplyBuilder currently does not support addOutputDoc(s)
-        return 0u;
-    }
+std::size_t LegacyReplyBuilder::availableSpaceForOutputDocs() const {
+    invariant(State::kDone != _state);
+    // LegacyReplyBuilder currently does not support addOutputDoc(s)
+    return 0u;
+}
 
 }  // namespace rpc
 }  // namespace mongo

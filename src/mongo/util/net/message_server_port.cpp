@@ -55,7 +55,7 @@
 #include "mongo/util/scopeguard.h"
 
 #ifdef __linux__  // TODO: consider making this ifndef _WIN32
-# include <sys/resource.h>
+#include <sys/resource.h>
 #endif
 
 #if !defined(__has_feature)
@@ -64,206 +64,205 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::endl;
+using std::unique_ptr;
+using std::endl;
 
 namespace {
 
-    class MessagingPortWithHandler : public MessagingPort {
-        MONGO_DISALLOW_COPYING(MessagingPortWithHandler);
+class MessagingPortWithHandler : public MessagingPort {
+    MONGO_DISALLOW_COPYING(MessagingPortWithHandler);
 
-    public:
-        MessagingPortWithHandler(const std::shared_ptr<Socket>& socket,
-                                 MessageHandler* handler,
-                                 long long connectionId)
-            : MessagingPort(socket), _handler(handler) {
-            setConnectionId(connectionId);
-        }
+public:
+    MessagingPortWithHandler(const std::shared_ptr<Socket>& socket,
+                             MessageHandler* handler,
+                             long long connectionId)
+        : MessagingPort(socket), _handler(handler) {
+        setConnectionId(connectionId);
+    }
 
-        MessageHandler* getHandler() const { return _handler; }
+    MessageHandler* getHandler() const {
+        return _handler;
+    }
 
-    private:
-        // Not owned.
-        MessageHandler* const _handler;
-    };
+private:
+    // Not owned.
+    MessageHandler* const _handler;
+};
 
 }  // namespace
 
-    class PortMessageServer : public MessageServer , public Listener {
-    public:
-        /**
-         * Creates a new message server.
-         *
-         * @param opts
-         * @param handler the handler to use. Caller is responsible for managing this object
-         *     and should make sure that it lives longer than this server.
-         */
-        PortMessageServer(  const MessageServer::Options& opts, MessageHandler * handler ) :
-            Listener( "" , opts.ipList, opts.port ), _handler(handler) {
+class PortMessageServer : public MessageServer, public Listener {
+public:
+    /**
+     * Creates a new message server.
+     *
+     * @param opts
+     * @param handler the handler to use. Caller is responsible for managing this object
+     *     and should make sure that it lives longer than this server.
+     */
+    PortMessageServer(const MessageServer::Options& opts, MessageHandler* handler)
+        : Listener("", opts.ipList, opts.port), _handler(handler) {}
+
+    virtual void accepted(std::shared_ptr<Socket> psocket, long long connectionId) {
+        ScopeGuard sleepAfterClosingPort = MakeGuard(sleepmillis, 2);
+        std::unique_ptr<MessagingPortWithHandler> portWithHandler(
+            new MessagingPortWithHandler(psocket, _handler, connectionId));
+
+        if (!Listener::globalTicketHolder.tryAcquire()) {
+            log() << "connection refused because too many open connections: "
+                  << Listener::globalTicketHolder.used() << endl;
+            return;
         }
 
-        virtual void accepted(std::shared_ptr<Socket> psocket, long long connectionId ) {
-            ScopeGuard sleepAfterClosingPort = MakeGuard(sleepmillis, 2);
-            std::unique_ptr<MessagingPortWithHandler> portWithHandler(
-                new MessagingPortWithHandler(psocket, _handler, connectionId));
+        try {
+#ifndef __linux__  // TODO: consider making this ifdef _WIN32
+            { stdx::thread thr(stdx::bind(&handleIncomingMsg, portWithHandler.get())); }
+#else
+            pthread_attr_t attrs;
+            pthread_attr_init(&attrs);
+            pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_DETACHED);
 
-            if ( ! Listener::globalTicketHolder.tryAcquire() ) {
-                log() << "connection refused because too many open connections: " << Listener::globalTicketHolder.used() << endl;
-                return;
+            static const size_t STACK_SIZE =
+                1024 * 1024;  // if we change this we need to update the warning
+
+            struct rlimit limits;
+            verify(getrlimit(RLIMIT_STACK, &limits) == 0);
+            if (limits.rlim_cur > STACK_SIZE) {
+                size_t stackSizeToSet = STACK_SIZE;
+#if !__has_feature(address_sanitizer)
+                if (kDebugBuild)
+                    stackSizeToSet /= 2;
+#endif
+                pthread_attr_setstacksize(&attrs, stackSizeToSet);
+            } else if (limits.rlim_cur < 1024 * 1024) {
+                warning() << "Stack size set to " << (limits.rlim_cur / 1024)
+                          << "KB. We suggest 1MB" << endl;
             }
 
-            try {
-#ifndef __linux__  // TODO: consider making this ifdef _WIN32
-                {
-                    stdx::thread thr(stdx::bind(&handleIncomingMsg, portWithHandler.get()));
-                }
-#else
-                pthread_attr_t attrs;
-                pthread_attr_init(&attrs);
-                pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_DETACHED);
 
-                static const size_t STACK_SIZE = 1024*1024; // if we change this we need to update the warning
+            pthread_t thread;
+            int failed = pthread_create(&thread, &attrs, &handleIncomingMsg, portWithHandler.get());
 
-                struct rlimit limits;
-                verify(getrlimit(RLIMIT_STACK, &limits) == 0);
-                if (limits.rlim_cur > STACK_SIZE) {
-                    size_t stackSizeToSet = STACK_SIZE;
-#if !__has_feature(address_sanitizer)
-                    if (kDebugBuild)
-                        stackSizeToSet /= 2;
-#endif
-                    pthread_attr_setstacksize(&attrs, stackSizeToSet);
-                } else if (limits.rlim_cur < 1024*1024) {
-                    warning() << "Stack size set to " << (limits.rlim_cur/1024) << "KB. We suggest 1MB" << endl;
-                }
+            pthread_attr_destroy(&attrs);
 
-
-                pthread_t thread;
-                int failed =
-                    pthread_create(&thread, &attrs, &handleIncomingMsg, portWithHandler.get());
-
-                pthread_attr_destroy(&attrs);
-
-                if (failed) {
-                    log() << "pthread_create failed: " << errnoWithDescription(failed) << endl;
-                    throw boost::thread_resource_error(); // for consistency with boost::thread
-                }
+            if (failed) {
+                log() << "pthread_create failed: " << errnoWithDescription(failed) << endl;
+                throw boost::thread_resource_error();  // for consistency with boost::thread
+            }
 #endif  // __linux__
 
-                portWithHandler.release();
-                sleepAfterClosingPort.Dismiss();
-            }
-            catch ( boost::thread_resource_error& ) {
-                Listener::globalTicketHolder.release();
-                log() << "can't create new thread, closing connection" << endl;
-            }
-            catch ( ... ) {
-                Listener::globalTicketHolder.release();
-                log() << "unknown error accepting new socket" << endl;
-            }
+            portWithHandler.release();
+            sleepAfterClosingPort.Dismiss();
+        } catch (boost::thread_resource_error&) {
+            Listener::globalTicketHolder.release();
+            log() << "can't create new thread, closing connection" << endl;
+        } catch (...) {
+            Listener::globalTicketHolder.release();
+            log() << "unknown error accepting new socket" << endl;
         }
+    }
 
-        virtual void setAsTimeTracker() {
-            Listener::setAsTimeTracker();
-        }
+    virtual void setAsTimeTracker() {
+        Listener::setAsTimeTracker();
+    }
 
-        virtual void setupSockets() {
-            Listener::setupSockets();
-        }
+    virtual void setupSockets() {
+        Listener::setupSockets();
+    }
 
-        void run() {
-            initAndListen();
-        }
+    void run() {
+        initAndListen();
+    }
 
-        virtual bool useUnixSockets() const { return true; }
+    virtual bool useUnixSockets() const {
+        return true;
+    }
 
-    private:
-        MessageHandler* _handler;
+private:
+    MessageHandler* _handler;
 
-        /**
-         * Handles incoming messages from a given socket.
-         *
-         * Terminating conditions:
-         * 1. Assertions while handling the request.
-         * 2. Socket is closed.
-         * 3. Server is shutting down (based on inShutdown)
-         *
-         * @param arg this method is in charge of cleaning up the arg object.
-         *
-         * @return NULL
-         */
-        static void* handleIncomingMsg(void* arg) {
-            TicketHolderReleaser connTicketReleaser( &Listener::globalTicketHolder );
+    /**
+     * Handles incoming messages from a given socket.
+     *
+     * Terminating conditions:
+     * 1. Assertions while handling the request.
+     * 2. Socket is closed.
+     * 3. Server is shutting down (based on inShutdown)
+     *
+     * @param arg this method is in charge of cleaning up the arg object.
+     *
+     * @return NULL
+     */
+    static void* handleIncomingMsg(void* arg) {
+        TicketHolderReleaser connTicketReleaser(&Listener::globalTicketHolder);
 
-            invariant(arg);
-            unique_ptr<MessagingPortWithHandler> portWithHandler(
-                static_cast<MessagingPortWithHandler*>(arg));
-            MessageHandler* const handler = portWithHandler->getHandler();
+        invariant(arg);
+        unique_ptr<MessagingPortWithHandler> portWithHandler(
+            static_cast<MessagingPortWithHandler*>(arg));
+        MessageHandler* const handler = portWithHandler->getHandler();
 
-            setThreadName(std::string(str::stream() << "conn" << portWithHandler->connectionId()));
-            portWithHandler->psock->setLogLevel(logger::LogSeverity::Debug(1));
+        setThreadName(std::string(str::stream() << "conn" << portWithHandler->connectionId()));
+        portWithHandler->psock->setLogLevel(logger::LogSeverity::Debug(1));
 
-            Message m;
-            int64_t counter = 0;
-            try {
-                handler->connected(portWithHandler.get());
+        Message m;
+        int64_t counter = 0;
+        try {
+            handler->connected(portWithHandler.get());
 
-                while ( ! inShutdown() ) {
-                    m.reset();
-                    portWithHandler->psock->clearCounters();
+            while (!inShutdown()) {
+                m.reset();
+                portWithHandler->psock->clearCounters();
 
-                    if (!portWithHandler->recv(m)) {
-                        if (!serverGlobalParams.quiet) {
-                            int conns = Listener::globalTicketHolder.used()-1;
-                            const char* word = (conns == 1 ? " connection" : " connections");
-                            log() << "end connection " << portWithHandler->psock->remoteString()
-                                  << " (" << conns << word << " now open)" << endl;
-                        }
-                        portWithHandler->shutdown();
-                        break;
+                if (!portWithHandler->recv(m)) {
+                    if (!serverGlobalParams.quiet) {
+                        int conns = Listener::globalTicketHolder.used() - 1;
+                        const char* word = (conns == 1 ? " connection" : " connections");
+                        log() << "end connection " << portWithHandler->psock->remoteString() << " ("
+                              << conns << word << " now open)" << endl;
                     }
+                    portWithHandler->shutdown();
+                    break;
+                }
 
-                    handler->process(m, portWithHandler.get());
-                    networkCounter.hit(portWithHandler->psock->getBytesIn(),
-                                       portWithHandler->psock->getBytesOut());
+                handler->process(m, portWithHandler.get());
+                networkCounter.hit(portWithHandler->psock->getBytesIn(),
+                                   portWithHandler->psock->getBytesOut());
 
-                    // Occasionally we want to see if we're using too much memory.
-                    if ((counter++ & 0xf) == 0) {
-                        markThreadIdle();
-                    }
+                // Occasionally we want to see if we're using too much memory.
+                if ((counter++ & 0xf) == 0) {
+                    markThreadIdle();
                 }
             }
-            catch ( AssertionException& e ) {
-                log() << "AssertionException handling request, closing client connection: " << e << endl;
-                portWithHandler->shutdown();
-            }
-            catch ( SocketException& e ) {
-                log() << "SocketException handling request, closing client connection: " << e << endl;
-                portWithHandler->shutdown();
-            }
-            catch ( const DBException& e ) { // must be right above std::exception to avoid catching subclasses
-                log() << "DBException handling request, closing client connection: " << e << endl;
-                portWithHandler->shutdown();
-            }
-            catch ( std::exception &e ) {
-                error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
-                dbexit( EXIT_UNCAUGHT );
-            }
+        } catch (AssertionException& e) {
+            log() << "AssertionException handling request, closing client connection: " << e
+                  << endl;
+            portWithHandler->shutdown();
+        } catch (SocketException& e) {
+            log() << "SocketException handling request, closing client connection: " << e << endl;
+            portWithHandler->shutdown();
+        } catch (const DBException&
+                     e) {  // must be right above std::exception to avoid catching subclasses
+            log() << "DBException handling request, closing client connection: " << e << endl;
+            portWithHandler->shutdown();
+        } catch (std::exception& e) {
+            error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
+            dbexit(EXIT_UNCAUGHT);
+        }
 
-            // Normal disconnect path.
+// Normal disconnect path.
 #ifdef MONGO_CONFIG_SSL
-            SSLManagerInterface* manager = getSSLManager();
-            if (manager)
-                manager->cleanupThreadLocals();
+        SSLManagerInterface* manager = getSSLManager();
+        if (manager)
+            manager->cleanupThreadLocals();
 #endif
 
-            return NULL;
-        }
-    };
-
-
-    MessageServer * createServer( const MessageServer::Options& opts , MessageHandler * handler ) {
-        return new PortMessageServer( opts , handler );
+        return NULL;
     }
+};
+
+
+MessageServer* createServer(const MessageServer::Options& opts, MessageHandler* handler) {
+    return new PortMessageServer(opts, handler);
+}
 
 }  // namespace mongo

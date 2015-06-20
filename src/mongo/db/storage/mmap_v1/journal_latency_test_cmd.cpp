@@ -54,102 +54,108 @@
 
 namespace mongo {
 
-    using std::max;
-    using std::min;
-    using std::string;
-    using std::stringstream;
+using std::max;
+using std::min;
+using std::string;
+using std::stringstream;
 
-    namespace dur {
-        boost::filesystem::path getJournalDir();
+namespace dur {
+boost::filesystem::path getJournalDir();
+}
+
+// Testing-only, enabled via command line
+class JournalLatencyTestCmd : public Command {
+public:
+    JournalLatencyTestCmd() : Command("journalLatencyTest") {}
+
+    virtual bool slaveOk() const {
+        return true;
     }
-
-    // Testing-only, enabled via command line
-    class JournalLatencyTestCmd : public Command {
-    public:
-        JournalLatencyTestCmd() : Command( "journalLatencyTest" ) {}
-
-        virtual bool slaveOk() const { return true; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual bool adminOnly() const { return true; }
-        virtual void help(stringstream& h) const { h << "test how long to write and fsync to a test file in the journal/ directory"; }
-        // No auth needed because it only works when enabled via command line.
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {}
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            boost::filesystem::path p = dur::getJournalDir();
-            p /= "journalLatencyTest";
-        
-            // remove file if already present
-            try { 
-                boost::filesystem::remove(p);
-            }
-            catch(...) { }
-
-            BSONObjBuilder bb[2];
-            for( int pass = 0; pass < 2; pass++ ) {
-                LogFile f(p.string());
-                AlignedBuilder b(1024 * 1024);
-                {
-                    Timer t;
-                    for( int i = 0 ; i < 100; i++ ) { 
-                        f.synchronousAppend(b.buf(), 8192);
-                    }
-                    bb[pass].append("8KB", t.millis() / 100.0);
-                }
-                {
-                    const int N = 50;
-                    Timer t2;
-                    long long x = 0;
-                    for( int i = 0 ; i < N; i++ ) { 
-                        Timer t;
-                        f.synchronousAppend(b.buf(), 8192);
-                        x += t.micros();
-                        sleepmillis(4);
-                    }
-                    long long y = t2.micros() - 4*N*1000;
-                    // not really trusting the timer granularity on all platforms so whichever is higher of x and y
-                    bb[pass].append("8KBWithPauses", max(x,y) / (N*1000.0));
-                }
-                {
-                    Timer t;
-                    for( int i = 0 ; i < 20; i++ ) { 
-                        f.synchronousAppend(b.buf(), 1024 * 1024);
-                    }
-                    bb[pass].append("1MB", t.millis() / 20.0);
-                }
-                // second time around, we are prealloced.
-            }
-            result.append("timeMillis", bb[0].obj());
-            result.append("timeMillisWithPrealloc", bb[1].obj());
-
-            try { 
-                remove(p);
-            }
-            catch(...) { }
-
-            try {
-                result.append("onSamePartition", onSamePartition(dur::getJournalDir().string(),
-                                                                 storageGlobalParams.dbpath));
-            }
-            catch(...) { }
-
-            return 1;
-        }
-    };
-    MONGO_INITIALIZER(RegisterJournalLatencyTestCmd)(InitializerContext* context) {
-        if (Command::testCommandsEnabled) {
-            // Leaked intentionally: a Command registers itself when constructed.
-            new JournalLatencyTestCmd();
-        }
-        return Status::OK();
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
     }
+    virtual bool adminOnly() const {
+        return true;
+    }
+    virtual void help(stringstream& h) const {
+        h << "test how long to write and fsync to a test file in the journal/ directory";
+    }
+    // No auth needed because it only works when enabled via command line.
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {}
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        boost::filesystem::path p = dur::getJournalDir();
+        p /= "journalLatencyTest";
 
+        // remove file if already present
+        try {
+            boost::filesystem::remove(p);
+        } catch (...) {
+        }
 
+        BSONObjBuilder bb[2];
+        for (int pass = 0; pass < 2; pass++) {
+            LogFile f(p.string());
+            AlignedBuilder b(1024 * 1024);
+            {
+                Timer t;
+                for (int i = 0; i < 100; i++) {
+                    f.synchronousAppend(b.buf(), 8192);
+                }
+                bb[pass].append("8KB", t.millis() / 100.0);
+            }
+            {
+                const int N = 50;
+                Timer t2;
+                long long x = 0;
+                for (int i = 0; i < N; i++) {
+                    Timer t;
+                    f.synchronousAppend(b.buf(), 8192);
+                    x += t.micros();
+                    sleepmillis(4);
+                }
+                long long y = t2.micros() - 4 * N * 1000;
+                // not really trusting the timer granularity on all platforms so whichever is higher of x and y
+                bb[pass].append("8KBWithPauses", max(x, y) / (N * 1000.0));
+            }
+            {
+                Timer t;
+                for (int i = 0; i < 20; i++) {
+                    f.synchronousAppend(b.buf(), 1024 * 1024);
+                }
+                bb[pass].append("1MB", t.millis() / 20.0);
+            }
+            // second time around, we are prealloced.
+        }
+        result.append("timeMillis", bb[0].obj());
+        result.append("timeMillisWithPrealloc", bb[1].obj());
 
+        try {
+            remove(p);
+        } catch (...) {
+        }
+
+        try {
+            result.append(
+                "onSamePartition",
+                onSamePartition(dur::getJournalDir().string(), storageGlobalParams.dbpath));
+        } catch (...) {
+        }
+
+        return 1;
+    }
+};
+MONGO_INITIALIZER(RegisterJournalLatencyTestCmd)(InitializerContext* context) {
+    if (Command::testCommandsEnabled) {
+        // Leaked intentionally: a Command registers itself when constructed.
+        new JournalLatencyTestCmd();
+    }
+    return Status::OK();
+}
 }

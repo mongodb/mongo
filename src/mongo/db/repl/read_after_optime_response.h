@@ -35,57 +35,55 @@
 
 namespace mongo {
 
-    class BSONObjBuilder;
+class BSONObjBuilder;
 
 namespace repl {
 
-    class ReadAfterOpTimeResponse {
-    public:
-        static const std::string kWaitedMSFieldName;
+class ReadAfterOpTimeResponse {
+public:
+    static const std::string kWaitedMSFieldName;
 
-        /**
-         * Constructs a default response that has OK status, and wait is false.
-         */
-        ReadAfterOpTimeResponse();
+    /**
+     * Constructs a default response that has OK status, and wait is false.
+     */
+    ReadAfterOpTimeResponse();
 
-        /**
-         * Constructs a response with the given status with wait equals to false.
-         */
-        explicit ReadAfterOpTimeResponse(Status status);
+    /**
+     * Constructs a response with the given status with wait equals to false.
+     */
+    explicit ReadAfterOpTimeResponse(Status status);
 
-        /**
-         * Constructs a response with wait set to true along with the given parameters.
-         */
-        ReadAfterOpTimeResponse(Status status, stdx::chrono::milliseconds duration);
+    /**
+     * Constructs a response with wait set to true along with the given parameters.
+     */
+    ReadAfterOpTimeResponse(Status status, stdx::chrono::milliseconds duration);
 
-        /**
-         * Appends to the builder the timeout and duration info if didWait() is true.
-         * Note: does not include status.
-         */
-        void appendInfo(BSONObjBuilder* builder);
+    /**
+     * Appends to the builder the timeout and duration info if didWait() is true.
+     * Note: does not include status.
+     */
+    void appendInfo(BSONObjBuilder* builder);
 
-        bool didWait() const;
+    bool didWait() const;
 
-        /**
-         * Returns the amount of duration waiting for opTime to pass.
-         * Valid only if didWait is true.
-         */
-        stdx::chrono::milliseconds getDuration() const;
+    /**
+     * Returns the amount of duration waiting for opTime to pass.
+     * Valid only if didWait is true.
+     */
+    stdx::chrono::milliseconds getDuration() const;
 
-        /**
-         * Returns more details about an error if it occurred.
-         */
-        Status getStatus() const;
+    /**
+     * Returns more details about an error if it occurred.
+     */
+    Status getStatus() const;
 
-    private:
-        ReadAfterOpTimeResponse(Status status,
-                                stdx::chrono::milliseconds duration,
-                                bool waited);
+private:
+    ReadAfterOpTimeResponse(Status status, stdx::chrono::milliseconds duration, bool waited);
 
-        bool _waited;
-        stdx::chrono::milliseconds _duration;
-        Status _status;
-    };
+    bool _waited;
+    stdx::chrono::milliseconds _duration;
+    Status _status;
+};
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

@@ -29,20 +29,22 @@
 #include "mongo/base/disallow_copying.h"
 
 namespace mongo {
-    class OperationContext;
+class OperationContext;
 
-    /**
-     * RAII class to optionally set an impersonated username list into the authorization session
-     * for the duration of the life of this object.
-     */
-    class ImpersonationSessionGuard {
-        MONGO_DISALLOW_COPYING(ImpersonationSessionGuard);
-    public:
-        ImpersonationSessionGuard(OperationContext* txn);
-        ~ImpersonationSessionGuard();
-    private:
-        OperationContext* _txn;
-        bool _active{false};
-    };
+/**
+ * RAII class to optionally set an impersonated username list into the authorization session
+ * for the duration of the life of this object.
+ */
+class ImpersonationSessionGuard {
+    MONGO_DISALLOW_COPYING(ImpersonationSessionGuard);
+
+public:
+    ImpersonationSessionGuard(OperationContext* txn);
+    ~ImpersonationSessionGuard();
+
+private:
+    OperationContext* _txn;
+    bool _active{false};
+};
 
 }  // namespace mongo

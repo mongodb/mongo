@@ -33,104 +33,117 @@
 
 namespace mongo {
 
-    /** a page-aligned BufBuilder. */
-    class AlignedBuilder {
-    public:
-        AlignedBuilder(unsigned init_size);
-        ~AlignedBuilder() { kill(); }
+/** a page-aligned BufBuilder. */
+class AlignedBuilder {
+public:
+    AlignedBuilder(unsigned init_size);
+    ~AlignedBuilder() {
+        kill();
+    }
 
-        /** reset with a hint as to the upcoming needed size specified */
-        void reset(unsigned sz);
+    /** reset with a hint as to the upcoming needed size specified */
+    void reset(unsigned sz);
 
-        /** reset for a re-use. shrinks if > 128MB */
-        void reset();
+    /** reset for a re-use. shrinks if > 128MB */
+    void reset();
 
-        /** note this may be deallocated (realloced) if you keep writing or reset(). */
-        const char* buf() const { return _p._data; }
+    /** note this may be deallocated (realloced) if you keep writing or reset(). */
+    const char* buf() const {
+        return _p._data;
+    }
 
-        /** leave room for some stuff later
-            @return offset in the buffer that was our current position
-        */
-        size_t skip(unsigned n) {
-            unsigned l = len();
-            grow(n);
-            return l;
+    /** leave room for some stuff later
+        @return offset in the buffer that was our current position
+    */
+    size_t skip(unsigned n) {
+        unsigned l = len();
+        grow(n);
+        return l;
+    }
+
+    /** if buffer grows pointer no longer valid */
+    char* atOfs(unsigned ofs) {
+        return _p._data + ofs;
+    }
+
+    /** if buffer grows pointer no longer valid */
+    char* cur() {
+        return _p._data + _len;
+    }
+
+    void appendChar(char j) {
+        *((char*)grow(sizeof(char))) = j;
+    }
+    void appendNum(char j) {
+        *((char*)grow(sizeof(char))) = j;
+    }
+    void appendNum(short j) {
+        *((short*)grow(sizeof(short))) = j;
+    }
+    void appendNum(int j) {
+        *((int*)grow(sizeof(int))) = j;
+    }
+    void appendNum(unsigned j) {
+        *((unsigned*)grow(sizeof(unsigned))) = j;
+    }
+    void appendNum(bool j) {
+        *((bool*)grow(sizeof(bool))) = j;
+    }
+    void appendNum(double j) {
+        *((double*)grow(sizeof(double))) = j;
+    }
+    void appendNum(long long j) {
+        *((long long*)grow(sizeof(long long))) = j;
+    }
+    void appendNum(unsigned long long j) {
+        *((unsigned long long*)grow(sizeof(unsigned long long))) = j;
+    }
+
+    void appendBuf(const void* src, size_t len) {
+        memcpy(grow((unsigned)len), src, len);
+    }
+
+    template <class T>
+    void appendStruct(const T& s) {
+        appendBuf(&s, sizeof(T));
+    }
+
+    void appendStr(StringData str, bool includeEOO = true) {
+        const unsigned len = str.size() + (includeEOO ? 1 : 0);
+        verify(len < (unsigned)BSONObjMaxUserSize);
+        str.copyTo(grow(len), includeEOO);
+    }
+
+    /** @return the in-use length */
+    unsigned len() const {
+        return _len;
+    }
+
+private:
+    static const unsigned Alignment = 8192;
+
+    /** returns the pre-grow write position */
+    inline char* grow(unsigned by) {
+        unsigned oldlen = _len;
+        _len += by;
+        if (MONGO_unlikely(_len > _p._size)) {
+            growReallocate(oldlen);
         }
+        return _p._data + oldlen;
+    }
 
-        /** if buffer grows pointer no longer valid */
-        char* atOfs(unsigned ofs) { return _p._data + ofs; }
+    void growReallocate(unsigned oldLenInUse);
+    void kill();
+    void mallocSelfAligned(unsigned sz);
+    void _malloc(unsigned sz);
+    void _realloc(unsigned newSize, unsigned oldLenInUse);
+    void _free(void*);
 
-        /** if buffer grows pointer no longer valid */
-        char* cur() { return _p._data + _len; }
-
-        void appendChar(char j) {
-            *((char*)grow(sizeof(char))) = j;
-        }
-        void appendNum(char j) {
-            *((char*)grow(sizeof(char))) = j;
-        }
-        void appendNum(short j) {
-            *((short*)grow(sizeof(short))) = j;
-        }
-        void appendNum(int j) {
-            *((int*)grow(sizeof(int))) = j;
-        }
-        void appendNum(unsigned j) {
-            *((unsigned*)grow(sizeof(unsigned))) = j;
-        }
-        void appendNum(bool j) {
-            *((bool*)grow(sizeof(bool))) = j;
-        }
-        void appendNum(double j) {
-            *((double*)grow(sizeof(double))) = j;
-        }
-        void appendNum(long long j) {
-            *((long long*)grow(sizeof(long long))) = j;
-        }
-        void appendNum(unsigned long long j) {
-            *((unsigned long long*)grow(sizeof(unsigned long long))) = j;
-        }
-
-        void appendBuf(const void *src, size_t len) { memcpy(grow((unsigned) len), src, len); }
-
-        template<class T>
-        void appendStruct(const T& s) { appendBuf(&s, sizeof(T)); }
-
-        void appendStr(StringData str , bool includeEOO = true ) {
-            const unsigned len = str.size() + ( includeEOO ? 1 : 0 );
-            verify( len < (unsigned) BSONObjMaxUserSize );
-            str.copyTo( grow(len), includeEOO );
-        }
-
-        /** @return the in-use length */
-        unsigned len() const { return _len; }
-
-    private:
-        static const unsigned Alignment = 8192;
-
-        /** returns the pre-grow write position */
-        inline char* grow(unsigned by) {
-            unsigned oldlen = _len;
-            _len += by;
-            if (MONGO_unlikely( _len > _p._size )) {
-                growReallocate(oldlen);
-            }
-            return _p._data + oldlen;
-        }
-
-        void growReallocate(unsigned oldLenInUse);
-        void kill();
-        void mallocSelfAligned(unsigned sz);
-        void _malloc(unsigned sz);
-        void _realloc(unsigned newSize, unsigned oldLenInUse);
-        void _free(void*);
-
-        struct AllocationInfo {
-            char *_data;
-            void *_allocationAddress;
-            unsigned _size;
-        } _p;
-        unsigned _len;  // bytes in use
-    };
-
+    struct AllocationInfo {
+        char* _data;
+        void* _allocationAddress;
+        unsigned _size;
+    } _p;
+    unsigned _len;  // bytes in use
+};
 }

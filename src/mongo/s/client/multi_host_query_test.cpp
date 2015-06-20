@@ -36,740 +36,698 @@
 
 namespace {
 
-    using namespace mongo;
-    using std::unique_ptr;
-    using std::shared_ptr;
-    using std::make_pair;
-    using std::map;
-    using std::string;
-    using std::vector;
+using namespace mongo;
+using std::unique_ptr;
+using std::shared_ptr;
+using std::make_pair;
+using std::map;
+using std::string;
+using std::vector;
 
-    class CallbackCheck {
-    public:
+class CallbackCheck {
+public:
+    enum LinkMode { None, Notify_Other, Wait_For_Other };
 
-        enum LinkMode {
-            None, Notify_Other, Wait_For_Other
-        };
+    CallbackCheck() : _status(ErrorCodes::OperationIncomplete, ""), _linkMode(None) {}
 
-        CallbackCheck() :
-            _status(ErrorCodes::OperationIncomplete, ""), _linkMode(None) {
+    void blockUntil(CallbackCheck* other) {
+        _otherNotification.reset(new Notification);
+        _linkMode = Wait_For_Other;
+
+        other->_otherNotification = _otherNotification;
+        other->_linkMode = Notify_Other;
+    }
+
+    HostThreadPool::Callback getCallback() {
+        return stdx::bind(&CallbackCheck::noteCallback, this);
+    }
+
+    HostThreadPool::Callback getHostCallback(const ConnectionString& host) {
+        return stdx::bind(&CallbackCheck::noteHostCallback, this, host);
+    }
+
+    void noteHostCallback(const ConnectionString& host) {
+        _host = host;
+        noteCallback();
+    }
+
+    void noteCallback() {
+        _status = Status::OK();
+        _notification.notifyOne();
+
+        if (_linkMode == Wait_For_Other)
+            _otherNotification->waitToBeNotified();
+        else if (_linkMode == Notify_Other) {
+            _otherNotification->notifyOne();
         }
+    }
 
-        void blockUntil(CallbackCheck* other) {
+    void waitForCallback() {
+        _notification.waitToBeNotified();
+    }
 
-            _otherNotification.reset(new Notification);
-            _linkMode = Wait_For_Other;
+    Status getStatus() {
+        return _status;
+    }
 
-            other->_otherNotification = _otherNotification;
-            other->_linkMode = Notify_Other;
+    const ConnectionString& getHost() {
+        return _host;
+    }
+
+private:
+    Status _status;
+    Notification _notification;
+
+    ConnectionString _host;
+
+    shared_ptr<Notification> _otherNotification;
+    LinkMode _linkMode;
+};
+
+TEST(HostThreadPool, Schedule) {
+    CallbackCheck cbCheck;
+
+    // NOTE: pool must be initialized *after* the cbCheck that it executes - this avoids a
+    // subtle race where the cbCheck structure is disposed before the callback is complete.
+    HostThreadPool threadPool(1, true);
+
+    threadPool.schedule(cbCheck.getCallback());
+
+    cbCheck.waitForCallback();
+    ASSERT_OK(cbCheck.getStatus());
+}
+
+TEST(HostThreadPool, ScheduleTwoSerial) {
+    CallbackCheck cbCheckA;
+    CallbackCheck cbCheckB;
+
+    // NOTE: pool must be initialized *after* the cbCheck that it executes
+    HostThreadPool threadPool(1, true);
+
+    threadPool.schedule(cbCheckA.getCallback());
+    threadPool.schedule(cbCheckB.getCallback());
+
+    cbCheckB.waitForCallback();
+    cbCheckA.waitForCallback();
+
+    ASSERT_OK(cbCheckA.getStatus());
+    ASSERT_OK(cbCheckB.getStatus());
+}
+
+TEST(HostThreadPool, ScheduleTwoParallel) {
+    CallbackCheck cbCheckA;
+    CallbackCheck cbCheckB;
+
+    // NOTE: pool must be initialized *after* the cbCheck that it executes
+    HostThreadPool threadPool(2, true);
+
+    // Don't allow cbCheckA's callback to finish until cbCheckB's callback is processed
+    cbCheckA.blockUntil(&cbCheckB);
+
+    threadPool.schedule(cbCheckA.getCallback());
+    cbCheckA.waitForCallback();
+    ASSERT_OK(cbCheckA.getStatus());
+    // We're still blocking the thread processing cbCheckA's callback
+
+    threadPool.schedule(cbCheckB.getCallback());
+    cbCheckB.waitForCallback();
+    ASSERT_OK(cbCheckB.getStatus());
+}
+
+TEST(HostThreadPool, ScheduleTwoHosts) {
+    CallbackCheck cbCheckA;
+    CallbackCheck cbCheckB;
+
+    // NOTE: pool must be initialized *after* the cbCheck that it executes
+    HostThreadPools threadPool(1, true);
+
+    // Don't allow cbCheckA's callback to finish until cbCheckB's callback is processed.
+    // This means a single thread pool with a single thread would hang.
+    cbCheckA.blockUntil(&cbCheckB);
+
+    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+
+    threadPool.schedule(hostA, cbCheckA.getHostCallback(hostA));
+    cbCheckA.waitForCallback();
+    ASSERT_OK(cbCheckA.getStatus());
+    ASSERT_EQUALS(cbCheckA.getHost().toString(), hostA.toString());
+    // We're still blocking the thread processing cbCheckA's callback
+
+    threadPool.schedule(hostB, cbCheckB.getHostCallback(hostB));
+    cbCheckB.waitForCallback();
+    ASSERT_OK(cbCheckB.getStatus());
+    ASSERT_EQUALS(cbCheckB.getHost().toString(), hostB.toString());
+}
+
+class MockSystemEnv : public MultiHostQueryOp::SystemEnv {
+private:
+    struct MockHostInfo;
+    typedef map<ConnectionString, MockHostInfo*> HostInfoMap;
+
+public:
+    MockSystemEnv(HostThreadPools* threadPool) : _threadPool(threadPool), _mockTimeMillis(0) {}
+
+    virtual ~MockSystemEnv() {
+        for (HostInfoMap::iterator it = _mockHostInfo.begin(); it != _mockHostInfo.end(); ++it) {
+            if (_threadPool)
+                _threadPool->waitUntilIdle(it->first);
+            delete it->second;
         }
+    }
 
-        HostThreadPool::Callback getCallback() {
-            return stdx::bind(&CallbackCheck::noteCallback, this);
-        }
+    void setHostThreadPools(HostThreadPools* threadPool) {
+        _threadPool = threadPool;
+    }
 
-        HostThreadPool::Callback getHostCallback(const ConnectionString& host) {
-            return stdx::bind(&CallbackCheck::noteHostCallback, this, host);
-        }
+    void addMockHostResultAt(const ConnectionString& host, int timeMillis) {
+        newMockHostResultAt(host, timeMillis, Status::OK(), NULL);
+    }
 
-        void noteHostCallback(const ConnectionString& host) {
-            _host = host;
-            noteCallback();
-        }
+    void addMockHostErrorAt(const ConnectionString& host, int timeMillis, Status error) {
+        newMockHostResultAt(host, timeMillis, error, NULL);
+    }
 
-        void noteCallback() {
+    void addMockHungHostAt(const ConnectionString& host,
+                           int hangTimeMillis,
+                           Notification* hangUntilNotify) {
+        newMockHostResultAt(host, hangTimeMillis, Status::OK(), hangUntilNotify);
+    }
 
-            _status = Status::OK();
-            _notification.notifyOne();
+    void addMockTimestepAt(int timeMillis) {
+        // Add a mock query to a host we aren't using at the provided time
+        ConnectionString host = uassertStatusOK(ConnectionString::parse("$timestepHost:1000"));
+        newMockHostResultAt(host, timeMillis, Status::OK(), NULL);
 
-            if (_linkMode == Wait_For_Other)
-                _otherNotification->waitToBeNotified();
-            else if (_linkMode == Notify_Other) {
-                _otherNotification->notifyOne();
+        // The query won't be scheduled by the multi op, so we need to do so ourselves
+        _threadPool->schedule(
+            host,
+            stdx::bind(&MockSystemEnv::doBlockingQuerySwallowResult, this, host, QuerySpec()));
+    }
+
+    Date_t currentTimeMillis() {
+        return Date_t::fromMillisSinceEpoch(_mockTimeMillis);
+    }
+
+    void doBlockingQuerySwallowResult(const ConnectionString& host, const QuerySpec& query) {
+        StatusWith<DBClientCursor*> result = doBlockingQuery(host, query);
+        if (result.isOK())
+            delete result.getValue();
+    }
+
+    StatusWith<DBClientCursor*> doBlockingQuery(const ConnectionString& host,
+                                                const QuerySpec& query) {
+        ASSERT(_mockHostInfo.find(host) != _mockHostInfo.end());
+
+        MockHostInfo& info = *(_mockHostInfo.find(host)->second);
+
+        if (info.prevHostActiveNotify) {
+            info.prevHostActiveNotify->waitToBeNotified();
+            if (info.waitForPrevHostIdle) {
+                _threadPool->waitUntilIdle(info.prevHost);
             }
         }
 
-        void waitForCallback() {
-            _notification.waitToBeNotified();
+        _mockTimeMillis = info.queryTimeMillis;
+
+        if (info.nextHostActiveNotify) {
+            info.nextHostActiveNotify->notifyOne();
         }
 
-        Status getStatus() {
-            return _status;
+        if (info.hangUntilNotify) {
+            info.hangUntilNotify->waitToBeNotified();
+            return StatusWith<DBClientCursor*>(ErrorCodes::InternalError, "");
         }
 
-        const ConnectionString& getHost() {
-            return _host;
+        if (!info.error.isOK()) {
+            return StatusWith<DBClientCursor*>(info.error);
         }
 
-    private:
+        //
+        // Successful mock query
+        //
 
-        Status _status;
-        Notification _notification;
+        if (!info.conn) {
+            info.conn.reset(new DBClientConnection(false));
+            // Need to do a connect failure so that we get an empty MessagingPort on the conn and
+            // the host name is set.
+            string errMsg;
+            ASSERT(!info.conn->connect(HostAndPort(host.toString()), errMsg));
+        }
 
-        ConnectionString _host;
+        return StatusWith<DBClientCursor*>(new DBClientCursor(info.conn.get(),
+                                                              query.ns(),
+                                                              query.query(),
+                                                              query.ntoreturn(),
+                                                              query.ntoskip(),
+                                                              query.fieldsPtr(),
+                                                              query.options(),
+                                                              0 /* batchSize */));
+    }
 
-        shared_ptr<Notification> _otherNotification;
-        LinkMode _linkMode;
+private:
+    MockHostInfo* newMockHostResultAt(const ConnectionString& host,
+                                      int timeMillis,
+                                      const Status& error,
+                                      Notification* hangUntilNotify) {
+        ASSERT(_mockHostInfo.find(host) == _mockHostInfo.end());
+
+        MockHostInfo* info = new MockHostInfo(timeMillis);
+        _mockHostInfo.insert(make_pair(host, info));
+        info->error = error;
+        info->hangUntilNotify = hangUntilNotify;
+
+        linkMockTimes(host, info);
+        return info;
+    }
+
+    void linkMockTimes(const ConnectionString& host, MockHostInfo* info) {
+        //
+        // This just basically sets up notifications between the processing of results such that
+        // the results are returned in the order defined by the _mockQueryTimes map.
+        //
+        // Idea is (second host result) waits for (first host result) thread to start and end,
+        //         (third host result) waits for (second host result) thread to start and end,
+        //         (fourth host result) waits for (third host result) thread to start and end,
+        //         ... and so on ...
+        //
+
+        ASSERT(_mockQueryTimes.find(info->queryTimeMillis) == _mockQueryTimes.end());
+
+        HostQueryTimes::iterator prev =
+            _mockQueryTimes.insert(make_pair(info->queryTimeMillis, host)).first;
+
+        if (prev != _mockQueryTimes.begin())
+            --prev;
+        else
+            prev = _mockQueryTimes.end();
+
+        HostQueryTimes::iterator next = _mockQueryTimes.upper_bound(info->queryTimeMillis);
+
+        if (prev != _mockQueryTimes.end()) {
+            const ConnectionString& prevHost = prev->second;
+            MockHostInfo* prevInfo = _mockHostInfo.find(prevHost)->second;
+
+            linkToNext(prevHost, prevInfo, info);
+        }
+
+        if (next != _mockQueryTimes.end()) {
+            const ConnectionString& nextHost = next->second;
+            MockHostInfo* nextInfo = _mockHostInfo.find(nextHost)->second;
+
+            linkToNext(host, info, nextInfo);
+        }
+    }
+
+    void linkToNext(const ConnectionString& host, MockHostInfo* info, MockHostInfo* nextInfo) {
+        nextInfo->prevHost = host;
+
+        nextInfo->prevHostActiveNotify.reset(new Notification());
+        info->nextHostActiveNotify = nextInfo->prevHostActiveNotify.get();
+
+        nextInfo->waitForPrevHostIdle = info->hangUntilNotify == NULL;
+    }
+
+    // Not owned here, needed to allow ordering of mock queries
+    HostThreadPools* _threadPool;
+
+    int _mockTimeMillis;
+
+    typedef map<int, ConnectionString> HostQueryTimes;
+    HostQueryTimes _mockQueryTimes;
+
+    struct MockHostInfo {
+        MockHostInfo(int queryTimeMillis)
+            : nextHostActiveNotify(NULL),
+              waitForPrevHostIdle(false),
+              queryTimeMillis(queryTimeMillis),
+              hangUntilNotify(NULL),
+              error(Status::OK()) {}
+
+        Notification* nextHostActiveNotify;
+
+        ConnectionString prevHost;
+        unique_ptr<Notification> prevHostActiveNotify;
+        bool waitForPrevHostIdle;
+
+        int queryTimeMillis;
+
+        unique_ptr<DBClientConnection> conn;
+        Notification* hangUntilNotify;
+        Status error;
     };
 
-    TEST(HostThreadPool, Schedule) {
+    HostInfoMap _mockHostInfo;
+};
 
-        CallbackCheck cbCheck;
+QuerySpec buildSpec(StringData ns, const BSONObj& query) {
+    return QuerySpec(ns.toString(), query, BSONObj(), 0, 0, 0);
+}
 
-        // NOTE: pool must be initialized *after* the cbCheck that it executes - this avoids a
-        // subtle race where the cbCheck structure is disposed before the callback is complete.
-        HostThreadPool threadPool(1, true);
+//
+// Tests for the MultiHostQueryOp
+//
 
-        threadPool.schedule(cbCheck.getCallback());
+TEST(MultiHostQueryOp, SingleHost) {
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
 
-        cbCheck.waitForCallback();
-        ASSERT_OK(cbCheck.getStatus());
-    }
+    ConnectionString host = uassertStatusOK(ConnectionString::parse("$host:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(host);
 
-    TEST(HostThreadPool, ScheduleTwoSerial) {
+    mockSystem.addMockHostResultAt(host, 1000);
 
-        CallbackCheck cbCheckA;
-        CallbackCheck cbCheckB;
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
 
-        // NOTE: pool must be initialized *after* the cbCheck that it executes
-        HostThreadPool threadPool(1, true);
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 2000);
 
-        threadPool.schedule(cbCheckA.getCallback());
-        threadPool.schedule(cbCheckB.getCallback());
+    ASSERT_OK(result.getStatus());
+    ASSERT(NULL != result.getValue());
+    ASSERT_EQUALS(result.getValue()->originalHost(), host.toString());
+    delete result.getValue();
+}
 
-        cbCheckB.waitForCallback();
-        cbCheckA.waitForCallback();
+TEST(MultiHostQueryOp, SingleHostError) {
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
 
-        ASSERT_OK(cbCheckA.getStatus());
-        ASSERT_OK(cbCheckB.getStatus());
-    }
+    ConnectionString host = uassertStatusOK(ConnectionString::parse("$host:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(host);
 
-    TEST(HostThreadPool, ScheduleTwoParallel) {
+    Status hostError = Status(ErrorCodes::InternalError, "");
+    mockSystem.addMockHostErrorAt(host, 1000, hostError);
 
-        CallbackCheck cbCheckA;
-        CallbackCheck cbCheckB;
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
 
-        // NOTE: pool must be initialized *after* the cbCheck that it executes
-        HostThreadPool threadPool(2, true);
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 2000);
 
-        // Don't allow cbCheckA's callback to finish until cbCheckB's callback is processed
-        cbCheckA.blockUntil(&cbCheckB);
+    ASSERT_EQUALS(result.getStatus().code(), hostError.code());
+}
 
-        threadPool.schedule(cbCheckA.getCallback());
-        cbCheckA.waitForCallback();
-        ASSERT_OK(cbCheckA.getStatus());
-        // We're still blocking the thread processing cbCheckA's callback
+TEST(MultiHostQueryOp, SingleHostHang) {
+    // Initialize notifier before the thread pool, otherwise we may dispose while threads are
+    // active
+    Notification unhangNotify;
 
-        threadPool.schedule(cbCheckB.getCallback());
-        cbCheckB.waitForCallback();
-        ASSERT_OK(cbCheckB.getStatus());
-    }
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
 
-    TEST(HostThreadPool, ScheduleTwoHosts) {
+    ConnectionString host = uassertStatusOK(ConnectionString::parse("$host:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(host);
 
-        CallbackCheck cbCheckA;
-        CallbackCheck cbCheckB;
+    mockSystem.addMockHungHostAt(host, 4000, &unhangNotify);
 
-        // NOTE: pool must be initialized *after* the cbCheck that it executes
-        HostThreadPools threadPool(1, true);
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
 
-        // Don't allow cbCheckA's callback to finish until cbCheckB's callback is processed.
-        // This means a single thread pool with a single thread would hang.
-        cbCheckA.blockUntil(&cbCheckB);
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 2000);
+    // Unhang before checking status, in case it throws
+    unhangNotify.notifyOne();
 
-        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::NetworkTimeout);
+}
 
-        threadPool.schedule(hostA, cbCheckA.getHostCallback(hostA));
-        cbCheckA.waitForCallback();
-        ASSERT_OK(cbCheckA.getStatus());
-        ASSERT_EQUALS(cbCheckA.getHost().toString(), hostA.toString());
-        // We're still blocking the thread processing cbCheckA's callback
+TEST(MultiHostQueryOp, TwoHostResponses) {
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
 
-        threadPool.schedule(hostB, cbCheckB.getHostCallback(hostB));
-        cbCheckB.waitForCallback();
-        ASSERT_OK(cbCheckB.getStatus());
-        ASSERT_EQUALS(cbCheckB.getHost().toString(), hostB.toString());
-    }
+    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(hostA);
+    hosts.push_back(hostB);
 
-    class MockSystemEnv : public MultiHostQueryOp::SystemEnv {
-    private:
+    // Make sure we return the first response, from hostB at time 1000
+    mockSystem.addMockHostResultAt(hostA, 2000);
+    mockSystem.addMockHostResultAt(hostB, 1000);
 
-        struct MockHostInfo;
-        typedef map<ConnectionString, MockHostInfo*> HostInfoMap;
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
 
-    public:
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
 
-        MockSystemEnv(HostThreadPools* threadPool) :
-            _threadPool(threadPool), _mockTimeMillis(0) {
-        }
-
-        virtual ~MockSystemEnv() {
-            for (HostInfoMap::iterator it = _mockHostInfo.begin(); it != _mockHostInfo.end();
-                ++it) {
-                if (_threadPool)
-                    _threadPool->waitUntilIdle(it->first);
-                delete it->second;
-            }
-        }
-
-        void setHostThreadPools(HostThreadPools* threadPool) {
-            _threadPool = threadPool;
-        }
-
-        void addMockHostResultAt(const ConnectionString& host, int timeMillis) {
-            newMockHostResultAt(host, timeMillis, Status::OK(), NULL);
-        }
-
-        void addMockHostErrorAt(const ConnectionString& host, int timeMillis, Status error) {
-            newMockHostResultAt(host, timeMillis, error, NULL);
-        }
-
-        void addMockHungHostAt(const ConnectionString& host,
-                               int hangTimeMillis,
-                               Notification* hangUntilNotify) {
-            newMockHostResultAt(host, hangTimeMillis, Status::OK(), hangUntilNotify);
-        }
-
-        void addMockTimestepAt(int timeMillis) {
-
-            // Add a mock query to a host we aren't using at the provided time
-            ConnectionString host = uassertStatusOK(ConnectionString::parse("$timestepHost:1000"));
-            newMockHostResultAt(host, timeMillis, Status::OK(), NULL);
-
-            // The query won't be scheduled by the multi op, so we need to do so ourselves
-            _threadPool->schedule(host,
-                                  stdx::bind(&MockSystemEnv::doBlockingQuerySwallowResult,
-                                              this,
-                                              host,
-                                              QuerySpec()));
-        }
-
-        Date_t currentTimeMillis() {
-            return Date_t::fromMillisSinceEpoch(_mockTimeMillis);
-        }
-
-        void doBlockingQuerySwallowResult(const ConnectionString& host,
-                                          const QuerySpec& query) {
-            StatusWith<DBClientCursor*> result = doBlockingQuery(host, query);
-            if (result.isOK())
-                delete result.getValue();
-        }
-
-        StatusWith<DBClientCursor*> doBlockingQuery(const ConnectionString& host,
-                                                    const QuerySpec& query) {
-
-            ASSERT(_mockHostInfo.find(host) != _mockHostInfo.end());
-
-            MockHostInfo& info = *(_mockHostInfo.find(host)->second);
-
-            if (info.prevHostActiveNotify) {
-                info.prevHostActiveNotify->waitToBeNotified();
-                if (info.waitForPrevHostIdle) {
-                    _threadPool->waitUntilIdle(info.prevHost);
-                }
-            }
-
-            _mockTimeMillis = info.queryTimeMillis;
-
-            if (info.nextHostActiveNotify) {
-                info.nextHostActiveNotify->notifyOne();
-            }
-
-            if (info.hangUntilNotify) {
-                info.hangUntilNotify->waitToBeNotified();
-                return StatusWith<DBClientCursor*>(ErrorCodes::InternalError, "");
-            }
+    ASSERT_OK(result.getStatus());
+    ASSERT(NULL != result.getValue());
+    ASSERT_EQUALS(result.getValue()->originalHost(), hostB.toString());
+    delete result.getValue();
+}
 
-            if (!info.error.isOK()) {
-                return StatusWith<DBClientCursor*>(info.error);
-            }
+TEST(MultiHostQueryOp, TwoHostsOneErrorResponse) {
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
+
+    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(hostA);
+    hosts.push_back(hostB);
+
+    // The first response is a host error, the second is a successful result
+    Status hostError = Status(ErrorCodes::InternalError, "");
+    mockSystem.addMockHostErrorAt(hostA, 1000, hostError);
+    mockSystem.addMockHostResultAt(hostB, 2000);
+
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
+
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
+
+    ASSERT_OK(result.getStatus());
+    ASSERT(NULL != result.getValue());
+    ASSERT_EQUALS(result.getValue()->originalHost(), hostB.toString());
+    delete result.getValue();
+}
+
+TEST(MultiHostQueryOp, TwoHostsBothErrors) {
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
+
+    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(hostA);
+    hosts.push_back(hostB);
+
+    // Both responses are errors
+    Status hostError = Status(ErrorCodes::InternalError, "");
+    mockSystem.addMockHostErrorAt(hostA, 1000, hostError);
+    mockSystem.addMockHostErrorAt(hostB, 2000, hostError);
 
-            //
-            // Successful mock query
-            //
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
+
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
+
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::MultipleErrorsOccurred);
+}
 
-            if (!info.conn) {
-                info.conn.reset(new DBClientConnection(false));
-                // Need to do a connect failure so that we get an empty MessagingPort on the conn and
-                // the host name is set.
-                string errMsg;
-                ASSERT(!info.conn->connect(HostAndPort(host.toString()), errMsg));
-            }
-            
-            return StatusWith<DBClientCursor*>(new DBClientCursor(info.conn.get(),
-                                                                  query.ns(),
-                                                                  query.query(),
-                                                                  query.ntoreturn(),
-                                                                  query.ntoskip(),
-                                                                  query.fieldsPtr(),
-                                                                  query.options(),
-                                                                  0 /* batchSize */));
-        }
+TEST(MultiHostQueryOp, TwoHostsOneHang) {
+    // Initialize notifier before the thread pool
+    Notification unhangNotify;
 
-    private:
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
 
-        MockHostInfo* newMockHostResultAt(const ConnectionString& host,
-                                          int timeMillis,
-                                          const Status& error,
-                                          Notification* hangUntilNotify) {
-
-            ASSERT(_mockHostInfo.find(host) == _mockHostInfo.end());
-
-            MockHostInfo* info = new MockHostInfo(timeMillis);
-            _mockHostInfo.insert(make_pair(host, info));
-            info->error = error;
-            info->hangUntilNotify = hangUntilNotify;
-
-            linkMockTimes(host, info);
-            return info;
-        }
-
-        void linkMockTimes(const ConnectionString& host, MockHostInfo* info) {
-
-            //
-            // This just basically sets up notifications between the processing of results such that
-            // the results are returned in the order defined by the _mockQueryTimes map.
-            //
-            // Idea is (second host result) waits for (first host result) thread to start and end,
-            //         (third host result) waits for (second host result) thread to start and end,
-            //         (fourth host result) waits for (third host result) thread to start and end,
-            //         ... and so on ...
-            //
-
-            ASSERT(_mockQueryTimes.find(info->queryTimeMillis) == _mockQueryTimes.end());
-
-            HostQueryTimes::iterator prev = _mockQueryTimes.insert(make_pair(info->queryTimeMillis,
-                                                                             host)).first;
-
-            if (prev != _mockQueryTimes.begin())
-                --prev;
-            else
-                prev = _mockQueryTimes.end();
-
-            HostQueryTimes::iterator next = _mockQueryTimes.upper_bound(info->queryTimeMillis);
-
-            if (prev != _mockQueryTimes.end()) {
-
-                const ConnectionString& prevHost = prev->second;
-                MockHostInfo* prevInfo = _mockHostInfo.find(prevHost)->second;
-
-                linkToNext(prevHost, prevInfo, info);
-            }
-
-            if (next != _mockQueryTimes.end()) {
-
-                const ConnectionString& nextHost = next->second;
-                MockHostInfo* nextInfo = _mockHostInfo.find(nextHost)->second;
-
-                linkToNext(host, info, nextInfo);
-            }
-        }
-
-        void linkToNext(const ConnectionString& host, MockHostInfo* info, MockHostInfo* nextInfo) {
-
-            nextInfo->prevHost = host;
-
-            nextInfo->prevHostActiveNotify.reset(new Notification());
-            info->nextHostActiveNotify = nextInfo->prevHostActiveNotify.get();
-
-            nextInfo->waitForPrevHostIdle = info->hangUntilNotify == NULL;
-        }
-
-        // Not owned here, needed to allow ordering of mock queries
-        HostThreadPools* _threadPool;
-
-        int _mockTimeMillis;
-
-        typedef map<int, ConnectionString> HostQueryTimes;
-        HostQueryTimes _mockQueryTimes;
-
-        struct MockHostInfo {
-
-            MockHostInfo(int queryTimeMillis) :
-                nextHostActiveNotify( NULL),
-                waitForPrevHostIdle(false),
-                queryTimeMillis(queryTimeMillis),
-                hangUntilNotify( NULL),
-                error(Status::OK()) {
-            }
-
-            Notification* nextHostActiveNotify;
-
-            ConnectionString prevHost;
-            unique_ptr<Notification> prevHostActiveNotify;
-            bool waitForPrevHostIdle;
-
-            int queryTimeMillis;
-
-            unique_ptr<DBClientConnection> conn;
-            Notification* hangUntilNotify;
-            Status error;
-        };
-
-        HostInfoMap _mockHostInfo;
-
-    };
-
-    QuerySpec buildSpec(StringData ns, const BSONObj& query) {
-        return QuerySpec(ns.toString(), query, BSONObj(), 0, 0, 0);
-    }
-
-    //
-    // Tests for the MultiHostQueryOp
-    //
-
-    TEST(MultiHostQueryOp, SingleHost) {
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString host = uassertStatusOK(ConnectionString::parse("$host:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(host);
-
-        mockSystem.addMockHostResultAt(host, 1000);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 2000);
-
-        ASSERT_OK(result.getStatus());
-        ASSERT(NULL != result.getValue());
-        ASSERT_EQUALS(result.getValue()->originalHost(), host.toString());
-        delete result.getValue();
-    }
-
-    TEST(MultiHostQueryOp, SingleHostError) {
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString host = uassertStatusOK(ConnectionString::parse("$host:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(host);
-
-        Status hostError = Status(ErrorCodes::InternalError, "");
-        mockSystem.addMockHostErrorAt(host, 1000, hostError);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 2000);
-
-        ASSERT_EQUALS(result.getStatus().code(), hostError.code());
-    }
-
-    TEST(MultiHostQueryOp, SingleHostHang) {
-
-        // Initialize notifier before the thread pool, otherwise we may dispose while threads are
-        // active
-        Notification unhangNotify;
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString host = uassertStatusOK(ConnectionString::parse("$host:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(host);
-
-        mockSystem.addMockHungHostAt(host, 4000, &unhangNotify);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 2000);
-        // Unhang before checking status, in case it throws
-        unhangNotify.notifyOne();
-
-        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::NetworkTimeout);
-    }
-
-    TEST(MultiHostQueryOp, TwoHostResponses) {
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(hostA);
-        hosts.push_back(hostB);
-
-        // Make sure we return the first response, from hostB at time 1000
-        mockSystem.addMockHostResultAt(hostA, 2000);
-        mockSystem.addMockHostResultAt(hostB, 1000);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
-
-        ASSERT_OK(result.getStatus());
-        ASSERT(NULL != result.getValue());
-        ASSERT_EQUALS(result.getValue()->originalHost(), hostB.toString());
-        delete result.getValue();
-    }
-
-    TEST(MultiHostQueryOp, TwoHostsOneErrorResponse) {
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(hostA);
-        hosts.push_back(hostB);
-
-        // The first response is a host error, the second is a successful result
-        Status hostError = Status(ErrorCodes::InternalError, "");
-        mockSystem.addMockHostErrorAt(hostA, 1000, hostError);
-        mockSystem.addMockHostResultAt(hostB, 2000);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
-
-        ASSERT_OK(result.getStatus());
-        ASSERT(NULL != result.getValue());
-        ASSERT_EQUALS(result.getValue()->originalHost(), hostB.toString());
-        delete result.getValue();
-    }
-
-    TEST(MultiHostQueryOp, TwoHostsBothErrors) {
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(hostA);
-        hosts.push_back(hostB);
-
-        // Both responses are errors
-        Status hostError = Status(ErrorCodes::InternalError, "");
-        mockSystem.addMockHostErrorAt(hostA, 1000, hostError);
-        mockSystem.addMockHostErrorAt(hostB, 2000, hostError);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
-
-        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::MultipleErrorsOccurred);
-    }
-
-    TEST(MultiHostQueryOp, TwoHostsOneHang) {
-
-        // Initialize notifier before the thread pool
-        Notification unhangNotify;
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(hostA);
-        hosts.push_back(hostB);
-
-        // One host hangs
-        mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
-        mockSystem.addMockHostResultAt(hostB, 2000);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
-        // Unhang before checking status, in case it throws
-        unhangNotify.notifyOne();
-
-        ASSERT_OK(result.getStatus());
-        ASSERT(NULL != result.getValue());
-        ASSERT_EQUALS(result.getValue()->originalHost(), hostB.toString());
-        delete result.getValue();
-    }
-
-    TEST(MultiHostQueryOp, TwoHostsOneHangOneError) {
-
-        // Initialize notifier before the thread pool
-        Notification unhangNotify;
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(hostA);
-        hosts.push_back(hostB);
-
-        // One host hangs, one host has an error (at the mock timeout point so the query finishes)
-        Status hostError = Status(ErrorCodes::InternalError, "");
-        mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
-        mockSystem.addMockHostErrorAt(hostB, 3000, hostError);
-        mockSystem.addMockTimestepAt(4000);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 4000);
-        // Unhang before checking status, in case it throws
-        unhangNotify.notifyOne();
-
-        ASSERT_EQUALS(result.getStatus().code(), hostError.code());
-    }
-
-    TEST(MultiHostQueryOp, ThreeHostsOneHang) {
-        // Initialize notifier before the thread pool
-        Notification unhangNotify;
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
-        ConnectionString hostC = uassertStatusOK(ConnectionString::parse("$hostC:1000"));
-
-        vector<ConnectionString> hosts;
-        hosts.push_back(hostA);
-        hosts.push_back(hostB);
-        hosts.push_back(hostC);
-
-        // Host A hangs
-        mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
-        mockSystem.addMockHostResultAt(hostB, 2000);
-        mockSystem.addMockHostResultAt(hostC, 3000);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 4000);
-
-        // Unhang before checking status, in case it throws
-        unhangNotify.notifyOne();
-
-        ASSERT_OK(result.getStatus());
-        ASSERT(NULL != result.getValue());
-
-        // We should never have results from hostA
-        ASSERT_NOT_EQUALS(result.getValue()->originalHost(), hostA.toString());
-
-        delete result.getValue();
-    }
-
-    TEST(MultiHostQueryOp, ThreeHostsTwoErrors) {
-
-        // Initialize notifier before the thread pool
-        Notification unhangNotify;
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
-        ConnectionString hostC = uassertStatusOK(ConnectionString::parse("$hostC:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(hostA);
-        hosts.push_back(hostB);
-        hosts.push_back(hostC);
-
-        // One host hangs, two hosts have errors (finish at mock timeout point so query ends)
-        Status hostError = Status(ErrorCodes::InternalError, "");
-        mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
-        mockSystem.addMockHostErrorAt(hostB, 4000, hostError);
-        mockSystem.addMockHostErrorAt(hostC, 2000, hostError);
-        mockSystem.addMockTimestepAt(5000);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 5000);
-        // Unhang before checking status, in case it throws
-        unhangNotify.notifyOne();
-
-        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::MultipleErrorsOccurred);
-    }
-
-    TEST(MultiHostQueryOp, ThreeHostsOneHangOneError) {
-
-        // Initialize notifier before the thread pool
-        Notification unhangNotify;
-
-        HostThreadPools threadPool(1, true);
-        MockSystemEnv mockSystem(&threadPool);
-
-        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
-        ConnectionString hostC = uassertStatusOK(ConnectionString::parse("$hostC:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(hostA);
-        hosts.push_back(hostB);
-        hosts.push_back(hostC);
-
-        // One host hangs, two hosts have errors (finish at mock timeout point so query ends)
-        Status hostError = Status(ErrorCodes::InternalError, "");
-        mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
-        mockSystem.addMockHostErrorAt(hostB, 2000, hostError);
-        mockSystem.addMockHostResultAt(hostC, 3000);
-
-        MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 4000);
-        // Unhang before checking status, in case it throws
-        unhangNotify.notifyOne();
-
-        ASSERT_OK(result.getStatus());
-        ASSERT(NULL != result.getValue());
-        ASSERT_EQUALS(result.getValue()->originalHost(), hostC.toString());
-        delete result.getValue();
-    }
-
-    TEST(MultiHostQueryOp, TwoHostsOneHangUnscoped) {
-
-        // Initialize notifier before the thread pool
-        Notification unhangNotify;
-
-        // Create a thread pool which detaches itself from outstanding work on cleanup
-        unique_ptr<HostThreadPools> threadPool(new HostThreadPools(1, false));
-        MockSystemEnv mockSystem(threadPool.get());
-
-        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
-        vector<ConnectionString> hosts;
-        hosts.push_back(hostA);
-        hosts.push_back(hostB);
-
-        // One host hangs
-        mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
-        mockSystem.addMockHostResultAt(hostB, 2000);
-
-        MultiHostQueryOp queryOp(&mockSystem, threadPool.get());
-
-        QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
-
-        // Clean up the thread pool
-        mockSystem.setHostThreadPools( NULL);
-        threadPool.reset();
-
-        // Unhang before checking status, in case it throws
-        unhangNotify.notifyOne();
-
-        ASSERT_OK(result.getStatus());
-        ASSERT(NULL != result.getValue());
-        ASSERT_EQUALS(result.getValue()->originalHost(), hostB.toString());
-        delete result.getValue();
-
-        // Make sure we get the next result
-        result = queryOp.waitForNextResult(Date_t::fromMillisSinceEpoch(4000));
-
-        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::InternalError);
-    }
-
-} // unnamed namespace
+    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(hostA);
+    hosts.push_back(hostB);
+
+    // One host hangs
+    mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
+    mockSystem.addMockHostResultAt(hostB, 2000);
+
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
+
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
+    // Unhang before checking status, in case it throws
+    unhangNotify.notifyOne();
+
+    ASSERT_OK(result.getStatus());
+    ASSERT(NULL != result.getValue());
+    ASSERT_EQUALS(result.getValue()->originalHost(), hostB.toString());
+    delete result.getValue();
+}
+
+TEST(MultiHostQueryOp, TwoHostsOneHangOneError) {
+    // Initialize notifier before the thread pool
+    Notification unhangNotify;
+
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
+
+    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(hostA);
+    hosts.push_back(hostB);
+
+    // One host hangs, one host has an error (at the mock timeout point so the query finishes)
+    Status hostError = Status(ErrorCodes::InternalError, "");
+    mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
+    mockSystem.addMockHostErrorAt(hostB, 3000, hostError);
+    mockSystem.addMockTimestepAt(4000);
+
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
+
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 4000);
+    // Unhang before checking status, in case it throws
+    unhangNotify.notifyOne();
+
+    ASSERT_EQUALS(result.getStatus().code(), hostError.code());
+}
+
+TEST(MultiHostQueryOp, ThreeHostsOneHang) {
+    // Initialize notifier before the thread pool
+    Notification unhangNotify;
+
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
+
+    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+    ConnectionString hostC = uassertStatusOK(ConnectionString::parse("$hostC:1000"));
+
+    vector<ConnectionString> hosts;
+    hosts.push_back(hostA);
+    hosts.push_back(hostB);
+    hosts.push_back(hostC);
+
+    // Host A hangs
+    mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
+    mockSystem.addMockHostResultAt(hostB, 2000);
+    mockSystem.addMockHostResultAt(hostC, 3000);
+
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
+
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 4000);
+
+    // Unhang before checking status, in case it throws
+    unhangNotify.notifyOne();
+
+    ASSERT_OK(result.getStatus());
+    ASSERT(NULL != result.getValue());
+
+    // We should never have results from hostA
+    ASSERT_NOT_EQUALS(result.getValue()->originalHost(), hostA.toString());
+
+    delete result.getValue();
+}
+
+TEST(MultiHostQueryOp, ThreeHostsTwoErrors) {
+    // Initialize notifier before the thread pool
+    Notification unhangNotify;
+
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
+
+    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+    ConnectionString hostC = uassertStatusOK(ConnectionString::parse("$hostC:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(hostA);
+    hosts.push_back(hostB);
+    hosts.push_back(hostC);
+
+    // One host hangs, two hosts have errors (finish at mock timeout point so query ends)
+    Status hostError = Status(ErrorCodes::InternalError, "");
+    mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
+    mockSystem.addMockHostErrorAt(hostB, 4000, hostError);
+    mockSystem.addMockHostErrorAt(hostC, 2000, hostError);
+    mockSystem.addMockTimestepAt(5000);
+
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
+
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 5000);
+    // Unhang before checking status, in case it throws
+    unhangNotify.notifyOne();
+
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::MultipleErrorsOccurred);
+}
+
+TEST(MultiHostQueryOp, ThreeHostsOneHangOneError) {
+    // Initialize notifier before the thread pool
+    Notification unhangNotify;
+
+    HostThreadPools threadPool(1, true);
+    MockSystemEnv mockSystem(&threadPool);
+
+    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+    ConnectionString hostC = uassertStatusOK(ConnectionString::parse("$hostC:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(hostA);
+    hosts.push_back(hostB);
+    hosts.push_back(hostC);
+
+    // One host hangs, two hosts have errors (finish at mock timeout point so query ends)
+    Status hostError = Status(ErrorCodes::InternalError, "");
+    mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
+    mockSystem.addMockHostErrorAt(hostB, 2000, hostError);
+    mockSystem.addMockHostResultAt(hostC, 3000);
+
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
+
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 4000);
+    // Unhang before checking status, in case it throws
+    unhangNotify.notifyOne();
+
+    ASSERT_OK(result.getStatus());
+    ASSERT(NULL != result.getValue());
+    ASSERT_EQUALS(result.getValue()->originalHost(), hostC.toString());
+    delete result.getValue();
+}
+
+TEST(MultiHostQueryOp, TwoHostsOneHangUnscoped) {
+    // Initialize notifier before the thread pool
+    Notification unhangNotify;
+
+    // Create a thread pool which detaches itself from outstanding work on cleanup
+    unique_ptr<HostThreadPools> threadPool(new HostThreadPools(1, false));
+    MockSystemEnv mockSystem(threadPool.get());
+
+    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+    vector<ConnectionString> hosts;
+    hosts.push_back(hostA);
+    hosts.push_back(hostB);
+
+    // One host hangs
+    mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
+    mockSystem.addMockHostResultAt(hostB, 2000);
+
+    MultiHostQueryOp queryOp(&mockSystem, threadPool.get());
+
+    QuerySpec query;
+    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
+
+    // Clean up the thread pool
+    mockSystem.setHostThreadPools(NULL);
+    threadPool.reset();
+
+    // Unhang before checking status, in case it throws
+    unhangNotify.notifyOne();
+
+    ASSERT_OK(result.getStatus());
+    ASSERT(NULL != result.getValue());
+    ASSERT_EQUALS(result.getValue()->originalHost(), hostB.toString());
+    delete result.getValue();
+
+    // Make sure we get the next result
+    result = queryOp.waitForNextResult(Date_t::fromMillisSinceEpoch(4000));
+
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::InternalError);
+}
+
+}  // unnamed namespace

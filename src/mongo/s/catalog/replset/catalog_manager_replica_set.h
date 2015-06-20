@@ -39,115 +39,111 @@
 
 namespace mongo {
 
+/**
+ * Implements the catalog manager for talking to replica set config servers.
+ */
+class CatalogManagerReplicaSet final : public CatalogManager {
+public:
+    CatalogManagerReplicaSet();
+    virtual ~CatalogManagerReplicaSet();
+
     /**
-     * Implements the catalog manager for talking to replica set config servers.
+     * Initializes the catalog manager.
+     * Can only be called once for the lifetime of the catalog manager.
+     * TODO(spencer): Take pointer to ShardRegistry rather than getting it from the global
+     * "grid" object.
      */
-    class CatalogManagerReplicaSet final : public CatalogManager {
-    public:
-        CatalogManagerReplicaSet();
-        virtual ~CatalogManagerReplicaSet();
+    Status init(const ConnectionString& configCS, std::unique_ptr<DistLockManager> distLockManager);
 
-        /**
-         * Initializes the catalog manager.
-         * Can only be called once for the lifetime of the catalog manager.
-         * TODO(spencer): Take pointer to ShardRegistry rather than getting it from the global
-         * "grid" object.
-         */
-        Status init(const ConnectionString& configCS,
-                    std::unique_ptr<DistLockManager> distLockManager);
+    Status startup(bool upgrade) override;
 
-        Status startup(bool upgrade) override;
+    ConnectionString connectionString() const override;
 
-        ConnectionString connectionString() const override;
+    void shutDown() override;
 
-        void shutDown() override;
+    Status enableSharding(const std::string& dbName) override;
 
-        Status enableSharding(const std::string& dbName) override;
+    Status shardCollection(const std::string& ns,
+                           const ShardKeyPattern& fieldsAndOrder,
+                           bool unique,
+                           std::vector<BSONObj>* initPoints,
+                           std::set<ShardId>* initShardsIds = nullptr) override;
 
-        Status shardCollection(const std::string& ns,
-                               const ShardKeyPattern& fieldsAndOrder,
-                               bool unique,
-                               std::vector<BSONObj>* initPoints,
-                               std::set<ShardId>* initShardsIds = nullptr) override;
+    StatusWith<std::string> addShard(const std::string& name,
+                                     const ConnectionString& shardConnectionString,
+                                     const long long maxSize) override;
 
-        StatusWith<std::string> addShard(const std::string& name,
-                                         const ConnectionString& shardConnectionString,
-                                         const long long maxSize) override;
+    StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
+                                                const std::string& name) override;
 
-        StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
-                                                    const std::string& name) override;
+    Status createDatabase(const std::string& dbName) override;
 
-        Status createDatabase(const std::string& dbName) override;
+    Status updateDatabase(const std::string& dbName, const DatabaseType& db) override;
 
-        Status updateDatabase(const std::string& dbName, const DatabaseType& db) override;
+    StatusWith<DatabaseType> getDatabase(const std::string& dbName) override;
 
-        StatusWith<DatabaseType> getDatabase(const std::string& dbName) override;
+    Status updateCollection(const std::string& collNs, const CollectionType& coll) override;
 
-        Status updateCollection(const std::string& collNs, const CollectionType& coll) override;
+    StatusWith<CollectionType> getCollection(const std::string& collNs) override;
 
-        StatusWith<CollectionType> getCollection(const std::string& collNs) override;
+    Status getCollections(const std::string* dbName,
+                          std::vector<CollectionType>* collections) override;
 
-        Status getCollections(const std::string* dbName,
-                              std::vector<CollectionType>* collections) override;
+    Status dropCollection(const std::string& collectionNs) override;
 
-        Status dropCollection(const std::string& collectionNs) override;
+    Status getDatabasesForShard(const std::string& shardName,
+                                std::vector<std::string>* dbs) override;
 
-        Status getDatabasesForShard(const std::string& shardName,
-                                    std::vector<std::string>* dbs) override;
+    Status getChunks(const Query& query, int nToReturn, std::vector<ChunkType>* chunks) override;
 
-        Status getChunks(const Query& query,
-                         int nToReturn,
-                         std::vector<ChunkType>* chunks) override;
+    Status getTagsForCollection(const std::string& collectionNs,
+                                std::vector<TagsType>* tags) override;
 
-        Status getTagsForCollection(const std::string& collectionNs,
-                                    std::vector<TagsType>* tags) override;
+    StatusWith<std::string> getTagForChunk(const std::string& collectionNs,
+                                           const ChunkType& chunk) override;
 
-        StatusWith<std::string> getTagForChunk(const std::string& collectionNs,
-                                               const ChunkType& chunk) override;
+    Status getAllShards(std::vector<ShardType>* shards) override;
 
-        Status getAllShards(std::vector<ShardType>* shards) override;
+    bool isShardHost(const ConnectionString& shardConnectionString) override;
 
-        bool isShardHost(const ConnectionString& shardConnectionString) override;
+    bool runUserManagementWriteCommand(const std::string& commandName,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       BSONObjBuilder* result) override;
 
-        bool runUserManagementWriteCommand(const std::string& commandName,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           BSONObjBuilder* result) override;
+    bool runUserManagementReadCommand(const std::string& dbname,
+                                      const BSONObj& cmdObj,
+                                      BSONObjBuilder* result) override;
 
-        bool runUserManagementReadCommand(const std::string& dbname,
-                                          const BSONObj& cmdObj,
-                                          BSONObjBuilder* result) override;
+    Status applyChunkOpsDeprecated(const BSONArray& updateOps,
+                                   const BSONArray& preCondition) override;
 
-        Status applyChunkOpsDeprecated(const BSONArray& updateOps,
-                                       const BSONArray& preCondition) override;
+    void logAction(const ActionLogType& actionLog) override;
 
-        void logAction(const ActionLogType& actionLog) override;
+    void logChange(OperationContext* txn,
+                   const std::string& what,
+                   const std::string& ns,
+                   const BSONObj& detail) override;
 
-        void logChange(OperationContext* txn,
-                       const std::string& what,
-                       const std::string& ns,
-                       const BSONObj& detail) override;
+    StatusWith<SettingsType> getGlobalSettings(const std::string& key) override;
 
-        StatusWith<SettingsType> getGlobalSettings(const std::string& key) override;
+    void writeConfigServerDirect(const BatchedCommandRequest& request,
+                                 BatchedCommandResponse* response) override;
 
-        void writeConfigServerDirect(const BatchedCommandRequest& request,
-                                     BatchedCommandResponse* response) override;
+    DistLockManager* getDistLockManager() override;
 
-        DistLockManager* getDistLockManager() override;
+private:
+    // Config server connection string
+    ConnectionString _configServerConnectionString;
 
-    private:
+    // Distribted lock manager singleton.
+    std::unique_ptr<DistLockManager> _distLockManager;
 
-        // Config server connection string
-        ConnectionString _configServerConnectionString;
+    // protects _inShutdown
+    std::mutex _mutex;
 
-        // Distribted lock manager singleton.
-        std::unique_ptr<DistLockManager> _distLockManager;
+    // True if shutDown() has been called. False, otherwise.
+    bool _inShutdown = false;
+};
 
-        // protects _inShutdown
-        std::mutex _mutex;
-
-        // True if shutDown() has been called. False, otherwise.
-        bool _inShutdown = false;
-    };
-
-} // namespace mongo
+}  // namespace mongo

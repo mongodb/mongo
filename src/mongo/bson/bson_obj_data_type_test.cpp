@@ -34,35 +34,35 @@
 
 namespace mongo {
 
-    TEST(BSONObjDataType, ConstDataTypeRangeBSON) {
-        char buf[1000] = { 0 };
+TEST(BSONObjDataType, ConstDataTypeRangeBSON) {
+    char buf[1000] = {0};
 
-        DataRangeCursor drc(buf, buf + sizeof(buf));
+    DataRangeCursor drc(buf, buf + sizeof(buf));
 
-        {
-            BSONObjBuilder b;
-            b.append("a", 1);
+    {
+        BSONObjBuilder b;
+        b.append("a", 1);
 
-            ASSERT_OK(drc.writeAndAdvance(b.obj()));
-        }
-        {
-            BSONObjBuilder b;
-            b.append("b", "fooo");
+        ASSERT_OK(drc.writeAndAdvance(b.obj()));
+    }
+    {
+        BSONObjBuilder b;
+        b.append("b", "fooo");
 
-            ASSERT_OK(drc.writeAndAdvance(b.obj()));
-        }
-        {
-            BSONObjBuilder b;
-            b.append("c", 3);
+        ASSERT_OK(drc.writeAndAdvance(b.obj()));
+    }
+    {
+        BSONObjBuilder b;
+        b.append("c", 3);
 
-            ASSERT_OK(drc.writeAndAdvance(b.obj()));
-        }
-
-        ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
-
-        ASSERT_EQUALS(1, cdrc.readAndAdvance<BSONObj>().getValue().getField("a").numberInt());
-        ASSERT_EQUALS("fooo", cdrc.readAndAdvance<BSONObj>().getValue().getField("b").str());
-        ASSERT_EQUALS(3, cdrc.readAndAdvance<BSONObj>().getValue().getField("c").numberInt());
+        ASSERT_OK(drc.writeAndAdvance(b.obj()));
     }
 
-} // namespace mongo
+    ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
+
+    ASSERT_EQUALS(1, cdrc.readAndAdvance<BSONObj>().getValue().getField("a").numberInt());
+    ASSERT_EQUALS("fooo", cdrc.readAndAdvance<BSONObj>().getValue().getField("b").str());
+    ASSERT_EQUALS(3, cdrc.readAndAdvance<BSONObj>().getValue().getField("c").numberInt());
+}
+
+}  // namespace mongo

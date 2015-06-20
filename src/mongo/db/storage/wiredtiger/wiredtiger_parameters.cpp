@@ -41,23 +41,25 @@ using std::string;
 
 WiredTigerEngineRuntimeConfigParameter::WiredTigerEngineRuntimeConfigParameter(
     WiredTigerKVEngine* engine)
-    : ServerParameter(ServerParameterSet::getGlobal(),
-        "wiredTigerEngineRuntimeConfig", false, true),
-        _engine(engine) {}
+    : ServerParameter(
+          ServerParameterSet::getGlobal(), "wiredTigerEngineRuntimeConfig", false, true),
+      _engine(engine) {}
 
 
-void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* txn, BSONObjBuilder& b,
-                    const std::string& name) {
+void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* txn,
+                                                    BSONObjBuilder& b,
+                                                    const std::string& name) {
     b << name << "";
 }
 
 Status WiredTigerEngineRuntimeConfigParameter::set(const BSONElement& newValueElement) {
     try {
         return setFromString(newValueElement.String());
-    }
-    catch (MsgAssertionException msg) {
-        return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
-                "Invalid value for wiredTigerEngineRuntimeConfig via setParameter command: "
+    } catch (MsgAssertionException msg) {
+        return Status(
+            ErrorCodes::BadValue,
+            mongoutils::str::stream()
+                << "Invalid value for wiredTigerEngineRuntimeConfig via setParameter command: "
                 << newValueElement);
     }
 }
@@ -65,18 +67,19 @@ Status WiredTigerEngineRuntimeConfigParameter::set(const BSONElement& newValueEl
 Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& str) {
     size_t pos = str.find('\0');
     if (pos != std::string::npos) {
-        return Status(ErrorCodes::BadValue, (str::stream() <<
-            "WiredTiger configuration strings cannot have embedded null characters. "
-            "Embedded null found at position " << pos));
+        return Status(ErrorCodes::BadValue,
+                      (str::stream()
+                       << "WiredTiger configuration strings cannot have embedded null characters. "
+                          "Embedded null found at position " << pos));
     }
 
     log() << "Reconfiguring WiredTiger storage engine with config string: \"" << str << "\"";
 
     int ret = _engine->reconfigure(str.c_str());
     if (ret != 0) {
-        string result = (mongoutils::str::stream() <<
-            "WiredTiger reconfiguration failed with error code (" << ret << "): "
-            << wiredtiger_strerror(ret));
+        string result =
+            (mongoutils::str::stream() << "WiredTiger reconfiguration failed with error code ("
+                                       << ret << "): " << wiredtiger_strerror(ret));
         error() << result;
 
         return Status(ErrorCodes::BadValue, result);
@@ -84,5 +87,4 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
 
     return Status::OK();
 }
-
 }

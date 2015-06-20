@@ -40,8 +40,8 @@
 
 namespace mongo {
 namespace repl {
-    // Body of the thread that will do the background sync.
-    void runSyncThread();
+// Body of the thread that will do the background sync.
+void runSyncThread();
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

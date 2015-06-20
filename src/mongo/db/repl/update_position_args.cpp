@@ -39,109 +39,106 @@ namespace mongo {
 namespace repl {
 
 
-    UpdatePositionArgs::UpdateInfo::UpdateInfo(
-            const OID& anRid, const OpTime& aTs, long long aCfgver, long long aMemberId)
-        : rid(anRid), ts(aTs), cfgver(aCfgver), memberId(aMemberId) {}
+UpdatePositionArgs::UpdateInfo::UpdateInfo(const OID& anRid,
+                                           const OpTime& aTs,
+                                           long long aCfgver,
+                                           long long aMemberId)
+    : rid(anRid), ts(aTs), cfgver(aCfgver), memberId(aMemberId) {}
 
 namespace {
 
-    const std::string kCommandFieldName = "replSetUpdatePosition";
-    const std::string kUpdateArrayFieldName = "optimes";
+const std::string kCommandFieldName = "replSetUpdatePosition";
+const std::string kUpdateArrayFieldName = "optimes";
 
-    const std::string kLegalUpdatePositionFieldNames[] = {
-        kCommandFieldName,
-        kUpdateArrayFieldName,
-    };
+const std::string kLegalUpdatePositionFieldNames[] = {
+    kCommandFieldName, kUpdateArrayFieldName,
+};
 
-    const std::string kMemberRIDFieldName = "_id";
-    const std::string kMemberConfigFieldName = "config";
-    const std::string kOpTimeFieldName = "optime";
-    const std::string kMemberIdFieldName = "memberId";
-    const std::string kConfigVersionFieldName = "cfgver";
+const std::string kMemberRIDFieldName = "_id";
+const std::string kMemberConfigFieldName = "config";
+const std::string kOpTimeFieldName = "optime";
+const std::string kMemberIdFieldName = "memberId";
+const std::string kConfigVersionFieldName = "cfgver";
 
-    const std::string kLegalUpdateInfoFieldNames[] = {
-        kMemberConfigFieldName,
-        kMemberRIDFieldName,
-        kOpTimeFieldName,
-        kMemberIdFieldName,
-        kConfigVersionFieldName,
-    };
+const std::string kLegalUpdateInfoFieldNames[] = {
+    kMemberConfigFieldName,
+    kMemberRIDFieldName,
+    kOpTimeFieldName,
+    kMemberIdFieldName,
+    kConfigVersionFieldName,
+};
 
-} // namespace
+}  // namespace
 
-    Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
-        Status status = bsonCheckOnlyHasFields("UpdatePositionArgs",
-                                               argsObj,
-                                               kLegalUpdatePositionFieldNames);
+Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
+    Status status =
+        bsonCheckOnlyHasFields("UpdatePositionArgs", argsObj, kLegalUpdatePositionFieldNames);
 
+    if (!status.isOK())
+        return status;
+
+    // grab the array of changes
+    BSONElement updateArray;
+    status = bsonExtractTypedField(argsObj, kUpdateArrayFieldName, Array, &updateArray);
+    if (!status.isOK())
+        return status;
+
+    // now parse each array entry into an update
+    BSONObjIterator i(updateArray.Obj());
+    while (i.more()) {
+        BSONObj entry = i.next().Obj();
+        status = bsonCheckOnlyHasFields("UpdateInfoArgs", entry, kLegalUpdateInfoFieldNames);
         if (!status.isOK())
             return status;
 
-        // grab the array of changes
-        BSONElement updateArray;
-        status = bsonExtractTypedField(argsObj, kUpdateArrayFieldName, Array, &updateArray);
+        Timestamp ts;
+        status = bsonExtractTimestampField(entry, kOpTimeFieldName, &ts);
         if (!status.isOK())
             return status;
 
-        // now parse each array entry into an update
-        BSONObjIterator i(updateArray.Obj());
-        while(i.more()) {
-            BSONObj entry = i.next().Obj();
-            status = bsonCheckOnlyHasFields("UpdateInfoArgs",
-                                            entry,
-                                            kLegalUpdateInfoFieldNames);
-            if (!status.isOK())
-                return status;
+        // TODO(spencer): The following three fields are optional in 3.0, but should be made
+        // required or ignored in 3.0
+        long long cfgver;
+        status = bsonExtractIntegerFieldWithDefault(entry, kConfigVersionFieldName, -1, &cfgver);
+        if (!status.isOK())
+            return status;
 
-            Timestamp ts;
-            status = bsonExtractTimestampField(entry, kOpTimeFieldName, &ts);
-            if (!status.isOK())
-                return status;
+        OID rid;
+        status = bsonExtractOIDFieldWithDefault(entry, kMemberRIDFieldName, OID(), &rid);
+        if (!status.isOK())
+            return status;
 
-            // TODO(spencer): The following three fields are optional in 3.0, but should be made
-            // required or ignored in 3.0
-            long long cfgver;
-            status = bsonExtractIntegerFieldWithDefault(entry, kConfigVersionFieldName, -1, &cfgver);
-            if (!status.isOK())
-                return status;
+        long long memberID;
+        status = bsonExtractIntegerFieldWithDefault(entry, kMemberIdFieldName, -1, &memberID);
+        if (!status.isOK())
+            return status;
 
-            OID rid;
-            status = bsonExtractOIDFieldWithDefault(entry, kMemberRIDFieldName, OID(), &rid);
-            if (!status.isOK())
-                return status;
-
-            long long memberID;
-            status = bsonExtractIntegerFieldWithDefault(entry, kMemberIdFieldName, -1, &memberID);
-            if (!status.isOK())
-                return status;
-
-            // TODO(siyuan) parse and fill term whem adding it to update position command.
-            _updates.push_back(UpdateInfo(rid, OpTime(ts, 0), cfgver, memberID));
-        }
-
-        return Status::OK();
+        // TODO(siyuan) parse and fill term whem adding it to update position command.
+        _updates.push_back(UpdateInfo(rid, OpTime(ts, 0), cfgver, memberID));
     }
 
-    BSONObj UpdatePositionArgs::toBSON() const {
-        BSONObjBuilder builder;
-        // add command name
-        builder.append(kCommandFieldName, 1);
-        
-        // build array of updates
-        if (!_updates.empty()) {
-            BSONArrayBuilder updateArray(builder.subarrayStart(kUpdateArrayFieldName));
-            for (UpdatePositionArgs::UpdateIterator update = updatesBegin();
-                    update != updatesEnd();
-                    ++update) {
-                updateArray.append(BSON(kMemberRIDFieldName << update->rid <<
-                                        kOpTimeFieldName << update->ts.getTimestamp() <<
-                                        kConfigVersionFieldName << update->cfgver <<
-                                        kMemberIdFieldName << update->memberId));
-            }
-            updateArray.doneFast();
+    return Status::OK();
+}
+
+BSONObj UpdatePositionArgs::toBSON() const {
+    BSONObjBuilder builder;
+    // add command name
+    builder.append(kCommandFieldName, 1);
+
+    // build array of updates
+    if (!_updates.empty()) {
+        BSONArrayBuilder updateArray(builder.subarrayStart(kUpdateArrayFieldName));
+        for (UpdatePositionArgs::UpdateIterator update = updatesBegin(); update != updatesEnd();
+             ++update) {
+            updateArray.append(BSON(kMemberRIDFieldName << update->rid << kOpTimeFieldName
+                                                        << update->ts.getTimestamp()
+                                                        << kConfigVersionFieldName << update->cfgver
+                                                        << kMemberIdFieldName << update->memberId));
         }
-        return builder.obj();
+        updateArray.doneFast();
     }
+    return builder.obj();
+}
 
 }  // namespace repl
 }  // namespace mongo

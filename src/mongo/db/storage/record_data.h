@@ -35,58 +35,69 @@
 
 namespace mongo {
 
-    // TODO: Does this need to have move support?
+// TODO: Does this need to have move support?
+/**
+ * A replacement for the Record class. This class represents data in a record store.
+ * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
+ * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
+ * it must point to the same array as _data.
+ */
+class RecordData {
+public:
+    RecordData() : _data(NULL), _size(0) {}
+    RecordData(const char* data, int size) : _data(data), _size(size) {}
+
+    RecordData(SharedBuffer ownedData, int size)
+        : _data(ownedData.get()), _size(size), _ownedData(std::move(ownedData)) {}
+
+    const char* data() const {
+        return _data;
+    }
+
+    int size() const {
+        return _size;
+    }
+
     /**
-     * A replacement for the Record class. This class represents data in a record store.
-     * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
-     * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
-     * it must point to the same array as _data.
+     * Returns true if this owns its own memory, and false otherwise
      */
-    class RecordData {
-    public:
-        RecordData() : _data( NULL ), _size( 0 ) {}
-        RecordData(const char* data, int size): _data(data), _size(size) { }
+    bool isOwned() const {
+        return _ownedData.get();
+    }
 
-        RecordData(SharedBuffer ownedData, int size)
-            : _data(ownedData.get()), _size(size), _ownedData(std::move(ownedData)) {
-        }
+    SharedBuffer releaseBuffer() {
+        return std::move(_ownedData);
+    }
 
-        const char* data() const { return _data; }
+    BSONObj toBson() const {
+        return isOwned() ? BSONObj(_ownedData) : BSONObj(_data);
+    }
 
-        int size() const { return _size; }
+    BSONObj releaseToBson() {
+        return isOwned() ? BSONObj(releaseBuffer()) : BSONObj(_data);
+    }
 
-        /**
-         * Returns true if this owns its own memory, and false otherwise
-         */
-        bool isOwned() const { return _ownedData.get(); }
+    // TODO uncomment once we require compilers that support overloading for rvalue this.
+    // BSONObj toBson() && { return releaseToBson(); }
 
-        SharedBuffer releaseBuffer() {
-            return std::move(_ownedData);
-        }
+    RecordData getOwned() const {
+        if (isOwned())
+            return *this;
+        auto buffer = SharedBuffer::allocate(_size);
+        memcpy(buffer.get(), _data, _size);
+        return RecordData(buffer, _size);
+    }
 
-        BSONObj toBson() const { return isOwned() ? BSONObj(_ownedData) : BSONObj(_data); }
+    void makeOwned() {
+        if (isOwned())
+            return;
+        *this = getOwned();
+    }
 
-        BSONObj releaseToBson() { return isOwned() ? BSONObj(releaseBuffer()) : BSONObj(_data); }
+private:
+    const char* _data;
+    int _size;
+    SharedBuffer _ownedData;
+};
 
-        // TODO uncomment once we require compilers that support overloading for rvalue this.
-        // BSONObj toBson() && { return releaseToBson(); }
-
-        RecordData getOwned() const {
-            if (isOwned()) return *this;
-            auto buffer = SharedBuffer::allocate(_size);
-            memcpy(buffer.get(), _data, _size);
-            return RecordData(buffer, _size);
-        }
-
-        void makeOwned() {
-            if (isOwned()) return;
-            *this = getOwned();
-        }
-
-    private:
-        const char* _data;
-        int _size;
-        SharedBuffer _ownedData;
-    };
-
-} // namespace mongo
+}  // namespace mongo

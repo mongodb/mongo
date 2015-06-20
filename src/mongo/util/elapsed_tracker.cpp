@@ -36,33 +36,32 @@
 
 namespace mongo {
 
-    ElapsedTracker::ElapsedTracker( int32_t hitsBetweenMarks, int32_t msBetweenMarks ) :
-        _hitsBetweenMarks( hitsBetweenMarks ),
-        _msBetweenMarks( msBetweenMarks ),
-        _pings( 0 ),
-        _last( Listener::getElapsedTimeMillis() ) {
-    }
+ElapsedTracker::ElapsedTracker(int32_t hitsBetweenMarks, int32_t msBetweenMarks)
+    : _hitsBetweenMarks(hitsBetweenMarks),
+      _msBetweenMarks(msBetweenMarks),
+      _pings(0),
+      _last(Listener::getElapsedTimeMillis()) {}
 
-    bool ElapsedTracker::intervalHasElapsed() {
-        if ( ++_pings >= _hitsBetweenMarks ) {
-            _pings = 0;
-            _last = Listener::getElapsedTimeMillis();
-            return true;
-        }
-
-        long long now = Listener::getElapsedTimeMillis();
-        if ( now - _last > _msBetweenMarks ) {
-            _pings = 0;
-            _last = now;
-            return true;
-        }
-
-        return false;
-    }
-
-    void ElapsedTracker::resetLastTime() {
+bool ElapsedTracker::intervalHasElapsed() {
+    if (++_pings >= _hitsBetweenMarks) {
         _pings = 0;
         _last = Listener::getElapsedTimeMillis();
+        return true;
     }
 
-} // namespace mongo
+    long long now = Listener::getElapsedTimeMillis();
+    if (now - _last > _msBetweenMarks) {
+        _pings = 0;
+        _last = now;
+        return true;
+    }
+
+    return false;
+}
+
+void ElapsedTracker::resetLastTime() {
+    _pings = 0;
+    _last = Listener::getElapsedTimeMillis();
+}
+
+}  // namespace mongo

@@ -39,39 +39,41 @@
 
 namespace mongo {
 
-    extern std::string dbExecCommand;
+extern std::string dbExecCommand;
 
-    /** a high level recording of operations to the database - sometimes used for diagnostics 
-        and debugging.
-        */
-    class DiagLog {
-        std::ofstream *f; // note this is never freed
-        /* 0 = off; 1 = writes, 2 = reads, 3 = both
-           7 = log a few reads, and all writes.
-        */
-        int level;
-        stdx::mutex mutex;
-        void openFile();
+/** a high level recording of operations to the database - sometimes used for diagnostics
+    and debugging.
+    */
+class DiagLog {
+    std::ofstream* f;  // note this is never freed
+                       /* 0 = off; 1 = writes, 2 = reads, 3 = both
+                          7 = log a few reads, and all writes.
+                       */
+    int level;
+    stdx::mutex mutex;
+    void openFile();
 
-    public:
-        DiagLog();
-        int getLevel() const { return level; }
-        /**
-         * @return old
-         */
-        int setLevel( int newLevel );
-        void flush();
-        void writeop(char *data,int len);
-        void readop(char *data, int len);
-    };
+public:
+    DiagLog();
+    int getLevel() const {
+        return level;
+    }
+    /**
+     * @return old
+     */
+    int setLevel(int newLevel);
+    void flush();
+    void writeop(char* data, int len);
+    void readop(char* data, int len);
+};
 
-    extern DiagLog _diaglog;
+extern DiagLog _diaglog;
 
-    void assembleResponse( OperationContext* txn,
-                           Message& m,
-                           DbResponse& dbresponse,
-                           const HostAndPort &client );
+void assembleResponse(OperationContext* txn,
+                      Message& m,
+                      DbResponse& dbresponse,
+                      const HostAndPort& client);
 
-    void maybeCreatePidFile();
+void maybeCreatePidFile();
 
-} // namespace mongo
+}  // namespace mongo

@@ -48,117 +48,114 @@
 
 namespace mongo {
 namespace {
-    Status wrappedRun(OperationContext* txn,
-                      const StringData& dbname,
-                      const std::string& toDeleteNs,
-                      Database* const db,
-                      const BSONObj& jsobj,
-                      BSONObjBuilder* anObjBuilder) {
-        if (!serverGlobalParams.quiet) {
-            LOG(0) << "CMD: dropIndexes " << toDeleteNs;
-        }
-        Collection* collection = db ? db->getCollection(toDeleteNs) : nullptr;
-
-        // If db/collection does not exist, short circuit and return.
-        if (!db || !collection) {
-            return Status(ErrorCodes::NamespaceNotFound, "ns not found");
-        }
-
-        OldClientContext ctx(txn, toDeleteNs);
-        BackgroundOperation::assertNoBgOpInProgForNs(toDeleteNs);
-
-        IndexCatalog* indexCatalog = collection->getIndexCatalog();
-        anObjBuilder->appendNumber("nIndexesWas", indexCatalog->numIndexesTotal(txn));
-
-
-        BSONElement f = jsobj.getField("index");
-        if (f.type() == String) {
-
-            std::string indexToDelete = f.valuestr();
-
-            if (indexToDelete == "*") {
-                Status s = indexCatalog->dropAllIndexes(txn, false);
-                if (!s.isOK()) {
-                    return s;
-                }
-                anObjBuilder->append("msg", "non-_id indexes dropped for collection");
-                return Status::OK();
-            }
-
-            IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(txn,
-                                                                                   indexToDelete);
-            if (desc == NULL) {
-                return Status(ErrorCodes::IndexNotFound,
-                              str::stream() << "index not found with name ["
-                                            << indexToDelete << "]");
-            }
-
-            if (desc->isIdIndex()) {
-                return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
-            }
-
-            Status s = indexCatalog->dropIndex(txn, desc);
-            if (!s.isOK()) {
-                return s;
-            }
-
-            return Status::OK();
-        }
-
-        if (f.type() == Object) {
-            IndexDescriptor* desc =
-                collection->getIndexCatalog()->findIndexByKeyPattern(txn, f.embeddedObject());
-            if (desc == NULL) {
-                return Status(ErrorCodes::InvalidOptions,
-                              str::stream() << "can't find index with key: "
-                                            << f.embeddedObject().toString());
-            }
-
-            if (desc->isIdIndex()) {
-                return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
-            }
-
-            Status s = indexCatalog->dropIndex(txn, desc);
-            if (!s.isOK()) {
-                return s;
-            }
-
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::IndexNotFound, "invalid index name spec");
+Status wrappedRun(OperationContext* txn,
+                  const StringData& dbname,
+                  const std::string& toDeleteNs,
+                  Database* const db,
+                  const BSONObj& jsobj,
+                  BSONObjBuilder* anObjBuilder) {
+    if (!serverGlobalParams.quiet) {
+        LOG(0) << "CMD: dropIndexes " << toDeleteNs;
     }
-} // namespace
+    Collection* collection = db ? db->getCollection(toDeleteNs) : nullptr;
 
-    Status dropIndexes(OperationContext* txn,
-                       const NamespaceString& ns,
-                       const BSONObj& idxDescriptor,
-                       BSONObjBuilder* result) {
-        StringData dbName = ns.db();
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(txn, MODE_IX);
-            AutoGetDb autoDb(txn, dbName, MODE_X);
+    // If db/collection does not exist, short circuit and return.
+    if (!db || !collection) {
+        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+    }
 
-            bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns);
+    OldClientContext ctx(txn, toDeleteNs);
+    BackgroundOperation::assertNoBgOpInProgForNs(toDeleteNs);
 
-            if (userInitiatedWritesAndNotPrimary) {
-                return Status(ErrorCodes::NotMaster,
-                              str::stream() << "Not primary while dropping indexes in "
-                                            << ns.toString());
+    IndexCatalog* indexCatalog = collection->getIndexCatalog();
+    anObjBuilder->appendNumber("nIndexesWas", indexCatalog->numIndexesTotal(txn));
+
+
+    BSONElement f = jsobj.getField("index");
+    if (f.type() == String) {
+        std::string indexToDelete = f.valuestr();
+
+        if (indexToDelete == "*") {
+            Status s = indexCatalog->dropAllIndexes(txn, false);
+            if (!s.isOK()) {
+                return s;
             }
+            anObjBuilder->append("msg", "non-_id indexes dropped for collection");
+            return Status::OK();
+        }
 
-            WriteUnitOfWork wunit(txn);
-            Status status = wrappedRun(txn, dbName, ns, autoDb.getDb(), idxDescriptor, result);
-            if (!status.isOK()) {
-                return status;
-            }
-            getGlobalServiceContext()->getOpObserver()->onDropIndex(txn,
-                                                                    dbName.toString() + ".$cmd",
-                                                                    idxDescriptor);
-            wunit.commit();
-        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropIndexes", dbName);
+        IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(txn, indexToDelete);
+        if (desc == NULL) {
+            return Status(ErrorCodes::IndexNotFound,
+                          str::stream() << "index not found with name [" << indexToDelete << "]");
+        }
+
+        if (desc->isIdIndex()) {
+            return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
+        }
+
+        Status s = indexCatalog->dropIndex(txn, desc);
+        if (!s.isOK()) {
+            return s;
+        }
+
         return Status::OK();
     }
 
-} // namespace mongo
+    if (f.type() == Object) {
+        IndexDescriptor* desc =
+            collection->getIndexCatalog()->findIndexByKeyPattern(txn, f.embeddedObject());
+        if (desc == NULL) {
+            return Status(ErrorCodes::InvalidOptions,
+                          str::stream()
+                              << "can't find index with key: " << f.embeddedObject().toString());
+        }
+
+        if (desc->isIdIndex()) {
+            return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
+        }
+
+        Status s = indexCatalog->dropIndex(txn, desc);
+        if (!s.isOK()) {
+            return s;
+        }
+
+        return Status::OK();
+    }
+
+    return Status(ErrorCodes::IndexNotFound, "invalid index name spec");
+}
+}  // namespace
+
+Status dropIndexes(OperationContext* txn,
+                   const NamespaceString& ns,
+                   const BSONObj& idxDescriptor,
+                   BSONObjBuilder* result) {
+    StringData dbName = ns.db();
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction transaction(txn, MODE_IX);
+        AutoGetDb autoDb(txn, dbName, MODE_X);
+
+        bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns);
+
+        if (userInitiatedWritesAndNotPrimary) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while dropping indexes in "
+                                        << ns.toString());
+        }
+
+        WriteUnitOfWork wunit(txn);
+        Status status = wrappedRun(txn, dbName, ns, autoDb.getDb(), idxDescriptor, result);
+        if (!status.isOK()) {
+            return status;
+        }
+        getGlobalServiceContext()->getOpObserver()->onDropIndex(
+            txn, dbName.toString() + ".$cmd", idxDescriptor);
+        wunit.commit();
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropIndexes", dbName);
+    return Status::OK();
+}
+
+}  // namespace mongo

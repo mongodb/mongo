@@ -41,102 +41,98 @@ using std::stringstream;
 
 namespace mongo {
 
-    using std::unique_ptr;
+using std::unique_ptr;
 
-    // Insert a record and try to delete it.
-    TEST( RecordStoreTestHarness, DeleteRecord ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Insert a record and try to delete it.
+TEST(RecordStoreTestHarness, DeleteRecord) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    string data = "my record";
+    RecordId loc;
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        string data = "my record";
-        RecordId loc;
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                rs->deleteRecord( opCtx.get(), loc );
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
         }
     }
 
-    // Insert multiple records and try to delete them.
-    TEST( RecordStoreTestHarness, DeleteMultipleRecords ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+    }
 
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        const int nToInsert = 10;
-        RecordId locs[nToInsert];
-        for ( int i = 0; i < nToInsert; i++ ) {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                stringstream ss;
-                ss << "record " << i;
-                string data = ss.str();
-
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                locs[i] = res.getValue();
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
-        }
-
-        for ( int i = 0; i < nToInsert; i++ ) {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                rs->deleteRecord( opCtx.get(), locs[i] );
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            rs->deleteRecord(opCtx.get(), loc);
+            uow.commit();
         }
     }
 
-} // namespace mongo
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+}
+
+// Insert multiple records and try to delete them.
+TEST(RecordStoreTestHarness, DeleteMultipleRecords) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    const int nToInsert = 10;
+    RecordId locs[nToInsert];
+    for (int i = 0; i < nToInsert; i++) {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            stringstream ss;
+            ss << "record " << i;
+            string data = ss.str();
+
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            locs[i] = res.getValue();
+            uow.commit();
+        }
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
+
+    for (int i = 0; i < nToInsert; i++) {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            rs->deleteRecord(opCtx.get(), locs[i]);
+            uow.commit();
+        }
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+}
+
+}  // namespace mongo

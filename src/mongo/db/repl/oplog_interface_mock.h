@@ -34,21 +34,23 @@
 namespace mongo {
 namespace repl {
 
-    /**
-     * Simulates oplog for testing rollback functionality.
-     */
-    class OplogInterfaceMock : public OplogInterface {
-        MONGO_DISALLOW_COPYING(OplogInterfaceMock);
-    public:
-        using Operation = std::pair<BSONObj,RecordId>;
-        using Operations = std::list<Operation>;
-        explicit OplogInterfaceMock(std::initializer_list<Operation> operations);
-        explicit OplogInterfaceMock(const Operations& operations);
-        std::string toString() const override;
-        std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
-    private:
-        Operations _operations;
-    };
+/**
+ * Simulates oplog for testing rollback functionality.
+ */
+class OplogInterfaceMock : public OplogInterface {
+    MONGO_DISALLOW_COPYING(OplogInterfaceMock);
 
-} // namespace repl
-} // namespace mongo
+public:
+    using Operation = std::pair<BSONObj, RecordId>;
+    using Operations = std::list<Operation>;
+    explicit OplogInterfaceMock(std::initializer_list<Operation> operations);
+    explicit OplogInterfaceMock(const Operations& operations);
+    std::string toString() const override;
+    std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
+
+private:
+    Operations _operations;
+};
+
+}  // namespace repl
+}  // namespace mongo

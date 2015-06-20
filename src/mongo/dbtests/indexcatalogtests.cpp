@@ -28,152 +28,151 @@
 
 namespace IndexCatalogTests {
 
-    static const char* const _ns = "unittests.indexcatalog";
+static const char* const _ns = "unittests.indexcatalog";
 
-    class IndexIteratorTests {
-    public:
-        IndexIteratorTests() {
-            OperationContextImpl txn;
-            ScopedTransaction transaction(&txn, MODE_IX);
-            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
-            OldClientContext ctx(&txn, _ns);
-            WriteUnitOfWork wuow(&txn);
+class IndexIteratorTests {
+public:
+    IndexIteratorTests() {
+        OperationContextImpl txn;
+        ScopedTransaction transaction(&txn, MODE_IX);
+        Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+        OldClientContext ctx(&txn, _ns);
+        WriteUnitOfWork wuow(&txn);
 
-            _db = ctx.db();
-            _coll = _db->createCollection(&txn, _ns);
-            _catalog = _coll->getIndexCatalog();
-            wuow.commit();
-        }
+        _db = ctx.db();
+        _coll = _db->createCollection(&txn, _ns);
+        _catalog = _coll->getIndexCatalog();
+        wuow.commit();
+    }
 
-        ~IndexIteratorTests() {
-            OperationContextImpl txn;
-            ScopedTransaction transaction(&txn, MODE_IX);
-            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
-            OldClientContext ctx(&txn, _ns);
-            WriteUnitOfWork wuow(&txn);
+    ~IndexIteratorTests() {
+        OperationContextImpl txn;
+        ScopedTransaction transaction(&txn, MODE_IX);
+        Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+        OldClientContext ctx(&txn, _ns);
+        WriteUnitOfWork wuow(&txn);
 
-            _db->dropCollection(&txn, _ns);
-            wuow.commit();
-        }
+        _db->dropCollection(&txn, _ns);
+        wuow.commit();
+    }
 
-        void run() {
-            OperationContextImpl txn;
-            OldClientWriteContext ctx(&txn, _ns);
+    void run() {
+        OperationContextImpl txn;
+        OldClientWriteContext ctx(&txn, _ns);
 
-            int numFinishedIndexesStart = _catalog->numIndexesReady(&txn);
+        int numFinishedIndexesStart = _catalog->numIndexesReady(&txn);
 
-            dbtests::createIndex(&txn, _ns, BSON("x" << 1));
-            dbtests::createIndex(&txn, _ns, BSON("y" << 1));
+        dbtests::createIndex(&txn, _ns, BSON("x" << 1));
+        dbtests::createIndex(&txn, _ns, BSON("y" << 1));
 
-            ASSERT_TRUE(_catalog->numIndexesReady(&txn) == numFinishedIndexesStart+2);
+        ASSERT_TRUE(_catalog->numIndexesReady(&txn) == numFinishedIndexesStart + 2);
 
-            IndexCatalog::IndexIterator ii = _catalog->getIndexIterator(&txn,false);
-            int indexesIterated = 0;
-            bool foundIndex = false;
-            while (ii.more()) {
-                IndexDescriptor* indexDesc = ii.next();
-                indexesIterated++;
-                BSONObjIterator boit(indexDesc->infoObj());
-                while (boit.more() && !foundIndex) {
-                    BSONElement e = boit.next();
-                    if (str::equals(e.fieldName(), "name") &&
-                            str::equals(e.valuestrsafe(), "y_1")) {
-                        foundIndex = true;
-                        break;
-                    }
+        IndexCatalog::IndexIterator ii = _catalog->getIndexIterator(&txn, false);
+        int indexesIterated = 0;
+        bool foundIndex = false;
+        while (ii.more()) {
+            IndexDescriptor* indexDesc = ii.next();
+            indexesIterated++;
+            BSONObjIterator boit(indexDesc->infoObj());
+            while (boit.more() && !foundIndex) {
+                BSONElement e = boit.next();
+                if (str::equals(e.fieldName(), "name") && str::equals(e.valuestrsafe(), "y_1")) {
+                    foundIndex = true;
+                    break;
                 }
             }
-
-            ASSERT_TRUE(indexesIterated == _catalog->numIndexesReady(&txn));
-            ASSERT_TRUE(foundIndex);
         }
 
-    private:
-        IndexCatalog* _catalog;
-        Collection* _coll;
-        Database* _db;
-    };
+        ASSERT_TRUE(indexesIterated == _catalog->numIndexesReady(&txn));
+        ASSERT_TRUE(foundIndex);
+    }
 
-    /**
-     * Test for IndexCatalog::refreshEntry().
-     */
-    class RefreshEntry {
-    public:
-        RefreshEntry() {
-            OperationContextImpl txn;
-            ScopedTransaction transaction(&txn, MODE_IX);
-            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
-            OldClientContext ctx(&txn, _ns);
+private:
+    IndexCatalog* _catalog;
+    Collection* _coll;
+    Database* _db;
+};
+
+/**
+ * Test for IndexCatalog::refreshEntry().
+ */
+class RefreshEntry {
+public:
+    RefreshEntry() {
+        OperationContextImpl txn;
+        ScopedTransaction transaction(&txn, MODE_IX);
+        Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+        OldClientContext ctx(&txn, _ns);
+        WriteUnitOfWork wuow(&txn);
+
+        _db = ctx.db();
+        _coll = _db->createCollection(&txn, _ns);
+        _catalog = _coll->getIndexCatalog();
+        wuow.commit();
+    }
+
+    ~RefreshEntry() {
+        OperationContextImpl txn;
+        ScopedTransaction transaction(&txn, MODE_IX);
+        Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+        OldClientContext ctx(&txn, _ns);
+        WriteUnitOfWork wuow(&txn);
+
+        _db->dropCollection(&txn, _ns);
+        wuow.commit();
+    }
+
+    void run() {
+        OperationContextImpl txn;
+        OldClientWriteContext ctx(&txn, _ns);
+        const std::string indexName = "x_1";
+
+        ASSERT_OK(dbtests::createIndexFromSpec(&txn,
+                                               _ns,
+                                               BSON("name" << indexName << "ns" << _ns << "key"
+                                                           << BSON("x" << 1) << "expireAfterSeconds"
+                                                           << 5)));
+
+        const IndexDescriptor* desc = _catalog->findIndexByName(&txn, indexName);
+        ASSERT(desc);
+        ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
+
+        // Change value of "expireAfterSeconds" on disk.
+        {
             WriteUnitOfWork wuow(&txn);
-
-            _db = ctx.db();
-            _coll = _db->createCollection(&txn, _ns);
-            _catalog = _coll->getIndexCatalog();
+            _coll->getCatalogEntry()->updateTTLSetting(&txn, "x_1", 10);
             wuow.commit();
         }
 
-        ~RefreshEntry () {
-            OperationContextImpl txn;
-            ScopedTransaction transaction(&txn, MODE_IX);
-            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
-            OldClientContext ctx(&txn, _ns);
-            WriteUnitOfWork wuow(&txn);
+        // Verify that the catalog does not yet know of the change.
+        desc = _catalog->findIndexByName(&txn, indexName);
+        ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
 
-            _db->dropCollection(&txn, _ns);
+        {
+            // Notify the catalog of the change.
+            WriteUnitOfWork wuow(&txn);
+            desc = _catalog->refreshEntry(&txn, desc);
             wuow.commit();
         }
 
-        void run() {
-            OperationContextImpl txn;
-            OldClientWriteContext ctx(&txn, _ns);
-            const std::string indexName = "x_1";
+        // Test that the catalog reflects the change.
+        ASSERT_EQUALS(10, desc->infoObj()["expireAfterSeconds"].numberLong());
+    }
 
-            ASSERT_OK(dbtests::createIndexFromSpec(&txn, _ns, BSON("name" << indexName <<
-                                                                   "ns" << _ns <<
-                                                                   "key" << BSON("x" << 1) <<
-                                                                   "expireAfterSeconds" << 5)));
+private:
+    IndexCatalog* _catalog;
+    Collection* _coll;
+    Database* _db;
+};
 
-            const IndexDescriptor* desc = _catalog->findIndexByName(&txn, indexName);
-            ASSERT(desc);
-            ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
+class IndexCatalogTests : public Suite {
+public:
+    IndexCatalogTests() : Suite("indexcatalogtests") {}
+    void setupTests() {
+        add<IndexIteratorTests>();
+        add<RefreshEntry>();
+    }
+};
 
-            // Change value of "expireAfterSeconds" on disk.
-            {
-                WriteUnitOfWork wuow(&txn);
-                _coll->getCatalogEntry()->updateTTLSetting(&txn, "x_1", 10);
-                wuow.commit();
-            }
-
-            // Verify that the catalog does not yet know of the change.
-            desc = _catalog->findIndexByName(&txn, indexName);
-            ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
-
-            {
-                // Notify the catalog of the change.
-                WriteUnitOfWork wuow(&txn);
-                desc = _catalog->refreshEntry(&txn, desc);
-                wuow.commit();
-            }
-
-            // Test that the catalog reflects the change.
-            ASSERT_EQUALS(10, desc->infoObj()["expireAfterSeconds"].numberLong());
-        }
-
-    private:
-        IndexCatalog* _catalog;
-        Collection* _coll;
-        Database* _db;
-    };
-
-    class IndexCatalogTests : public Suite {
-    public:
-        IndexCatalogTests() : Suite( "indexcatalogtests" ) {
-        }
-        void setupTests() {
-            add<IndexIteratorTests>();
-            add<RefreshEntry>();
-        }
-    };
-
-    SuiteInstance<IndexCatalogTests> indexCatalogTests;
+SuiteInstance<IndexCatalogTests> indexCatalogTests;
 }

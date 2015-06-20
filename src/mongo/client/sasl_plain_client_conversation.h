@@ -36,21 +36,22 @@
 #include "mongo/client/sasl_client_conversation.h"
 
 namespace mongo {
+/**
+ *  Client side authentication session for SASL PLAIN.
+ */
+class SaslPLAINClientConversation : public SaslClientConversation {
+    MONGO_DISALLOW_COPYING(SaslPLAINClientConversation);
+
+public:
     /**
-     *  Client side authentication session for SASL PLAIN.
-     */
-    class SaslPLAINClientConversation : public SaslClientConversation {
-        MONGO_DISALLOW_COPYING(SaslPLAINClientConversation);
-    public:
-        /**
-         * Implements the client side of a SASL PLAIN mechanism session.
-         *
-         **/
-        explicit SaslPLAINClientConversation(SaslClientSession* saslClientSession);
+     * Implements the client side of a SASL PLAIN mechanism session.
+     *
+     **/
+    explicit SaslPLAINClientConversation(SaslClientSession* saslClientSession);
 
-        virtual ~SaslPLAINClientConversation();
+    virtual ~SaslPLAINClientConversation();
 
-        virtual StatusWith<bool> step(StringData inputData, std::string* outputData);
-    };
+    virtual StatusWith<bool> step(StringData inputData, std::string* outputData);
+};
 
 }  // namespace mongo

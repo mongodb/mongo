@@ -39,143 +39,143 @@
 
 namespace mongo {
 
-    const std::string ShardType::ConfigNS = "config.shards";
+const std::string ShardType::ConfigNS = "config.shards";
 
-    const BSONField<std::string> ShardType::name("_id");
-    const BSONField<std::string> ShardType::host("host");
-    const BSONField<bool> ShardType::draining("draining");
-    const BSONField<long long> ShardType::maxSizeMB("maxSize");
-    const BSONField<BSONArray> ShardType::tags("tags");
+const BSONField<std::string> ShardType::name("_id");
+const BSONField<std::string> ShardType::host("host");
+const BSONField<bool> ShardType::draining("draining");
+const BSONField<long long> ShardType::maxSizeMB("maxSize");
+const BSONField<BSONArray> ShardType::tags("tags");
 
 
-    StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
-        ShardType shard;
+StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
+    ShardType shard;
 
-        {
-            std::string shardName;
-            Status status = bsonExtractStringField(source, name.name(), &shardName);
-            if (!status.isOK()) return status;
-            shard._name = shardName;
+    {
+        std::string shardName;
+        Status status = bsonExtractStringField(source, name.name(), &shardName);
+        if (!status.isOK())
+            return status;
+        shard._name = shardName;
+    }
+
+    {
+        std::string shardHost;
+        Status status = bsonExtractStringField(source, host.name(), &shardHost);
+        if (!status.isOK())
+            return status;
+        shard._host = shardHost;
+    }
+
+    {
+        bool isShardDraining;
+        Status status = bsonExtractBooleanField(source, draining.name(), &isShardDraining);
+        if (status.isOK()) {
+            shard._draining = isShardDraining;
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // draining field can be mssing in which case it is presumed false
+        } else {
+            return status;
         }
+    }
 
-        {
-            std::string shardHost;
-            Status status = bsonExtractStringField(source, host.name(), &shardHost);
-            if (!status.isOK()) return status;
-            shard._host = shardHost;
+    {
+        long long shardMaxSizeMB;
+        // maxSizeMB == 0 means there's no limitation to space usage.
+        Status status = bsonExtractIntegerField(source, maxSizeMB.name(), &shardMaxSizeMB);
+        if (status.isOK()) {
+            shard._maxSizeMB = shardMaxSizeMB;
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // maxSizeMB field can be missing in which case it is presumed false
+        } else {
+            return status;
         }
+    }
 
-        {
-            bool isShardDraining;
-            Status status = bsonExtractBooleanField(source,
-                                                    draining.name(),
-                                                    &isShardDraining);
-            if (status.isOK()) {
-                shard._draining = isShardDraining;
+    if (source.hasField(tags.name())) {
+        shard._tags = std::vector<std::string>();
+        BSONElement tagsElement;
+        Status status = bsonExtractTypedField(source, tags.name(), Array, &tagsElement);
+        if (!status.isOK())
+            return status;
+
+        BSONObjIterator it(tagsElement.Obj());
+        while (it.more()) {
+            BSONElement tagElement = it.next();
+            if (tagElement.type() != String) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "Elements in \"" << tags.name()
+                                            << "\" array must be strings but found "
+                                            << typeName(tagElement.type()));
             }
-            else if (status == ErrorCodes::NoSuchKey) {
-                // draining field can be mssing in which case it is presumed false
-            }
-            else {
-                return status;
-            }
+            shard._tags->push_back(tagElement.String());
         }
-
-        {
-            long long shardMaxSizeMB;
-            // maxSizeMB == 0 means there's no limitation to space usage.
-            Status status = bsonExtractIntegerField(source,
-                                                    maxSizeMB.name(),
-                                                    &shardMaxSizeMB);
-            if (status.isOK()) {
-                shard._maxSizeMB = shardMaxSizeMB;
-            }
-            else if (status == ErrorCodes::NoSuchKey) {
-                // maxSizeMB field can be missing in which case it is presumed false
-            }
-            else {
-                return status;
-            }
-        }
-
-        if (source.hasField(tags.name())) {
-            shard._tags = std::vector<std::string>();
-            BSONElement tagsElement;
-            Status status = bsonExtractTypedField(source, tags.name(), Array, &tagsElement);
-            if (!status.isOK()) return status;
-
-            BSONObjIterator it(tagsElement.Obj());
-            while (it.more()) {
-                BSONElement tagElement = it.next();
-                if (tagElement.type() != String) {
-                    return Status(ErrorCodes::TypeMismatch,
-                                  str::stream() << "Elements in \"" << tags.name()
-                                                << "\" array must be strings but found "
-                                                <<  typeName(tagElement.type()));
-                }
-                shard._tags->push_back(tagElement.String());
-            }
-        }
-
-        return shard;
     }
 
-    Status ShardType::validate() const {
-        if (!_name.is_initialized() || _name->empty()) {
-            return Status(ErrorCodes::NoSuchKey,
-                          str::stream() << "missing " << name.name() << " field");
-        }
+    return shard;
+}
 
-        if (!_host.is_initialized() || _host->empty()) {
-            return Status(ErrorCodes::NoSuchKey,
-                          str::stream() << "missing " << host.name() << " field");
-        }
-
-        if (_maxSizeMB.is_initialized() && getMaxSizeMB() < 0) {
-            return Status(ErrorCodes::BadValue, str::stream() << "maxSize can't be negative");
-        }
-
-        return Status::OK();
+Status ShardType::validate() const {
+    if (!_name.is_initialized() || _name->empty()) {
+        return Status(ErrorCodes::NoSuchKey,
+                      str::stream() << "missing " << name.name() << " field");
     }
 
-    BSONObj ShardType::toBSON() const {
-        BSONObjBuilder builder;
-
-        if (_name) builder.append(name(), getName());
-        if (_host) builder.append(host(), getHost());
-        if (_draining) builder.append(draining(), getDraining());
-        if (_maxSizeMB) builder.append(maxSizeMB(), getMaxSizeMB());
-        if (_tags) builder.append(tags(), getTags());
-
-        return builder.obj();
+    if (!_host.is_initialized() || _host->empty()) {
+        return Status(ErrorCodes::NoSuchKey,
+                      str::stream() << "missing " << host.name() << " field");
     }
 
-    std::string ShardType::toString() const {
-        return toBSON().toString();
+    if (_maxSizeMB.is_initialized() && getMaxSizeMB() < 0) {
+        return Status(ErrorCodes::BadValue, str::stream() << "maxSize can't be negative");
     }
 
-    void ShardType::setName(const std::string& name) {
-        invariant(!name.empty());
-        _name = name;
-    }
+    return Status::OK();
+}
 
-    void ShardType::setHost(const std::string& host) {
-        invariant(!host.empty());
-        _host = host;
-    }
+BSONObj ShardType::toBSON() const {
+    BSONObjBuilder builder;
 
-    void ShardType::setDraining(const bool isDraining) {
-        _draining = isDraining;
-    }
+    if (_name)
+        builder.append(name(), getName());
+    if (_host)
+        builder.append(host(), getHost());
+    if (_draining)
+        builder.append(draining(), getDraining());
+    if (_maxSizeMB)
+        builder.append(maxSizeMB(), getMaxSizeMB());
+    if (_tags)
+        builder.append(tags(), getTags());
 
-    void ShardType::setMaxSizeMB(const long long maxSizeMB) {
-        invariant(maxSizeMB >= 0);
-        _maxSizeMB = maxSizeMB;
-    }
+    return builder.obj();
+}
 
-    void ShardType::setTags(const std::vector<std::string>& tags) {
-        invariant(tags.size() > 0);
-        _tags = tags;
-    }
+std::string ShardType::toString() const {
+    return toBSON().toString();
+}
 
-} // namespace mongo
+void ShardType::setName(const std::string& name) {
+    invariant(!name.empty());
+    _name = name;
+}
+
+void ShardType::setHost(const std::string& host) {
+    invariant(!host.empty());
+    _host = host;
+}
+
+void ShardType::setDraining(const bool isDraining) {
+    _draining = isDraining;
+}
+
+void ShardType::setMaxSizeMB(const long long maxSizeMB) {
+    invariant(maxSizeMB >= 0);
+    _maxSizeMB = maxSizeMB;
+}
+
+void ShardType::setTags(const std::vector<std::string>& tags) {
+    invariant(tags.size() > 0);
+    _tags = tags;
+}
+
+}  // namespace mongo

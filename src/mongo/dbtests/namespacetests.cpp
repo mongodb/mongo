@@ -58,84 +58,89 @@
 
 namespace NamespaceTests {
 
-    using std::string;
+using std::string;
 
-    const int MinExtentSize = 4096;
+const int MinExtentSize = 4096;
 
-    namespace MissingFieldTests {
+namespace MissingFieldTests {
 
-        /** A missing field is represented as null in a btree index. */
-        class BtreeIndexMissingField {
-        public:
-            void run() {
-                OperationContextImpl txn;
-                BSONObj spec( BSON("key" << BSON( "a" << 1 ) ));
-                ASSERT_EQUALS(jstNULL, IndexLegacy::getMissingField(&txn, NULL,spec).firstElement().type());
-            }
-        };
-        
-        /** A missing field is represented as null in a 2d index. */
-        class TwoDIndexMissingField {
-        public:
-            void run() {
-                OperationContextImpl txn;
-                BSONObj spec( BSON("key" << BSON( "a" << "2d" ) ));
-                ASSERT_EQUALS(jstNULL, IndexLegacy::getMissingField(&txn, NULL,spec).firstElement().type());
-            }
-        };
+/** A missing field is represented as null in a btree index. */
+class BtreeIndexMissingField {
+public:
+    void run() {
+        OperationContextImpl txn;
+        BSONObj spec(BSON("key" << BSON("a" << 1)));
+        ASSERT_EQUALS(jstNULL,
+                      IndexLegacy::getMissingField(&txn, NULL, spec).firstElement().type());
+    }
+};
 
-        /** A missing field is represented with the hash of null in a hashed index. */
-        class HashedIndexMissingField {
-        public:
-            void run() {
-                OperationContextImpl txn;
-                BSONObj spec( BSON("key" << BSON( "a" << "hashed" ) ));
-                BSONObj nullObj = BSON( "a" << BSONNULL );
+/** A missing field is represented as null in a 2d index. */
+class TwoDIndexMissingField {
+public:
+    void run() {
+        OperationContextImpl txn;
+        BSONObj spec(BSON("key" << BSON("a"
+                                        << "2d")));
+        ASSERT_EQUALS(jstNULL,
+                      IndexLegacy::getMissingField(&txn, NULL, spec).firstElement().type());
+    }
+};
 
-                // Call getKeys on the nullObj.
-                BSONObjSet nullFieldKeySet;
-                ExpressionKeysPrivate::getHashKeys(nullObj, "a", 0, 0, false, &nullFieldKeySet);
-                BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
+/** A missing field is represented with the hash of null in a hashed index. */
+class HashedIndexMissingField {
+public:
+    void run() {
+        OperationContextImpl txn;
+        BSONObj spec(BSON("key" << BSON("a"
+                                        << "hashed")));
+        BSONObj nullObj = BSON("a" << BSONNULL);
 
-                ASSERT_EQUALS( ExpressionKeysPrivate::makeSingleHashKey( nullObj.firstElement(), 0, 0 ),
-                               nullFieldFromKey.Long() );
+        // Call getKeys on the nullObj.
+        BSONObjSet nullFieldKeySet;
+        ExpressionKeysPrivate::getHashKeys(nullObj, "a", 0, 0, false, &nullFieldKeySet);
+        BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
 
-                BSONObj missingField = IndexLegacy::getMissingField(&txn, NULL,spec);
-                ASSERT_EQUALS( NumberLong, missingField.firstElement().type() );
-                ASSERT_EQUALS( nullFieldFromKey, missingField.firstElement());
-            }
-        };
+        ASSERT_EQUALS(ExpressionKeysPrivate::makeSingleHashKey(nullObj.firstElement(), 0, 0),
+                      nullFieldFromKey.Long());
 
-        /**
-         * A missing field is represented with the hash of null in a hashed index.  This hash value
-         * depends on the hash seed.
-         */
-        class HashedIndexMissingFieldAlternateSeed {
-        public:
-            void run() {
-                OperationContextImpl txn;
-                BSONObj spec( BSON("key" << BSON( "a" << "hashed" ) <<  "seed" << 0x5eed ));
-                BSONObj nullObj = BSON( "a" << BSONNULL );
+        BSONObj missingField = IndexLegacy::getMissingField(&txn, NULL, spec);
+        ASSERT_EQUALS(NumberLong, missingField.firstElement().type());
+        ASSERT_EQUALS(nullFieldFromKey, missingField.firstElement());
+    }
+};
 
-                BSONObjSet nullFieldKeySet;
-                ExpressionKeysPrivate::getHashKeys(nullObj, "a", 0x5eed, 0, false, &nullFieldKeySet);
-                BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
+/**
+ * A missing field is represented with the hash of null in a hashed index.  This hash value
+ * depends on the hash seed.
+ */
+class HashedIndexMissingFieldAlternateSeed {
+public:
+    void run() {
+        OperationContextImpl txn;
+        BSONObj spec(BSON("key" << BSON("a"
+                                        << "hashed") << "seed" << 0x5eed));
+        BSONObj nullObj = BSON("a" << BSONNULL);
 
-                ASSERT_EQUALS( ExpressionKeysPrivate::makeSingleHashKey( nullObj.firstElement(), 0x5eed, 0 ),
-                               nullFieldFromKey.Long() );
+        BSONObjSet nullFieldKeySet;
+        ExpressionKeysPrivate::getHashKeys(nullObj, "a", 0x5eed, 0, false, &nullFieldKeySet);
+        BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
 
-                // Ensure that getMissingField recognizes that the seed is different (and returns
-                // the right key).
-                BSONObj missingField = IndexLegacy::getMissingField(&txn, NULL,spec);
-                ASSERT_EQUALS( NumberLong, missingField.firstElement().type());
-                ASSERT_EQUALS( nullFieldFromKey, missingField.firstElement());
-            }
-        };
-        
-    } // namespace MissingFieldTests
+        ASSERT_EQUALS(ExpressionKeysPrivate::makeSingleHashKey(nullObj.firstElement(), 0x5eed, 0),
+                      nullFieldFromKey.Long());
 
-    namespace NamespaceDetailsTests {
-#if 0    // SERVER-13640
+        // Ensure that getMissingField recognizes that the seed is different (and returns
+        // the right key).
+        BSONObj missingField = IndexLegacy::getMissingField(&txn, NULL, spec);
+        ASSERT_EQUALS(NumberLong, missingField.firstElement().type());
+        ASSERT_EQUALS(nullFieldFromKey, missingField.firstElement());
+    }
+};
+
+}  // namespace MissingFieldTests
+
+namespace NamespaceDetailsTests {
+#if 0   // SERVER-13640
 
         class Base {
             const char *ns_;
@@ -425,8 +430,8 @@ namespace NamespaceTests {
                 pass(0);
             }
         };
-#endif // SERVER-13640
-#if 0 // XXXXXX - once RecordStore is clean, we can put this back
+#endif  // SERVER-13640
+#if 0   // XXXXXX - once RecordStore is clean, we can put this back
         class Migrate : public Base {
         public:
             void run() {
@@ -460,26 +465,26 @@ namespace NamespaceTests {
         };
 #endif
 
-        // This isn't a particularly useful test, and because it doesn't clean up
-        // after itself, /tmp/unittest needs to be cleared after running.
-        //        class BigCollection : public Base {
-        //        public:
-        //            BigCollection() : Base( "NamespaceDetailsTests_BigCollection" ) {}
-        //            void run() {
-        //                create();
-        //                ASSERT_EQUALS( 2, nExtents() );
-        //            }
-        //        private:
-        //            virtual string spec() const {
-        //                // NOTE 256 added to size in _userCreateNS()
-        //                long long big = DataFile::maxSize() - DataFileHeader::HeaderSize;
-        //                stringstream ss;
-        //                ss << "{\"capped\":true,\"size\":" << big << "}";
-        //                return ss.str();
-        //            }
-        //        };
+// This isn't a particularly useful test, and because it doesn't clean up
+// after itself, /tmp/unittest needs to be cleared after running.
+//        class BigCollection : public Base {
+//        public:
+//            BigCollection() : Base( "NamespaceDetailsTests_BigCollection" ) {}
+//            void run() {
+//                create();
+//                ASSERT_EQUALS( 2, nExtents() );
+//            }
+//        private:
+//            virtual string spec() const {
+//                // NOTE 256 added to size in _userCreateNS()
+//                long long big = DataFile::maxSize() - DataFileHeader::HeaderSize;
+//                stringstream ss;
+//                ss << "{\"capped\":true,\"size\":" << big << "}";
+//                return ss.str();
+//            }
+//        };
 
-#if 0    // SERVER-13640
+#if 0   // SERVER-13640
         class SwapIndexEntriesTest : public Base {
         public:
             void run() {
@@ -515,134 +520,132 @@ namespace NamespaceTests {
             }
             virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
         };
-#endif // SERVER-13640
-    } // namespace NamespaceDetailsTests
+#endif  // SERVER-13640
+}  // namespace NamespaceDetailsTests
 
-    namespace DatabaseTests {
+namespace DatabaseTests {
 
-        class RollbackCreateCollection {
-        public:
-            void run() {
-                const string dbName = "rollback_create_collection";
-                const string committedName = dbName + ".committed";
-                const string rolledBackName = dbName + ".rolled_back";
+class RollbackCreateCollection {
+public:
+    void run() {
+        const string dbName = "rollback_create_collection";
+        const string committedName = dbName + ".committed";
+        const string rolledBackName = dbName + ".rolled_back";
 
-                OperationContextImpl txn;
+        OperationContextImpl txn;
 
-                ScopedTransaction transaction(&txn, MODE_IX);
-                Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
+        ScopedTransaction transaction(&txn, MODE_IX);
+        Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
 
-                bool justCreated;
-                Database* db = dbHolder().openDb(&txn, dbName, &justCreated);
-                ASSERT(justCreated);
+        bool justCreated;
+        Database* db = dbHolder().openDb(&txn, dbName, &justCreated);
+        ASSERT(justCreated);
 
-                Collection* committedColl;
-                {
-                    WriteUnitOfWork wunit(&txn);
-                    ASSERT_FALSE(db->getCollection(committedName));
-                    committedColl = db->createCollection(&txn, committedName);
-                    ASSERT_EQUALS(db->getCollection(committedName), committedColl);
-                    wunit.commit();
-                }
-
-                ASSERT_EQUALS(db->getCollection(committedName), committedColl);
-
-                {
-                    WriteUnitOfWork wunit(&txn);
-                    ASSERT_FALSE(db->getCollection(rolledBackName));
-                    Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
-                    ASSERT_EQUALS(db->getCollection(rolledBackName), rolledBackColl);
-                    // not committing so creation should be rolled back
-                }
-
-                // The rolledBackCollection creation should have been rolled back
-                ASSERT_FALSE(db->getCollection(rolledBackName));
-
-                // The committedCollection should not have been affected by the rollback. Holders
-                // of the original Collection pointer should still be valid.
-                ASSERT_EQUALS(db->getCollection(committedName), committedColl);
-            }
-        };
-
-        class RollbackDropCollection {
-        public:
-            void run() {
-                const string dbName = "rollback_drop_collection";
-                const string droppedName = dbName + ".dropped";
-                const string rolledBackName = dbName + ".rolled_back";
-
-                OperationContextImpl txn;
-
-                ScopedTransaction transaction(&txn, MODE_IX);
-                Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
-
-                bool justCreated;
-                Database* db = dbHolder().openDb(&txn, dbName, &justCreated);
-                ASSERT(justCreated);
-
-                {
-                    WriteUnitOfWork wunit(&txn);
-                    ASSERT_FALSE(db->getCollection(droppedName));
-                    Collection* droppedColl;
-                    droppedColl = db->createCollection(&txn, droppedName);
-                    ASSERT_EQUALS(db->getCollection(droppedName), droppedColl);
-                    db->dropCollection(&txn, droppedName);
-                    wunit.commit();
-                }
-
-                //  Should have been really dropped
-                ASSERT_FALSE(db->getCollection(droppedName));
-
-                {
-                    WriteUnitOfWork wunit(&txn);
-                    ASSERT_FALSE(db->getCollection(rolledBackName));
-                    Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
-                    wunit.commit();
-                    ASSERT_EQUALS(db->getCollection(rolledBackName), rolledBackColl);
-                    db->dropCollection(&txn, rolledBackName);
-                    // not committing so dropping should be rolled back
-                }
-
-                // The rolledBackCollection dropping should have been rolled back.
-                // Original Collection pointers are no longer valid.
-                ASSERT(db->getCollection(rolledBackName));
-
-                // The droppedCollection should not have been restored by the rollback.
-                ASSERT_FALSE(db->getCollection(droppedName));
-            }
-        };
-    }  // namespace DatabaseTests
-
-    class All : public Suite {
-    public:
-        All() : Suite( "namespace" ) {
+        Collection* committedColl;
+        {
+            WriteUnitOfWork wunit(&txn);
+            ASSERT_FALSE(db->getCollection(committedName));
+            committedColl = db->createCollection(&txn, committedName);
+            ASSERT_EQUALS(db->getCollection(committedName), committedColl);
+            wunit.commit();
         }
 
-        void setupTests() {
-            add< MissingFieldTests::BtreeIndexMissingField >();
-            add< MissingFieldTests::TwoDIndexMissingField >();
-            add< MissingFieldTests::HashedIndexMissingField >();
-            add< MissingFieldTests::HashedIndexMissingFieldAlternateSeed >();
+        ASSERT_EQUALS(db->getCollection(committedName), committedColl);
 
-            // add< NamespaceDetailsTests::Create >();
-            //add< NamespaceDetailsTests::SingleAlloc >();
-            //add< NamespaceDetailsTests::Realloc >();
-            //add< NamespaceDetailsTests::AllocCappedNotQuantized >();
-            //add< NamespaceDetailsTests::TwoExtent >();
-            //add< NamespaceDetailsTests::TruncateCapped >();
-            //add< NamespaceDetailsTests::Migrate >();
-            //add< NamespaceDetailsTests::SwapIndexEntriesTest >();
-            //            add< NamespaceDetailsTests::BigCollection >();
+        {
+            WriteUnitOfWork wunit(&txn);
+            ASSERT_FALSE(db->getCollection(rolledBackName));
+            Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
+            ASSERT_EQUALS(db->getCollection(rolledBackName), rolledBackColl);
+            // not committing so creation should be rolled back
+        }
+
+        // The rolledBackCollection creation should have been rolled back
+        ASSERT_FALSE(db->getCollection(rolledBackName));
+
+        // The committedCollection should not have been affected by the rollback. Holders
+        // of the original Collection pointer should still be valid.
+        ASSERT_EQUALS(db->getCollection(committedName), committedColl);
+    }
+};
+
+class RollbackDropCollection {
+public:
+    void run() {
+        const string dbName = "rollback_drop_collection";
+        const string droppedName = dbName + ".dropped";
+        const string rolledBackName = dbName + ".rolled_back";
+
+        OperationContextImpl txn;
+
+        ScopedTransaction transaction(&txn, MODE_IX);
+        Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
+
+        bool justCreated;
+        Database* db = dbHolder().openDb(&txn, dbName, &justCreated);
+        ASSERT(justCreated);
+
+        {
+            WriteUnitOfWork wunit(&txn);
+            ASSERT_FALSE(db->getCollection(droppedName));
+            Collection* droppedColl;
+            droppedColl = db->createCollection(&txn, droppedName);
+            ASSERT_EQUALS(db->getCollection(droppedName), droppedColl);
+            db->dropCollection(&txn, droppedName);
+            wunit.commit();
+        }
+
+        //  Should have been really dropped
+        ASSERT_FALSE(db->getCollection(droppedName));
+
+        {
+            WriteUnitOfWork wunit(&txn);
+            ASSERT_FALSE(db->getCollection(rolledBackName));
+            Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
+            wunit.commit();
+            ASSERT_EQUALS(db->getCollection(rolledBackName), rolledBackColl);
+            db->dropCollection(&txn, rolledBackName);
+            // not committing so dropping should be rolled back
+        }
+
+        // The rolledBackCollection dropping should have been rolled back.
+        // Original Collection pointers are no longer valid.
+        ASSERT(db->getCollection(rolledBackName));
+
+        // The droppedCollection should not have been restored by the rollback.
+        ASSERT_FALSE(db->getCollection(droppedName));
+    }
+};
+}  // namespace DatabaseTests
+
+class All : public Suite {
+public:
+    All() : Suite("namespace") {}
+
+    void setupTests() {
+        add<MissingFieldTests::BtreeIndexMissingField>();
+        add<MissingFieldTests::TwoDIndexMissingField>();
+        add<MissingFieldTests::HashedIndexMissingField>();
+        add<MissingFieldTests::HashedIndexMissingFieldAlternateSeed>();
+
+// add< NamespaceDetailsTests::Create >();
+// add< NamespaceDetailsTests::SingleAlloc >();
+// add< NamespaceDetailsTests::Realloc >();
+// add< NamespaceDetailsTests::AllocCappedNotQuantized >();
+// add< NamespaceDetailsTests::TwoExtent >();
+// add< NamespaceDetailsTests::TruncateCapped >();
+// add< NamespaceDetailsTests::Migrate >();
+// add< NamespaceDetailsTests::SwapIndexEntriesTest >();
+//            add< NamespaceDetailsTests::BigCollection >();
 
 #if 0
             // until ROLLBACK_ENABLED
             add< DatabaseTests::RollbackCreateCollection >();
             add< DatabaseTests::RollbackDropCollection >();
 #endif
-        }
-    };
+    }
+};
 
-    SuiteInstance<All> myall;
+SuiteInstance<All> myall;
 
-} // namespace NamespaceTests
-
+}  // namespace NamespaceTests

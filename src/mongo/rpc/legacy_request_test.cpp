@@ -37,16 +37,16 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(LegacyRequest, InvalidNSThrows) {
-        rpc::LegacyRequestBuilder crb;
-        crb.setDatabase("foo////!!!!<><><>");
-        crb.setCommandName("foo");
-        crb.setMetadata(BSONObj());
-        crb.setCommandArgs(BSON("ping" << 1));
-        auto msg = crb.done();
-        ASSERT_THROWS(rpc::LegacyRequest{msg.get()}, AssertionException);
-    }
+TEST(LegacyRequest, InvalidNSThrows) {
+    rpc::LegacyRequestBuilder crb;
+    crb.setDatabase("foo////!!!!<><><>");
+    crb.setCommandName("foo");
+    crb.setMetadata(BSONObj());
+    crb.setCommandArgs(BSON("ping" << 1));
+    auto msg = crb.done();
+    ASSERT_THROWS(rpc::LegacyRequest{msg.get()}, AssertionException);
+}
 
 }  // namespace

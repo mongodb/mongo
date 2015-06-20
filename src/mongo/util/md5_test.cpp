@@ -32,7 +32,7 @@
 extern int do_md5_test(void);
 
 namespace mongo {
-    TEST( MD5, BuiltIn1 ) {
-        ASSERT_EQUALS( 0, do_md5_test() );
-    }
+TEST(MD5, BuiltIn1) {
+    ASSERT_EQUALS(0, do_md5_test());
+}
 }

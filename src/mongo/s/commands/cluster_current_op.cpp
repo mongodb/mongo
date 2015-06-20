@@ -46,181 +46,165 @@
 namespace mongo {
 namespace {
 
-    const char kInprogFieldName[] = "inprog";
-    const char kOpIdFieldName[] = "opid";
-    const char kClientFieldName[] = "client";
-    // awkward underscores used to make this visually distinct from kClientFieldName
-    const char kClient_S_FieldName[] = "client_s";
-    const char kLegacyInprogCollection[] = "$cmd.sys.inprog";
+const char kInprogFieldName[] = "inprog";
+const char kOpIdFieldName[] = "opid";
+const char kClientFieldName[] = "client";
+// awkward underscores used to make this visually distinct from kClientFieldName
+const char kClient_S_FieldName[] = "client_s";
+const char kLegacyInprogCollection[] = "$cmd.sys.inprog";
 
-    const char kCommandName[] = "currentOp";
+const char kCommandName[] = "currentOp";
 
-    class ClusterCurrentOpCommand : public RunOnAllShardsCommand {
-    public:
+class ClusterCurrentOpCommand : public RunOnAllShardsCommand {
+public:
+    ClusterCurrentOpCommand() : RunOnAllShardsCommand(kCommandName) {}
 
-        ClusterCurrentOpCommand() : RunOnAllShardsCommand(kCommandName) { }
+    bool adminOnly() const final {
+        return true;
+    }
 
-        bool adminOnly() const final { return true; }
+    Status checkAuthForCommand(ClientBasic* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(), ActionType::inprog);
 
-        Status checkAuthForCommand(ClientBasic* client,
-                                   const std::string& dbname,
-                                   const BSONObj& cmdObj) final {
+        return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
 
+    // TODO remove after 3.2
+    BSONObj specialErrorHandler(const std::string& server,
+                                const std::string& db,
+                                const BSONObj& cmdObj,
+                                const BSONObj& originalResult) const final {
+        // it is unfortunate that this logic needs to be duplicated from
+        // DBClientWithCommands::runPseudoCommand
+        // but I don't see a better way to do it without performing heart surgery on
+        // Future/CommandResponse.
 
-            bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                                    ResourcePattern::forClusterResource(),
-                                    ActionType::inprog);
+        auto status = getStatusFromCommandResult(originalResult);
+        invariant(!status.isOK());
 
-            return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
+        uassert(28629,
+                str::stream() << "Received bad " << kCommandName << " response from server "
+                              << server << " got: " << originalResult,
+                status != ErrorCodes::CommandResultSchemaViolation);
 
-        // TODO remove after 3.2
-        BSONObj specialErrorHandler(const std::string& server,
-                                    const std::string& db,
-                                    const BSONObj& cmdObj,
-                                    const BSONObj& originalResult) const final {
+        // getStatusFromCommandResult handles cooercing "no such command" into the right
+        // Status type
+        if (status == ErrorCodes::CommandNotFound) {
+            // fall back to the old inprog pseudo-command
+            NamespaceString pseudoCommandNss("admin", kLegacyInprogCollection);
+            BSONObj legacyResult;
 
-            // it is unfortunate that this logic needs to be duplicated from
-            // DBClientWithCommands::runPseudoCommand
-            // but I don't see a better way to do it without performing heart surgery on
-            // Future/CommandResponse.
+            BSONObjBuilder legacyCommandBob;
 
-            auto status = getStatusFromCommandResult(originalResult);
-            invariant(!status.isOK());
-
-            uassert(28629,
-                    str::stream() << "Received bad "
-                                  << kCommandName
-                                  << " response from server " << server
-                                  << " got: " << originalResult,
-                    status != ErrorCodes::CommandResultSchemaViolation);
-
-            // getStatusFromCommandResult handles cooercing "no such command" into the right
-            // Status type
-            if (status == ErrorCodes::CommandNotFound) {
-                // fall back to the old inprog pseudo-command
-                NamespaceString pseudoCommandNss("admin", kLegacyInprogCollection);
-                BSONObj legacyResult;
-
-                BSONObjBuilder legacyCommandBob;
-
-                // need to exclude {currentOp: 1}
-                for (auto&& cmdElem : cmdObj) {
-                    if (cmdElem.fieldNameStringData() != kCommandName) {
-                        legacyCommandBob.append(cmdElem);
-                    }
+            // need to exclude {currentOp: 1}
+            for (auto&& cmdElem : cmdObj) {
+                if (cmdElem.fieldNameStringData() != kCommandName) {
+                    legacyCommandBob.append(cmdElem);
                 }
-                auto legacyCommand = legacyCommandBob.done();
-
-                try {
-                    ScopedDbConnection conn(server);
-                    legacyResult =
-                        conn->findOne(pseudoCommandNss.ns(), legacyCommand);
-
-                }
-                catch (const DBException& ex) {
-                    // If there is a non-DBException exception the entire operation will be
-                    // terminated, as that would be a programmer error.
-
-                    // We convert the exception to a BSONObj so that the ordinary
-                    // failure path for RunOnAllShardsCommand will handle the failure
-
-                    // TODO: consider adding an exceptionToBSONObj utility?
-                    BSONObjBuilder b;
-                    b.append("errmsg", ex.toString());
-                    b.append("code", ex.getCode());
-                    return b.obj();
-                }
-                return legacyResult;
             }
-            // if the command failed for another reason then we don't retry it.
-            return originalResult;
+            auto legacyCommand = legacyCommandBob.done();
+
+            try {
+                ScopedDbConnection conn(server);
+                legacyResult = conn->findOne(pseudoCommandNss.ns(), legacyCommand);
+
+            } catch (const DBException& ex) {
+                // If there is a non-DBException exception the entire operation will be
+                // terminated, as that would be a programmer error.
+
+                // We convert the exception to a BSONObj so that the ordinary
+                // failure path for RunOnAllShardsCommand will handle the failure
+
+                // TODO: consider adding an exceptionToBSONObj utility?
+                BSONObjBuilder b;
+                b.append("errmsg", ex.toString());
+                b.append("code", ex.getCode());
+                return b.obj();
+            }
+            return legacyResult;
         }
+        // if the command failed for another reason then we don't retry it.
+        return originalResult;
+    }
 
-        void aggregateResults(const std::vector<ShardAndReply>& results,
-                              BSONObjBuilder& output) final {
-            // Each shard responds with a document containing an array of subdocuments.
-            // Each subdocument represents an operation running on that shard.
-            // We merge the responses into a single document containg an array
-            // of the operations from all shards.
+    void aggregateResults(const std::vector<ShardAndReply>& results, BSONObjBuilder& output) final {
+        // Each shard responds with a document containing an array of subdocuments.
+        // Each subdocument represents an operation running on that shard.
+        // We merge the responses into a single document containg an array
+        // of the operations from all shards.
 
-            // There are two modifications we make.
-            // 1) we prepend the shardid (with a colon separator) to the opid of each operation.
-            // This allows users to pass the value of the opid field directly to killOp.
+        // There are two modifications we make.
+        // 1) we prepend the shardid (with a colon separator) to the opid of each operation.
+        // This allows users to pass the value of the opid field directly to killOp.
 
-            // 2) we change the field name of "client" to "client_s". This is because each
-            // client is actually a mongos.
+        // 2) we change the field name of "client" to "client_s". This is because each
+        // client is actually a mongos.
 
-            // TODO: failpoint for a shard response being invalid.
+        // TODO: failpoint for a shard response being invalid.
 
-            // Error handling - we maintain the same behavior as legacy currentOp/inprog
-            // that is, if any shard replies with an invalid response (i.e. it does not
-            // contain a field 'inprog' that is an array), we ignore it.
-            //
-            // If there is a lower level error (i.e. the command fails, network error, etc)
-            // RunOnAllShardsCommand will handle returning an error to the user.
-            BSONArrayBuilder aggregatedOpsBab(output.subarrayStart(kInprogFieldName));
+        // Error handling - we maintain the same behavior as legacy currentOp/inprog
+        // that is, if any shard replies with an invalid response (i.e. it does not
+        // contain a field 'inprog' that is an array), we ignore it.
+        //
+        // If there is a lower level error (i.e. the command fails, network error, etc)
+        // RunOnAllShardsCommand will handle returning an error to the user.
+        BSONArrayBuilder aggregatedOpsBab(output.subarrayStart(kInprogFieldName));
 
-            for (auto&& shardResponse : results) {
+        for (auto&& shardResponse : results) {
+            StringData shardName;
+            BSONObj shardResponseObj;
+            std::tie(shardName, shardResponseObj) = shardResponse;
 
-                StringData shardName;
-                BSONObj shardResponseObj;
-                std::tie(shardName, shardResponseObj) = shardResponse;
+            auto shardOps = shardResponseObj[kInprogFieldName];
 
-                auto shardOps = shardResponseObj[kInprogFieldName];
+            // legacy behavior
+            if (!shardOps.isABSONObj()) {
+                warning() << "invalid currentOp response from shard " << shardName
+                          << ", got: " << shardOps;
+                continue;
+            }
 
-                // legacy behavior
-                if (!shardOps.isABSONObj()) {
-                    warning() << "invalid currentOp response from shard "
-                              << shardName
-                              << ", got: "
-                              << shardOps;
+            for (auto&& shardOp : shardOps.Obj()) {
+                BSONObjBuilder modifiedShardOpBob;
+
+                // maintain legacy behavior
+                // but log it first
+                if (!shardOp.isABSONObj()) {
+                    warning() << "invalid currentOp response from shard " << shardName
+                              << ", got: " << shardOp;
                     continue;
                 }
 
-                for (auto&& shardOp : shardOps.Obj()) {
-                    BSONObjBuilder modifiedShardOpBob;
+                for (auto&& shardOpElement : shardOp.Obj()) {
+                    auto fieldName = shardOpElement.fieldNameStringData();
+                    if (fieldName == kOpIdFieldName) {
+                        uassert(28630,
+                                str::stream() << "expected numeric opid from currentOp response"
+                                              << " from shard " << shardName
+                                              << ", got: " << shardOpElement,
+                                shardOpElement.isNumber());
 
-                    // maintain legacy behavior
-                    // but log it first
-                    if (!shardOp.isABSONObj()) {
-                        warning() << "invalid currentOp response from shard "
-                                  << shardName
-                                  << ", got: "
-                                  << shardOp;
-                        continue;
+                        modifiedShardOpBob.append(kOpIdFieldName,
+                                                  str::stream() << shardName << ":"
+                                                                << shardOpElement.numberInt());
+                    } else if (fieldName == kClientFieldName) {
+                        modifiedShardOpBob.appendAs(shardOpElement, kClient_S_FieldName);
+                    } else {
+                        modifiedShardOpBob.append(shardOpElement);
                     }
-
-                    for (auto&& shardOpElement : shardOp.Obj()) {
-                        auto fieldName = shardOpElement.fieldNameStringData();
-                        if (fieldName == kOpIdFieldName) {
-                            uassert(28630,
-                                    str::stream() << "expected numeric opid from currentOp response"
-                                                  << " from shard " << shardName
-                                                  << ", got: " << shardOpElement,
-                                    shardOpElement.isNumber());
-
-                            modifiedShardOpBob.append(kOpIdFieldName,
-                                                      str::stream() << shardName
-                                                                    << ":"
-                                                                    << shardOpElement.numberInt());
-                        }
-                        else if (fieldName == kClientFieldName) {
-                            modifiedShardOpBob.appendAs(shardOpElement, kClient_S_FieldName);
-                        }
-                        else {
-                            modifiedShardOpBob.append(shardOpElement);
-                        }
-                    }
-                    modifiedShardOpBob.done();
-                    // append the modified document to the output array
-                    aggregatedOpsBab.append(modifiedShardOpBob.obj());
                 }
+                modifiedShardOpBob.done();
+                // append the modified document to the output array
+                aggregatedOpsBab.append(modifiedShardOpBob.obj());
             }
-            aggregatedOpsBab.done();
         }
+        aggregatedOpsBab.done();
+    }
 
-    } clusterCurrentOpCmd;
+} clusterCurrentOpCmd;
 
 }  // namespace
 }  // namespace mongo

@@ -40,31 +40,31 @@
 
 namespace mongo {
 
-    /**
-     * Authentication session data for the server side of SASL authentication.
-     */
-    class NativeSaslAuthenticationSession : public SaslAuthenticationSession {
-        MONGO_DISALLOW_COPYING(NativeSaslAuthenticationSession);
-    public:
+/**
+ * Authentication session data for the server side of SASL authentication.
+ */
+class NativeSaslAuthenticationSession : public SaslAuthenticationSession {
+    MONGO_DISALLOW_COPYING(NativeSaslAuthenticationSession);
 
-        explicit NativeSaslAuthenticationSession(AuthorizationSession* authSession);
-        virtual ~NativeSaslAuthenticationSession();
+public:
+    explicit NativeSaslAuthenticationSession(AuthorizationSession* authSession);
+    virtual ~NativeSaslAuthenticationSession();
 
-        virtual Status start(StringData authenticationDatabase,
-                             StringData mechanism,
-                             StringData serviceName,
-                             StringData serviceHostname,
-                             int64_t conversationId,
-                             bool autoAuthorize);
+    virtual Status start(StringData authenticationDatabase,
+                         StringData mechanism,
+                         StringData serviceName,
+                         StringData serviceHostname,
+                         int64_t conversationId,
+                         bool autoAuthorize);
 
-        virtual Status step(StringData inputData, std::string* outputData);
+    virtual Status step(StringData inputData, std::string* outputData);
 
-        virtual std::string getPrincipalId() const;
+    virtual std::string getPrincipalId() const;
 
-        virtual const char* getMechanism() const;
+    virtual const char* getMechanism() const;
 
-    private:
-        std::string _mechanism;
-        std::unique_ptr<SaslServerConversation> _saslConversation;
-    };
+private:
+    std::string _mechanism;
+    std::unique_ptr<SaslServerConversation> _saslConversation;
+};
 }  // namespace mongo

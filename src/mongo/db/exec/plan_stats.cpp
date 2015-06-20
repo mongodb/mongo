@@ -31,19 +31,19 @@
 
 namespace mongo {
 
-    void CommonStats::writeExplainTo(BSONObjBuilder* bob) const {
-        if (NULL == bob) {
-            return;
-        }
-        // potential overflow because original counters are unsigned 64-bit values
-        bob->append("works", static_cast<long long>(works));
-        bob->append("advanced", static_cast<long long>(advanced));
+void CommonStats::writeExplainTo(BSONObjBuilder* bob) const {
+    if (NULL == bob) {
+        return;
     }
+    // potential overflow because original counters are unsigned 64-bit values
+    bob->append("works", static_cast<long long>(works));
+    bob->append("advanced", static_cast<long long>(advanced));
+}
 
-    // forward to CommonStats for now
-    // TODO: fill in specific stats
-    void PlanStageStats::writeExplainTo(BSONObjBuilder* bob) const {
-        common.writeExplainTo(bob);
-    }
+// forward to CommonStats for now
+// TODO: fill in specific stats
+void PlanStageStats::writeExplainTo(BSONObjBuilder* bob) const {
+    common.writeExplainTo(bob);
+}
 
 }  // namespace mongo

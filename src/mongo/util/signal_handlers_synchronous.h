@@ -30,24 +30,24 @@
 
 namespace mongo {
 
-    /**
-     * Sets up handlers for synchronous events, like segv, abort, terminate and malloc-failure.
-     *
-     * Call this very early in main(), before runGlobalInitializers().
-     *
-     * Called by setupSignalHandlers() in signal_handlers.h.  Prefer that method to this one,
-     * in server code and tools that use the storage engine.
-     */
-    void setupSynchronousSignalHandlers();
+/**
+ * Sets up handlers for synchronous events, like segv, abort, terminate and malloc-failure.
+ *
+ * Call this very early in main(), before runGlobalInitializers().
+ *
+ * Called by setupSignalHandlers() in signal_handlers.h.  Prefer that method to this one,
+ * in server code and tools that use the storage engine.
+ */
+void setupSynchronousSignalHandlers();
 
-    /**
-     * Report out of memory error with a stack trace and exit.
-     *
-     * Called when any of the following functions fails to allocate memory:
-     *     operator new
-     *     mongoMalloc
-     *     mongoRealloc
-     */
-    void reportOutOfMemoryErrorAndExit();
+/**
+ * Report out of memory error with a stack trace and exit.
+ *
+ * Called when any of the following functions fails to allocate memory:
+ *     operator new
+ *     mongoMalloc
+ *     mongoRealloc
+ */
+void reportOutOfMemoryErrorAndExit();
 
 }  // namespace mongo

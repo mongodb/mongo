@@ -38,93 +38,89 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    class MMAPV1FactoryTest : public mongo::unittest::Test {
-    private:
-        virtual void setUp() {
-            ServiceContext* globalEnv = getGlobalServiceContext();
-            ASSERT_TRUE(globalEnv);
-            ASSERT_TRUE(getGlobalServiceContext()->isRegisteredStorageEngine("mmapv1"));
-            std::unique_ptr<StorageFactoriesIterator> sfi(getGlobalServiceContext()->
-                                                            makeStorageFactoriesIterator());
-            ASSERT_TRUE(sfi);
-            bool found = false;
-            while (sfi->more()) {
-                const StorageEngine::Factory* currentFactory = sfi->next();
-                if (currentFactory->getCanonicalName() == "mmapv1") {
-                    found = true;
-                    factory = currentFactory;
-                    break;
-                }
+class MMAPV1FactoryTest : public mongo::unittest::Test {
+private:
+    virtual void setUp() {
+        ServiceContext* globalEnv = getGlobalServiceContext();
+        ASSERT_TRUE(globalEnv);
+        ASSERT_TRUE(getGlobalServiceContext()->isRegisteredStorageEngine("mmapv1"));
+        std::unique_ptr<StorageFactoriesIterator> sfi(
+            getGlobalServiceContext()->makeStorageFactoriesIterator());
+        ASSERT_TRUE(sfi);
+        bool found = false;
+        while (sfi->more()) {
+            const StorageEngine::Factory* currentFactory = sfi->next();
+            if (currentFactory->getCanonicalName() == "mmapv1") {
+                found = true;
+                factory = currentFactory;
+                break;
             }
-            ASSERT_TRUE(found);
         }
-
-        virtual void tearDown() {
-            factory = NULL;
-        }
-
-    protected:
-        const StorageEngine::Factory* factory;
-    };
-
-    void _testValidateMetadata(const StorageEngine::Factory* factory,
-                               const BSONObj& metadataOptions,
-                               bool directoryPerDB,
-                               ErrorCodes::Error expectedCode) {
-        // It is fine to specify an invalid data directory for the metadata
-        // as long as we do not invoke read() or write().
-        StorageEngineMetadata metadata("no_such_directory");
-        metadata.setStorageEngineOptions(metadataOptions);
-
-        StorageGlobalParams storageOptions;
-        storageOptions.directoryperdb = directoryPerDB;
-
-        Status status = factory->validateMetadata(metadata, storageOptions);
-        if (expectedCode != status.code()) {
-            FAIL(str::stream()
-                << "Unexpected StorageEngine::Factory::validateMetadata result. Expected: "
-                << ErrorCodes::errorString(expectedCode) << " but got "
-                << status.toString()
-                << " instead. metadataOptions: " << metadataOptions
-                << "; directoryPerDB: " << directoryPerDB);
-        }
+        ASSERT_TRUE(found);
     }
 
-    // Do not validate fields that are not present in metadata.
-    TEST_F(MMAPV1FactoryTest, ValidateMetadataEmptyOptions) {
-        _testValidateMetadata(factory, BSONObj(), false, ErrorCodes::OK);
-        _testValidateMetadata(factory, BSONObj(), true, ErrorCodes::OK);
+    virtual void tearDown() {
+        factory = NULL;
     }
 
-    TEST_F(MMAPV1FactoryTest, ValidateMetadataDirectoryPerDB) {
-        _testValidateMetadata(factory, fromjson("{directoryPerDB: 123}"), false,
-                              ErrorCodes::FailedToParse);
-        _testValidateMetadata(factory, fromjson("{directoryPerDB: false}"), false,
-                              ErrorCodes::OK);
-        _testValidateMetadata(factory, fromjson("{directoryPerDB: false}"), true,
-                              ErrorCodes::InvalidOptions);
-        _testValidateMetadata(factory, fromjson("{directoryPerDB: true}"), false,
-                              ErrorCodes::InvalidOptions);
-        _testValidateMetadata(factory, fromjson("{directoryPerDB: true}"), true,
-                              ErrorCodes::OK);
-    }
+protected:
+    const StorageEngine::Factory* factory;
+};
 
-    void _testCreateMetadataOptions(const StorageEngine::Factory* factory,
-                                    bool directoryPerDB) {
-        StorageGlobalParams storageOptions;
-        storageOptions.directoryperdb = directoryPerDB;
+void _testValidateMetadata(const StorageEngine::Factory* factory,
+                           const BSONObj& metadataOptions,
+                           bool directoryPerDB,
+                           ErrorCodes::Error expectedCode) {
+    // It is fine to specify an invalid data directory for the metadata
+    // as long as we do not invoke read() or write().
+    StorageEngineMetadata metadata("no_such_directory");
+    metadata.setStorageEngineOptions(metadataOptions);
 
-        BSONObj metadataOptions = factory->createMetadataOptions(storageOptions);
-        BSONElement directoryPerDBElement = metadataOptions.getField("directoryPerDB");
-        ASSERT_TRUE(directoryPerDBElement.isBoolean());
-        ASSERT_EQUALS(directoryPerDB, directoryPerDBElement.boolean());
-    }
+    StorageGlobalParams storageOptions;
+    storageOptions.directoryperdb = directoryPerDB;
 
-    TEST_F(MMAPV1FactoryTest, CreateMetadataOptions) {
-        _testCreateMetadataOptions(factory, false);
-        _testCreateMetadataOptions(factory, true);
+    Status status = factory->validateMetadata(metadata, storageOptions);
+    if (expectedCode != status.code()) {
+        FAIL(str::stream()
+             << "Unexpected StorageEngine::Factory::validateMetadata result. Expected: "
+             << ErrorCodes::errorString(expectedCode) << " but got " << status.toString()
+             << " instead. metadataOptions: " << metadataOptions
+             << "; directoryPerDB: " << directoryPerDB);
     }
+}
+
+// Do not validate fields that are not present in metadata.
+TEST_F(MMAPV1FactoryTest, ValidateMetadataEmptyOptions) {
+    _testValidateMetadata(factory, BSONObj(), false, ErrorCodes::OK);
+    _testValidateMetadata(factory, BSONObj(), true, ErrorCodes::OK);
+}
+
+TEST_F(MMAPV1FactoryTest, ValidateMetadataDirectoryPerDB) {
+    _testValidateMetadata(
+        factory, fromjson("{directoryPerDB: 123}"), false, ErrorCodes::FailedToParse);
+    _testValidateMetadata(factory, fromjson("{directoryPerDB: false}"), false, ErrorCodes::OK);
+    _testValidateMetadata(
+        factory, fromjson("{directoryPerDB: false}"), true, ErrorCodes::InvalidOptions);
+    _testValidateMetadata(
+        factory, fromjson("{directoryPerDB: true}"), false, ErrorCodes::InvalidOptions);
+    _testValidateMetadata(factory, fromjson("{directoryPerDB: true}"), true, ErrorCodes::OK);
+}
+
+void _testCreateMetadataOptions(const StorageEngine::Factory* factory, bool directoryPerDB) {
+    StorageGlobalParams storageOptions;
+    storageOptions.directoryperdb = directoryPerDB;
+
+    BSONObj metadataOptions = factory->createMetadataOptions(storageOptions);
+    BSONElement directoryPerDBElement = metadataOptions.getField("directoryPerDB");
+    ASSERT_TRUE(directoryPerDBElement.isBoolean());
+    ASSERT_EQUALS(directoryPerDB, directoryPerDBElement.boolean());
+}
+
+TEST_F(MMAPV1FactoryTest, CreateMetadataOptions) {
+    _testCreateMetadataOptions(factory, false);
+    _testCreateMetadataOptions(factory, true);
+}
 
 }  // namespace

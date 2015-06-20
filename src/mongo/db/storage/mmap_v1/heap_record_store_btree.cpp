@@ -40,117 +40,117 @@
 
 namespace mongo {
 
-    RecordData HeapRecordStoreBtree::dataFor(OperationContext* txn, const RecordId& loc) const {
-        Records::const_iterator it = _records.find(loc);
-        invariant(it != _records.end());
-        const MmapV1RecordHeader& rec = it->second;
+RecordData HeapRecordStoreBtree::dataFor(OperationContext* txn, const RecordId& loc) const {
+    Records::const_iterator it = _records.find(loc);
+    invariant(it != _records.end());
+    const MmapV1RecordHeader& rec = it->second;
 
-        return RecordData(rec.data.get(), rec.dataSize);
+    return RecordData(rec.data.get(), rec.dataSize);
+}
+
+bool HeapRecordStoreBtree::findRecord(OperationContext* txn,
+                                      const RecordId& loc,
+                                      RecordData* out) const {
+    Records::const_iterator it = _records.find(loc);
+    if (it == _records.end())
+        return false;
+    const MmapV1RecordHeader& rec = it->second;
+    *out = RecordData(rec.data.get(), rec.dataSize);
+    return true;
+}
+
+void HeapRecordStoreBtree::deleteRecord(OperationContext* txn, const RecordId& loc) {
+    invariant(_records.erase(loc) == 1);
+}
+
+StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
+                                                        const char* data,
+                                                        int len,
+                                                        bool enforceQuota) {
+    MmapV1RecordHeader rec(len);
+    memcpy(rec.data.get(), data, len);
+
+    const RecordId loc = allocateLoc();
+    _records[loc] = rec;
+
+    HeapRecordStoreBtreeRecoveryUnit::notifyInsert(txn, this, loc);
+
+    return StatusWith<RecordId>(loc);
+}
+
+StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
+                                                        const DocWriter* doc,
+                                                        bool enforceQuota) {
+    MmapV1RecordHeader rec(doc->documentSize());
+    doc->writeDocument(rec.data.get());
+
+    const RecordId loc = allocateLoc();
+    _records[loc] = rec;
+
+    HeapRecordStoreBtreeRecoveryUnit::notifyInsert(txn, this, loc);
+
+    return StatusWith<RecordId>(loc);
+}
+
+RecordId HeapRecordStoreBtree::allocateLoc() {
+    const int64_t id = _nextId++;
+    // This is a hack, but both the high and low order bits of RecordId offset must be 0, and the
+    // file must fit in 23 bits. This gives us a total of 30 + 23 == 53 bits.
+    invariant(id < (1LL << 53));
+    RecordId dl(int(id >> 30), int((id << 1) & ~(1 << 31)));
+    invariant((dl.repr() & 0x1) == 0);
+    return dl;
+}
+
+Status HeapRecordStoreBtree::touch(OperationContext* txn, BSONObjBuilder* output) const {
+    // not currently called from the tests, but called from btree_logic.h
+    return Status::OK();
+}
+
+// ---------------------------
+
+void HeapRecordStoreBtreeRecoveryUnit::commitUnitOfWork() {
+    _insertions.clear();
+    _mods.clear();
+}
+
+void HeapRecordStoreBtreeRecoveryUnit::abortUnitOfWork() {
+    // reverse in case we write same area twice
+    for (size_t i = _mods.size(); i > 0; i--) {
+        ModEntry& e = _mods[i - 1];
+        memcpy(e.data, e.old.get(), e.len);
     }
 
-    bool HeapRecordStoreBtree::findRecord(OperationContext* txn,
-                                          const RecordId& loc, RecordData* out) const {
-        Records::const_iterator it = _records.find(loc);
-        if ( it == _records.end() )
-            return false;
-        const MmapV1RecordHeader& rec = it->second;
-        *out = RecordData(rec.data.get(), rec.dataSize);
-        return true;
-    }
+    invariant(_insertions.size() == 0);  // todo
+}
 
-    void HeapRecordStoreBtree::deleteRecord(OperationContext* txn, const RecordId& loc) {
-        invariant(_records.erase(loc) == 1);
-    }
+void* HeapRecordStoreBtreeRecoveryUnit::writingPtr(void* data, size_t len) {
+    ModEntry e = {data, len, boost::shared_array<char>(new char[len])};
+    memcpy(e.old.get(), data, len);
+    _mods.push_back(e);
+    return data;
+}
 
-    StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
-                                                           const char* data,
-                                                           int len,
-                                                           bool enforceQuota) {
-        MmapV1RecordHeader rec(len);
-        memcpy(rec.data.get(), data, len);
+void HeapRecordStoreBtreeRecoveryUnit::notifyInsert(HeapRecordStoreBtree* rs, const RecordId& loc) {
+    InsertEntry e = {rs, loc};
+    _insertions.push_back(e);
+}
 
-        const RecordId loc = allocateLoc();
-        _records[loc] = rec;
+void HeapRecordStoreBtreeRecoveryUnit::notifyInsert(OperationContext* ctx,
+                                                    HeapRecordStoreBtree* rs,
+                                                    const RecordId& loc) {
+    if (!ctx)
+        return;
 
-        HeapRecordStoreBtreeRecoveryUnit::notifyInsert( txn, this, loc );
+    // This dynamic_cast has semantics, should change ideally.
+    HeapRecordStoreBtreeRecoveryUnit* ru =
+        dynamic_cast<HeapRecordStoreBtreeRecoveryUnit*>(ctx->recoveryUnit());
 
-        return StatusWith<RecordId>(loc);
-    }
+    if (!ru)
+        return;
 
-    StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
-                                                           const DocWriter* doc,
-                                                           bool enforceQuota) {
-        MmapV1RecordHeader rec(doc->documentSize());
-        doc->writeDocument(rec.data.get());
-
-        const RecordId loc = allocateLoc();
-        _records[loc] = rec;
-
-        HeapRecordStoreBtreeRecoveryUnit::notifyInsert( txn, this, loc );
-
-        return StatusWith<RecordId>(loc);
-    }
-
-    RecordId HeapRecordStoreBtree::allocateLoc() {
-        const int64_t id = _nextId++;
-        // This is a hack, but both the high and low order bits of RecordId offset must be 0, and the
-        // file must fit in 23 bits. This gives us a total of 30 + 23 == 53 bits.
-        invariant(id < (1LL << 53));
-        RecordId dl(int(id >> 30), int((id << 1) & ~(1<<31)));
-        invariant( (dl.repr() & 0x1) == 0 );
-        return dl;
-    }
-
-    Status HeapRecordStoreBtree::touch(OperationContext* txn, BSONObjBuilder* output) const {
-        // not currently called from the tests, but called from btree_logic.h
-        return Status::OK();
-    }
-
-    // ---------------------------
-
-    void HeapRecordStoreBtreeRecoveryUnit::commitUnitOfWork() {
-        _insertions.clear();
-        _mods.clear();
-    }
-
-    void HeapRecordStoreBtreeRecoveryUnit::abortUnitOfWork() {
-        // reverse in case we write same area twice
-        for ( size_t i = _mods.size(); i > 0; i-- ) {
-            ModEntry& e = _mods[i-1];
-            memcpy( e.data, e.old.get(), e.len );
-        }
-
-        invariant( _insertions.size() == 0 ); // todo
-    }
-
-    void* HeapRecordStoreBtreeRecoveryUnit::writingPtr(void* data, size_t len) {
-        ModEntry e = { data, len, boost::shared_array<char>( new char[len] ) };
-        memcpy( e.old.get(), data, len );
-        _mods.push_back( e );
-        return data;
-    }
-
-    void HeapRecordStoreBtreeRecoveryUnit::notifyInsert( HeapRecordStoreBtree* rs,
-                                                         const RecordId& loc ) {
-        InsertEntry e = { rs, loc };
-        _insertions.push_back( e );
-    }
-
-    void HeapRecordStoreBtreeRecoveryUnit::notifyInsert( OperationContext* ctx,
-                                                         HeapRecordStoreBtree* rs,
-                                                         const RecordId& loc ) {
-        if ( !ctx )
-            return;
-
-        // This dynamic_cast has semantics, should change ideally.
-        HeapRecordStoreBtreeRecoveryUnit* ru =
-            dynamic_cast<HeapRecordStoreBtreeRecoveryUnit*>( ctx->recoveryUnit() );
-
-        if ( !ru )
-            return;
-
-        ru->notifyInsert( rs, loc );
-    }
+    ru->notifyInsert(rs, loc);
+}
 
 
-} // namespace mongo
+}  // namespace mongo

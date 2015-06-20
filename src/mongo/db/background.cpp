@@ -45,137 +45,136 @@
 
 namespace mongo {
 
-    using std::shared_ptr;
+using std::shared_ptr;
 
 namespace {
 
-    class BgInfo {
-        MONGO_DISALLOW_COPYING(BgInfo);
-    public:
-        BgInfo() : _opsInProgCount(0) {}
+class BgInfo {
+    MONGO_DISALLOW_COPYING(BgInfo);
 
-        void recordBegin();
-        int recordEnd();
-        void awaitNoBgOps(stdx::unique_lock<stdx::mutex>& lk);
+public:
+    BgInfo() : _opsInProgCount(0) {}
 
-        int getOpsInProgCount() const { return _opsInProgCount; }
+    void recordBegin();
+    int recordEnd();
+    void awaitNoBgOps(stdx::unique_lock<stdx::mutex>& lk);
 
-    private:
-        int _opsInProgCount;
-        stdx::condition_variable _noOpsInProg;
-    };
-
-    typedef StringMap<std::shared_ptr<BgInfo> > BgInfoMap;
-    typedef BgInfoMap::const_iterator BgInfoMapIterator;
-
-    stdx::mutex m;
-    BgInfoMap dbsInProg;
-    BgInfoMap nsInProg;
-
-    void BgInfo::recordBegin() {
-        ++_opsInProgCount;
-    }
-
-    int BgInfo::recordEnd() {
-        dassert(_opsInProgCount > 0);
-        --_opsInProgCount;
-        if (0 == _opsInProgCount) {
-            _noOpsInProg.notify_all();
-        }
+    int getOpsInProgCount() const {
         return _opsInProgCount;
     }
 
-    void BgInfo::awaitNoBgOps(stdx::unique_lock<stdx::mutex>& lk) {
-        while (_opsInProgCount > 0)
-            _noOpsInProg.wait(lk);
-    }
+private:
+    int _opsInProgCount;
+    stdx::condition_variable _noOpsInProg;
+};
 
-    void recordBeginAndInsert(BgInfoMap* bgiMap, StringData key) {
-        std::shared_ptr<BgInfo>& bgInfo = bgiMap->get(key);
-        if (!bgInfo)
-            bgInfo.reset(new BgInfo);
-        bgInfo->recordBegin();
-    }
+typedef StringMap<std::shared_ptr<BgInfo>> BgInfoMap;
+typedef BgInfoMap::const_iterator BgInfoMapIterator;
 
-    void recordEndAndRemove(BgInfoMap* bgiMap, StringData key) {
-        BgInfoMapIterator iter = bgiMap->find(key);
-        fassert(17431, iter != bgiMap->end());
-        if (0 == iter->second->recordEnd()) {
-            bgiMap->erase(iter);
-        }
-    }
+stdx::mutex m;
+BgInfoMap dbsInProg;
+BgInfoMap nsInProg;
 
-    void awaitNoBgOps(
-            stdx::unique_lock<stdx::mutex>& lk,
-            BgInfoMap* bgiMap,
-            StringData key) {
+void BgInfo::recordBegin() {
+    ++_opsInProgCount;
+}
 
-        std::shared_ptr<BgInfo> bgInfo = mapFindWithDefault(
-                *bgiMap, key, std::shared_ptr<BgInfo>());
-        if (!bgInfo)
-            return;
-        bgInfo->awaitNoBgOps(lk);
+int BgInfo::recordEnd() {
+    dassert(_opsInProgCount > 0);
+    --_opsInProgCount;
+    if (0 == _opsInProgCount) {
+        _noOpsInProg.notify_all();
     }
+    return _opsInProgCount;
+}
+
+void BgInfo::awaitNoBgOps(stdx::unique_lock<stdx::mutex>& lk) {
+    while (_opsInProgCount > 0)
+        _noOpsInProg.wait(lk);
+}
+
+void recordBeginAndInsert(BgInfoMap* bgiMap, StringData key) {
+    std::shared_ptr<BgInfo>& bgInfo = bgiMap->get(key);
+    if (!bgInfo)
+        bgInfo.reset(new BgInfo);
+    bgInfo->recordBegin();
+}
+
+void recordEndAndRemove(BgInfoMap* bgiMap, StringData key) {
+    BgInfoMapIterator iter = bgiMap->find(key);
+    fassert(17431, iter != bgiMap->end());
+    if (0 == iter->second->recordEnd()) {
+        bgiMap->erase(iter);
+    }
+}
+
+void awaitNoBgOps(stdx::unique_lock<stdx::mutex>& lk, BgInfoMap* bgiMap, StringData key) {
+    std::shared_ptr<BgInfo> bgInfo = mapFindWithDefault(*bgiMap, key, std::shared_ptr<BgInfo>());
+    if (!bgInfo)
+        return;
+    bgInfo->awaitNoBgOps(lk);
+}
 
 }  // namespace
-    bool BackgroundOperation::inProgForDb(StringData db) {
-        stdx::lock_guard<stdx::mutex> lk(m);
-        return dbsInProg.find(db) != dbsInProg.end();
+bool BackgroundOperation::inProgForDb(StringData db) {
+    stdx::lock_guard<stdx::mutex> lk(m);
+    return dbsInProg.find(db) != dbsInProg.end();
+}
+
+bool BackgroundOperation::inProgForNs(StringData ns) {
+    stdx::lock_guard<stdx::mutex> lk(m);
+    return nsInProg.find(ns) != nsInProg.end();
+}
+
+void BackgroundOperation::assertNoBgOpInProgForDb(StringData db) {
+    uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
+            mongoutils::str::stream()
+                << "cannot perform operation: a background operation is currently running for "
+                   "database " << db,
+            !inProgForDb(db));
+}
+
+void BackgroundOperation::assertNoBgOpInProgForNs(StringData ns) {
+    uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
+            mongoutils::str::stream()
+                << "cannot perform operation: a background operation is currently running for "
+                   "collection " << ns,
+            !inProgForNs(ns));
+}
+
+void BackgroundOperation::awaitNoBgOpInProgForDb(StringData db) {
+    stdx::unique_lock<stdx::mutex> lk(m);
+    awaitNoBgOps(lk, &dbsInProg, db);
+}
+
+void BackgroundOperation::awaitNoBgOpInProgForNs(StringData ns) {
+    stdx::unique_lock<stdx::mutex> lk(m);
+    awaitNoBgOps(lk, &nsInProg, ns);
+}
+
+BackgroundOperation::BackgroundOperation(StringData ns) : _ns(ns) {
+    stdx::lock_guard<stdx::mutex> lk(m);
+    recordBeginAndInsert(&dbsInProg, _ns.db());
+    recordBeginAndInsert(&nsInProg, _ns.ns());
+}
+
+BackgroundOperation::~BackgroundOperation() {
+    stdx::lock_guard<stdx::mutex> lk(m);
+    recordEndAndRemove(&dbsInProg, _ns.db());
+    recordEndAndRemove(&nsInProg, _ns.ns());
+}
+
+void BackgroundOperation::dump(std::ostream& ss) {
+    stdx::lock_guard<stdx::mutex> lk(m);
+    if (nsInProg.size()) {
+        ss << "\n<b>Background Jobs in Progress</b>\n";
+        for (BgInfoMapIterator i = nsInProg.begin(); i != nsInProg.end(); ++i)
+            ss << "  " << i->first << '\n';
     }
-
-    bool BackgroundOperation::inProgForNs(StringData ns) {
-        stdx::lock_guard<stdx::mutex> lk(m);
-        return nsInProg.find(ns) != nsInProg.end();
+    for (BgInfoMapIterator i = dbsInProg.begin(); i != dbsInProg.end(); ++i) {
+        if (i->second->getOpsInProgCount())
+            ss << "database " << i->first << ": " << i->second->getOpsInProgCount() << '\n';
     }
+}
 
-    void BackgroundOperation::assertNoBgOpInProgForDb(StringData db) {
-        uassert(ErrorCodes::BackgroundOperationInProgressForDatabase, mongoutils::str::stream() <<
-                "cannot perform operation: a background operation is currently running for "
-                "database " << db,
-                !inProgForDb(db));
-    }
-
-    void BackgroundOperation::assertNoBgOpInProgForNs(StringData ns) {
-        uassert(ErrorCodes::BackgroundOperationInProgressForNamespace, mongoutils::str::stream() <<
-                "cannot perform operation: a background operation is currently running for "
-                "collection " << ns,
-                !inProgForNs(ns));
-    }
-
-    void BackgroundOperation::awaitNoBgOpInProgForDb(StringData db) {
-        stdx::unique_lock<stdx::mutex> lk(m);
-        awaitNoBgOps(lk, &dbsInProg, db);
-    }
-
-    void BackgroundOperation::awaitNoBgOpInProgForNs(StringData ns) {
-        stdx::unique_lock<stdx::mutex> lk(m);
-        awaitNoBgOps(lk, &nsInProg, ns);
-    }
-
-    BackgroundOperation::BackgroundOperation(StringData ns) : _ns(ns) {
-        stdx::lock_guard<stdx::mutex> lk(m);
-        recordBeginAndInsert(&dbsInProg, _ns.db());
-        recordBeginAndInsert(&nsInProg, _ns.ns());
-    }
-
-    BackgroundOperation::~BackgroundOperation() {
-        stdx::lock_guard<stdx::mutex> lk(m);
-        recordEndAndRemove(&dbsInProg, _ns.db());
-        recordEndAndRemove(&nsInProg, _ns.ns());
-    }
-
-    void BackgroundOperation::dump(std::ostream& ss) {
-        stdx::lock_guard<stdx::mutex> lk(m);
-        if( nsInProg.size() ) {
-            ss << "\n<b>Background Jobs in Progress</b>\n";
-            for( BgInfoMapIterator i = nsInProg.begin(); i != nsInProg.end(); ++i )
-                ss << "  " << i->first << '\n';
-        }
-        for( BgInfoMapIterator i = dbsInProg.begin(); i != dbsInProg.end(); ++i ) {
-            if( i->second->getOpsInProgCount() )
-                ss << "database " << i->first << ": " << i->second->getOpsInProgCount() << '\n';
-        }
-    }
-
-} // namespace mongo
-
+}  // namespace mongo

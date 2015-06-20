@@ -43,85 +43,85 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
+using std::string;
+using std::stringstream;
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
-    /**
-     * This command is required in v3.0 mongod to prevent v2.6 mongos from entering a tight loop and
-     * spamming the server with invalid writebacklisten requests.  This command reports an error
-     * and pauses, which is safe because the original v2.6 WBL command was a long-poll (30s).
-     */
-    class WriteBackCommand : public Command {
-    public:
-        WriteBackCommand() : Command("writebacklisten") {}
+/**
+ * This command is required in v3.0 mongod to prevent v2.6 mongos from entering a tight loop and
+ * spamming the server with invalid writebacklisten requests.  This command reports an error
+ * and pauses, which is safe because the original v2.6 WBL command was a long-poll (30s).
+ */
+class WriteBackCommand : public Command {
+public:
+    WriteBackCommand() : Command("writebacklisten") {}
 
-        void help(stringstream& helpOut) const {
-            helpOut << "v3.0 disallowed internal command, present for compatibility only";
-        }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        //
-        // Same as v2.6 settings
-        //
-
-        virtual bool adminOnly() const { return true; }
-        virtual bool slaveOk() const { return true; }
-
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::internal);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
-
-        virtual bool run(OperationContext* opCtx,
-                         const string&,
-                         BSONObj&,
-                         int,
-                         string&,
-                         BSONObjBuilder& result) {
-
-            string errMsg = stream()
-                << "Writeback functionality is no longer present in v3.0 mongod, "
-                << "a v2.6 mongos may be running in the v3.0 cluster at "
-                << opCtx->getClient()->clientAddress(false);
-
-            error() << errMsg;
-
-            // Prevent v2.6 mongos from spamming writebacklisten retries
-            const int kSleepSecsBeforeMessage = 5;
-            sleepsecs(kSleepSecsBeforeMessage);
-
-            return appendCommandStatus(result, Status(ErrorCodes::CommandNotFound, errMsg));
-        }
-    };
-
-    /**
-     * The "writeBacksQueued" field is required in ServerStatus output to avoid v2.6 mongos crashing
-     * confusingly when upgrading a cluster.
-     */
-    class WriteBacksQueuedSSM : public ServerStatusMetric {
-    public:
-        WriteBacksQueuedSSM() : ServerStatusMetric(".writeBacksQueued") {}
-
-        virtual void appendAtLeaf(BSONObjBuilder& b) const {
-            // always append false, we don't queue writebacks
-            b.appendBool(_leafName, false);
-        }
-    };
-
-    namespace {
-        MONGO_INITIALIZER(RegisterWriteBackShim)(InitializerContext* context) {
-            // Leaked intentionally: a Command registers itself when constructed.
-            new WriteBackCommand();
-            // Leaked intentionally: a SSM registers itself when constructed.
-            new WriteBacksQueuedSSM();
-            return Status::OK();
-        }
+    void help(stringstream& helpOut) const {
+        helpOut << "v3.0 disallowed internal command, present for compatibility only";
     }
 
-} // namespace
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    //
+    // Same as v2.6 settings
+    //
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::internal);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
+
+    virtual bool run(
+        OperationContext* opCtx, const string&, BSONObj&, int, string&, BSONObjBuilder& result) {
+        string errMsg = stream() << "Writeback functionality is no longer present in v3.0 mongod, "
+                                 << "a v2.6 mongos may be running in the v3.0 cluster at "
+                                 << opCtx->getClient()->clientAddress(false);
+
+        error() << errMsg;
+
+        // Prevent v2.6 mongos from spamming writebacklisten retries
+        const int kSleepSecsBeforeMessage = 5;
+        sleepsecs(kSleepSecsBeforeMessage);
+
+        return appendCommandStatus(result, Status(ErrorCodes::CommandNotFound, errMsg));
+    }
+};
+
+/**
+ * The "writeBacksQueued" field is required in ServerStatus output to avoid v2.6 mongos crashing
+ * confusingly when upgrading a cluster.
+ */
+class WriteBacksQueuedSSM : public ServerStatusMetric {
+public:
+    WriteBacksQueuedSSM() : ServerStatusMetric(".writeBacksQueued") {}
+
+    virtual void appendAtLeaf(BSONObjBuilder& b) const {
+        // always append false, we don't queue writebacks
+        b.appendBool(_leafName, false);
+    }
+};
+
+namespace {
+MONGO_INITIALIZER(RegisterWriteBackShim)(InitializerContext* context) {
+    // Leaked intentionally: a Command registers itself when constructed.
+    new WriteBackCommand();
+    // Leaked intentionally: a SSM registers itself when constructed.
+    new WriteBacksQueuedSSM();
+    return Status::OK();
+}
+}
+
+}  // namespace

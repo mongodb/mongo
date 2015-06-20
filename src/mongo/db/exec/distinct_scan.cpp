@@ -37,60 +37,62 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::vector;
+using std::unique_ptr;
+using std::vector;
 
-    // static
-    const char* DistinctScan::kStageType = "DISTINCT_SCAN";
+// static
+const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
-    DistinctScan::DistinctScan(OperationContext* txn, const DistinctParams& params, WorkingSet* workingSet)
-        : _txn(txn),
-          _workingSet(workingSet),
-          _descriptor(params.descriptor),
-          _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
-          _params(params),
-          _checker(&_params.bounds, _descriptor->keyPattern(), _params.direction),
-          _commonStats(kStageType) {
+DistinctScan::DistinctScan(OperationContext* txn,
+                           const DistinctParams& params,
+                           WorkingSet* workingSet)
+    : _txn(txn),
+      _workingSet(workingSet),
+      _descriptor(params.descriptor),
+      _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
+      _params(params),
+      _checker(&_params.bounds, _descriptor->keyPattern(), _params.direction),
+      _commonStats(kStageType) {
+    _specificStats.keyPattern = _params.descriptor->keyPattern();
+    _specificStats.indexName = _params.descriptor->indexName();
+    _specificStats.indexVersion = _params.descriptor->version();
 
-        _specificStats.keyPattern = _params.descriptor->keyPattern();
-        _specificStats.indexName = _params.descriptor->indexName();
-        _specificStats.indexVersion = _params.descriptor->version();
+    // Set up our initial seek. If there is no valid data, just mark as EOF.
+    _commonStats.isEOF = !_checker.getStartSeekPoint(&_seekPoint);
+}
 
-        // Set up our initial seek. If there is no valid data, just mark as EOF.
-        _commonStats.isEOF = !_checker.getStartSeekPoint(&_seekPoint);
+PlanStage::StageState DistinctScan::work(WorkingSetID* out) {
+    ++_commonStats.works;
+    if (_commonStats.isEOF)
+        return PlanStage::IS_EOF;
+
+    // Adds the amount of time taken by work() to executionTimeMillis.
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
+
+    boost::optional<IndexKeyEntry> kv;
+    try {
+        if (!_cursor)
+            _cursor = _iam->newCursor(_txn, _params.direction == 1);
+        kv = _cursor->seek(_seekPoint);
+    } catch (const WriteConflictException& wce) {
+        *out = WorkingSet::INVALID_ID;
+        return PlanStage::NEED_YIELD;
     }
 
-    PlanStage::StageState DistinctScan::work(WorkingSetID* out) {
-        ++_commonStats.works;
-        if (_commonStats.isEOF) return PlanStage::IS_EOF;
+    if (!kv) {
+        _commonStats.isEOF = true;
+        return PlanStage::IS_EOF;
+    }
 
-        // Adds the amount of time taken by work() to executionTimeMillis.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
+    ++_specificStats.keysExamined;
 
-        boost::optional<IndexKeyEntry> kv;
-        try {
-            if (!_cursor) _cursor = _iam->newCursor(_txn, _params.direction == 1);
-            kv = _cursor->seek(_seekPoint);
-        }
-        catch (const WriteConflictException& wce) {
-            *out = WorkingSet::INVALID_ID;
-            return PlanStage::NEED_YIELD;
-        }
-        
-        if (!kv) {
-            _commonStats.isEOF = true;
-            return PlanStage::IS_EOF;
-        }
-
-        ++_specificStats.keysExamined;
-
-        switch (_checker.checkKey(kv->key, &_seekPoint)) {
-        case IndexBoundsChecker::MUST_ADVANCE: 
+    switch (_checker.checkKey(kv->key, &_seekPoint)) {
+        case IndexBoundsChecker::MUST_ADVANCE:
             // Try again next time. The checker has adjusted the _seekPoint.
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
 
-        case IndexBoundsChecker::DONE: 
+        case IndexBoundsChecker::DONE:
             // There won't be a next time.
             _commonStats.isEOF = true;
             _cursor.reset();
@@ -99,8 +101,9 @@ namespace mongo {
         case IndexBoundsChecker::VALID:
             // Return this key. Adjust the _seekPoint so that it is exclusive on the field we
             // are using.
-            
-            if (!kv->key.isOwned()) kv->key = kv->key.getOwned();
+
+            if (!kv->key.isOwned())
+                kv->key = kv->key.getOwned();
             _seekPoint.keyPrefix = kv->key;
             _seekPoint.prefixLen = _params.fieldNo + 1;
             _seekPoint.prefixExclusive = true;
@@ -115,51 +118,53 @@ namespace mongo {
             *out = id;
             ++_commonStats.advanced;
             return PlanStage::ADVANCED;
-        }
-        invariant(false);
     }
+    invariant(false);
+}
 
-    bool DistinctScan::isEOF() {
-        return _commonStats.isEOF;
-    }
+bool DistinctScan::isEOF() {
+    return _commonStats.isEOF;
+}
 
-    void DistinctScan::saveState() {
-        _txn = NULL;
-        ++_commonStats.yields;
+void DistinctScan::saveState() {
+    _txn = NULL;
+    ++_commonStats.yields;
 
-        // We always seek, so we don't care where the cursor is.
-        if (_cursor) _cursor->saveUnpositioned();
-    }
+    // We always seek, so we don't care where the cursor is.
+    if (_cursor)
+        _cursor->saveUnpositioned();
+}
 
-    void DistinctScan::restoreState(OperationContext* opCtx) {
-        invariant(_txn == NULL);
-        _txn = opCtx;
-        ++_commonStats.unyields;
+void DistinctScan::restoreState(OperationContext* opCtx) {
+    invariant(_txn == NULL);
+    _txn = opCtx;
+    ++_commonStats.unyields;
 
-        if (_cursor) _cursor->restore(opCtx);
-    }
+    if (_cursor)
+        _cursor->restore(opCtx);
+}
 
-    void DistinctScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-        ++_commonStats.invalidates;
-    }
+void DistinctScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    ++_commonStats.invalidates;
+}
 
-    vector<PlanStage*> DistinctScan::getChildren() const {
-        vector<PlanStage*> empty;
-        return empty;
-    }
+vector<PlanStage*> DistinctScan::getChildren() const {
+    vector<PlanStage*> empty;
+    return empty;
+}
 
-    PlanStageStats* DistinctScan::getStats() {
-        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_DISTINCT_SCAN));
-        ret->specific.reset(new DistinctScanStats(_specificStats));
-        return ret.release();
-    }
+PlanStageStats* DistinctScan::getStats() {
+    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_DISTINCT_SCAN));
+    ret->specific.reset(new DistinctScanStats(_specificStats));
+    return ret.release();
+}
 
-    const CommonStats* DistinctScan::getCommonStats() const {
-        return &_commonStats;
-    }
+const CommonStats* DistinctScan::getCommonStats() const {
+    return &_commonStats;
+}
 
-    const SpecificStats* DistinctScan::getSpecificStats() const {
-        return &_specificStats;
-    }
+const SpecificStats* DistinctScan::getSpecificStats() const {
+    return &_specificStats;
+}
 
 }  // namespace mongo

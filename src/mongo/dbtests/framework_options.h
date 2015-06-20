@@ -35,36 +35,36 @@
 
 namespace mongo {
 
-    namespace optionenvironment {
-        class OptionSection;
-        class Environment;
-    } // namespace optionenvironment
+namespace optionenvironment {
+class OptionSection;
+class Environment;
+}  // namespace optionenvironment
 
-    namespace moe = mongo::optionenvironment;
+namespace moe = mongo::optionenvironment;
 
-    struct FrameworkGlobalParams {
-        unsigned perfHist;
-        unsigned long long seed;
-        int runsPerTest;
-        std::string dbpathSpec;
-        std::vector<std::string> suites;
-        std::string filter;
-    };
+struct FrameworkGlobalParams {
+    unsigned perfHist;
+    unsigned long long seed;
+    int runsPerTest;
+    std::string dbpathSpec;
+    std::vector<std::string> suites;
+    std::string filter;
+};
 
-    extern FrameworkGlobalParams frameworkGlobalParams;
+extern FrameworkGlobalParams frameworkGlobalParams;
 
-    Status addTestFrameworkOptions(moe::OptionSection* options);
+Status addTestFrameworkOptions(moe::OptionSection* options);
 
-    std::string getTestFrameworkHelp(StringData name, const moe::OptionSection& options);
+std::string getTestFrameworkHelp(StringData name, const moe::OptionSection& options);
 
-    /**
-     * Handle options that should come before validation, such as "help".
-     *
-     * Returns false if an option was found that implies we should prematurely exit with success.
-     */
-    bool handlePreValidationTestFrameworkOptions(const moe::Environment& params,
+/**
+ * Handle options that should come before validation, such as "help".
+ *
+ * Returns false if an option was found that implies we should prematurely exit with success.
+ */
+bool handlePreValidationTestFrameworkOptions(const moe::Environment& params,
                                              const std::vector<std::string>& args);
 
-    Status storeTestFrameworkOptions(const moe::Environment& params,
-                                     const std::vector<std::string>& args);
+Status storeTestFrameworkOptions(const moe::Environment& params,
+                                 const std::vector<std::string>& args);
 }

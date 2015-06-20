@@ -42,528 +42,623 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
-
-    TEST( MatchExpressionParserLeafTest, SimpleEQ2 ) {
-        BSONObj query = BSON( "x" << BSON( "$eq" << 2 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, SimpleEQUndefined ) {
-        BSONObj query = BSON( "x" << BSON( "$eq" << BSONUndefined ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
-    TEST( MatchExpressionParserLeafTest, SimpleGT1 ) {
-        BSONObj query = BSON( "x" << BSON( "$gt" << 2 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, SimpleLT1 ) {
-        BSONObj query = BSON( "x" << BSON( "$lt" << 2 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, SimpleGTE1 ) {
-        BSONObj query = BSON( "x" << BSON( "$gte" << 2 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, SimpleLTE1 ) {
-        BSONObj query = BSON( "x" << BSON( "$lte" << 2 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, SimpleNE1 ) {
-        BSONObj query = BSON( "x" << BSON( "$ne" << 2 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, SimpleModBad1 ) {
-        BSONObj query = BSON( "x" << BSON( "$mod" << BSON_ARRAY( 3 << 2 ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy1(result.getValue());
-
-        query = BSON( "x" << BSON( "$mod" << BSON_ARRAY( 3 ) ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( !result.isOK() );
-
-        query = BSON( "x" << BSON( "$mod" << BSON_ARRAY( 3 << 2 << 4 ) ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( !result.isOK() );
-
-        query = BSON( "x" << BSON( "$mod" << BSON_ARRAY( "q" << 2 ) ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( !result.isOK() );
-
-        query = BSON( "x" << BSON( "$mod" << 3 ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( !result.isOK() );
-
-        query = BSON( "x" << BSON( "$mod" << BSON( "a" << 1 << "b" << 2 ) ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( !result.isOK() );
-    }
-
-    TEST( MatchExpressionParserLeafTest, SimpleMod1 ) {
-        BSONObj query = BSON( "x" << BSON( "$mod" << BSON_ARRAY( 3 << 2 ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 4 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 8 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, SimpleModNotNumber ) {
-        BSONObj query = BSON( "x" << BSON( "$mod" << BSON_ARRAY( 2 << "r" ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 4 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "a" ) ) );
-    }
-
-
-    TEST( MatchExpressionParserLeafTest, SimpleIN1 ) {
-        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY( 2 << 3 ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INSingleDBRef ) {
-        OID oid = OID::gen();
-        BSONObj query =
-            BSON( "x" << BSON( "$in" << BSON_ARRAY(
-                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        OID oidx = OID::gen();
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oidx << "$db" << "db" ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$id" << oid << "$ref" << "coll" << "$db" << "db" ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$id" << oid << "$ref" << "coll" << "$db" << "db" ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$id" << oid << "$ref" << "coll" << "$db" << "db" ) ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oid << "$db" << "dbx" ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON(  "$db" << "db" << "$ref" << "coll" << "$id" << oid ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
-                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INMultipleDBRef ) {
-        OID oid = OID::gen();
-        OID oidy = OID::gen();
-        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
-            BSON( "$ref" << "colly" << "$id" << oidy << "$db" << "db" ) <<
-            BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        OID oidx = OID::gen();
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oidx << "$db" << "db" ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$id" << oid << "$ref" << "coll" << "$db" << "db" ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "coll" << "$id" << oidy << "$db" << "db" ) ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "colly" << "$id" << oid << "$db" << "db" ) ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$id" << oid << "$ref" << "coll" << "$db" << "db" ) ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "dbx" ) ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$id" << oidy << "$ref" << "colly" << "$db" << "db" ) ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
-                BSON( "$ref" << "coll" << "$id" << oidx << "$db" << "db" ) ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
-                BSON( "$ref" << "colly" << "$id" << oidx << "$db" << "db" ) ) ) ) );
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
-                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "dbx" ) ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$ref" << "colly" << "$id" << oidy << "$db" << "db" ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "colly" << "$id" << oidy << "$db" << "db" ) ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
-                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
-                BSON( "$ref" << "colly" << "$id" << oidy << "$db" << "db" ) ) ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INDBRefWithOptionalField1 ) {
-        OID oid = OID::gen();
-        BSONObj query =
-            BSON( "x" << BSON( "$in" << BSON_ARRAY(
-                BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 ) ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        OID oidx = OID::gen();
-        ASSERT( !result.getValue()->matchesBSON(
-            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oidx << "$db" << "db" ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 ) ) ) ) );
-        ASSERT( result.getValue()->matchesBSON(
-            BSON( "x" << BSON_ARRAY(
-                BSON( "$ref" << "collx" << "$id" << oidx << "foo" << 12345 ) <<
-                BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 ) ) ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INInvalidDBRefs ) {
-        // missing $id
-        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
-            BSON( "$ref" << "coll" ) ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        result = MatchExpressionParser::parse( query );
-
-        // second field is not $id
-        query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
-                    BSON( "$ref" << "coll" <<
-                          "$foo" << 1 ) ) ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
-        OID oid = OID::gen();
-
-        // missing $ref field
-        query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
-                    BSON( "$id" << oid <<
-                          "foo" << 3 ) ) ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
-        // missing $id and $ref field
-        query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
-                    BSON( "$db" << "test" <<
-                          "foo" << 3 ) ) ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
-    }
-
-    TEST( MatchExpressionParserLeafTest, INExpressionDocument ) {
-        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY( BSON( "$foo" << 1 ) ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INNotArray ) {
-        BSONObj query = BSON( "x" << BSON( "$in" << 5 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INUndefined ) {
-        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY( BSONUndefined ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INNotElemMatch ) {
-        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY( BSON( "$elemMatch" << 1 ) ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INRegexTooLong ) {
-        string tooLargePattern( 50 * 1000, 'z' );
-        BSONObjBuilder inArray;
-        inArray.appendRegex( "0", tooLargePattern, "" );
-        BSONObjBuilder operand;
-        operand.appendArray( "$in", inArray.obj() );
-        BSONObj query = BSON( "x" << operand.obj() );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INRegexTooLong2 ) {
-        string tooLargePattern( 50 * 1000, 'z' );
-        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY( BSON( "$regex" << tooLargePattern ) ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INRegexStuff ) {
-        BSONObjBuilder inArray;
-        inArray.appendRegex( "0", "^a", "" );
-        inArray.appendRegex( "1", "B", "i" );
-        inArray.append( "2", 4 );
-        BSONObjBuilder operand;
-        operand.appendArray( "$in", inArray.obj() );
-
-        BSONObj query = BSON( "a" << operand.obj() );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        BSONObj matchFirst = BSON( "a" << "ax" );
-        BSONObj matchFirstRegex = BSONObjBuilder().appendRegex( "a", "^a", "" ).obj();
-        BSONObj matchSecond = BSON( "a" << "qqb" );
-        BSONObj matchSecondRegex = BSONObjBuilder().appendRegex( "a", "B", "i" ).obj();
-        BSONObj matchThird = BSON( "a" << 4 );
-        BSONObj notMatch = BSON( "a" << "l" );
-        BSONObj notMatchRegex = BSONObjBuilder().appendRegex( "a", "B", "" ).obj();
-
-        ASSERT( result.getValue()->matchesBSON( matchFirst ) );
-        ASSERT( result.getValue()->matchesBSON( matchFirstRegex ) );
-        ASSERT( result.getValue()->matchesBSON( matchSecond ) );
-        ASSERT( result.getValue()->matchesBSON( matchSecondRegex ) );
-        ASSERT( result.getValue()->matchesBSON( matchThird ) );
-        ASSERT( !result.getValue()->matchesBSON( notMatch ) );
-        ASSERT( !result.getValue()->matchesBSON( notMatchRegex ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, SimpleNIN1 ) {
-        BSONObj query = BSON( "x" << BSON( "$nin" << BSON_ARRAY( 2 << 3 ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, NINNotArray ) {
-        BSONObj query = BSON( "x" << BSON( "$nin" << 5 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
-
-    TEST( MatchExpressionParserLeafTest, Regex1 ) {
-        BSONObjBuilder b;
-        b.appendRegex( "x", "abc", "i" );
-        BSONObj query = b.obj();
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "ABC" ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "AC" ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, Regex2 ) {
-        BSONObj query = BSON( "x" << BSON( "$regex" << "abc" << "$options" << "i" ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "ABC" ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "AC" ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, Regex3 ) {
-        BSONObj query = BSON( "x" << BSON( "$options" << "i" << "$regex" << "abc" ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        log() << "result: " << result.getStatus() << endl;
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "ABC" ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "AC" ) ) );
-    }
-
-
-    TEST( MatchExpressionParserLeafTest, RegexBad ) {
-        BSONObj query = BSON( "x" << BSON( "$regex" << "abc" << "$optionas" << "i" ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
-        // $regex does not with numbers
-        query = BSON( "x" << BSON( "$regex" << 123 ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
-        query = BSON( "x" << BSON( "$regex" << BSON_ARRAY("abc") ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
-        query = BSON( "x" << BSON( "$optionas" << "i" ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
-        query = BSON( "x" << BSON( "$options" << "i" ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
-    TEST( MatchExpressionParserLeafTest, ExistsYes1 ) {
-        BSONObjBuilder b;
-        b.appendBool( "$exists", true );
-        BSONObj query = BSON( "x" << b.obj() );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "y" << "AC" ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, ExistsNO1 ) {
-        BSONObjBuilder b;
-        b.appendBool( "$exists", false );
-        BSONObj query = BSON( "x" << b.obj() );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "y" << "AC" ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, Type1 ) {
-        BSONObj query = BSON( "x" << BSON( "$type" << String ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, Type2 ) {
-        BSONObj query = BSON( "x" << BSON( "$type" << (double)NumberDouble ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 5.3 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, TypeDoubleOperator ) {
-        BSONObj query = BSON( "x" << BSON( "$type" << 1.5 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5.3 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, TypeNull ) {
-        BSONObj query = BSON( "x" << BSON( "$type" << jstNULL ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( !result.getValue()->matchesBSON( BSONObj() ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
-        BSONObjBuilder b;
-        b.appendNull( "x" );
-        ASSERT( result.getValue()->matchesBSON( b.obj() ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, TypeBadType ) {
-        BSONObjBuilder b;
-        b.append( "$type", ( JSTypeMax + 1 ) );
-        BSONObj query = BSON( "x" << b.obj() );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
-
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5.3 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
-    }
-
-    TEST( MatchExpressionParserLeafTest, TypeBad ) {
-        BSONObj query = BSON( "x" << BSON( "$type" << BSON( "x" << 1 ) ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
+using std::endl;
+using std::string;
+
+TEST(MatchExpressionParserLeafTest, SimpleEQ2) {
+    BSONObj query = BSON("x" << BSON("$eq" << 2));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
+}
+
+TEST(MatchExpressionParserLeafTest, SimpleEQUndefined) {
+    BSONObj query = BSON("x" << BSON("$eq" << BSONUndefined));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserLeafTest, SimpleGT1) {
+    BSONObj query = BSON("x" << BSON("$gt" << 2));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
+}
+
+TEST(MatchExpressionParserLeafTest, SimpleLT1) {
+    BSONObj query = BSON("x" << BSON("$lt" << 2));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
+}
+
+TEST(MatchExpressionParserLeafTest, SimpleGTE1) {
+    BSONObj query = BSON("x" << BSON("$gte" << 2));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
+}
+
+TEST(MatchExpressionParserLeafTest, SimpleLTE1) {
+    BSONObj query = BSON("x" << BSON("$lte" << 2));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
+}
+
+TEST(MatchExpressionParserLeafTest, SimpleNE1) {
+    BSONObj query = BSON("x" << BSON("$ne" << 2));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
+}
+
+TEST(MatchExpressionParserLeafTest, SimpleModBad1) {
+    BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2)));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy1(result.getValue());
+
+    query = BSON("x" << BSON("$mod" << BSON_ARRAY(3)));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(!result.isOK());
+
+    query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2 << 4)));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(!result.isOK());
+
+    query = BSON("x" << BSON("$mod" << BSON_ARRAY("q" << 2)));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(!result.isOK());
+
+    query = BSON("x" << BSON("$mod" << 3));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(!result.isOK());
+
+    query = BSON("x" << BSON("$mod" << BSON("a" << 1 << "b" << 2)));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(!result.isOK());
+}
+
+TEST(MatchExpressionParserLeafTest, SimpleMod1) {
+    BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2)));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 5)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 4)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 8)));
+}
+
+TEST(MatchExpressionParserLeafTest, SimpleModNotNumber) {
+    BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(2 << "r")));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 4)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "a")));
+}
+
+
+TEST(MatchExpressionParserLeafTest, SimpleIN1) {
+    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(2 << 3)));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
+}
+
+TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
+    OID oid = OID::gen();
+    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
+                                                              << "coll"
+                                                              << "$id" << oid << "$db"
+                                                              << "db"))));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    OID oidx = OID::gen();
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "collx"
+                                                            << "$id" << oidx << "$db"
+                                                            << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "coll"
+                                                            << "$id" << oidx << "$db"
+                                                            << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$id" << oid << "$ref"
+                                                                  << "coll"
+                                                                  << "$db"
+                                                                  << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$id" << oid << "$ref"
+                                                                  << "coll"
+                                                                  << "$db"
+                                                                  << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$id" << oid << "$ref"
+                                                                             << "coll"
+                                                                             << "$db"
+                                                                             << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "coll"
+                                                            << "$id" << oid << "$db"
+                                                            << "dbx"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$db"
+                                                            << "db"
+                                                            << "$ref"
+                                                            << "coll"
+                                                            << "$id" << oid))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                           << "coll"
+                                                           << "$id" << oid << "$db"
+                                                           << "db"))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "coll"
+                                                                      << "$id" << oid << "$db"
+                                                                      << "db")))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "collx"
+                                                                      << "$id" << oidx << "$db"
+                                                                      << "db")
+                                                                 << BSON("$ref"
+                                                                         << "coll"
+                                                                         << "$id" << oid << "$db"
+                                                                         << "db")))));
+}
+
+TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
+    OID oid = OID::gen();
+    OID oidy = OID::gen();
+    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
+                                                              << "colly"
+                                                              << "$id" << oidy << "$db"
+                                                              << "db")
+                                                         << BSON("$ref"
+                                                                 << "coll"
+                                                                 << "$id" << oid << "$db"
+                                                                 << "db"))));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    OID oidx = OID::gen();
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "collx"
+                                                            << "$id" << oidx << "$db"
+                                                            << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "coll"
+                                                            << "$id" << oidx << "$db"
+                                                            << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$id" << oid << "$ref"
+                                                                  << "coll"
+                                                                  << "$db"
+                                                                  << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "coll"
+                                                                       << "$id" << oidy << "$db"
+                                                                       << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "colly"
+                                                                       << "$id" << oid << "$db"
+                                                                       << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$id" << oid << "$ref"
+                                                                             << "coll"
+                                                                             << "$db"
+                                                                             << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "coll"
+                                                                       << "$id" << oid << "$db"
+                                                                       << "dbx")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$id" << oidy << "$ref"
+                                                                             << "colly"
+                                                                             << "$db"
+                                                                             << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "collx"
+                                                                       << "$id" << oidx << "$db"
+                                                                       << "db")
+                                                                  << BSON("$ref"
+                                                                          << "coll"
+                                                                          << "$id" << oidx << "$db"
+                                                                          << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "collx"
+                                                                       << "$id" << oidx << "$db"
+                                                                       << "db")
+                                                                  << BSON("$ref"
+                                                                          << "colly"
+                                                                          << "$id" << oidx << "$db"
+                                                                          << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "collx"
+                                                                       << "$id" << oidx << "$db"
+                                                                       << "db")
+                                                                  << BSON("$ref"
+                                                                          << "coll"
+                                                                          << "$id" << oid << "$db"
+                                                                          << "dbx")))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                           << "coll"
+                                                           << "$id" << oid << "$db"
+                                                           << "db"))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                           << "colly"
+                                                           << "$id" << oidy << "$db"
+                                                           << "db"))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "coll"
+                                                                      << "$id" << oid << "$db"
+                                                                      << "db")))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "colly"
+                                                                      << "$id" << oidy << "$db"
+                                                                      << "db")))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "collx"
+                                                                      << "$id" << oidx << "$db"
+                                                                      << "db")
+                                                                 << BSON("$ref"
+                                                                         << "coll"
+                                                                         << "$id" << oid << "$db"
+                                                                         << "db")))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "collx"
+                                                                      << "$id" << oidx << "$db"
+                                                                      << "db")
+                                                                 << BSON("$ref"
+                                                                         << "colly"
+                                                                         << "$id" << oidy << "$db"
+                                                                         << "db")))));
+}
+
+TEST(MatchExpressionParserLeafTest, INDBRefWithOptionalField1) {
+    OID oid = OID::gen();
+    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
+                                                              << "coll"
+                                                              << "$id" << oid << "foo" << 12345))));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    OID oidx = OID::gen();
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "coll"
+                                                            << "$id" << oidx << "$db"
+                                                            << "db"))));
+    ASSERT(result.getValue()->matchesBSON(
+        BSON("x" << BSON_ARRAY(BSON("$ref"
+                                    << "coll"
+                                    << "$id" << oid << "foo" << 12345)))));
+    ASSERT(result.getValue()->matchesBSON(
+        BSON("x" << BSON_ARRAY(BSON("$ref"
+                                    << "collx"
+                                    << "$id" << oidx << "foo" << 12345)
+                               << BSON("$ref"
+                                       << "coll"
+                                       << "$id" << oid << "foo" << 12345)))));
+}
+
+TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
+    // missing $id
+    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
+                                                              << "coll"))));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    result = MatchExpressionParser::parse(query);
+
+    // second field is not $id
+    query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
+                                                      << "coll"
+                                                      << "$foo" << 1))));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+
+    OID oid = OID::gen();
+
+    // missing $ref field
+    query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$id" << oid << "foo" << 3))));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+
+    // missing $id and $ref field
+    query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$db"
+                                                      << "test"
+                                                      << "foo" << 3))));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserLeafTest, INExpressionDocument) {
+    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$foo" << 1))));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserLeafTest, INNotArray) {
+    BSONObj query = BSON("x" << BSON("$in" << 5));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserLeafTest, INUndefined) {
+    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSONUndefined)));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserLeafTest, INNotElemMatch) {
+    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$elemMatch" << 1))));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserLeafTest, INRegexTooLong) {
+    string tooLargePattern(50 * 1000, 'z');
+    BSONObjBuilder inArray;
+    inArray.appendRegex("0", tooLargePattern, "");
+    BSONObjBuilder operand;
+    operand.appendArray("$in", inArray.obj());
+    BSONObj query = BSON("x" << operand.obj());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserLeafTest, INRegexTooLong2) {
+    string tooLargePattern(50 * 1000, 'z');
+    BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$regex" << tooLargePattern))));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserLeafTest, INRegexStuff) {
+    BSONObjBuilder inArray;
+    inArray.appendRegex("0", "^a", "");
+    inArray.appendRegex("1", "B", "i");
+    inArray.append("2", 4);
+    BSONObjBuilder operand;
+    operand.appendArray("$in", inArray.obj());
+
+    BSONObj query = BSON("a" << operand.obj());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    BSONObj matchFirst = BSON("a"
+                              << "ax");
+    BSONObj matchFirstRegex = BSONObjBuilder().appendRegex("a", "^a", "").obj();
+    BSONObj matchSecond = BSON("a"
+                               << "qqb");
+    BSONObj matchSecondRegex = BSONObjBuilder().appendRegex("a", "B", "i").obj();
+    BSONObj matchThird = BSON("a" << 4);
+    BSONObj notMatch = BSON("a"
+                            << "l");
+    BSONObj notMatchRegex = BSONObjBuilder().appendRegex("a", "B", "").obj();
+
+    ASSERT(result.getValue()->matchesBSON(matchFirst));
+    ASSERT(result.getValue()->matchesBSON(matchFirstRegex));
+    ASSERT(result.getValue()->matchesBSON(matchSecond));
+    ASSERT(result.getValue()->matchesBSON(matchSecondRegex));
+    ASSERT(result.getValue()->matchesBSON(matchThird));
+    ASSERT(!result.getValue()->matchesBSON(notMatch));
+    ASSERT(!result.getValue()->matchesBSON(notMatchRegex));
+}
+
+TEST(MatchExpressionParserLeafTest, SimpleNIN1) {
+    BSONObj query = BSON("x" << BSON("$nin" << BSON_ARRAY(2 << 3)));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
+}
+
+TEST(MatchExpressionParserLeafTest, NINNotArray) {
+    BSONObj query = BSON("x" << BSON("$nin" << 5));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
+
+
+TEST(MatchExpressionParserLeafTest, Regex1) {
+    BSONObjBuilder b;
+    b.appendRegex("x", "abc", "i");
+    BSONObj query = b.obj();
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "abc")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "ABC")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "AC")));
+}
+
+TEST(MatchExpressionParserLeafTest, Regex2) {
+    BSONObj query = BSON("x" << BSON("$regex"
+                                     << "abc"
+                                     << "$options"
+                                     << "i"));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "abc")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "ABC")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "AC")));
+}
+
+TEST(MatchExpressionParserLeafTest, Regex3) {
+    BSONObj query = BSON("x" << BSON("$options"
+                                     << "i"
+                                     << "$regex"
+                                     << "abc"));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    log() << "result: " << result.getStatus() << endl;
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "abc")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "ABC")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "AC")));
+}
+
+
+TEST(MatchExpressionParserLeafTest, RegexBad) {
+    BSONObj query = BSON("x" << BSON("$regex"
+                                     << "abc"
+                                     << "$optionas"
+                                     << "i"));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+
+    // $regex does not with numbers
+    query = BSON("x" << BSON("$regex" << 123));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+
+    query = BSON("x" << BSON("$regex" << BSON_ARRAY("abc")));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+
+    query = BSON("x" << BSON("$optionas"
+                             << "i"));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+
+    query = BSON("x" << BSON("$options"
+                             << "i"));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserLeafTest, ExistsYes1) {
+    BSONObjBuilder b;
+    b.appendBool("$exists", true);
+    BSONObj query = BSON("x" << b.obj());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "abc")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("y"
+                                                << "AC")));
+}
+
+TEST(MatchExpressionParserLeafTest, ExistsNO1) {
+    BSONObjBuilder b;
+    b.appendBool("$exists", false);
+    BSONObj query = BSON("x" << b.obj());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "abc")));
+    ASSERT(result.getValue()->matchesBSON(BSON("y"
+                                               << "AC")));
+}
+
+TEST(MatchExpressionParserLeafTest, Type1) {
+    BSONObj query = BSON("x" << BSON("$type" << String));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "abc")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
+}
+
+TEST(MatchExpressionParserLeafTest, Type2) {
+    BSONObj query = BSON("x" << BSON("$type" << (double)NumberDouble));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 5.3)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeDoubleOperator) {
+    BSONObj query = BSON("x" << BSON("$type" << 1.5));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5.3)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeNull) {
+    BSONObj query = BSON("x" << BSON("$type" << jstNULL));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(!result.getValue()->matchesBSON(BSONObj()));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
+    BSONObjBuilder b;
+    b.appendNull("x");
+    ASSERT(result.getValue()->matchesBSON(b.obj()));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeBadType) {
+    BSONObjBuilder b;
+    b.append("$type", (JSTypeMax + 1));
+    BSONObj query = BSON("x" << b.obj());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
+
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5.3)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeBad) {
+    BSONObj query = BSON("x" << BSON("$type" << BSON("x" << 1)));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
 }

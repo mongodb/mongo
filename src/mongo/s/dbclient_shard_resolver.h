@@ -32,42 +32,37 @@
 
 namespace mongo {
 
+/**
+ * ShardResolver based on the Shard and ReplicaSetMonitor caches.
+ *
+ * TODO: Currently it's possible for the shard resolver to be stale after we target and remove
+ * a shard.  We need to figure out how to refresh.
+ */
+class DBClientShardResolver : public ShardResolver {
+public:
+    DBClientShardResolver() {}
+
+    virtual ~DBClientShardResolver() {}
+
     /**
-     * ShardResolver based on the Shard and ReplicaSetMonitor caches.
+     * Returns the current host ConnectionString for a write to a shard.
      *
-     * TODO: Currently it's possible for the shard resolver to be stale after we target and remove
-     * a shard.  We need to figure out how to refresh.
+     * Note: Does *not* trigger a refresh of either the shard or replica set monitor caches,
+     * though refreshes may happen unexpectedly between calls.
+     *
+     * Returns ShardNotFound if the shard name is unknown
+     * Returns ReplicaSetNotFound if the replica set is not being tracked
+     * Returns !OK with message if the shard host could not be found for other reasons.
      */
-    class DBClientShardResolver : public ShardResolver {
-    public:
+    Status chooseWriteHost(const std::string& shardName, ConnectionString* shardHost) const;
 
-        DBClientShardResolver() {
-        }
+    /**
+     * Resolves a replica set connection string to a master or returns an error.
+     *
+     * Returns HostNotFound if the master is not reachable
+     * Returns ReplicaSetNotFound if the replica set is not being tracked
+     */
+    static Status findMaster(const ConnectionString& connString, ConnectionString* resolvedHost);
+};
 
-        virtual ~DBClientShardResolver() {
-        }
-
-        /**
-         * Returns the current host ConnectionString for a write to a shard.
-         *
-         * Note: Does *not* trigger a refresh of either the shard or replica set monitor caches,
-         * though refreshes may happen unexpectedly between calls.
-         *
-         * Returns ShardNotFound if the shard name is unknown
-         * Returns ReplicaSetNotFound if the replica set is not being tracked
-         * Returns !OK with message if the shard host could not be found for other reasons.
-         */
-        Status chooseWriteHost( const std::string& shardName, ConnectionString* shardHost ) const;
-        
-        /**
-         * Resolves a replica set connection string to a master or returns an error.
-         *
-         * Returns HostNotFound if the master is not reachable
-         * Returns ReplicaSetNotFound if the replica set is not being tracked
-         */
-        static Status findMaster(const ConnectionString& connString,
-                                 ConnectionString* resolvedHost);
-
-    };
-
-} // namespace mongo
+}  // namespace mongo

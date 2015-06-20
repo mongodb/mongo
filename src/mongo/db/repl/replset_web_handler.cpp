@@ -41,56 +41,55 @@
 namespace mongo {
 namespace repl {
 
-    using namespace html;
+using namespace html;
 
-    class ReplSetHandler : public DbWebHandler {
-    public:
-        ReplSetHandler() : DbWebHandler( "_replSet" , 1 , false ) {}
+class ReplSetHandler : public DbWebHandler {
+public:
+    ReplSetHandler() : DbWebHandler("_replSet", 1, false) {}
 
-        virtual bool handles( const std::string& url ) const {
-            return str::startsWith( url , "/_replSet" );
-        }
+    virtual bool handles(const std::string& url) const {
+        return str::startsWith(url, "/_replSet");
+    }
 
-        virtual void handle( OperationContext* txn,
-                             const char *rq, 
-                             const std::string& url, 
-                             BSONObj params,
-                             std::string& responseMsg,
-                             int& responseCode,
-                             std::vector<std::string>& headers,
-                             const SockAddr &from ) {
-            responseMsg = _replSet(txn);
-            responseCode = 200;
-        }
+    virtual void handle(OperationContext* txn,
+                        const char* rq,
+                        const std::string& url,
+                        BSONObj params,
+                        std::string& responseMsg,
+                        int& responseCode,
+                        std::vector<std::string>& headers,
+                        const SockAddr& from) {
+        responseMsg = _replSet(txn);
+        responseCode = 200;
+    }
 
-        /* /_replSet show replica set status in html format */
-        std::string _replSet(OperationContext* txn) {
-            std::stringstream s;
-            s << start("Replica Set Status " + prettyHostName());
-            s << p( a("/", "back", "Home") + " | " +
-                    a("/local/system.replset/?html=1", "", "View Replset Config") + " | " +
-                    a("/replSetGetStatus?text=1", "", "replSetGetStatus") + " | " +
-                    a("http://dochub.mongodb.org/core/replicasets", "", "Docs")
-                  );
+    /* /_replSet show replica set status in html format */
+    std::string _replSet(OperationContext* txn) {
+        std::stringstream s;
+        s << start("Replica Set Status " + prettyHostName());
+        s << p(a("/", "back", "Home") + " | " +
+               a("/local/system.replset/?html=1", "", "View Replset Config") + " | " +
+               a("/replSetGetStatus?text=1", "", "replSetGetStatus") + " | " +
+               a("http://dochub.mongodb.org/core/replicasets", "", "Docs"));
 
-            ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-            if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet) {
-                s << p("Not using --replSet");
-                s << _end();
-                return s.str();
-            }
-
-            ReplSetHtmlSummary summary;
-            replCoord->summarizeAsHtml(&summary);
-            s << summary.toHtmlString();
-
-            s << p("Recent replset log activity:");
-            fillRsLog(&s);
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet) {
+            s << p("Not using --replSet");
             s << _end();
             return s.str();
         }
 
-    } replSetHandler;
+        ReplSetHtmlSummary summary;
+        replCoord->summarizeAsHtml(&summary);
+        s << summary.toHtmlString();
 
-} // namespace repl
-} // namespace mongo
+        s << p("Recent replset log activity:");
+        fillRsLog(&s);
+        s << _end();
+        return s.str();
+    }
+
+} replSetHandler;
+
+}  // namespace repl
+}  // namespace mongo

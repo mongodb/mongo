@@ -40,77 +40,83 @@
 
 namespace mongo {
 
-    class KVCatalog;
-    class KVEngine;
-    class KVDatabaseCatalogEntry;
+class KVCatalog;
+class KVEngine;
+class KVDatabaseCatalogEntry;
 
-    struct KVStorageEngineOptions {
-        KVStorageEngineOptions() :
-            directoryPerDB(false),
-            directoryForIndexes(false),
-            forRepair(false) {}
+struct KVStorageEngineOptions {
+    KVStorageEngineOptions()
+        : directoryPerDB(false), directoryForIndexes(false), forRepair(false) {}
 
-        bool directoryPerDB;
-        bool directoryForIndexes;
-        bool forRepair;
-    };
+    bool directoryPerDB;
+    bool directoryForIndexes;
+    bool forRepair;
+};
 
-    class KVStorageEngine : public StorageEngine {
-    public:
-        /**
-         * @param engine - owneership passes to me
-         */
-        KVStorageEngine( KVEngine* engine,
-                         const KVStorageEngineOptions& options = KVStorageEngineOptions() );
-        virtual ~KVStorageEngine();
+class KVStorageEngine : public StorageEngine {
+public:
+    /**
+     * @param engine - owneership passes to me
+     */
+    KVStorageEngine(KVEngine* engine,
+                    const KVStorageEngineOptions& options = KVStorageEngineOptions());
+    virtual ~KVStorageEngine();
 
-        virtual void finishInit();
+    virtual void finishInit();
 
-        virtual RecoveryUnit* newRecoveryUnit();
+    virtual RecoveryUnit* newRecoveryUnit();
 
-        virtual void listDatabases( std::vector<std::string>* out ) const;
+    virtual void listDatabases(std::vector<std::string>* out) const;
 
-        virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                               StringData db );
+    virtual DatabaseCatalogEntry* getDatabaseCatalogEntry(OperationContext* opCtx, StringData db);
 
-        virtual bool supportsDocLocking() const { return _supportsDocLocking; }
+    virtual bool supportsDocLocking() const {
+        return _supportsDocLocking;
+    }
 
-        virtual Status closeDatabase( OperationContext* txn, StringData db );
+    virtual Status closeDatabase(OperationContext* txn, StringData db);
 
-        virtual Status dropDatabase( OperationContext* txn, StringData db );
+    virtual Status dropDatabase(OperationContext* txn, StringData db);
 
-        virtual int flushAllFiles( bool sync );
+    virtual int flushAllFiles(bool sync);
 
-        virtual bool isDurable() const;
+    virtual bool isDurable() const;
 
-        virtual Status repairRecordStore(OperationContext* txn, const std::string& ns);
+    virtual Status repairRecordStore(OperationContext* txn, const std::string& ns);
 
-        virtual void cleanShutdown();
+    virtual void cleanShutdown();
 
-        // ------ kv ------
+    // ------ kv ------
 
-        KVEngine* getEngine() { return _engine.get(); }
-        const KVEngine* getEngine() const { return _engine.get(); }
+    KVEngine* getEngine() {
+        return _engine.get();
+    }
+    const KVEngine* getEngine() const {
+        return _engine.get();
+    }
 
-        KVCatalog* getCatalog() { return _catalog.get(); }
-        const KVCatalog* getCatalog() const { return _catalog.get(); }
+    KVCatalog* getCatalog() {
+        return _catalog.get();
+    }
+    const KVCatalog* getCatalog() const {
+        return _catalog.get();
+    }
 
-    private:
-        class RemoveDBChange;
+private:
+    class RemoveDBChange;
 
-        KVStorageEngineOptions _options;
+    KVStorageEngineOptions _options;
 
-        // This must be the first member so it is destroyed last.
-        std::unique_ptr<KVEngine> _engine;
+    // This must be the first member so it is destroyed last.
+    std::unique_ptr<KVEngine> _engine;
 
-        const bool _supportsDocLocking;
+    const bool _supportsDocLocking;
 
-        std::unique_ptr<RecordStore> _catalogRecordStore;
-        std::unique_ptr<KVCatalog> _catalog;
+    std::unique_ptr<RecordStore> _catalogRecordStore;
+    std::unique_ptr<KVCatalog> _catalog;
 
-        typedef std::map<std::string,KVDatabaseCatalogEntry*> DBMap;
-        DBMap _dbs;
-        mutable stdx::mutex _dbsLock;
-    };
-
+    typedef std::map<std::string, KVDatabaseCatalogEntry*> DBMap;
+    DBMap _dbs;
+    mutable stdx::mutex _dbsLock;
+};
 }

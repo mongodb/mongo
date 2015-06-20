@@ -35,82 +35,78 @@
 
 namespace mongo {
 
-    namespace optionenvironment {
-        class OptionSection;
-        class Environment;
-    } // namespace optionenvironment
+namespace optionenvironment {
+class OptionSection;
+class Environment;
+}  // namespace optionenvironment
 
-    namespace moe = mongo::optionenvironment;
+namespace moe = mongo::optionenvironment;
 
-    struct SSLParams {
-        enum class Protocols {
-            TLS1_0,
-            TLS1_1,
-            TLS1_2
-        };
-        AtomicInt32 sslMode;        // --sslMode - the SSL operation mode, see enum SSLModes
-        bool sslOnNormalPorts;      // --sslOnNormalPorts (deprecated)
-        std::string sslPEMKeyFile;       // --sslPEMKeyFile
-        std::string sslPEMKeyPassword;   // --sslPEMKeyPassword
-        std::string sslClusterFile;       // --sslInternalKeyFile
-        std::string sslClusterPassword;   // --sslInternalKeyPassword
-        std::string sslCAFile;      // --sslCAFile
-        std::string sslCRLFile;     // --sslCRLFile
-        std::string sslCipherConfig; // --sslCipherConfig
-        std::vector<Protocols> sslDisabledProtocols; // --sslDisabledProtocols
-        bool sslWeakCertificateValidation; // --sslWeakCertificateValidation
-        bool sslFIPSMode; // --sslFIPSMode
-        bool sslAllowInvalidCertificates; // --sslAllowInvalidCertificates
-        bool sslAllowInvalidHostnames; // --sslAllowInvalidHostnames
+struct SSLParams {
+    enum class Protocols { TLS1_0, TLS1_1, TLS1_2 };
+    AtomicInt32 sslMode;             // --sslMode - the SSL operation mode, see enum SSLModes
+    bool sslOnNormalPorts;           // --sslOnNormalPorts (deprecated)
+    std::string sslPEMKeyFile;       // --sslPEMKeyFile
+    std::string sslPEMKeyPassword;   // --sslPEMKeyPassword
+    std::string sslClusterFile;      // --sslInternalKeyFile
+    std::string sslClusterPassword;  // --sslInternalKeyPassword
+    std::string sslCAFile;           // --sslCAFile
+    std::string sslCRLFile;          // --sslCRLFile
+    std::string sslCipherConfig;     // --sslCipherConfig
+    std::vector<Protocols> sslDisabledProtocols;  // --sslDisabledProtocols
+    bool sslWeakCertificateValidation;            // --sslWeakCertificateValidation
+    bool sslFIPSMode;                             // --sslFIPSMode
+    bool sslAllowInvalidCertificates;             // --sslAllowInvalidCertificates
+    bool sslAllowInvalidHostnames;                // --sslAllowInvalidHostnames
 
-        SSLParams() {
-            sslMode.store(SSLMode_disabled);
-        }
- 
-        enum SSLModes {
-            /** 
-            * Make unencrypted outgoing connections and do not accept incoming SSL-connections 
-            */
-            SSLMode_disabled,
+    SSLParams() {
+        sslMode.store(SSLMode_disabled);
+    }
 
-            /**
-            * Make unencrypted outgoing connections and accept both unencrypted and SSL-connections 
-            */
-            SSLMode_allowSSL,
+    enum SSLModes {
+        /**
+        * Make unencrypted outgoing connections and do not accept incoming SSL-connections
+        */
+        SSLMode_disabled,
 
-            /**
-            * Make outgoing SSL-connections and accept both unecrypted and SSL-connections
-            */
-            SSLMode_preferSSL,
- 
-            /**
-            * Make outgoing SSL-connections and only accept incoming SSL-connections
-            */
-            SSLMode_requireSSL
-        };
+        /**
+        * Make unencrypted outgoing connections and accept both unencrypted and SSL-connections
+        */
+        SSLMode_allowSSL,
+
+        /**
+        * Make outgoing SSL-connections and accept both unecrypted and SSL-connections
+        */
+        SSLMode_preferSSL,
+
+        /**
+        * Make outgoing SSL-connections and only accept incoming SSL-connections
+        */
+        SSLMode_requireSSL
     };
+};
 
-    extern SSLParams sslGlobalParams;
+extern SSLParams sslGlobalParams;
 
-    Status addSSLServerOptions(moe::OptionSection* options);
+Status addSSLServerOptions(moe::OptionSection* options);
 
-    Status addSSLClientOptions(moe::OptionSection* options);
+Status addSSLClientOptions(moe::OptionSection* options);
 
-    Status storeSSLServerOptions(const moe::Environment& params);
+Status storeSSLServerOptions(const moe::Environment& params);
 
-    /**
-     * Canonicalize SSL options for the given environment that have different representations with
-     * the same logical meaning
-     */
-    Status canonicalizeSSLServerOptions(moe::Environment* params);
+/**
+ * Canonicalize SSL options for the given environment that have different representations with
+ * the same logical meaning
+ */
+Status canonicalizeSSLServerOptions(moe::Environment* params);
 
-    Status validateSSLServerOptions(const moe::Environment& params);
+Status validateSSLServerOptions(const moe::Environment& params);
 
-    Status storeSSLClientOptions(const moe::Environment& params);
+Status storeSSLClientOptions(const moe::Environment& params);
 
-    /**
-     * Used by the Mongo shell to validate that the SSL options passed are acceptable and
-     * do not conflict with one another.
-     */
-    Status validateSSLMongoShellOptions(const moe::Environment& params);
+/**
+ * Used by the Mongo shell to validate that the SSL options passed are acceptable and
+ * do not conflict with one another.
+ */
+Status validateSSLMongoShellOptions(const moe::Environment& params);
 }

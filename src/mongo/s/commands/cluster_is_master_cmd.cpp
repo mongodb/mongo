@@ -35,52 +35,50 @@
 namespace mongo {
 namespace {
 
-    class CmdIsMaster : public Command {
-    public:
-        CmdIsMaster() : Command("isMaster", false, "ismaster") { }
+class CmdIsMaster : public Command {
+public:
+    CmdIsMaster() : Command("isMaster", false, "ismaster") {}
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
-        }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+    virtual bool slaveOk() const {
+        return true;
+    }
 
-        virtual void help(std::stringstream& help) const {
-            help << "test if this is master half of a replica pair";
-        }
+    virtual void help(std::stringstream& help) const {
+        help << "test if this is master half of a replica pair";
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        // No auth required
+    }
 
-            // No auth required
-        }
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        result.appendBool("ismaster", true);
+        result.append("msg", "isdbgrid");
+        result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+        result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
+        result.appendNumber("maxWriteBatchSize", BatchedCommandRequest::kMaxWriteBatchSize);
+        result.appendDate("localTime", jsTime());
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
+        // Mongos tries to keep exactly the same version range of the server for which
+        // it is compiled.
+        result.append("maxWireVersion", maxWireVersion);
+        result.append("minWireVersion", minWireVersion);
 
-            result.appendBool("ismaster", true);
-            result.append("msg", "isdbgrid");
-            result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
-            result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
-            result.appendNumber("maxWriteBatchSize", BatchedCommandRequest::kMaxWriteBatchSize);
-            result.appendDate("localTime", jsTime());
+        return true;
+    }
 
-            // Mongos tries to keep exactly the same version range of the server for which
-            // it is compiled.
-            result.append("maxWireVersion", maxWireVersion);
-            result.append("minWireVersion", minWireVersion);
+} isMaster;
 
-            return true;
-        }
-
-    } isMaster;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

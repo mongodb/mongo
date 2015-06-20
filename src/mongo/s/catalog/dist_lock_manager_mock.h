@@ -36,44 +36,41 @@
 
 namespace mongo {
 
-    class DistLockManagerMock: public DistLockManager {
-    public:
-        DistLockManagerMock();
+class DistLockManagerMock : public DistLockManager {
+public:
+    DistLockManagerMock();
 
-        virtual ~DistLockManagerMock() = default;
+    virtual ~DistLockManagerMock() = default;
 
-        virtual void startUp() override;
-        virtual void shutDown() override;
+    virtual void startUp() override;
+    virtual void shutDown() override;
 
-        virtual StatusWith<DistLockManager::ScopedDistLock> lock(
-                StringData name,
-                StringData whyMessage,
-                stdx::chrono::milliseconds waitFor,
-                stdx::chrono::milliseconds lockTryInterval) override;
+    virtual StatusWith<DistLockManager::ScopedDistLock> lock(
+        StringData name,
+        StringData whyMessage,
+        stdx::chrono::milliseconds waitFor,
+        stdx::chrono::milliseconds lockTryInterval) override;
 
-        using LockFunc = stdx::function<void (StringData name,
-                                              StringData whyMessage,
-                                              stdx::chrono::milliseconds waitFor,
-                                              stdx::chrono::milliseconds lockTryInterval)>;
+    using LockFunc = stdx::function<void(StringData name,
+                                         StringData whyMessage,
+                                         stdx::chrono::milliseconds waitFor,
+                                         stdx::chrono::milliseconds lockTryInterval)>;
 
-        void expectLock(LockFunc checkerFunc, Status lockStatus);
+    void expectLock(LockFunc checkerFunc, Status lockStatus);
 
-    protected:
+protected:
+    virtual void unlock(const DistLockHandle& lockHandle) override;
 
-        virtual void unlock(const DistLockHandle& lockHandle) override;
+    virtual Status checkStatus(const DistLockHandle& lockHandle) override;
 
-        virtual Status checkStatus(const DistLockHandle& lockHandle) override;
-
-    private:
-
-        struct LockInfo {
-            DistLockHandle lockID;
-            std::string name;
-        };
-
-        std::vector<LockInfo> _locks;
-        Status _lockReturnStatus;
-        LockFunc _lockChecker;
+private:
+    struct LockInfo {
+        DistLockHandle lockID;
+        std::string name;
     };
 
+    std::vector<LockInfo> _locks;
+    Status _lockReturnStatus;
+    LockFunc _lockChecker;
+};
 }

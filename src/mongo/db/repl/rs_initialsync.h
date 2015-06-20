@@ -30,10 +30,10 @@
 
 namespace mongo {
 namespace repl {
-    /**
-     * Begins an initial sync of a node.  This drops all data, chooses a sync source,
-     * and runs the cloner from that sync source.  The node's state is not changed.
-     */
-    void syncDoInitialSync();
+/**
+ * Begins an initial sync of a node.  This drops all data, chooses a sync source,
+ * and runs the cloner from that sync source.  The node's state is not changed.
+ */
+void syncDoInitialSync();
 }
 }

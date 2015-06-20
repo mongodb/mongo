@@ -31,15 +31,18 @@
 
 namespace mongo {
 
-    // If you create a local static instance of this class, that instance will be destroyed
-    // before all global static objects are destroyed, so _destroyingStatics will be set
-    // to true before the global static variables are destroyed.
-    class StaticObserver {
-        MONGO_DISALLOW_COPYING(StaticObserver);
-    public:
-        static bool _destroyingStatics;
-        StaticObserver() = default;
-        ~StaticObserver() { _destroyingStatics = true; }
-    };
+// If you create a local static instance of this class, that instance will be destroyed
+// before all global static objects are destroyed, so _destroyingStatics will be set
+// to true before the global static variables are destroyed.
+class StaticObserver {
+    MONGO_DISALLOW_COPYING(StaticObserver);
 
-} // namespace mongo
+public:
+    static bool _destroyingStatics;
+    StaticObserver() = default;
+    ~StaticObserver() {
+        _destroyingStatics = true;
+    }
+};
+
+}  // namespace mongo

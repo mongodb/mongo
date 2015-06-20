@@ -40,118 +40,114 @@
 
 namespace mongo {
 
-    class OperationContext;
-    class PseudoRandom;
-    class PlanExecutor;
+class OperationContext;
+class PseudoRandom;
+class PlanExecutor;
 
-    class CursorManager {
-    public:
-        CursorManager( StringData ns );
+class CursorManager {
+public:
+    CursorManager(StringData ns);
 
-        /**
-         * will kill() all PlanExecutor instances it has
-         */
-        ~CursorManager();
+    /**
+     * will kill() all PlanExecutor instances it has
+     */
+    ~CursorManager();
 
-        // -----------------
+    // -----------------
 
-        /**
-         * @param collectionGoingAway Pass as true if the Collection instance is going away.
-         *                            This could be because the db is being closed, or the
-         *                            collection/db is being dropped.
-         * @param reason              The motivation for invalidating all cursors. Will be used
-         *                            for error reporting and logging when an operation finds that
-         *                            the cursor it was operating on has been killed.
-         */
-        void invalidateAll(bool collectionGoingAway, const std::string& reason);
+    /**
+     * @param collectionGoingAway Pass as true if the Collection instance is going away.
+     *                            This could be because the db is being closed, or the
+     *                            collection/db is being dropped.
+     * @param reason              The motivation for invalidating all cursors. Will be used
+     *                            for error reporting and logging when an operation finds that
+     *                            the cursor it was operating on has been killed.
+     */
+    void invalidateAll(bool collectionGoingAway, const std::string& reason);
 
-        /**
-         * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
-         * must called *before* the provided RecordId is about to be deleted or mutated.
-         */
-        void invalidateDocument( OperationContext* txn,
-                                 const RecordId& dl,
-                                 InvalidationType type );
+    /**
+     * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
+     * must called *before* the provided RecordId is about to be deleted or mutated.
+     */
+    void invalidateDocument(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        /*
-         * timesout cursors that have been idle for too long
-         * note: must have a readlock on the collection
-         * @return number timed out
-         */
-        std::size_t timeoutCursors( int millisSinceLastCall );
+    /*
+     * timesout cursors that have been idle for too long
+     * note: must have a readlock on the collection
+     * @return number timed out
+     */
+    std::size_t timeoutCursors(int millisSinceLastCall);
 
-        // -----------------
+    // -----------------
 
-        /**
-         * Register an executor so that it can be notified of deletion/invalidation during yields.
-         * Must be called before an executor yields.  If an executor is cached (inside a
-         * ClientCursor) it MUST NOT be registered; the two are mutually exclusive.
-         */
-        void registerExecutor(PlanExecutor* exec);
+    /**
+     * Register an executor so that it can be notified of deletion/invalidation during yields.
+     * Must be called before an executor yields.  If an executor is cached (inside a
+     * ClientCursor) it MUST NOT be registered; the two are mutually exclusive.
+     */
+    void registerExecutor(PlanExecutor* exec);
 
-        /**
-         * Remove an executor from the registry.
-         */
-        void deregisterExecutor(PlanExecutor* exec);
+    /**
+     * Remove an executor from the registry.
+     */
+    void deregisterExecutor(PlanExecutor* exec);
 
-        // -----------------
+    // -----------------
 
-        CursorId registerCursor( ClientCursor* cc );
-        void deregisterCursor( ClientCursor* cc );
+    CursorId registerCursor(ClientCursor* cc);
+    void deregisterCursor(ClientCursor* cc);
 
-        bool eraseCursor(OperationContext* txn, CursorId id, bool checkAuth );
+    bool eraseCursor(OperationContext* txn, CursorId id, bool checkAuth);
 
-        /**
-         * Returns true if the space of cursor ids that cursor manager is responsible for includes
-         * the given cursor id.  Otherwise, returns false.
-         *
-         * The return value of this method does not indicate any information about whether or not a
-         * cursor actually exists with the given cursor id.  Use the find() method for that purpose.
-         */
-        bool ownsCursorId( CursorId cursorId ) const;
+    /**
+     * Returns true if the space of cursor ids that cursor manager is responsible for includes
+     * the given cursor id.  Otherwise, returns false.
+     *
+     * The return value of this method does not indicate any information about whether or not a
+     * cursor actually exists with the given cursor id.  Use the find() method for that purpose.
+     */
+    bool ownsCursorId(CursorId cursorId) const;
 
-        void getCursorIds( std::set<CursorId>* openCursors ) const;
-        std::size_t numCursors() const;
+    void getCursorIds(std::set<CursorId>* openCursors) const;
+    std::size_t numCursors() const;
 
-        /**
-         * @param pin - if true, will try to pin cursor
-         *                  if pinned already, will assert
-         *                  otherwise will pin
-         */
-        ClientCursor* find( CursorId id, bool pin );
+    /**
+     * @param pin - if true, will try to pin cursor
+     *                  if pinned already, will assert
+     *                  otherwise will pin
+     */
+    ClientCursor* find(CursorId id, bool pin);
 
-        void unpin( ClientCursor* cursor );
+    void unpin(ClientCursor* cursor);
 
-        // ----------------------
+    // ----------------------
 
-        static CursorManager* getGlobalCursorManager();
+    static CursorManager* getGlobalCursorManager();
 
-        static int eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, 
-            const char* ids);
-        static bool eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id);
+    static int eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, const char* ids);
+    static bool eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id);
 
-        static bool eraseCursorGlobal(OperationContext* txn, CursorId id);
+    static bool eraseCursorGlobal(OperationContext* txn, CursorId id);
 
-        /**
-         * @return number timed out
-         */
-        static std::size_t timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall);
+    /**
+     * @return number timed out
+     */
+    static std::size_t timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall);
 
-    private:
-        CursorId _allocateCursorId_inlock();
-        void _deregisterCursor_inlock( ClientCursor* cc );
+private:
+    CursorId _allocateCursorId_inlock();
+    void _deregisterCursor_inlock(ClientCursor* cc);
 
-        NamespaceString _nss;
-        unsigned _collectionCacheRuntimeId;
-        std::unique_ptr<PseudoRandom> _random;
+    NamespaceString _nss;
+    unsigned _collectionCacheRuntimeId;
+    std::unique_ptr<PseudoRandom> _random;
 
-        mutable SimpleMutex _mutex;
+    mutable SimpleMutex _mutex;
 
-        typedef unordered_set<PlanExecutor*> ExecSet;
-        ExecSet _nonCachedExecutors;
+    typedef unordered_set<PlanExecutor*> ExecSet;
+    ExecSet _nonCachedExecutors;
 
-        typedef std::map<CursorId,ClientCursor*> CursorMap;
-        CursorMap _cursors;
-    };
-
+    typedef std::map<CursorId, ClientCursor*> CursorMap;
+    CursorMap _cursors;
+};
 }

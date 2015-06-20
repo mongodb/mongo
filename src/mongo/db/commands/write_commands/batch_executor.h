@@ -40,158 +40,148 @@
 
 namespace mongo {
 
-    class BSONObjBuilder;
-    class CurOp;
-    class LastError;
-    class OpCounters;
-    class OperationContext;
-    class WriteBatchStats;
-    struct WriteOpStats;
+class BSONObjBuilder;
+class CurOp;
+class LastError;
+class OpCounters;
+class OperationContext;
+class WriteBatchStats;
+struct WriteOpStats;
+
+/**
+ * An instance of WriteBatchExecutor is an object capable of issuing a write batch.
+ */
+class WriteBatchExecutor {
+    MONGO_DISALLOW_COPYING(WriteBatchExecutor);
+
+public:
+    // State object used by private execInserts.  TODO: Do not expose this type.
+    class ExecInsertsState;
+
+    WriteBatchExecutor(OperationContext* txn, OpCounters* opCounters, LastError* le);
 
     /**
-     * An instance of WriteBatchExecutor is an object capable of issuing a write batch.
+     * Issues writes with requested write concern.  Fills response with errors if problems
+     * occur.
      */
-    class WriteBatchExecutor {
-        MONGO_DISALLOW_COPYING(WriteBatchExecutor);
-    public:
+    void executeBatch(const BatchedCommandRequest& request, BatchedCommandResponse* response);
 
-        // State object used by private execInserts.  TODO: Do not expose this type.
-        class ExecInsertsState;
-
-        WriteBatchExecutor( OperationContext* txn,
-                            OpCounters* opCounters,
-                            LastError* le );
-
-        /**
-         * Issues writes with requested write concern.  Fills response with errors if problems
-         * occur.
-         */
-        void executeBatch( const BatchedCommandRequest& request, BatchedCommandResponse* response );
-
-        const WriteBatchStats& getStats() const;
-
-        /**
-         * Does basic validation of the batch request. Returns a non-OK status if
-         * any problems with the batch are found.
-         */
-        static Status validateBatch( const BatchedCommandRequest& request );
-
-    private:
-        /**
-         * Executes the writes in the batch and returns upserted _ids and write errors.
-         * Dispatches to one of the three functions below for DBLock, CurOp, and stats management.
-         */
-        void bulkExecute( const BatchedCommandRequest& request,
-                          std::vector<BatchedUpsertDetail*>* upsertedIds,
-                          std::vector<WriteErrorDetail*>* errors );
-
-        /**
-         * Executes the inserts of an insert batch and returns the write errors.
-         *
-         * Internally uses the DBLock of the request namespace.
-         * May execute multiple inserts inside the same DBLock, and/or take the DBLock multiple
-         * times.
-         */
-        void execInserts( const BatchedCommandRequest& request,
-                          std::vector<WriteErrorDetail*>* errors );
-
-        /**
-         * Executes a single insert from a batch, described in the opaque "state" object.
-         */
-        void execOneInsert( ExecInsertsState* state, WriteErrorDetail** error );
-
-        /**
-         * Executes an update item (which may update many documents or upsert), and returns the
-         * upserted _id on upsert or error on failure.
-         *
-         * Internally uses the DBLock of the update namespace.
-         * May take the DBLock multiple times.
-         */
-        void execUpdate( const BatchItemRef& updateItem,
-                         BSONObj* upsertedId,
-                         WriteErrorDetail** error );
-
-        /**
-         * Executes a delete item (which may remove many documents) and returns an error on failure.
-         *
-         * Internally uses the DBLock of the delete namespace.
-         * May take the DBLock multiple times.
-         */
-        void execRemove( const BatchItemRef& removeItem, WriteErrorDetail** error );
-
-        /**
-         * Helper for incrementing stats on the next CurOp.
-         *
-         * No lock requirements.
-         */
-        void incOpStats( const BatchItemRef& currWrite );
-
-        /**
-         * Helper for incrementing stats after each individual write op.
-         *
-         * No lock requirements (though usually done inside write lock to make stats update look
-         * atomic).
-         */
-        void incWriteStats( const BatchItemRef& currWrite,
-                            const WriteOpStats& stats,
-                            const WriteErrorDetail* error,
-                            CurOp* currentOp );
-
-        OperationContext* _txn;
-
-        // OpCounters object to update - needed for stats reporting
-        // Not owned here.
-        OpCounters* _opCounters;
-
-        // LastError object to use for preparing write results - needed for stats reporting
-        // Not owned here.
-        LastError* _le;
-
-        // Stats
-        std::unique_ptr<WriteBatchStats> _stats;
-    };
+    const WriteBatchStats& getStats() const;
 
     /**
-     * Holds information about the result of a single write operation.
+     * Does basic validation of the batch request. Returns a non-OK status if
+     * any problems with the batch are found.
      */
-    struct WriteOpStats {
+    static Status validateBatch(const BatchedCommandRequest& request);
 
-        WriteOpStats() :
-            n( 0 ), nModified( 0 ) {
-        }
-
-        void reset() {
-            n = 0;
-            nModified = 0;
-            upsertedID = BSONObj();
-        }
-
-        // Num docs logically affected by this operation.
-        int n;
-
-        // Num docs actually modified by this operation, if applicable (update)
-        int nModified;
-
-        // _id of newly upserted document, if applicable (update)
-        BSONObj upsertedID;
-    };
+private:
+    /**
+     * Executes the writes in the batch and returns upserted _ids and write errors.
+     * Dispatches to one of the three functions below for DBLock, CurOp, and stats management.
+     */
+    void bulkExecute(const BatchedCommandRequest& request,
+                     std::vector<BatchedUpsertDetail*>* upsertedIds,
+                     std::vector<WriteErrorDetail*>* errors);
 
     /**
-     * Full stats accumulated by a write batch execution.  Note that these stats do not directly
-     * correspond to the stats accumulated in opCounters and LastError.
+     * Executes the inserts of an insert batch and returns the write errors.
+     *
+     * Internally uses the DBLock of the request namespace.
+     * May execute multiple inserts inside the same DBLock, and/or take the DBLock multiple
+     * times.
      */
-    class WriteBatchStats {
-    public:
+    void execInserts(const BatchedCommandRequest& request, std::vector<WriteErrorDetail*>* errors);
 
-        WriteBatchStats() :
-            numInserted( 0 ), numUpserted( 0 ), numMatched( 0 ), numModified( 0 ), numDeleted( 0 ) {
-        }
+    /**
+     * Executes a single insert from a batch, described in the opaque "state" object.
+     */
+    void execOneInsert(ExecInsertsState* state, WriteErrorDetail** error);
 
-        int numInserted;
-        int numUpserted;
-        int numMatched;
-        int numModified;
-        int numDeleted;
-    };
+    /**
+     * Executes an update item (which may update many documents or upsert), and returns the
+     * upserted _id on upsert or error on failure.
+     *
+     * Internally uses the DBLock of the update namespace.
+     * May take the DBLock multiple times.
+     */
+    void execUpdate(const BatchItemRef& updateItem, BSONObj* upsertedId, WriteErrorDetail** error);
 
-} // namespace mongo
+    /**
+     * Executes a delete item (which may remove many documents) and returns an error on failure.
+     *
+     * Internally uses the DBLock of the delete namespace.
+     * May take the DBLock multiple times.
+     */
+    void execRemove(const BatchItemRef& removeItem, WriteErrorDetail** error);
+
+    /**
+     * Helper for incrementing stats on the next CurOp.
+     *
+     * No lock requirements.
+     */
+    void incOpStats(const BatchItemRef& currWrite);
+
+    /**
+     * Helper for incrementing stats after each individual write op.
+     *
+     * No lock requirements (though usually done inside write lock to make stats update look
+     * atomic).
+     */
+    void incWriteStats(const BatchItemRef& currWrite,
+                       const WriteOpStats& stats,
+                       const WriteErrorDetail* error,
+                       CurOp* currentOp);
+
+    OperationContext* _txn;
+
+    // OpCounters object to update - needed for stats reporting
+    // Not owned here.
+    OpCounters* _opCounters;
+
+    // LastError object to use for preparing write results - needed for stats reporting
+    // Not owned here.
+    LastError* _le;
+
+    // Stats
+    std::unique_ptr<WriteBatchStats> _stats;
+};
+
+/**
+ * Holds information about the result of a single write operation.
+ */
+struct WriteOpStats {
+    WriteOpStats() : n(0), nModified(0) {}
+
+    void reset() {
+        n = 0;
+        nModified = 0;
+        upsertedID = BSONObj();
+    }
+
+    // Num docs logically affected by this operation.
+    int n;
+
+    // Num docs actually modified by this operation, if applicable (update)
+    int nModified;
+
+    // _id of newly upserted document, if applicable (update)
+    BSONObj upsertedID;
+};
+
+/**
+ * Full stats accumulated by a write batch execution.  Note that these stats do not directly
+ * correspond to the stats accumulated in opCounters and LastError.
+ */
+class WriteBatchStats {
+public:
+    WriteBatchStats()
+        : numInserted(0), numUpserted(0), numMatched(0), numModified(0), numDeleted(0) {}
+
+    int numInserted;
+    int numUpserted;
+    int numMatched;
+    int numModified;
+    int numDeleted;
+};
+
+}  // namespace mongo

@@ -29,10 +29,10 @@
 #pragma once
 
 #ifndef _WIN32
-# include <sys/poll.h>
-#endif // ndef _WIN32
+#include <sys/poll.h>
+#endif  // ndef _WIN32
 
 namespace mongo {
-    bool isPollSupported();
-    int socketPoll(pollfd* fdarray, unsigned long nfds, int timeout);
+bool isPollSupported();
+int socketPoll(pollfd* fdarray, unsigned long nfds, int timeout);
 }

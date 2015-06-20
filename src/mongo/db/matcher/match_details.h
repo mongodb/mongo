@@ -35,39 +35,47 @@
 
 namespace mongo {
 
-    /** Reports information about a match request. */
-    class MatchDetails {
-    public:
-        MatchDetails();
+/** Reports information about a match request. */
+class MatchDetails {
+public:
+    MatchDetails();
 
-        void resetOutput();
+    void resetOutput();
 
-        // for debugging only
-        std::string toString() const;
+    // for debugging only
+    std::string toString() const;
 
-        // relating to whether or not we had to load the full record
+    // relating to whether or not we had to load the full record
 
-        void setLoadedRecord( bool loadedRecord ) { _loadedRecord = loadedRecord; }
+    void setLoadedRecord(bool loadedRecord) {
+        _loadedRecord = loadedRecord;
+    }
 
-        bool hasLoadedRecord() const { return _loadedRecord; }
+    bool hasLoadedRecord() const {
+        return _loadedRecord;
+    }
 
-        // this name is wrong
+    // this name is wrong
 
-        bool needRecord() const { return _elemMatchKeyRequested; }
+    bool needRecord() const {
+        return _elemMatchKeyRequested;
+    }
 
-        // if we need to store the offset into an array where we found the match
+    // if we need to store the offset into an array where we found the match
 
-        /** Request that an elemMatchKey be recorded. */
-        void requestElemMatchKey() { _elemMatchKeyRequested = true; }
+    /** Request that an elemMatchKey be recorded. */
+    void requestElemMatchKey() {
+        _elemMatchKeyRequested = true;
+    }
 
-        bool hasElemMatchKey() const;
-        std::string elemMatchKey() const;
+    bool hasElemMatchKey() const;
+    std::string elemMatchKey() const;
 
-        void setElemMatchKey( const std::string &elemMatchKey );
+    void setElemMatchKey(const std::string& elemMatchKey);
 
-    private:
-        bool _loadedRecord;
-        bool _elemMatchKeyRequested;
-        std::unique_ptr<std::string> _elemMatchKey;
-    };
+private:
+    bool _loadedRecord;
+    bool _elemMatchKeyRequested;
+    std::unique_ptr<std::string> _elemMatchKey;
+};
 }

@@ -37,67 +37,63 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    Status DBClientShardResolver::chooseWriteHost(const string& shardName,
-                                                  ConnectionString* shardHost) const {
-
-        // Internally uses our shard cache, does no reload
-        std::shared_ptr<Shard> shard = grid.shardRegistry()->getShard(shardName);
-        if (!shard) {
-            return Status(ErrorCodes::ShardNotFound,
-                          str::stream() << "unknown shard name " << shardName);
-        }
-
-        return findMaster(shard->getConnString(), shardHost);
+Status DBClientShardResolver::chooseWriteHost(const string& shardName,
+                                              ConnectionString* shardHost) const {
+    // Internally uses our shard cache, does no reload
+    std::shared_ptr<Shard> shard = grid.shardRegistry()->getShard(shardName);
+    if (!shard) {
+        return Status(ErrorCodes::ShardNotFound,
+                      str::stream() << "unknown shard name " << shardName);
     }
 
-    Status DBClientShardResolver::findMaster(const ConnectionString& connString,
-                                             ConnectionString* resolvedHost) {
+    return findMaster(shard->getConnString(), shardHost);
+}
 
-        if (connString.type() == ConnectionString::MASTER) {
-            *resolvedHost = connString;
-            return Status::OK();
-        }
-
-        dassert(connString.type() == ConnectionString::SET);
-
-        //
-        // If we need to, then get the particular node we're targeting in the replica set
-        //
-
-        // Don't create the monitor unless we need to - fast path
-        ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(connString.getSetName());
-
-        if (!replMonitor) {
-            // Slow path
-            std::set<HostAndPort> seedServers(connString.getServers().begin(),
-                                              connString.getServers().end());
-            ReplicaSetMonitor::createIfNeeded(connString.getSetName(), seedServers);
-
-            replMonitor = ReplicaSetMonitor::get(connString.getSetName());
-        }
-
-        if (!replMonitor) {
-            return Status(ErrorCodes::ReplicaSetNotFound,
-                          str::stream() << "unknown replica set " << connString.getSetName());
-        }
-
-        try {
-            // This can throw when we don't find a master!
-            HostAndPort masterHostAndPort = replMonitor->getMasterOrUassert();
-            *resolvedHost = fassertStatusOK(28687,
-                                            ConnectionString::parse(masterHostAndPort.toString()));
-            return Status::OK();
-        }
-        catch ( const DBException& ) {
-            return Status( ErrorCodes::HostNotFound,
-                           string("could not contact primary for replica set ")
-                           + replMonitor->getName() );
-        }
-
-        MONGO_UNREACHABLE;
+Status DBClientShardResolver::findMaster(const ConnectionString& connString,
+                                         ConnectionString* resolvedHost) {
+    if (connString.type() == ConnectionString::MASTER) {
+        *resolvedHost = connString;
+        return Status::OK();
     }
 
-} // namespace mongo
+    dassert(connString.type() == ConnectionString::SET);
 
+    //
+    // If we need to, then get the particular node we're targeting in the replica set
+    //
+
+    // Don't create the monitor unless we need to - fast path
+    ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(connString.getSetName());
+
+    if (!replMonitor) {
+        // Slow path
+        std::set<HostAndPort> seedServers(connString.getServers().begin(),
+                                          connString.getServers().end());
+        ReplicaSetMonitor::createIfNeeded(connString.getSetName(), seedServers);
+
+        replMonitor = ReplicaSetMonitor::get(connString.getSetName());
+    }
+
+    if (!replMonitor) {
+        return Status(ErrorCodes::ReplicaSetNotFound,
+                      str::stream() << "unknown replica set " << connString.getSetName());
+    }
+
+    try {
+        // This can throw when we don't find a master!
+        HostAndPort masterHostAndPort = replMonitor->getMasterOrUassert();
+        *resolvedHost =
+            fassertStatusOK(28687, ConnectionString::parse(masterHostAndPort.toString()));
+        return Status::OK();
+    } catch (const DBException&) {
+        return Status(ErrorCodes::HostNotFound,
+                      string("could not contact primary for replica set ") +
+                          replMonitor->getName());
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+}  // namespace mongo

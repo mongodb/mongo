@@ -51,49 +51,43 @@
 
 namespace mongo {
 
-    AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() = default;
-    AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() = default;
+AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() = default;
+AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() = default;
 
-    std::unique_ptr<AuthzSessionExternalState>
-    AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(
-            AuthorizationManager* authzManager) {
+std::unique_ptr<AuthzSessionExternalState>
+AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
+    return stdx::make_unique<AuthzSessionExternalStateMongod>(authzManager);
+}
 
-        return stdx::make_unique<AuthzSessionExternalStateMongod>(authzManager);
+Status AuthzManagerExternalStateMongod::query(
+    OperationContext* txn,
+    const NamespaceString& collectionName,
+    const BSONObj& query,
+    const BSONObj& projection,
+    const stdx::function<void(const BSONObj&)>& resultProcessor) {
+    try {
+        DBDirectClient client(txn);
+        client.query(resultProcessor, collectionName.ns(), query, &projection);
+        return Status::OK();
+    } catch (const DBException& e) {
+        return e.toStatus();
     }
+}
 
-    Status AuthzManagerExternalStateMongod::query(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& query,
-            const BSONObj& projection,
-            const stdx::function<void(const BSONObj&)>& resultProcessor) {
-        try {
-            DBDirectClient client(txn);
-            client.query(resultProcessor, collectionName.ns(), query, &projection);
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
+Status AuthzManagerExternalStateMongod::findOne(OperationContext* txn,
+                                                const NamespaceString& collectionName,
+                                                const BSONObj& query,
+                                                BSONObj* result) {
+    AutoGetCollectionForRead ctx(txn, collectionName);
+
+    BSONObj found;
+    if (Helpers::findOne(txn, ctx.getCollection(), query, found)) {
+        *result = found.getOwned();
+        return Status::OK();
     }
+    return Status(ErrorCodes::NoMatchingDocument,
+                  mongoutils::str::stream() << "No document in " << collectionName.ns()
+                                            << " matches " << query);
+}
 
-    Status AuthzManagerExternalStateMongod::findOne(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& query,
-            BSONObj* result) {
-
-        AutoGetCollectionForRead ctx(txn, collectionName);
-
-        BSONObj found;
-        if (Helpers::findOne(txn,
-                             ctx.getCollection(),
-                             query,
-                             found)) {
-            *result = found.getOwned();
-            return Status::OK();
-        }
-        return Status(ErrorCodes::NoMatchingDocument, mongoutils::str::stream() <<
-                      "No document in " << collectionName.ns() << " matches " << query);
-    }
-
-} // namespace mongo
+}  // namespace mongo

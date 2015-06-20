@@ -36,161 +36,151 @@
 
 namespace mongo {
 
-    namespace str = mongoutils::str;
+namespace str = mongoutils::str;
 
-    namespace {
-        const char idFieldName[] = "_id";
+namespace {
+const char idFieldName[] = "_id";
 
-        Status fixupTimestamps( const BSONObj& obj ) {
-            BSONObjIterator i(obj);
-            while (i.more()) {
-                BSONElement e = i.next();
+Status fixupTimestamps(const BSONObj& obj) {
+    BSONObjIterator i(obj);
+    while (i.more()) {
+        BSONElement e = i.next();
 
-                // Skip _id field -- we do not replace it
-                if (e.type() == bsonTimestamp && e.fieldNameStringData() != idFieldName) {
-                    // TODO(emilkie): This is not endian-safe.
-                    unsigned long long &timestamp =
-                        *(reinterpret_cast<unsigned long long*>(
-                              const_cast<char *>(e.value())));
-                    if (timestamp == 0) {
-                        // performance note, this locks a mutex:
-                        Timestamp ts(getNextGlobalTimestamp());
-                        timestamp = ts.asULL();
-                    }
-                }
+        // Skip _id field -- we do not replace it
+        if (e.type() == bsonTimestamp && e.fieldNameStringData() != idFieldName) {
+            // TODO(emilkie): This is not endian-safe.
+            unsigned long long& timestamp =
+                *(reinterpret_cast<unsigned long long*>(const_cast<char*>(e.value())));
+            if (timestamp == 0) {
+                // performance note, this locks a mutex:
+                Timestamp ts(getNextGlobalTimestamp());
+                timestamp = ts.asULL();
             }
-
-            return Status::OK();
         }
     }
 
-    struct ModifierObjectReplace::PreparedState {
+    return Status::OK();
+}
+}
 
-        PreparedState(mutablebson::Document* targetDoc)
-            : doc(*targetDoc)
-            , noOp(false) {
+struct ModifierObjectReplace::PreparedState {
+    PreparedState(mutablebson::Document* targetDoc) : doc(*targetDoc), noOp(false) {}
+
+    // Document that is going to be changed
+    mutablebson::Document& doc;
+
+    // This is a no op
+    bool noOp;
+};
+
+ModifierObjectReplace::ModifierObjectReplace() : _val() {}
+
+ModifierObjectReplace::~ModifierObjectReplace() {}
+
+Status ModifierObjectReplace::init(const BSONElement& modExpr,
+                                   const Options& opts,
+                                   bool* positional) {
+    if (modExpr.type() != Object) {
+        // Impossible, really since the caller check this already...
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Document replacement expects a complete document"
+                                       " but the type supplied was " << modExpr.type());
+    }
+
+    // Object replacements never have positional operator.
+    if (positional)
+        *positional = false;
+
+    // We make a copy of the object here because the update driver does not guarantees, in
+    // the case of object replacement, that the modExpr is going to outlive this mod.
+    _val = modExpr.embeddedObject().getOwned();
+    return fixupTimestamps(_val);
+}
+
+Status ModifierObjectReplace::prepare(mutablebson::Element root,
+                                      StringData matchedField,
+                                      ExecInfo* execInfo) {
+    _preparedState.reset(new PreparedState(&root.getDocument()));
+
+    // objectSize checked by binaryEqual (optimization)
+    BSONObj objOld = root.getDocument().getObject();
+    if (objOld.binaryEqual(_val)) {
+        _preparedState->noOp = true;
+        execInfo->noOp = true;
+    }
+
+    return Status::OK();
+}
+
+Status ModifierObjectReplace::apply() const {
+    dassert(!_preparedState->noOp);
+
+    // Remove the contents of the provided doc.
+    mutablebson::Document& doc = _preparedState->doc;
+    mutablebson::Element current = doc.root().leftChild();
+    mutablebson::Element srcIdElement = doc.end();
+    while (current.ok()) {
+        mutablebson::Element toRemove = current;
+        current = current.rightSibling();
+
+        // Skip _id field element -- it should not change
+        if (toRemove.getFieldName() == idFieldName) {
+            srcIdElement = toRemove;
+            continue;
         }
 
-        // Document that is going to be changed
-        mutablebson::Document& doc;
-
-        // This is a no op
-        bool noOp;
-
-    };
-
-    ModifierObjectReplace::ModifierObjectReplace() : _val() {
-    }
-
-    ModifierObjectReplace::~ModifierObjectReplace() {
-    }
-
-    Status ModifierObjectReplace::init(const BSONElement& modExpr, const Options& opts,
-                                       bool* positional) {
-
-        if (modExpr.type() != Object) {
-            // Impossible, really since the caller check this already...
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Document replacement expects a complete document"
-                                           " but the type supplied was "
-                                        << modExpr.type());
+        Status status = toRemove.remove();
+        if (!status.isOK()) {
+            return status;
         }
-
-        // Object replacements never have positional operator.
-        if (positional)
-            *positional = false;
-
-        // We make a copy of the object here because the update driver does not guarantees, in
-        // the case of object replacement, that the modExpr is going to outlive this mod.
-        _val = modExpr.embeddedObject().getOwned();
-        return fixupTimestamps(_val);
     }
 
-    Status ModifierObjectReplace::prepare(mutablebson::Element root,
-                                          StringData matchedField,
-                                          ExecInfo* execInfo) {
-        _preparedState.reset(new PreparedState(&root.getDocument()));
+    // Insert the provided contents instead.
+    BSONElement dstIdElement;
+    BSONObjIterator it(_val);
+    while (it.more()) {
+        BSONElement elem = it.next();
+        if (elem.fieldNameStringData() == idFieldName) {
+            dstIdElement = elem;
 
-        // objectSize checked by binaryEqual (optimization)
-        BSONObj objOld = root.getDocument().getObject();
-        if (objOld.binaryEqual(_val)) {
-            _preparedState->noOp = true;
-            execInfo->noOp = true;
-        }
-
-        return Status::OK();
-    }
-
-    Status ModifierObjectReplace::apply() const {
-        dassert(!_preparedState->noOp);
-
-        // Remove the contents of the provided doc.
-        mutablebson::Document& doc = _preparedState->doc;
-        mutablebson::Element current = doc.root().leftChild();
-        mutablebson::Element srcIdElement = doc.end();
-        while (current.ok()) {
-            mutablebson::Element toRemove = current;
-            current = current.rightSibling();
-
-            // Skip _id field element -- it should not change
-            if (toRemove.getFieldName() == idFieldName) {
-                srcIdElement = toRemove;
+            // Do not duplicate _id field
+            if (srcIdElement.ok()) {
+                if (srcIdElement.compareWithBSONElement(dstIdElement, true) != 0) {
+                    return Status(ErrorCodes::ImmutableField,
+                                  str::stream() << "The _id field cannot be changed from {"
+                                                << srcIdElement.toString() << "} to {"
+                                                << dstIdElement.toString() << "}.");
+                }
                 continue;
             }
-
-            Status status = toRemove.remove();
-            if (!status.isOK()) {
-                return status;
-            }
         }
 
-        // Insert the provided contents instead.
-        BSONElement dstIdElement;
-        BSONObjIterator it(_val);
-        while (it.more()) {
-            BSONElement elem = it.next();
-            if (elem.fieldNameStringData() == idFieldName) {
-                dstIdElement = elem;
-
-                // Do not duplicate _id field
-                if (srcIdElement.ok()) {
-                    if (srcIdElement.compareWithBSONElement(dstIdElement, true) != 0) {
-                        return Status(ErrorCodes::ImmutableField,
-                                      str::stream() << "The _id field cannot be changed from {"
-                                                    << srcIdElement.toString() << "} to {"
-                                                    << dstIdElement.toString() << "}.");
-                    }
-                    continue;
-                }
-            }
-
-            Status status = doc.root().appendElement(elem);
-            if (!status.isOK()) {
-                return status;
-            }
+        Status status = doc.root().appendElement(elem);
+        if (!status.isOK()) {
+            return status;
         }
-
-        return Status::OK();
     }
 
-    Status ModifierObjectReplace::log(LogBuilder* logBuilder) const {
+    return Status::OK();
+}
 
-        mutablebson::Document& doc = logBuilder->getDocument();
+Status ModifierObjectReplace::log(LogBuilder* logBuilder) const {
+    mutablebson::Document& doc = logBuilder->getDocument();
 
-        mutablebson::Element replacementObject = doc.end();
-        Status status = logBuilder->getReplacementObject(&replacementObject);
+    mutablebson::Element replacementObject = doc.end();
+    Status status = logBuilder->getReplacementObject(&replacementObject);
 
-        if (status.isOK()) {
-            mutablebson::Element current = _preparedState->doc.root().leftChild();
-            while (current.ok()) {
-                status = replacementObject.appendElement(current.getValue());
-                if (!status.isOK())
-                    return status;
-                current = current.rightSibling();
-            }
+    if (status.isOK()) {
+        mutablebson::Element current = _preparedState->doc.root().leftChild();
+        while (current.ok()) {
+            status = replacementObject.appendElement(current.getValue());
+            if (!status.isOK())
+                return status;
+            current = current.rightSibling();
         }
-
-        return status;
     }
 
-} // namespace mongo
+    return status;
+}
+
+}  // namespace mongo

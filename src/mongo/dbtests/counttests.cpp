@@ -41,139 +41,133 @@
 
 namespace CountTests {
 
-    class Base {
-    public:
-        Base() : _txn(),
-                 _scopedXact(&_txn, MODE_IX),
-                 _lk(_txn.lockState(),
-                 nsToDatabaseSubstring(ns()), MODE_X),
-                 _context(&_txn, ns()),
-                 _client(&_txn) {
+class Base {
+public:
+    Base()
+        : _txn(),
+          _scopedXact(&_txn, MODE_IX),
+          _lk(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
+          _context(&_txn, ns()),
+          _client(&_txn) {
+        _database = _context.db();
 
-            _database = _context.db();
-
-            {
-                WriteUnitOfWork wunit(&_txn);
-                _collection = _database->getCollection( ns() );
-                if ( _collection ) {
-                    _database->dropCollection( &_txn, ns() );
-                }
-                _collection = _database->createCollection( &_txn, ns() );
-                wunit.commit();
-            }
-
-            addIndex( fromjson( "{\"a\":1}" ) );
-        }
-        ~Base() {
-            try {
-                WriteUnitOfWork wunit(&_txn);
-                uassertStatusOK( _database->dropCollection( &_txn, ns() ) );
-                wunit.commit();
-            }
-            catch ( ... ) {
-                FAIL( "Exception while cleaning up collection" );
-            }
-        }
-
-    protected:
-
-        static const char *ns() {
-            return "unittests.counttests";
-        }
-
-        void addIndex( const BSONObj &key ) {
-            Helpers::ensureIndex(&_txn,
-                                 _collection,
-                                 key,
-                                 /*unique=*/ false,
-                                 /*name=*/ key.firstElementFieldName());
-        }
-
-        void insert( const char *s ) {
+        {
             WriteUnitOfWork wunit(&_txn);
-            const BSONObj o = fromjson(s);
-
-            if ( o["_id"].eoo() ) {
-                BSONObjBuilder b;
-                OID oid;
-                oid.init();
-                b.appendOID( "_id", &oid );
-                b.appendElements( o );
-                _collection->insertDocument( &_txn, b.obj(), false );
+            _collection = _database->getCollection(ns());
+            if (_collection) {
+                _database->dropCollection(&_txn, ns());
             }
-            else {
-                _collection->insertDocument( &_txn, o, false );
-            }
+            _collection = _database->createCollection(&_txn, ns());
             wunit.commit();
         }
 
-
-        OperationContextImpl _txn;
-        ScopedTransaction _scopedXact;
-        Lock::DBLock _lk;
-
-        OldClientContext _context;
-
-        Database* _database;
-        Collection* _collection;
-
-        DBDirectClient _client;
-    };
-    
-    class Basic : public Base {
-    public:
-        void run() {
-            insert("{\"a\":\"b\"}");
-            insert("{\"c\":\"d\"}");
-            ASSERT_EQUALS(2ULL, _client.count(ns(), fromjson("{}")));
+        addIndex(fromjson("{\"a\":1}"));
+    }
+    ~Base() {
+        try {
+            WriteUnitOfWork wunit(&_txn);
+            uassertStatusOK(_database->dropCollection(&_txn, ns()));
+            wunit.commit();
+        } catch (...) {
+            FAIL("Exception while cleaning up collection");
         }
-    };
-    
-    class Query : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"a\":\"b\",\"x\":\"y\"}" );
-            insert( "{\"a\":\"c\"}" );
-            ASSERT_EQUALS(2ULL, _client.count(ns(), fromjson("{\"a\":\"b\"}")));
-        }
-    };
-    
-    class QueryFields : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"a\":\"c\"}" );
-            insert( "{\"d\":\"e\"}" );
-            ASSERT_EQUALS(1ULL, _client.count(ns(), fromjson("{\"a\":\"b\"}")));
-        }
-    };
-    
-    class IndexedRegex : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"c\"}" );
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"a\":\"d\"}" );
-            ASSERT_EQUALS(1ULL, _client.count(ns(), fromjson("{\"a\":/^b/}")));
-        }
-    };
+    }
 
-    
-    class All : public Suite {
-    public:
-        All() : Suite( "count" ) {
+protected:
+    static const char* ns() {
+        return "unittests.counttests";
+    }
 
+    void addIndex(const BSONObj& key) {
+        Helpers::ensureIndex(&_txn,
+                             _collection,
+                             key,
+                             /*unique=*/false,
+                             /*name=*/key.firstElementFieldName());
+    }
+
+    void insert(const char* s) {
+        WriteUnitOfWork wunit(&_txn);
+        const BSONObj o = fromjson(s);
+
+        if (o["_id"].eoo()) {
+            BSONObjBuilder b;
+            OID oid;
+            oid.init();
+            b.appendOID("_id", &oid);
+            b.appendElements(o);
+            _collection->insertDocument(&_txn, b.obj(), false);
+        } else {
+            _collection->insertDocument(&_txn, o, false);
         }
-        
-        void setupTests() {
-            add<Basic>();
-            add<Query>();
-            add<QueryFields>();
-            add<IndexedRegex>();
-        }
-    };
+        wunit.commit();
+    }
 
-    SuiteInstance<All> myall;
 
-} // namespace CountTests
+    OperationContextImpl _txn;
+    ScopedTransaction _scopedXact;
+    Lock::DBLock _lk;
+
+    OldClientContext _context;
+
+    Database* _database;
+    Collection* _collection;
+
+    DBDirectClient _client;
+};
+
+class Basic : public Base {
+public:
+    void run() {
+        insert("{\"a\":\"b\"}");
+        insert("{\"c\":\"d\"}");
+        ASSERT_EQUALS(2ULL, _client.count(ns(), fromjson("{}")));
+    }
+};
+
+class Query : public Base {
+public:
+    void run() {
+        insert("{\"a\":\"b\"}");
+        insert("{\"a\":\"b\",\"x\":\"y\"}");
+        insert("{\"a\":\"c\"}");
+        ASSERT_EQUALS(2ULL, _client.count(ns(), fromjson("{\"a\":\"b\"}")));
+    }
+};
+
+class QueryFields : public Base {
+public:
+    void run() {
+        insert("{\"a\":\"b\"}");
+        insert("{\"a\":\"c\"}");
+        insert("{\"d\":\"e\"}");
+        ASSERT_EQUALS(1ULL, _client.count(ns(), fromjson("{\"a\":\"b\"}")));
+    }
+};
+
+class IndexedRegex : public Base {
+public:
+    void run() {
+        insert("{\"a\":\"c\"}");
+        insert("{\"a\":\"b\"}");
+        insert("{\"a\":\"d\"}");
+        ASSERT_EQUALS(1ULL, _client.count(ns(), fromjson("{\"a\":/^b/}")));
+    }
+};
+
+
+class All : public Suite {
+public:
+    All() : Suite("count") {}
+
+    void setupTests() {
+        add<Basic>();
+        add<Query>();
+        add<QueryFields>();
+        add<IndexedRegex>();
+    }
+};
+
+SuiteInstance<All> myall;
+
+}  // namespace CountTests

@@ -49,106 +49,104 @@
 
 namespace mongo {
 
-    using logger::LogComponent;
+using logger::LogComponent;
 
-    TSP_DECLARE(ServiceContext::UniqueClient, currentClient)
-    TSP_DEFINE(ServiceContext::UniqueClient, currentClient)
+TSP_DECLARE(ServiceContext::UniqueClient, currentClient)
+TSP_DEFINE(ServiceContext::UniqueClient, currentClient)
 
-    void Client::initThreadIfNotAlready(const char* desc) {
-        if (currentClient.getMake()->get())
-            return;
-        initThread(desc);
+void Client::initThreadIfNotAlready(const char* desc) {
+    if (currentClient.getMake()->get())
+        return;
+    initThread(desc);
+}
+
+void Client::initThreadIfNotAlready() {
+    initThreadIfNotAlready(getThreadName().c_str());
+}
+
+void Client::initThread(const char* desc, AbstractMessagingPort* mp) {
+    initThread(desc, getGlobalServiceContext(), mp);
+}
+
+/**
+ * This must be called whenever a new thread is started, so that active threads can be tracked
+ * so each thread has a Client object in TLS.
+ */
+void Client::initThread(const char* desc, ServiceContext* service, AbstractMessagingPort* mp) {
+    invariant(currentClient.getMake()->get() == nullptr);
+
+    std::string fullDesc;
+    if (mp != NULL) {
+        fullDesc = str::stream() << desc << mp->connectionId();
+    } else {
+        fullDesc = desc;
     }
 
-    void Client::initThreadIfNotAlready() {
-        initThreadIfNotAlready(getThreadName().c_str());
+    setThreadName(fullDesc.c_str());
+
+    // Create the client obj, attach to thread
+    *currentClient.get() = service->makeClient(fullDesc, mp);
+}
+
+Client::Client(std::string desc, ServiceContext* serviceContext, AbstractMessagingPort* p)
+    : ClientBasic(serviceContext, p),
+      _desc(std::move(desc)),
+      _threadId(stdx::this_thread::get_id()),
+      _connectionId(p ? p->connectionId() : 0) {}
+
+void Client::reportState(BSONObjBuilder& builder) {
+    builder.append("desc", desc());
+
+    std::stringstream ss;
+    ss << _threadId;
+    builder.append("threadId", ss.str());
+
+    if (_connectionId) {
+        builder.appendNumber("connectionId", _connectionId);
     }
 
-    void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-        initThread(desc, getGlobalServiceContext(), mp);
+    if (hasRemote()) {
+        builder.append("client", getRemote().toString());
     }
+}
 
-    /**
-     * This must be called whenever a new thread is started, so that active threads can be tracked
-     * so each thread has a Client object in TLS.
-     */
-    void Client::initThread(const char *desc, ServiceContext* service, AbstractMessagingPort *mp) {
-        invariant(currentClient.getMake()->get() == nullptr);
+ServiceContext::UniqueOperationContext Client::makeOperationContext() {
+    return getServiceContext()->makeOperationContext(this);
+}
 
-        std::string fullDesc;
-        if (mp != NULL) {
-            fullDesc = str::stream() << desc << mp->connectionId();
-        }
-        else {
-            fullDesc = desc;
-        }
+void Client::setOperationContext(OperationContext* txn) {
+    // We can only set the OperationContext once before resetting it.
+    invariant(txn != NULL && _txn == NULL);
+    _txn = txn;
+}
 
-        setThreadName(fullDesc.c_str());
+void Client::resetOperationContext() {
+    invariant(_txn != NULL);
+    _txn = NULL;
+}
 
-        // Create the client obj, attach to thread
-        *currentClient.get() = service->makeClient(fullDesc, mp);
+std::string Client::clientAddress(bool includePort) const {
+    if (!hasRemote()) {
+        return "";
     }
-
-    Client::Client(std::string desc,
-                   ServiceContext* serviceContext,
-                   AbstractMessagingPort *p)
-        : ClientBasic(serviceContext, p),
-          _desc(std::move(desc)),
-          _threadId(stdx::this_thread::get_id()),
-          _connectionId(p ? p->connectionId() : 0) {
+    if (includePort) {
+        return getRemote().toString();
     }
+    return getRemote().host();
+}
 
-    void Client::reportState(BSONObjBuilder& builder) {
-        builder.append("desc", desc());
+ClientBasic* ClientBasic::getCurrent() {
+    return currentClient.getMake()->get();
+}
 
-        std::stringstream ss;
-        ss << _threadId;
-        builder.append("threadId", ss.str());
+Client& cc() {
+    Client* c = currentClient.getMake()->get();
+    verify(c);
+    return *c;
+}
 
-        if (_connectionId) {
-            builder.appendNumber("connectionId", _connectionId);
-        }
+bool haveClient() {
+    return currentClient.getMake()->get();
+}
 
-        if (hasRemote()) {
-            builder.append("client", getRemote().toString());
-        }
-    }
-
-    ServiceContext::UniqueOperationContext Client::makeOperationContext() {
-        return getServiceContext()->makeOperationContext(this);
-    }
-
-    void Client::setOperationContext(OperationContext* txn) {
-        // We can only set the OperationContext once before resetting it.
-        invariant(txn != NULL && _txn == NULL);
-        _txn = txn;
-    }
-
-    void Client::resetOperationContext() {
-        invariant(_txn != NULL);
-        _txn = NULL;
-    }
-
-    std::string Client::clientAddress(bool includePort) const {
-        if (!hasRemote()) {
-            return "";
-        }
-        if (includePort) {
-            return getRemote().toString();
-        }
-        return getRemote().host();
-    }
-
-    ClientBasic* ClientBasic::getCurrent() {
-        return currentClient.getMake()->get();
-    }
-
-    Client& cc() {
-        Client* c = currentClient.getMake()->get();
-        verify(c);
-        return *c;
-    }
-
-    bool haveClient() { return currentClient.getMake()->get(); }
-
-} // namespace mongo
+}  // namespace mongo

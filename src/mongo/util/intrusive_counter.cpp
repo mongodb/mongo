@@ -33,36 +33,36 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-    using boost::intrusive_ptr;
-    using namespace mongoutils;
+using boost::intrusive_ptr;
+using namespace mongoutils;
 
-    intrusive_ptr<const RCString> RCString::create(StringData s) {
-        uassert(16493, str::stream() << "Tried to create string longer than "
-                                     << (BSONObjMaxUserSize/1024/1024) << "MB",
-                s.size() < static_cast<size_t>(BSONObjMaxUserSize));
+intrusive_ptr<const RCString> RCString::create(StringData s) {
+    uassert(16493,
+            str::stream() << "Tried to create string longer than "
+                          << (BSONObjMaxUserSize / 1024 / 1024) << "MB",
+            s.size() < static_cast<size_t>(BSONObjMaxUserSize));
 
-        const size_t sizeWithNUL = s.size() + 1;
-        const size_t bytesNeeded = sizeof(RCString) + sizeWithNUL;
+    const size_t sizeWithNUL = s.size() + 1;
+    const size_t bytesNeeded = sizeof(RCString) + sizeWithNUL;
 
 #pragma warning(push)
 #pragma warning(disable : 4291)
-        intrusive_ptr<RCString> ptr = new (bytesNeeded) RCString(); // uses custom operator new
+    intrusive_ptr<RCString> ptr = new (bytesNeeded) RCString();  // uses custom operator new
 #pragma warning(pop)
 
-        ptr->_size = s.size();
-        char* stringStart = reinterpret_cast<char*>(ptr.get()) + sizeof(RCString);
-        s.copyTo(stringStart, true);
+    ptr->_size = s.size();
+    char* stringStart = reinterpret_cast<char*>(ptr.get()) + sizeof(RCString);
+    s.copyTo(stringStart, true);
 
-        return ptr;
-    }
+    return ptr;
+}
 
-    void IntrusiveCounterUnsigned::addRef() const {
-        ++counter;
-    }
+void IntrusiveCounterUnsigned::addRef() const {
+    ++counter;
+}
 
-    void IntrusiveCounterUnsigned::release() const {
-        if (!--counter)
-            delete this;
-    }
-
+void IntrusiveCounterUnsigned::release() const {
+    if (!--counter)
+        delete this;
+}
 }

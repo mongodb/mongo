@@ -37,44 +37,45 @@
 namespace mongo {
 namespace fts {
 
-    class FTSLanguage;
-    class StopWords;
+class FTSLanguage;
+class StopWords;
 
-    /**
-     * BasicFTSTokenizer
-     * A iterator of "documents" where a document contains ASCII space (U+0020) delimited words.
-     * Uses
-     * - Tokenizer for tokenizing words via ASCII space (ie, U+0020 space).
-     * - tolower from the C standard libary to lower letters, ie, it only supports lower casing
-     * -     ASCII letters (U+0000 - U+007F)
-     * - Stemmer (ie, Snowball Stemmer) to stem words.
-     * - Embeded stop word lists for each language in StopWord class
-     *
-     * For each word returns a stem version of a word optimized for full text indexing.
-     * Optionally supports returning case sensitive search terms.
-     */
-    class BasicFTSTokenizer : public FTSTokenizer {
-        MONGO_DISALLOW_COPYING(BasicFTSTokenizer);
-    public:
-        BasicFTSTokenizer(const FTSLanguage* language);
+/**
+ * BasicFTSTokenizer
+ * A iterator of "documents" where a document contains ASCII space (U+0020) delimited words.
+ * Uses
+ * - Tokenizer for tokenizing words via ASCII space (ie, U+0020 space).
+ * - tolower from the C standard libary to lower letters, ie, it only supports lower casing
+ * -     ASCII letters (U+0000 - U+007F)
+ * - Stemmer (ie, Snowball Stemmer) to stem words.
+ * - Embeded stop word lists for each language in StopWord class
+ *
+ * For each word returns a stem version of a word optimized for full text indexing.
+ * Optionally supports returning case sensitive search terms.
+ */
+class BasicFTSTokenizer : public FTSTokenizer {
+    MONGO_DISALLOW_COPYING(BasicFTSTokenizer);
 
-        void reset(StringData document, Options options) final;
+public:
+    BasicFTSTokenizer(const FTSLanguage* language);
 
-        bool moveNext() final;
+    void reset(StringData document, Options options) final;
 
-        StringData get() const final;
+    bool moveNext() final;
 
-    private:
-        const FTSLanguage* const _language;
-        const Stemmer _stemmer;
-        const StopWords* const _stopWords;
+    StringData get() const final;
 
-        std::string _document;
-        std::unique_ptr<Tokenizer> _tokenizer;
-        Options _options;
+private:
+    const FTSLanguage* const _language;
+    const Stemmer _stemmer;
+    const StopWords* const _stopWords;
 
-        std::string _stem;
-    };
+    std::string _document;
+    std::unique_ptr<Tokenizer> _tokenizer;
+    Options _options;
 
-} // namespace fts
-} // namespace mongo
+    std::string _stem;
+};
+
+}  // namespace fts
+}  // namespace mongo

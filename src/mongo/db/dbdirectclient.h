@@ -34,77 +34,75 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
-    /**
-     * Embedded calls to the local server using the DBClientBase API without going over the network.
-     *
-     * Caller does not need to lock, that is handled within.
-     *
-     * All operations are performed within the scope of a passed-in OperationContext (except when
-     * using the deprecated constructor). You must ensure that the OperationContext is valid when
-     * calling into any function. If you ever need to change the OperationContext, that can be done
-     * without the overhead of creating a new DBDirectClient by calling setOpCtx(), after which all
-     * operations will use the new OperationContext.
-     */
-    class DBDirectClient : public DBClientBase {
-    public:
-        static const HostAndPort dummyHost;
+/**
+ * Embedded calls to the local server using the DBClientBase API without going over the network.
+ *
+ * Caller does not need to lock, that is handled within.
+ *
+ * All operations are performed within the scope of a passed-in OperationContext (except when
+ * using the deprecated constructor). You must ensure that the OperationContext is valid when
+ * calling into any function. If you ever need to change the OperationContext, that can be done
+ * without the overhead of creating a new DBDirectClient by calling setOpCtx(), after which all
+ * operations will use the new OperationContext.
+ */
+class DBDirectClient : public DBClientBase {
+public:
+    static const HostAndPort dummyHost;
 
-        DBDirectClient(OperationContext* txn);
+    DBDirectClient(OperationContext* txn);
 
-        using DBClientBase::query;
+    using DBClientBase::query;
 
-        // XXX: is this valid or useful?
-        void setOpCtx(OperationContext* txn);
+    // XXX: is this valid or useful?
+    void setOpCtx(OperationContext* txn);
 
-        virtual std::unique_ptr<DBClientCursor> query(const std::string &ns,
-                                                    Query query,
-                                                    int nToReturn = 0,
-                                                    int nToSkip = 0,
-                                                    const BSONObj* fieldsToReturn = 0,
-                                                    int queryOptions = 0,
-                                                    int batchSize = 0);
+    virtual std::unique_ptr<DBClientCursor> query(const std::string& ns,
+                                                  Query query,
+                                                  int nToReturn = 0,
+                                                  int nToSkip = 0,
+                                                  const BSONObj* fieldsToReturn = 0,
+                                                  int queryOptions = 0,
+                                                  int batchSize = 0);
 
-        virtual bool isFailed() const;
+    virtual bool isFailed() const;
 
-        virtual bool isStillConnected();
+    virtual bool isStillConnected();
 
-        virtual std::string toString() const;
+    virtual std::string toString() const;
 
-        virtual std::string getServerAddress() const;
+    virtual std::string getServerAddress() const;
 
-        virtual bool call(Message& toSend,
-                          Message& response,
-                          bool assertOk = true,
-                          std::string* actualServer = 0);
+    virtual bool call(Message& toSend,
+                      Message& response,
+                      bool assertOk = true,
+                      std::string* actualServer = 0);
 
-        virtual void say(Message& toSend,
-                         bool isRetry = false,
-                         std::string* actualServer = 0);
+    virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
 
-        virtual void sayPiggyBack(Message& toSend);
+    virtual void sayPiggyBack(Message& toSend);
 
-        virtual void killCursor(long long cursorID);
+    virtual void killCursor(long long cursorID);
 
-        virtual bool callRead(Message& toSend, Message& response);
-        
-        virtual unsigned long long count(const std::string &ns,
-                                         const BSONObj& query = BSONObj(),
-                                         int options = 0,
-                                         int limit = 0,
-                                         int skip = 0);
-        
-        virtual ConnectionString::ConnectionType type() const;
+    virtual bool callRead(Message& toSend, Message& response);
 
-        double getSoTimeout() const;
+    virtual unsigned long long count(const std::string& ns,
+                                     const BSONObj& query = BSONObj(),
+                                     int options = 0,
+                                     int limit = 0,
+                                     int skip = 0);
 
-        virtual bool lazySupported() const;
+    virtual ConnectionString::ConnectionType type() const;
 
-        virtual QueryOptions _lookupAvailableOptions();
+    double getSoTimeout() const;
 
-    private:
-        OperationContext* _txn;
-    };
+    virtual bool lazySupported() const;
+
+    virtual QueryOptions _lookupAvailableOptions();
+
+private:
+    OperationContext* _txn;
+};
 
 }  // namespace mongo

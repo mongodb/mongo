@@ -30,24 +30,23 @@
 
 namespace mongo {
 
-    class OperationContext;
-    class RecordFetcher;
+class OperationContext;
+class RecordFetcher;
 
+/**
+ * See the documentation for yieldAllLocks(...).
+ */
+class QueryYield {
+    QueryYield();
+
+public:
     /**
-     * See the documentation for yieldAllLocks(...).
+     * If not in a nested context, unlocks all locks, suggests to the operating system to
+     * switch to another thread, and then reacquires all locks.
+     *
+     * If in a nested context (eg DBDirectClient), does nothing.
      */
-    class QueryYield {
-        QueryYield();
+    static void yieldAllLocks(OperationContext* txn, RecordFetcher* fetcher);
+};
 
-    public:
-
-        /**
-         * If not in a nested context, unlocks all locks, suggests to the operating system to
-         * switch to another thread, and then reacquires all locks.
-         *
-         * If in a nested context (eg DBDirectClient), does nothing.
-         */
-        static void yieldAllLocks(OperationContext* txn, RecordFetcher* fetcher);
-    };
-
-} // namespace mongo
+}  // namespace mongo

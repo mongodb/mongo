@@ -41,189 +41,183 @@
 namespace mongo {
 namespace {
 
-    using std::string;
-    using std::vector;
+using std::string;
+using std::vector;
 
+//
+// Test mongo version ranges
+//
+
+TEST(Excludes, Empty) {
     //
-    // Test mongo version ranges
+    // Tests basic empty range
     //
 
-    TEST(Excludes, Empty) {
+    BSONArray includeArr;
+    vector<MongoVersionRange> includes;
 
-        //
-        // Tests basic empty range
-        //
+    string errMsg;
+    MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
+    ASSERT_EQUALS(errMsg, "");
 
-        BSONArray includeArr;
-        vector<MongoVersionRange> includes;
-
-        string errMsg;
-        MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
-        ASSERT_EQUALS(errMsg, "");
-
-        // Make sure nothing is included
-        ASSERT(!isInMongoVersionRanges("1.2.3", includes));
-        ASSERT(!isInMongoVersionRanges("1.2.3-pre", includes));
-        ASSERT(!isInMongoVersionRanges("1.2.3-rc0", includes));
-    }
-
-    TEST(Excludes, SinglePointRange) {
-
-        //
-        // Tests single string range
-        //
-
-        BSONArrayBuilder bab;
-        bab << "1.2.3";
-        BSONArray includeArr = bab.arr();
-
-        vector<MongoVersionRange> includes;
-
-        string errMsg;
-        MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
-        ASSERT_EQUALS(errMsg, "");
-
-        ASSERT(isInMongoVersionRanges("1.2.3", includes));
-
-        ASSERT(!isInMongoVersionRanges("1.2.2-rc0", includes));
-        ASSERT(!isInMongoVersionRanges("1.2.2", includes));
-
-        ASSERT(isInMongoVersionRanges("1.2.3-pre", includes));
-        ASSERT(isInMongoVersionRanges("1.2.3-rc0", includes));
-
-        ASSERT(!isInMongoVersionRanges("1.2.4-rc0", includes));
-        ASSERT(!isInMongoVersionRanges("1.2.4", includes));
-    }
-
-    TEST(Excludes, BetweenRange) {
-
-        //
-        // Tests range with two endpoints
-        //
-
-        BSONArrayBuilder bab;
-        bab << BSON_ARRAY("7.8.9" << "10.11.12");
-        BSONArray includeArr = bab.arr();
-
-        vector<MongoVersionRange> includes;
-
-        string errMsg;
-        MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
-        ASSERT_EQUALS(errMsg, "");
-
-        ASSERT(isInMongoVersionRanges("7.8.9", includes));
-        ASSERT(isInMongoVersionRanges("10.11.12", includes));
-
-        // Before
-        ASSERT(!isInMongoVersionRanges("7.8.8-rc0", includes));
-        ASSERT(!isInMongoVersionRanges("7.8.8", includes));
-
-        // Boundary
-        ASSERT(isInMongoVersionRanges("7.8.9-pre", includes));
-        ASSERT(isInMongoVersionRanges("7.8.9-rc0", includes));
-
-        ASSERT(isInMongoVersionRanges("7.8.10-rc0", includes));
-        ASSERT(isInMongoVersionRanges("7.8.10", includes));
-
-        // Between
-        ASSERT(isInMongoVersionRanges("8.9.10", includes));
-        ASSERT(isInMongoVersionRanges("9.10.11", includes));
-
-        // Boundary
-        ASSERT(isInMongoVersionRanges("10.11.11-rc0", includes));
-        ASSERT(isInMongoVersionRanges("10.11.11", includes));
-
-        ASSERT(isInMongoVersionRanges("10.11.12-pre", includes));
-        ASSERT(isInMongoVersionRanges("10.11.12-rc0", includes));
-
-        // After
-        ASSERT(!isInMongoVersionRanges("10.11.13-rc0", includes));
-        ASSERT(!isInMongoVersionRanges("10.11.13", includes));
-
-    }
-
-    TEST(Excludes, WeirdRange) {
-
-        //
-        // Tests range with rc/pre endpoints
-        //
-
-        BSONArrayBuilder bab;
-        bab << BSON_ARRAY("7.8.9-rc0" << "10.11.12-pre");
-        BSONArray includeArr = bab.arr();
-
-        vector<MongoVersionRange> includes;
-
-        string errMsg;
-        MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
-        ASSERT_EQUALS(errMsg, "");
-
-        // Near endpoints
-        ASSERT(isInMongoVersionRanges("7.8.9", includes));
-        ASSERT(!isInMongoVersionRanges("10.11.12", includes));
-
-        // Before
-        ASSERT(!isInMongoVersionRanges("7.8.8-rc0", includes));
-        ASSERT(!isInMongoVersionRanges("7.8.8", includes));
-
-        // Boundary
-        ASSERT(!isInMongoVersionRanges("7.8.9-pre", includes));
-        ASSERT(isInMongoVersionRanges("7.8.9-rc0", includes));
-
-        ASSERT(isInMongoVersionRanges("7.8.10-rc0", includes));
-        ASSERT(isInMongoVersionRanges("7.8.10", includes));
-
-        // Between
-        ASSERT(isInMongoVersionRanges("8.9.10", includes));
-        ASSERT(isInMongoVersionRanges("9.10.11", includes));
-
-        // Boundary
-        ASSERT(isInMongoVersionRanges("10.11.11-rc0", includes));
-        ASSERT(isInMongoVersionRanges("10.11.11", includes));
-
-        ASSERT(isInMongoVersionRanges("10.11.12-pre", includes));
-        ASSERT(!isInMongoVersionRanges("10.11.12-rc0", includes));
-
-        // After
-        ASSERT(!isInMongoVersionRanges("10.11.13-rc0", includes));
-        ASSERT(!isInMongoVersionRanges("10.11.13", includes));
-    }
-
-    TEST(Excludes, BadRangeType) {
-
-        //
-        // Tests range with bad endpoint types
-        //
-
-        BSONArrayBuilder bab;
-        bab << "1.2.3";
-        bab << 2; // integer is not version
-        BSONArray includeArr = bab.arr();
-
-        vector<MongoVersionRange> includes;
-
-        string errMsg;
-        MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
-        ASSERT_NOT_EQUALS(errMsg, "");
-    }
-
-    TEST(Excludes, BadRangeArray) {
-
-        //
-        // Tests range with bad array
-        //
-
-        BSONArrayBuilder bab;
-        bab << BSON_ARRAY("" << "1.2.3"); // empty bound
-        BSONArray includeArr = bab.arr();
-
-        vector<MongoVersionRange> includes;
-
-        string errMsg;
-        MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
-        ASSERT_NOT_EQUALS(errMsg, "");
-    }
-
+    // Make sure nothing is included
+    ASSERT(!isInMongoVersionRanges("1.2.3", includes));
+    ASSERT(!isInMongoVersionRanges("1.2.3-pre", includes));
+    ASSERT(!isInMongoVersionRanges("1.2.3-rc0", includes));
 }
-} // namespace mongo
 
+TEST(Excludes, SinglePointRange) {
+    //
+    // Tests single string range
+    //
+
+    BSONArrayBuilder bab;
+    bab << "1.2.3";
+    BSONArray includeArr = bab.arr();
+
+    vector<MongoVersionRange> includes;
+
+    string errMsg;
+    MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
+    ASSERT_EQUALS(errMsg, "");
+
+    ASSERT(isInMongoVersionRanges("1.2.3", includes));
+
+    ASSERT(!isInMongoVersionRanges("1.2.2-rc0", includes));
+    ASSERT(!isInMongoVersionRanges("1.2.2", includes));
+
+    ASSERT(isInMongoVersionRanges("1.2.3-pre", includes));
+    ASSERT(isInMongoVersionRanges("1.2.3-rc0", includes));
+
+    ASSERT(!isInMongoVersionRanges("1.2.4-rc0", includes));
+    ASSERT(!isInMongoVersionRanges("1.2.4", includes));
+}
+
+TEST(Excludes, BetweenRange) {
+    //
+    // Tests range with two endpoints
+    //
+
+    BSONArrayBuilder bab;
+    bab << BSON_ARRAY("7.8.9"
+                      << "10.11.12");
+    BSONArray includeArr = bab.arr();
+
+    vector<MongoVersionRange> includes;
+
+    string errMsg;
+    MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
+    ASSERT_EQUALS(errMsg, "");
+
+    ASSERT(isInMongoVersionRanges("7.8.9", includes));
+    ASSERT(isInMongoVersionRanges("10.11.12", includes));
+
+    // Before
+    ASSERT(!isInMongoVersionRanges("7.8.8-rc0", includes));
+    ASSERT(!isInMongoVersionRanges("7.8.8", includes));
+
+    // Boundary
+    ASSERT(isInMongoVersionRanges("7.8.9-pre", includes));
+    ASSERT(isInMongoVersionRanges("7.8.9-rc0", includes));
+
+    ASSERT(isInMongoVersionRanges("7.8.10-rc0", includes));
+    ASSERT(isInMongoVersionRanges("7.8.10", includes));
+
+    // Between
+    ASSERT(isInMongoVersionRanges("8.9.10", includes));
+    ASSERT(isInMongoVersionRanges("9.10.11", includes));
+
+    // Boundary
+    ASSERT(isInMongoVersionRanges("10.11.11-rc0", includes));
+    ASSERT(isInMongoVersionRanges("10.11.11", includes));
+
+    ASSERT(isInMongoVersionRanges("10.11.12-pre", includes));
+    ASSERT(isInMongoVersionRanges("10.11.12-rc0", includes));
+
+    // After
+    ASSERT(!isInMongoVersionRanges("10.11.13-rc0", includes));
+    ASSERT(!isInMongoVersionRanges("10.11.13", includes));
+}
+
+TEST(Excludes, WeirdRange) {
+    //
+    // Tests range with rc/pre endpoints
+    //
+
+    BSONArrayBuilder bab;
+    bab << BSON_ARRAY("7.8.9-rc0"
+                      << "10.11.12-pre");
+    BSONArray includeArr = bab.arr();
+
+    vector<MongoVersionRange> includes;
+
+    string errMsg;
+    MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
+    ASSERT_EQUALS(errMsg, "");
+
+    // Near endpoints
+    ASSERT(isInMongoVersionRanges("7.8.9", includes));
+    ASSERT(!isInMongoVersionRanges("10.11.12", includes));
+
+    // Before
+    ASSERT(!isInMongoVersionRanges("7.8.8-rc0", includes));
+    ASSERT(!isInMongoVersionRanges("7.8.8", includes));
+
+    // Boundary
+    ASSERT(!isInMongoVersionRanges("7.8.9-pre", includes));
+    ASSERT(isInMongoVersionRanges("7.8.9-rc0", includes));
+
+    ASSERT(isInMongoVersionRanges("7.8.10-rc0", includes));
+    ASSERT(isInMongoVersionRanges("7.8.10", includes));
+
+    // Between
+    ASSERT(isInMongoVersionRanges("8.9.10", includes));
+    ASSERT(isInMongoVersionRanges("9.10.11", includes));
+
+    // Boundary
+    ASSERT(isInMongoVersionRanges("10.11.11-rc0", includes));
+    ASSERT(isInMongoVersionRanges("10.11.11", includes));
+
+    ASSERT(isInMongoVersionRanges("10.11.12-pre", includes));
+    ASSERT(!isInMongoVersionRanges("10.11.12-rc0", includes));
+
+    // After
+    ASSERT(!isInMongoVersionRanges("10.11.13-rc0", includes));
+    ASSERT(!isInMongoVersionRanges("10.11.13", includes));
+}
+
+TEST(Excludes, BadRangeType) {
+    //
+    // Tests range with bad endpoint types
+    //
+
+    BSONArrayBuilder bab;
+    bab << "1.2.3";
+    bab << 2;  // integer is not version
+    BSONArray includeArr = bab.arr();
+
+    vector<MongoVersionRange> includes;
+
+    string errMsg;
+    MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
+    ASSERT_NOT_EQUALS(errMsg, "");
+}
+
+TEST(Excludes, BadRangeArray) {
+    //
+    // Tests range with bad array
+    //
+
+    BSONArrayBuilder bab;
+    bab << BSON_ARRAY(""
+                      << "1.2.3");  // empty bound
+    BSONArray includeArr = bab.arr();
+
+    vector<MongoVersionRange> includes;
+
+    string errMsg;
+    MongoVersionRange::parseBSONArray(includeArr, &includes, &errMsg);
+    ASSERT_NOT_EQUALS(errMsg, "");
+}
+}
+}  // namespace mongo

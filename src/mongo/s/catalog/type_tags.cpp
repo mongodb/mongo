@@ -39,111 +39,115 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    const std::string TagsType::ConfigNS = "config.tags";
+const std::string TagsType::ConfigNS = "config.tags";
 
-    const BSONField<std::string> TagsType::ns("ns");
-    const BSONField<std::string> TagsType::tag("tag");
-    const BSONField<BSONObj> TagsType::min("min");
-    const BSONField<BSONObj> TagsType::max("max");
+const BSONField<std::string> TagsType::ns("ns");
+const BSONField<std::string> TagsType::tag("tag");
+const BSONField<BSONObj> TagsType::min("min");
+const BSONField<BSONObj> TagsType::max("max");
 
 
-    StatusWith<TagsType> TagsType::fromBSON(const BSONObj& source) {
-        TagsType tags;
+StatusWith<TagsType> TagsType::fromBSON(const BSONObj& source) {
+    TagsType tags;
 
-        {
-            std::string tagsNs;
-            Status status = bsonExtractStringField(source, ns.name(), &tagsNs);
-            if (!status.isOK()) return status;
+    {
+        std::string tagsNs;
+        Status status = bsonExtractStringField(source, ns.name(), &tagsNs);
+        if (!status.isOK())
+            return status;
 
-            tags._ns = tagsNs;
-        }
-
-        {
-            std::string tagsTag;
-            Status status = bsonExtractStringField(source, tag.name(), &tagsTag);
-            if (!status.isOK()) return status;
-
-            tags._tag = tagsTag;
-        }
-
-        {
-            BSONElement tagsMinKey;
-            Status status = bsonExtractTypedField(source, min.name(), Object, &tagsMinKey);
-            if (!status.isOK()) return status;
-
-            tags._minKey = tagsMinKey.Obj().getOwned();
-        }
-
-        {
-            BSONElement tagsMaxKey;
-            Status status = bsonExtractTypedField(source, max.name(), Object, &tagsMaxKey);
-            if (!status.isOK()) return status;
-
-            tags._maxKey = tagsMaxKey.Obj().getOwned();
-        }
-
-        return tags;
+        tags._ns = tagsNs;
     }
 
-    Status TagsType::validate() const {
-        if (!_ns.is_initialized() || _ns->empty()) {
-            return Status(ErrorCodes::NoSuchKey,
-                          str::stream() << "missing " << ns.name() << " field");
-        }
+    {
+        std::string tagsTag;
+        Status status = bsonExtractStringField(source, tag.name(), &tagsTag);
+        if (!status.isOK())
+            return status;
 
-        if (!_tag.is_initialized() || _tag->empty()) {
-            return Status(ErrorCodes::NoSuchKey,
-                          str::stream() << "missing " << tag.name() << " field");
-        }
-
-        if (!_minKey.is_initialized() || _minKey->isEmpty()) {
-            return Status(ErrorCodes::NoSuchKey,
-                          str::stream() << "missing " << min.name() << " field");
-        }
-
-        if (!_maxKey.is_initialized() || _maxKey->isEmpty()) {
-            return Status(ErrorCodes::NoSuchKey,
-                          str::stream() << "missing " << max.name() << " field");
-        }
-
-        // 'min' and 'max' must share the same fields.
-        if (_minKey->nFields() != _maxKey->nFields()) {
-            return Status(ErrorCodes::BadValue, "min and max have a different number of keys");
-        }
-
-        BSONObjIterator minIt(_minKey.get());
-        BSONObjIterator maxIt(_maxKey.get());
-        while (minIt.more() && maxIt.more()) {
-            BSONElement minElem = minIt.next();
-            BSONElement maxElem = maxIt.next();
-            if (strcmp(minElem.fieldName(), maxElem.fieldName())) {
-                return Status(ErrorCodes::BadValue, "min and max have different set of keys");
-            }
-        }
-
-        // 'max' should be greater than 'min'.
-        if (_minKey->woCompare(_maxKey.get()) >= 0) {
-            return Status(ErrorCodes::BadValue, "max key must be greater than min key");
-        }
-
-        return Status::OK();
+        tags._tag = tagsTag;
     }
 
-    BSONObj TagsType::toBSON() const {
-        BSONObjBuilder builder;
+    {
+        BSONElement tagsMinKey;
+        Status status = bsonExtractTypedField(source, min.name(), Object, &tagsMinKey);
+        if (!status.isOK())
+            return status;
 
-        if (_ns) builder.append(ns.name(), getNS());
-        if (_tag) builder.append(tag.name(), getTag());
-        if (_minKey) builder.append(min.name(), getMinKey());
-        if (_maxKey) builder.append(max.name(), getMaxKey());
-
-        return builder.obj();
+        tags._minKey = tagsMinKey.Obj().getOwned();
     }
 
-    std::string TagsType::toString() const {
-        return toBSON().toString();
+    {
+        BSONElement tagsMaxKey;
+        Status status = bsonExtractTypedField(source, max.name(), Object, &tagsMaxKey);
+        if (!status.isOK())
+            return status;
+
+        tags._maxKey = tagsMaxKey.Obj().getOwned();
     }
 
-} // namespace mongo
+    return tags;
+}
+
+Status TagsType::validate() const {
+    if (!_ns.is_initialized() || _ns->empty()) {
+        return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << ns.name() << " field");
+    }
+
+    if (!_tag.is_initialized() || _tag->empty()) {
+        return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << tag.name() << " field");
+    }
+
+    if (!_minKey.is_initialized() || _minKey->isEmpty()) {
+        return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << min.name() << " field");
+    }
+
+    if (!_maxKey.is_initialized() || _maxKey->isEmpty()) {
+        return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << max.name() << " field");
+    }
+
+    // 'min' and 'max' must share the same fields.
+    if (_minKey->nFields() != _maxKey->nFields()) {
+        return Status(ErrorCodes::BadValue, "min and max have a different number of keys");
+    }
+
+    BSONObjIterator minIt(_minKey.get());
+    BSONObjIterator maxIt(_maxKey.get());
+    while (minIt.more() && maxIt.more()) {
+        BSONElement minElem = minIt.next();
+        BSONElement maxElem = maxIt.next();
+        if (strcmp(minElem.fieldName(), maxElem.fieldName())) {
+            return Status(ErrorCodes::BadValue, "min and max have different set of keys");
+        }
+    }
+
+    // 'max' should be greater than 'min'.
+    if (_minKey->woCompare(_maxKey.get()) >= 0) {
+        return Status(ErrorCodes::BadValue, "max key must be greater than min key");
+    }
+
+    return Status::OK();
+}
+
+BSONObj TagsType::toBSON() const {
+    BSONObjBuilder builder;
+
+    if (_ns)
+        builder.append(ns.name(), getNS());
+    if (_tag)
+        builder.append(tag.name(), getTag());
+    if (_minKey)
+        builder.append(min.name(), getMinKey());
+    if (_maxKey)
+        builder.append(max.name(), getMaxKey());
+
+    return builder.obj();
+}
+
+std::string TagsType::toString() const {
+    return toBSON().toString();
+}
+
+}  // namespace mongo

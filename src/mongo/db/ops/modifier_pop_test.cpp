@@ -42,275 +42,277 @@
 
 namespace {
 
-    using mongo::Array;
-    using mongo::BSONObj;
-    using mongo::LogBuilder;
-    using mongo::fromjson;
-    using mongo::ModifierInterface;
-    using mongo::ModifierPop;
-    using mongo::Status;
-    using mongo::StringData;
-    using mongo::mutablebson::Document;
-    using mongo::mutablebson::Element;
+using mongo::Array;
+using mongo::BSONObj;
+using mongo::LogBuilder;
+using mongo::fromjson;
+using mongo::ModifierInterface;
+using mongo::ModifierPop;
+using mongo::Status;
+using mongo::StringData;
+using mongo::mutablebson::Document;
+using mongo::mutablebson::Element;
 
-    /** Helper to build and manipulate a $pop mod. */
-    class Mod {
-    public:
-        Mod() : _mod() {}
+/** Helper to build and manipulate a $pop mod. */
+class Mod {
+public:
+    Mod() : _mod() {}
 
-        explicit Mod(BSONObj modObj) {
-            _modObj = modObj;
-            ASSERT_OK(_mod.init(_modObj["$pop"].embeddedObject().firstElement(),
-                                ModifierInterface::Options::normal()));
-        }
-
-        Status prepare(Element root,
-                       StringData matchedField,
-                       ModifierInterface::ExecInfo* execInfo) {
-            return _mod.prepare(root, matchedField, execInfo);
-        }
-
-        Status apply() const {
-            return _mod.apply();
-        }
-
-        Status log(LogBuilder* logBuilder) const {
-            return _mod.log(logBuilder);
-        }
-
-        ModifierPop& mod() { return _mod; }
-
-        BSONObj modObj() { return _modObj; }
-
-    private:
-        ModifierPop _mod;
-        BSONObj _modObj;
-    };
-
-    //
-    // Test init values which aren't numbers.
-    // These are going to cause a pop from the bottom.
-    //
-    TEST(Init, StringArg) {
-        BSONObj modObj = fromjson("{$pop: {a: 'hi'}}");
-        ModifierPop mod;
-        ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+    explicit Mod(BSONObj modObj) {
+        _modObj = modObj;
+        ASSERT_OK(_mod.init(_modObj["$pop"].embeddedObject().firstElement(),
+                            ModifierInterface::Options::normal()));
     }
 
-    TEST(Init, BoolTrueArg) {
-        BSONObj modObj = fromjson("{$pop: {a: true}}");
-        ModifierPop mod;
-        ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+    Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
+        return _mod.prepare(root, matchedField, execInfo);
     }
 
-    TEST(Init, BoolFalseArg) {
-        BSONObj modObj = fromjson("{$pop: {a: false}}");
-        ModifierPop mod;
-        ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+    Status apply() const {
+        return _mod.apply();
     }
 
-    TEST(MissingField, AllButApply) {
-        Document doc(fromjson("{a: [1,2]}"));
-        Mod mod(fromjson("{$pop: {s: 1}}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "s");
-        ASSERT_TRUE(execInfo.noOp);
-
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{$unset: {'s': true}}"), logDoc);
+    Status log(LogBuilder* logBuilder) const {
+        return _mod.log(logBuilder);
     }
 
-    TEST(SimpleMod, PrepareBottom) {
-        Document doc(fromjson("{a: [1,2]}"));
-        Mod mod(fromjson("{$pop: {a: 1}}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
+    ModifierPop& mod() {
+        return _mod;
     }
 
-    TEST(SimpleMod, PrepareApplyBottomO) {
-        Document doc(fromjson("{a: [1,2]}"));
-        Mod mod(fromjson("{$pop: {a: 0}}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson(("{a: [1]}")), doc);
+    BSONObj modObj() {
+        return _modObj;
     }
 
-    TEST(SimpleMod, PrepareTop) {
-        Document doc(fromjson("{a: [1,2]}"));
-        Mod mod(fromjson("{$pop: {a: -1}}"));
+private:
+    ModifierPop _mod;
+    BSONObj _modObj;
+};
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+//
+// Test init values which aren't numbers.
+// These are going to cause a pop from the bottom.
+//
+TEST(Init, StringArg) {
+    BSONObj modObj = fromjson("{$pop: {a: 'hi'}}");
+    ModifierPop mod;
+    ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement(),
+                       ModifierInterface::Options::normal()));
+}
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
-    }
+TEST(Init, BoolTrueArg) {
+    BSONObj modObj = fromjson("{$pop: {a: true}}");
+    ModifierPop mod;
+    ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement(),
+                       ModifierInterface::Options::normal()));
+}
 
-    TEST(SimpleMod, ApplyTopPop) {
-        Document doc(fromjson("{a: [1,2]}"));
-        Mod mod(fromjson("{$pop: {a: -1}}"));
+TEST(Init, BoolFalseArg) {
+    BSONObj modObj = fromjson("{$pop: {a: false}}");
+    ModifierPop mod;
+    ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement(),
+                       ModifierInterface::Options::normal()));
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+TEST(MissingField, AllButApply) {
+    Document doc(fromjson("{a: [1,2]}"));
+    Mod mod(fromjson("{$pop: {s: 1}}"));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson(("{a: [2]}")), doc);
-    }
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "s");
+    ASSERT_TRUE(execInfo.noOp);
 
-    TEST(SimpleMod, ApplyBottomPop) {
-        Document doc(fromjson("{a: [1,2]}"));
-        Mod mod(fromjson("{$pop: {a: 1}}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{$unset: {'s': true}}"), logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+TEST(SimpleMod, PrepareBottom) {
+    Document doc(fromjson("{a: [1,2]}"));
+    Mod mod(fromjson("{$pop: {a: 1}}"));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson(("{a: [1]}")), doc);
-    }
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+}
 
-    TEST(SimpleMod, ApplyLogBottomPop) {
-        Document doc(fromjson("{a: [1,2]}"));
-        Mod mod(fromjson("{$pop: {a: 1}}"));
+TEST(SimpleMod, PrepareApplyBottomO) {
+    Document doc(fromjson("{a: [1,2]}"));
+    Mod mod(fromjson("{$pop: {a: 0}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson(("{a:[1]}")), doc);
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson(("{a: [1]}")), doc);
+}
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
-    }
+TEST(SimpleMod, PrepareTop) {
+    Document doc(fromjson("{a: [1,2]}"));
+    Mod mod(fromjson("{$pop: {a: -1}}"));
 
-    TEST(EmptyArray, PrepareNoOp) {
-        Document doc(fromjson("{}"));
-        Mod mod(fromjson("{$pop: {a: 1}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+}
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_TRUE(execInfo.noOp);
-    }
+TEST(SimpleMod, ApplyTopPop) {
+    Document doc(fromjson("{a: [1,2]}"));
+    Mod mod(fromjson("{$pop: {a: -1}}"));
 
-    TEST(SingleElemArray, ApplyLog) {
-        Document doc(fromjson("{a: [1]}"));
-        Mod mod(fromjson("{$pop: {a: 1}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson(("{a: [2]}")), doc);
+}
 
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson(("{a:[]}")), doc);
+TEST(SimpleMod, ApplyBottomPop) {
+    Document doc(fromjson("{a: [1,2]}"));
+    Mod mod(fromjson("{$pop: {a: 1}}"));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{$set: {a: []}}"), logDoc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
 
-    TEST(ArrayOfArray, ApplyLogPop) {
-        Document doc(fromjson("{a: [[1,2], 1]}"));
-        Mod mod(fromjson("{$pop: {'a.0': 1}}"));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson(("{a: [1]}")), doc);
+}
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.0");
-        ASSERT_FALSE(execInfo.noOp);
+TEST(SimpleMod, ApplyLogBottomPop) {
+    Document doc(fromjson("{a: [1,2]}"));
+    Mod mod(fromjson("{$pop: {a: 1}}"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson(("{a:[[1], 1]}")), doc);
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{$set: { 'a.0': [1]}}"), logDoc);
-    }
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
 
-    TEST(ArrayOfArray, ApplyLogPopOnlyElement) {
-        Document doc(fromjson("{a: [[1], 1]}"));
-        Mod mod(fromjson("{$pop: {'a.0': 1}}"));
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson(("{a:[1]}")), doc);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
+}
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.0");
-        ASSERT_FALSE(execInfo.noOp);
+TEST(EmptyArray, PrepareNoOp) {
+    Document doc(fromjson("{}"));
+    Mod mod(fromjson("{$pop: {a: 1}}"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson(("{a:[[], 1]}")), doc);
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{$set: { 'a.0': []}}"), logDoc);
-    }
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-    TEST(Prepare, MissingPath) {
-        Document doc(fromjson("{ a : [1, 2] }"));
-        Mod mod(fromjson("{ $pop : { b : 1 } }"));
+TEST(SingleElemArray, ApplyLog) {
+    Document doc(fromjson("{a: [1]}"));
+    Mod mod(fromjson("{$pop: {a: 1}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
 
-    // from SERVER-12846
-    TEST(Prepare, MissingArrayElementPath) {
-        Document doc(fromjson("{_id : 1, a : [1, 2]}"));
-        Mod mod(fromjson("{ $pop : { 'a.3' : 1 } }"));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
-    }
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson(("{a:[]}")), doc);
 
-    TEST(Prepare, FromArrayElementPath) {
-        Document doc(fromjson("{ a : [1, 2] }"));
-        Mod mod(fromjson("{ $pop : { 'a.0' : 1 } }"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_NOT_OK(mod.prepare(doc.root(), "", &execInfo));
-    }
+TEST(ArrayOfArray, ApplyLogPop) {
+    Document doc(fromjson("{a: [[1,2], 1]}"));
+    Mod mod(fromjson("{$pop: {'a.0': 1}}"));
 
-} // unnamed namespace
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.0");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson(("{a:[[1], 1]}")), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{$set: { 'a.0': [1]}}"), logDoc);
+}
+
+TEST(ArrayOfArray, ApplyLogPopOnlyElement) {
+    Document doc(fromjson("{a: [[1], 1]}"));
+    Mod mod(fromjson("{$pop: {'a.0': 1}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.0");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson(("{a:[[], 1]}")), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{$set: { 'a.0': []}}"), logDoc);
+}
+
+TEST(Prepare, MissingPath) {
+    Document doc(fromjson("{ a : [1, 2] }"));
+    Mod mod(fromjson("{ $pop : { b : 1 } }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+}
+
+// from SERVER-12846
+TEST(Prepare, MissingArrayElementPath) {
+    Document doc(fromjson("{_id : 1, a : [1, 2]}"));
+    Mod mod(fromjson("{ $pop : { 'a.3' : 1 } }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+}
+
+TEST(Prepare, FromArrayElementPath) {
+    Document doc(fromjson("{ a : [1, 2] }"));
+    Mod mod(fromjson("{ $pop : { 'a.0' : 1 } }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_NOT_OK(mod.prepare(doc.root(), "", &execInfo));
+}
+
+}  // unnamed namespace

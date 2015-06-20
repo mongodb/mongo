@@ -40,54 +40,61 @@
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
-    
-    using namespace mongoutils;
 
-    /** this is very much like a boost::path.  however, we define a new type to get some type
-        checking.  if you want to say 'my param MUST be a relative path", use this.
-    */
-    struct RelativePath {
-        std::string _p;
+using namespace mongoutils;
 
-        bool empty() const { return _p.empty(); }
+/** this is very much like a boost::path.  however, we define a new type to get some type
+    checking.  if you want to say 'my param MUST be a relative path", use this.
+*/
+struct RelativePath {
+    std::string _p;
 
-        static RelativePath fromRelativePath(const std::string& f) {
-            RelativePath rp;
-            rp._p = f;
-            return rp;
-        }
-        
-        /**
-         * Returns path relative to 'dbpath' from a full path 'f'.
-         */
-        static RelativePath fromFullPath(boost::filesystem::path dbpath,
-                                         boost::filesystem::path f);
-
-        std::string toString() const { return _p; }
-
-        bool operator!=(const RelativePath& r) const { return _p != r._p; }
-        bool operator==(const RelativePath& r) const { return _p == r._p; }
-        bool operator<(const RelativePath& r) const { return _p < r._p; }
-
-        std::string asFullPath() const {
-            boost::filesystem::path x(storageGlobalParams.dbpath);
-            x /= _p;
-            return x.string();
-        }
-
-    };
-
-    dev_t getPartition(const std::string& path);
-    
-    inline bool onSamePartition(const std::string& path1, const std::string& path2){
-        dev_t dev1 = getPartition(path1);
-        dev_t dev2 = getPartition(path2);
-
-        return dev1 == dev2;
+    bool empty() const {
+        return _p.empty();
     }
 
-    void flushMyDirectory(const boost::filesystem::path& file);
+    static RelativePath fromRelativePath(const std::string& f) {
+        RelativePath rp;
+        rp._p = f;
+        return rp;
+    }
 
-    boost::filesystem::path ensureParentDirCreated(const boost::filesystem::path& p);
+    /**
+     * Returns path relative to 'dbpath' from a full path 'f'.
+     */
+    static RelativePath fromFullPath(boost::filesystem::path dbpath, boost::filesystem::path f);
 
+    std::string toString() const {
+        return _p;
+    }
+
+    bool operator!=(const RelativePath& r) const {
+        return _p != r._p;
+    }
+    bool operator==(const RelativePath& r) const {
+        return _p == r._p;
+    }
+    bool operator<(const RelativePath& r) const {
+        return _p < r._p;
+    }
+
+    std::string asFullPath() const {
+        boost::filesystem::path x(storageGlobalParams.dbpath);
+        x /= _p;
+        return x.string();
+    }
+};
+
+dev_t getPartition(const std::string& path);
+
+inline bool onSamePartition(const std::string& path1, const std::string& path2) {
+    dev_t dev1 = getPartition(path1);
+    dev_t dev2 = getPartition(path2);
+
+    return dev1 == dev2;
+}
+
+void flushMyDirectory(const boost::filesystem::path& file);
+
+boost::filesystem::path ensureParentDirCreated(const boost::filesystem::path& p);
 }

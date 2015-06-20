@@ -40,68 +40,77 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        class FTSQuery {
+class FTSQuery {
+public:
+    // Initializes an FTSQuery.  Note that the parsing of "language" depends on the text
+    // index version, since a query which doesn't specify a language and is against a
+    // version 1 text index with a version 1 default language string needs to be parsed as
+    // version 1 (see fts_language.cpp for a list of language strings specific to version
+    // 1).
+    Status parse(const std::string& query,
+                 StringData language,
+                 bool caseSensitive,
+                 TextIndexVersion textIndexVersion);
 
-        public:
-            // Initializes an FTSQuery.  Note that the parsing of "language" depends on the text
-            // index version, since a query which doesn't specify a language and is against a
-            // version 1 text index with a version 1 default language string needs to be parsed as
-            // version 1 (see fts_language.cpp for a list of language strings specific to version
-            // 1).
-            Status parse(const std::string& query, StringData language, bool caseSensitive,
-                         TextIndexVersion textIndexVersion);
-
-            const std::set<std::string>& getPositiveTerms() const { return _positiveTerms; }
-            const std::set<std::string>& getNegatedTerms() const { return _negatedTerms; }
-            const std::vector<std::string>& getPositivePhr() const { return _positivePhrases; }
-            const std::vector<std::string>& getNegatedPhr() const { return _negatedPhrases; }
-
-            const std::set<std::string>& getTermsForBounds() const {
-                return _termsForBounds;
-            }
-
-            const FTSLanguage& getLanguage() const { return *_language; }
-            bool getCaseSensitive() const { return _caseSensitive; }
-
-            std::string toString() const;
-
-            std::string debugString() const;
-
-            BSONObj toBSON() const;
-
-            /**
-             * Lowercases "str" if _caseSensitive is set, else returns a copy of "str" unchanged.
-             */
-            std::string normalizeString( StringData str ) const;
-
-            static const bool caseSensitiveDefault;
-
-        private:
-            void _addTerms( FTSTokenizer* tokenizer,
-                           const std::string& tokens,
-                           bool negated );
-
-            const FTSLanguage* _language;
-            bool _caseSensitive;
-
-            // Positive terms.
-            std::set<std::string> _positiveTerms;
-
-            // Negated terms.
-            std::set<std::string> _negatedTerms;
-
-            // Positive phrases.
-            std::vector<std::string> _positivePhrases;
-
-            // Negated phrases.
-            std::vector<std::string> _negatedPhrases;
-
-            // Terms for bounds.
-            std::set<std::string> _termsForBounds;
-        };
-
+    const std::set<std::string>& getPositiveTerms() const {
+        return _positiveTerms;
     }
-}
+    const std::set<std::string>& getNegatedTerms() const {
+        return _negatedTerms;
+    }
+    const std::vector<std::string>& getPositivePhr() const {
+        return _positivePhrases;
+    }
+    const std::vector<std::string>& getNegatedPhr() const {
+        return _negatedPhrases;
+    }
 
+    const std::set<std::string>& getTermsForBounds() const {
+        return _termsForBounds;
+    }
+
+    const FTSLanguage& getLanguage() const {
+        return *_language;
+    }
+    bool getCaseSensitive() const {
+        return _caseSensitive;
+    }
+
+    std::string toString() const;
+
+    std::string debugString() const;
+
+    BSONObj toBSON() const;
+
+    /**
+     * Lowercases "str" if _caseSensitive is set, else returns a copy of "str" unchanged.
+     */
+    std::string normalizeString(StringData str) const;
+
+    static const bool caseSensitiveDefault;
+
+private:
+    void _addTerms(FTSTokenizer* tokenizer, const std::string& tokens, bool negated);
+
+    const FTSLanguage* _language;
+    bool _caseSensitive;
+
+    // Positive terms.
+    std::set<std::string> _positiveTerms;
+
+    // Negated terms.
+    std::set<std::string> _negatedTerms;
+
+    // Positive phrases.
+    std::vector<std::string> _positivePhrases;
+
+    // Negated phrases.
+    std::vector<std::string> _negatedPhrases;
+
+    // Terms for bounds.
+    std::set<std::string> _termsForBounds;
+};
+}
+}

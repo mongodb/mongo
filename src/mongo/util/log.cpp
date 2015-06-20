@@ -54,88 +54,87 @@ using namespace std;
 
 namespace mongo {
 
-    static logger::ExtraLogContextFn _appendExtraLogContext;
+static logger::ExtraLogContextFn _appendExtraLogContext;
 
-    Status logger::registerExtraLogContextFn(logger::ExtraLogContextFn contextFn) {
-        if (!contextFn)
-            return Status(ErrorCodes::BadValue, "Cannot register a NULL log context function.");
-        if (_appendExtraLogContext) {
-            return Status(ErrorCodes::AlreadyInitialized,
-                          "Cannot call registerExtraLogContextFn multiple times.");
-        }
-        _appendExtraLogContext = contextFn;
-        return Status::OK();
+Status logger::registerExtraLogContextFn(logger::ExtraLogContextFn contextFn) {
+    if (!contextFn)
+        return Status(ErrorCodes::BadValue, "Cannot register a NULL log context function.");
+    if (_appendExtraLogContext) {
+        return Status(ErrorCodes::AlreadyInitialized,
+                      "Cannot call registerExtraLogContextFn multiple times.");
     }
+    _appendExtraLogContext = contextFn;
+    return Status::OK();
+}
 
-    bool rotateLogs(bool renameFiles) {
-        using logger::RotatableFileManager;
-        RotatableFileManager* manager = logger::globalRotatableFileManager();
-        RotatableFileManager::FileNameStatusPairVector result(
-                manager->rotateAll(renameFiles, "." + terseCurrentTime(false)));
-        for (RotatableFileManager::FileNameStatusPairVector::iterator it = result.begin();
-                it != result.end(); it++) {
-            warning() << "Rotating log file " << it->first << " failed: " << it->second.toString()
-                    << endl;
-        }
-        return result.empty();
+bool rotateLogs(bool renameFiles) {
+    using logger::RotatableFileManager;
+    RotatableFileManager* manager = logger::globalRotatableFileManager();
+    RotatableFileManager::FileNameStatusPairVector result(
+        manager->rotateAll(renameFiles, "." + terseCurrentTime(false)));
+    for (RotatableFileManager::FileNameStatusPairVector::iterator it = result.begin();
+         it != result.end();
+         it++) {
+        warning() << "Rotating log file " << it->first << " failed: " << it->second.toString()
+                  << endl;
     }
+    return result.empty();
+}
 
-    string errnoWithDescription(int x) {
+string errnoWithDescription(int x) {
 #if defined(_WIN32)
-        if( x < 0 ) 
-            x = GetLastError();
+    if (x < 0)
+        x = GetLastError();
 #else
-        if( x < 0 ) 
-            x = errno;
+    if (x < 0)
+        x = errno;
 #endif
-        stringstream s;
-        s << "errno:" << x << ' ';
+    stringstream s;
+    s << "errno:" << x << ' ';
 
 #if defined(_WIN32)
-        LPWSTR errorText = NULL;
-        FormatMessageW(
-            FORMAT_MESSAGE_FROM_SYSTEM
-            |FORMAT_MESSAGE_ALLOCATE_BUFFER
-            |FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL,
-            x, 0,
-            reinterpret_cast<LPWSTR>( &errorText ),  // output
-            0, // minimum size for output buffer
-            NULL);
-        if( errorText ) {
-            string x = toUtf8String(errorText);
-            for( string::iterator i = x.begin(); i != x.end(); i++ ) {
-                if( *i == '\n' || *i == '\r' )
-                    break;
-                s << *i;
-            }
-            LocalFree(errorText);
+    LPWSTR errorText = NULL;
+    FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                       FORMAT_MESSAGE_IGNORE_INSERTS,
+                   NULL,
+                   x,
+                   0,
+                   reinterpret_cast<LPWSTR>(&errorText),  // output
+                   0,                                     // minimum size for output buffer
+                   NULL);
+    if (errorText) {
+        string x = toUtf8String(errorText);
+        for (string::iterator i = x.begin(); i != x.end(); i++) {
+            if (*i == '\n' || *i == '\r')
+                break;
+            s << *i;
         }
-        else
-            s << strerror(x);
-        /*
-        DWORD n = FormatMessage(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER |
-            FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL, x,
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPTSTR) &lpMsgBuf, 0, NULL);
-        */
-#else
+        LocalFree(errorText);
+    } else
         s << strerror(x);
+/*
+DWORD n = FormatMessage(
+    FORMAT_MESSAGE_ALLOCATE_BUFFER |
+    FORMAT_MESSAGE_FROM_SYSTEM |
+    FORMAT_MESSAGE_IGNORE_INSERTS,
+    NULL, x,
+    MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+    (LPTSTR) &lpMsgBuf, 0, NULL);
+*/
+#else
+    s << strerror(x);
 #endif
-        return s.str();
-    }
+    return s.str();
+}
 
-    void logContext(const char *errmsg) {
-        if ( errmsg ) {
-            log() << errmsg << endl;
-        }
-        printStackTrace(log().stream());
+void logContext(const char* errmsg) {
+    if (errmsg) {
+        log() << errmsg << endl;
     }
+    printStackTrace(log().stream());
+}
 
-    Tee* const warnings = RamLog::get("warnings"); // Things put here go in serverStatus
-    Tee* const startupWarningsLog = RamLog::get("startupWarnings");  // intentionally leaked
+Tee* const warnings = RamLog::get("warnings");  // Things put here go in serverStatus
+Tee* const startupWarningsLog = RamLog::get("startupWarnings");  // intentionally leaked
 
 }  // namespace mongo

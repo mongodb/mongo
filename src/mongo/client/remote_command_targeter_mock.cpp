@@ -35,26 +35,24 @@
 
 namespace mongo {
 
-    RemoteCommandTargeterMock::RemoteCommandTargeterMock()
-        : _findHostReturnValue(Status(ErrorCodes::InternalError, "No return value set")) {
-    }
+RemoteCommandTargeterMock::RemoteCommandTargeterMock()
+    : _findHostReturnValue(Status(ErrorCodes::InternalError, "No return value set")) {}
 
-    RemoteCommandTargeterMock::~RemoteCommandTargeterMock() = default;
+RemoteCommandTargeterMock::~RemoteCommandTargeterMock() = default;
 
-    RemoteCommandTargeterMock* RemoteCommandTargeterMock::get(RemoteCommandTargeter* targeter) {
-        auto mock = dynamic_cast<RemoteCommandTargeterMock*>(targeter);
-        invariant(mock);
+RemoteCommandTargeterMock* RemoteCommandTargeterMock::get(RemoteCommandTargeter* targeter) {
+    auto mock = dynamic_cast<RemoteCommandTargeterMock*>(targeter);
+    invariant(mock);
 
-        return mock;
-    }
+    return mock;
+}
 
-    StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(
-            const ReadPreferenceSetting& readPref) {
-        return _findHostReturnValue;
-    }
+StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(const ReadPreferenceSetting& readPref) {
+    return _findHostReturnValue;
+}
 
-    void RemoteCommandTargeterMock::setFindHostReturnValue(StatusWith<HostAndPort> returnValue) {
-        _findHostReturnValue = std::move(returnValue);
-    }
+void RemoteCommandTargeterMock::setFindHostReturnValue(StatusWith<HostAndPort> returnValue) {
+    _findHostReturnValue = std::move(returnValue);
+}
 
-} // namespace mongo
+}  // namespace mongo

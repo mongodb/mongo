@@ -35,78 +35,80 @@
 
 namespace mongo {
 
-    class RecordId;
+class RecordId;
+
+/**
+ * QueuedDataStage is a data-producing stage.  Unlike the other two leaf stages (CollectionScan
+ * and IndexScan) QueuedDataStage does not require any underlying storage layer.
+ *
+ * A QueuedDataStage is "programmed" by pushing return values from work() onto its internal
+ * queue.  Calls to QueuedDataStage::work() pop values off that queue and return them in FIFO
+ * order, annotating the working set with data when appropriate.
+ */
+class QueuedDataStage : public PlanStage {
+public:
+    QueuedDataStage(WorkingSet* ws);
+    virtual ~QueuedDataStage() {}
+
+    virtual StageState work(WorkingSetID* out);
+
+    virtual bool isEOF();
+
+    // These don't really mean anything here.
+    // Some day we could count the # of calls to the yield functions to check that other stages
+    // have correct yielding behavior.
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_QUEUED_DATA;
+    }
+
+    //
+    // Exec stats
+    //
+
+    virtual PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats() const;
+
+    virtual const SpecificStats* getSpecificStats() const;
 
     /**
-     * QueuedDataStage is a data-producing stage.  Unlike the other two leaf stages (CollectionScan
-     * and IndexScan) QueuedDataStage does not require any underlying storage layer.
+     * Add a result to the back of the queue.
      *
-     * A QueuedDataStage is "programmed" by pushing return values from work() onto its internal
-     * queue.  Calls to QueuedDataStage::work() pop values off that queue and return them in FIFO
-     * order, annotating the working set with data when appropriate.
+     * Note: do not add PlanStage::ADVANCED with this method, ADVANCED can
+     * only be added with a data member.
+     *
+     * Work() goes through the queue.
+     * Either no data is returned (just a state), or...
      */
-    class QueuedDataStage : public PlanStage {
-    public:
-        QueuedDataStage(WorkingSet* ws);
-        virtual ~QueuedDataStage() { }
+    void pushBack(const PlanStage::StageState state);
 
-        virtual StageState work(WorkingSetID* out);
+    /**
+     * ...data is returned (and we ADVANCED)
+     *
+     * Allocates a new member and copies 'member' into it.
+     * Does not take ownership of anything in 'member'.
+     */
+    void pushBack(const WorkingSetMember& member);
 
-        virtual bool isEOF();
+    static const char* kStageType;
 
-        // These don't really mean anything here.
-        // Some day we could count the # of calls to the yield functions to check that other stages
-        // have correct yielding behavior.
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+private:
+    // We don't own this.
+    WorkingSet* _ws;
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    // The data we return.
+    std::queue<PlanStage::StageState> _results;
+    std::queue<WorkingSetID> _members;
 
-        virtual StageType stageType() const { return STAGE_QUEUED_DATA; }
-
-        //
-        // Exec stats
-        //
-
-        virtual PlanStageStats* getStats();
-
-        virtual const CommonStats* getCommonStats() const;
-
-        virtual const SpecificStats* getSpecificStats() const;
-
-        /**
-         * Add a result to the back of the queue.
-         *
-         * Note: do not add PlanStage::ADVANCED with this method, ADVANCED can
-         * only be added with a data member.
-         *
-         * Work() goes through the queue.
-         * Either no data is returned (just a state), or...
-         */
-        void pushBack(const PlanStage::StageState state);
-
-        /**
-         * ...data is returned (and we ADVANCED)
-         *
-         * Allocates a new member and copies 'member' into it.
-         * Does not take ownership of anything in 'member'.
-         */
-        void pushBack(const WorkingSetMember& member);
-
-        static const char* kStageType;
-
-    private:
-        // We don't own this.
-        WorkingSet* _ws;
-
-        // The data we return.
-        std::queue<PlanStage::StageState> _results;
-        std::queue<WorkingSetID> _members;
-
-        // Stats
-        CommonStats _commonStats;
-        MockStats _specificStats;
-    };
+    // Stats
+    CommonStats _commonStats;
+    MockStats _specificStats;
+};
 
 }  // namespace mongo

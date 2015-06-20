@@ -33,57 +33,63 @@
 
 namespace mongo {
 
+/**
+ * The explain command is used to generate explain output for any read or write
+ * operation which has a query component (e.g. find, count, update, remove, distinct, etc.).
+ *
+ * The explain command takes as its argument a nested object which specifies the command to
+ * explain, and a verbosity indicator. For example:
+ *
+ *    {explain: {count: "coll", query: {foo: "bar"}}, verbosity: "executionStats"}
+ *
+ * This command like a dispatcher: it just retrieves a pointer to the nested command and
+ * invokes its explain() implementation.
+ */
+class CmdExplain : public Command {
+public:
+    CmdExplain() : Command("explain") {}
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
     /**
-     * The explain command is used to generate explain output for any read or write
-     * operation which has a query component (e.g. find, count, update, remove, distinct, etc.).
-     *
-     * The explain command takes as its argument a nested object which specifies the command to
-     * explain, and a verbosity indicator. For example:
-     *
-     *    {explain: {count: "coll", query: {foo: "bar"}}, verbosity: "executionStats"}
-     *
-     * This command like a dispatcher: it just retrieves a pointer to the nested command and
-     * invokes its explain() implementation.
+     * Running an explain on a secondary requires explicitly setting slaveOk.
      */
-    class CmdExplain : public Command {
-    public:
-        CmdExplain() : Command("explain") { }
+    virtual bool slaveOk() const {
+        return false;
+    }
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
 
-        virtual bool isWriteCommandForConfigServer() const { return false; }
+    virtual bool maintenanceOk() const {
+        return false;
+    }
 
-        /**
-         * Running an explain on a secondary requires explicitly setting slaveOk.
-         */
-        virtual bool slaveOk() const {
-            return false;
-        }
-        virtual bool slaveOverrideOk() const {
-            return true;
-        }
+    virtual bool adminOnly() const {
+        return false;
+    }
 
-        virtual bool maintenanceOk() const { return false; }
+    virtual void help(std::stringstream& help) const {
+        help << "explain database reads and writes";
+    }
 
-        virtual bool adminOnly() const { return false; }
+    /**
+     * You are authorized to run an explain if you are authorized to run
+     * the command that you are explaining. The auth check is performed recursively
+     * on the nested command.
+     */
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj);
 
-        virtual void help( std::stringstream& help ) const {
-            help << "explain database reads and writes";
-        }
-
-        /**
-         * You are authorized to run an explain if you are authorized to run
-         * the command that you are explaining. The auth check is performed recursively
-         * on the nested command.
-         */
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj);
-
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj, int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result);
-
-    };
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result);
+};
 
 }  // namespace mongo

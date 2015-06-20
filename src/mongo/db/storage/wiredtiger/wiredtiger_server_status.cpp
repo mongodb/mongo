@@ -45,41 +45,36 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    WiredTigerServerStatusSection::WiredTigerServerStatusSection(WiredTigerKVEngine* engine)
-        : ServerStatusSection(kWiredTigerEngineName),
-          _engine(engine) { }
+WiredTigerServerStatusSection::WiredTigerServerStatusSection(WiredTigerKVEngine* engine)
+    : ServerStatusSection(kWiredTigerEngineName), _engine(engine) {}
 
-    bool WiredTigerServerStatusSection::includeByDefault() const {
-        return true;
+bool WiredTigerServerStatusSection::includeByDefault() const {
+    return true;
+}
+
+BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* txn,
+                                                       const BSONElement& configElement) const {
+    WiredTigerSession* session =
+        checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit())->getSession(txn);
+    invariant(session);
+
+    WT_SESSION* s = session->getSession();
+    invariant(s);
+    const string uri = "statistics:";
+
+    BSONObjBuilder bob;
+    Status status = WiredTigerUtil::exportTableToBSON(s, uri, "statistics=(fast)", &bob);
+    if (!status.isOK()) {
+        bob.append("error", "unable to retrieve statistics");
+        bob.append("code", static_cast<int>(status.code()));
+        bob.append("reason", status.reason());
     }
 
-    BSONObj WiredTigerServerStatusSection::generateSection(
-                OperationContext* txn,
-                const BSONElement& configElement) const {
+    WiredTigerRecoveryUnit::appendGlobalStats(bob);
 
-        WiredTigerSession* session =
-            checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit())->getSession(txn);
-        invariant(session);
-
-        WT_SESSION* s = session->getSession();
-        invariant(s);
-        const string uri = "statistics:";
-
-        BSONObjBuilder bob;
-        Status status = WiredTigerUtil::exportTableToBSON(s, uri,
-                                                          "statistics=(fast)", &bob);
-        if (!status.isOK()) {
-            bob.append("error", "unable to retrieve statistics");
-            bob.append("code", static_cast<int>(status.code()));
-            bob.append("reason", status.reason());
-        }
-
-        WiredTigerRecoveryUnit::appendGlobalStats(bob);
-
-        return bob.obj();
-    }
+    return bob.obj();
+}
 
 }  // namespace mongo
-

@@ -38,58 +38,57 @@
 
 namespace mongo {
 
-    class Collection;
-    class Database;
-    class OperationContext;
+class Collection;
+class Database;
+class OperationContext;
+
+/**
+ * A helper class for replication to use for building indexes.
+ * In standalone mode, we use the client connection thread for building indexes in the
+ * background. In replication mode, secondaries must spawn a new thread to build background
+ * indexes, since there are no client connection threads to use for such purpose.  IndexBuilder
+ * is a subclass of BackgroundJob to enable this use.
+ * This class is also used for building indexes in the foreground on secondaries, for
+ * code convenience.  buildInForeground() is directly called by the replication applier to
+ * build an index in the foreground; the properties of BackgroundJob are not used for this use
+ * case.
+ * For background index builds, BackgroundJob::go() is called on the IndexBuilder instance,
+ * which begins a new thread at this class's run() method.  After go() is called in the
+ * parent thread, waitForBgIndexStarting() must be called by the same parent thread,
+ * before any other thread calls go() on any other IndexBuilder instance.  This is
+ * ensured by the replication system, since commands are effectively run single-threaded
+ * by the replication applier, and index builds are treated as commands even though they look
+ * like inserts on system.indexes.
+ */
+class IndexBuilder : public BackgroundJob {
+public:
+    IndexBuilder(const BSONObj& index);
+    virtual ~IndexBuilder();
+
+    virtual void run();
 
     /**
-     * A helper class for replication to use for building indexes.
-     * In standalone mode, we use the client connection thread for building indexes in the
-     * background. In replication mode, secondaries must spawn a new thread to build background 
-     * indexes, since there are no client connection threads to use for such purpose.  IndexBuilder
-     * is a subclass of BackgroundJob to enable this use.
-     * This class is also used for building indexes in the foreground on secondaries, for
-     * code convenience.  buildInForeground() is directly called by the replication applier to
-     * build an index in the foreground; the properties of BackgroundJob are not used for this use
-     * case.
-     * For background index builds, BackgroundJob::go() is called on the IndexBuilder instance,
-     * which begins a new thread at this class's run() method.  After go() is called in the
-     * parent thread, waitForBgIndexStarting() must be called by the same parent thread,
-     * before any other thread calls go() on any other IndexBuilder instance.  This is
-     * ensured by the replication system, since commands are effectively run single-threaded
-     * by the replication applier, and index builds are treated as commands even though they look
-     * like inserts on system.indexes.
+     * name of the builder, not the index
      */
-    class IndexBuilder : public BackgroundJob {
-    public:
-        IndexBuilder(const BSONObj& index);
-        virtual ~IndexBuilder();
+    virtual std::string name() const;
 
-        virtual void run();
+    Status buildInForeground(OperationContext* txn, Database* db) const;
 
-        /**
-         * name of the builder, not the index
-         */
-        virtual std::string name() const;
+    /**
+     * Waits for a background index build to register itself.  This function must be called
+     * after starting a background index build via a BackgroundJob and before starting a
+     * subsequent one.
+     */
+    static void waitForBgIndexStarting();
 
-        Status buildInForeground(OperationContext* txn, Database* db) const;
+private:
+    Status _build(OperationContext* txn,
+                  Database* db,
+                  bool allowBackgroundBuilding,
+                  Lock::DBLock* dbLock) const;
 
-        /**
-         * Waits for a background index build to register itself.  This function must be called
-         * after starting a background index build via a BackgroundJob and before starting a
-         * subsequent one.
-         */
-        static void waitForBgIndexStarting();
-
-    private:
-        Status _build(OperationContext* txn,
-                      Database* db,
-                      bool allowBackgroundBuilding,
-                      Lock::DBLock* dbLock) const;
-
-        const BSONObj _index;
-        std::string _name; // name of this builder, not related to the index
-        static AtomicUInt32 _indexBuildCount;
-    };
-
+    const BSONObj _index;
+    std::string _name;  // name of this builder, not related to the index
+    static AtomicUInt32 _indexBuildCount;
+};
 }

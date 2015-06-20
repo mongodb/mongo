@@ -41,70 +41,62 @@ using std::string;
 namespace mongo {
 namespace repl {
 
-    const string ReadAfterOpTimeArgs::kRootFieldName("$readConcern");
-    const string ReadAfterOpTimeArgs::kOpTimeFieldName("afterOpTime");
-    const string ReadAfterOpTimeArgs::kOpTimestampFieldName("ts");
-    const string ReadAfterOpTimeArgs::kOpTermFieldName("term");
+const string ReadAfterOpTimeArgs::kRootFieldName("$readConcern");
+const string ReadAfterOpTimeArgs::kOpTimeFieldName("afterOpTime");
+const string ReadAfterOpTimeArgs::kOpTimestampFieldName("ts");
+const string ReadAfterOpTimeArgs::kOpTermFieldName("term");
 
-    ReadAfterOpTimeArgs::ReadAfterOpTimeArgs(): ReadAfterOpTimeArgs(OpTime()) {
-    }
+ReadAfterOpTimeArgs::ReadAfterOpTimeArgs() : ReadAfterOpTimeArgs(OpTime()) {}
 
-    ReadAfterOpTimeArgs::ReadAfterOpTimeArgs(OpTime opTime):
-            _opTime(std::move(opTime)) {
-    }
+ReadAfterOpTimeArgs::ReadAfterOpTimeArgs(OpTime opTime) : _opTime(std::move(opTime)) {}
 
-    const OpTime& ReadAfterOpTimeArgs::getOpTime() const {
-        return _opTime;
-    }
+const OpTime& ReadAfterOpTimeArgs::getOpTime() const {
+    return _opTime;
+}
 
-    Status ReadAfterOpTimeArgs::initialize(const BSONObj& cmdObj) {
-        auto afterElem = cmdObj[ReadAfterOpTimeArgs::kRootFieldName];
+Status ReadAfterOpTimeArgs::initialize(const BSONObj& cmdObj) {
+    auto afterElem = cmdObj[ReadAfterOpTimeArgs::kRootFieldName];
 
-        if (afterElem.eoo()) {
-            return Status::OK();
-        }
-
-        if (!afterElem.isABSONObj()) {
-            return Status(ErrorCodes::FailedToParse, "'after' field should be an object");
-        }
-
-        BSONObj readAfterObj = afterElem.Obj();
-        BSONElement opTimeElem;
-        auto opTimeStatus = bsonExtractTypedField(readAfterObj,
-                                                  ReadAfterOpTimeArgs::kOpTimeFieldName,
-                                                  Object,
-                                                  &opTimeElem);
-
-        if (!opTimeStatus.isOK()) {
-            return opTimeStatus;
-        }
-
-        BSONObj opTimeObj = opTimeElem.Obj();
-        BSONElement timestampElem;
-
-        Timestamp timestamp;
-        auto timestampStatus =
-                bsonExtractTimestampField(opTimeObj,
-                                          ReadAfterOpTimeArgs::kOpTimestampFieldName,
-                                          &timestamp);
-
-        if (!timestampStatus.isOK()) {
-            return timestampStatus;
-        }
-
-        long long termNumber;
-        auto termStatus = bsonExtractIntegerField(opTimeObj,
-                                                  ReadAfterOpTimeArgs::kOpTermFieldName,
-                                                  &termNumber);
-
-        if (!termStatus.isOK()) {
-            return termStatus;
-        }
-
-        _opTime = OpTime(timestamp, termNumber);
-
+    if (afterElem.eoo()) {
         return Status::OK();
     }
 
-} // namespace repl
-} // namespace mongo
+    if (!afterElem.isABSONObj()) {
+        return Status(ErrorCodes::FailedToParse, "'after' field should be an object");
+    }
+
+    BSONObj readAfterObj = afterElem.Obj();
+    BSONElement opTimeElem;
+    auto opTimeStatus = bsonExtractTypedField(
+        readAfterObj, ReadAfterOpTimeArgs::kOpTimeFieldName, Object, &opTimeElem);
+
+    if (!opTimeStatus.isOK()) {
+        return opTimeStatus;
+    }
+
+    BSONObj opTimeObj = opTimeElem.Obj();
+    BSONElement timestampElem;
+
+    Timestamp timestamp;
+    auto timestampStatus = bsonExtractTimestampField(
+        opTimeObj, ReadAfterOpTimeArgs::kOpTimestampFieldName, &timestamp);
+
+    if (!timestampStatus.isOK()) {
+        return timestampStatus;
+    }
+
+    long long termNumber;
+    auto termStatus =
+        bsonExtractIntegerField(opTimeObj, ReadAfterOpTimeArgs::kOpTermFieldName, &termNumber);
+
+    if (!termStatus.isOK()) {
+        return termStatus;
+    }
+
+    _opTime = OpTime(timestamp, termNumber);
+
+    return Status::OK();
+}
+
+}  // namespace repl
+}  // namespace mongo

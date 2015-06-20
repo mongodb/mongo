@@ -36,59 +36,59 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-    class OperationContext;
+class OperationContext;
 
 namespace repl {
 
-    class SyncSourceFeedback {
-    public:
-        SyncSourceFeedback();
-        ~SyncSourceFeedback();
+class SyncSourceFeedback {
+public:
+    SyncSourceFeedback();
+    ~SyncSourceFeedback();
 
-        /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of slave
-        /// replication progress.
-        void forwardSlaveProgress();
+    /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of slave
+    /// replication progress.
+    void forwardSlaveProgress();
 
-        /// Loops continuously until shutdown() is called, passing updates when they are present.
-        void run();
+    /// Loops continuously until shutdown() is called, passing updates when they are present.
+    void run();
 
-        /// Signals the run() method to terminate.
-        void shutdown();
+    /// Signals the run() method to terminate.
+    void shutdown();
 
-    private:
-        void _resetConnection();
+private:
+    void _resetConnection();
 
-        /**
-         * Authenticates _connection using the server's cluster-membership credentials.
-         *
-         * Returns true on successful authentication.
-         */
-        bool replAuthenticate();
+    /**
+     * Authenticates _connection using the server's cluster-membership credentials.
+     *
+     * Returns true on successful authentication.
+     */
+    bool replAuthenticate();
 
-        /* Inform the sync target of our current position in the oplog, as well as the positions
-         * of all secondaries chained through us.
-         */
-        Status updateUpstream(OperationContext* txn);
+    /* Inform the sync target of our current position in the oplog, as well as the positions
+     * of all secondaries chained through us.
+     */
+    Status updateUpstream(OperationContext* txn);
 
-        bool hasConnection() {
-            return _connection.get();
-        }
+    bool hasConnection() {
+        return _connection.get();
+    }
 
-        /// Connect to sync target.
-        bool _connect(OperationContext* txn, const HostAndPort& host);
+    /// Connect to sync target.
+    bool _connect(OperationContext* txn, const HostAndPort& host);
 
-        // the member we are currently syncing from
-        HostAndPort _syncTarget;
-        // our connection to our sync target
-        std::unique_ptr<DBClientConnection> _connection;
-        // protects cond, _shutdownSignaled, and _positionChanged.
-        stdx::mutex _mtx;
-        // used to alert our thread of changes which need to be passed up the chain
-        stdx::condition_variable _cond;
-        // used to indicate a position change which has not yet been pushed along
-        bool _positionChanged;
-        // Once this is set to true the _run method will terminate
-        bool _shutdownSignaled;
-    };
-} // namespace repl
-} // namespace mongo
+    // the member we are currently syncing from
+    HostAndPort _syncTarget;
+    // our connection to our sync target
+    std::unique_ptr<DBClientConnection> _connection;
+    // protects cond, _shutdownSignaled, and _positionChanged.
+    stdx::mutex _mtx;
+    // used to alert our thread of changes which need to be passed up the chain
+    stdx::condition_variable _cond;
+    // used to indicate a position change which has not yet been pushed along
+    bool _positionChanged;
+    // Once this is set to true the _run method will terminate
+    bool _shutdownSignaled;
+};
+}  // namespace repl
+}  // namespace mongo

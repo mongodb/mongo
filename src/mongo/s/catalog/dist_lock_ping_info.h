@@ -36,31 +36,31 @@
 
 namespace mongo {
 
-    /**
-     * Data structure for storing information about distributed lock pings.
-     */
-    struct DistLockPingInfo {
-        DistLockPingInfo();
-        DistLockPingInfo(StringData processId,
-                         Date_t lastPing,
-                         Date_t configLocalTime,
-                         OID lockSessionId,
-                         OID electionId);
+/**
+ * Data structure for storing information about distributed lock pings.
+ */
+struct DistLockPingInfo {
+    DistLockPingInfo();
+    DistLockPingInfo(StringData processId,
+                     Date_t lastPing,
+                     Date_t configLocalTime,
+                     OID lockSessionId,
+                     OID electionId);
 
-        // the process processId of the last known owner of the lock.
-        std::string processId;
+    // the process processId of the last known owner of the lock.
+    std::string processId;
 
-        // the ping value from the last owner of the lock.
-        Date_t lastPing;
+    // the ping value from the last owner of the lock.
+    Date_t lastPing;
 
-        // the config server local time when this object was updated.
-        Date_t configLocalTime;
+    // the config server local time when this object was updated.
+    Date_t configLocalTime;
 
-        // last known owner of the lock.
-        OID lockSessionId;
+    // last known owner of the lock.
+    OID lockSessionId;
 
-        // the election id of the config server when this object was updated.
-        // Note: unused by legacy dist lock.
-        OID electionId;
-    };
+    // the election id of the config server when this object was updated.
+    // Note: unused by legacy dist lock.
+    OID electionId;
+};
 }

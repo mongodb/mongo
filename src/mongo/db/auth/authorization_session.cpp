@@ -51,461 +51,437 @@
 
 namespace mongo {
 
-    using std::vector;
+using std::vector;
 
 namespace {
-    const std::string ADMIN_DBNAME = "admin";
+const std::string ADMIN_DBNAME = "admin";
 }  // namespace
 
-    AuthorizationSession::AuthorizationSession(
-            std::unique_ptr<AuthzSessionExternalState> externalState)
-        : _externalState(std::move(externalState)),
-          _impersonationFlag(false) {}
+AuthorizationSession::AuthorizationSession(std::unique_ptr<AuthzSessionExternalState> externalState)
+    : _externalState(std::move(externalState)), _impersonationFlag(false) {}
 
-    AuthorizationSession::~AuthorizationSession() {
-        for (UserSet::iterator it = _authenticatedUsers.begin();
-                it != _authenticatedUsers.end(); ++it) {
-            getAuthorizationManager().releaseUser(*it);
-        }
+AuthorizationSession::~AuthorizationSession() {
+    for (UserSet::iterator it = _authenticatedUsers.begin(); it != _authenticatedUsers.end();
+         ++it) {
+        getAuthorizationManager().releaseUser(*it);
+    }
+}
+
+AuthorizationManager& AuthorizationSession::getAuthorizationManager() {
+    return _externalState->getAuthorizationManager();
+}
+
+void AuthorizationSession::startRequest(OperationContext* txn) {
+    _externalState->startRequest(txn);
+    _refreshUserInfoAsNeeded(txn);
+}
+
+Status AuthorizationSession::addAndAuthorizeUser(OperationContext* txn, const UserName& userName) {
+    User* user;
+    Status status = getAuthorizationManager().acquireUser(txn, userName, &user);
+    if (!status.isOK()) {
+        return status;
     }
 
-    AuthorizationManager& AuthorizationSession::getAuthorizationManager() {
-        return _externalState->getAuthorizationManager();
+    // Calling add() on the UserSet may return a user that was replaced because it was from the
+    // same database.
+    User* replacedUser = _authenticatedUsers.add(user);
+    if (replacedUser) {
+        getAuthorizationManager().releaseUser(replacedUser);
     }
 
-    void AuthorizationSession::startRequest(OperationContext* txn) {
-        _externalState->startRequest(txn);
-        _refreshUserInfoAsNeeded(txn);
+    // If there are any users and roles in the impersonation data, clear it out.
+    clearImpersonatedUserData();
+
+    _buildAuthenticatedRolesVector();
+    return Status::OK();
+}
+
+User* AuthorizationSession::lookupUser(const UserName& name) {
+    return _authenticatedUsers.lookup(name);
+}
+
+void AuthorizationSession::logoutDatabase(const std::string& dbname) {
+    User* removedUser = _authenticatedUsers.removeByDBName(dbname);
+    if (removedUser) {
+        getAuthorizationManager().releaseUser(removedUser);
+    }
+    clearImpersonatedUserData();
+    _buildAuthenticatedRolesVector();
+}
+
+UserNameIterator AuthorizationSession::getAuthenticatedUserNames() {
+    return _authenticatedUsers.getNames();
+}
+
+RoleNameIterator AuthorizationSession::getAuthenticatedRoleNames() {
+    return makeRoleNameIterator(_authenticatedRoleNames.begin(), _authenticatedRoleNames.end());
+}
+
+std::string AuthorizationSession::getAuthenticatedUserNamesToken() {
+    std::string ret;
+    for (UserNameIterator nameIter = getAuthenticatedUserNames(); nameIter.more();
+         nameIter.next()) {
+        ret += '\0';  // Using a NUL byte which isn't valid in usernames to separate them.
+        ret += nameIter->getFullName();
     }
 
-    Status AuthorizationSession::addAndAuthorizeUser(
-                        OperationContext* txn, const UserName& userName) {
-        User* user;
-        Status status = getAuthorizationManager().acquireUser(txn, userName, &user);
-        if (!status.isOK()) {
-            return status;
-        }
+    return ret;
+}
 
-        // Calling add() on the UserSet may return a user that was replaced because it was from the
-        // same database.
-        User* replacedUser = _authenticatedUsers.add(user);
-        if (replacedUser) {
-            getAuthorizationManager().releaseUser(replacedUser);
-        }
+void AuthorizationSession::grantInternalAuthorization() {
+    _authenticatedUsers.add(internalSecurity.user);
+    _buildAuthenticatedRolesVector();
+}
 
-        // If there are any users and roles in the impersonation data, clear it out.
-        clearImpersonatedUserData();
+PrivilegeVector AuthorizationSession::getDefaultPrivileges() {
+    PrivilegeVector defaultPrivileges;
 
-        _buildAuthenticatedRolesVector();
-        return Status::OK();
-    }
+    // If localhost exception is active (and no users exist),
+    // return a vector of the minimum privileges required to bootstrap
+    // a system and add the first user.
+    if (_externalState->shouldAllowLocalhost()) {
+        ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(ADMIN_DBNAME);
+        ActionSet setupAdminUserActionSet;
+        setupAdminUserActionSet.addAction(ActionType::createUser);
+        setupAdminUserActionSet.addAction(ActionType::grantRole);
+        Privilege setupAdminUserPrivilege = Privilege(adminDBResource, setupAdminUserActionSet);
 
-    User* AuthorizationSession::lookupUser(const UserName& name) {
-        return _authenticatedUsers.lookup(name);
-    }
+        ResourcePattern externalDBResource = ResourcePattern::forDatabaseName("$external");
+        Privilege setupExternalUserPrivilege =
+            Privilege(externalDBResource, ActionType::createUser);
 
-    void AuthorizationSession::logoutDatabase(const std::string& dbname) {
-        User* removedUser = _authenticatedUsers.removeByDBName(dbname);
-        if (removedUser) {
-            getAuthorizationManager().releaseUser(removedUser);
-        }
-        clearImpersonatedUserData();
-        _buildAuthenticatedRolesVector();
-    }
+        ActionSet setupServerConfigActionSet;
 
-    UserNameIterator AuthorizationSession::getAuthenticatedUserNames() {
-        return _authenticatedUsers.getNames();
-    }
-
-    RoleNameIterator AuthorizationSession::getAuthenticatedRoleNames() {
-        return makeRoleNameIterator(_authenticatedRoleNames.begin(),
-                                    _authenticatedRoleNames.end());
-    }
-
-    std::string AuthorizationSession::getAuthenticatedUserNamesToken() {
-        std::string ret;
-        for (UserNameIterator nameIter = getAuthenticatedUserNames();
-                nameIter.more();
-                nameIter.next()) {
-            ret += '\0'; // Using a NUL byte which isn't valid in usernames to separate them.
-            ret += nameIter->getFullName();
-        }
-
-        return ret;
-    }
-
-    void AuthorizationSession::grantInternalAuthorization() {
-        _authenticatedUsers.add(internalSecurity.user);
-        _buildAuthenticatedRolesVector();
-    }
-
-    PrivilegeVector AuthorizationSession::getDefaultPrivileges() {
-        PrivilegeVector defaultPrivileges;
-
-        // If localhost exception is active (and no users exist),
-        // return a vector of the minimum privileges required to bootstrap
-        // a system and add the first user.
-        if (_externalState->shouldAllowLocalhost()) {
-            ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(ADMIN_DBNAME);
-            ActionSet setupAdminUserActionSet;
-            setupAdminUserActionSet.addAction(ActionType::createUser);
-            setupAdminUserActionSet.addAction(ActionType::grantRole);
-            Privilege setupAdminUserPrivilege =
-                Privilege(adminDBResource, setupAdminUserActionSet);
-
-            ResourcePattern externalDBResource = ResourcePattern::forDatabaseName("$external");
-            Privilege setupExternalUserPrivilege =
-                Privilege(externalDBResource, ActionType::createUser);
-
-            ActionSet setupServerConfigActionSet;
-
-            // If this server is an arbiter, add specific privileges meant to circumvent
-            // the behavior of an arbiter in an authenticated replset. See SERVER-5479.
-            if (_externalState->serverIsArbiter()) {
-                setupServerConfigActionSet.addAction(ActionType::getCmdLineOpts);
-                setupServerConfigActionSet.addAction(ActionType::getParameter);
-                setupServerConfigActionSet.addAction(ActionType::serverStatus);
-                setupServerConfigActionSet.addAction(ActionType::shutdown);
-            }
-
-            setupServerConfigActionSet.addAction(ActionType::addShard);
-            setupServerConfigActionSet.addAction(ActionType::replSetConfigure);
-            setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
-            Privilege setupServerConfigPrivilege =
-                Privilege(ResourcePattern::forClusterResource(), setupServerConfigActionSet);
-
-            Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges, setupAdminUserPrivilege);
-            Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges,
-                                                     setupExternalUserPrivilege);
-            Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges,
-                                                     setupServerConfigPrivilege);
-            return defaultPrivileges;
+        // If this server is an arbiter, add specific privileges meant to circumvent
+        // the behavior of an arbiter in an authenticated replset. See SERVER-5479.
+        if (_externalState->serverIsArbiter()) {
+            setupServerConfigActionSet.addAction(ActionType::getCmdLineOpts);
+            setupServerConfigActionSet.addAction(ActionType::getParameter);
+            setupServerConfigActionSet.addAction(ActionType::serverStatus);
+            setupServerConfigActionSet.addAction(ActionType::shutdown);
         }
 
+        setupServerConfigActionSet.addAction(ActionType::addShard);
+        setupServerConfigActionSet.addAction(ActionType::replSetConfigure);
+        setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
+        Privilege setupServerConfigPrivilege =
+            Privilege(ResourcePattern::forClusterResource(), setupServerConfigActionSet);
+
+        Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges, setupAdminUserPrivilege);
+        Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges, setupExternalUserPrivilege);
+        Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges, setupServerConfigPrivilege);
         return defaultPrivileges;
     }
 
-    Status AuthorizationSession::checkAuthForQuery(const NamespaceString& ns,
-                                                   const BSONObj& query) {
-        if (MONGO_unlikely(ns.isCommand())) {
-            return Status(ErrorCodes::InternalError, str::stream() <<
-                          "Checking query auth on command namespace " << ns.ns());
+    return defaultPrivileges;
+}
+
+Status AuthorizationSession::checkAuthForQuery(const NamespaceString& ns, const BSONObj& query) {
+    if (MONGO_unlikely(ns.isCommand())) {
+        return Status(ErrorCodes::InternalError,
+                      str::stream() << "Checking query auth on command namespace " << ns.ns());
+    }
+    if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
+        return Status(ErrorCodes::Unauthorized,
+                      str::stream() << "not authorized for query on " << ns.ns());
+    }
+    return Status::OK();
+}
+
+Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns, long long cursorID) {
+    // "ns" can be in one of three formats: "listCollections" format, "listIndexes" format, and
+    // normal format.
+    if (ns.isListCollectionsGetMore()) {
+        // "ns" is of the form "<db>.$cmd.listCollections".  Check if we can perform the
+        // listCollections action on the database resource for "<db>".
+        if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
+                                              ActionType::listCollections)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "not authorized for listCollections getMore on "
+                                        << ns.ns());
         }
+    } else if (ns.isListIndexesGetMore()) {
+        // "ns" is of the form "<db>.$cmd.listIndexes.<coll>".  Check if we can perform the
+        // listIndexes action on the "<db>.<coll>" namespace.
+        NamespaceString targetNS = ns.getTargetNSForListIndexesGetMore();
+        if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::listIndexes)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "not authorized for listIndexes getMore on " << ns.ns());
+        }
+    } else {
+        // "ns" is a regular namespace string.  Check if we can perform the find action on it.
         if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
             return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "not authorized for query on " << ns.ns());
+                          str::stream() << "not authorized for getMore on " << ns.ns());
         }
-        return Status::OK();
+    }
+    return Status::OK();
+}
+
+Status AuthorizationSession::checkAuthForInsert(const NamespaceString& ns,
+                                                const BSONObj& document) {
+    if (ns.coll() == StringData("system.indexes", StringData::LiteralTag())) {
+        BSONElement nsElement = document["ns"];
+        if (nsElement.type() != String) {
+            return Status(ErrorCodes::Unauthorized,
+                          "Cannot authorize inserting into "
+                          "system.indexes documents without a string-typed \"ns\" field.");
+        }
+        NamespaceString indexNS(nsElement.str());
+        if (!isAuthorizedForActionsOnNamespace(indexNS, ActionType::createIndex)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "not authorized to create index on " << indexNS.ns());
+        }
+    } else {
+        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::insert)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "not authorized for insert on " << ns.ns());
+        }
     }
 
-    Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
+    return Status::OK();
+}
+
+Status AuthorizationSession::checkAuthForUpdate(const NamespaceString& ns,
+                                                const BSONObj& query,
+                                                const BSONObj& update,
+                                                bool upsert) {
+    if (!upsert) {
+        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::update)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "not authorized for update on " << ns.ns());
+        }
+    } else {
+        ActionSet required;
+        required.addAction(ActionType::update);
+        required.addAction(ActionType::insert);
+        if (!isAuthorizedForActionsOnNamespace(ns, required)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "not authorized for upsert on " << ns.ns());
+        }
+    }
+    return Status::OK();
+}
+
+Status AuthorizationSession::checkAuthForDelete(const NamespaceString& ns, const BSONObj& query) {
+    if (!isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
+        return Status(ErrorCodes::Unauthorized,
+                      str::stream() << "not authorized to remove from " << ns.ns());
+    }
+    return Status::OK();
+}
+
+Status AuthorizationSession::checkAuthForKillCursors(const NamespaceString& ns,
                                                      long long cursorID) {
-        // "ns" can be in one of three formats: "listCollections" format, "listIndexes" format, and
-        // normal format.
-        if (ns.isListCollectionsGetMore()) {
-            // "ns" is of the form "<db>.$cmd.listCollections".  Check if we can perform the
-            // listCollections action on the database resource for "<db>".
-            if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
-                                                  ActionType::listCollections)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "not authorized for listCollections getMore on "
-                                            << ns.ns());
-            }
-        }
-        else if (ns.isListIndexesGetMore()) {
-            // "ns" is of the form "<db>.$cmd.listIndexes.<coll>".  Check if we can perform the
-            // listIndexes action on the "<db>.<coll>" namespace.
-            NamespaceString targetNS = ns.getTargetNSForListIndexesGetMore();
-            if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::listIndexes)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "not authorized for listIndexes getMore on "
-                                            << ns.ns());
-            }
-        }
-        else {
-            // "ns" is a regular namespace string.  Check if we can perform the find action on it.
-            if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "not authorized for getMore on " << ns.ns());
-            }
-        }
-        return Status::OK();
-    }
-
-    Status AuthorizationSession::checkAuthForInsert(const NamespaceString& ns,
-                                                    const BSONObj& document) {
-        if (ns.coll() == StringData("system.indexes", StringData::LiteralTag())) {
-            BSONElement nsElement = document["ns"];
-            if (nsElement.type() != String) {
-                return Status(ErrorCodes::Unauthorized, "Cannot authorize inserting into "
-                              "system.indexes documents without a string-typed \"ns\" field.");
-            }
-            NamespaceString indexNS(nsElement.str());
-            if (!isAuthorizedForActionsOnNamespace(indexNS, ActionType::createIndex)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "not authorized to create index on " <<
-                              indexNS.ns());
-            }
-        } else {
-            if (!isAuthorizedForActionsOnNamespace(ns, ActionType::insert)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "not authorized for insert on " << ns.ns());
-            }
-        }
-
-        return Status::OK();
-    }
-
-    Status AuthorizationSession::checkAuthForUpdate(const NamespaceString& ns,
-                                                    const BSONObj& query,
-                                                    const BSONObj& update,
-                                                    bool upsert) {
-        if (!upsert) {
-            if (!isAuthorizedForActionsOnNamespace(ns, ActionType::update)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "not authorized for update on " << ns.ns());
-            }
-        }
-        else {
-            ActionSet required;
-            required.addAction(ActionType::update);
-            required.addAction(ActionType::insert);
-            if (!isAuthorizedForActionsOnNamespace(ns, required)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "not authorized for upsert on " << ns.ns());
-            }
-        }
-        return Status::OK();
-    }
-
-    Status AuthorizationSession::checkAuthForDelete(const NamespaceString& ns,
-                                                    const BSONObj& query) {
-        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
+    // See implementation comments in checkAuthForGetMore().  This method looks very similar.
+    if (ns.isListCollectionsGetMore()) {
+        if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
+                                              ActionType::killCursors)) {
             return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "not authorized to remove from " << ns.ns());
+                          str::stream() << "not authorized to kill listCollections cursor on "
+                                        << ns.ns());
         }
-        return Status::OK();
-    }
-
-    Status AuthorizationSession::checkAuthForKillCursors(const NamespaceString& ns,
-                                                         long long cursorID) {
-        // See implementation comments in checkAuthForGetMore().  This method looks very similar.
-        if (ns.isListCollectionsGetMore()) {
-            if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
-                                                  ActionType::killCursors)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "not authorized to kill listCollections cursor on "
-                                            << ns.ns());
-            }
-        }
-        else if (ns.isListIndexesGetMore()) {
-            NamespaceString targetNS = ns.getTargetNSForListIndexesGetMore();
-            if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::killCursors)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "not authorized to kill listIndexes cursor on "
-                                            << ns.ns());
-            }
-        }
-        else {
-            if (!isAuthorizedForActionsOnNamespace(ns, ActionType::killCursors)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "not authorized to kill cursor on " << ns.ns());
-            }
-        }
-        return Status::OK();
-    }
-
-    Status AuthorizationSession::checkAuthorizedToGrantPrivilege(const Privilege& privilege) {
-        const ResourcePattern& resource = privilege.getResourcePattern();
-        if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
-            if (!isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(resource.databaseToMatch()),
-                    ActionType::grantRole)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "Not authorized to grant privileges on the "
-                                      << resource.databaseToMatch() << "database");
-            }
-        } else if (!isAuthorizedForActionsOnResource(
-                        ResourcePattern::forDatabaseName("admin"),
-                        ActionType::grantRole)) {
+    } else if (ns.isListIndexesGetMore()) {
+        NamespaceString targetNS = ns.getTargetNSForListIndexesGetMore();
+        if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::killCursors)) {
             return Status(ErrorCodes::Unauthorized,
-                          "To grant privileges affecting multiple databases or the cluster,"
-                          " must be authorized to grant roles from the admin database");
+                          str::stream() << "not authorized to kill listIndexes cursor on "
+                                        << ns.ns());
         }
-        return Status::OK();
-    }
-
-
-    Status AuthorizationSession::checkAuthorizedToRevokePrivilege(const Privilege& privilege) {
-        const ResourcePattern& resource = privilege.getResourcePattern();
-        if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
-            if (!isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(resource.databaseToMatch()),
-                    ActionType::revokeRole)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "Not authorized to revoke privileges on the "
-                                      << resource.databaseToMatch() << "database");
-            }
-        } else if (!isAuthorizedForActionsOnResource(
-                        ResourcePattern::forDatabaseName("admin"),
-                        ActionType::revokeRole)) {
+    } else {
+        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::killCursors)) {
             return Status(ErrorCodes::Unauthorized,
-                          "To revoke privileges affecting multiple databases or the cluster,"
-                          " must be authorized to revoke roles from the admin database");
+                          str::stream() << "not authorized to kill cursor on " << ns.ns());
         }
-        return Status::OK();
     }
+    return Status::OK();
+}
 
-    bool AuthorizationSession::isAuthorizedToGrantRole(const RoleName& role) {
-        return isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(role.getDB()),
-                    ActionType::grantRole);
-    }
-
-    bool AuthorizationSession::isAuthorizedToRevokeRole(const RoleName& role) {
-        return isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(role.getDB()),
-                    ActionType::revokeRole);
-    }
-
-    bool AuthorizationSession::isAuthorizedForPrivilege(const Privilege& privilege) {
-        if (_externalState->shouldIgnoreAuthChecks())
-            return true;
-
-        return _isAuthorizedForPrivilege(privilege);
-    }
-
-    bool AuthorizationSession::isAuthorizedForPrivileges(const vector<Privilege>& privileges) {
-        if (_externalState->shouldIgnoreAuthChecks())
-            return true;
-
-        for (size_t i = 0; i < privileges.size(); ++i) {
-            if (!_isAuthorizedForPrivilege(privileges[i]))
-                return false;
+Status AuthorizationSession::checkAuthorizedToGrantPrivilege(const Privilege& privilege) {
+    const ResourcePattern& resource = privilege.getResourcePattern();
+    if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
+        if (!isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(resource.databaseToMatch()),
+                ActionType::grantRole)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "Not authorized to grant privileges on the "
+                                        << resource.databaseToMatch() << "database");
         }
+    } else if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName("admin"),
+                                                 ActionType::grantRole)) {
+        return Status(ErrorCodes::Unauthorized,
+                      "To grant privileges affecting multiple databases or the cluster,"
+                      " must be authorized to grant roles from the admin database");
+    }
+    return Status::OK();
+}
 
+
+Status AuthorizationSession::checkAuthorizedToRevokePrivilege(const Privilege& privilege) {
+    const ResourcePattern& resource = privilege.getResourcePattern();
+    if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
+        if (!isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(resource.databaseToMatch()),
+                ActionType::revokeRole)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "Not authorized to revoke privileges on the "
+                                        << resource.databaseToMatch() << "database");
+        }
+    } else if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName("admin"),
+                                                 ActionType::revokeRole)) {
+        return Status(ErrorCodes::Unauthorized,
+                      "To revoke privileges affecting multiple databases or the cluster,"
+                      " must be authorized to revoke roles from the admin database");
+    }
+    return Status::OK();
+}
+
+bool AuthorizationSession::isAuthorizedToGrantRole(const RoleName& role) {
+    return isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(role.getDB()),
+                                            ActionType::grantRole);
+}
+
+bool AuthorizationSession::isAuthorizedToRevokeRole(const RoleName& role) {
+    return isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(role.getDB()),
+                                            ActionType::revokeRole);
+}
+
+bool AuthorizationSession::isAuthorizedForPrivilege(const Privilege& privilege) {
+    if (_externalState->shouldIgnoreAuthChecks())
         return true;
-    }
 
-    bool AuthorizationSession::isAuthorizedForActionsOnResource(const ResourcePattern& resource,
-                                                                ActionType action) {
-        return isAuthorizedForPrivilege(Privilege(resource, action));
-    }
+    return _isAuthorizedForPrivilege(privilege);
+}
 
-    bool AuthorizationSession::isAuthorizedForActionsOnResource(const ResourcePattern& resource,
-                                                                const ActionSet& actions) {
-        return isAuthorizedForPrivilege(Privilege(resource, actions));
-    }
+bool AuthorizationSession::isAuthorizedForPrivileges(const vector<Privilege>& privileges) {
+    if (_externalState->shouldIgnoreAuthChecks())
+        return true;
 
-    bool AuthorizationSession::isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
-                                                                 ActionType action) {
-        return isAuthorizedForPrivilege(
-                    Privilege(ResourcePattern::forExactNamespace(ns), action));
-    }
-
-    bool AuthorizationSession::isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
-                                                                 const ActionSet& actions) {
-        return isAuthorizedForPrivilege(
-                    Privilege(ResourcePattern::forExactNamespace(ns), actions));
-    }
-
-    static const int resourceSearchListCapacity = 5;
-    /**
-     * Builds from "target" an exhaustive list of all ResourcePatterns that match "target".
-     *
-     * Stores the resulting list into resourceSearchList, and returns the length.
-     *
-     * The seach lists are as follows, depending on the type of "target":
-     *
-     * target is ResourcePattern::forAnyResource():
-     *   searchList = { ResourcePattern::forAnyResource(), ResourcePattern::forAnyResource() }
-     * target is the ResourcePattern::forClusterResource():
-     *   searchList = { ResourcePattern::forAnyResource(), ResourcePattern::forClusterResource() }
-     * target is a database, db:
-     *   searchList = { ResourcePattern::forAnyResource(),
-     *                  ResourcePattern::forAnyNormalResource(),
-     *                  db }
-     * target is a non-system collection, db.coll:
-     *   searchList = { ResourcePattern::forAnyResource(),
-     *                  ResourcePattern::forAnyNormalResource(),
-     *                  db,
-     *                  coll,
-     *                  db.coll }
-     * target is a system collection, db.system.coll:
-     *   searchList = { ResourcePattern::forAnyResource(),
-     *                  system.coll,
-     *                  db.system.coll }
-     */
-    static int buildResourceSearchList(
-            const ResourcePattern& target,
-            ResourcePattern resourceSearchList[resourceSearchListCapacity]) {
-
-        int size = 0;
-        resourceSearchList[size++] = ResourcePattern::forAnyResource();
-        if (target.isExactNamespacePattern()) {
-            if (!target.ns().isSystem()) {
-                resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
-                resourceSearchList[size++] = ResourcePattern::forDatabaseName(target.ns().db());
-            }
-            resourceSearchList[size++] = ResourcePattern::forCollectionName(target.ns().coll());
-        }
-        else if (target.isDatabasePattern()) {
-                resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
-        }
-        resourceSearchList[size++] = target;
-        dassert(size <= resourceSearchListCapacity);
-        return size;
-    }
-
-    bool AuthorizationSession::isAuthorizedToChangeAsUser(const UserName& userName, ActionType actionType) {
-        User* user = lookupUser(userName);
-        if (!user) {
+    for (size_t i = 0; i < privileges.size(); ++i) {
+        if (!_isAuthorizedForPrivilege(privileges[i]))
             return false;
-        }
-        ResourcePattern resourceSearchList[resourceSearchListCapacity];
-        const int resourceSearchListLength =
-                buildResourceSearchList(ResourcePattern::forDatabaseName(userName.getDB()),
-                                        resourceSearchList);
-
-        ActionSet actions;
-        for (int i = 0; i < resourceSearchListLength; ++i) {
-            actions.addAllActionsFromSet(user->getActionsForResource(resourceSearchList[i]));
-        }
-        return actions.contains(actionType);
     }
 
-    bool AuthorizationSession::isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) {
-        return AuthorizationSession::isAuthorizedToChangeAsUser(userName, ActionType::changeOwnPassword);
-    }
+    return true;
+}
 
-    bool AuthorizationSession::isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName) {
-        return AuthorizationSession::isAuthorizedToChangeAsUser(userName, ActionType::changeOwnCustomData);
-    }
+bool AuthorizationSession::isAuthorizedForActionsOnResource(const ResourcePattern& resource,
+                                                            ActionType action) {
+    return isAuthorizedForPrivilege(Privilege(resource, action));
+}
 
-    bool AuthorizationSession::isAuthenticatedAsUserWithRole(const RoleName& roleName) {
-        for (UserSet::iterator it = _authenticatedUsers.begin();
-                it != _authenticatedUsers.end(); ++it) {
-            if ((*it)->hasRole(roleName)) {
-                return true;
-            }
+bool AuthorizationSession::isAuthorizedForActionsOnResource(const ResourcePattern& resource,
+                                                            const ActionSet& actions) {
+    return isAuthorizedForPrivilege(Privilege(resource, actions));
+}
+
+bool AuthorizationSession::isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
+                                                             ActionType action) {
+    return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), action));
+}
+
+bool AuthorizationSession::isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
+                                                             const ActionSet& actions) {
+    return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), actions));
+}
+
+static const int resourceSearchListCapacity = 5;
+/**
+ * Builds from "target" an exhaustive list of all ResourcePatterns that match "target".
+ *
+ * Stores the resulting list into resourceSearchList, and returns the length.
+ *
+ * The seach lists are as follows, depending on the type of "target":
+ *
+ * target is ResourcePattern::forAnyResource():
+ *   searchList = { ResourcePattern::forAnyResource(), ResourcePattern::forAnyResource() }
+ * target is the ResourcePattern::forClusterResource():
+ *   searchList = { ResourcePattern::forAnyResource(), ResourcePattern::forClusterResource() }
+ * target is a database, db:
+ *   searchList = { ResourcePattern::forAnyResource(),
+ *                  ResourcePattern::forAnyNormalResource(),
+ *                  db }
+ * target is a non-system collection, db.coll:
+ *   searchList = { ResourcePattern::forAnyResource(),
+ *                  ResourcePattern::forAnyNormalResource(),
+ *                  db,
+ *                  coll,
+ *                  db.coll }
+ * target is a system collection, db.system.coll:
+ *   searchList = { ResourcePattern::forAnyResource(),
+ *                  system.coll,
+ *                  db.system.coll }
+ */
+static int buildResourceSearchList(const ResourcePattern& target,
+                                   ResourcePattern resourceSearchList[resourceSearchListCapacity]) {
+    int size = 0;
+    resourceSearchList[size++] = ResourcePattern::forAnyResource();
+    if (target.isExactNamespacePattern()) {
+        if (!target.ns().isSystem()) {
+            resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
+            resourceSearchList[size++] = ResourcePattern::forDatabaseName(target.ns().db());
         }
+        resourceSearchList[size++] = ResourcePattern::forCollectionName(target.ns().coll());
+    } else if (target.isDatabasePattern()) {
+        resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
+    }
+    resourceSearchList[size++] = target;
+    dassert(size <= resourceSearchListCapacity);
+    return size;
+}
+
+bool AuthorizationSession::isAuthorizedToChangeAsUser(const UserName& userName,
+                                                      ActionType actionType) {
+    User* user = lookupUser(userName);
+    if (!user) {
         return false;
     }
+    ResourcePattern resourceSearchList[resourceSearchListCapacity];
+    const int resourceSearchListLength = buildResourceSearchList(
+        ResourcePattern::forDatabaseName(userName.getDB()), resourceSearchList);
 
-    void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* txn) {
-        AuthorizationManager& authMan = getAuthorizationManager();
-        UserSet::iterator it = _authenticatedUsers.begin();
-        while (it != _authenticatedUsers.end()) {
-            User* user = *it;
+    ActionSet actions;
+    for (int i = 0; i < resourceSearchListLength; ++i) {
+        actions.addAllActionsFromSet(user->getActionsForResource(resourceSearchList[i]));
+    }
+    return actions.contains(actionType);
+}
 
-            if (!user->isValid()) {
-                // Make a good faith effort to acquire an up-to-date user object, since the one
-                // we've cached is marked "out-of-date."
-                UserName name = user->getName();
-                User* updatedUser;
+bool AuthorizationSession::isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) {
+    return AuthorizationSession::isAuthorizedToChangeAsUser(userName,
+                                                            ActionType::changeOwnPassword);
+}
 
-                Status status = authMan.acquireUser(txn, name, &updatedUser);
-                switch (status.code()) {
+bool AuthorizationSession::isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName) {
+    return AuthorizationSession::isAuthorizedToChangeAsUser(userName,
+                                                            ActionType::changeOwnCustomData);
+}
+
+bool AuthorizationSession::isAuthenticatedAsUserWithRole(const RoleName& roleName) {
+    for (UserSet::iterator it = _authenticatedUsers.begin(); it != _authenticatedUsers.end();
+         ++it) {
+        if ((*it)->hasRole(roleName)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* txn) {
+    AuthorizationManager& authMan = getAuthorizationManager();
+    UserSet::iterator it = _authenticatedUsers.begin();
+    while (it != _authenticatedUsers.end()) {
+        User* user = *it;
+
+        if (!user->isValid()) {
+            // Make a good faith effort to acquire an up-to-date user object, since the one
+            // we've cached is marked "out-of-date."
+            UserName name = user->getName();
+            User* updatedUser;
+
+            Status status = authMan.acquireUser(txn, name, &updatedUser);
+            switch (status.code()) {
                 case ErrorCodes::OK: {
                     // Success! Replace the old User object with the updated one.
                     fassert(17067, _authenticatedUsers.replaceAt(it, updatedUser) == user);
@@ -517,103 +493,98 @@ namespace {
                     // User does not exist anymore; remove it from _authenticatedUsers.
                     fassert(17068, _authenticatedUsers.removeAt(it) == user);
                     authMan.releaseUser(user);
-                    log() << "Removed deleted user " << name <<
-                        " from session cache of user information.";
+                    log() << "Removed deleted user " << name
+                          << " from session cache of user information.";
                     continue;  // No need to advance "it" in this case.
                 }
                 default:
                     // Unrecognized error; assume that it's transient, and continue working with the
                     // out-of-date privilege data.
-                    warning() << "Could not fetch updated user privilege information for " <<
-                        name << "; continuing to use old information.  Reason is " << status;
+                    warning() << "Could not fetch updated user privilege information for " << name
+                              << "; continuing to use old information.  Reason is " << status;
                     break;
-                }
-            }
-            ++it;
-        }
-        _buildAuthenticatedRolesVector();
-    }
-
-    void AuthorizationSession::_buildAuthenticatedRolesVector() {
-        _authenticatedRoleNames.clear();
-        for (UserSet::iterator it = _authenticatedUsers.begin();
-                it != _authenticatedUsers.end();
-                ++it) {
-            RoleNameIterator roles = (*it)->getIndirectRoles();
-            while (roles.more()) {
-                RoleName roleName = roles.next();
-                _authenticatedRoleNames.push_back(RoleName(roleName.getRole(),
-                                                           roleName.getDB()));
             }
         }
+        ++it;
     }
+    _buildAuthenticatedRolesVector();
+}
 
-    bool AuthorizationSession::_isAuthorizedForPrivilege(const Privilege& privilege) {
-        const ResourcePattern& target(privilege.getResourcePattern());
-
-        ResourcePattern resourceSearchList[resourceSearchListCapacity];
-        const int resourceSearchListLength = buildResourceSearchList(target, resourceSearchList);
-
-        ActionSet unmetRequirements = privilege.getActions();
-
-        PrivilegeVector defaultPrivileges = getDefaultPrivileges();
-        for (PrivilegeVector::iterator it = defaultPrivileges.begin();
-                it != defaultPrivileges.end(); ++it) {
-
-            for (int i = 0; i < resourceSearchListLength; ++i) {
-                if (!(it->getResourcePattern() == resourceSearchList[i]))
-                    continue;
-
-                ActionSet userActions = it->getActions();
-                unmetRequirements.removeAllActionsFromSet(userActions);
-
-                if (unmetRequirements.empty())
-                    return true;
-            }
+void AuthorizationSession::_buildAuthenticatedRolesVector() {
+    _authenticatedRoleNames.clear();
+    for (UserSet::iterator it = _authenticatedUsers.begin(); it != _authenticatedUsers.end();
+         ++it) {
+        RoleNameIterator roles = (*it)->getIndirectRoles();
+        while (roles.more()) {
+            RoleName roleName = roles.next();
+            _authenticatedRoleNames.push_back(RoleName(roleName.getRole(), roleName.getDB()));
         }
+    }
+}
 
-        for (UserSet::iterator it = _authenticatedUsers.begin();
-                it != _authenticatedUsers.end(); ++it) {
-            User* user = *it;
-            for (int i = 0; i < resourceSearchListLength; ++i) {
-                ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);
-                unmetRequirements.removeAllActionsFromSet(userActions);
+bool AuthorizationSession::_isAuthorizedForPrivilege(const Privilege& privilege) {
+    const ResourcePattern& target(privilege.getResourcePattern());
 
-                if (unmetRequirements.empty())
-                    return true;
-            }
+    ResourcePattern resourceSearchList[resourceSearchListCapacity];
+    const int resourceSearchListLength = buildResourceSearchList(target, resourceSearchList);
+
+    ActionSet unmetRequirements = privilege.getActions();
+
+    PrivilegeVector defaultPrivileges = getDefaultPrivileges();
+    for (PrivilegeVector::iterator it = defaultPrivileges.begin(); it != defaultPrivileges.end();
+         ++it) {
+        for (int i = 0; i < resourceSearchListLength; ++i) {
+            if (!(it->getResourcePattern() == resourceSearchList[i]))
+                continue;
+
+            ActionSet userActions = it->getActions();
+            unmetRequirements.removeAllActionsFromSet(userActions);
+
+            if (unmetRequirements.empty())
+                return true;
         }
-
-        return false;
     }
 
-    void AuthorizationSession::setImpersonatedUserData(std::vector<UserName> usernames,
-                                                       std::vector<RoleName> roles) {
-        _impersonatedUserNames = usernames;
-        _impersonatedRoleNames = roles;
-        _impersonationFlag = true;
+    for (UserSet::iterator it = _authenticatedUsers.begin(); it != _authenticatedUsers.end();
+         ++it) {
+        User* user = *it;
+        for (int i = 0; i < resourceSearchListLength; ++i) {
+            ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);
+            unmetRequirements.removeAllActionsFromSet(userActions);
+
+            if (unmetRequirements.empty())
+                return true;
+        }
     }
 
-    UserNameIterator AuthorizationSession::getImpersonatedUserNames() {
-        return makeUserNameIterator(_impersonatedUserNames.begin(),
-                                    _impersonatedUserNames.end());
-    }
+    return false;
+}
 
-    RoleNameIterator AuthorizationSession::getImpersonatedRoleNames() {
-        return makeRoleNameIterator(_impersonatedRoleNames.begin(),
-                                    _impersonatedRoleNames.end());
-    }
+void AuthorizationSession::setImpersonatedUserData(std::vector<UserName> usernames,
+                                                   std::vector<RoleName> roles) {
+    _impersonatedUserNames = usernames;
+    _impersonatedRoleNames = roles;
+    _impersonationFlag = true;
+}
 
-    // Clear the vectors of impersonated usernames and roles.
-    void AuthorizationSession::clearImpersonatedUserData() {
-        _impersonatedUserNames.clear();
-        _impersonatedRoleNames.clear();
-        _impersonationFlag = false;
-    }
+UserNameIterator AuthorizationSession::getImpersonatedUserNames() {
+    return makeUserNameIterator(_impersonatedUserNames.begin(), _impersonatedUserNames.end());
+}
+
+RoleNameIterator AuthorizationSession::getImpersonatedRoleNames() {
+    return makeRoleNameIterator(_impersonatedRoleNames.begin(), _impersonatedRoleNames.end());
+}
+
+// Clear the vectors of impersonated usernames and roles.
+void AuthorizationSession::clearImpersonatedUserData() {
+    _impersonatedUserNames.clear();
+    _impersonatedRoleNames.clear();
+    _impersonationFlag = false;
+}
 
 
-    bool AuthorizationSession::isImpersonating() const {
-        return _impersonationFlag;
-    }
+bool AuthorizationSession::isImpersonating() const {
+    return _impersonationFlag;
+}
 
-} // namespace mongo
+}  // namespace mongo

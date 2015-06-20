@@ -48,133 +48,127 @@
 
 namespace mongo {
 
-    using executor::NetworkInterfaceMock;
-    using std::vector;
+using executor::NetworkInterfaceMock;
+using std::vector;
 
-    CatalogManagerReplSetTestFixture::CatalogManagerReplSetTestFixture() = default;
+CatalogManagerReplSetTestFixture::CatalogManagerReplSetTestFixture() = default;
 
-    CatalogManagerReplSetTestFixture::~CatalogManagerReplSetTestFixture() = default;
+CatalogManagerReplSetTestFixture::~CatalogManagerReplSetTestFixture() = default;
 
-    void CatalogManagerReplSetTestFixture::setUp() {
-        std::unique_ptr<NetworkInterfaceMock> network(
-            stdx::make_unique<executor::NetworkInterfaceMock>());
+void CatalogManagerReplSetTestFixture::setUp() {
+    std::unique_ptr<NetworkInterfaceMock> network(
+        stdx::make_unique<executor::NetworkInterfaceMock>());
 
-        _mockNetwork = network.get();
+    _mockNetwork = network.get();
 
-        std::unique_ptr<repl::ReplicationExecutor> executor(
-            stdx::make_unique<repl::ReplicationExecutor>(network.release(),
-                                                         nullptr,
-                                                         0));
+    std::unique_ptr<repl::ReplicationExecutor> executor(
+        stdx::make_unique<repl::ReplicationExecutor>(network.release(), nullptr, 0));
 
-        // The executor thread might run after the executor unique_ptr above has been moved to the
-        // ShardRegistry, so make sure we get the underlying pointer before that.
-        _executorThread = std::thread(std::bind([](repl::ReplicationExecutor* executorPtr) {
-                                                    executorPtr->run();
-                                                },
-                                                executor.get()));
+    // The executor thread might run after the executor unique_ptr above has been moved to the
+    // ShardRegistry, so make sure we get the underlying pointer before that.
+    _executorThread = std::thread(std::bind(
+        [](repl::ReplicationExecutor* executorPtr) { executorPtr->run(); }, executor.get()));
 
-        std::unique_ptr<CatalogManagerReplicaSet> cm(
-            stdx::make_unique<CatalogManagerReplicaSet>());
+    std::unique_ptr<CatalogManagerReplicaSet> cm(stdx::make_unique<CatalogManagerReplicaSet>());
 
-        ASSERT_OK(cm->init(ConnectionString::forReplicaSet("CatalogManagerReplSetTest",
-                                                           { HostAndPort{ "TestHost1" },
-                                                             HostAndPort{ "TestHost2" } }),
-                           stdx::make_unique<DistLockManagerMock>()));
+    ASSERT_OK(cm->init(
+        ConnectionString::forReplicaSet("CatalogManagerReplSetTest",
+                                        {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}}),
+        stdx::make_unique<DistLockManagerMock>()));
 
-        std::unique_ptr<ShardRegistry> shardRegistry(
-            stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
-                                             stdx::make_unique<RemoteCommandRunnerMock>(),
-                                             std::move(executor),
-                                             cm.get()));
+    std::unique_ptr<ShardRegistry> shardRegistry(
+        stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
+                                         stdx::make_unique<RemoteCommandRunnerMock>(),
+                                         std::move(executor),
+                                         cm.get()));
 
-        // For now initialize the global grid object. All sharding objects will be accessible
-        // from there until we get rid of it.
-        grid.init(std::move(cm), std::move(shardRegistry));
+    // For now initialize the global grid object. All sharding objects will be accessible
+    // from there until we get rid of it.
+    grid.init(std::move(cm), std::move(shardRegistry));
+}
+
+void CatalogManagerReplSetTestFixture::tearDown() {
+    // Stop the executor and wait for the executor thread to complete. This means that there
+    // will be no more calls into the executor and it can be safely deleted.
+    shardRegistry()->getExecutor()->shutdown();
+    _executorThread.join();
+
+    // This call will delete the shard registry, which will terminate the executor
+    grid.clearForUnitTests();
+}
+
+CatalogManagerReplicaSet* CatalogManagerReplSetTestFixture::catalogManager() const {
+    auto cm = dynamic_cast<CatalogManagerReplicaSet*>(grid.catalogManager());
+    invariant(cm);
+
+    return cm;
+}
+
+ShardRegistry* CatalogManagerReplSetTestFixture::shardRegistry() const {
+    return grid.shardRegistry();
+}
+
+RemoteCommandRunnerMock* CatalogManagerReplSetTestFixture::commandRunner() const {
+    return RemoteCommandRunnerMock::get(shardRegistry()->getCommandRunner());
+}
+
+executor::NetworkInterfaceMock* CatalogManagerReplSetTestFixture::network() const {
+    return _mockNetwork;
+}
+
+DistLockManagerMock* CatalogManagerReplSetTestFixture::distLock() const {
+    auto distLock = dynamic_cast<DistLockManagerMock*>(catalogManager()->getDistLockManager());
+    invariant(distLock);
+
+    return distLock;
+}
+
+void CatalogManagerReplSetTestFixture::onCommand(OnCommandFunction func) {
+    network()->enterNetwork();
+
+    const NetworkInterfaceMock::NetworkOperationIterator noi = network()->getNextReadyRequest();
+    const RemoteCommandRequest& request = noi->getRequest();
+
+    const auto& resultStatus = func(request);
+
+    BSONObjBuilder result;
+
+    if (resultStatus.isOK()) {
+        result.appendElements(resultStatus.getValue());
     }
 
-    void CatalogManagerReplSetTestFixture::tearDown() {
-        // Stop the executor and wait for the executor thread to complete. This means that there
-        // will be no more calls into the executor and it can be safely deleted.
-        shardRegistry()->getExecutor()->shutdown();
-        _executorThread.join();
+    Command::appendCommandStatus(result, resultStatus.getStatus());
 
-        // This call will delete the shard registry, which will terminate the executor
-        grid.clearForUnitTests();
-    }
+    const RemoteCommandResponse response(result.obj(), Milliseconds(1));
 
-    CatalogManagerReplicaSet* CatalogManagerReplSetTestFixture::catalogManager() const {
-        auto cm = dynamic_cast<CatalogManagerReplicaSet*>(grid.catalogManager());
-        invariant(cm);
+    network()->scheduleResponse(noi, network()->now(), response);
 
-        return cm;
-    }
+    network()->runReadyNetworkOperations();
 
-    ShardRegistry* CatalogManagerReplSetTestFixture::shardRegistry() const {
-        return grid.shardRegistry();
-    }
+    network()->exitNetwork();
+}
 
-    RemoteCommandRunnerMock* CatalogManagerReplSetTestFixture::commandRunner() const {
-        return RemoteCommandRunnerMock::get(shardRegistry()->getCommandRunner());
-    }
-
-    executor::NetworkInterfaceMock* CatalogManagerReplSetTestFixture::network() const {
-        return _mockNetwork;
-    }
-
-    DistLockManagerMock* CatalogManagerReplSetTestFixture::distLock() const {
-        auto distLock = dynamic_cast<DistLockManagerMock*>(catalogManager()->getDistLockManager());
-        invariant(distLock);
-
-        return distLock;
-    }
-
-    void CatalogManagerReplSetTestFixture::onCommand(OnCommandFunction func) {
-        network()->enterNetwork();
-
-        const NetworkInterfaceMock::NetworkOperationIterator noi =
-            network()->getNextReadyRequest();
-        const RemoteCommandRequest& request = noi->getRequest();
+void CatalogManagerReplSetTestFixture::onFindCommand(OnFindCommandFunction func) {
+    onCommand([&func](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
 
         const auto& resultStatus = func(request);
 
-        BSONObjBuilder result;
-
-        if (resultStatus.isOK()) {
-            result.appendElements(resultStatus.getValue());
+        if (!resultStatus.isOK()) {
+            return resultStatus.getStatus();
         }
 
-        Command::appendCommandStatus(result, resultStatus.getStatus());
+        BSONArrayBuilder arr;
+        for (const auto& obj : resultStatus.getValue()) {
+            arr.append(obj);
+        }
 
-        const RemoteCommandResponse response(result.obj(), Milliseconds(1));
+        const NamespaceString nss =
+            NamespaceString(request.dbname, request.cmdObj.firstElement().String());
+        BSONObjBuilder result;
+        appendCursorResponseObject(0LL, nss.toString(), arr.arr(), &result);
 
-        network()->scheduleResponse(noi, network()->now(), response);
+        return result.obj();
+    });
+}
 
-        network()->runReadyNetworkOperations();
-
-        network()->exitNetwork();
-    }
-
-    void CatalogManagerReplSetTestFixture::onFindCommand(OnFindCommandFunction func) {
-        onCommand([&func](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-
-            const auto& resultStatus = func(request);
-
-            if (!resultStatus.isOK()) {
-                return resultStatus.getStatus();
-            }
-
-            BSONArrayBuilder arr;
-            for (const auto& obj : resultStatus.getValue()) {
-                arr.append(obj);
-            }
-
-            const NamespaceString nss = NamespaceString(request.dbname,
-                                                        request.cmdObj.firstElement().String());
-            BSONObjBuilder result;
-            appendCursorResponseObject(0LL, nss.toString(), arr.arr(), &result);
-
-            return result.obj();
-        });
-    }
-
-} // namespace mongo
+}  // namespace mongo

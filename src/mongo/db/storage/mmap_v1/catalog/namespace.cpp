@@ -37,13 +37,12 @@
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
-    namespace {
-        BOOST_STATIC_ASSERT( sizeof(Namespace) == 128 );
-        BOOST_STATIC_ASSERT( Namespace::MaxNsLenWithNUL == MaxDatabaseNameLen );
-        BOOST_STATIC_ASSERT((int)Namespace::MaxNsLenWithNUL == (int)NamespaceString::MaxNsLenWithNUL);
-        BOOST_STATIC_ASSERT((int)Namespace::MaxNsLen == (int)NamespaceString::MaxNsLen);
-        // Note the typo.
-        BOOST_STATIC_ASSERT((int)Namespace::MaxNsColletionLen == (int)NamespaceString::MaxNsCollectionLen);
-    }
+namespace {
+BOOST_STATIC_ASSERT(sizeof(Namespace) == 128);
+BOOST_STATIC_ASSERT(Namespace::MaxNsLenWithNUL == MaxDatabaseNameLen);
+BOOST_STATIC_ASSERT((int)Namespace::MaxNsLenWithNUL == (int)NamespaceString::MaxNsLenWithNUL);
+BOOST_STATIC_ASSERT((int)Namespace::MaxNsLen == (int)NamespaceString::MaxNsLen);
+// Note the typo.
+BOOST_STATIC_ASSERT((int)Namespace::MaxNsColletionLen == (int)NamespaceString::MaxNsCollectionLen);
 }
-
+}

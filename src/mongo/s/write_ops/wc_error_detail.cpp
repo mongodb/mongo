@@ -33,150 +33,155 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    using mongoutils::str::stream;
-    const BSONField<int> WCErrorDetail::errCode("code");
-    const BSONField<BSONObj> WCErrorDetail::errInfo("errInfo");
-    const BSONField<std::string> WCErrorDetail::errMessage("errmsg");
+using mongoutils::str::stream;
+const BSONField<int> WCErrorDetail::errCode("code");
+const BSONField<BSONObj> WCErrorDetail::errInfo("errInfo");
+const BSONField<std::string> WCErrorDetail::errMessage("errmsg");
 
-    WCErrorDetail::WCErrorDetail() {
-        clear();
+WCErrorDetail::WCErrorDetail() {
+    clear();
+}
+
+WCErrorDetail::~WCErrorDetail() {}
+
+bool WCErrorDetail::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    WCErrorDetail::~WCErrorDetail() {
+    // All the mandatory fields must be present.
+    if (!_isErrCodeSet) {
+        *errMsg = stream() << "missing " << errCode.name() << " field";
+        return false;
     }
 
-    bool WCErrorDetail::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
+    return true;
+}
 
-        // All the mandatory fields must be present.
-        if (!_isErrCodeSet) {
-            *errMsg = stream() << "missing " << errCode.name() << " field";
-            return false;
-        }
+BSONObj WCErrorDetail::toBSON() const {
+    BSONObjBuilder builder;
 
-        return true;
-    }
+    if (_isErrCodeSet)
+        builder.append(errCode(), _errCode);
 
-    BSONObj WCErrorDetail::toBSON() const {
-        BSONObjBuilder builder;
+    if (_isErrInfoSet)
+        builder.append(errInfo(), _errInfo);
 
-        if (_isErrCodeSet) builder.append(errCode(), _errCode);
+    if (_isErrMessageSet)
+        builder.append(errMessage(), _errMessage);
 
-        if (_isErrInfoSet) builder.append(errInfo(), _errInfo);
+    return builder.obj();
+}
 
-        if (_isErrMessageSet) builder.append(errMessage(), _errMessage);
+bool WCErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-        return builder.obj();
-    }
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-    bool WCErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+    FieldParser::FieldState fieldState;
+    fieldState = FieldParser::extract(source, errCode, &_errCode, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isErrCodeSet = fieldState == FieldParser::FIELD_SET;
 
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
+    fieldState = FieldParser::extract(source, errInfo, &_errInfo, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isErrInfoSet = fieldState == FieldParser::FIELD_SET;
 
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, errCode, &_errCode, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isErrCodeSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, errMessage, &_errMessage, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isErrMessageSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, errInfo, &_errInfo, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isErrInfoSet = fieldState == FieldParser::FIELD_SET;
+    return true;
+}
 
-        fieldState = FieldParser::extract(source, errMessage, &_errMessage, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isErrMessageSet = fieldState == FieldParser::FIELD_SET;
+void WCErrorDetail::clear() {
+    _errCode = 0;
+    _isErrCodeSet = false;
 
-        return true;
-    }
+    _errInfo = BSONObj();
+    _isErrInfoSet = false;
 
-    void WCErrorDetail::clear() {
-        _errCode = 0;
-        _isErrCodeSet = false;
+    _errMessage.clear();
+    _isErrMessageSet = false;
+}
 
-        _errInfo = BSONObj();
-        _isErrInfoSet = false;
+void WCErrorDetail::cloneTo(WCErrorDetail* other) const {
+    other->clear();
 
-        _errMessage.clear();
-        _isErrMessageSet = false;
+    other->_errCode = _errCode;
+    other->_isErrCodeSet = _isErrCodeSet;
 
-    }
+    other->_errInfo = _errInfo;
+    other->_isErrInfoSet = _isErrInfoSet;
 
-    void WCErrorDetail::cloneTo(WCErrorDetail* other) const {
-        other->clear();
+    other->_errMessage = _errMessage;
+    other->_isErrMessageSet = _isErrMessageSet;
+}
 
-        other->_errCode = _errCode;
-        other->_isErrCodeSet = _isErrCodeSet;
+std::string WCErrorDetail::toString() const {
+    return "implement me";
+}
 
-        other->_errInfo = _errInfo;
-        other->_isErrInfoSet = _isErrInfoSet;
+void WCErrorDetail::setErrCode(int errCode) {
+    _errCode = errCode;
+    _isErrCodeSet = true;
+}
 
-        other->_errMessage = _errMessage;
-        other->_isErrMessageSet = _isErrMessageSet;
-    }
+void WCErrorDetail::unsetErrCode() {
+    _isErrCodeSet = false;
+}
 
-    std::string WCErrorDetail::toString() const {
-        return "implement me";
-    }
+bool WCErrorDetail::isErrCodeSet() const {
+    return _isErrCodeSet;
+}
 
-    void WCErrorDetail::setErrCode(int errCode) {
-        _errCode = errCode;
-        _isErrCodeSet = true;
-    }
+int WCErrorDetail::getErrCode() const {
+    dassert(_isErrCodeSet);
+    return _errCode;
+}
 
-    void WCErrorDetail::unsetErrCode() {
-         _isErrCodeSet = false;
-     }
+void WCErrorDetail::setErrInfo(const BSONObj& errInfo) {
+    _errInfo = errInfo.getOwned();
+    _isErrInfoSet = true;
+}
 
-    bool WCErrorDetail::isErrCodeSet() const {
-         return _isErrCodeSet;
-    }
+void WCErrorDetail::unsetErrInfo() {
+    _isErrInfoSet = false;
+}
 
-    int WCErrorDetail::getErrCode() const {
-        dassert(_isErrCodeSet);
-        return _errCode;
-    }
+bool WCErrorDetail::isErrInfoSet() const {
+    return _isErrInfoSet;
+}
 
-    void WCErrorDetail::setErrInfo(const BSONObj& errInfo) {
-        _errInfo = errInfo.getOwned();
-        _isErrInfoSet = true;
-    }
+const BSONObj& WCErrorDetail::getErrInfo() const {
+    dassert(_isErrInfoSet);
+    return _errInfo;
+}
 
-    void WCErrorDetail::unsetErrInfo() {
-         _isErrInfoSet = false;
-     }
+void WCErrorDetail::setErrMessage(StringData errMessage) {
+    _errMessage = errMessage.toString();
+    _isErrMessageSet = true;
+}
 
-    bool WCErrorDetail::isErrInfoSet() const {
-         return _isErrInfoSet;
-    }
+void WCErrorDetail::unsetErrMessage() {
+    _isErrMessageSet = false;
+}
 
-    const BSONObj& WCErrorDetail::getErrInfo() const {
-        dassert(_isErrInfoSet);
-        return _errInfo;
-    }
+bool WCErrorDetail::isErrMessageSet() const {
+    return _isErrMessageSet;
+}
 
-    void WCErrorDetail::setErrMessage(StringData errMessage) {
-        _errMessage = errMessage.toString();
-        _isErrMessageSet = true;
-    }
+const std::string& WCErrorDetail::getErrMessage() const {
+    dassert(_isErrMessageSet);
+    return _errMessage;
+}
 
-    void WCErrorDetail::unsetErrMessage() {
-         _isErrMessageSet = false;
-     }
-
-    bool WCErrorDetail::isErrMessageSet() const {
-         return _isErrMessageSet;
-    }
-
-    const std::string& WCErrorDetail::getErrMessage() const {
-        dassert(_isErrMessageSet);
-        return _errMessage;
-    }
-
-} // namespace mongo
+}  // namespace mongo

@@ -37,41 +37,39 @@
 
 namespace mongo {
 
-    namespace {
+namespace {
 
-        class InMemoryFactory : public StorageEngine::Factory {
-        public:
-            virtual ~InMemoryFactory() { }
-            virtual StorageEngine* create(const StorageGlobalParams& params,
-                                          const StorageEngineLockFile& lockFile) const {
-                KVStorageEngineOptions options;
-                options.directoryPerDB = params.directoryperdb;
-                options.forRepair = params.repair;
-                return new KVStorageEngine(new InMemoryEngine(), options);
-            }
+class InMemoryFactory : public StorageEngine::Factory {
+public:
+    virtual ~InMemoryFactory() {}
+    virtual StorageEngine* create(const StorageGlobalParams& params,
+                                  const StorageEngineLockFile& lockFile) const {
+        KVStorageEngineOptions options;
+        options.directoryPerDB = params.directoryperdb;
+        options.forRepair = params.repair;
+        return new KVStorageEngine(new InMemoryEngine(), options);
+    }
 
-            virtual StringData getCanonicalName() const {
-                return "inMemoryExperiment";
-            }
+    virtual StringData getCanonicalName() const {
+        return "inMemoryExperiment";
+    }
 
-            virtual Status validateMetadata(const StorageEngineMetadata& metadata,
-                                            const StorageGlobalParams& params) const {
-                return Status::OK();
-            }
-
-            virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const {
-                return BSONObj();
-            }
-        };
-
-    } // namespace
-
-    MONGO_INITIALIZER_WITH_PREREQUISITES(InMemoryEngineInit,
-                                         ("SetGlobalEnvironment"))
-                                         (InitializerContext* context) {
-
-        getGlobalServiceContext()->registerStorageEngine("inMemoryExperiment", new InMemoryFactory());
+    virtual Status validateMetadata(const StorageEngineMetadata& metadata,
+                                    const StorageGlobalParams& params) const {
         return Status::OK();
     }
+
+    virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const {
+        return BSONObj();
+    }
+};
+
+}  // namespace
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(InMemoryEngineInit, ("SetGlobalEnvironment"))
+(InitializerContext* context) {
+    getGlobalServiceContext()->registerStorageEngine("inMemoryExperiment", new InMemoryFactory());
+    return Status::OK();
+}
 
 }  // namespace mongo

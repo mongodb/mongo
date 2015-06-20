@@ -38,179 +38,216 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class BSONObjBuilder;
-    class Status;
+class BSONObj;
+class BSONObjBuilder;
+class Status;
 
 namespace repl {
 
+/**
+ * Response structure for the ismaster command.  Only handles responses from nodes
+ * that are in replset mode.
+ */
+class IsMasterResponse {
+public:
+    IsMasterResponse();
+
     /**
-     * Response structure for the ismaster command.  Only handles responses from nodes
-     * that are in replset mode.
+     * Initializes this IsMasterResponse from the contents of "doc".
      */
-    class IsMasterResponse {
-    public:
-        IsMasterResponse();
+    Status initialize(const BSONObj& doc);
 
-        /**
-         * Initializes this IsMasterResponse from the contents of "doc".
-         */
-        Status initialize(const BSONObj& doc);
+    /**
+     * Appends all non-default values to "builder".
+     * There are two values that are handled specially: if _inShutdown is true or _configSet
+     * is false, we will add a standard response to "builder" indicating either that we are
+     * in the middle of shutting down or we do not have a valid replica set config, ignoring
+     * the values of all other member variables.
+     */
+    void addToBSON(BSONObjBuilder* builder) const;
 
-        /**
-         * Appends all non-default values to "builder".
-         * There are two values that are handled specially: if _inShutdown is true or _configSet
-         * is false, we will add a standard response to "builder" indicating either that we are
-         * in the middle of shutting down or we do not have a valid replica set config, ignoring
-         * the values of all other member variables.
-         */
-        void addToBSON(BSONObjBuilder* builder) const;
-
-        /**
-         * Returns a BSONObj consisting the results of calling addToBSON on an otherwise empty
-         * BSONObjBuilder.
-         */
-        BSONObj toBSON() const;
+    /**
+     * Returns a BSONObj consisting the results of calling addToBSON on an otherwise empty
+     * BSONObjBuilder.
+     */
+    BSONObj toBSON() const;
 
 
-        // ===================== Accessors for member variables ================================= //
+    // ===================== Accessors for member variables ================================= //
 
-        bool isMaster() const { return _isMaster; }
+    bool isMaster() const {
+        return _isMaster;
+    }
 
-        bool isSecondary() const { return _secondary; }
+    bool isSecondary() const {
+        return _secondary;
+    }
 
-        const std::string& getReplSetName() const { return _setName; }
+    const std::string& getReplSetName() const {
+        return _setName;
+    }
 
-        long long getReplSetVersion() const { return _setVersion; }
+    long long getReplSetVersion() const {
+        return _setVersion;
+    }
 
-        const std::vector<HostAndPort>& getHosts() const { return _hosts; }
+    const std::vector<HostAndPort>& getHosts() const {
+        return _hosts;
+    }
 
-        const std::vector<HostAndPort>& getPassives() const { return _passives; }
+    const std::vector<HostAndPort>& getPassives() const {
+        return _passives;
+    }
 
-        const std::vector<HostAndPort>& getArbiters() const { return _arbiters; }
+    const std::vector<HostAndPort>& getArbiters() const {
+        return _arbiters;
+    }
 
-        const HostAndPort& getPrimary() const { return _primary; }
+    const HostAndPort& getPrimary() const {
+        return _primary;
+    }
 
-        bool hasPrimary() const { return _primarySet; }
+    bool hasPrimary() const {
+        return _primarySet;
+    }
 
-        bool isArbiterOnly() const { return _arbiterOnly; }
+    bool isArbiterOnly() const {
+        return _arbiterOnly;
+    }
 
-        bool isPassive() const { return _passive; }
+    bool isPassive() const {
+        return _passive;
+    }
 
-        bool isHidden() const { return _hidden; }
+    bool isHidden() const {
+        return _hidden;
+    }
 
-        bool shouldBuildIndexes() const { return _buildIndexes; }
+    bool shouldBuildIndexes() const {
+        return _buildIndexes;
+    }
 
-        Seconds getSlaveDelay() const { return _slaveDelay; }
+    Seconds getSlaveDelay() const {
+        return _slaveDelay;
+    }
 
-        const unordered_map<std::string, std::string> getTags() const { return _tags; }
+    const unordered_map<std::string, std::string> getTags() const {
+        return _tags;
+    }
 
-        const HostAndPort& getMe() const { return _me; }
+    const HostAndPort& getMe() const {
+        return _me;
+    }
 
-        const OID& getElectionId() const { return _electionId; }
+    const OID& getElectionId() const {
+        return _electionId;
+    }
 
-        /**
-         * If false, calls to toBSON/addToBSON will ignore all other fields and add a specific
-         * message to indicate that we have no replica set config.
-         */
-        bool isConfigSet() const { return _configSet; }
+    /**
+     * If false, calls to toBSON/addToBSON will ignore all other fields and add a specific
+     * message to indicate that we have no replica set config.
+     */
+    bool isConfigSet() const {
+        return _configSet;
+    }
 
-        /**
-         * If false, calls to toBSON/addToBSON will ignore all other fields and add a specific
-         * message to indicate that we are in the middle of shutting down.
-         */
-        bool isShutdownInProgress() const { return _shutdownInProgress; }
+    /**
+     * If false, calls to toBSON/addToBSON will ignore all other fields and add a specific
+     * message to indicate that we are in the middle of shutting down.
+     */
+    bool isShutdownInProgress() const {
+        return _shutdownInProgress;
+    }
 
 
-        // ===================== Mutators for member variables ================================= //
+    // ===================== Mutators for member variables ================================= //
 
-        void setIsMaster(bool isMaster);
+    void setIsMaster(bool isMaster);
 
-        void setIsSecondary(bool secondary);
+    void setIsSecondary(bool secondary);
 
-        void setReplSetName(const std::string& setName);
+    void setReplSetName(const std::string& setName);
 
-        void setReplSetVersion(long long version);
+    void setReplSetVersion(long long version);
 
-        void addHost(const HostAndPort& host);
+    void addHost(const HostAndPort& host);
 
-        void addPassive(const HostAndPort& passive);
+    void addPassive(const HostAndPort& passive);
 
-        void addArbiter(const HostAndPort& arbiter);
+    void addArbiter(const HostAndPort& arbiter);
 
-        void setPrimary(const HostAndPort& primary);
+    void setPrimary(const HostAndPort& primary);
 
-        void setIsArbiterOnly(bool arbiterOnly);
+    void setIsArbiterOnly(bool arbiterOnly);
 
-        void setIsPassive(bool passive);
+    void setIsPassive(bool passive);
 
-        void setIsHidden(bool hidden);
+    void setIsHidden(bool hidden);
 
-        void setShouldBuildIndexes(bool buildIndexes);
+    void setShouldBuildIndexes(bool buildIndexes);
 
-        void setSlaveDelay(Seconds slaveDelay);
+    void setSlaveDelay(Seconds slaveDelay);
 
-        void addTag(const std::string& tagKey, const std::string& tagValue);
+    void addTag(const std::string& tagKey, const std::string& tagValue);
 
-        void setMe(const HostAndPort& me);
+    void setMe(const HostAndPort& me);
 
-        void setElectionId(const OID& electionId);
+    void setElectionId(const OID& electionId);
 
-        /**
-         * Marks _configSet as false, which will cause future calls to toBSON/addToBSON to ignore
-         * all other member variables and output a hardcoded response indicating that we have no
-         * valid replica set config.
-         */
-        void markAsNoConfig();
+    /**
+     * Marks _configSet as false, which will cause future calls to toBSON/addToBSON to ignore
+     * all other member variables and output a hardcoded response indicating that we have no
+     * valid replica set config.
+     */
+    void markAsNoConfig();
 
-        /**
-         * Marks _shutdownInProgress as true, which will cause future calls to toBSON/addToBSON to
-         * ignore all other member variables and output a hardcoded response indicating that we are
-         * in the middle of shutting down.
-         */
-        void markAsShutdownInProgress();
+    /**
+     * Marks _shutdownInProgress as true, which will cause future calls to toBSON/addToBSON to
+     * ignore all other member variables and output a hardcoded response indicating that we are
+     * in the middle of shutting down.
+     */
+    void markAsShutdownInProgress();
 
-    private:
+private:
+    bool _isMaster;
+    bool _isMasterSet;
+    bool _secondary;
+    bool _isSecondarySet;
+    std::string _setName;
+    bool _setNameSet;
+    long long _setVersion;
+    bool _setVersionSet;
+    std::vector<HostAndPort> _hosts;
+    bool _hostsSet;
+    std::vector<HostAndPort> _passives;
+    bool _passivesSet;
+    std::vector<HostAndPort> _arbiters;
+    bool _arbitersSet;
+    HostAndPort _primary;
+    bool _primarySet;
+    bool _arbiterOnly;
+    bool _arbiterOnlySet;
+    bool _passive;
+    bool _passiveSet;
+    bool _hidden;
+    bool _hiddenSet;
+    bool _buildIndexes;
+    bool _buildIndexesSet;
+    Seconds _slaveDelay;
+    bool _slaveDelaySet;
+    unordered_map<std::string, std::string> _tags;
+    bool _tagsSet;
+    HostAndPort _me;
+    bool _meSet;
+    OID _electionId;
 
-        bool _isMaster;
-        bool _isMasterSet;
-        bool _secondary;
-        bool _isSecondarySet;
-        std::string _setName;
-        bool _setNameSet;
-        long long _setVersion;
-        bool _setVersionSet;
-        std::vector<HostAndPort> _hosts;
-        bool _hostsSet;
-        std::vector<HostAndPort> _passives;
-        bool _passivesSet;
-        std::vector<HostAndPort> _arbiters;
-        bool _arbitersSet;
-        HostAndPort _primary;
-        bool _primarySet;
-        bool _arbiterOnly;
-        bool _arbiterOnlySet;
-        bool _passive;
-        bool _passiveSet;
-        bool _hidden;
-        bool _hiddenSet;
-        bool _buildIndexes;
-        bool _buildIndexesSet;
-        Seconds _slaveDelay;
-        bool _slaveDelaySet;
-        unordered_map<std::string, std::string> _tags;
-        bool _tagsSet;
-        HostAndPort _me;
-        bool _meSet;
-        OID _electionId;
+    // If _configSet is false this means we don't have a valid repl set config, so toBSON
+    // will return a set of hardcoded values that indicate this.
+    bool _configSet;
+    // If _shutdownInProgress is true toBSON will return a set of hardcoded values to indicate
+    // that we are mid shutdown
+    bool _shutdownInProgress;
+};
 
-        // If _configSet is false this means we don't have a valid repl set config, so toBSON
-        // will return a set of hardcoded values that indicate this.
-        bool _configSet;
-        // If _shutdownInProgress is true toBSON will return a set of hardcoded values to indicate
-        // that we are mid shutdown
-        bool _shutdownInProgress;
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

@@ -33,10 +33,10 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(TopTest, CollectionDropped) {
-        Top().collectionDropped("coll");
-    }
+TEST(TopTest, CollectionDropped) {
+    Top().collectionDropped("coll");
+}
 
-} // namespace
+}  // namespace

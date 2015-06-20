@@ -44,36 +44,29 @@
 
 namespace mongo {
 
-    ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* txn)
-        : _txn(txn) {
+ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* txn) : _txn(txn) {
+    auto authSession = AuthorizationSession::get(_txn->getClient());
 
-        auto authSession = AuthorizationSession::get(_txn->getClient());
+    const auto& impersonatedUsersAndRoles =
+        rpc::AuditMetadata::get(txn).getImpersonatedUsersAndRoles();
 
-        const auto& impersonatedUsersAndRoles =
-            rpc::AuditMetadata::get(txn).getImpersonatedUsersAndRoles();
+    if (impersonatedUsersAndRoles != boost::none) {
+        uassert(ErrorCodes::Unauthorized,
+                "Unauthorized use of impersonation metadata.",
+                authSession->isAuthorizedForPrivilege(
+                    Privilege(ResourcePattern::forClusterResource(), ActionType::impersonate)));
 
-        if (impersonatedUsersAndRoles != boost::none) {
+        fassert(ErrorCodes::InternalError, !authSession->isImpersonating());
 
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized use of impersonation metadata.",
-                    authSession->isAuthorizedForPrivilege(
-                        Privilege(ResourcePattern::forClusterResource(),
-                                  ActionType::impersonate)));
-
-            fassert(ErrorCodes::InternalError, !authSession->isImpersonating());
-
-            authSession->setImpersonatedUserData(std::get<0>(*impersonatedUsersAndRoles),
-                                                 std::get<1>(*impersonatedUsersAndRoles));
-            _active = true;
-        }
+        authSession->setImpersonatedUserData(std::get<0>(*impersonatedUsersAndRoles),
+                                             std::get<1>(*impersonatedUsersAndRoles));
+        _active = true;
     }
+}
 
-    ImpersonationSessionGuard::~ImpersonationSessionGuard() {
-        DESTRUCTOR_GUARD(
-            if (_active) {
-                AuthorizationSession::get(_txn->getClient())->clearImpersonatedUserData();
-            }
-        )
-    }
+ImpersonationSessionGuard::~ImpersonationSessionGuard() {
+    DESTRUCTOR_GUARD(
+        if (_active) { AuthorizationSession::get(_txn->getClient())->clearImpersonatedUserData(); })
+}
 
 }  // namespace mongo

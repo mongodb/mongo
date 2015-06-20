@@ -33,97 +33,93 @@
 
 namespace mongo {
 
-    using boost::intrusive_ptr;
-    using std::vector;
+using boost::intrusive_ptr;
+using std::vector;
 
-    void DocumentSourceCommandShards::setSource(DocumentSource *pSource) {
-        /* this doesn't take a source */
-        verify(false);
-    }
-
-    Value DocumentSourceCommandShards::serialize(bool explain) const {
-        // this has no BSON equivalent
-        verify(false);
-    }
-
-    DocumentSourceCommandShards::DocumentSourceCommandShards(
-        const ShardOutput& shardOutput,
-        const intrusive_ptr<ExpressionContext> &pExpCtx):
-        DocumentSource(pExpCtx),
-        unstarted(true),
-        hasCurrent(false),
-        newSource(false),
-        pBsonSource(),
-        pCurrent(),
-        iterator(shardOutput.begin()),
-        listEnd(shardOutput.end())
-    {}
-
-    intrusive_ptr<DocumentSourceCommandShards>
-    DocumentSourceCommandShards::create(
-        const ShardOutput& shardOutput,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        intrusive_ptr<DocumentSourceCommandShards> pSource(
-            new DocumentSourceCommandShards(shardOutput, pExpCtx));
-        return pSource;
-    }
-
-namespace {
-    BSONArray extractResultsArray(const Strategy::CommandResult& result) {
-        /* grab the next command result */
-        BSONObj resultObj = result.result;
-
-        uassert(16390, str::stream() << "sharded pipeline failed on shard " <<
-                                    result.shardTargetId << ": " <<
-                                    resultObj.toString(),
-                resultObj["ok"].trueValue());
-
-        /* grab the result array out of the shard server's response */
-        BSONElement resultArray = resultObj["result"];
-        massert(16391, str::stream() << "no result array? shard:" <<
-                                    result.shardTargetId << ": " <<
-                                    resultObj.toString(),
-                resultArray.type() == Array);
-
-        return BSONArray(resultArray.Obj());
-    }
+void DocumentSourceCommandShards::setSource(DocumentSource* pSource) {
+    /* this doesn't take a source */
+    verify(false);
 }
 
-    vector<BSONArray> DocumentSourceCommandShards::getArrays() {
-        vector<BSONArray> out;
-        for (; iterator != listEnd; ++iterator) {
-            out.push_back(extractResultsArray(*iterator));
-        }
-        return out;
+Value DocumentSourceCommandShards::serialize(bool explain) const {
+    // this has no BSON equivalent
+    verify(false);
+}
+
+DocumentSourceCommandShards::DocumentSourceCommandShards(
+    const ShardOutput& shardOutput, const intrusive_ptr<ExpressionContext>& pExpCtx)
+    : DocumentSource(pExpCtx),
+      unstarted(true),
+      hasCurrent(false),
+      newSource(false),
+      pBsonSource(),
+      pCurrent(),
+      iterator(shardOutput.begin()),
+      listEnd(shardOutput.end()) {}
+
+intrusive_ptr<DocumentSourceCommandShards> DocumentSourceCommandShards::create(
+    const ShardOutput& shardOutput, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    intrusive_ptr<DocumentSourceCommandShards> pSource(
+        new DocumentSourceCommandShards(shardOutput, pExpCtx));
+    return pSource;
+}
+
+namespace {
+BSONArray extractResultsArray(const Strategy::CommandResult& result) {
+    /* grab the next command result */
+    BSONObj resultObj = result.result;
+
+    uassert(16390,
+            str::stream() << "sharded pipeline failed on shard " << result.shardTargetId << ": "
+                          << resultObj.toString(),
+            resultObj["ok"].trueValue());
+
+    /* grab the result array out of the shard server's response */
+    BSONElement resultArray = resultObj["result"];
+    massert(16391,
+            str::stream() << "no result array? shard:" << result.shardTargetId << ": "
+                          << resultObj.toString(),
+            resultArray.type() == Array);
+
+    return BSONArray(resultArray.Obj());
+}
+}
+
+vector<BSONArray> DocumentSourceCommandShards::getArrays() {
+    vector<BSONArray> out;
+    for (; iterator != listEnd; ++iterator) {
+        out.push_back(extractResultsArray(*iterator));
     }
+    return out;
+}
 
-    boost::optional<Document> DocumentSourceCommandShards::getNext() {
-        pExpCtx->checkForInterrupt();
+boost::optional<Document> DocumentSourceCommandShards::getNext() {
+    pExpCtx->checkForInterrupt();
 
-        while(true) {
-            if (!pBsonSource.get()) {
-                /* if there aren't any more futures, we're done */
-                if (iterator == listEnd)
-                    return boost::none;
+    while (true) {
+        if (!pBsonSource.get()) {
+            /* if there aren't any more futures, we're done */
+            if (iterator == listEnd)
+                return boost::none;
 
-                BSONArray resultArray = extractResultsArray(*iterator);
+            BSONArray resultArray = extractResultsArray(*iterator);
 
-                // done with error checking, don't need the shard name anymore
-                ++iterator;
+            // done with error checking, don't need the shard name anymore
+            ++iterator;
 
-                if (resultArray.isEmpty()){
-                    // this shard had no results, on to the next one
-                    continue;
-                }
-
-                pBsonSource = DocumentSourceBsonArray::create(resultArray, pExpCtx);
+            if (resultArray.isEmpty()) {
+                // this shard had no results, on to the next one
+                continue;
             }
 
-            if (boost::optional<Document> out = pBsonSource->getNext())
-                return out;
-
-            // Source exhausted. Try next.
-            pBsonSource.reset();
+            pBsonSource = DocumentSourceBsonArray::create(resultArray, pExpCtx);
         }
+
+        if (boost::optional<Document> out = pBsonSource->getNext())
+            return out;
+
+        // Source exhausted. Try next.
+        pBsonSource.reset();
     }
+}
 }

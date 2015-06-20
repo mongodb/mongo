@@ -55,378 +55,366 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::string;
-    using std::vector;
+using std::unique_ptr;
+using std::string;
+using std::vector;
 
-    class Client;
-    class OperationContext;
+class Client;
+class OperationContext;
 
 namespace {
 
-    std::mutex shutDownMutex;
-    bool shuttingDown = false;
+std::mutex shutDownMutex;
+bool shuttingDown = false;
 
-} // namespace
+}  // namespace
 
-    // Symbols defined to build the binary correctly.
-    bool inShutdown() {
+// Symbols defined to build the binary correctly.
+bool inShutdown() {
+    std::lock_guard<std::mutex> sl(shutDownMutex);
+    return shuttingDown;
+}
+
+void signalShutdown() {}
+
+DBClientBase* createDirectClient(OperationContext* txn) {
+    return NULL;
+}
+
+void dbexit(ExitCode rc, const char* why) {
+    {
         std::lock_guard<std::mutex> sl(shutDownMutex);
-        return shuttingDown;
+        shuttingDown = true;
     }
 
-    void signalShutdown() { }
+    quickExit(rc);
+}
 
-    DBClientBase* createDirectClient(OperationContext* txn) {
-        return NULL;
+void exitCleanly(ExitCode rc) {
+    dbexit(rc, "");
+}
+
+bool haveLocalShardingInfo(Client* client, const string& ns) {
+    return false;
+}
+
+namespace {
+
+const string TARGET_HOST = "localhost:27017";
+const int TARGET_PORT = 27017;
+
+class DummyMessageHandler final : public MessageHandler {
+public:
+    virtual void connected(AbstractMessagingPort* p) {}
+
+    virtual void process(Message& m, AbstractMessagingPort* por) {}
+
+} dummyHandler;
+
+// TODO: Take this out and make it as a reusable class in a header file. The only
+// thing that is preventing this from happening is the dependency on the inShutdown
+// method to terminate the socket listener thread.
+/**
+ * Very basic server that accepts connections. Note: can only create one instance
+ * at a time. Should not create as a static global instance because of dependency
+ * with ListeningSockets::_instance.
+ *
+ * Warning: Not thread-safe
+ *
+ * Note: external symbols used:
+ * shutDownMutex, shuttingDown
+ */
+class DummyServer {
+public:
+    /**
+     * Creates a new server that listens to the given port.
+     *
+     * @param port the port number to listen to.
+     */
+    DummyServer(int port) : _port(port) {}
+
+    ~DummyServer() {
+        stop();
     }
 
-    void dbexit(ExitCode rc, const char *why) {
+    /**
+     * Starts the server if it is not yet running.
+     *
+     * @param messageHandler the message handler to use for this server. Ownership
+     *     of this object is passed to this server.
+     */
+    void run(MessageHandler* messsageHandler) {
+        if (_server != NULL) {
+            return;
+        }
+
+        MessageServer::Options options;
+        options.port = _port;
+
+        {
+            std::lock_guard<std::mutex> sl(shutDownMutex);
+            shuttingDown = false;
+        }
+
+        _server.reset(createServer(options, messsageHandler));
+        _serverThread = std::thread(runServer, _server.get());
+    }
+
+    /**
+     * Stops the server if it is running.
+     */
+    void stop() {
+        if (!_server) {
+            return;
+        }
+
         {
             std::lock_guard<std::mutex> sl(shutDownMutex);
             shuttingDown = true;
         }
 
-        quickExit(rc);
+        ListeningSockets::get()->closeAll();
+        _serverThread.join();
+
+        int connCount = Listener::globalTicketHolder.used();
+        size_t iterCount = 0;
+        while (connCount > 0) {
+            if ((++iterCount % 20) == 0) {
+                log() << "DummyServer: Waiting for " << connCount << " connections to close."
+                      << std::endl;
+            }
+
+            sleepmillis(500);
+            connCount = Listener::globalTicketHolder.used();
+        }
+
+        _server.reset();
     }
-
-    void exitCleanly(ExitCode rc) {
-        dbexit(rc, "");
-    }
-
-    bool haveLocalShardingInfo(Client* client, const string& ns) {
-        return false;
-    }
-
-namespace {
-
-    const string TARGET_HOST = "localhost:27017";
-    const int TARGET_PORT = 27017;
-
-    class DummyMessageHandler final : public MessageHandler {
-    public:
-        virtual void connected(AbstractMessagingPort* p) {
-
-        }
-
-        virtual void process(Message& m, AbstractMessagingPort* por) {
-
-        }
-
-    } dummyHandler;
-
-    // TODO: Take this out and make it as a reusable class in a header file. The only
-    // thing that is preventing this from happening is the dependency on the inShutdown
-    // method to terminate the socket listener thread.
-    /**
-     * Very basic server that accepts connections. Note: can only create one instance
-     * at a time. Should not create as a static global instance because of dependency
-     * with ListeningSockets::_instance.
-     *
-     * Warning: Not thread-safe
-     *
-     * Note: external symbols used:
-     * shutDownMutex, shuttingDown
-     */
-    class DummyServer {
-    public:
-        /**
-         * Creates a new server that listens to the given port.
-         *
-         * @param port the port number to listen to.
-         */
-        DummyServer(int port) : _port(port) {
-
-        }
-
-        ~DummyServer() {
-            stop();
-        }
-
-        /**
-         * Starts the server if it is not yet running.
-         *
-         * @param messageHandler the message handler to use for this server. Ownership
-         *     of this object is passed to this server.
-         */
-        void run(MessageHandler* messsageHandler) {
-            if (_server != NULL) {
-                return;
-            }
-
-            MessageServer::Options options;
-            options.port = _port;
-
-            {
-                std::lock_guard<std::mutex> sl(shutDownMutex);
-                shuttingDown = false;
-            }
-
-            _server.reset(createServer(options, messsageHandler));
-            _serverThread = std::thread(runServer, _server.get());
-        }
-
-        /**
-         * Stops the server if it is running.
-         */
-        void stop() {
-            if (!_server) {
-                return;
-            }
-
-            {
-                std::lock_guard<std::mutex> sl(shutDownMutex);
-                shuttingDown = true;
-            }
-
-            ListeningSockets::get()->closeAll();
-            _serverThread.join();
-
-            int connCount = Listener::globalTicketHolder.used();
-            size_t iterCount = 0;
-            while (connCount > 0) {
-                if ((++iterCount % 20) == 0) {
-                    log() << "DummyServer: Waiting for " << connCount
-                                 << " connections to close." << std::endl;
-                }
-
-                sleepmillis(500);
-                connCount = Listener::globalTicketHolder.used();
-            }
-
-            _server.reset();
-        }
-
-        /**
-         * Helper method for running the server on a separate thread.
-         */
-        static void runServer(MessageServer* server) {
-            server->setupSockets();
-            server->run();
-        }
-
-    private:
-        const int _port;
-
-        std::thread _serverThread;
-        unique_ptr<MessageServer> _server;
-    };
 
     /**
-     * Warning: cannot run in parallel
+     * Helper method for running the server on a separate thread.
      */
-    class DummyServerFixture: public unittest::Test {
-    public:
-        void setUp() {
-            _maxPoolSizePerHost = globalConnPool.getMaxPoolSize();
-            _dummyServer = new DummyServer(TARGET_PORT);
+    static void runServer(MessageServer* server) {
+        server->setupSockets();
+        server->run();
+    }
 
-            _dummyServer->run(&dummyHandler);
-            DBClientConnection conn;
-            Timer timer;
+private:
+    const int _port;
 
-            // Make sure the dummy server is up and running before proceeding
-            while (true) {
-                try {
-                    conn.connect(TARGET_HOST);
-                    break;
-                } catch (const ConnectException&) {
-                    if (timer.seconds() > 20) {
-                        FAIL("Timed out connecting to dummy server");
-                    }
+    std::thread _serverThread;
+    unique_ptr<MessageServer> _server;
+};
+
+/**
+ * Warning: cannot run in parallel
+ */
+class DummyServerFixture : public unittest::Test {
+public:
+    void setUp() {
+        _maxPoolSizePerHost = globalConnPool.getMaxPoolSize();
+        _dummyServer = new DummyServer(TARGET_PORT);
+
+        _dummyServer->run(&dummyHandler);
+        DBClientConnection conn;
+        Timer timer;
+
+        // Make sure the dummy server is up and running before proceeding
+        while (true) {
+            try {
+                conn.connect(TARGET_HOST);
+                break;
+            } catch (const ConnectException&) {
+                if (timer.seconds() > 20) {
+                    FAIL("Timed out connecting to dummy server");
                 }
             }
         }
+    }
 
-        void tearDown() {
-            ScopedDbConnection::clearPool();
-            delete _dummyServer;
+    void tearDown() {
+        ScopedDbConnection::clearPool();
+        delete _dummyServer;
 
-            globalConnPool.setMaxPoolSize(_maxPoolSizePerHost);
+        globalConnPool.setMaxPoolSize(_maxPoolSizePerHost);
+    }
+
+protected:
+    static void assertGreaterThan(uint64_t a, uint64_t b) {
+        ASSERT_GREATER_THAN(a, b);
+    }
+
+    static void assertNotEqual(uint64_t a, uint64_t b) {
+        ASSERT_NOT_EQUALS(a, b);
+    }
+
+    /**
+     * Tries to grab a series of connections from the pool, perform checks on
+     * them, then put them back into the globalConnPool. After that, it checks these
+     * connections can be retrieved again from the pool.
+     *
+     * @param checkFunc method for comparing new connections and arg2.
+     * @param arg2 the value to pass as the 2nd parameter of checkFunc.
+     * @param newConnsToCreate the number of new connections to make.
+     */
+    void checkNewConns(void (*checkFunc)(uint64_t, uint64_t),
+                       uint64_t arg2,
+                       size_t newConnsToCreate) {
+        vector<ScopedDbConnection*> newConnList;
+        for (size_t x = 0; x < newConnsToCreate; x++) {
+            ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
+            checkFunc(newConn->get()->getSockCreationMicroSec(), arg2);
+            newConnList.push_back(newConn);
         }
 
-    protected:
-        static void assertGreaterThan(uint64_t a, uint64_t b) {
-            ASSERT_GREATER_THAN(a, b);
+        const uint64_t oldCreationTime = curTimeMicros64();
+
+        for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
+             iter != newConnList.end();
+             ++iter) {
+            (*iter)->done();
+            delete *iter;
         }
 
-        static void assertNotEqual(uint64_t a, uint64_t b) {
-            ASSERT_NOT_EQUALS(a, b);
+        newConnList.clear();
+
+        // Check that connections created after the purge was put back to the pool.
+        for (size_t x = 0; x < newConnsToCreate; x++) {
+            ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
+            ASSERT_LESS_THAN(newConn->get()->getSockCreationMicroSec(), oldCreationTime);
+            newConnList.push_back(newConn);
         }
 
-        /**
-         * Tries to grab a series of connections from the pool, perform checks on
-         * them, then put them back into the globalConnPool. After that, it checks these
-         * connections can be retrieved again from the pool.
-         *
-         * @param checkFunc method for comparing new connections and arg2.
-         * @param arg2 the value to pass as the 2nd parameter of checkFunc.
-         * @param newConnsToCreate the number of new connections to make.
-         */
-        void checkNewConns(void (*checkFunc)(uint64_t, uint64_t), uint64_t arg2,
-                size_t newConnsToCreate) {
-            vector<ScopedDbConnection*> newConnList;
-            for (size_t x = 0; x < newConnsToCreate; x++) {
-                ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
-                checkFunc(newConn->get()->getSockCreationMicroSec(), arg2);
-                newConnList.push_back(newConn);
-            }
-
-            const uint64_t oldCreationTime = curTimeMicros64();
-
-            for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
-                    iter != newConnList.end(); ++iter) {
-                (*iter)->done();
-                delete *iter;
-            }
-
-            newConnList.clear();
-
-            // Check that connections created after the purge was put back to the pool.
-            for (size_t x = 0; x < newConnsToCreate; x++) {
-                ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
-                ASSERT_LESS_THAN(newConn->get()->getSockCreationMicroSec(), oldCreationTime);
-                newConnList.push_back(newConn);
-            }
-
-            for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
-                    iter != newConnList.end(); ++iter) {
-                (*iter)->done();
-                delete *iter;
-            }
+        for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
+             iter != newConnList.end();
+             ++iter) {
+            (*iter)->done();
+            delete *iter;
         }
+    }
 
-    private:
-        static void runServer(MessageServer* server) {
-            server->setupSockets();
-            server->run();
-        }
+private:
+    static void runServer(MessageServer* server) {
+        server->setupSockets();
+        server->run();
+    }
 
-        DummyServer* _dummyServer;
-        uint32_t _maxPoolSizePerHost;
-    };
+    DummyServer* _dummyServer;
+    uint32_t _maxPoolSizePerHost;
+};
 
-    TEST_F(DummyServerFixture, BasicScopedDbConnection) {
-        ScopedDbConnection conn1(TARGET_HOST);
+TEST_F(DummyServerFixture, BasicScopedDbConnection) {
+    ScopedDbConnection conn1(TARGET_HOST);
+    ScopedDbConnection conn2(TARGET_HOST);
+
+    DBClientBase* conn1Ptr = conn1.get();
+    conn1.done();
+
+    ScopedDbConnection conn3(TARGET_HOST);
+    ASSERT_EQUALS(conn1Ptr, conn3.get());
+
+    conn2.done();
+    conn3.done();
+}
+
+TEST_F(DummyServerFixture, InvalidateBadConnInPool) {
+    ScopedDbConnection conn1(TARGET_HOST);
+    ScopedDbConnection conn2(TARGET_HOST);
+    ScopedDbConnection conn3(TARGET_HOST);
+
+    conn1.done();
+    conn3.done();
+
+    const uint64_t badCreationTime = curTimeMicros64();
+
+    getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->setMode(FailPoint::alwaysOn);
+
+    try {
+        conn2->query("test.user", Query());
+    } catch (const SocketException&) {
+    }
+
+    getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->setMode(FailPoint::off);
+    conn2.done();
+
+    checkNewConns(assertGreaterThan, badCreationTime, 10);
+}
+
+TEST_F(DummyServerFixture, DontReturnKnownBadConnToPool) {
+    ScopedDbConnection conn1(TARGET_HOST);
+    ScopedDbConnection conn2(TARGET_HOST);
+    ScopedDbConnection conn3(TARGET_HOST);
+
+    conn1.done();
+
+    getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->setMode(FailPoint::alwaysOn);
+
+    try {
+        conn3->query("test.user", Query());
+    } catch (const SocketException&) {
+    }
+
+    getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->setMode(FailPoint::off);
+
+    const uint64_t badCreationTime = conn3->getSockCreationMicroSec();
+    conn3.done();
+    // attempting to put a 'bad' connection back to the pool
+    conn2.done();
+
+    checkNewConns(assertGreaterThan, badCreationTime, 10);
+}
+
+TEST_F(DummyServerFixture, InvalidateBadConnEvenWhenPoolIsFull) {
+    globalConnPool.setMaxPoolSize(2);
+
+    ScopedDbConnection conn1(TARGET_HOST);
+    ScopedDbConnection conn2(TARGET_HOST);
+    ScopedDbConnection conn3(TARGET_HOST);
+
+    conn1.done();
+    conn3.done();
+
+    const uint64_t badCreationTime = curTimeMicros64();
+
+    getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->setMode(FailPoint::alwaysOn);
+
+    try {
+        conn2->query("test.user", Query());
+    } catch (const SocketException&) {
+    }
+
+    getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->setMode(FailPoint::off);
+    conn2.done();
+
+    checkNewConns(assertGreaterThan, badCreationTime, 2);
+}
+
+TEST_F(DummyServerFixture, DontReturnConnGoneBadToPool) {
+    ScopedDbConnection conn1(TARGET_HOST);
+
+    const uint64_t conn1CreationTime = conn1->getSockCreationMicroSec();
+
+    uint64_t conn2CreationTime = 0;
+
+    {
         ScopedDbConnection conn2(TARGET_HOST);
-
-        DBClientBase* conn1Ptr = conn1.get();
-        conn1.done();
-
-        ScopedDbConnection conn3(TARGET_HOST);
-        ASSERT_EQUALS(conn1Ptr, conn3.get());
-
-        conn2.done();
-        conn3.done();
-    }
-
-    TEST_F(DummyServerFixture, InvalidateBadConnInPool) {
-        ScopedDbConnection conn1(TARGET_HOST);
-        ScopedDbConnection conn2(TARGET_HOST);
-        ScopedDbConnection conn3(TARGET_HOST);
+        conn2CreationTime = conn2->getSockCreationMicroSec();
 
         conn1.done();
-        conn3.done();
-
-        const uint64_t badCreationTime = curTimeMicros64();
-
-        getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
-                setMode(FailPoint::alwaysOn);
-
-        try {
-            conn2->query("test.user", Query());
-        }
-        catch (const SocketException&) {
-        }
-
-        getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
-                setMode(FailPoint::off);
-        conn2.done();
-
-        checkNewConns(assertGreaterThan, badCreationTime, 10);
+        // conn2 gets out of scope without calling done()
     }
 
-    TEST_F(DummyServerFixture, DontReturnKnownBadConnToPool) {
-        ScopedDbConnection conn1(TARGET_HOST);
-        ScopedDbConnection conn2(TARGET_HOST);
-        ScopedDbConnection conn3(TARGET_HOST);
+    // conn2 should not have been put back into the pool but it should
+    // also not invalidate older connections since it didn't encounter
+    // a socket exception.
 
-        conn1.done();
+    ScopedDbConnection conn1Again(TARGET_HOST);
+    ASSERT_EQUALS(conn1CreationTime, conn1Again->getSockCreationMicroSec());
 
-        getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
-                setMode(FailPoint::alwaysOn);
+    checkNewConns(assertNotEqual, conn2CreationTime, 10);
 
-        try {
-            conn3->query("test.user", Query());
-        }
-        catch (const SocketException&) {
-        }
+    conn1Again.done();
+}
 
-        getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
-                setMode(FailPoint::off);
-
-        const uint64_t badCreationTime = conn3->getSockCreationMicroSec();
-        conn3.done();
-        // attempting to put a 'bad' connection back to the pool
-        conn2.done();
-
-        checkNewConns(assertGreaterThan, badCreationTime, 10);
-    }
-
-    TEST_F(DummyServerFixture, InvalidateBadConnEvenWhenPoolIsFull) {
-        globalConnPool.setMaxPoolSize(2);
-
-        ScopedDbConnection conn1(TARGET_HOST);
-        ScopedDbConnection conn2(TARGET_HOST);
-        ScopedDbConnection conn3(TARGET_HOST);
-
-        conn1.done();
-        conn3.done();
-
-        const uint64_t badCreationTime = curTimeMicros64();
-
-        getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
-                setMode(FailPoint::alwaysOn);
-
-        try {
-            conn2->query("test.user", Query());
-        }
-        catch (const SocketException&) {
-        }
-
-        getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
-                setMode(FailPoint::off);
-        conn2.done();
-
-        checkNewConns(assertGreaterThan, badCreationTime, 2);
-    }
-
-    TEST_F(DummyServerFixture, DontReturnConnGoneBadToPool) {
-        ScopedDbConnection conn1(TARGET_HOST);
-
-        const uint64_t conn1CreationTime = conn1->getSockCreationMicroSec();
-
-        uint64_t conn2CreationTime = 0;
-
-        {
-            ScopedDbConnection conn2(TARGET_HOST);
-            conn2CreationTime = conn2->getSockCreationMicroSec();
-
-            conn1.done();
-            // conn2 gets out of scope without calling done()
-        }
-
-        // conn2 should not have been put back into the pool but it should
-        // also not invalidate older connections since it didn't encounter
-        // a socket exception.
-
-        ScopedDbConnection conn1Again(TARGET_HOST);
-        ASSERT_EQUALS(conn1CreationTime, conn1Again->getSockCreationMicroSec());
-
-        checkNewConns(assertNotEqual, conn2CreationTime, 10);
-
-        conn1Again.done();
-    }
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

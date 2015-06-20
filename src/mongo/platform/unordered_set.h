@@ -31,6 +31,6 @@
 
 namespace mongo {
 
-    using std::unordered_set;
+using std::unordered_set;
 
 }  // namespace mongo

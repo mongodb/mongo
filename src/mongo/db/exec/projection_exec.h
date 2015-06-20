@@ -36,166 +36,162 @@
 
 namespace mongo {
 
-    class ProjectionExec {
-    public:
-        /**
-         * A .find() projection can have an array operation, either an elemMatch or positional (or
-         * neither).
-         */
-        enum ArrayOpType {
-            ARRAY_OP_NORMAL = 0,
-            ARRAY_OP_ELEM_MATCH,
-            ARRAY_OP_POSITIONAL
-        };
+class ProjectionExec {
+public:
+    /**
+     * A .find() projection can have an array operation, either an elemMatch or positional (or
+     * neither).
+     */
+    enum ArrayOpType { ARRAY_OP_NORMAL = 0, ARRAY_OP_ELEM_MATCH, ARRAY_OP_POSITIONAL };
 
-        /**
-         * Projections based on data computed while answering a query, or other metadata about a
-         * document / query.
-         */
-        enum MetaProjection {
-            META_TEXT_SCORE,
-            META_GEONEAR_DIST,
-            META_GEONEAR_POINT,
-            META_RECORDID,
-            META_IX_KEY,
-        };
-
-        /**
-         * TODO: document why we like StringMap so much here
-         */
-        typedef StringMap<ProjectionExec*> FieldMap;
-        typedef StringMap<MatchExpression*> Matchers;
-        typedef StringMap<MetaProjection> MetaMap;
-
-        ProjectionExec(const BSONObj& spec, 
-                       const MatchExpression* queryExpression,
-                       const MatchExpressionParser::WhereCallback& whereCallback =
-                                    MatchExpressionParser::WhereCallback());
-        ~ProjectionExec();
-
-        /**
-         * Apply this projection to the 'member'.  Changes the type to OWNED_OBJ.
-         */
-        Status transform(WorkingSetMember* member) const;
-
-        /**
-         * Apply this projection to the object 'in'.
-         *
-         * Upon success, 'out' is set to the new object and Status::OK() is returned.
-         * Otherwise, returns an error Status and *out is not mutated.
-         */
-        Status transform(const BSONObj& in, BSONObj* out) const;
-
-    private:
-        //
-        // Initialization
-        //
-
-        ProjectionExec();
-
-        /**
-         * Add 'field' as a field name that is included or excluded as part of the projection.
-         */
-        void add(const std::string& field, bool include);
-
-        /**
-         * Add 'field' as a field name that is sliced as part of the projection.
-         */
-        void add(const std::string& field, int skip, int limit);
-
-        //
-        // Execution
-        //
-
-        /**
-         * Apply the projection that 'this' represents to the object 'in'.  'details' is the result
-         * of a match evaluation of the full query on the object 'in'.  This is only required
-         * if the projection is positional.
-         *
-         * If the projection is successfully computed, returns Status::OK() and stuff the result in
-         * 'bob'.
-         * Otherwise, returns error.
-         */
-        Status transform(const BSONObj& in,
-                         BSONObjBuilder* bob,
-                         const MatchDetails* details = NULL) const;
-
-        /**
-         * See transform(...) above.
-         */
-        bool transformRequiresDetails() const {
-            return ARRAY_OP_POSITIONAL == _arrayOpType;
-        }
-
-        /**
-         * Is the full document required to compute this projection?
-         */
-        bool requiresDocument() const {
-            return _include || _hasNonSimple || _hasDottedField;
-        }
-
-        /**
-         * Appends the element 'e' to the builder 'bob', possibly descending into sub-fields of 'e'
-         * if needed.
-         */
-        Status append(BSONObjBuilder* bob,
-                      const BSONElement& elt,
-                      const MatchDetails* details = NULL,
-                      const ArrayOpType arrayOpType = ARRAY_OP_NORMAL) const;
-
-        /**
-         * Like append, but for arrays.
-         * Deals with slice and calls appendArray to preserve the array-ness.
-         */
-        void appendArray(BSONObjBuilder* bob, const BSONObj& array, bool nested = false) const;
-
-        // True if default at this level is to include.
-        bool _include;
-
-        // True if this level can't be skipped or included without recursing.
-        bool _special; 
-
-        // We must group projections with common prefixes together.
-        // TODO: benchmark std::vector<pair> vs map
-        //
-        // Projection is a rooted tree.  If we have {a.b: 1, a.c: 1} we don't want to
-        // double-traverse the document when we're projecting it.  Instead, we have an entry in
-        // _fields for 'a' with two sub projections: b:1 and c:1.
-        FieldMap _fields;
-
-        // The raw projection spec. that is passed into init(...)
-        BSONObj _source;
-
-        // Should we include the _id field?
-        bool _includeID;
-
-        // Arguments from the $slice operator.
-        int _skip;
-        int _limit;
-
-        // Used for $elemMatch and positional operator ($)
-        Matchers _matchers;
-
-        // The matchers above point into BSONObjs and this is where those objs live.
-        std::vector<BSONObj> _elemMatchObjs;
-
-        ArrayOpType _arrayOpType;
-
-        // Is there an slice, elemMatch or meta operator?
-        bool _hasNonSimple;
-
-        // Is there a projection over a dotted field or a $ positional operator?
-        bool _hasDottedField;
-
-        // The full query expression.  Used when we need MatchDetails.
-        const MatchExpression* _queryExpression;
-
-        // Projections that aren't sourced from the document or index keys.
-        MetaMap _meta;
-
-        // Do we have a returnKey projection?  If so we *only* output the index key metadata.  If
-        // it's not found we output nothing.
-        bool _hasReturnKey;
+    /**
+     * Projections based on data computed while answering a query, or other metadata about a
+     * document / query.
+     */
+    enum MetaProjection {
+        META_TEXT_SCORE,
+        META_GEONEAR_DIST,
+        META_GEONEAR_POINT,
+        META_RECORDID,
+        META_IX_KEY,
     };
+
+    /**
+     * TODO: document why we like StringMap so much here
+     */
+    typedef StringMap<ProjectionExec*> FieldMap;
+    typedef StringMap<MatchExpression*> Matchers;
+    typedef StringMap<MetaProjection> MetaMap;
+
+    ProjectionExec(const BSONObj& spec,
+                   const MatchExpression* queryExpression,
+                   const MatchExpressionParser::WhereCallback& whereCallback =
+                       MatchExpressionParser::WhereCallback());
+    ~ProjectionExec();
+
+    /**
+     * Apply this projection to the 'member'.  Changes the type to OWNED_OBJ.
+     */
+    Status transform(WorkingSetMember* member) const;
+
+    /**
+     * Apply this projection to the object 'in'.
+     *
+     * Upon success, 'out' is set to the new object and Status::OK() is returned.
+     * Otherwise, returns an error Status and *out is not mutated.
+     */
+    Status transform(const BSONObj& in, BSONObj* out) const;
+
+private:
+    //
+    // Initialization
+    //
+
+    ProjectionExec();
+
+    /**
+     * Add 'field' as a field name that is included or excluded as part of the projection.
+     */
+    void add(const std::string& field, bool include);
+
+    /**
+     * Add 'field' as a field name that is sliced as part of the projection.
+     */
+    void add(const std::string& field, int skip, int limit);
+
+    //
+    // Execution
+    //
+
+    /**
+     * Apply the projection that 'this' represents to the object 'in'.  'details' is the result
+     * of a match evaluation of the full query on the object 'in'.  This is only required
+     * if the projection is positional.
+     *
+     * If the projection is successfully computed, returns Status::OK() and stuff the result in
+     * 'bob'.
+     * Otherwise, returns error.
+     */
+    Status transform(const BSONObj& in,
+                     BSONObjBuilder* bob,
+                     const MatchDetails* details = NULL) const;
+
+    /**
+     * See transform(...) above.
+     */
+    bool transformRequiresDetails() const {
+        return ARRAY_OP_POSITIONAL == _arrayOpType;
+    }
+
+    /**
+     * Is the full document required to compute this projection?
+     */
+    bool requiresDocument() const {
+        return _include || _hasNonSimple || _hasDottedField;
+    }
+
+    /**
+     * Appends the element 'e' to the builder 'bob', possibly descending into sub-fields of 'e'
+     * if needed.
+     */
+    Status append(BSONObjBuilder* bob,
+                  const BSONElement& elt,
+                  const MatchDetails* details = NULL,
+                  const ArrayOpType arrayOpType = ARRAY_OP_NORMAL) const;
+
+    /**
+     * Like append, but for arrays.
+     * Deals with slice and calls appendArray to preserve the array-ness.
+     */
+    void appendArray(BSONObjBuilder* bob, const BSONObj& array, bool nested = false) const;
+
+    // True if default at this level is to include.
+    bool _include;
+
+    // True if this level can't be skipped or included without recursing.
+    bool _special;
+
+    // We must group projections with common prefixes together.
+    // TODO: benchmark std::vector<pair> vs map
+    //
+    // Projection is a rooted tree.  If we have {a.b: 1, a.c: 1} we don't want to
+    // double-traverse the document when we're projecting it.  Instead, we have an entry in
+    // _fields for 'a' with two sub projections: b:1 and c:1.
+    FieldMap _fields;
+
+    // The raw projection spec. that is passed into init(...)
+    BSONObj _source;
+
+    // Should we include the _id field?
+    bool _includeID;
+
+    // Arguments from the $slice operator.
+    int _skip;
+    int _limit;
+
+    // Used for $elemMatch and positional operator ($)
+    Matchers _matchers;
+
+    // The matchers above point into BSONObjs and this is where those objs live.
+    std::vector<BSONObj> _elemMatchObjs;
+
+    ArrayOpType _arrayOpType;
+
+    // Is there an slice, elemMatch or meta operator?
+    bool _hasNonSimple;
+
+    // Is there a projection over a dotted field or a $ positional operator?
+    bool _hasDottedField;
+
+    // The full query expression.  Used when we need MatchDetails.
+    const MatchExpression* _queryExpression;
+
+    // Projections that aren't sourced from the document or index keys.
+    MetaMap _meta;
+
+    // Do we have a returnKey projection?  If so we *only* output the index key metadata.  If
+    // it's not found we output nothing.
+    bool _hasReturnKey;
+};
 
 }  // namespace mongo

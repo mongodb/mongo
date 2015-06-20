@@ -28,8 +28,8 @@
 
 namespace mongo {
 
-    // We cut off further objects once we cross this threshold; thus, you might get
-    // a little bit more than this, it is a threshold rather than a limit.
-    extern const int32_t MaxBytesToReturnToClientAtOnce;
+// We cut off further objects once we cross this threshold; thus, you might get
+// a little bit more than this, it is a threshold rather than a limit.
+extern const int32_t MaxBytesToReturnToClientAtOnce;
 
 }  // namespace mongo

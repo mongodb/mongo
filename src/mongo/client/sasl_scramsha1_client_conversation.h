@@ -38,50 +38,51 @@
 #include "mongo/crypto/mechanism_scram.h"
 
 namespace mongo {
+/**
+ *  Client side authentication session for SASL PLAIN.
+ */
+class SaslSCRAMSHA1ClientConversation : public SaslClientConversation {
+    MONGO_DISALLOW_COPYING(SaslSCRAMSHA1ClientConversation);
+
+public:
     /**
-     *  Client side authentication session for SASL PLAIN.
-     */
-    class SaslSCRAMSHA1ClientConversation : public SaslClientConversation {
-        MONGO_DISALLOW_COPYING(SaslSCRAMSHA1ClientConversation);
-    public:
-        /**
-         * Implements the client side of a SASL PLAIN mechanism session.
-         **/
-        explicit SaslSCRAMSHA1ClientConversation(SaslClientSession* saslClientSession);
+     * Implements the client side of a SASL PLAIN mechanism session.
+     **/
+    explicit SaslSCRAMSHA1ClientConversation(SaslClientSession* saslClientSession);
 
-        virtual ~SaslSCRAMSHA1ClientConversation();
+    virtual ~SaslSCRAMSHA1ClientConversation();
 
-        /**
-         * Takes one step in a SCRAM-SHA-1 conversation.
-         *
-         * @return !Status::OK() for failure. The boolean part indicates if the
-         * authentication conversation is finished or not.
-         *
-         **/
-        virtual StatusWith<bool> step(StringData inputData, std::string* outputData);
+    /**
+     * Takes one step in a SCRAM-SHA-1 conversation.
+     *
+     * @return !Status::OK() for failure. The boolean part indicates if the
+     * authentication conversation is finished or not.
+     *
+     **/
+    virtual StatusWith<bool> step(StringData inputData, std::string* outputData);
 
-    private:
-        /**
-         * Generates client-first-message.
-         **/
-        StatusWith<bool> _firstStep(std::string* outputData);
+private:
+    /**
+     * Generates client-first-message.
+     **/
+    StatusWith<bool> _firstStep(std::string* outputData);
 
-        /**
-         * Parses server-first-message and generate client-final-message.
-         **/
-        StatusWith<bool> _secondStep(const std::vector<std::string>& input, std::string* outputData);
+    /**
+     * Parses server-first-message and generate client-final-message.
+     **/
+    StatusWith<bool> _secondStep(const std::vector<std::string>& input, std::string* outputData);
 
-        /**
-         * Generates client-first-message.
-         **/
-        StatusWith<bool> _thirdStep(const std::vector<std::string>& input, std::string* outputData);
+    /**
+     * Generates client-first-message.
+     **/
+    StatusWith<bool> _thirdStep(const std::vector<std::string>& input, std::string* outputData);
 
-        int _step;
-        std::string _authMessage;
-        unsigned char _saltedPassword[scram::hashSize];
+    int _step;
+    std::string _authMessage;
+    unsigned char _saltedPassword[scram::hashSize];
 
-        // client and server nonce concatenated
-        std::string _clientNonce;
-    };
+    // client and server nonce concatenated
+    std::string _clientNonce;
+};
 
 }  // namespace mongo

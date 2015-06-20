@@ -42,215 +42,221 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::vector;
+using std::unique_ptr;
+using std::vector;
 
-    // static
-    const char* IDHackStage::kStageType = "IDHACK";
+// static
+const char* IDHackStage::kStageType = "IDHACK";
 
-    IDHackStage::IDHackStage(OperationContext* txn, const Collection* collection,
-                             CanonicalQuery* query, WorkingSet* ws)
-        : _txn(txn),
-          _collection(collection),
-          _workingSet(ws),
-          _key(query->getQueryObj()["_id"].wrap()),
-          _done(false),
-          _idBeingPagedIn(WorkingSet::INVALID_ID),
-          _commonStats(kStageType) {
-        if (NULL != query->getProj()) {
-            _addKeyMetadata = query->getProj()->wantIndexKey();
-        }
-        else {
-            _addKeyMetadata = false;
-        }
+IDHackStage::IDHackStage(OperationContext* txn,
+                         const Collection* collection,
+                         CanonicalQuery* query,
+                         WorkingSet* ws)
+    : _txn(txn),
+      _collection(collection),
+      _workingSet(ws),
+      _key(query->getQueryObj()["_id"].wrap()),
+      _done(false),
+      _idBeingPagedIn(WorkingSet::INVALID_ID),
+      _commonStats(kStageType) {
+    if (NULL != query->getProj()) {
+        _addKeyMetadata = query->getProj()->wantIndexKey();
+    } else {
+        _addKeyMetadata = false;
+    }
+}
+
+IDHackStage::IDHackStage(OperationContext* txn,
+                         Collection* collection,
+                         const BSONObj& key,
+                         WorkingSet* ws)
+    : _txn(txn),
+      _collection(collection),
+      _workingSet(ws),
+      _key(key),
+      _done(false),
+      _addKeyMetadata(false),
+      _idBeingPagedIn(WorkingSet::INVALID_ID),
+      _commonStats(kStageType) {}
+
+IDHackStage::~IDHackStage() {}
+
+bool IDHackStage::isEOF() {
+    if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
+        // We asked the parent for a page-in, but still haven't had a chance to return the
+        // paged in document
+        return false;
     }
 
-    IDHackStage::IDHackStage(OperationContext* txn, Collection* collection,
-                             const BSONObj& key, WorkingSet* ws)
-        : _txn(txn),
-          _collection(collection),
-          _workingSet(ws),
-          _key(key),
-          _done(false),
-          _addKeyMetadata(false),
-          _idBeingPagedIn(WorkingSet::INVALID_ID),
-          _commonStats(kStageType) { }
+    return _done;
+}
 
-    IDHackStage::~IDHackStage() { }
+PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
+    ++_commonStats.works;
 
-    bool IDHackStage::isEOF() {
-        if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
-            // We asked the parent for a page-in, but still haven't had a chance to return the
-            // paged in document
-            return false;
-        }
+    // Adds the amount of time taken by work() to executionTimeMillis.
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        return  _done;
+    if (_done) {
+        return PlanStage::IS_EOF;
     }
 
-    PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
-        ++_commonStats.works;
+    if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
+        invariant(_recordCursor);
+        WorkingSetID id = _idBeingPagedIn;
+        _idBeingPagedIn = WorkingSet::INVALID_ID;
+        WorkingSetMember* member = _workingSet->get(id);
 
-        // Adds the amount of time taken by work() to executionTimeMillis.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
+        invariant(WorkingSetCommon::fetchIfUnfetched(_txn, member, _recordCursor));
 
-        if (_done) { return PlanStage::IS_EOF; }
+        return advance(id, member, out);
+    }
 
-        if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
-            invariant(_recordCursor);
-            WorkingSetID id = _idBeingPagedIn;
-            _idBeingPagedIn = WorkingSet::INVALID_ID;
-            WorkingSetMember* member = _workingSet->get(id);
+    WorkingSetID id = WorkingSet::INVALID_ID;
+    try {
+        // Use the index catalog to get the id index.
+        const IndexCatalog* catalog = _collection->getIndexCatalog();
 
-            invariant(WorkingSetCommon::fetchIfUnfetched(_txn, member, _recordCursor));
-
-            return advance(id, member, out);
+        // Find the index we use.
+        IndexDescriptor* idDesc = catalog->findIdIndex(_txn);
+        if (NULL == idDesc) {
+            _done = true;
+            return PlanStage::IS_EOF;
         }
 
-        WorkingSetID id = WorkingSet::INVALID_ID;
-        try {
-            // Use the index catalog to get the id index.
-            const IndexCatalog* catalog = _collection->getIndexCatalog();
+        // Look up the key by going directly to the index.
+        RecordId loc = catalog->getIndex(idDesc)->findSingle(_txn, _key);
 
-            // Find the index we use.
-            IndexDescriptor* idDesc = catalog->findIdIndex(_txn);
-            if (NULL == idDesc) {
-                _done = true;
-                return PlanStage::IS_EOF;
-            }
-
-            // Look up the key by going directly to the index.
-            RecordId loc = catalog->getIndex(idDesc)->findSingle(_txn, _key);
-
-            // Key not found.
-            if (loc.isNull()) {
-                _done = true;
-                return PlanStage::IS_EOF;
-            }
-
-            ++_specificStats.keysExamined;
-            ++_specificStats.docsExamined;
-
-            // Create a new WSM for the result document.
-            id = _workingSet->allocate();
-            WorkingSetMember* member = _workingSet->get(id);
-            member->state = WorkingSetMember::LOC_AND_IDX;
-            member->loc = loc;
-
-            if (!_recordCursor) _recordCursor = _collection->getCursor(_txn);
-
-            // We may need to request a yield while we fetch the document.
-            if (auto fetcher = _recordCursor->fetcherForId(loc)) {
-                // There's something to fetch. Hand the fetcher off to the WSM, and pass up a
-                // fetch request.
-                _idBeingPagedIn = id;
-                member->setFetcher(fetcher.release());
-                *out = id;
-                _commonStats.needYield++;
-                return NEED_YIELD;
-            }
-
-            // The doc was already in memory, so we go ahead and return it.
-            if (!WorkingSetCommon::fetch(_txn, member, _recordCursor)) {
-                // _id is immutable so the index would return the only record that could
-                // possibly match the query.
-                _workingSet->free(id);
-                _commonStats.isEOF = true;
-                _done = true;
-                return IS_EOF;
-            }
-
-            return advance(id, member, out);
+        // Key not found.
+        if (loc.isNull()) {
+            _done = true;
+            return PlanStage::IS_EOF;
         }
-        catch (const WriteConflictException& wce) {
-            // Restart at the beginning on retry.
-            _recordCursor.reset();
-            if (id != WorkingSet::INVALID_ID)
-                _workingSet->free(id);
 
-            *out = WorkingSet::INVALID_ID;
+        ++_specificStats.keysExamined;
+        ++_specificStats.docsExamined;
+
+        // Create a new WSM for the result document.
+        id = _workingSet->allocate();
+        WorkingSetMember* member = _workingSet->get(id);
+        member->state = WorkingSetMember::LOC_AND_IDX;
+        member->loc = loc;
+
+        if (!_recordCursor)
+            _recordCursor = _collection->getCursor(_txn);
+
+        // We may need to request a yield while we fetch the document.
+        if (auto fetcher = _recordCursor->fetcherForId(loc)) {
+            // There's something to fetch. Hand the fetcher off to the WSM, and pass up a
+            // fetch request.
+            _idBeingPagedIn = id;
+            member->setFetcher(fetcher.release());
+            *out = id;
             _commonStats.needYield++;
             return NEED_YIELD;
         }
-    }
 
-    PlanStage::StageState IDHackStage::advance(WorkingSetID id,
-                                               WorkingSetMember* member,
-                                               WorkingSetID* out) {
-        invariant(member->hasObj());
-
-        if (_addKeyMetadata) {
-            BSONObjBuilder bob;
-            BSONObj ownedKeyObj = member->obj.value()["_id"].wrap().getOwned();
-            bob.appendKeys(_key, ownedKeyObj);
-            member->addComputed(new IndexKeyComputedData(bob.obj()));
+        // The doc was already in memory, so we go ahead and return it.
+        if (!WorkingSetCommon::fetch(_txn, member, _recordCursor)) {
+            // _id is immutable so the index would return the only record that could
+            // possibly match the query.
+            _workingSet->free(id);
+            _commonStats.isEOF = true;
+            _done = true;
+            return IS_EOF;
         }
 
-        _done = true;
-        ++_commonStats.advanced;
-        *out = id;
-        return PlanStage::ADVANCED;
+        return advance(id, member, out);
+    } catch (const WriteConflictException& wce) {
+        // Restart at the beginning on retry.
+        _recordCursor.reset();
+        if (id != WorkingSet::INVALID_ID)
+            _workingSet->free(id);
+
+        *out = WorkingSet::INVALID_ID;
+        _commonStats.needYield++;
+        return NEED_YIELD;
+    }
+}
+
+PlanStage::StageState IDHackStage::advance(WorkingSetID id,
+                                           WorkingSetMember* member,
+                                           WorkingSetID* out) {
+    invariant(member->hasObj());
+
+    if (_addKeyMetadata) {
+        BSONObjBuilder bob;
+        BSONObj ownedKeyObj = member->obj.value()["_id"].wrap().getOwned();
+        bob.appendKeys(_key, ownedKeyObj);
+        member->addComputed(new IndexKeyComputedData(bob.obj()));
     }
 
-    void IDHackStage::saveState() {
-        _txn = NULL;
-        ++_commonStats.yields;
-        if (_recordCursor) _recordCursor->saveUnpositioned();
+    _done = true;
+    ++_commonStats.advanced;
+    *out = id;
+    return PlanStage::ADVANCED;
+}
+
+void IDHackStage::saveState() {
+    _txn = NULL;
+    ++_commonStats.yields;
+    if (_recordCursor)
+        _recordCursor->saveUnpositioned();
+}
+
+void IDHackStage::restoreState(OperationContext* opCtx) {
+    invariant(_txn == NULL);
+    _txn = opCtx;
+    ++_commonStats.unyields;
+    if (_recordCursor)
+        _recordCursor->restore(opCtx);
+}
+
+void IDHackStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    ++_commonStats.invalidates;
+
+    // Since updates can't mutate the '_id' field, we can ignore mutation invalidations.
+    if (INVALIDATION_MUTATION == type) {
+        return;
     }
 
-    void IDHackStage::restoreState(OperationContext* opCtx) {
-        invariant(_txn == NULL);
-        _txn = opCtx;
-        ++_commonStats.unyields;
-        if (_recordCursor) _recordCursor->restore(opCtx);
-    }
-
-    void IDHackStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-        ++_commonStats.invalidates;
-
-        // Since updates can't mutate the '_id' field, we can ignore mutation invalidations.
-        if (INVALIDATION_MUTATION == type) {
-            return;
+    // It's possible that the loc getting invalidated is the one we're about to
+    // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
+    if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
+        WorkingSetMember* member = _workingSet->get(_idBeingPagedIn);
+        if (member->hasLoc() && (member->loc == dl)) {
+            // Fetch it now and kill the diskloc.
+            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
         }
-
-        // It's possible that the loc getting invalidated is the one we're about to
-        // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
-        if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
-            WorkingSetMember* member = _workingSet->get(_idBeingPagedIn);
-            if (member->hasLoc() && (member->loc == dl)) {
-                // Fetch it now and kill the diskloc.
-                WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
-            }
-        }
     }
+}
 
-    // static
-    bool IDHackStage::supportsQuery(const CanonicalQuery& query) {
-        return !query.getParsed().showRecordId()
-            && query.getParsed().getHint().isEmpty()
-            && 0 == query.getParsed().getSkip()
-            && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
-            && !query.getParsed().isTailable();
-    }
+// static
+bool IDHackStage::supportsQuery(const CanonicalQuery& query) {
+    return !query.getParsed().showRecordId() && query.getParsed().getHint().isEmpty() &&
+        0 == query.getParsed().getSkip() &&
+        CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter()) &&
+        !query.getParsed().isTailable();
+}
 
-    vector<PlanStage*> IDHackStage::getChildren() const {
-        vector<PlanStage*> empty;
-        return empty;
-    }
+vector<PlanStage*> IDHackStage::getChildren() const {
+    vector<PlanStage*> empty;
+    return empty;
+}
 
-    PlanStageStats* IDHackStage::getStats() {
-        _commonStats.isEOF = isEOF();
-        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IDHACK));
-        ret->specific.reset(new IDHackStats(_specificStats));
-        return ret.release();
-    }
+PlanStageStats* IDHackStage::getStats() {
+    _commonStats.isEOF = isEOF();
+    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IDHACK));
+    ret->specific.reset(new IDHackStats(_specificStats));
+    return ret.release();
+}
 
-    const CommonStats* IDHackStage::getCommonStats() const {
-        return &_commonStats;
-    }
+const CommonStats* IDHackStage::getCommonStats() const {
+    return &_commonStats;
+}
 
-    const SpecificStats* IDHackStage::getSpecificStats() const {
-        return &_specificStats;
-    }
+const SpecificStats* IDHackStage::getSpecificStats() const {
+    return &_specificStats;
+}
 
 }  // namespace mongo

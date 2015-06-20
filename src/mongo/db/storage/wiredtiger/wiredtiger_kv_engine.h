@@ -44,113 +44,112 @@
 
 namespace mongo {
 
-    class WiredTigerSessionCache;
-    class WiredTigerSizeStorer;
+class WiredTigerSessionCache;
+class WiredTigerSizeStorer;
 
-    class WiredTigerKVEngine : public KVEngine {
-    public:
-        WiredTigerKVEngine( const std::string& path,
-                            const std::string& extraOpenOptions = "",
-                            bool durable = true,
-                            bool repair = false );
-        virtual ~WiredTigerKVEngine();
+class WiredTigerKVEngine : public KVEngine {
+public:
+    WiredTigerKVEngine(const std::string& path,
+                       const std::string& extraOpenOptions = "",
+                       bool durable = true,
+                       bool repair = false);
+    virtual ~WiredTigerKVEngine();
 
-        void setRecordStoreExtraOptions( const std::string& options );
-        void setSortedDataInterfaceExtraOptions( const std::string& options );
+    void setRecordStoreExtraOptions(const std::string& options);
+    void setSortedDataInterfaceExtraOptions(const std::string& options);
 
-        virtual bool supportsDocLocking() const;
+    virtual bool supportsDocLocking() const;
 
-        virtual bool supportsDirectoryPerDB() const;
+    virtual bool supportsDirectoryPerDB() const;
 
-        virtual bool isDurable() const { return _durable; }
+    virtual bool isDurable() const {
+        return _durable;
+    }
 
-        virtual RecoveryUnit* newRecoveryUnit();
+    virtual RecoveryUnit* newRecoveryUnit();
 
-        virtual Status createRecordStore( OperationContext* opCtx,
-                                          StringData ns,
-                                          StringData ident,
-                                          const CollectionOptions& options );
+    virtual Status createRecordStore(OperationContext* opCtx,
+                                     StringData ns,
+                                     StringData ident,
+                                     const CollectionOptions& options);
 
-        virtual RecordStore* getRecordStore( OperationContext* opCtx,
-                                             StringData ns,
+    virtual RecordStore* getRecordStore(OperationContext* opCtx,
+                                        StringData ns,
+                                        StringData ident,
+                                        const CollectionOptions& options);
+
+    virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
-                                             const CollectionOptions& options );
+                                             const IndexDescriptor* desc);
 
-        virtual Status createSortedDataInterface( OperationContext* opCtx,
-                                                  StringData ident,
-                                                  const IndexDescriptor* desc );
+    virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
+                                                        StringData ident,
+                                                        const IndexDescriptor* desc);
 
-        virtual SortedDataInterface* getSortedDataInterface( OperationContext* opCtx,
-                                                             StringData ident,
-                                                             const IndexDescriptor* desc );
+    virtual Status dropIdent(OperationContext* opCtx, StringData ident);
 
-        virtual Status dropIdent( OperationContext* opCtx,
-                                  StringData ident );
+    virtual Status okToRename(OperationContext* opCtx,
+                              StringData fromNS,
+                              StringData toNS,
+                              StringData ident,
+                              const RecordStore* originalRecordStore) const;
 
-        virtual Status okToRename( OperationContext* opCtx,
-                                   StringData fromNS,
-                                   StringData toNS,
-                                   StringData ident,
-                                   const RecordStore* originalRecordStore ) const;
+    virtual int flushAllFiles(bool sync);
 
-        virtual int flushAllFiles( bool sync );
+    virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident);
 
-        virtual int64_t getIdentSize( OperationContext* opCtx,
-                                      StringData ident );
+    virtual Status repairIdent(OperationContext* opCtx, StringData ident);
 
-        virtual Status repairIdent( OperationContext* opCtx,
-                                    StringData ident );
+    virtual bool hasIdent(OperationContext* opCtx, StringData ident) const;
 
-        virtual bool hasIdent(OperationContext* opCtx, StringData ident) const;
+    std::vector<std::string> getAllIdents(OperationContext* opCtx) const;
 
-        std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
+    virtual void cleanShutdown();
 
-        virtual void cleanShutdown();
+    // wiredtiger specific
+    // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
+    // held by this class
+    int reconfigure(const char* str);
 
-        // wiredtiger specific
-        // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
-        // held by this class
-        int reconfigure(const char* str);
+    WT_CONNECTION* getConnection() {
+        return _conn;
+    }
+    void dropAllQueued();
+    bool haveDropsQueued() const;
 
-        WT_CONNECTION* getConnection() { return _conn; }
-        void dropAllQueued();
-        bool haveDropsQueued() const;
+    void syncSizeInfo(bool sync) const;
 
-        void syncSizeInfo(bool sync) const;
+    /**
+     * Initializes a background job to remove excess documents in the oplog collections.
+     * This applies to the capped collections in the local.oplog.* namespaces (specifically
+     * local.oplog.rs for replica sets and local.oplog.$main for master/slave replication).
+     * Returns true if a background job is running for the namespace.
+     */
+    static bool initRsOplogBackgroundThread(StringData ns);
 
-        /**
-         * Initializes a background job to remove excess documents in the oplog collections.
-         * This applies to the capped collections in the local.oplog.* namespaces (specifically
-         * local.oplog.rs for replica sets and local.oplog.$main for master/slave replication).
-         * Returns true if a background job is running for the namespace.
-         */
-        static bool initRsOplogBackgroundThread(StringData ns);
+private:
+    Status _salvageIfNeeded(const char* uri);
+    void _checkIdentPath(StringData ident);
 
-    private:
+    bool _hasUri(WT_SESSION* session, const std::string& uri) const;
 
-        Status _salvageIfNeeded(const char* uri);
-        void _checkIdentPath( StringData ident );
+    std::string _uri(StringData ident) const;
+    bool _drop(StringData ident);
 
-        bool _hasUri(WT_SESSION* session, const std::string& uri) const;
+    WT_CONNECTION* _conn;
+    WT_EVENT_HANDLER _eventHandler;
+    std::unique_ptr<WiredTigerSessionCache> _sessionCache;
+    std::string _path;
+    bool _durable;
 
-        std::string _uri( StringData ident ) const;
-        bool _drop( StringData ident );
+    std::string _rsOptions;
+    std::string _indexOptions;
 
-        WT_CONNECTION* _conn;
-        WT_EVENT_HANDLER _eventHandler;
-        std::unique_ptr<WiredTigerSessionCache> _sessionCache;
-        std::string _path;
-        bool _durable;
+    std::set<std::string> _identToDrop;
+    mutable stdx::mutex _identToDropMutex;
 
-        std::string _rsOptions;
-        std::string _indexOptions;
-
-        std::set<std::string> _identToDrop;
-        mutable stdx::mutex _identToDropMutex;
-
-        std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
-        std::string _sizeStorerUri;
-        mutable ElapsedTracker _sizeStorerSyncTracker;
-    };
-
+    std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
+    std::string _sizeStorerUri;
+    mutable ElapsedTracker _sizeStorerSyncTracker;
+};
 }

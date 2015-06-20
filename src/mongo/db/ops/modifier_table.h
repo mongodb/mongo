@@ -33,38 +33,38 @@
 namespace mongo {
 namespace modifiertable {
 
-    // NOTE: Please update jstests/verify_update_mods.js or include a jstest for any new mods
-    enum ModifierType {
-        MOD_ADD_TO_SET,
-        MOD_BIT,
-        MOD_CURRENTDATE,
-        MOD_INC,
-        MOD_MAX,
-        MOD_MIN,
-        MOD_MUL,
-        MOD_POP,
-        MOD_PULL,
-        MOD_PULL_ALL,
-        MOD_PUSH,
-        MOD_PUSH_ALL,
-        MOD_SET,
-        MOD_SET_ON_INSERT,
-        MOD_RENAME,
-        MOD_UNSET,
-        MOD_UNKNOWN
-    };
+// NOTE: Please update jstests/verify_update_mods.js or include a jstest for any new mods
+enum ModifierType {
+    MOD_ADD_TO_SET,
+    MOD_BIT,
+    MOD_CURRENTDATE,
+    MOD_INC,
+    MOD_MAX,
+    MOD_MIN,
+    MOD_MUL,
+    MOD_POP,
+    MOD_PULL,
+    MOD_PULL_ALL,
+    MOD_PUSH,
+    MOD_PUSH_ALL,
+    MOD_SET,
+    MOD_SET_ON_INSERT,
+    MOD_RENAME,
+    MOD_UNSET,
+    MOD_UNKNOWN
+};
 
-    /**
-     * Returns the modifier type for 'typeStr', if it was recognized as an existing update
-     * mod, or MOD_UNKNOWN otherwise.
-     */
-    ModifierType getType(StringData typeStr);
+/**
+ * Returns the modifier type for 'typeStr', if it was recognized as an existing update
+ * mod, or MOD_UNKNOWN otherwise.
+ */
+ModifierType getType(StringData typeStr);
 
-    /**
-     * Instantiate an update mod that corresponds to 'modType' or NULL if 'modType' is not
-     * valid. The ownership of the new object is the caller's.
-     */
-    ModifierInterface* makeUpdateMod(ModifierType modType);
+/**
+ * Instantiate an update mod that corresponds to 'modType' or NULL if 'modType' is not
+ * valid. The ownership of the new object is the caller's.
+ */
+ModifierInterface* makeUpdateMod(ModifierType modType);
 
-} // namespace modifiertable
-} // namespace mongo
+}  // namespace modifiertable
+}  // namespace mongo

@@ -37,140 +37,136 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
+using std::string;
+using std::stringstream;
 
-    /**
-     * Command for modifying installed fail points.
-     *
-     * Format
-     * {
-     *    configureFailPoint: <string>, // name of the fail point.
-     *    mode: <string|Object>, // the new mode to set. Can have one of the
-     *        following format:
-     *
-     *        1. 'off' - disable fail point.
-     *        2. 'alwaysOn' - fail point is always active.
-     *        3. { activationProbability: <n> } - n should be a double between 0 and 1,
-     *           representing the probability that the fail point will fire.  0 means never,
-     *           1 means (nearly) always.
-     *        4. { times: <n> } - n should be positive and within the range of a 32 bit
-     *            signed integer and this is the number of passes on the fail point will
-     *            remain activated.
-     *
-     *    data: <Object> // optional arbitrary object to store.
-     * }
-     */
-    class FaultInjectCmd: public Command {
-    public:
-        FaultInjectCmd(): Command("configureFailPoint") {}
+/**
+ * Command for modifying installed fail points.
+ *
+ * Format
+ * {
+ *    configureFailPoint: <string>, // name of the fail point.
+ *    mode: <string|Object>, // the new mode to set. Can have one of the
+ *        following format:
+ *
+ *        1. 'off' - disable fail point.
+ *        2. 'alwaysOn' - fail point is always active.
+ *        3. { activationProbability: <n> } - n should be a double between 0 and 1,
+ *           representing the probability that the fail point will fire.  0 means never,
+ *           1 means (nearly) always.
+ *        4. { times: <n> } - n should be positive and within the range of a 32 bit
+ *            signed integer and this is the number of passes on the fail point will
+ *            remain activated.
+ *
+ *    data: <Object> // optional arbitrary object to store.
+ * }
+ */
+class FaultInjectCmd : public Command {
+public:
+    FaultInjectCmd() : Command("configureFailPoint") {}
 
-        virtual bool slaveOk() const {
-            return true;
-        }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual bool adminOnly() const {
-            return true;
-        }
-
-        // No auth needed because it only works when enabled via command line.
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {}
-
-        virtual void help(stringstream& h) const {
-            h << "modifies the settings of a fail point";
-        }
-
-        bool run(OperationContext* txn, const string& dbname,
-                BSONObj& cmdObj,
-                int,
-                string& errmsg,
-                BSONObjBuilder& result) {
-            const string failPointName(cmdObj.firstElement().str());
-            FailPointRegistry* registry = getGlobalFailPointRegistry();
-            FailPoint* failPoint = registry->getFailPoint(failPointName);
-
-            if (failPoint == NULL) {
-                errmsg = failPointName + " not found";
-                return false;
-            }
-
-            FailPoint::Mode mode = FailPoint::alwaysOn;
-            FailPoint::ValType val = 0;
-
-            const BSONElement modeElem(cmdObj["mode"]);
-            if (modeElem.eoo()) {
-                result.appendElements(failPoint->toBSON());
-                return true;
-            }
-            else if (modeElem.type() == String) {
-                const string modeStr(modeElem.valuestr());
-
-                if (modeStr == "off") {
-                    mode = FailPoint::off;
-                }
-                else if (modeStr == "alwaysOn") {
-                    mode = FailPoint::alwaysOn;
-                }
-                else {
-                    errmsg = "unknown mode: " + modeStr;
-                    return false;
-                }
-            }
-            else if (modeElem.type() == Object) {
-                const BSONObj modeObj(modeElem.Obj());
-
-                if (modeObj.hasField("times")) {
-                    mode = FailPoint::nTimes;
-                    const int intVal = modeObj["times"].numberInt();
-
-                    if (intVal < 0) {
-                        errmsg = "times should be positive";
-                        return false;
-                    }
-
-                    val = intVal;
-                }
-                else if (modeObj.hasField("activationProbability")) {
-                    mode = FailPoint::random;
-                    const double activationProbability =
-                        modeObj["activationProbability"].numberDouble();
-                    if (activationProbability < 0 || activationProbability > 1) {
-                        errmsg = str::stream() <<
-                            "activationProbability must be between 0.0 and 1.0; found " <<
-                            activationProbability;
-                        return false;
-                    }
-                    val = static_cast<int32_t>(
-                            std::numeric_limits<int32_t>::max() * activationProbability);
-                }
-                else {
-                    errmsg = "invalid mode object";
-                    return false;
-                }
-            }
-            else {
-                errmsg = "invalid mode format";
-                return false;
-            }
-
-            BSONObj dataObj;
-            if (cmdObj.hasField("data")) {
-                dataObj = cmdObj["data"].Obj();
-            }
-
-            failPoint->setMode(mode, val, dataObj);
-            return true;
-        }
-    };
-    MONGO_INITIALIZER(RegisterFaultInjectCmd)(InitializerContext* context) {
-        if (Command::testCommandsEnabled) {
-            // Leaked intentionally: a Command registers itself when constructed.
-            new FaultInjectCmd();
-        }
-        return Status::OK();
+    virtual bool slaveOk() const {
+        return true;
     }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    // No auth needed because it only works when enabled via command line.
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {}
+
+    virtual void help(stringstream& h) const {
+        h << "modifies the settings of a fail point";
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        const string failPointName(cmdObj.firstElement().str());
+        FailPointRegistry* registry = getGlobalFailPointRegistry();
+        FailPoint* failPoint = registry->getFailPoint(failPointName);
+
+        if (failPoint == NULL) {
+            errmsg = failPointName + " not found";
+            return false;
+        }
+
+        FailPoint::Mode mode = FailPoint::alwaysOn;
+        FailPoint::ValType val = 0;
+
+        const BSONElement modeElem(cmdObj["mode"]);
+        if (modeElem.eoo()) {
+            result.appendElements(failPoint->toBSON());
+            return true;
+        } else if (modeElem.type() == String) {
+            const string modeStr(modeElem.valuestr());
+
+            if (modeStr == "off") {
+                mode = FailPoint::off;
+            } else if (modeStr == "alwaysOn") {
+                mode = FailPoint::alwaysOn;
+            } else {
+                errmsg = "unknown mode: " + modeStr;
+                return false;
+            }
+        } else if (modeElem.type() == Object) {
+            const BSONObj modeObj(modeElem.Obj());
+
+            if (modeObj.hasField("times")) {
+                mode = FailPoint::nTimes;
+                const int intVal = modeObj["times"].numberInt();
+
+                if (intVal < 0) {
+                    errmsg = "times should be positive";
+                    return false;
+                }
+
+                val = intVal;
+            } else if (modeObj.hasField("activationProbability")) {
+                mode = FailPoint::random;
+                const double activationProbability =
+                    modeObj["activationProbability"].numberDouble();
+                if (activationProbability < 0 || activationProbability > 1) {
+                    errmsg = str::stream()
+                        << "activationProbability must be between 0.0 and 1.0; found "
+                        << activationProbability;
+                    return false;
+                }
+                val = static_cast<int32_t>(std::numeric_limits<int32_t>::max() *
+                                           activationProbability);
+            } else {
+                errmsg = "invalid mode object";
+                return false;
+            }
+        } else {
+            errmsg = "invalid mode format";
+            return false;
+        }
+
+        BSONObj dataObj;
+        if (cmdObj.hasField("data")) {
+            dataObj = cmdObj["data"].Obj();
+        }
+
+        failPoint->setMode(mode, val, dataObj);
+        return true;
+    }
+};
+MONGO_INITIALIZER(RegisterFaultInjectCmd)(InitializerContext* context) {
+    if (Command::testCommandsEnabled) {
+        // Leaked intentionally: a Command registers itself when constructed.
+        new FaultInjectCmd();
+    }
+    return Status::OK();
+}
 }

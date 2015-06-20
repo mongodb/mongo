@@ -33,30 +33,32 @@
 
 namespace mongo {
 
-    /**
-     * does background async flushes of mmapped files
-     */
-    class DataFileSync : public BackgroundJob , public ServerStatusSection {
-    public:
-        DataFileSync();
+/**
+ * does background async flushes of mmapped files
+ */
+class DataFileSync : public BackgroundJob, public ServerStatusSection {
+public:
+    DataFileSync();
 
-        virtual bool includeByDefault() const { return true; }
-        virtual std::string name() const { return "DataFileSync"; }
+    virtual bool includeByDefault() const {
+        return true;
+    }
+    virtual std::string name() const {
+        return "DataFileSync";
+    }
 
-        void run();
+    void run();
 
-        virtual BSONObj generateSection(OperationContext* txn,
-                                        const BSONElement& configElement) const;
+    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const;
 
-    private:
-        void _flushed(int ms);
+private:
+    void _flushed(int ms);
 
-        long long _total_time;
-        long long _flushes;
-        int _last_time;
-        Date_t _last;
+    long long _total_time;
+    long long _flushes;
+    int _last_time;
+    Date_t _last;
+};
 
-    };
-
-    extern DataFileSync dataFileSync;
+extern DataFileSync dataFileSync;
 }

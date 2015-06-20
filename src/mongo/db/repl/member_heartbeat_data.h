@@ -36,77 +36,103 @@
 namespace mongo {
 namespace repl {
 
+/**
+ * This class contains the data returned from a heartbeat command for one member
+ * of a replica set.
+ **/
+class MemberHeartbeatData {
+public:
+    MemberHeartbeatData();
+
+    MemberState getState() const {
+        return _lastResponse.getState();
+    }
+    int getHealth() const {
+        return _health;
+    }
+    Date_t getUpSince() const {
+        return _upSince;
+    }
+    Date_t getLastHeartbeat() const {
+        return _lastHeartbeat;
+    }
+    Date_t getLastHeartbeatRecv() const {
+        return _lastHeartbeatRecv;
+    }
+    void setLastHeartbeatRecv(Date_t newHeartbeatRecvTime) {
+        _lastHeartbeatRecv = newHeartbeatRecvTime;
+    }
+    const std::string& getLastHeartbeatMsg() const {
+        return _lastResponse.getHbMsg();
+    }
+    const HostAndPort& getSyncSource() const {
+        return _lastResponse.getSyncingTo();
+    }
+    OpTime getOpTime() const {
+        return _lastResponse.getOpTime();
+    }
+    int getConfigVersion() const {
+        return _lastResponse.getConfigVersion();
+    }
+    bool hasAuthIssue() const {
+        return _authIssue;
+    }
+
+    Timestamp getElectionTime() const {
+        return _lastResponse.getElectionTime();
+    }
+
+    // Returns true if the last heartbeat data explicilty stated that the node
+    // is not electable.
+    bool isUnelectable() const {
+        return _lastResponse.hasIsElectable() && !_lastResponse.isElectable();
+    }
+
+    // Was this member up for the last heartbeat?
+    bool up() const {
+        return _health > 0;
+    }
+    // Was this member up for the last hearbeeat
+    // (or we haven't received the first heartbeat yet)
+    bool maybeUp() const {
+        return _health != 0;
+    }
+
     /**
-     * This class contains the data returned from a heartbeat command for one member
-     * of a replica set.
-     **/
-    class MemberHeartbeatData {
-    public:
-        MemberHeartbeatData();
+     * Sets values in this object from the results of a successful heartbeat command.
+     */
+    void setUpValues(Date_t now, const HostAndPort& host, ReplSetHeartbeatResponse hbResponse);
 
-        MemberState getState() const { return _lastResponse.getState(); }
-        int getHealth() const { return _health; }
-        Date_t getUpSince() const { return _upSince; }
-        Date_t getLastHeartbeat() const { return _lastHeartbeat; }
-        Date_t getLastHeartbeatRecv() const { return _lastHeartbeatRecv; }
-        void setLastHeartbeatRecv(Date_t newHeartbeatRecvTime) {
-            _lastHeartbeatRecv = newHeartbeatRecvTime;
-        }
-        const std::string& getLastHeartbeatMsg() const { return _lastResponse.getHbMsg(); }
-        const HostAndPort& getSyncSource() const { return _lastResponse.getSyncingTo(); }
-        OpTime getOpTime() const { return _lastResponse.getOpTime(); }
-        int getConfigVersion() const { return _lastResponse.getConfigVersion(); }
-        bool hasAuthIssue() const { return _authIssue; }
+    /**
+     * Sets values in this object from the results of a erroring/failed heartbeat command.
+     * _authIssues is set to false, _health is set to 0, _state is set to RS_DOWN, and
+     * other values are set as specified.
+     */
+    void setDownValues(Date_t now, const std::string& heartbeatMessage);
 
-        Timestamp getElectionTime() const { return _lastResponse.getElectionTime(); }
+    /**
+     * Sets values in this object that indicate there was an auth issue on the last heartbeat
+     * command.
+     */
+    void setAuthIssue(Date_t now);
 
-        // Returns true if the last heartbeat data explicilty stated that the node
-        // is not electable.
-        bool isUnelectable() const {
-            return _lastResponse.hasIsElectable() && !_lastResponse.isElectable();
-        }
+private:
+    // -1 = not checked yet, 0 = member is down/unreachable, 1 = member is up
+    int _health;
 
-        // Was this member up for the last heartbeat?
-        bool up() const { return _health > 0; }
-        // Was this member up for the last hearbeeat
-        // (or we haven't received the first heartbeat yet)
-        bool maybeUp() const { return _health != 0; }
+    // Time of first successful heartbeat, if currently still up
+    Date_t _upSince;
+    // This is the last time we got a response from a heartbeat request to a given member.
+    Date_t _lastHeartbeat;
+    // This is the last time we got a heartbeat request from a given member.
+    Date_t _lastHeartbeatRecv;
 
-        /**
-         * Sets values in this object from the results of a successful heartbeat command.
-         */
-        void setUpValues(Date_t now, const HostAndPort& host, ReplSetHeartbeatResponse hbResponse);
+    // Did the last heartbeat show a failure to authenticate?
+    bool _authIssue;
 
-        /**
-         * Sets values in this object from the results of a erroring/failed heartbeat command.
-         * _authIssues is set to false, _health is set to 0, _state is set to RS_DOWN, and
-         * other values are set as specified.
-         */
-        void setDownValues(Date_t now, const std::string& heartbeatMessage);
+    // The last heartbeat response we received.
+    ReplSetHeartbeatResponse _lastResponse;
+};
 
-        /**
-         * Sets values in this object that indicate there was an auth issue on the last heartbeat
-         * command.
-         */
-        void setAuthIssue(Date_t now);
-
-    private:
-        // -1 = not checked yet, 0 = member is down/unreachable, 1 = member is up
-        int _health;
-
-        // Time of first successful heartbeat, if currently still up
-        Date_t _upSince;
-        // This is the last time we got a response from a heartbeat request to a given member.
-        Date_t _lastHeartbeat;
-        // This is the last time we got a heartbeat request from a given member.
-        Date_t _lastHeartbeatRecv;
-
-        // Did the last heartbeat show a failure to authenticate?
-        bool _authIssue;
-
-        // The last heartbeat response we received.
-        ReplSetHeartbeatResponse _lastResponse;
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

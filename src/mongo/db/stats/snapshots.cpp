@@ -45,83 +45,77 @@
  */
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::endl;
+using std::unique_ptr;
+using std::endl;
 
-    void SnapshotData::takeSnapshot() {
-        _created = curTimeMicros64();
-        Top::get(getGlobalServiceContext()).cloneMap(_usage);
+void SnapshotData::takeSnapshot() {
+    _created = curTimeMicros64();
+    Top::get(getGlobalServiceContext()).cloneMap(_usage);
+}
+
+SnapshotDelta::SnapshotDelta(const SnapshotData& older, const SnapshotData& newer)
+    : _older(older), _newer(newer) {
+    verify(_newer._created > _older._created);
+    _elapsed = _newer._created - _older._created;
+}
+
+Top::UsageMap SnapshotDelta::collectionUsageDiff() {
+    verify(_newer._created > _older._created);
+    Top::UsageMap u;
+
+    for (Top::UsageMap::const_iterator i = _newer._usage.begin(); i != _newer._usage.end(); ++i) {
+        Top::UsageMap::const_iterator j = _older._usage.find(i->first);
+        if (j != _older._usage.end())
+            u[i->first] = Top::CollectionData(j->second, i->second);
+        else
+            u[i->first] = i->second;
+    }
+    return u;
+}
+
+Snapshots::Snapshots() : _loc(0), _stored(0) {}
+
+const SnapshotData* Snapshots::takeSnapshot() {
+    stdx::lock_guard<stdx::mutex> lk(_lock);
+    _loc = (_loc + 1) % kNumSnapshots;
+    _snapshots[_loc].takeSnapshot();
+    if (_stored < kNumSnapshots)
+        _stored++;
+    return &_snapshots[_loc];
+}
+
+StatusWith<SnapshotDiff> Snapshots::computeDelta() {
+    stdx::lock_guard<stdx::mutex> lk(_lock);
+
+    // We need 2 snapshots to calculate a delta
+    if (_stored < 2) {
+        return StatusWith<SnapshotDiff>(ErrorCodes::BadValue, "Less than 2 snapshots exist");
     }
 
-    SnapshotDelta::SnapshotDelta( const SnapshotData& older , const SnapshotData& newer )
-        : _older( older ) , _newer( newer ) {
-        verify( _newer._created > _older._created );
-        _elapsed = _newer._created - _older._created;
-    }
+    // The following logic depends on there being exactly 2 stored snapshots
+    BOOST_STATIC_ASSERT(kNumSnapshots == 2);
 
-    Top::UsageMap SnapshotDelta::collectionUsageDiff() {
-        verify( _newer._created > _older._created );
-        Top::UsageMap u;
+    // Current and previous napshot alternates between indexes 0 and 1
+    int currIdx = _loc;
+    int prevIdx = _loc > 0 ? 0 : 1;
+    SnapshotDelta delta(_snapshots[prevIdx], _snapshots[currIdx]);
 
-        for ( Top::UsageMap::const_iterator i=_newer._usage.begin();
-              i != _newer._usage.end(); ++i ) {
-            Top::UsageMap::const_iterator j = _older._usage.find(i->first);
-            if (j != _older._usage.end())
-                u[i->first] = Top::CollectionData( j->second , i->second );
-            else
-                u[i->first] = i->second;
+    return SnapshotDiff(delta.collectionUsageDiff(), delta.elapsed());
+}
+
+void SnapshotThread::run() {
+    Client::initThread("snapshot");
+    while (!inShutdown()) {
+        try {
+            statsSnapshots.takeSnapshot();
+        } catch (std::exception& e) {
+            log() << "ERROR in SnapshotThread: " << e.what() << endl;
         }
-        return u;
+
+        sleepsecs(4);
     }
+}
 
-    Snapshots::Snapshots()
-        : _loc(0)
-        , _stored(0)
-    {}
-
-    const SnapshotData* Snapshots::takeSnapshot() {
-        stdx::lock_guard<stdx::mutex> lk(_lock);
-        _loc = ( _loc + 1 ) % kNumSnapshots;
-        _snapshots[_loc].takeSnapshot();
-        if ( _stored < kNumSnapshots )
-            _stored++;
-        return &_snapshots[_loc];
-    }
-
-    StatusWith<SnapshotDiff> Snapshots::computeDelta() {
-        stdx::lock_guard<stdx::mutex> lk(_lock);
-
-        // We need 2 snapshots to calculate a delta
-        if (_stored < 2) {
-            return StatusWith<SnapshotDiff>(ErrorCodes::BadValue, 
-                                            "Less than 2 snapshots exist");
-        }
-
-        // The following logic depends on there being exactly 2 stored snapshots
-        BOOST_STATIC_ASSERT(kNumSnapshots == 2);
-
-        // Current and previous napshot alternates between indexes 0 and 1
-        int currIdx = _loc;
-        int prevIdx = _loc > 0 ? 0 : 1;
-        SnapshotDelta delta(_snapshots[prevIdx], _snapshots[currIdx]);
-
-        return SnapshotDiff(delta.collectionUsageDiff(), delta.elapsed());
-    }
-
-    void SnapshotThread::run() {
-        Client::initThread("snapshot");
-        while ( ! inShutdown() ) {
-            try {
-                statsSnapshots.takeSnapshot();
-            }
-            catch ( std::exception& e ) {
-                log() << "ERROR in SnapshotThread: " << e.what() << endl;
-            }
-
-            sleepsecs(4);
-        }
-    }
-
-    Snapshots statsSnapshots;
-    SnapshotThread snapshotThread;
+Snapshots statsSnapshots;
+SnapshotThread snapshotThread;
 }

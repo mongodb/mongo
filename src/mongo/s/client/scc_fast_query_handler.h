@@ -33,44 +33,40 @@
 
 namespace mongo {
 
-    /**
-     * Query handler that plugs in to a SyncClusterConnection and allows query on fastest host
-     * (if enabled).
-     *
-     * Glue code which shields the MultiHostQuery and server parameters from the separate client
-     * module which knows about neither.
-     *
-     * There is a *single* SCCFastQueryHandler for every SCC.  Each SCCFastQueryHandler contains
-     * its own thread pool (lazily initialized) so that at maximum there is a thread-per-SCC-host
-     * and this thread may have an open connection to the host until it times out.
-     * If using the "fastestConfigReads" options, clients must be ready for the additional thread
-     * and connection load when configs are slow.
-     */
-    class SCCFastQueryHandler : public SyncClusterConnection::QueryHandler {
-    public:
+/**
+ * Query handler that plugs in to a SyncClusterConnection and allows query on fastest host
+ * (if enabled).
+ *
+ * Glue code which shields the MultiHostQuery and server parameters from the separate client
+ * module which knows about neither.
+ *
+ * There is a *single* SCCFastQueryHandler for every SCC.  Each SCCFastQueryHandler contains
+ * its own thread pool (lazily initialized) so that at maximum there is a thread-per-SCC-host
+ * and this thread may have an open connection to the host until it times out.
+ * If using the "fastestConfigReads" options, clients must be ready for the additional thread
+ * and connection load when configs are slow.
+ */
+class SCCFastQueryHandler : public SyncClusterConnection::QueryHandler {
+public:
+    SCCFastQueryHandler();
 
-        SCCFastQueryHandler();
+    virtual ~SCCFastQueryHandler() {}
 
-        virtual ~SCCFastQueryHandler() {
-        }
+    virtual bool canHandleQuery(const std::string& ns, Query query);
 
-        virtual bool canHandleQuery(const std::string& ns, Query query);
+    virtual std::unique_ptr<DBClientCursor> handleQuery(const std::vector<std::string>& hostStrings,
+                                                        const std::string& ns,
+                                                        Query query,
+                                                        int nToReturn,
+                                                        int nToSkip,
+                                                        const BSONObj* fieldsToReturn,
+                                                        int queryOptions,
+                                                        int batchSize);
 
-        virtual std::unique_ptr<DBClientCursor> handleQuery(const std::vector<std::string>& hostStrings,
-                                                          const std::string &ns,
-                                                          Query query,
-                                                          int nToReturn,
-                                                          int nToSkip,
-                                                          const BSONObj *fieldsToReturn,
-                                                          int queryOptions,
-                                                          int batchSize);
-
-    private:
-
-        // The thread pool itself is scoped to the handler and SCC, and lazily creates threads
-        // per-host as needed.  This ensures query starvation cannot occur due to other active
-        // client threads - though a thread must be created for every client.
-        HostThreadPools _queryThreads;
-    };
-
+private:
+    // The thread pool itself is scoped to the handler and SCC, and lazily creates threads
+    // per-host as needed.  This ensures query starvation cannot occur due to other active
+    // client threads - though a thread must be created for every client.
+    HostThreadPools _queryThreads;
+};
 }

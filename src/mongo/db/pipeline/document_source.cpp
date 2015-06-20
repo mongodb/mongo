@@ -34,42 +34,40 @@
 
 namespace mongo {
 
-    using boost::intrusive_ptr;
-    using std::vector;
+using boost::intrusive_ptr;
+using std::vector;
 
-    DocumentSource::DocumentSource(const intrusive_ptr<ExpressionContext> &pCtx)
-        : pSource(NULL)
-        , pExpCtx(pCtx)
-    {}
+DocumentSource::DocumentSource(const intrusive_ptr<ExpressionContext>& pCtx)
+    : pSource(NULL), pExpCtx(pCtx) {}
 
-    const char *DocumentSource::getSourceName() const {
-        static const char unknown[] = "[UNKNOWN]";
-        return unknown;
+const char* DocumentSource::getSourceName() const {
+    static const char unknown[] = "[UNKNOWN]";
+    return unknown;
+}
+
+void DocumentSource::setSource(DocumentSource* pTheSource) {
+    verify(!pSource);
+    pSource = pTheSource;
+}
+
+bool DocumentSource::coalesce(const intrusive_ptr<DocumentSource>& pNextSource) {
+    return false;
+}
+
+intrusive_ptr<DocumentSource> DocumentSource::optimize() {
+    return this;
+}
+
+void DocumentSource::dispose() {
+    if (pSource) {
+        pSource->dispose();
     }
+}
 
-    void DocumentSource::setSource(DocumentSource *pTheSource) {
-        verify(!pSource);
-        pSource = pTheSource;
+void DocumentSource::serializeToArray(vector<Value>& array, bool explain) const {
+    Value entry = serialize(explain);
+    if (!entry.missing()) {
+        array.push_back(entry);
     }
-
-    bool DocumentSource::coalesce(const intrusive_ptr<DocumentSource> &pNextSource) {
-        return false;
-    }
-
-    intrusive_ptr<DocumentSource> DocumentSource::optimize() {
-        return this;
-    }
-
-    void DocumentSource::dispose() {
-        if ( pSource ) {
-            pSource->dispose();
-        }
-    }
-
-    void DocumentSource::serializeToArray(vector<Value>& array, bool explain) const {
-        Value entry = serialize(explain);
-        if (!entry.missing()) {
-            array.push_back(entry);
-        }
-    }
+}
 }

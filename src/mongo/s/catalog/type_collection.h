@@ -37,91 +37,110 @@
 
 namespace mongo {
 
-    class Status;
-    template<typename T> class StatusWith;
+class Status;
+template <typename T>
+class StatusWith;
+
+
+/**
+ * This class represents the layout and contents of documents contained in the
+ * config.collections collection. All manipulation of documents coming from that collection
+ * should be done with this class.
+ */
+class CollectionType {
+public:
+    // Name of the collections collection in the config server.
+    static const std::string ConfigNS;
+
+    static const BSONField<std::string> fullNs;
+    static const BSONField<OID> epoch;
+    static const BSONField<Date_t> updatedAt;
+    static const BSONField<BSONObj> keyPattern;
+    static const BSONField<bool> unique;
+    static const BSONField<bool> noBalance;
+    static const BSONField<bool> dropped;
 
 
     /**
-     * This class represents the layout and contents of documents contained in the
-     * config.collections collection. All manipulation of documents coming from that collection
-     * should be done with this class.
+     * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
      */
-    class CollectionType {
-    public:
-        // Name of the collections collection in the config server.
-        static const std::string ConfigNS;
+    static StatusWith<CollectionType> fromBSON(const BSONObj& source);
 
-        static const BSONField<std::string> fullNs;
-        static const BSONField<OID> epoch;
-        static const BSONField<Date_t> updatedAt;
-        static const BSONField<BSONObj> keyPattern;
-        static const BSONField<bool> unique;
-        static const BSONField<bool> noBalance;
-        static const BSONField<bool> dropped;
+    /**
+     * Returns OK if all fields have been set. Otherwise returns NoSuchKey and information
+     * about what is the first field which is missing.
+     */
+    Status validate() const;
 
+    /**
+     * Returns the BSON representation of the entry.
+     */
+    BSONObj toBSON() const;
 
-        /**
-         * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
-         */
-        static StatusWith<CollectionType> fromBSON(const BSONObj& source);
+    /**
+     * Returns a std::string representation of the current internal state.
+     */
+    std::string toString() const;
 
-        /**
-         * Returns OK if all fields have been set. Otherwise returns NoSuchKey and information
-         * about what is the first field which is missing.
-         */
-        Status validate() const;
+    const NamespaceString& getNs() const {
+        return _fullNs.get();
+    }
+    void setNs(const NamespaceString& fullNs);
 
-        /**
-         * Returns the BSON representation of the entry.
-         */
-        BSONObj toBSON() const;
+    OID getEpoch() const {
+        return _epoch.get();
+    }
+    void setEpoch(OID epoch);
 
-        /**
-         * Returns a std::string representation of the current internal state.
-         */
-        std::string toString() const;
+    Date_t getUpdatedAt() const {
+        return _updatedAt.get();
+    }
+    void setUpdatedAt(Date_t updatedAt);
 
-        const NamespaceString& getNs() const { return _fullNs.get(); }
-        void setNs(const NamespaceString& fullNs);
+    bool getDropped() const {
+        return _dropped.get_value_or(false);
+    }
+    void setDropped(bool dropped) {
+        _dropped = dropped;
+    }
 
-        OID getEpoch() const { return _epoch.get(); }
-        void setEpoch(OID epoch);
+    const KeyPattern& getKeyPattern() const {
+        return _keyPattern.get();
+    }
+    void setKeyPattern(const KeyPattern& keyPattern);
 
-        Date_t getUpdatedAt() const { return _updatedAt.get(); }
-        void setUpdatedAt(Date_t updatedAt);
+    bool getUnique() const {
+        return _unique.get_value_or(false);
+    }
+    void setUnique(bool unique) {
+        _unique = unique;
+    }
 
-        bool getDropped() const { return _dropped.get_value_or(false); }
-        void setDropped(bool dropped) { _dropped = dropped; }
+    bool getAllowBalance() const {
+        return _allowBalance.get_value_or(true);
+    }
 
-        const KeyPattern& getKeyPattern() const { return _keyPattern.get(); }
-        void setKeyPattern(const KeyPattern& keyPattern);
+private:
+    // Required full namespace (with the database prefix).
+    boost::optional<NamespaceString> _fullNs;
 
-        bool getUnique() const { return _unique.get_value_or(false); }
-        void setUnique(bool unique) { _unique = unique; }
+    // Required to disambiguate collection namespace incarnations.
+    boost::optional<OID> _epoch;
 
-        bool getAllowBalance() const { return _allowBalance.get_value_or(true); }
+    // Required last updated time.
+    boost::optional<Date_t> _updatedAt;
 
-    private:
-        // Required full namespace (with the database prefix).
-        boost::optional<NamespaceString> _fullNs;
+    // Optional, whether the collection has been dropped. If missing, implies false.
+    boost::optional<bool> _dropped;
 
-        // Required to disambiguate collection namespace incarnations.
-        boost::optional<OID> _epoch;
+    // Sharding key. Required, if collection is not dropped.
+    boost::optional<KeyPattern> _keyPattern;
 
-        // Required last updated time.
-        boost::optional<Date_t> _updatedAt;
+    // Optional uniqueness of the sharding key. If missing, implies false.
+    boost::optional<bool> _unique;
 
-        // Optional, whether the collection has been dropped. If missing, implies false.
-        boost::optional<bool> _dropped;
+    // Optional whether balancing is allowed for this collection. If missing, implies true.
+    boost::optional<bool> _allowBalance;
+};
 
-        // Sharding key. Required, if collection is not dropped.
-        boost::optional<KeyPattern> _keyPattern;
-
-        // Optional uniqueness of the sharding key. If missing, implies false.
-        boost::optional<bool> _unique;
-
-        // Optional whether balancing is allowed for this collection. If missing, implies true.
-        boost::optional<bool> _allowBalance;
-    };
-
-} // namespace mongo
+}  // namespace mongo

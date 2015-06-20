@@ -35,69 +35,70 @@
 
 namespace mongo {
 
-    struct CollectionOptions {
-        CollectionOptions() {
-            reset();
-        }
+struct CollectionOptions {
+    CollectionOptions() {
+        reset();
+    }
 
-        void reset();
+    void reset();
 
-        /**
-         * Returns true if collection options validates successfully.
-         */
-        bool isValid() const;
+    /**
+     * Returns true if collection options validates successfully.
+     */
+    bool isValid() const;
 
-        /**
-         * Confirms that collection options can be converted to BSON and back without errors.
-         */
-        Status validate() const;
+    /**
+     * Confirms that collection options can be converted to BSON and back without errors.
+     */
+    Status validate() const;
 
-        /**
-         * Parses the "options" subfield of the collection info object.
-         */
-        Status parse( const BSONObj& obj );
+    /**
+     * Parses the "options" subfield of the collection info object.
+     */
+    Status parse(const BSONObj& obj);
 
-        BSONObj toBSON() const;
+    BSONObj toBSON() const;
 
-        /**
-         * @param max in and out, will be adjusted
-         * @return if the value is valid at all
-         */
-        static bool validMaxCappedDocs( long long* max );
+    /**
+     * @param max in and out, will be adjusted
+     * @return if the value is valid at all
+     */
+    static bool validMaxCappedDocs(long long* max);
 
-        // ----
+    // ----
 
-        bool capped;
-        long long cappedSize;
-        long long cappedMaxDocs;
+    bool capped;
+    long long cappedSize;
+    long long cappedMaxDocs;
 
-        // following 2 are mutually exclusive, can only have one set
-        long long initialNumExtents;
-        std::vector<long long> initialExtentSizes;
+    // following 2 are mutually exclusive, can only have one set
+    long long initialNumExtents;
+    std::vector<long long> initialExtentSizes;
 
-        // behavior of _id index creation when collection created
-        void setNoIdIndex() { autoIndexId = NO; }
-        enum {
-            DEFAULT, // currently yes for most collections, NO for some system ones
-            YES, // create _id index
-            NO // do not create _id index
-        } autoIndexId;
+    // behavior of _id index creation when collection created
+    void setNoIdIndex() {
+        autoIndexId = NO;
+    }
+    enum {
+        DEFAULT,  // currently yes for most collections, NO for some system ones
+        YES,      // create _id index
+        NO        // do not create _id index
+    } autoIndexId;
 
-        // user flags
-        enum UserFlags {
-            Flag_UsePowerOf2Sizes = 1 << 0,
-            Flag_NoPadding = 1 << 1,
-        };
-        int flags; // a bitvector of UserFlags
-        bool flagsSet;
-
-        bool temp;
-
-        // Storage engine collection options. Always owned or empty.
-        BSONObj storageEngine;
-
-        // Always owned or empty.
-        BSONObj validator;
+    // user flags
+    enum UserFlags {
+        Flag_UsePowerOf2Sizes = 1 << 0,
+        Flag_NoPadding = 1 << 1,
     };
+    int flags;  // a bitvector of UserFlags
+    bool flagsSet;
 
+    bool temp;
+
+    // Storage engine collection options. Always owned or empty.
+    BSONObj storageEngine;
+
+    // Always owned or empty.
+    BSONObj validator;
+};
 }

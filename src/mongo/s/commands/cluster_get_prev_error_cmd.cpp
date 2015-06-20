@@ -38,41 +38,39 @@
 namespace mongo {
 namespace {
 
-    class GetPrevErrorCmd : public Command {
-    public:
-        GetPrevErrorCmd() : Command("getPrevError", false, "getpreverror") { }
+class GetPrevErrorCmd : public Command {
+public:
+    GetPrevErrorCmd() : Command("getPrevError", false, "getpreverror") {}
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
-        }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+    virtual bool slaveOk() const {
+        return true;
+    }
 
-        virtual void help(std::stringstream& help) const {
-            help << "get previous error (since last reseterror command)";
-        }
+    virtual void help(std::stringstream& help) const {
+        help << "get previous error (since last reseterror command)";
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        // No auth required
+    }
 
-            // No auth required
-        }
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        errmsg += "getpreverror not supported for sharded environments";
+        return false;
+    }
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
+} cmdGetPrevError;
 
-            errmsg += "getpreverror not supported for sharded environments";
-            return false;
-        }
-
-    } cmdGetPrevError;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

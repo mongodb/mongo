@@ -36,28 +36,30 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
-    /*
-     * An AdminAccess is an interface class used to determine if certain users have
-     * privileges to a given resource.
-     *
+/*
+ * An AdminAccess is an interface class used to determine if certain users have
+ * privileges to a given resource.
+ *
+ */
+class AdminAccess {
+public:
+    virtual ~AdminAccess() {}
+
+    /** @return if there are any priviledge users. This should not
+     *          block for long and throw if can't get a lock if needed.
      */
-    class AdminAccess {
-    public:
-        virtual ~AdminAccess() { }
+    virtual bool haveAdminUsers(OperationContext* txn) const = 0;
+};
 
-        /** @return if there are any priviledge users. This should not
-         *          block for long and throw if can't get a lock if needed.
-         */
-        virtual bool haveAdminUsers(OperationContext* txn) const = 0;
-    };
+class NoAdminAccess : public AdminAccess {
+public:
+    virtual ~NoAdminAccess() {}
 
-    class NoAdminAccess : public AdminAccess {
-    public:
-        virtual ~NoAdminAccess() { }
-
-        virtual bool haveAdminUsers(OperationContext* txn) const { return false; }
-    };
+    virtual bool haveAdminUsers(OperationContext* txn) const {
+        return false;
+    }
+};
 
 }  // namespace mongo

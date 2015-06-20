@@ -31,47 +31,44 @@
 
 namespace mongo {
 
-    TimerHolder::TimerHolder( TimerStats* stats )
-        : _stats( stats ), _recorded( false ){
-    }
+TimerHolder::TimerHolder(TimerStats* stats) : _stats(stats), _recorded(false) {}
 
-    TimerHolder::~TimerHolder() {
-        if ( ! _recorded ) {
-            recordMillis();
-        }
+TimerHolder::~TimerHolder() {
+    if (!_recorded) {
+        recordMillis();
     }
+}
 
-    int TimerHolder::recordMillis() {
-        _recorded = true;
-        if ( _stats ) {
-            return _stats->record( _t );
-        }
-        return _t.millis();
+int TimerHolder::recordMillis() {
+    _recorded = true;
+    if (_stats) {
+        return _stats->record(_t);
     }
+    return _t.millis();
+}
 
-    void TimerStats::recordMillis( int millis ) {
-        scoped_spinlock lk( _lock );
-        _num++;
-        _totalMillis += millis;
+void TimerStats::recordMillis(int millis) {
+    scoped_spinlock lk(_lock);
+    _num++;
+    _totalMillis += millis;
+}
+
+int TimerStats::record(const Timer& timer) {
+    int millis = timer.millis();
+    recordMillis(millis);
+    return millis;
+}
+
+BSONObj TimerStats::getReport() const {
+    long long n, t;
+    {
+        scoped_spinlock lk(_lock);
+        n = _num;
+        t = _totalMillis;
     }
-
-    int TimerStats::record( const Timer& timer ) {
-        int millis = timer.millis();
-        recordMillis( millis );
-        return millis;
-    }
-
-    BSONObj TimerStats::getReport() const {
-        long long n, t;
-        {
-            scoped_spinlock lk( _lock );
-            n = _num;
-            t = _totalMillis;
-        }
-        BSONObjBuilder b(64);
-        b.appendNumber( "num", n );
-        b.appendNumber( "totalMillis" , t );
-        return b.obj();
-
-    }
+    BSONObjBuilder b(64);
+    b.appendNumber("num", n);
+    b.appendNumber("totalMillis", t);
+    return b.obj();
+}
 }

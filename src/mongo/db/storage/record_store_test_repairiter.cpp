@@ -43,128 +43,126 @@ using std::stringstream;
 
 namespace mongo {
 
-    // Create an iterator for repairing an empty record store.
-    TEST( RecordStoreTestHarness, GetIteratorForRepairEmpty ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Create an iterator for repairing an empty record store.
+TEST(RecordStoreTestHarness, GetIteratorForRepairEmpty) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            auto cursor = rs->getCursorForRepair( opCtx.get() );
-            // returns NULL if getCursorForRepair is not supported
-            if (!cursor) {
-                return;
-            }
-            ASSERT(!cursor->next());
-        }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    // Insert multiple records and create an iterator for repairing the record store,
-    // even though the it has not been corrupted.
-    TEST( RecordStoreTestHarness, GetIteratorForRepairNonEmpty ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        auto cursor = rs->getCursorForRepair(opCtx.get());
+        // returns NULL if getCursorForRepair is not supported
+        if (!cursor) {
+            return;
         }
+        ASSERT(!cursor->next());
+    }
+}
 
-        const int nToInsert = 10;
-        RecordId locs[nToInsert];
-        for ( int i = 0; i < nToInsert; i++ ) {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                stringstream ss;
-                ss << "record " << i;
-                string data = ss.str();
+// Insert multiple records and create an iterator for repairing the record store,
+// even though the it has not been corrupted.
+TEST(RecordStoreTestHarness, GetIteratorForRepairNonEmpty) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                locs[i] = res.getValue();
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
-        }
-
-        set<RecordId> remain( locs, locs + nToInsert );
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            auto cursor = rs->getCursorForRepair( opCtx.get() );
-            // returns NULL if getCursorForRepair is not supported
-            if (!cursor) {
-                return;
-            }
-
-            while (auto record = cursor->next()) {
-                remain.erase(record->id); // can happen more than once per doc
-            }
-            ASSERT( remain.empty() );
-
-            ASSERT(!cursor->next());
-        }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    // Insert a single record. Create a repair iterator pointing to that single record.
-    // Then invalidate the record and ensure that the repair iterator responds correctly.
-    // See SERVER-16300.
-    TEST(RecordStoreTestHarness, GetIteratorForRepairInvalidateSingleton) {
-        unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
-        unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
-
+    const int nToInsert = 10;
+    RecordId locs[nToInsert];
+    for (int i = 0; i < nToInsert; i++) {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-            ASSERT_EQ(0, rs->numRecords(opCtx.get()));
-        }
+            stringstream ss;
+            ss << "record " << i;
+            string data = ss.str();
 
-        // Insert one record.
-        RecordId idToInvalidate;
-        {
-            unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "some data", 10, false);
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
             ASSERT_OK(res.getStatus());
-            idToInvalidate = res.getValue();
+            locs[i] = res.getValue();
             uow.commit();
         }
-
-        // Double-check that the record store has one record in it now.
-        {
-            unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-            ASSERT_EQ(1, rs->numRecords(opCtx.get()));
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-            auto cursor = rs->getCursorForRepair( opCtx.get() );
-            // returns NULL if getCursorForRepair is not supported
-            if (!cursor) {
-                return;
-            }
-
-            // We should be pointing at the only record in the store.
-
-            // Invalidate the record we're pointing at.
-            cursor->savePositioned();
-            cursor->invalidate(idToInvalidate);
-            cursor->restore(opCtx.get());
-
-            // Iterator should be EOF now because the only thing in the collection got deleted.
-            ASSERT(!cursor->next());
-        }
     }
 
-} // namespace mongo
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
+
+    set<RecordId> remain(locs, locs + nToInsert);
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        auto cursor = rs->getCursorForRepair(opCtx.get());
+        // returns NULL if getCursorForRepair is not supported
+        if (!cursor) {
+            return;
+        }
+
+        while (auto record = cursor->next()) {
+            remain.erase(record->id);  // can happen more than once per doc
+        }
+        ASSERT(remain.empty());
+
+        ASSERT(!cursor->next());
+    }
+}
+
+// Insert a single record. Create a repair iterator pointing to that single record.
+// Then invalidate the record and ensure that the repair iterator responds correctly.
+// See SERVER-16300.
+TEST(RecordStoreTestHarness, GetIteratorForRepairInvalidateSingleton) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQ(0, rs->numRecords(opCtx.get()));
+    }
+
+    // Insert one record.
+    RecordId idToInvalidate;
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork uow(opCtx.get());
+        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "some data", 10, false);
+        ASSERT_OK(res.getStatus());
+        idToInvalidate = res.getValue();
+        uow.commit();
+    }
+
+    // Double-check that the record store has one record in it now.
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQ(1, rs->numRecords(opCtx.get()));
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        auto cursor = rs->getCursorForRepair(opCtx.get());
+        // returns NULL if getCursorForRepair is not supported
+        if (!cursor) {
+            return;
+        }
+
+        // We should be pointing at the only record in the store.
+
+        // Invalidate the record we're pointing at.
+        cursor->savePositioned();
+        cursor->invalidate(idToInvalidate);
+        cursor->restore(opCtx.get());
+
+        // Iterator should be EOF now because the only thing in the collection got deleted.
+        ASSERT(!cursor->next());
+    }
+}
+
+}  // namespace mongo

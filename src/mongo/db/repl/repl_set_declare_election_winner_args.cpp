@@ -36,133 +36,120 @@ namespace mongo {
 namespace repl {
 namespace {
 
-    const std::string kCommandName = "replSetDeclareElectionWinner";
-    const std::string kErrorMessageFieldName = "errmsg";
-    const std::string kErrorCodeFieldName = "code";
-    const std::string kOkFieldName = "ok";
-    const std::string kSetNameFieldName = "setName";
-    const std::string kTermFieldName = "term";
-    const std::string kWinnerIdFieldName = "winnerId";
+const std::string kCommandName = "replSetDeclareElectionWinner";
+const std::string kErrorMessageFieldName = "errmsg";
+const std::string kErrorCodeFieldName = "code";
+const std::string kOkFieldName = "ok";
+const std::string kSetNameFieldName = "setName";
+const std::string kTermFieldName = "term";
+const std::string kWinnerIdFieldName = "winnerId";
 
-    const std::string kLegalArgsFieldNames[] = {
-        kCommandName,
-        kSetNameFieldName,
-        kTermFieldName,
-        kWinnerIdFieldName,
-    };
+const std::string kLegalArgsFieldNames[] = {
+    kCommandName, kSetNameFieldName, kTermFieldName, kWinnerIdFieldName,
+};
 
-    const std::string kLegalResponseFieldNames[] = {
-        kErrorMessageFieldName,
-        kErrorCodeFieldName,
-        kOkFieldName,
-        kTermFieldName,
-    };
+const std::string kLegalResponseFieldNames[] = {
+    kErrorMessageFieldName, kErrorCodeFieldName, kOkFieldName, kTermFieldName,
+};
 
 }  // namespace
 
-    Status ReplSetDeclareElectionWinnerArgs::initialize(const BSONObj& argsObj) {
-        Status status = bsonCheckOnlyHasFields("ReplSetDeclareElectionWinner",
-                                               argsObj,
-                                               kLegalArgsFieldNames);
-        if (!status.isOK())
-            return status;
+Status ReplSetDeclareElectionWinnerArgs::initialize(const BSONObj& argsObj) {
+    Status status =
+        bsonCheckOnlyHasFields("ReplSetDeclareElectionWinner", argsObj, kLegalArgsFieldNames);
+    if (!status.isOK())
+        return status;
 
-        status = bsonExtractStringField(argsObj, kSetNameFieldName, &_setName);
-        if (!status.isOK())
-            return status;
+    status = bsonExtractStringField(argsObj, kSetNameFieldName, &_setName);
+    if (!status.isOK())
+        return status;
 
-        status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
-        if (!status.isOK())
-            return status;
+    status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
+    if (!status.isOK())
+        return status;
 
-        status = bsonExtractIntegerField(argsObj, kWinnerIdFieldName, &_winnerId);
-        if (!status.isOK())
-            return status;
+    status = bsonExtractIntegerField(argsObj, kWinnerIdFieldName, &_winnerId);
+    if (!status.isOK())
+        return status;
 
-        return Status::OK();
+    return Status::OK();
+}
+
+std::string ReplSetDeclareElectionWinnerArgs::getReplSetName() const {
+    return _setName;
+}
+
+long long ReplSetDeclareElectionWinnerArgs::getTerm() const {
+    return _term;
+}
+
+long long ReplSetDeclareElectionWinnerArgs::getWinnerId() const {
+    return _winnerId;
+}
+
+void ReplSetDeclareElectionWinnerArgs::addToBSON(BSONObjBuilder* builder) const {
+    builder->append("replSetDeclareElectionWinner", 1);
+    builder->append(kSetNameFieldName, _setName);
+    builder->append(kTermFieldName, _term);
+    builder->appendIntOrLL(kWinnerIdFieldName, _winnerId);
+}
+
+BSONObj ReplSetDeclareElectionWinnerArgs::toBSON() const {
+    BSONObjBuilder builder;
+    addToBSON(&builder);
+    return builder.obj();
+}
+
+Status ReplSetDeclareElectionWinnerResponse::initialize(const BSONObj& argsObj) {
+    Status status =
+        bsonCheckOnlyHasFields("ReplSetDeclareElectionWinner", argsObj, kLegalResponseFieldNames);
+    if (!status.isOK())
+        return status;
+
+    status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
+    if (!status.isOK())
+        return status;
+
+    status =
+        bsonExtractIntegerFieldWithDefault(argsObj, kErrorCodeFieldName, ErrorCodes::OK, &_code);
+    if (!status.isOK())
+        return status;
+
+    status = bsonExtractStringFieldWithDefault(argsObj, kErrorMessageFieldName, "", &_errmsg);
+    if (!status.isOK())
+        return status;
+
+    status = bsonExtractBooleanField(argsObj, kOkFieldName, &_ok);
+    if (!status.isOK())
+        return status;
+
+    return Status::OK();
+}
+
+bool ReplSetDeclareElectionWinnerResponse::getOk() const {
+    return _ok;
+}
+
+long long ReplSetDeclareElectionWinnerResponse::getTerm() const {
+    return _term;
+}
+
+long long ReplSetDeclareElectionWinnerResponse::getErrorCode() const {
+    return _code;
+}
+
+const std::string& ReplSetDeclareElectionWinnerResponse::getErrorMsg() const {
+    return _errmsg;
+}
+
+void ReplSetDeclareElectionWinnerResponse::addToBSON(BSONObjBuilder* builder) const {
+    builder->append(kOkFieldName, _ok);
+    builder->append(kTermFieldName, _term);
+    if (_code != ErrorCodes::OK) {
+        builder->append(kErrorCodeFieldName, _code);
+        builder->append(kErrorMessageFieldName, _errmsg);
     }
+}
 
-    std::string ReplSetDeclareElectionWinnerArgs::getReplSetName() const {
-        return _setName;
-    }
-
-    long long ReplSetDeclareElectionWinnerArgs::getTerm() const {
-        return _term;
-    }
-
-    long long ReplSetDeclareElectionWinnerArgs::getWinnerId() const {
-        return _winnerId;
-    }
-
-    void ReplSetDeclareElectionWinnerArgs::addToBSON(BSONObjBuilder* builder) const {
-        builder->append("replSetDeclareElectionWinner", 1);
-        builder->append(kSetNameFieldName, _setName);
-        builder->append(kTermFieldName, _term);
-        builder->appendIntOrLL(kWinnerIdFieldName, _winnerId);
-    }
-
-    BSONObj ReplSetDeclareElectionWinnerArgs::toBSON() const {
-        BSONObjBuilder builder;
-        addToBSON(&builder);
-        return builder.obj();
-    }
-
-    Status ReplSetDeclareElectionWinnerResponse::initialize(const BSONObj& argsObj) {
-        Status status = bsonCheckOnlyHasFields("ReplSetDeclareElectionWinner",
-                                               argsObj,
-                                               kLegalResponseFieldNames);
-        if (!status.isOK())
-            return status;
-
-        status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
-        if (!status.isOK())
-            return status;
-
-        status = bsonExtractIntegerFieldWithDefault(argsObj,
-                                                    kErrorCodeFieldName,
-                                                    ErrorCodes::OK,
-                                                    &_code);
-        if (!status.isOK())
-            return status;
-
-        status = bsonExtractStringFieldWithDefault(argsObj,
-                                                   kErrorMessageFieldName,
-                                                   "",
-                                                   &_errmsg);
-        if (!status.isOK())
-            return status;
-
-        status = bsonExtractBooleanField(argsObj, kOkFieldName, &_ok);
-        if (!status.isOK())
-            return status;
-
-        return Status::OK();
-    }
-
-    bool ReplSetDeclareElectionWinnerResponse::getOk() const {
-        return _ok;
-    }
-
-    long long ReplSetDeclareElectionWinnerResponse::getTerm() const {
-        return _term;
-    }
-
-    long long ReplSetDeclareElectionWinnerResponse::getErrorCode() const {
-        return _code;
-    }
-
-    const std::string& ReplSetDeclareElectionWinnerResponse::getErrorMsg() const {
-        return _errmsg;
-    }
-
-    void ReplSetDeclareElectionWinnerResponse::addToBSON(BSONObjBuilder* builder) const {
-        builder->append(kOkFieldName, _ok);
-        builder->append(kTermFieldName, _term);
-        if (_code != ErrorCodes::OK) {
-            builder->append(kErrorCodeFieldName, _code);
-            builder->append(kErrorMessageFieldName, _errmsg);
-        }
-    }
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

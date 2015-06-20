@@ -35,15 +35,15 @@
 namespace mongo {
 namespace repl {
 
-    Status ReplSetCommand::checkAuthForCommand(ClientBasic* client,
-                                               const std::string& dbname,
-                                               const BSONObj& cmdObj) {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::internal)) {
-            return {ErrorCodes::Unauthorized, "Unauthorized"};
-        }
-        return Status::OK();
+Status ReplSetCommand::checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+    if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(), ActionType::internal)) {
+        return {ErrorCodes::Unauthorized, "Unauthorized"};
     }
+    return Status::OK();
+}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

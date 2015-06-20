@@ -48,308 +48,304 @@
 #include "mongo/util/time_support.h"
 
 #ifndef _WIN32
-# ifndef __sun
-#  include <ifaddrs.h>
-# endif
-# include <sys/resource.h>
-# include <sys/stat.h>
+#ifndef __sun
+#include <ifaddrs.h>
+#endif
+#include <sys/resource.h>
+#include <sys/stat.h>
 #endif
 
 namespace mongo {
 
-    using std::shared_ptr;
-    using std::string;
+using std::shared_ptr;
+using std::string;
 
 // if you want trace output:
 #define mmm(x)
 
-    void AbstractMessagingPort::setConnectionId( long long connectionId ) { 
-        verify( _connectionId == 0 );
-        _connectionId = connectionId; 
+void AbstractMessagingPort::setConnectionId(long long connectionId) {
+    verify(_connectionId == 0);
+    _connectionId = connectionId;
+}
+
+/* messagingport -------------------------------------------------------------- */
+
+class PiggyBackData {
+public:
+    PiggyBackData(MessagingPort* port) {
+        _port = port;
+        _buf = new char[1300];
+        _cur = _buf;
     }
 
-    /* messagingport -------------------------------------------------------------- */
+    ~PiggyBackData() {
+        DESTRUCTOR_GUARD(flush(); delete[](_cur););
+    }
 
-    class PiggyBackData {
-    public:
-        PiggyBackData( MessagingPort * port ) {
-            _port = port;
-            _buf = new char[1300];
-            _cur = _buf;
+    void append(Message& m) {
+        verify(m.header().getLen() <= 1300);
+
+        if (len() + m.header().getLen() > 1300)
+            flush();
+
+        memcpy(_cur, m.singleData().view2ptr(), m.header().getLen());
+        _cur += m.header().getLen();
+    }
+
+    void flush() {
+        if (_buf == _cur)
+            return;
+
+        _port->send(_buf, len(), "flush");
+        _cur = _buf;
+    }
+
+    int len() const {
+        return _cur - _buf;
+    }
+
+private:
+    MessagingPort* _port;
+    char* _buf;
+    char* _cur;
+};
+
+class Ports {
+    std::set<MessagingPort*> ports;
+    stdx::mutex m;
+
+public:
+    Ports() : ports() {}
+    void closeAll(unsigned skip_mask) {
+        stdx::lock_guard<stdx::mutex> bl(m);
+        for (std::set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++) {
+            if ((*i)->tag & skip_mask)
+                continue;
+            (*i)->shutdown();
         }
+    }
+    void insert(MessagingPort* p) {
+        stdx::lock_guard<stdx::mutex> bl(m);
+        ports.insert(p);
+    }
+    void erase(MessagingPort* p) {
+        stdx::lock_guard<stdx::mutex> bl(m);
+        ports.erase(p);
+    }
+};
 
-        ~PiggyBackData() {
-            DESTRUCTOR_GUARD (
-                flush();
-                delete[]( _cur );
-            );
+// we "new" this so it is still be around when other automatic global vars
+// are being destructed during termination.
+Ports& ports = *(new Ports());
+
+void MessagingPort::closeAllSockets(unsigned mask) {
+    ports.closeAll(mask);
+}
+
+MessagingPort::MessagingPort(int fd, const SockAddr& remote)
+    : psock(new Socket(fd, remote)), piggyBackData(0) {
+    ports.insert(this);
+}
+
+MessagingPort::MessagingPort(double timeout, logger::LogSeverity ll)
+    : psock(new Socket(timeout, ll)) {
+    ports.insert(this);
+    piggyBackData = 0;
+}
+
+MessagingPort::MessagingPort(std::shared_ptr<Socket> sock) : psock(sock), piggyBackData(0) {
+    ports.insert(this);
+}
+
+void MessagingPort::setSocketTimeout(double timeout) {
+    psock->setTimeout(timeout);
+}
+
+void MessagingPort::shutdown() {
+    psock->close();
+}
+
+MessagingPort::~MessagingPort() {
+    if (piggyBackData)
+        delete (piggyBackData);
+    shutdown();
+    ports.erase(this);
+}
+
+bool MessagingPort::recv(Message& m) {
+    try {
+    again:
+        // mmm( log() << "*  recv() sock:" << this->sock << endl; )
+        MSGHEADER::Value header;
+        int headerLen = sizeof(MSGHEADER::Value);
+        psock->recv((char*)&header, headerLen);
+        int len = header.constView().getMessageLength();
+
+        if (len == 542393671) {
+            // an http GET
+            string msg =
+                "It looks like you are trying to access MongoDB over HTTP on the native driver "
+                "port.\n";
+            LOG(psock->getLogLevel()) << msg;
+            std::stringstream ss;
+            ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: "
+                  "text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
+            string s = ss.str();
+            send(s.c_str(), s.size(), "http");
+            return false;
+        } else if (len == -1) {
+            // Endian check from the client, after connecting, to see what mode server is running in.
+            unsigned foo = 0x10203040;
+            send((char*)&foo, 4, "endian");
+            psock->setHandshakeReceived();
+            goto again;
         }
-
-        void append( Message& m ) {
-            verify( m.header().getLen() <= 1300 );
-
-            if ( len() + m.header().getLen() > 1300 )
-                flush();
-
-            memcpy( _cur , m.singleData().view2ptr() , m.header().getLen() );
-            _cur += m.header().getLen();
-        }
-
-        void flush() {
-            if ( _buf == _cur )
-                return;
-
-            _port->send( _buf , len(), "flush" );
-            _cur = _buf;
-        }
-
-        int len() const { return _cur - _buf; }
-
-    private:
-        MessagingPort* _port;
-        char * _buf;
-        char * _cur;
-    };
-
-    class Ports {
-        std::set<MessagingPort*> ports;
-        stdx::mutex m;
-    public:
-        Ports() : ports() {}
-        void closeAll(unsigned skip_mask) {
-            stdx::lock_guard<stdx::mutex> bl(m);
-            for ( std::set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ ) {
-                if( (*i)->tag & skip_mask )
-                    continue;
-                (*i)->shutdown();
+        // If responseTo is not 0 or -1 for first packet assume SSL
+        else if (psock->isAwaitingHandshake()) {
+#ifndef MONGO_CONFIG_SSL
+            if (header.constView().getResponseTo() != 0 &&
+                header.constView().getResponseTo() != -1) {
+                uasserted(17133,
+                          "SSL handshake requested, SSL feature not available in this build");
             }
-        }
-        void insert(MessagingPort* p) {
-            stdx::lock_guard<stdx::mutex> bl(m);
-            ports.insert(p);
-        }
-        void erase(MessagingPort* p) {
-            stdx::lock_guard<stdx::mutex> bl(m);
-            ports.erase(p);
-        }
-    };
-
-    // we "new" this so it is still be around when other automatic global vars
-    // are being destructed during termination.
-    Ports& ports = *(new Ports());
-
-    void MessagingPort::closeAllSockets(unsigned mask) {
-        ports.closeAll(mask);
-    }
-
-    MessagingPort::MessagingPort(int fd, const SockAddr& remote) 
-        : psock( new Socket( fd , remote ) ) , piggyBackData(0) {
-        ports.insert(this);
-    }
-
-    MessagingPort::MessagingPort( double timeout, logger::LogSeverity ll ) 
-        : psock( new Socket( timeout, ll ) ) {
-        ports.insert(this);
-        piggyBackData = 0;
-    }
-
-    MessagingPort::MessagingPort( std::shared_ptr<Socket> sock )
-        : psock( sock ), piggyBackData( 0 ) {
-        ports.insert(this);
-    }
-
-    void MessagingPort::setSocketTimeout(double timeout) {
-        psock->setTimeout(timeout);
-    }
-
-    void MessagingPort::shutdown() {
-        psock->close();
-    }
-
-    MessagingPort::~MessagingPort() {
-        if ( piggyBackData )
-            delete( piggyBackData );
-        shutdown();
-        ports.erase(this);
-    }
-    
-    bool MessagingPort::recv(Message& m) {
-        try {
-again:
-            //mmm( log() << "*  recv() sock:" << this->sock << endl; )
-            MSGHEADER::Value header;
-            int headerLen = sizeof(MSGHEADER::Value);
-            psock->recv( (char *)&header, headerLen );
-            int len = header.constView().getMessageLength();
-
-            if ( len == 542393671 ) {
-                // an http GET
-                string msg = "It looks like you are trying to access MongoDB over HTTP on the native driver port.\n";
-                LOG( psock->getLogLevel() ) << msg;
-                std::stringstream ss;
-                ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
-                string s = ss.str();
-                send( s.c_str(), s.size(), "http" );
-                return false;
-            }
-            else if ( len == -1 ) {
-                // Endian check from the client, after connecting, to see what mode server is running in.
-                unsigned foo = 0x10203040;
-                send( (char *) &foo, 4, "endian" );
+#else
+            if (header.constView().getResponseTo() != 0 &&
+                header.constView().getResponseTo() != -1) {
+                uassert(17132,
+                        "SSL handshake received but server is started without SSL support",
+                        sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled);
+                setX509SubjectName(
+                    psock->doSSLHandshake(reinterpret_cast<const char*>(&header), sizeof(header)));
                 psock->setHandshakeReceived();
                 goto again;
             }
-            // If responseTo is not 0 or -1 for first packet assume SSL
-            else if (psock->isAwaitingHandshake()) {
-#ifndef MONGO_CONFIG_SSL
-                if (header.constView().getResponseTo() != 0
-                 && header.constView().getResponseTo() != -1) {
-                    uasserted(17133,
-                              "SSL handshake requested, SSL feature not available in this build");
-                }
-#else                    
-                if (header.constView().getResponseTo() != 0
-                 && header.constView().getResponseTo() != -1) {
-                    uassert(17132,
-                            "SSL handshake received but server is started without SSL support",
-                            sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled);
-                    setX509SubjectName(psock->doSSLHandshake(
-                                       reinterpret_cast<const char*>(&header), sizeof(header)));
-                    psock->setHandshakeReceived();
-                    goto again;
-                }
-                uassert(17189, "The server is configured to only allow SSL connections",
-                        sslGlobalParams.sslMode.load() != SSLParams::SSLMode_requireSSL);
-#endif // MONGO_CONFIG_SSL
-            }
-            if ( static_cast<size_t>(len) < sizeof(MSGHEADER::Value) ||
-                 static_cast<size_t>(len) > MaxMessageSizeBytes ) {
-                LOG(0) << "recv(): message len " << len << " is invalid. "
-                       << "Min " << sizeof(MSGHEADER::Value) << " Max: " << MaxMessageSizeBytes;
-                return false;
-            }
-
-            psock->setHandshakeReceived();
-            int z = (len+1023)&0xfffffc00;
-            verify(z>=len);
-            MsgData::View md = reinterpret_cast<char *>(mongoMalloc(z));
-            ScopeGuard guard = MakeGuard(free, md.view2ptr());
-            verify(md.view2ptr());
-
-            memcpy(md.view2ptr(), &header, headerLen);
-            int left = len - headerLen;
-
-            psock->recv( md.data(), left );
-
-            guard.Dismiss();
-            m.setData(md.view2ptr(), true);
-            return true;
-
+            uassert(17189,
+                    "The server is configured to only allow SSL connections",
+                    sslGlobalParams.sslMode.load() != SSLParams::SSLMode_requireSSL);
+#endif  // MONGO_CONFIG_SSL
         }
-        catch ( const SocketException & e ) {
-            logger::LogSeverity severity = psock->getLogLevel();
-            if (!e.shouldPrint())
-                severity = severity.lessSevere();
-            LOG(severity) << "SocketException: remote: " << remote() << " error: " << e;
-            m.reset();
+        if (static_cast<size_t>(len) < sizeof(MSGHEADER::Value) ||
+            static_cast<size_t>(len) > MaxMessageSizeBytes) {
+            LOG(0) << "recv(): message len " << len << " is invalid. "
+                   << "Min " << sizeof(MSGHEADER::Value) << " Max: " << MaxMessageSizeBytes;
             return false;
         }
-    }
 
-    void MessagingPort::reply(Message& received, Message& response) {
-        say(/*received.from, */response, received.header().getId());
-    }
+        psock->setHandshakeReceived();
+        int z = (len + 1023) & 0xfffffc00;
+        verify(z >= len);
+        MsgData::View md = reinterpret_cast<char*>(mongoMalloc(z));
+        ScopeGuard guard = MakeGuard(free, md.view2ptr());
+        verify(md.view2ptr());
 
-    void MessagingPort::reply(Message& received, Message& response, MSGID responseTo) {
-        say(/*received.from, */response, responseTo);
-    }
+        memcpy(md.view2ptr(), &header, headerLen);
+        int left = len - headerLen;
 
-    bool MessagingPort::call(Message& toSend, Message& response) {
-        mmm( log() << "*call()" << endl; )
-        say(toSend);
-        return recv( toSend , response );
-    }
+        psock->recv(md.data(), left);
 
-    bool MessagingPort::recv( const Message& toSend , Message& response ) {
-        while ( 1 ) {
-            bool ok = recv(response);
-            if ( !ok ) {
-                mmm( log() << "recv not ok" << endl; )
-                return false;
-            }
-            //log() << "got response: " << response.data->responseTo << endl;
-            if ( response.header().getResponseTo() == toSend.header().getId() )
-                break;
-            error() << "MessagingPort::call() wrong id got:"
-                    << std::hex << (unsigned)response.header().getResponseTo()
-                    << " expect:" << (unsigned)toSend.header().getId() << '\n'
-                    << std::dec
-                    << "  toSend op: " << (unsigned)toSend.operation() << '\n'
-                    << "  response msgid:" << (unsigned)response.header().getId() << '\n'
-                    << "  response len:  " << (unsigned)response.header().getLen() << '\n'
-                    << "  response op:  " << response.operation() << '\n'
-                    << "  remote: " << psock->remoteString();
-            verify(false);
-            response.reset();
-        }
-        mmm( log() << "*call() end" << endl; )
+        guard.Dismiss();
+        m.setData(md.view2ptr(), true);
         return true;
+
+    } catch (const SocketException& e) {
+        logger::LogSeverity severity = psock->getLogLevel();
+        if (!e.shouldPrint())
+            severity = severity.lessSevere();
+        LOG(severity) << "SocketException: remote: " << remote() << " error: " << e;
+        m.reset();
+        return false;
     }
+}
 
-    void MessagingPort::say(Message& toSend, int responseTo) {
-        verify( !toSend.empty() );
-        mmm( log() << "*  say()  thr:" << GetCurrentThreadId() << endl; )
-        toSend.header().setId(nextMessageId());
-        toSend.header().setResponseTo(responseTo);
+void MessagingPort::reply(Message& received, Message& response) {
+    say(/*received.from, */ response, received.header().getId());
+}
 
-        if ( piggyBackData && piggyBackData->len() ) {
-            mmm( log() << "*     have piggy back" << endl; )
-            if ( ( piggyBackData->len() + toSend.header().getLen() ) > 1300 ) {
-                // won't fit in a packet - so just send it off
-                piggyBackData->flush();
-            }
-            else {
-                piggyBackData->append( toSend );
-                piggyBackData->flush();
-                return;
-            }
+void MessagingPort::reply(Message& received, Message& response, MSGID responseTo) {
+    say(/*received.from, */ response, responseTo);
+}
+
+bool MessagingPort::call(Message& toSend, Message& response) {
+    mmm(log() << "*call()" << endl;) say(toSend);
+    return recv(toSend, response);
+}
+
+bool MessagingPort::recv(const Message& toSend, Message& response) {
+    while (1) {
+        bool ok = recv(response);
+        if (!ok) {
+            mmm(log() << "recv not ok" << endl;) return false;
         }
-
-        toSend.send( *this, "say" );
+        // log() << "got response: " << response.data->responseTo << endl;
+        if (response.header().getResponseTo() == toSend.header().getId())
+            break;
+        error() << "MessagingPort::call() wrong id got:" << std::hex
+                << (unsigned)response.header().getResponseTo()
+                << " expect:" << (unsigned)toSend.header().getId() << '\n' << std::dec
+                << "  toSend op: " << (unsigned)toSend.operation() << '\n'
+                << "  response msgid:" << (unsigned)response.header().getId() << '\n'
+                << "  response len:  " << (unsigned)response.header().getLen() << '\n'
+                << "  response op:  " << response.operation() << '\n'
+                << "  remote: " << psock->remoteString();
+        verify(false);
+        response.reset();
     }
+    mmm(log() << "*call() end" << endl;) return true;
+}
 
-    void MessagingPort::piggyBack( Message& toSend , int responseTo ) {
+void MessagingPort::say(Message& toSend, int responseTo) {
+    verify(!toSend.empty());
+    mmm(log() << "*  say()  thr:" << GetCurrentThreadId() << endl;)
+        toSend.header().setId(nextMessageId());
+    toSend.header().setResponseTo(responseTo);
 
-        if ( toSend.header().getLen() > 1300 ) {
-            // not worth saving because its almost an entire packet
-            say( toSend );
+    if (piggyBackData && piggyBackData->len()) {
+        mmm(log() << "*     have piggy back"
+                  << endl;) if ((piggyBackData->len() + toSend.header().getLen()) > 1300) {
+            // won't fit in a packet - so just send it off
+            piggyBackData->flush();
+        }
+        else {
+            piggyBackData->append(toSend);
+            piggyBackData->flush();
             return;
         }
-
-        // we're going to be storing this, so need to set it up
-        toSend.header().setId(nextMessageId());
-        toSend.header().setResponseTo(responseTo);
-
-        if ( ! piggyBackData )
-            piggyBackData = new PiggyBackData( this );
-
-        piggyBackData->append( toSend );
     }
 
-    HostAndPort MessagingPort::remote() const {
-        if ( ! _remoteParsed.hasPort() ) {
-            SockAddr sa = psock->remoteAddr();
-            _remoteParsed = HostAndPort( sa.getAddr(), sa.getPort());
-        }
-        return _remoteParsed;
+    toSend.send(*this, "say");
+}
+
+void MessagingPort::piggyBack(Message& toSend, int responseTo) {
+    if (toSend.header().getLen() > 1300) {
+        // not worth saving because its almost an entire packet
+        say(toSend);
+        return;
     }
 
-    SockAddr MessagingPort::remoteAddr() const {
-        return psock->remoteAddr();
-    }
+    // we're going to be storing this, so need to set it up
+    toSend.header().setId(nextMessageId());
+    toSend.header().setResponseTo(responseTo);
 
-    SockAddr MessagingPort::localAddr() const {
-        return psock->localAddr();
-    }
+    if (!piggyBackData)
+        piggyBackData = new PiggyBackData(this);
 
-} // namespace mongo
+    piggyBackData->append(toSend);
+}
+
+HostAndPort MessagingPort::remote() const {
+    if (!_remoteParsed.hasPort()) {
+        SockAddr sa = psock->remoteAddr();
+        _remoteParsed = HostAndPort(sa.getAddr(), sa.getPort());
+    }
+    return _remoteParsed;
+}
+
+SockAddr MessagingPort::remoteAddr() const {
+    return psock->remoteAddr();
+}
+
+SockAddr MessagingPort::localAddr() const {
+    return psock->localAddr();
+}
+
+}  // namespace mongo

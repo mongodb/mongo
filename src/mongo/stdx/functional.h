@@ -41,9 +41,9 @@
 namespace mongo {
 namespace stdx {
 
-    using ::std::bind;
-    using ::std::function;
-    namespace placeholders = ::std::placeholders;
+using ::std::bind;
+using ::std::function;
+namespace placeholders = ::std::placeholders;
 
 }  // namespace stdx
 }  // namespace mongo
@@ -56,23 +56,22 @@ namespace stdx {
 namespace mongo {
 namespace stdx {
 
-    using boost::bind;
-    using boost::function;
+using boost::bind;
+using boost::function;
 
-    namespace placeholders {
-        static boost::arg<1> _1;
-        static boost::arg<2> _2;
-        static boost::arg<3> _3;
-        static boost::arg<4> _4;
-        static boost::arg<5> _5;
-        static boost::arg<6> _6;
-        static boost::arg<7> _7;
-        static boost::arg<8> _8;
-        static boost::arg<9> _9;
-    }  // namespace placeholders
+namespace placeholders {
+static boost::arg<1> _1;
+static boost::arg<2> _2;
+static boost::arg<3> _3;
+static boost::arg<4> _4;
+static boost::arg<5> _5;
+static boost::arg<6> _6;
+static boost::arg<7> _7;
+static boost::arg<8> _8;
+static boost::arg<9> _9;
+}  // namespace placeholders
 
 }  // namespace stdx
 }  // namespace mongo
 
 #endif
-

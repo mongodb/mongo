@@ -33,8 +33,8 @@
 namespace mongo {
 namespace repl {
 
-    ReplicationCoordinator* getGlobalReplicationCoordinator();
-    void setGlobalReplicationCoordinator(ReplicationCoordinator* coordinator);
+ReplicationCoordinator* getGlobalReplicationCoordinator();
+void setGlobalReplicationCoordinator(ReplicationCoordinator* coordinator);
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

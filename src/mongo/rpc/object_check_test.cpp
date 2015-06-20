@@ -39,49 +39,51 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(DataTypeValidated, BSONValidationEnabled) {
+TEST(DataTypeValidated, BSONValidationEnabled) {
+    using std::swap;
 
-        using std::swap;
+    bool wasEnabled = serverGlobalParams.objcheck;
+    const auto setValidation = [&](bool enabled) { serverGlobalParams.objcheck = enabled; };
+    ON_BLOCK_EXIT(setValidation, wasEnabled);
 
-        bool wasEnabled = serverGlobalParams.objcheck;
-        const auto setValidation = [&](bool enabled){ serverGlobalParams.objcheck = enabled; };
-        ON_BLOCK_EXIT(setValidation, wasEnabled);
+    using std::begin;
+    using std::end;
 
-        using std::begin;
-        using std::end;
-
-        BSONObj valid = BSON("baz" << "bar" << "garply" << BSON("foo" << "bar"));
-        char buf[1024] = { 0 };
-        std::copy(valid.objdata(), valid.objdata() + valid.objsize(), begin(buf));
-        {
-            Validated<BSONObj> v;
-            ConstDataRangeCursor cdrc(begin(buf), end(buf));
-            ASSERT_OK(cdrc.readAndAdvance(&v));
-        }
-
-        {
-            // mess up the data
-            DataRangeCursor drc(begin(buf), end(buf));
-            // skip past size so we don't trip any sanity checks.
-            drc.advance(4);  // skip size
-            while (drc.writeAndAdvance(0xFF).isOK()) ;
-        }
-
-        {
-            Validated<BSONObj> v;
-            ConstDataRangeCursor cdrc(begin(buf), end(buf));
-            ASSERT_NOT_OK(cdrc.readAndAdvance(&v));
-        }
-
-        {
-            // disable validation
-            setValidation(false);
-            Validated<BSONObj> v;
-            ConstDataRangeCursor cdrc(begin(buf), end(buf));
-            ASSERT_OK(cdrc.readAndAdvance(&v));
-        }
+    BSONObj valid = BSON("baz"
+                         << "bar"
+                         << "garply" << BSON("foo"
+                                             << "bar"));
+    char buf[1024] = {0};
+    std::copy(valid.objdata(), valid.objdata() + valid.objsize(), begin(buf));
+    {
+        Validated<BSONObj> v;
+        ConstDataRangeCursor cdrc(begin(buf), end(buf));
+        ASSERT_OK(cdrc.readAndAdvance(&v));
     }
 
+    {
+        // mess up the data
+        DataRangeCursor drc(begin(buf), end(buf));
+        // skip past size so we don't trip any sanity checks.
+        drc.advance(4);  // skip size
+        while (drc.writeAndAdvance(0xFF).isOK())
+            ;
+    }
+
+    {
+        Validated<BSONObj> v;
+        ConstDataRangeCursor cdrc(begin(buf), end(buf));
+        ASSERT_NOT_OK(cdrc.readAndAdvance(&v));
+    }
+
+    {
+        // disable validation
+        setValidation(false);
+        Validated<BSONObj> v;
+        ConstDataRangeCursor cdrc(begin(buf), end(buf));
+        ASSERT_OK(cdrc.readAndAdvance(&v));
+    }
+}
 }

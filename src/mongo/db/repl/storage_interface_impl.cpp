@@ -39,16 +39,16 @@
 namespace mongo {
 namespace repl {
 
-    StorageInterfaceImpl::StorageInterfaceImpl() : StorageInterface() {}
-    StorageInterfaceImpl::~StorageInterfaceImpl() { }
+StorageInterfaceImpl::StorageInterfaceImpl() : StorageInterface() {}
+StorageInterfaceImpl::~StorageInterfaceImpl() {}
 
-    OperationContext* StorageInterfaceImpl::createOperationContext() {
-        if (!ClientBasic::getCurrent()) {
-            Client::initThreadIfNotAlready();
-            AuthorizationSession::get(*ClientBasic::getCurrent())->grantInternalAuthorization();
-        }
-        return new OperationContextImpl();
+OperationContext* StorageInterfaceImpl::createOperationContext() {
+    if (!ClientBasic::getCurrent()) {
+        Client::initThreadIfNotAlready();
+        AuthorizationSession::get(*ClientBasic::getCurrent())->grantInternalAuthorization();
     }
+    return new OperationContextImpl();
+}
 
 }  // namespace repl
-} // namespace mongo
+}  // namespace mongo

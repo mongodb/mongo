@@ -52,122 +52,108 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
+using std::unique_ptr;
 
 namespace {
-    SaslAuthenticationSession* createNativeSaslAuthenticationSession(
-        AuthorizationSession* authzSession,
-        const std::string& mechanism) {
-        return new NativeSaslAuthenticationSession(authzSession);
-    }
+SaslAuthenticationSession* createNativeSaslAuthenticationSession(AuthorizationSession* authzSession,
+                                                                 const std::string& mechanism) {
+    return new NativeSaslAuthenticationSession(authzSession);
+}
 
-    MONGO_INITIALIZER(NativeSaslServerCore)(InitializerContext* context) {
-        if (saslGlobalParams.hostName.empty())
-            saslGlobalParams.hostName = getHostNameCached();
-        if (saslGlobalParams.serviceName.empty())
-            saslGlobalParams.serviceName = "mongodb";
+MONGO_INITIALIZER(NativeSaslServerCore)(InitializerContext* context) {
+    if (saslGlobalParams.hostName.empty())
+        saslGlobalParams.hostName = getHostNameCached();
+    if (saslGlobalParams.serviceName.empty())
+        saslGlobalParams.serviceName = "mongodb";
 
-        SaslAuthenticationSession::create = createNativeSaslAuthenticationSession;
-        return Status::OK();
-    }
+    SaslAuthenticationSession::create = createNativeSaslAuthenticationSession;
+    return Status::OK();
+}
 
-    // PostSaslCommands is reversely dependent on CyrusSaslCommands having been run
-    MONGO_INITIALIZER_WITH_PREREQUISITES(PostSaslCommands,
-                                         ("NativeSaslServerCore"))
-        (InitializerContext*) {
+// PostSaslCommands is reversely dependent on CyrusSaslCommands having been run
+MONGO_INITIALIZER_WITH_PREREQUISITES(PostSaslCommands, ("NativeSaslServerCore"))
+(InitializerContext*) {
+    AuthorizationManager authzManager(stdx::make_unique<AuthzManagerExternalStateMock>());
+    std::unique_ptr<AuthorizationSession> authzSession = authzManager.makeAuthorizationSession();
 
-        AuthorizationManager authzManager(stdx::make_unique<AuthzManagerExternalStateMock>());
-        std::unique_ptr<AuthorizationSession> authzSession =
-            authzManager.makeAuthorizationSession();
-
-        for (size_t i = 0; i < saslGlobalParams.authenticationMechanisms.size(); ++i) {
-            const std::string& mechanism = saslGlobalParams.authenticationMechanisms[i];
-            if (mechanism == "MONGODB-CR" || mechanism == "MONGODB-X509") {
-                // Not a SASL mechanism; no need to smoke test built-in mechanisms.
-                continue;
-            }
-            unique_ptr<SaslAuthenticationSession>
-                session(SaslAuthenticationSession::create(authzSession.get(), mechanism));
-            Status status = session->start("test",
-                                           mechanism,
-                                           saslGlobalParams.serviceName,
-                                           saslGlobalParams.hostName,
-                                           1,
-                                           true);
-            if (!status.isOK())
-                return status;
+    for (size_t i = 0; i < saslGlobalParams.authenticationMechanisms.size(); ++i) {
+        const std::string& mechanism = saslGlobalParams.authenticationMechanisms[i];
+        if (mechanism == "MONGODB-CR" || mechanism == "MONGODB-X509") {
+            // Not a SASL mechanism; no need to smoke test built-in mechanisms.
+            continue;
         }
-
-        return Status::OK();
-    }
-} //namespace
-
-    NativeSaslAuthenticationSession::NativeSaslAuthenticationSession(
-        AuthorizationSession* authzSession) :
-        SaslAuthenticationSession(authzSession),
-        _mechanism("") {
+        unique_ptr<SaslAuthenticationSession> session(
+            SaslAuthenticationSession::create(authzSession.get(), mechanism));
+        Status status = session->start(
+            "test", mechanism, saslGlobalParams.serviceName, saslGlobalParams.hostName, 1, true);
+        if (!status.isOK())
+            return status;
     }
 
-    NativeSaslAuthenticationSession::~NativeSaslAuthenticationSession() {}
+    return Status::OK();
+}
+}  // namespace
 
-    Status NativeSaslAuthenticationSession::start(StringData authenticationDatabase,
-                                                  StringData mechanism,
-                                                  StringData serviceName,
-                                                  StringData serviceHostname,
-                                                  int64_t conversationId,
-                                                  bool autoAuthorize) {
-        fassert(18626, conversationId > 0);
+NativeSaslAuthenticationSession::NativeSaslAuthenticationSession(AuthorizationSession* authzSession)
+    : SaslAuthenticationSession(authzSession), _mechanism("") {}
 
-        if (_conversationId != 0) {
-            return Status(ErrorCodes::AlreadyInitialized,
-                          "Cannot call start() twice on same NativeSaslAuthenticationSession.");
-        }
+NativeSaslAuthenticationSession::~NativeSaslAuthenticationSession() {}
 
-        _authenticationDatabase = authenticationDatabase.toString();
-        _mechanism = mechanism.toString();
-        _serviceName = serviceName.toString();
-        _serviceHostname = serviceHostname.toString();
-        _conversationId = conversationId;
-        _autoAuthorize = autoAuthorize;
+Status NativeSaslAuthenticationSession::start(StringData authenticationDatabase,
+                                              StringData mechanism,
+                                              StringData serviceName,
+                                              StringData serviceHostname,
+                                              int64_t conversationId,
+                                              bool autoAuthorize) {
+    fassert(18626, conversationId > 0);
 
-        if (mechanism == "PLAIN") {
-            _saslConversation.reset(new SaslPLAINServerConversation(this));
-        }
-        else if (mechanism == "SCRAM-SHA-1") {
-            _saslConversation.reset(new SaslSCRAMSHA1ServerConversation(this));
-        }
-        else {
-            return Status(ErrorCodes::BadValue,
-                mongoutils::str::stream() << "SASL mechanism " << mechanism <<
-                                             " is not supported");
-        }
-
-        return Status::OK();
+    if (_conversationId != 0) {
+        return Status(ErrorCodes::AlreadyInitialized,
+                      "Cannot call start() twice on same NativeSaslAuthenticationSession.");
     }
 
-    Status NativeSaslAuthenticationSession::step(StringData inputData,
-                                                 std::string* outputData) {
-        if (!_saslConversation) {
-            return Status(ErrorCodes::BadValue,
-                mongoutils::str::stream() <<
-                "The authentication session has not been properly initialized");
-        }
+    _authenticationDatabase = authenticationDatabase.toString();
+    _mechanism = mechanism.toString();
+    _serviceName = serviceName.toString();
+    _serviceHostname = serviceHostname.toString();
+    _conversationId = conversationId;
+    _autoAuthorize = autoAuthorize;
 
-        StatusWith<bool> status = _saslConversation->step(inputData, outputData);
-        if (status.isOK()) {
-            _done = status.getValue();
-        } else {
-            _done = true;
-        }
-        return status.getStatus();
+    if (mechanism == "PLAIN") {
+        _saslConversation.reset(new SaslPLAINServerConversation(this));
+    } else if (mechanism == "SCRAM-SHA-1") {
+        _saslConversation.reset(new SaslSCRAMSHA1ServerConversation(this));
+    } else {
+        return Status(ErrorCodes::BadValue,
+                      mongoutils::str::stream() << "SASL mechanism " << mechanism
+                                                << " is not supported");
     }
 
-    std::string NativeSaslAuthenticationSession::getPrincipalId() const {
-        return _saslConversation->getPrincipalId();
+    return Status::OK();
+}
+
+Status NativeSaslAuthenticationSession::step(StringData inputData, std::string* outputData) {
+    if (!_saslConversation) {
+        return Status(ErrorCodes::BadValue,
+                      mongoutils::str::stream()
+                          << "The authentication session has not been properly initialized");
     }
 
-    const char* NativeSaslAuthenticationSession::getMechanism() const {
-        return _mechanism.c_str();
+    StatusWith<bool> status = _saslConversation->step(inputData, outputData);
+    if (status.isOK()) {
+        _done = status.getValue();
+    } else {
+        _done = true;
     }
+    return status.getStatus();
+}
+
+std::string NativeSaslAuthenticationSession::getPrincipalId() const {
+    return _saslConversation->getPrincipalId();
+}
+
+const char* NativeSaslAuthenticationSession::getMechanism() const {
+    return _mechanism.c_str();
+}
 
 }  // namespace mongo

@@ -38,198 +38,191 @@
 
 namespace mongo {
 
-    const std::string CollectionType::ConfigNS = "config.collections";
+const std::string CollectionType::ConfigNS = "config.collections";
 
-    const BSONField<std::string> CollectionType::fullNs("_id");
-    const BSONField<OID> CollectionType::epoch("lastmodEpoch");
-    const BSONField<Date_t> CollectionType::updatedAt("lastmod");
-    const BSONField<BSONObj> CollectionType::keyPattern("key");
-    const BSONField<bool> CollectionType::unique("unique");
-    const BSONField<bool> CollectionType::noBalance("noBalance");
-    const BSONField<bool> CollectionType::dropped("dropped");
+const BSONField<std::string> CollectionType::fullNs("_id");
+const BSONField<OID> CollectionType::epoch("lastmodEpoch");
+const BSONField<Date_t> CollectionType::updatedAt("lastmod");
+const BSONField<BSONObj> CollectionType::keyPattern("key");
+const BSONField<bool> CollectionType::unique("unique");
+const BSONField<bool> CollectionType::noBalance("noBalance");
+const BSONField<bool> CollectionType::dropped("dropped");
 
 
-    StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
-        CollectionType coll;
+StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
+    CollectionType coll;
 
-        {
-            std::string collFullNs;
-            Status status = bsonExtractStringField(source, fullNs.name(), &collFullNs);
-            if (!status.isOK()) return status;
+    {
+        std::string collFullNs;
+        Status status = bsonExtractStringField(source, fullNs.name(), &collFullNs);
+        if (!status.isOK())
+            return status;
 
-            coll._fullNs = NamespaceString{collFullNs};
-        }
-
-        {
-            OID collEpoch;
-            Status status = bsonExtractOIDField(source, epoch.name(), &collEpoch);
-            if (!status.isOK()) return status;
-
-            coll._epoch = collEpoch;
-        }
-
-        {
-            BSONElement collUpdatedAt;
-            Status status = bsonExtractTypedField(source, updatedAt.name(), Date, &collUpdatedAt);
-            if (!status.isOK()) return status;
-
-            coll._updatedAt = collUpdatedAt.Date();
-        }
-
-        {
-            bool collDropped;
-            Status status = bsonExtractBooleanField(source, dropped.name(), &collDropped);
-            if (status.isOK()) {
-                coll._dropped = collDropped;
-            }
-            else if (status == ErrorCodes::NoSuchKey) {
-                // Dropped can be missing in which case it is presumed false
-            }
-            else {
-                return status;
-            }
-        }
-
-        {
-            BSONElement collKeyPattern;
-            Status status =
-                    bsonExtractTypedField(source, keyPattern.name(), Object, &collKeyPattern);
-            if (status.isOK()) {
-                BSONObj obj = collKeyPattern.Obj();
-                if (obj.isEmpty()) {
-                    return Status(ErrorCodes::ShardKeyNotFound, "empty shard key");
-                }
-
-                coll._keyPattern = KeyPattern(obj.getOwned());
-            }
-            else if ((status == ErrorCodes::NoSuchKey) && coll.getDropped()) {
-                // Sharding key can be missing if the collection is dropped
-            }
-            else {
-                return status;
-            }
-        }
-
-        {
-            bool collUnique;
-            Status status = bsonExtractBooleanField(source, unique.name(), &collUnique);
-            if (status.isOK()) {
-                coll._unique = collUnique;
-            }
-            else if (status == ErrorCodes::NoSuchKey) {
-                // Key uniqueness can be missing in which case it is presumed false
-            }
-            else {
-                return status;
-            }
-        }
-
-        {
-            bool collNoBalance;
-            Status status = bsonExtractBooleanField(source, noBalance.name(), &collNoBalance);
-            if (status.isOK()) {
-                coll._allowBalance = !collNoBalance;
-            }
-            else if (status == ErrorCodes::NoSuchKey) {
-                // No balance can be missing in which case it is presumed as false
-            }
-            else {
-                return status;
-            }
-        }
-
-        return StatusWith<CollectionType>(coll);
+        coll._fullNs = NamespaceString{collFullNs};
     }
 
-    Status CollectionType::validate() const {
-        // These fields must always be set
-        if (!_fullNs.is_initialized()) {
-            return Status(ErrorCodes::NoSuchKey, "missing ns");
-        }
+    {
+        OID collEpoch;
+        Status status = bsonExtractOIDField(source, epoch.name(), &collEpoch);
+        if (!status.isOK())
+            return status;
 
-        if (!_fullNs->isValid()) {
-            return Status(ErrorCodes::BadValue, "invalid namespace " + _fullNs->toString());
-        }
+        coll._epoch = collEpoch;
+    }
 
-        if (!_epoch.is_initialized()) {
-            return Status(ErrorCodes::NoSuchKey, "missing epoch");
-        }
+    {
+        BSONElement collUpdatedAt;
+        Status status = bsonExtractTypedField(source, updatedAt.name(), Date, &collUpdatedAt);
+        if (!status.isOK())
+            return status;
 
-        if (!_updatedAt.is_initialized()) {
-            return Status(ErrorCodes::NoSuchKey, "missing updated at timestamp");
-        }
+        coll._updatedAt = collUpdatedAt.Date();
+    }
 
-        if (!_dropped.get_value_or(false)) {
-            if (!_epoch->isSet()) {
-                return Status(ErrorCodes::BadValue, "invalid epoch");
+    {
+        bool collDropped;
+        Status status = bsonExtractBooleanField(source, dropped.name(), &collDropped);
+        if (status.isOK()) {
+            coll._dropped = collDropped;
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Dropped can be missing in which case it is presumed false
+        } else {
+            return status;
+        }
+    }
+
+    {
+        BSONElement collKeyPattern;
+        Status status = bsonExtractTypedField(source, keyPattern.name(), Object, &collKeyPattern);
+        if (status.isOK()) {
+            BSONObj obj = collKeyPattern.Obj();
+            if (obj.isEmpty()) {
+                return Status(ErrorCodes::ShardKeyNotFound, "empty shard key");
             }
 
-            if (Date_t() == _updatedAt.get()) {
-                return Status(ErrorCodes::BadValue, "invalid updated at timestamp");
-            }
+            coll._keyPattern = KeyPattern(obj.getOwned());
+        } else if ((status == ErrorCodes::NoSuchKey) && coll.getDropped()) {
+            // Sharding key can be missing if the collection is dropped
+        } else {
+            return status;
+        }
+    }
 
-            if (!_keyPattern.is_initialized()) {
-                return Status(ErrorCodes::NoSuchKey, "missing key pattern");
-            }
-            else {
-                invariant(!_keyPattern->toBSON().isEmpty());
-            }
+    {
+        bool collUnique;
+        Status status = bsonExtractBooleanField(source, unique.name(), &collUnique);
+        if (status.isOK()) {
+            coll._unique = collUnique;
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Key uniqueness can be missing in which case it is presumed false
+        } else {
+            return status;
+        }
+    }
+
+    {
+        bool collNoBalance;
+        Status status = bsonExtractBooleanField(source, noBalance.name(), &collNoBalance);
+        if (status.isOK()) {
+            coll._allowBalance = !collNoBalance;
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // No balance can be missing in which case it is presumed as false
+        } else {
+            return status;
+        }
+    }
+
+    return StatusWith<CollectionType>(coll);
+}
+
+Status CollectionType::validate() const {
+    // These fields must always be set
+    if (!_fullNs.is_initialized()) {
+        return Status(ErrorCodes::NoSuchKey, "missing ns");
+    }
+
+    if (!_fullNs->isValid()) {
+        return Status(ErrorCodes::BadValue, "invalid namespace " + _fullNs->toString());
+    }
+
+    if (!_epoch.is_initialized()) {
+        return Status(ErrorCodes::NoSuchKey, "missing epoch");
+    }
+
+    if (!_updatedAt.is_initialized()) {
+        return Status(ErrorCodes::NoSuchKey, "missing updated at timestamp");
+    }
+
+    if (!_dropped.get_value_or(false)) {
+        if (!_epoch->isSet()) {
+            return Status(ErrorCodes::BadValue, "invalid epoch");
         }
 
-        return Status::OK();
-    }
-
-    BSONObj CollectionType::toBSON() const {
-        BSONObjBuilder builder;
-
-        if (_fullNs) {
-            builder.append(fullNs.name(), _fullNs->toString());
-        }
-        builder.append(epoch.name(), _epoch.get_value_or(OID()));
-        builder.append(updatedAt.name(), _updatedAt.get_value_or(Date_t()));
-
-        // These fields are optional, so do not include them in the metadata for the purposes of
-        // consuming less space on the config servers.
-
-        if (_dropped.is_initialized()) {
-            builder.append(dropped.name(), _dropped.get());
+        if (Date_t() == _updatedAt.get()) {
+            return Status(ErrorCodes::BadValue, "invalid updated at timestamp");
         }
 
-        if (_keyPattern.is_initialized()) {
-            builder.append(keyPattern.name(), _keyPattern->toBSON());
+        if (!_keyPattern.is_initialized()) {
+            return Status(ErrorCodes::NoSuchKey, "missing key pattern");
+        } else {
+            invariant(!_keyPattern->toBSON().isEmpty());
         }
-
-        if (_unique.is_initialized()) {
-            builder.append(unique.name(), _unique.get());
-        }
-
-        if (_allowBalance.is_initialized()) {
-            builder.append(noBalance.name(), !_allowBalance.get());
-        }
-
-        return builder.obj();
     }
 
-    std::string CollectionType::toString() const {
-        return toBSON().toString();
+    return Status::OK();
+}
+
+BSONObj CollectionType::toBSON() const {
+    BSONObjBuilder builder;
+
+    if (_fullNs) {
+        builder.append(fullNs.name(), _fullNs->toString());
+    }
+    builder.append(epoch.name(), _epoch.get_value_or(OID()));
+    builder.append(updatedAt.name(), _updatedAt.get_value_or(Date_t()));
+
+    // These fields are optional, so do not include them in the metadata for the purposes of
+    // consuming less space on the config servers.
+
+    if (_dropped.is_initialized()) {
+        builder.append(dropped.name(), _dropped.get());
     }
 
-    void CollectionType::setNs(const NamespaceString& fullNs) {
-        invariant(fullNs.isValid());
-        _fullNs = fullNs;
+    if (_keyPattern.is_initialized()) {
+        builder.append(keyPattern.name(), _keyPattern->toBSON());
     }
 
-    void CollectionType::setEpoch(OID epoch) {
-        _epoch = epoch;
+    if (_unique.is_initialized()) {
+        builder.append(unique.name(), _unique.get());
     }
 
-    void CollectionType::setUpdatedAt(Date_t updatedAt) {
-        _updatedAt = updatedAt;
+    if (_allowBalance.is_initialized()) {
+        builder.append(noBalance.name(), !_allowBalance.get());
     }
 
-    void CollectionType::setKeyPattern(const KeyPattern& keyPattern) {
-        invariant(!keyPattern.toBSON().isEmpty());
-        _keyPattern = keyPattern;
-    }
+    return builder.obj();
+}
 
-} // namespace mongo
+std::string CollectionType::toString() const {
+    return toBSON().toString();
+}
+
+void CollectionType::setNs(const NamespaceString& fullNs) {
+    invariant(fullNs.isValid());
+    _fullNs = fullNs;
+}
+
+void CollectionType::setEpoch(OID epoch) {
+    _epoch = epoch;
+}
+
+void CollectionType::setUpdatedAt(Date_t updatedAt) {
+    _updatedAt = updatedAt;
+}
+
+void CollectionType::setKeyPattern(const KeyPattern& keyPattern) {
+    invariant(!keyPattern.toBSON().isEmpty());
+    _keyPattern = keyPattern;
+}
+
+}  // namespace mongo

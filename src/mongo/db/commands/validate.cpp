@@ -41,81 +41,87 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
-    using std::stringstream;
+using std::endl;
+using std::string;
+using std::stringstream;
 
-    class ValidateCmd : public Command {
-    public:
-        ValidateCmd() : Command( "validate" ) {}
+class ValidateCmd : public Command {
+public:
+    ValidateCmd() : Command("validate") {}
 
-        virtual bool slaveOk() const {
-            return true;
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual void help(stringstream& h) const {
+        h << "Validate contents of a namespace by scanning its data structures for correctness.  "
+             "Slow.\n"
+             "Add full:true option to do a more thorough check";
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::validate);
+        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
+    //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] [, full: <bool> } */
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
+
+        NamespaceString ns_string(ns);
+        const bool full = cmdObj["full"].trueValue();
+        const bool scanData = full || cmdObj["scandata"].trueValue();
+
+        if (!ns_string.isNormal() && full) {
+            errmsg = "Can only run full validate on a regular collection";
+            return false;
         }
 
-        virtual void help(stringstream& h) const { h << "Validate contents of a namespace by scanning its data structures for correctness.  Slow.\n"
-                                                        "Add full:true option to do a more thorough check"; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::validate);
-            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-        }
-        //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] [, full: <bool> } */
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
-
-            NamespaceString ns_string(ns);
-            const bool full = cmdObj["full"].trueValue();
-            const bool scanData = full || cmdObj["scandata"].trueValue();
-
-            if ( !ns_string.isNormal() && full ) {
-                errmsg = "Can only run full validate on a regular collection";
-                return false;
-            }
-
-            if (!serverGlobalParams.quiet) {
-                LOG(0) << "CMD: validate " << ns << endl;
-            }
-
-            AutoGetDb ctx(txn, ns_string.db(), MODE_IX);
-            Lock::CollectionLock collLk(txn->lockState(), ns_string.ns(), MODE_X);
-            Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(ns_string) : NULL;
-            if ( !collection ) {
-                errmsg = "ns not found";
-                return false;
-            }
-
-            result.append( "ns", ns );
-
-            ValidateResults results;
-            Status status = collection->validate( txn, full, scanData, &results, &result );
-            if ( !status.isOK() )
-                return appendCommandStatus( result, status );
-
-            result.appendBool("valid", results.valid);
-            result.append("errors", results.errors);
-
-            if ( !full ){
-                result.append("warning", "Some checks omitted for speed. use {full:true} option to do more thorough scan.");
-            }
-
-            if ( !results.valid ) {
-                result.append("advice", "ns corrupt. See http://dochub.mongodb.org/core/data-recovery");
-            }
-
-            return true;
+        if (!serverGlobalParams.quiet) {
+            LOG(0) << "CMD: validate " << ns << endl;
         }
 
-    } validateCmd;
+        AutoGetDb ctx(txn, ns_string.db(), MODE_IX);
+        Lock::CollectionLock collLk(txn->lockState(), ns_string.ns(), MODE_X);
+        Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(ns_string) : NULL;
+        if (!collection) {
+            errmsg = "ns not found";
+            return false;
+        }
 
+        result.append("ns", ns);
+
+        ValidateResults results;
+        Status status = collection->validate(txn, full, scanData, &results, &result);
+        if (!status.isOK())
+            return appendCommandStatus(result, status);
+
+        result.appendBool("valid", results.valid);
+        result.append("errors", results.errors);
+
+        if (!full) {
+            result.append(
+                "warning",
+                "Some checks omitted for speed. use {full:true} option to do more thorough scan.");
+        }
+
+        if (!results.valid) {
+            result.append("advice", "ns corrupt. See http://dochub.mongodb.org/core/data-recovery");
+        }
+
+        return true;
+    }
+
+} validateCmd;
 }

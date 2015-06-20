@@ -34,8 +34,8 @@
 
 namespace mongo {
 
-    std::ostream& operator<<(std::ostream &s, const ThreadSafeString &o) {
-        return s << o.toString();
-    }
+std::ostream& operator<<(std::ostream& s, const ThreadSafeString& o) {
+    return s << o.toString();
+}
 
-} // namespace mongo
+}  // namespace mongo

@@ -34,30 +34,30 @@
 #include "mongo/bson/oid.h"
 
 namespace mongo {
-    struct HostAndPort;
+struct HostAndPort;
 
 namespace repl {
 
-    /**
-     * An identifier unique to this instance. Used by isSelf to see if we are talking
-     * to ourself or someone else.
-     */
-    extern OID instanceId;
+/**
+ * An identifier unique to this instance. Used by isSelf to see if we are talking
+ * to ourself or someone else.
+ */
+extern OID instanceId;
 
-    /**
-     * Returns true if "hostAndPort" identifies this instance.
-     */
-    bool isSelf(const HostAndPort& hostAndPort);
+/**
+ * Returns true if "hostAndPort" identifies this instance.
+ */
+bool isSelf(const HostAndPort& hostAndPort);
 
-    /**
-     * Returns all the IP addresses bound to the network interfaces of this machine.
-     * This requires a syscall. If the ipv6enabled parameter is true, both IPv6 AND IPv4
-     * addresses will be returned.
-     *
-     * Note: this only works on Linux and Windows. All calls should be properly ifdef'd,
-     * otherwise an invariant will be triggered.
-     */
-    std::vector<std::string> getBoundAddrs(const bool ipv6enabled);
+/**
+ * Returns all the IP addresses bound to the network interfaces of this machine.
+ * This requires a syscall. If the ipv6enabled parameter is true, both IPv6 AND IPv4
+ * addresses will be returned.
+ *
+ * Note: this only works on Linux and Windows. All calls should be properly ifdef'd,
+ * otherwise an invariant will be triggered.
+ */
+std::vector<std::string> getBoundAddrs(const bool ipv6enabled);
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

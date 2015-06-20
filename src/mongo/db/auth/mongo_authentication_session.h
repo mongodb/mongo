@@ -31,24 +31,27 @@
 
 namespace mongo {
 
-    typedef unsigned long long nonce64;
+typedef unsigned long long nonce64;
 
-    /**
-     * Authentication session data for a nonce-challenge-response authentication of the
-     * type used in the Mongo nonce-authenticate protocol.
-     *
-     * The only session data is the nonce sent to the client.
-     */
-    class MongoAuthenticationSession : public AuthenticationSession {
-        MONGO_DISALLOW_COPYING(MongoAuthenticationSession);
-    public:
-        explicit MongoAuthenticationSession(nonce64 nonce);
-        virtual ~MongoAuthenticationSession();
+/**
+ * Authentication session data for a nonce-challenge-response authentication of the
+ * type used in the Mongo nonce-authenticate protocol.
+ *
+ * The only session data is the nonce sent to the client.
+ */
+class MongoAuthenticationSession : public AuthenticationSession {
+    MONGO_DISALLOW_COPYING(MongoAuthenticationSession);
 
-        nonce64 getNonce() const { return _nonce; }
+public:
+    explicit MongoAuthenticationSession(nonce64 nonce);
+    virtual ~MongoAuthenticationSession();
 
-    private:
-        const nonce64 _nonce;
-    };
+    nonce64 getNonce() const {
+        return _nonce;
+    }
+
+private:
+    const nonce64 _nonce;
+};
 
 }  // namespace mongo

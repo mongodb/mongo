@@ -35,36 +35,34 @@
 
 namespace {
 
-    using namespace mongo;
-    using std::string;
+using namespace mongo;
+using std::string;
 
-    TEST(DatabaseType, Empty) {
-        StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSONObj());
-        ASSERT_FALSE(status.isOK());
-    }
+TEST(DatabaseType, Empty) {
+    StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSONObj());
+    ASSERT_FALSE(status.isOK());
+}
 
-    TEST(DatabaseType, Basic) {
-        StatusWith<DatabaseType> status = DatabaseType::fromBSON(
-                                                BSON(DatabaseType::name("mydb") <<
-                                                     DatabaseType::primary("shard") <<
-                                                     DatabaseType::sharded(true)));
-        ASSERT_TRUE(status.isOK());
+TEST(DatabaseType, Basic) {
+    StatusWith<DatabaseType> status =
+        DatabaseType::fromBSON(BSON(DatabaseType::name("mydb") << DatabaseType::primary("shard")
+                                                               << DatabaseType::sharded(true)));
+    ASSERT_TRUE(status.isOK());
 
-        DatabaseType db = status.getValue();
-        ASSERT_EQUALS(db.getName(), "mydb");
-        ASSERT_EQUALS(db.getPrimary(), "shard");
-        ASSERT_TRUE(db.getSharded());
-    }
+    DatabaseType db = status.getValue();
+    ASSERT_EQUALS(db.getName(), "mydb");
+    ASSERT_EQUALS(db.getPrimary(), "shard");
+    ASSERT_TRUE(db.getSharded());
+}
 
-    TEST(DatabaseType, BadType) {
-        StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSON(DatabaseType::name() << 0));
-        ASSERT_FALSE(status.isOK());
-    }
+TEST(DatabaseType, BadType) {
+    StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSON(DatabaseType::name() << 0));
+    ASSERT_FALSE(status.isOK());
+}
 
-    TEST(DatabaseType, MissingRequired) {
-        StatusWith<DatabaseType> status = DatabaseType::fromBSON(
-                                                BSON(DatabaseType::name("mydb")));
-        ASSERT_FALSE(status.isOK());
-    }
+TEST(DatabaseType, MissingRequired) {
+    StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSON(DatabaseType::name("mydb")));
+    ASSERT_FALSE(status.isOK());
+}
 
-} // unnamed namespace
+}  // unnamed namespace

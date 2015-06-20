@@ -37,119 +37,119 @@
 
 namespace mongo {
 
-    // Insert multiple keys and verify that omitting the commit()
-    // on the WriteUnitOfWork causes the changes to not become visible.
-    TEST( SortedDataInterface, InsertWithoutCommit ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
+// Insert multiple keys and verify that omitting the commit()
+// on the WriteUnitOfWork causes the changes to not become visible.
+TEST(SortedDataInterface, InsertWithoutCommit) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
 
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                // no commit
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, false ) );
-                // no commit
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
+            // no commit
         }
     }
 
-    // Insert multiple keys, then unindex those same keys and verify that
-    // omitting the commit() on the WriteUnitOfWork causes the changes to
-    // not become visible.
-    TEST( SortedDataInterface, UnindexWithoutCommit ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
 
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                sorted->unindex( opCtx.get(), key2, loc2, true );
-                ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
-                // no commit
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc3, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                sorted->unindex( opCtx.get(), key1, loc1, true );
-                ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-                sorted->unindex( opCtx.get(), key3, loc3, true );
-                ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
-                // no commit
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc2, false));
+            // no commit
         }
     }
 
-} // namespace mongo
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+}
+
+// Insert multiple keys, then unindex those same keys and verify that
+// omitting the commit() on the WriteUnitOfWork causes the changes to
+// not become visible.
+TEST(SortedDataInterface, UnindexWithoutCommit) {
+    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, true));
+            uow.commit();
+        }
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            sorted->unindex(opCtx.get(), key2, loc2, true);
+            ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+            // no commit
+        }
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc3, true));
+            uow.commit();
+        }
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            sorted->unindex(opCtx.get(), key1, loc1, true);
+            ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+            sorted->unindex(opCtx.get(), key3, loc3, true);
+            ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+            // no commit
+        }
+    }
+
+    {
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
+    }
+}
+
+}  // namespace mongo

@@ -38,82 +38,86 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    const std::string DatabaseType::ConfigNS = "config.databases";
+const std::string DatabaseType::ConfigNS = "config.databases";
 
-    const BSONField<std::string> DatabaseType::name("_id");
-    const BSONField<std::string> DatabaseType::primary("primary");
-    const BSONField<bool> DatabaseType::sharded("partitioned");
+const BSONField<std::string> DatabaseType::name("_id");
+const BSONField<std::string> DatabaseType::primary("primary");
+const BSONField<bool> DatabaseType::sharded("partitioned");
 
 
-    StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
-        DatabaseType dbt;
+StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
+    DatabaseType dbt;
 
-        {
-            std::string dbtName;
-            Status status = bsonExtractStringField(source, name.name(), &dbtName);
-            if (!status.isOK()) return status;
+    {
+        std::string dbtName;
+        Status status = bsonExtractStringField(source, name.name(), &dbtName);
+        if (!status.isOK())
+            return status;
 
-            dbt._name = dbtName;
-        }
-
-        {
-            std::string dbtPrimary;
-            Status status = bsonExtractStringField(source, primary.name(), &dbtPrimary);
-            if (!status.isOK()) return status;
-
-            dbt._primary = dbtPrimary;
-        }
-
-        {
-            bool dbtSharded;
-            Status status = bsonExtractBooleanFieldWithDefault(source, sharded.name(), false, &dbtSharded);
-            if (!status.isOK()) return status;
-
-            dbt._sharded = dbtSharded;
-        }
-
-        return StatusWith<DatabaseType>(dbt);
+        dbt._name = dbtName;
     }
 
-    Status DatabaseType::validate() const {
-        if (!_name.is_initialized() || _name->empty()) {
-            return Status(ErrorCodes::NoSuchKey, "missing name");
-        }
+    {
+        std::string dbtPrimary;
+        Status status = bsonExtractStringField(source, primary.name(), &dbtPrimary);
+        if (!status.isOK())
+            return status;
 
-        if (!_primary.is_initialized() || _primary->empty()) {
-            return Status(ErrorCodes::NoSuchKey, "missing primary");
-        }
-
-        if (!_sharded.is_initialized()) {
-            return Status(ErrorCodes::NoSuchKey, "missing sharded");
-        }
-
-        return Status::OK();
+        dbt._primary = dbtPrimary;
     }
 
-    BSONObj DatabaseType::toBSON() const {
-        BSONObjBuilder builder;
-        builder.append(name.name(), _name.get_value_or(""));
-        builder.append(primary.name(), _primary.get_value_or(""));
-        builder.append(sharded.name(), _sharded.get_value_or(false));
+    {
+        bool dbtSharded;
+        Status status =
+            bsonExtractBooleanFieldWithDefault(source, sharded.name(), false, &dbtSharded);
+        if (!status.isOK())
+            return status;
 
-        return builder.obj();
+        dbt._sharded = dbtSharded;
     }
 
-    std::string DatabaseType::toString() const {
-        return toBSON().toString();
+    return StatusWith<DatabaseType>(dbt);
+}
+
+Status DatabaseType::validate() const {
+    if (!_name.is_initialized() || _name->empty()) {
+        return Status(ErrorCodes::NoSuchKey, "missing name");
     }
 
-    void DatabaseType::setName(const std::string& name) {
-        invariant(!name.empty());
-        _name = name;
+    if (!_primary.is_initialized() || _primary->empty()) {
+        return Status(ErrorCodes::NoSuchKey, "missing primary");
     }
 
-    void DatabaseType::setPrimary(const std::string& primary) {
-        invariant(!primary.empty());
-        _primary = primary;
+    if (!_sharded.is_initialized()) {
+        return Status(ErrorCodes::NoSuchKey, "missing sharded");
     }
 
-} // namespace mongo
+    return Status::OK();
+}
+
+BSONObj DatabaseType::toBSON() const {
+    BSONObjBuilder builder;
+    builder.append(name.name(), _name.get_value_or(""));
+    builder.append(primary.name(), _primary.get_value_or(""));
+    builder.append(sharded.name(), _sharded.get_value_or(false));
+
+    return builder.obj();
+}
+
+std::string DatabaseType::toString() const {
+    return toBSON().toString();
+}
+
+void DatabaseType::setName(const std::string& name) {
+    invariant(!name.empty());
+    _name = name;
+}
+
+void DatabaseType::setPrimary(const std::string& primary) {
+    invariant(!primary.empty());
+    _primary = primary;
+}
+
+}  // namespace mongo

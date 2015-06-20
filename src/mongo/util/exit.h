@@ -32,19 +32,17 @@
 
 namespace mongo {
 
-    // Note: whyMsg can never be NULL.
-    void dbexit( ExitCode returnCode, const char *whyMsg = "" );
+// Note: whyMsg can never be NULL.
+void dbexit(ExitCode returnCode, const char* whyMsg = "");
 
-    /**
-     * Quickly determines if the shutdown flag is set.  May not be definitive.
-     */
-    bool inShutdown();
+/**
+ * Quickly determines if the shutdown flag is set.  May not be definitive.
+ */
+bool inShutdown();
 
-    /**
-     * Definitively determines if the shutdown flag is set.  Calling this is more expensive
-     * than inShutdown().
-     */
-    bool inShutdownStrict();
-
+/**
+ * Definitively determines if the shutdown flag is set.  Calling this is more expensive
+ * than inShutdown().
+ */
+bool inShutdownStrict();
 }
-

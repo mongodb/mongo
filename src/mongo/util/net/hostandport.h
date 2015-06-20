@@ -34,93 +34,95 @@
 #include "mongo/platform/hash_namespace.h"
 
 namespace mongo {
-    class Status;
-    class StringData;
-    template <typename T> class StatusWith;
+class Status;
+class StringData;
+template <typename T>
+class StatusWith;
+
+/**
+ * Name of a process on the network.
+ *
+ * Composed of some name component, followed optionally by a colon and a numeric port.  The name
+ * might be an IPv4 or IPv6 address or a relative or fully qualified host name, or an absolute
+ * path to a unix socket.
+ */
+struct HostAndPort {
+    /**
+     * Parses "text" to produce a HostAndPort.  Returns either that or an error
+     * status describing the parse failure.
+     */
+    static StatusWith<HostAndPort> parse(StringData text);
 
     /**
-     * Name of a process on the network.
-     *
-     * Composed of some name component, followed optionally by a colon and a numeric port.  The name
-     * might be an IPv4 or IPv6 address or a relative or fully qualified host name, or an absolute
-     * path to a unix socket.
+     * Construct an empty/invalid HostAndPort.
      */
-    struct HostAndPort {
+    HostAndPort();
 
-        /**
-         * Parses "text" to produce a HostAndPort.  Returns either that or an error
-         * status describing the parse failure.
-         */
-        static StatusWith<HostAndPort> parse(StringData text);
+    /**
+     * Constructs a HostAndPort by parsing "text" of the form hostname[:portnumber]
+     * Throws an AssertionException if bad config std::string or bad port #.
+     */
+    explicit HostAndPort(StringData text);
 
-        /**
-         * Construct an empty/invalid HostAndPort.
-         */
-        HostAndPort();
+    /**
+     * Constructs a HostAndPort with the hostname "h" and port "p".
+     *
+     * If "p" is -1, port() returns ServerGlobalParams::DefaultDBPort.
+     */
+    HostAndPort(const std::string& h, int p);
 
-        /**
-         * Constructs a HostAndPort by parsing "text" of the form hostname[:portnumber]
-         * Throws an AssertionException if bad config std::string or bad port #.
-         */
-        explicit HostAndPort(StringData text);
+    /**
+     * (Re-)initializes this HostAndPort by parsing "s".  Returns
+     * Status::OK on success.  The state of this HostAndPort is unspecified
+     * after initialize() returns a non-OK status, though it is safe to
+     * assign to it or re-initialize it.
+     */
+    Status initialize(StringData s);
 
-        /**
-         * Constructs a HostAndPort with the hostname "h" and port "p".
-         *
-         * If "p" is -1, port() returns ServerGlobalParams::DefaultDBPort.
-         */
-        HostAndPort(const std::string& h, int p);
+    bool operator<(const HostAndPort& r) const;
+    bool operator==(const HostAndPort& r) const;
+    bool operator!=(const HostAndPort& r) const {
+        return !(*this == r);
+    }
 
-        /**
-         * (Re-)initializes this HostAndPort by parsing "s".  Returns
-         * Status::OK on success.  The state of this HostAndPort is unspecified
-         * after initialize() returns a non-OK status, though it is safe to
-         * assign to it or re-initialize it.
-         */
-        Status initialize(StringData s);
+    /**
+     * Returns true if the hostname looks localhost-y.
+     *
+     * TODO: Make a more rigorous implementation, perhaps elsewhere in
+     * the networking library.
+     */
+    bool isLocalHost() const;
 
-        bool operator<(const HostAndPort& r) const;
-        bool operator==(const HostAndPort& r) const;
-        bool operator!=(const HostAndPort& r) const { return !(*this == r); }
+    /**
+     * Returns a string representation of "host:port".
+     */
+    std::string toString() const;
 
-        /**
-         * Returns true if the hostname looks localhost-y.
-         *
-         * TODO: Make a more rigorous implementation, perhaps elsewhere in
-         * the networking library.
-         */
-        bool isLocalHost() const;
+    /**
+     * Like toString(), above, but writes to "ss", instead.
+     */
+    void append(StringBuilder& ss) const;
 
-        /**
-         * Returns a string representation of "host:port".
-         */
-        std::string toString() const;
+    /**
+     * Returns true if this object represents no valid HostAndPort.
+     */
+    bool empty() const;
 
-        /**
-         * Like toString(), above, but writes to "ss", instead.
-         */
-        void append( StringBuilder& ss ) const;
+    const std::string& host() const {
+        return _host;
+    }
+    int port() const;
 
-        /**
-         * Returns true if this object represents no valid HostAndPort.
-         */
-        bool empty() const;
+    bool hasPort() const {
+        return _port >= 0;
+    }
 
-        const std::string& host() const {
-            return _host;
-        }
-        int port() const;
+private:
+    std::string _host;
+    int _port;  // -1 indicates unspecified
+};
 
-        bool hasPort() const {
-            return _port >= 0;
-        }
-
-    private:
-        std::string _host;
-        int _port; // -1 indicates unspecified
-    };
-
-    std::ostream& operator<<(std::ostream& os, const HostAndPort& hp);
+std::ostream& operator<<(std::ostream& os, const HostAndPort& hp);
 
 }  // namespace mongo
 

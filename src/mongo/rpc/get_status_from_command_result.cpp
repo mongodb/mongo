@@ -36,43 +36,40 @@
 
 namespace mongo {
 
-    Status getStatusFromCommandResult(const BSONObj& result) {
-        BSONElement okElement = result["ok"];
-        BSONElement codeElement = result["code"];
-        BSONElement errmsgElement = result["errmsg"];
+Status getStatusFromCommandResult(const BSONObj& result) {
+    BSONElement okElement = result["ok"];
+    BSONElement codeElement = result["code"];
+    BSONElement errmsgElement = result["errmsg"];
 
-        // StaleConfigException doesn't pass "ok" in legacy servers
-        BSONElement dollarErrElement = result["$err"];
+    // StaleConfigException doesn't pass "ok" in legacy servers
+    BSONElement dollarErrElement = result["$err"];
 
-        if (okElement.eoo() && dollarErrElement.eoo()) {
-            return Status(ErrorCodes::CommandResultSchemaViolation,
-                          mongoutils::str::stream() << "No \"ok\" field in command result " <<
-                          result);
-        }
-        if (okElement.trueValue()) {
-            return Status::OK();
-        }
-        int code = codeElement.numberInt();
-        if (0 == code) {
-            code = ErrorCodes::UnknownError;
-        }
-        std::string errmsg;
-        if (errmsgElement.type() == String) {
-            errmsg = errmsgElement.String();
-        }
-        else if (!errmsgElement.eoo()) {
-            errmsg = errmsgElement.toString();
-        }
-
-        // we can't use startsWith(errmsg, "no such")
-        // as we have errors such as "no such collection"
-        if (code == ErrorCodes::UnknownError &&
-            (str::startsWith(errmsg, "no such cmd") ||
-             str::startsWith(errmsg, "no such command"))) {
-            code = ErrorCodes::CommandNotFound;
-        }
-
-        return Status(ErrorCodes::Error(code), errmsg);
+    if (okElement.eoo() && dollarErrElement.eoo()) {
+        return Status(ErrorCodes::CommandResultSchemaViolation,
+                      mongoutils::str::stream() << "No \"ok\" field in command result " << result);
     }
+    if (okElement.trueValue()) {
+        return Status::OK();
+    }
+    int code = codeElement.numberInt();
+    if (0 == code) {
+        code = ErrorCodes::UnknownError;
+    }
+    std::string errmsg;
+    if (errmsgElement.type() == String) {
+        errmsg = errmsgElement.String();
+    } else if (!errmsgElement.eoo()) {
+        errmsg = errmsgElement.toString();
+    }
+
+    // we can't use startsWith(errmsg, "no such")
+    // as we have errors such as "no such collection"
+    if (code == ErrorCodes::UnknownError &&
+        (str::startsWith(errmsg, "no such cmd") || str::startsWith(errmsg, "no such command"))) {
+        code = ErrorCodes::CommandNotFound;
+    }
+
+    return Status(ErrorCodes::Error(code), errmsg);
+}
 
 }  // namespace mongo

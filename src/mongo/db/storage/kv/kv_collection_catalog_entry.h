@@ -36,60 +36,57 @@
 
 namespace mongo {
 
-    class KVCatalog;
-    class KVEngine;
+class KVCatalog;
+class KVEngine;
 
-    class KVCollectionCatalogEntry final : public BSONCollectionCatalogEntry {
-    public:
-        KVCollectionCatalogEntry( KVEngine* engine,
-                                  KVCatalog* catalog,
-                                  StringData ns,
-                                  StringData ident,
-                                  RecordStore* rs );
+class KVCollectionCatalogEntry final : public BSONCollectionCatalogEntry {
+public:
+    KVCollectionCatalogEntry(
+        KVEngine* engine, KVCatalog* catalog, StringData ns, StringData ident, RecordStore* rs);
 
-        ~KVCollectionCatalogEntry() final;
+    ~KVCollectionCatalogEntry() final;
 
-        int getMaxAllowedIndexes() const final { return 64; };
-
-        bool setIndexIsMultikey(OperationContext* txn,
-                                StringData indexName,
-                                bool multikey = true) final;
-
-        void setIndexHead( OperationContext* txn,
-                           StringData indexName,
-                           const RecordId& newHead ) final;
-
-        Status removeIndex( OperationContext* txn,
-                            StringData indexName ) final;
-
-        Status prepareForIndexBuild( OperationContext* txn,
-                                     const IndexDescriptor* spec ) final;
-
-        void indexBuildSuccess( OperationContext* txn,
-                                StringData indexName ) final;
-
-        void updateTTLSetting( OperationContext* txn,
-                               StringData idxName,
-                               long long newExpireSeconds ) final;
-
-        void updateFlags(OperationContext* txn, int newValue) final;
-
-        void updateValidator(OperationContext* txn, const BSONObj& validator) final;
-
-        RecordStore* getRecordStore() { return _recordStore.get(); }
-        const RecordStore* getRecordStore() const { return _recordStore.get(); }
-
-    protected:
-        MetaData _getMetaData( OperationContext* txn ) const final;
-
-    private:
-        class AddIndexChange;
-        class RemoveIndexChange;
-
-        KVEngine* _engine; // not owned
-        KVCatalog* _catalog; // not owned
-        std::string _ident;
-        std::unique_ptr<RecordStore> _recordStore; // owned
+    int getMaxAllowedIndexes() const final {
+        return 64;
     };
 
+    bool setIndexIsMultikey(OperationContext* txn,
+                            StringData indexName,
+                            bool multikey = true) final;
+
+    void setIndexHead(OperationContext* txn, StringData indexName, const RecordId& newHead) final;
+
+    Status removeIndex(OperationContext* txn, StringData indexName) final;
+
+    Status prepareForIndexBuild(OperationContext* txn, const IndexDescriptor* spec) final;
+
+    void indexBuildSuccess(OperationContext* txn, StringData indexName) final;
+
+    void updateTTLSetting(OperationContext* txn,
+                          StringData idxName,
+                          long long newExpireSeconds) final;
+
+    void updateFlags(OperationContext* txn, int newValue) final;
+
+    void updateValidator(OperationContext* txn, const BSONObj& validator) final;
+
+    RecordStore* getRecordStore() {
+        return _recordStore.get();
+    }
+    const RecordStore* getRecordStore() const {
+        return _recordStore.get();
+    }
+
+protected:
+    MetaData _getMetaData(OperationContext* txn) const final;
+
+private:
+    class AddIndexChange;
+    class RemoveIndexChange;
+
+    KVEngine* _engine;    // not owned
+    KVCatalog* _catalog;  // not owned
+    std::string _ident;
+    std::unique_ptr<RecordStore> _recordStore;  // owned
+};
 }

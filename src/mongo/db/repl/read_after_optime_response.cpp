@@ -39,48 +39,40 @@ using std::string;
 namespace mongo {
 namespace repl {
 
-    const string ReadAfterOpTimeResponse::kWaitedMSFieldName("waitedMS");
+const string ReadAfterOpTimeResponse::kWaitedMSFieldName("waitedMS");
 
-    ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status):
-        ReadAfterOpTimeResponse(status, stdx::chrono::milliseconds(0), false) {
+ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status)
+    : ReadAfterOpTimeResponse(status, stdx::chrono::milliseconds(0), false) {}
+
+ReadAfterOpTimeResponse::ReadAfterOpTimeResponse() : ReadAfterOpTimeResponse(Status::OK()) {}
+
+ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status, stdx::chrono::milliseconds duration)
+    : ReadAfterOpTimeResponse(status, duration, true) {}
+
+ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status,
+                                                 stdx::chrono::milliseconds duration,
+                                                 bool waited)
+    : _waited(waited), _duration(duration), _status(status) {}
+
+void ReadAfterOpTimeResponse::appendInfo(BSONObjBuilder* builder) {
+    if (!_waited) {
+        return;
     }
 
-    ReadAfterOpTimeResponse::ReadAfterOpTimeResponse():
-        ReadAfterOpTimeResponse(Status::OK()) {
-    }
+    builder->append(kWaitedMSFieldName, durationCount<Milliseconds>(_duration));
+}
 
-    ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status,
-                                                     stdx::chrono::milliseconds duration):
-        ReadAfterOpTimeResponse(status, duration, true) {
-    }
+bool ReadAfterOpTimeResponse::didWait() const {
+    return _waited;
+}
 
-    ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status,
-                                                     stdx::chrono::milliseconds duration,
-                                                     bool waited):
-        _waited(waited),
-        _duration(duration),
-        _status(status) {
-    }
+stdx::chrono::milliseconds ReadAfterOpTimeResponse::getDuration() const {
+    return _duration;
+}
 
-    void ReadAfterOpTimeResponse::appendInfo(BSONObjBuilder* builder) {
-        if (!_waited) {
-            return;
-        }
+Status ReadAfterOpTimeResponse::getStatus() const {
+    return _status;
+}
 
-        builder->append(kWaitedMSFieldName, durationCount<Milliseconds>(_duration));
-    }
-
-    bool ReadAfterOpTimeResponse::didWait() const {
-        return _waited;
-    }
-
-    stdx::chrono::milliseconds ReadAfterOpTimeResponse::getDuration() const {
-        return _duration;
-    }
-
-    Status ReadAfterOpTimeResponse::getStatus() const {
-        return _status;
-    }
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

@@ -48,165 +48,165 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::list;
-    using std::string;
-    using std::stringstream;
+using std::unique_ptr;
+using std::list;
+using std::string;
+using std::stringstream;
 
-    class CmdListCollections : public Command {
-    public:
-        virtual bool slaveOk() const { return false; }
-        virtual bool slaveOverrideOk() const { return true; }
-        virtual bool adminOnly() const { return false; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
+class CmdListCollections : public Command {
+public:
+    virtual bool slaveOk() const {
+        return false;
+    }
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
+    virtual bool adminOnly() const {
+        return false;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual void help( stringstream& help ) const { help << "list collections for this db"; }
+    virtual void help(stringstream& help) const {
+        help << "list collections for this db";
+    }
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            AuthorizationSession* authzSession = AuthorizationSession::get(client);
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
-            // Check for the listCollections ActionType on the database
-            // or find on system.namespaces for pre 3.0 systems.
-            if (authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(dbname),
-                    ActionType::listCollections) ||
-                authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(
-                        NamespaceString(dbname, "system.namespaces")),
-                    ActionType::find)) {
-                return Status::OK();
-            }
-
-            return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "Not authorized to create users on db: " <<
-                          dbname);
+        // Check for the listCollections ActionType on the database
+        // or find on system.namespaces for pre 3.0 systems.
+        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
+                                                           ActionType::listCollections) ||
+            authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.namespaces")),
+                ActionType::find)) {
+            return Status::OK();
         }
 
-        CmdListCollections() : Command( "listCollections" ) {}
+        return Status(ErrorCodes::Unauthorized,
+                      str::stream() << "Not authorized to create users on db: " << dbname);
+    }
 
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& jsobj,
-                 int,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            std::unique_ptr<MatchExpression> matcher;
-            BSONElement filterElt = jsobj["filter"];
-            if (!filterElt.eoo()) {
-                if (filterElt.type() != mongo::Object) {
-                    return appendCommandStatus(result, Status(ErrorCodes::BadValue,
-                                                              "\"filter\" must be an object"));
-                }
-                StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(filterElt.Obj());
-                if (!statusWithMatcher.isOK()) {
-                    return appendCommandStatus(result, statusWithMatcher.getStatus());
-                }
-                matcher.reset(statusWithMatcher.getValue());
+    CmdListCollections() : Command("listCollections") {}
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& jsobj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        std::unique_ptr<MatchExpression> matcher;
+        BSONElement filterElt = jsobj["filter"];
+        if (!filterElt.eoo()) {
+            if (filterElt.type() != mongo::Object) {
+                return appendCommandStatus(
+                    result, Status(ErrorCodes::BadValue, "\"filter\" must be an object"));
             }
-
-            const long long defaultBatchSize = std::numeric_limits<long long>::max();
-            long long batchSize;
-            Status parseCursorStatus = parseCommandCursorOptions(jsobj,
-                                                                 defaultBatchSize,
-                                                                 &batchSize);
-            if (!parseCursorStatus.isOK()) {
-                return appendCommandStatus(result, parseCursorStatus);
+            StatusWithMatchExpression statusWithMatcher =
+                MatchExpressionParser::parse(filterElt.Obj());
+            if (!statusWithMatcher.isOK()) {
+                return appendCommandStatus(result, statusWithMatcher.getStatus());
             }
-
-            ScopedTransaction scopedXact(txn, MODE_IS);
-            AutoGetDb autoDb(txn, dbname, MODE_S);
-
-            const Database* d = autoDb.getDb();
-            const DatabaseCatalogEntry* dbEntry = NULL;
-
-            list<string> names;
-            if ( d ) {
-                dbEntry = d->getDatabaseCatalogEntry();
-                dbEntry->getCollectionNamespaces( &names );
-                names.sort();
-            }
-
-            std::unique_ptr<WorkingSet> ws(new WorkingSet());
-            std::unique_ptr<QueuedDataStage> root(new QueuedDataStage(ws.get()));
-
-            for (std::list<std::string>::const_iterator i = names.begin();
-                 i != names.end();
-                 ++i) {
-                const std::string& ns = *i;
-
-                StringData collection = nsToCollectionSubstring( ns );
-                if ( collection == "system.namespaces" ) {
-                    continue;
-                }
-
-                BSONObjBuilder b;
-                b.append( "name", collection );
-
-                CollectionOptions options =
-                    dbEntry->getCollectionCatalogEntry( ns )->getCollectionOptions(txn);
-                b.append( "options", options.toBSON() );
-
-                BSONObj maybe = b.obj();
-                if ( matcher && !matcher->matchesBSON( maybe ) ) {
-                    continue;
-                }
-
-                WorkingSetMember member;
-                member.state = WorkingSetMember::OWNED_OBJ;
-                member.keyData.clear();
-                member.loc = RecordId();
-                member.obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
-                root->pushBack(member);
-            }
-
-            std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name;
-            dassert(NamespaceString(cursorNamespace).isValid());
-            dassert(NamespaceString(cursorNamespace).isListCollectionsGetMore());
-
-            PlanExecutor* rawExec;
-            Status makeStatus = PlanExecutor::make(txn,
-                                                   ws.release(),
-                                                   root.release(),
-                                                   cursorNamespace,
-                                                   PlanExecutor::YIELD_MANUAL,
-                                                   &rawExec);
-            std::unique_ptr<PlanExecutor> exec(rawExec);
-            if (!makeStatus.isOK()) {
-                return appendCommandStatus( result, makeStatus );
-            }
-
-            BSONArrayBuilder firstBatch;
-
-            const int byteLimit = MaxBytesToReturnToClientAtOnce;
-            for (long long objCount = 0;
-                 objCount < batchSize && firstBatch.len() < byteLimit;
-                 objCount++) {
-                BSONObj next;
-                PlanExecutor::ExecState state = exec->getNext(&next, NULL);
-                if ( state == PlanExecutor::IS_EOF ) {
-                    break;
-                }
-                invariant( state == PlanExecutor::ADVANCED );
-                firstBatch.append(next);
-            }
-
-            CursorId cursorId = 0LL;
-            if ( !exec->isEOF() ) {
-                exec->saveState();
-                ClientCursor* cursor = new ClientCursor(CursorManager::getGlobalCursorManager(),
-                                                        exec.release(),
-                                                        cursorNamespace);
-                cursorId = cursor->cursorid();
-            }
-
-            appendCursorResponseObject( cursorId, cursorNamespace, firstBatch.arr(), &result );
-
-            return true;
+            matcher.reset(statusWithMatcher.getValue());
         }
 
-    } cmdListCollections;
+        const long long defaultBatchSize = std::numeric_limits<long long>::max();
+        long long batchSize;
+        Status parseCursorStatus = parseCommandCursorOptions(jsobj, defaultBatchSize, &batchSize);
+        if (!parseCursorStatus.isOK()) {
+            return appendCommandStatus(result, parseCursorStatus);
+        }
 
+        ScopedTransaction scopedXact(txn, MODE_IS);
+        AutoGetDb autoDb(txn, dbname, MODE_S);
+
+        const Database* d = autoDb.getDb();
+        const DatabaseCatalogEntry* dbEntry = NULL;
+
+        list<string> names;
+        if (d) {
+            dbEntry = d->getDatabaseCatalogEntry();
+            dbEntry->getCollectionNamespaces(&names);
+            names.sort();
+        }
+
+        std::unique_ptr<WorkingSet> ws(new WorkingSet());
+        std::unique_ptr<QueuedDataStage> root(new QueuedDataStage(ws.get()));
+
+        for (std::list<std::string>::const_iterator i = names.begin(); i != names.end(); ++i) {
+            const std::string& ns = *i;
+
+            StringData collection = nsToCollectionSubstring(ns);
+            if (collection == "system.namespaces") {
+                continue;
+            }
+
+            BSONObjBuilder b;
+            b.append("name", collection);
+
+            CollectionOptions options =
+                dbEntry->getCollectionCatalogEntry(ns)->getCollectionOptions(txn);
+            b.append("options", options.toBSON());
+
+            BSONObj maybe = b.obj();
+            if (matcher && !matcher->matchesBSON(maybe)) {
+                continue;
+            }
+
+            WorkingSetMember member;
+            member.state = WorkingSetMember::OWNED_OBJ;
+            member.keyData.clear();
+            member.loc = RecordId();
+            member.obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
+            root->pushBack(member);
+        }
+
+        std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name;
+        dassert(NamespaceString(cursorNamespace).isValid());
+        dassert(NamespaceString(cursorNamespace).isListCollectionsGetMore());
+
+        PlanExecutor* rawExec;
+        Status makeStatus = PlanExecutor::make(txn,
+                                               ws.release(),
+                                               root.release(),
+                                               cursorNamespace,
+                                               PlanExecutor::YIELD_MANUAL,
+                                               &rawExec);
+        std::unique_ptr<PlanExecutor> exec(rawExec);
+        if (!makeStatus.isOK()) {
+            return appendCommandStatus(result, makeStatus);
+        }
+
+        BSONArrayBuilder firstBatch;
+
+        const int byteLimit = MaxBytesToReturnToClientAtOnce;
+        for (long long objCount = 0; objCount < batchSize && firstBatch.len() < byteLimit;
+             objCount++) {
+            BSONObj next;
+            PlanExecutor::ExecState state = exec->getNext(&next, NULL);
+            if (state == PlanExecutor::IS_EOF) {
+                break;
+            }
+            invariant(state == PlanExecutor::ADVANCED);
+            firstBatch.append(next);
+        }
+
+        CursorId cursorId = 0LL;
+        if (!exec->isEOF()) {
+            exec->saveState();
+            ClientCursor* cursor = new ClientCursor(
+                CursorManager::getGlobalCursorManager(), exec.release(), cursorNamespace);
+            cursorId = cursor->cursorid();
+        }
+
+        appendCursorResponseObject(cursorId, cursorNamespace, firstBatch.arr(), &result);
+
+        return true;
+    }
+
+} cmdListCollections;
 }

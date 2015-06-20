@@ -34,52 +34,51 @@
 
 namespace mongo {
 
-    namespace task {
+namespace task {
 
-        /** abstraction around threads.  simpler than BackgroundJob which is used behind the scenes.
-            allocate the Task dynamically.  when the thread terminates, the Task object will delete itself.
+/** abstraction around threads.  simpler than BackgroundJob which is used behind the scenes.
+    allocate the Task dynamically.  when the thread terminates, the Task object will delete itself.
+*/
+class Task : private BackgroundJob {
+protected:
+    virtual void setUp();                  // Override to perform any do-once work for the task.
+    virtual void doWork() = 0;             // implement the task here.
+    virtual std::string name() const = 0;  // name the thread
+public:
+    Task();
+
+    /** for a repeating task, stop after current invocation ends. can be called by other threads
+        as long as the Task is still in scope.
         */
-        class Task : private BackgroundJob {
-        protected:
-            virtual void setUp();  // Override to perform any do-once work for the task.
-            virtual void doWork() = 0;                  // implement the task here.
-            virtual std::string name() const = 0;            // name the thread
-        public:
-            Task();
+    void halt();
 
-            /** for a repeating task, stop after current invocation ends. can be called by other threads
-                as long as the Task is still in scope.
-                */
-            void halt();
-        private:
-            unsigned n, repeat;
-            friend void fork(Task* t);
-            friend void repeat(Task* t, unsigned millis);
-            virtual void run();
-            //virtual void ending() { }
-            void begin();
-        };
+private:
+    unsigned n, repeat;
+    friend void fork(Task* t);
+    friend void repeat(Task* t, unsigned millis);
+    virtual void run();
+    // virtual void ending() { }
+    void begin();
+};
 
-        /** run once */
-        void fork(Task *t);
+/** run once */
+void fork(Task* t);
 
-        /** run doWork() over and over, with a pause between runs of millis */
-        void repeat(Task *t, unsigned millis);
+/** run doWork() over and over, with a pause between runs of millis */
+void repeat(Task* t, unsigned millis);
 
-        /*** Example ***
-        inline void sample() {
-            class Sample : public Task {
-            public:
-                int result;
-                virtual void doWork() { result = 1234; }
-                Sample() : result(0) { }
-            };
-            std::shared_ptr<Sample> q( new Sample() );
-            fork(q);
-            cout << q->result << std::endl; // could print 1234 or 0.
-        }
-        */
-
-    }
-
+/*** Example ***
+inline void sample() {
+    class Sample : public Task {
+    public:
+        int result;
+        virtual void doWork() { result = 1234; }
+        Sample() : result(0) { }
+    };
+    std::shared_ptr<Sample> q( new Sample() );
+    fork(q);
+    cout << q->result << std::endl; // could print 1234 or 0.
+}
+*/
+}
 }

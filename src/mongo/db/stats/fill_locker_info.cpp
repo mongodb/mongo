@@ -35,46 +35,45 @@
 
 namespace mongo {
 
-    void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder) {
-        // "locks" section
-        BSONObjBuilder locks(infoBuilder.subobjStart("locks"));
-        const size_t locksSize = lockerInfo.locks.size();
+void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder) {
+    // "locks" section
+    BSONObjBuilder locks(infoBuilder.subobjStart("locks"));
+    const size_t locksSize = lockerInfo.locks.size();
 
-        // Only add the last lock of each type, and use the largest mode encountered
-        LockMode modeForType[ResourceTypesCount] = { }; // default initialize to zero (min value)
-        for (size_t i = 0; i < locksSize; i++) {
-            const Locker::OneLock& lock = lockerInfo.locks[i];
-            const ResourceType lockType = lock.resourceId.getType();
-            const LockMode lockMode =  std::max(lock.mode, modeForType[lockType]);
+    // Only add the last lock of each type, and use the largest mode encountered
+    LockMode modeForType[ResourceTypesCount] = {};  // default initialize to zero (min value)
+    for (size_t i = 0; i < locksSize; i++) {
+        const Locker::OneLock& lock = lockerInfo.locks[i];
+        const ResourceType lockType = lock.resourceId.getType();
+        const LockMode lockMode = std::max(lock.mode, modeForType[lockType]);
 
-            // Check that lockerInfo is sorted on resource type
-            invariant(i == 0 || lockType >= lockerInfo.locks[i - 1].resourceId.getType());
+        // Check that lockerInfo is sorted on resource type
+        invariant(i == 0 || lockType >= lockerInfo.locks[i - 1].resourceId.getType());
 
-            if (lock.resourceId == resourceIdLocalDB) {
-                locks.append("local", legacyModeName(lock.mode));
-                continue;
-            }
-
-            modeForType[lockType] = lockMode;
-
-            if (i + 1 < locksSize && lockerInfo.locks[i + 1].resourceId.getType() == lockType) {
-                continue; // skip this lock as it is not the last one of its type
-            }
-            else {
-                locks.append(resourceTypeName(lockType), legacyModeName(lockMode));
-            }
+        if (lock.resourceId == resourceIdLocalDB) {
+            locks.append("local", legacyModeName(lock.mode));
+            continue;
         }
-        locks.done();
 
-        // "waitingForLock" section
-        infoBuilder.append("waitingForLock", lockerInfo.waitingResource.isValid());
+        modeForType[lockType] = lockMode;
 
-        // "lockStats" section
-        {
-            BSONObjBuilder lockStats(infoBuilder.subobjStart("lockStats"));
-            lockerInfo.stats.report(&lockStats);
-            lockStats.done();
+        if (i + 1 < locksSize && lockerInfo.locks[i + 1].resourceId.getType() == lockType) {
+            continue;  // skip this lock as it is not the last one of its type
+        } else {
+            locks.append(resourceTypeName(lockType), legacyModeName(lockMode));
         }
     }
+    locks.done();
+
+    // "waitingForLock" section
+    infoBuilder.append("waitingForLock", lockerInfo.waitingResource.isValid());
+
+    // "lockStats" section
+    {
+        BSONObjBuilder lockStats(infoBuilder.subobjStart("lockStats"));
+        lockerInfo.stats.report(&lockStats);
+        lockStats.done();
+    }
+}
 
 }  // namespace mongo

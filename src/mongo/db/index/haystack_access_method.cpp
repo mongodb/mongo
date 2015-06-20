@@ -44,94 +44,97 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
+using std::unique_ptr;
 
-    HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
-        : IndexAccessMethod(btreeState, btree) {
+HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
+                                           SortedDataInterface* btree)
+    : IndexAccessMethod(btreeState, btree) {
+    const IndexDescriptor* descriptor = btreeState->descriptor();
 
-        const IndexDescriptor* descriptor = btreeState->descriptor();
+    ExpressionParams::parseHaystackParams(
+        descriptor->infoObj(), &_geoField, &_otherFields, &_bucketSize);
 
-        ExpressionParams::parseHaystackParams(descriptor->infoObj(),
-                                              &_geoField,
-                                              &_otherFields,
-                                              &_bucketSize);
+    uassert(16773, "no geo field specified", _geoField.size());
+    uassert(16774, "no non-geo fields specified", _otherFields.size());
+}
 
-        uassert(16773, "no geo field specified", _geoField.size());
-        uassert(16774, "no non-geo fields specified", _otherFields.size());
+void HaystackAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
+    ExpressionKeysPrivate::getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
+}
+
+void HaystackAccessMethod::searchCommand(OperationContext* txn,
+                                         Collection* collection,
+                                         const BSONObj& nearObj,
+                                         double maxDistance,
+                                         const BSONObj& search,
+                                         BSONObjBuilder* result,
+                                         unsigned limit) {
+    Timer t;
+
+    LOG(1) << "SEARCH near:" << nearObj << " maxDistance:" << maxDistance << " search: " << search
+           << endl;
+    int x, y;
+    {
+        BSONObjIterator i(nearObj);
+        x = ExpressionKeysPrivate::hashHaystackElement(i.next(), _bucketSize);
+        y = ExpressionKeysPrivate::hashHaystackElement(i.next(), _bucketSize);
     }
+    int scale = static_cast<int>(ceil(maxDistance / _bucketSize));
 
-    void HaystackAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
-        ExpressionKeysPrivate::getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
-    }
+    GeoHaystackSearchHopper hopper(txn, nearObj, maxDistance, limit, _geoField, collection);
 
-    void HaystackAccessMethod::searchCommand(OperationContext* txn, Collection* collection,
-                                             const BSONObj& nearObj, double maxDistance,
-                                             const BSONObj& search, BSONObjBuilder* result,
-                                             unsigned limit) {
-        Timer t;
+    long long btreeMatches = 0;
 
-        LOG(1) << "SEARCH near:" << nearObj << " maxDistance:" << maxDistance
-               << " search: " << search << endl;
-        int x, y;
-        {
-            BSONObjIterator i(nearObj);
-            x = ExpressionKeysPrivate::hashHaystackElement(i.next(), _bucketSize);
-            y = ExpressionKeysPrivate::hashHaystackElement(i.next(), _bucketSize);
-        }
-        int scale = static_cast<int>(ceil(maxDistance / _bucketSize));
+    for (int a = -scale; a <= scale && !hopper.limitReached(); ++a) {
+        for (int b = -scale; b <= scale && !hopper.limitReached(); ++b) {
+            BSONObjBuilder bb;
+            bb.append("", ExpressionKeysPrivate::makeHaystackString(x + a, y + b));
 
-        GeoHaystackSearchHopper hopper(txn, nearObj, maxDistance, limit, _geoField, collection);
+            for (unsigned i = 0; i < _otherFields.size(); i++) {
+                // See if the non-geo field we're indexing on is in the provided search term.
+                BSONElement e = search.getFieldDotted(_otherFields[i]);
+                if (e.eoo())
+                    bb.appendNull("");
+                else
+                    bb.appendAs(e, "");
+            }
 
-        long long btreeMatches = 0;
+            BSONObj key = bb.obj();
 
-        for (int a = -scale; a <= scale && !hopper.limitReached(); ++a) {
-            for (int b = -scale; b <= scale && !hopper.limitReached(); ++b) {
-                BSONObjBuilder bb;
-                bb.append("", ExpressionKeysPrivate::makeHaystackString(x + a, y + b));
+            unordered_set<RecordId, RecordId::Hasher> thisPass;
 
-                for (unsigned i = 0; i < _otherFields.size(); i++) {
-                    // See if the non-geo field we're indexing on is in the provided search term.
-                    BSONElement e = search.getFieldDotted(_otherFields[i]);
-                    if (e.eoo())
-                        bb.appendNull("");
-                    else
-                        bb.appendAs(e, "");
+
+            unique_ptr<PlanExecutor> exec(
+                InternalPlanner::indexScan(txn, collection, _descriptor, key, key, true));
+            PlanExecutor::ExecState state;
+            RecordId loc;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
+                if (hopper.limitReached()) {
+                    break;
                 }
-
-                BSONObj key = bb.obj();
-
-                unordered_set<RecordId, RecordId::Hasher> thisPass;
-
-
-                unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,  collection,
-                                                                     _descriptor, key, key, true));
-                PlanExecutor::ExecState state;
-                RecordId loc;
-                while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
-                    if (hopper.limitReached()) { break; }
-                    pair<unordered_set<RecordId, RecordId::Hasher>::iterator, bool> p
-                        = thisPass.insert(loc);
-                    // If a new element was inserted (haven't seen the RecordId before), p.second
-                    // is true.
-                    if (p.second) {
-                        hopper.consider(loc);
-                        btreeMatches++;
-                    }
+                pair<unordered_set<RecordId, RecordId::Hasher>::iterator, bool> p =
+                    thisPass.insert(loc);
+                // If a new element was inserted (haven't seen the RecordId before), p.second
+                // is true.
+                if (p.second) {
+                    hopper.consider(loc);
+                    btreeMatches++;
                 }
             }
         }
-
-        BSONArrayBuilder arr(result->subarrayStart("results"));
-        int num = hopper.appendResultsTo(&arr);
-        arr.done();
-
-        {
-            BSONObjBuilder b(result->subobjStart("stats"));
-            b.append("time", t.millis());
-            b.appendNumber("btreeMatches", btreeMatches);
-            b.append("n", num);
-            b.done();
-        }
     }
+
+    BSONArrayBuilder arr(result->subarrayStart("results"));
+    int num = hopper.appendResultsTo(&arr);
+    arr.done();
+
+    {
+        BSONObjBuilder b(result->subobjStart("stats"));
+        b.append("time", t.millis());
+        b.appendNumber("btreeMatches", btreeMatches);
+        b.append("n", num);
+        b.done();
+    }
+}
 
 }  // namespace mongo

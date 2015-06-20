@@ -39,134 +39,134 @@
 
 namespace {
 
-    using std::string;
-    using mongo::unittest::TempDir;
+using std::string;
+using mongo::unittest::TempDir;
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(StorageEngineLockFileTest, UncleanShutdownNoExistingFile) {
-        TempDir tempDir("StorageEngineLockFileTest_UncleanShutdownNoExistingFile");
-        StorageEngineLockFile lockFile(tempDir.path());
-        ASSERT_FALSE(lockFile.createdByUncleanShutdown());
-    }
+TEST(StorageEngineLockFileTest, UncleanShutdownNoExistingFile) {
+    TempDir tempDir("StorageEngineLockFileTest_UncleanShutdownNoExistingFile");
+    StorageEngineLockFile lockFile(tempDir.path());
+    ASSERT_FALSE(lockFile.createdByUncleanShutdown());
+}
 
-    TEST(StorageEngineLockFileTest, UncleanShutdownEmptyExistingFile) {
-        TempDir tempDir("StorageEngineLockFileTest_UncleanShutdownEmptyExistingFile");
-        {
-            std::string filename(tempDir.path() + "/mongod.lock");
-            std::ofstream(filename.c_str());
-        }
-        StorageEngineLockFile lockFile(tempDir.path());
-        ASSERT_FALSE(lockFile.createdByUncleanShutdown());
-    }
-
-    TEST(StorageEngineLockFileTest, UncleanShutdownNonEmptyExistingFile) {
-        TempDir tempDir("StorageEngineLockFileTest_UncleanShutdownNonEmptyExistingFile");
-        {
-            std::string filename(tempDir.path() + "/mongod.lock");
-            std::ofstream ofs(filename.c_str());
-            ofs << 12345 << std::endl;
-        }
-        StorageEngineLockFile lockFile(tempDir.path());
-        ASSERT_TRUE(lockFile.createdByUncleanShutdown());
-    }
-
-    TEST(StorageEngineLockFileTest, OpenInvalidDirectory) {
-        StorageEngineLockFile lockFile("no_such_directory");
-        ASSERT_EQUALS((boost::filesystem::path("no_such_directory") / "mongod.lock").string(),
-                      lockFile.getFilespec());
-        Status status = lockFile.open();
-        ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::NonExistentPath, status.code());
-    }
-
-    // Cause ::open() to fail by providing a regular file instead of a directory for 'dbpath'.
-    TEST(StorageEngineLockFileTest, OpenInvalidFilename) {
-        TempDir tempDir("StorageEngineLockFileTest_OpenInvalidFilename");
-        std::string filename(tempDir.path() + "/some_file");
+TEST(StorageEngineLockFileTest, UncleanShutdownEmptyExistingFile) {
+    TempDir tempDir("StorageEngineLockFileTest_UncleanShutdownEmptyExistingFile");
+    {
+        std::string filename(tempDir.path() + "/mongod.lock");
         std::ofstream(filename.c_str());
-        StorageEngineLockFile lockFile(filename);
-        Status status = lockFile.open();
-        ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::DBPathInUse, status.code());
     }
+    StorageEngineLockFile lockFile(tempDir.path());
+    ASSERT_FALSE(lockFile.createdByUncleanShutdown());
+}
 
-    TEST(StorageEngineLockFileTest, OpenNoExistingLockFile) {
-        TempDir tempDir("StorageEngineLockFileTest_OpenNoExistingLockFile");
-        StorageEngineLockFile lockFile(tempDir.path());
-        ASSERT_OK(lockFile.open());
-        lockFile.close();
+TEST(StorageEngineLockFileTest, UncleanShutdownNonEmptyExistingFile) {
+    TempDir tempDir("StorageEngineLockFileTest_UncleanShutdownNonEmptyExistingFile");
+    {
+        std::string filename(tempDir.path() + "/mongod.lock");
+        std::ofstream ofs(filename.c_str());
+        ofs << 12345 << std::endl;
     }
+    StorageEngineLockFile lockFile(tempDir.path());
+    ASSERT_TRUE(lockFile.createdByUncleanShutdown());
+}
 
-    TEST(StorageEngineLockFileTest, OpenEmptyLockFile) {
-        TempDir tempDir("StorageEngineLockFileTest_OpenEmptyLockFile");
-        StorageEngineLockFile lockFile(tempDir.path());
-        std::string filename(lockFile.getFilespec());
-        std::ofstream(filename.c_str());
-        ASSERT_OK(lockFile.open());
-        lockFile.close();
+TEST(StorageEngineLockFileTest, OpenInvalidDirectory) {
+    StorageEngineLockFile lockFile("no_such_directory");
+    ASSERT_EQUALS((boost::filesystem::path("no_such_directory") / "mongod.lock").string(),
+                  lockFile.getFilespec());
+    Status status = lockFile.open();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::NonExistentPath, status.code());
+}
+
+// Cause ::open() to fail by providing a regular file instead of a directory for 'dbpath'.
+TEST(StorageEngineLockFileTest, OpenInvalidFilename) {
+    TempDir tempDir("StorageEngineLockFileTest_OpenInvalidFilename");
+    std::string filename(tempDir.path() + "/some_file");
+    std::ofstream(filename.c_str());
+    StorageEngineLockFile lockFile(filename);
+    Status status = lockFile.open();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::DBPathInUse, status.code());
+}
+
+TEST(StorageEngineLockFileTest, OpenNoExistingLockFile) {
+    TempDir tempDir("StorageEngineLockFileTest_OpenNoExistingLockFile");
+    StorageEngineLockFile lockFile(tempDir.path());
+    ASSERT_OK(lockFile.open());
+    lockFile.close();
+}
+
+TEST(StorageEngineLockFileTest, OpenEmptyLockFile) {
+    TempDir tempDir("StorageEngineLockFileTest_OpenEmptyLockFile");
+    StorageEngineLockFile lockFile(tempDir.path());
+    std::string filename(lockFile.getFilespec());
+    std::ofstream(filename.c_str());
+    ASSERT_OK(lockFile.open());
+    lockFile.close();
+}
+
+TEST(StorageEngineLockFileTest, WritePidFileNotOpened) {
+    TempDir tempDir("StorageEngineLockFileTest_WritePidFileNotOpened");
+    StorageEngineLockFile lockFile(tempDir.path());
+    Status status = lockFile.writePid();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::FileNotOpen, status.code());
+}
+
+TEST(StorageEngineLockFileTest, WritePidFileOpened) {
+    TempDir tempDir("StorageEngineLockFileTest_WritePidFileOpened");
+    StorageEngineLockFile lockFile(tempDir.path());
+    ASSERT_OK(lockFile.open());
+    ASSERT_OK(lockFile.writePid());
+    lockFile.close();
+
+    // Read PID from lock file.
+    std::string filename(lockFile.getFilespec());
+    std::ifstream ifs(filename.c_str());
+    int64_t pidFromLockFile = 0;
+    ASSERT_TRUE(ifs >> pidFromLockFile);
+    ASSERT_EQUALS(ProcessId::getCurrent().asInt64(), pidFromLockFile);
+}
+
+// Existing data in lock file must be removed before writing process ID.
+TEST(StorageEngineLockFileTest, WritePidTruncateExistingFile) {
+    TempDir tempDir("StorageEngineLockFileTest_WritePidTruncateExistingFile");
+    StorageEngineLockFile lockFile(tempDir.path());
+    {
+        std::string filename(tempDir.path() + "/mongod.lock");
+        std::ofstream ofs(filename.c_str());
+        std::string currentPidStr = ProcessId::getCurrent().toString();
+        ASSERT_FALSE(currentPidStr.empty());
+        ofs << std::string(currentPidStr.size() * 100, 'X') << std::endl;
     }
+    ASSERT_OK(lockFile.open());
+    ASSERT_OK(lockFile.writePid());
+    lockFile.close();
 
-    TEST(StorageEngineLockFileTest, WritePidFileNotOpened) {
-        TempDir tempDir("StorageEngineLockFileTest_WritePidFileNotOpened");
-        StorageEngineLockFile lockFile(tempDir.path());
-        Status status = lockFile.writePid();
-        ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::FileNotOpen, status.code());
-    }
+    // Read PID from lock file.
+    std::string filename(lockFile.getFilespec());
+    std::ifstream ifs(filename.c_str());
+    int64_t pidFromLockFile = 0;
+    ASSERT_TRUE(ifs >> pidFromLockFile);
+    ASSERT_EQUALS(ProcessId::getCurrent().asInt64(), pidFromLockFile);
 
-    TEST(StorageEngineLockFileTest, WritePidFileOpened) {
-        TempDir tempDir("StorageEngineLockFileTest_WritePidFileOpened");
-        StorageEngineLockFile lockFile(tempDir.path());
-        ASSERT_OK(lockFile.open());
-        ASSERT_OK(lockFile.writePid());
-        lockFile.close();
+    // There should not be any data in the file after the process ID.
+    std::string extraData;
+    ASSERT_FALSE(ifs >> extraData);
+}
 
-        // Read PID from lock file.
-        std::string filename(lockFile.getFilespec());
-        std::ifstream ifs(filename.c_str());
-        int64_t pidFromLockFile = 0;
-        ASSERT_TRUE(ifs >> pidFromLockFile);
-        ASSERT_EQUALS(ProcessId::getCurrent().asInt64(), pidFromLockFile);
-    }
+TEST(StorageEngineLockFileTest, ClearPidAndUnlock) {
+    TempDir tempDir("StorageEngineLockFileTest_ClearPidAndUnlock");
+    StorageEngineLockFile lockFile(tempDir.path());
+    ASSERT_OK(lockFile.open());
+    ASSERT_OK(lockFile.writePid());
 
-    // Existing data in lock file must be removed before writing process ID.
-    TEST(StorageEngineLockFileTest, WritePidTruncateExistingFile) {
-        TempDir tempDir("StorageEngineLockFileTest_WritePidTruncateExistingFile");
-        StorageEngineLockFile lockFile(tempDir.path());
-        {
-            std::string filename(tempDir.path() + "/mongod.lock");
-            std::ofstream ofs(filename.c_str());
-            std::string currentPidStr = ProcessId::getCurrent().toString();
-            ASSERT_FALSE(currentPidStr.empty());
-            ofs << std::string(currentPidStr.size() * 100, 'X') << std::endl;
-        }
-        ASSERT_OK(lockFile.open());
-        ASSERT_OK(lockFile.writePid());
-        lockFile.close();
-
-        // Read PID from lock file.
-        std::string filename(lockFile.getFilespec());
-        std::ifstream ifs(filename.c_str());
-        int64_t pidFromLockFile = 0;
-        ASSERT_TRUE(ifs >> pidFromLockFile);
-        ASSERT_EQUALS(ProcessId::getCurrent().asInt64(), pidFromLockFile);
-
-        // There should not be any data in the file after the process ID.
-        std::string extraData;
-        ASSERT_FALSE(ifs >> extraData);
-    }
-
-    TEST(StorageEngineLockFileTest, ClearPidAndUnlock) {
-        TempDir tempDir("StorageEngineLockFileTest_ClearPidAndUnlock");
-        StorageEngineLockFile lockFile(tempDir.path());
-        ASSERT_OK(lockFile.open());
-        ASSERT_OK(lockFile.writePid());
-
-        // Clear lock file contents.
-        lockFile.clearPidAndUnlock();
-        ASSERT_TRUE(boost::filesystem::exists(lockFile.getFilespec()));
-        ASSERT_EQUALS(0U, boost::filesystem::file_size(lockFile.getFilespec()));
-    }
+    // Clear lock file contents.
+    lockFile.clearPidAndUnlock();
+    ASSERT_TRUE(boost::filesystem::exists(lockFile.getFilespec()));
+    ASSERT_EQUALS(0U, boost::filesystem::file_size(lockFile.getFilespec()));
+}
 
 }  // namespace

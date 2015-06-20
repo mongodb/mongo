@@ -36,46 +36,45 @@
 #include "mongo/s/d_state.h"
 
 namespace mongo {
-    namespace {
-        CollectionMetadataPtr getMetadata(const NamespaceString& nsString) {
-            if (shardingState.enabled()) {
-                return shardingState.getCollectionMetadata(nsString.ns());
-            }
-
-            return CollectionMetadataPtr();
-        }
+namespace {
+CollectionMetadataPtr getMetadata(const NamespaceString& nsString) {
+    if (shardingState.enabled()) {
+        return shardingState.getCollectionMetadata(nsString.ns());
     }
 
-    UpdateLifecycleImpl::UpdateLifecycleImpl(bool ignoreVersion, const NamespaceString& nsStr)
-        : _nsString(nsStr)
-        , _shardVersion((!ignoreVersion && getMetadata(_nsString)) ?
-            getMetadata(_nsString)->getShardVersion() :
-            ChunkVersion::IGNORED()) {
-    }
+    return CollectionMetadataPtr();
+}
+}
 
-    void UpdateLifecycleImpl::setCollection(Collection* collection) {
-        _collection = collection;
-    }
+UpdateLifecycleImpl::UpdateLifecycleImpl(bool ignoreVersion, const NamespaceString& nsStr)
+    : _nsString(nsStr),
+      _shardVersion((!ignoreVersion && getMetadata(_nsString))
+                        ? getMetadata(_nsString)->getShardVersion()
+                        : ChunkVersion::IGNORED()) {}
 
-    bool UpdateLifecycleImpl::canContinue() const {
-        // Collection needs to exist to continue
-        return _collection;
-    }
+void UpdateLifecycleImpl::setCollection(Collection* collection) {
+    _collection = collection;
+}
 
-    const UpdateIndexData* UpdateLifecycleImpl::getIndexKeys(OperationContext* opCtx) const {
-        if (_collection)
-            return &_collection->infoCache()->indexKeys(opCtx);
-        return NULL;
-    }
+bool UpdateLifecycleImpl::canContinue() const {
+    // Collection needs to exist to continue
+    return _collection;
+}
 
-    const std::vector<FieldRef*>* UpdateLifecycleImpl::getImmutableFields() const {
-        CollectionMetadataPtr metadata = getMetadata(_nsString);
-        if (metadata) {
-            const std::vector<FieldRef*>& fields = metadata->getKeyPatternFields();
-            // Return shard-keys as immutable for the update system.
-            return &fields;
-        }
-        return NULL;
-    }
+const UpdateIndexData* UpdateLifecycleImpl::getIndexKeys(OperationContext* opCtx) const {
+    if (_collection)
+        return &_collection->infoCache()->indexKeys(opCtx);
+    return NULL;
+}
 
-} // namespace mongo
+const std::vector<FieldRef*>* UpdateLifecycleImpl::getImmutableFields() const {
+    CollectionMetadataPtr metadata = getMetadata(_nsString);
+    if (metadata) {
+        const std::vector<FieldRef*>& fields = metadata->getKeyPatternFields();
+        // Return shard-keys as immutable for the update system.
+        return &fields;
+    }
+    return NULL;
+}
+
+}  // namespace mongo

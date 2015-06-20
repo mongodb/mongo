@@ -47,137 +47,142 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::string;
-    using std::stringstream;
+using std::unique_ptr;
+using std::string;
+using std::stringstream;
 
-    class DistinctCommand : public Command {
-    public:
-        DistinctCommand() : Command("distinct") {}
+class DistinctCommand : public Command {
+public:
+    DistinctCommand() : Command("distinct") {}
 
-        virtual bool slaveOk() const { return false; }
-        virtual bool slaveOverrideOk() const { return true; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
+    virtual bool slaveOk() const {
+        return false;
+    }
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-        }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::find);
+        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
 
-        virtual void help( stringstream &help ) const {
-            help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
-        }
+    virtual void help(stringstream& help) const {
+        help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
+    }
 
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        Timer t;
 
-            Timer t;
+        // ensure that the key is a string
+        uassert(18510,
+                mongoutils::str::stream() << "The first argument to the distinct command "
+                                          << "must be a string but was a "
+                                          << typeName(cmdObj["key"].type()),
+                cmdObj["key"].type() == mongo::String);
 
-            // ensure that the key is a string
-            uassert(18510,
-                    mongoutils::str::stream() << "The first argument to the distinct command " <<
-                        "must be a string but was a " << typeName(cmdObj["key"].type()),
-                    cmdObj["key"].type() == mongo::String);
-
-            // ensure that the where clause is a document
-            if( cmdObj["query"].isNull() == false && cmdObj["query"].eoo() == false ){
-             uassert(18511,
-                    mongoutils::str::stream() << "The query for the distinct command must be a " <<
-                        "document but was a " << typeName(cmdObj["query"].type()),
+        // ensure that the where clause is a document
+        if (cmdObj["query"].isNull() == false && cmdObj["query"].eoo() == false) {
+            uassert(18511,
+                    mongoutils::str::stream() << "The query for the distinct command must be a "
+                                              << "document but was a "
+                                              << typeName(cmdObj["query"].type()),
                     cmdObj["query"].type() == mongo::Object);
-            }
+        }
 
-            string key = cmdObj["key"].valuestrsafe();
-            BSONObj keyPattern = BSON( key << 1 );
+        string key = cmdObj["key"].valuestrsafe();
+        BSONObj keyPattern = BSON(key << 1);
 
-            BSONObj query = getQuery( cmdObj );
+        BSONObj query = getQuery(cmdObj);
 
-            int bufSize = BSONObjMaxUserSize - 4096;
-            BufBuilder bb( bufSize );
-            char * start = bb.buf();
+        int bufSize = BSONObjMaxUserSize - 4096;
+        BufBuilder bb(bufSize);
+        char* start = bb.buf();
 
-            BSONArrayBuilder arr( bb );
-            BSONElementSet values;
+        BSONArrayBuilder arr(bb);
+        BSONElementSet values;
 
-            const string ns = parseNs(dbname, cmdObj);
-            AutoGetCollectionForRead ctx(txn, ns);
+        const string ns = parseNs(dbname, cmdObj);
+        AutoGetCollectionForRead ctx(txn, ns);
 
-            Collection* collection = ctx.getCollection();
-            if (!collection) {
-                result.appendArray( "values" , BSONObj() );
-                result.append("stats", BSON("n" << 0 <<
-                                            "nscanned" << 0 <<
-                                            "nscannedObjects" << 0));
-                return true;
-            }
-
-            PlanExecutor* rawExec;
-            Status status = getExecutorDistinct(txn,
-                                                collection,
-                                                query,
-                                                key,
-                                                PlanExecutor::YIELD_AUTO,
-                                                &rawExec);
-            if (!status.isOK()) {
-                uasserted(17216, mongoutils::str::stream() << "Can't get executor for query "
-                              << query << ": " << status.toString());
-                return 0;
-            }
-
-            unique_ptr<PlanExecutor> exec(rawExec);
-
-            BSONObj obj;
-            PlanExecutor::ExecState state;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
-                // Distinct expands arrays.
-                //
-                // If our query is covered, each value of the key should be in the index key and
-                // available to us without this.  If a collection scan is providing the data, we may
-                // have to expand an array.
-                BSONElementSet elts;
-                obj.getFieldsDotted(key, elts);
-
-                for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
-                    BSONElement elt = *it;
-                    if (values.count(elt)) { continue; }
-                    int currentBufPos = bb.len();
-
-                    uassert(17217, "distinct too big, 16mb cap",
-                            (currentBufPos + elt.size() + 1024) < bufSize);
-
-                    arr.append(elt);
-                    BSONElement x(start + currentBufPos);
-                    values.insert(x);
-                }
-            }
-
-            // Get summary information about the plan.
-            PlanSummaryStats stats;
-            Explain::getSummaryStats(exec.get(), &stats);
-
-            verify( start == bb.buf() );
-
-            result.appendArray( "values" , arr.done() );
-
-            {
-                BSONObjBuilder b;
-                b.appendNumber( "n" , stats.nReturned );
-                b.appendNumber( "nscanned" , stats.totalKeysExamined );
-                b.appendNumber( "nscannedObjects" , stats.totalDocsExamined );
-                b.appendNumber( "timems" , t.millis() );
-                b.append( "planSummary" , Explain::getPlanSummary(exec.get()) );
-                result.append( "stats" , b.obj() );
-            }
-
+        Collection* collection = ctx.getCollection();
+        if (!collection) {
+            result.appendArray("values", BSONObj());
+            result.append("stats", BSON("n" << 0 << "nscanned" << 0 << "nscannedObjects" << 0));
             return true;
         }
-    } distinctCmd;
+
+        PlanExecutor* rawExec;
+        Status status =
+            getExecutorDistinct(txn, collection, query, key, PlanExecutor::YIELD_AUTO, &rawExec);
+        if (!status.isOK()) {
+            uasserted(17216,
+                      mongoutils::str::stream() << "Can't get executor for query " << query << ": "
+                                                << status.toString());
+            return 0;
+        }
+
+        unique_ptr<PlanExecutor> exec(rawExec);
+
+        BSONObj obj;
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+            // Distinct expands arrays.
+            //
+            // If our query is covered, each value of the key should be in the index key and
+            // available to us without this.  If a collection scan is providing the data, we may
+            // have to expand an array.
+            BSONElementSet elts;
+            obj.getFieldsDotted(key, elts);
+
+            for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
+                BSONElement elt = *it;
+                if (values.count(elt)) {
+                    continue;
+                }
+                int currentBufPos = bb.len();
+
+                uassert(17217,
+                        "distinct too big, 16mb cap",
+                        (currentBufPos + elt.size() + 1024) < bufSize);
+
+                arr.append(elt);
+                BSONElement x(start + currentBufPos);
+                values.insert(x);
+            }
+        }
+
+        // Get summary information about the plan.
+        PlanSummaryStats stats;
+        Explain::getSummaryStats(exec.get(), &stats);
+
+        verify(start == bb.buf());
+
+        result.appendArray("values", arr.done());
+
+        {
+            BSONObjBuilder b;
+            b.appendNumber("n", stats.nReturned);
+            b.appendNumber("nscanned", stats.totalKeysExamined);
+            b.appendNumber("nscannedObjects", stats.totalDocsExamined);
+            b.appendNumber("timems", t.millis());
+            b.append("planSummary", Explain::getPlanSummary(exec.get()));
+            result.append("stats", b.obj());
+        }
+
+        return true;
+    }
+} distinctCmd;
 
 }  // namespace mongo

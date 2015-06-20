@@ -52,4 +52,3 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/base/string_data.h"
-

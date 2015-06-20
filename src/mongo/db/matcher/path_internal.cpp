@@ -32,31 +32,27 @@
 
 namespace mongo {
 
-    bool isAllDigits( StringData str ) {
-        for ( unsigned i = 0; i < str.size(); i++ ) {
-            if ( !isdigit( str[i] ) )
-                return false;
-        }
-        return true;
+bool isAllDigits(StringData str) {
+    for (unsigned i = 0; i < str.size(); i++) {
+        if (!isdigit(str[i]))
+            return false;
     }
+    return true;
+}
 
-    BSONElement getFieldDottedOrArray( const BSONObj& doc,
-                                       const FieldRef& path,
-                                       size_t* idxPath ) {
-        if ( path.numParts() == 0 )
-            return doc.getField( "" );
+BSONElement getFieldDottedOrArray(const BSONObj& doc, const FieldRef& path, size_t* idxPath) {
+    if (path.numParts() == 0)
+        return doc.getField("");
 
-        BSONElement res;
+    BSONElement res;
 
-        BSONObj curr = doc;
-        bool stop = false;
-        size_t partNum = 0;
-        while ( partNum < path.numParts() && !stop ) {
+    BSONObj curr = doc;
+    bool stop = false;
+    size_t partNum = 0;
+    while (partNum < path.numParts() && !stop) {
+        res = curr.getField(path.getPart(partNum));
 
-            res = curr.getField( path.getPart( partNum ) );
-
-            switch ( res.type() ) {
-
+        switch (res.type()) {
             case EOO:
                 stop = true;
                 break;
@@ -71,17 +67,16 @@ namespace mongo {
                 break;
 
             default:
-                if ( partNum+1 < path.numParts() ) {
+                if (partNum + 1 < path.numParts()) {
                     res = BSONElement();
                 }
                 stop = true;
-
-            }
         }
-
-        *idxPath = partNum;
-        return res;
     }
+
+    *idxPath = partNum;
+    return res;
+}
 
 
 }  // namespace mongo

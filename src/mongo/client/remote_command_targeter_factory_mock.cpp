@@ -38,13 +38,13 @@
 
 namespace mongo {
 
-    RemoteCommandTargeterFactoryMock::RemoteCommandTargeterFactoryMock() = default;
+RemoteCommandTargeterFactoryMock::RemoteCommandTargeterFactoryMock() = default;
 
-    RemoteCommandTargeterFactoryMock::~RemoteCommandTargeterFactoryMock() = default;
+RemoteCommandTargeterFactoryMock::~RemoteCommandTargeterFactoryMock() = default;
 
-    std::unique_ptr<RemoteCommandTargeter>
-    RemoteCommandTargeterFactoryMock::create(const ConnectionString& connStr) {
-        return stdx::make_unique<RemoteCommandTargeterMock>();
-    }
+std::unique_ptr<RemoteCommandTargeter> RemoteCommandTargeterFactoryMock::create(
+    const ConnectionString& connStr) {
+    return stdx::make_unique<RemoteCommandTargeterMock>();
+}
 
-} // namespace mongo
+}  // namespace mongo

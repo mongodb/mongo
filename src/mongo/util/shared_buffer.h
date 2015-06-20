@@ -34,95 +34,93 @@
 
 namespace mongo {
 
-    class SharedBuffer {
+class SharedBuffer {
+public:
+    SharedBuffer() = default;
+
+    void swap(SharedBuffer& other) {
+        _holder.swap(other._holder);
+    }
+
+    SharedBuffer(const SharedBuffer&) = default;
+    SharedBuffer& operator=(const SharedBuffer&) = default;
+
+    SharedBuffer(SharedBuffer&& other) : _holder() {
+        swap(other);
+    }
+
+    SharedBuffer& operator=(SharedBuffer&& other) {
+        swap(other);
+        other._holder.reset();
+        return *this;
+    }
+
+    static SharedBuffer allocate(size_t bytes) {
+        return takeOwnership(static_cast<char*>(malloc(sizeof(Holder) + bytes)));
+    }
+
+    /**
+     * Given a pointer to a region of un-owned data, prefixed by sufficient space for a
+     * SharedBuffer::Holder object, return an SharedBuffer that owns the
+     * memory.
+     *
+     * This class will call free(holderPrefixedData), so it must have been allocated in a way
+     * that makes that valid.
+     */
+    static SharedBuffer takeOwnership(char* holderPrefixedData) {
+        // Initialize the refcount to 1 so we don't need to increment it in the constructor
+        // (see private Holder* constructor below).
+        //
+        // TODO: Should dassert alignment of holderPrefixedData
+        // here if possible.
+        return SharedBuffer(new (holderPrefixedData) Holder(1U));
+    }
+
+    char* get() const {
+        return _holder ? _holder->data() : NULL;
+    }
+
+    class Holder {
     public:
-        SharedBuffer() = default;
+        explicit Holder(AtomicUInt32::WordType initial = AtomicUInt32::WordType())
+            : _refCount(initial) {}
 
-        void swap(SharedBuffer& other) {
-            _holder.swap(other._holder);
+        // these are called automatically by boost::intrusive_ptr
+        friend void intrusive_ptr_add_ref(Holder* h) {
+            h->_refCount.fetchAndAdd(1);
         }
 
-        SharedBuffer(const SharedBuffer&) = default;
-        SharedBuffer& operator=(const SharedBuffer&) = default;
-
-        SharedBuffer(SharedBuffer&& other)
-            : _holder() {
-            swap(other);
-        }
-
-        SharedBuffer& operator=(SharedBuffer&& other) {
-            swap(other);
-            other._holder.reset();
-            return *this;
-        }
-
-        static SharedBuffer allocate(size_t bytes) {
-            return takeOwnership(static_cast<char*>(malloc(sizeof(Holder) + bytes)));
-        }
-
-        /**
-         * Given a pointer to a region of un-owned data, prefixed by sufficient space for a
-         * SharedBuffer::Holder object, return an SharedBuffer that owns the
-         * memory.
-         *
-         * This class will call free(holderPrefixedData), so it must have been allocated in a way
-         * that makes that valid.
-         */
-        static SharedBuffer takeOwnership(char* holderPrefixedData) {
-            // Initialize the refcount to 1 so we don't need to increment it in the constructor
-            // (see private Holder* constructor below).
-            //
-            // TODO: Should dassert alignment of holderPrefixedData
-            // here if possible.
-            return SharedBuffer(new(holderPrefixedData) Holder(1U));
-        }
-
-        char* get() const {
-            return _holder ? _holder->data() : NULL;
-        }
-
-        class Holder {
-        public:
-            explicit Holder(AtomicUInt32::WordType initial = AtomicUInt32::WordType())
-                : _refCount(initial) {}
-
-            // these are called automatically by boost::intrusive_ptr
-            friend void intrusive_ptr_add_ref(Holder* h) {
-                h->_refCount.fetchAndAdd(1);
+        friend void intrusive_ptr_release(Holder* h) {
+            if (h->_refCount.subtractAndFetch(1) == 0) {
+                // We placement new'ed a Holder in takeOwnership above,
+                // so we must destroy the object here.
+                h->~Holder();
+                free(h);
             }
+        }
 
-            friend void intrusive_ptr_release(Holder* h) {
-                if (h->_refCount.subtractAndFetch(1) == 0) {
-                    // We placement new'ed a Holder in takeOwnership above,
-                    // so we must destroy the object here.
-                    h->~Holder();
-                    free(h);
-                }
-            }
+        char* data() {
+            return reinterpret_cast<char*>(this + 1);
+        }
 
-            char* data() {
-                return reinterpret_cast<char *>(this + 1);
-            }
-
-            const char* data() const {
-                return reinterpret_cast<const char *>(this + 1);
-            }
-
-        private:
-            AtomicUInt32 _refCount;
-        };
+        const char* data() const {
+            return reinterpret_cast<const char*>(this + 1);
+        }
 
     private:
-        explicit SharedBuffer(Holder* holder)
-            : _holder(holder, /*add_ref=*/ false) {
-            // NOTE: The 'false' above is because we have already initialized the Holder with a
-            // refcount of '1' in takeOwnership above. This avoids an atomic increment.
-        }
-
-        boost::intrusive_ptr<Holder> _holder;
+        AtomicUInt32 _refCount;
     };
 
-    inline void swap(SharedBuffer& one, SharedBuffer& two) {
-        one.swap(two);
+private:
+    explicit SharedBuffer(Holder* holder) : _holder(holder, /*add_ref=*/false) {
+        // NOTE: The 'false' above is because we have already initialized the Holder with a
+        // refcount of '1' in takeOwnership above. This avoids an atomic increment.
     }
+
+    boost::intrusive_ptr<Holder> _holder;
+};
+
+inline void swap(SharedBuffer& one, SharedBuffer& two) {
+    one.swap(two);
+}
 }

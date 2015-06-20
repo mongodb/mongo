@@ -29,62 +29,62 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-    class BSONObj;
-    class BSONObjBuilder;
-    class Status;
-    template <typename T> class StatusWith;
+class BSONObj;
+class BSONObjBuilder;
+class Status;
+template <typename T>
+class StatusWith;
 namespace rpc {
 
+/**
+ * This class compromises the reply metadata fields that concern sharding. MongoD attaches
+ * this information to a command reply, which MongoS uses to process getLastError.
+ */
+class ShardingMetadata {
+public:
     /**
-     * This class compromises the reply metadata fields that concern sharding. MongoD attaches
-     * this information to a command reply, which MongoS uses to process getLastError.
+     * Reads ShardingMetadata from a metadata object.
      */
-    class ShardingMetadata {
-    public:
+    static StatusWith<ShardingMetadata> readFromMetadata(const BSONObj& metadataObj);
 
-        /**
-         * Reads ShardingMetadata from a metadata object.
-         */
-        static StatusWith<ShardingMetadata> readFromMetadata(const BSONObj& metadataObj);
+    /**
+     * Writes ShardingMetadata to a metadata builder.
+     */
+    Status writeToMetadata(BSONObjBuilder* metadataBob) const;
 
-        /**
-         * Writes ShardingMetadata to a metadata builder.
-         */
-        Status writeToMetadata(BSONObjBuilder* metadataBob) const;
+    /**
+     * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
+     * format.
+     */
+    static Status downconvert(const BSONObj& commandReply,
+                              const BSONObj& replyMetadata,
+                              BSONObjBuilder* legacyCommandReply);
 
-        /**
-         * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
-         * format.
-         */
-        static Status downconvert(const BSONObj& commandReply,
-                                  const BSONObj& replyMetadata,
-                                  BSONObjBuilder* legacyCommandReply);
+    /**
+     * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
+     * format.
+     */
+    static Status upconvert(const BSONObj& legacyCommandReply,
+                            BSONObjBuilder* commandReplyBob,
+                            BSONObjBuilder* metadataBob);
 
-        /**
-         * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
-         * format.
-         */
-        static Status upconvert(const BSONObj& legacyCommandReply,
-                                BSONObjBuilder* commandReplyBob,
-                                BSONObjBuilder* metadataBob);
+    /**
+     * Gets the OpTime of the oplog entry of the last succssful write operation executed by the
+     * server that produced the metadata.
+     */
+    const Timestamp& getLastOpTime() const;
 
-        /**
-         * Gets the OpTime of the oplog entry of the last succssful write operation executed by the
-         * server that produced the metadata.
-         */
-        const Timestamp& getLastOpTime() const;
+    /**
+     * Gets the most recent election id observed by the server that produced the metadata.
+     */
+    const OID& getLastElectionId() const;
 
-        /**
-         * Gets the most recent election id observed by the server that produced the metadata.
-         */
-        const OID& getLastElectionId() const;
+    ShardingMetadata(Timestamp lastOpTime, OID lastElectionId);
 
-        ShardingMetadata(Timestamp lastOpTime, OID lastElectionId);
-
-    private:
-        Timestamp _lastOpTime;
-        OID _lastElectionId;
-    };
+private:
+    Timestamp _lastOpTime;
+    OID _lastElectionId;
+};
 
 }  // namespace rpc
 }  // namespace mongo

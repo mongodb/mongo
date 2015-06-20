@@ -41,7 +41,7 @@
  *
  * 0 <-  3 <- 7
  *  ^   / ^    ^
- *   \ v   \     \ 
+ *   \ v   \     \
  *    2     5 <-  8
  *   / ^   /     /
  *  v   \ v    v
@@ -49,128 +49,143 @@
  *
  */
 
-#define ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS)                 \
-    (GRAPH).addInitializer(                                             \
-            (NAME),                                                     \
-            (FN),                                                       \
-            MONGO_MAKE_STRING_VECTOR PREREQS,                           \
-            MONGO_MAKE_STRING_VECTOR DEPS)
+#define ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS) \
+    (GRAPH).addInitializer(                             \
+        (NAME), (FN), MONGO_MAKE_STRING_VECTOR PREREQS, MONGO_MAKE_STRING_VECTOR DEPS)
 
-#define ASSERT_ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS)  \
+#define ASSERT_ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS) \
     ASSERT_EQUALS(Status::OK(), ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS))
 
 
-#define CONSTRUCT_DEPENDENCY_GRAPH(GRAPH, FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7, FN8) \
-    do {                                                                \
-        InitializerDependencyGraph& _graph_ = (GRAPH);                  \
+#define CONSTRUCT_DEPENDENCY_GRAPH(GRAPH, FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7, FN8)           \
+    do {                                                                                         \
+        InitializerDependencyGraph& _graph_ = (GRAPH);                                           \
         ASSERT_ADD_INITIALIZER(_graph_, "n0", FN0, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS); \
         ASSERT_ADD_INITIALIZER(_graph_, "n1", FN1, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS); \
-        ASSERT_ADD_INITIALIZER(_graph_, "n2", FN2, ("n0", "n1"), MONGO_NO_DEPENDENTS);   \
-        ASSERT_ADD_INITIALIZER(_graph_, "n3", FN3, ("n0", "n2"), MONGO_NO_DEPENDENTS);   \
-        ASSERT_ADD_INITIALIZER(_graph_, "n4", FN4, ("n2", "n1"), MONGO_NO_DEPENDENTS);   \
-        ASSERT_ADD_INITIALIZER(_graph_, "n5", FN5, ("n3", "n4"), MONGO_NO_DEPENDENTS);   \
-        ASSERT_ADD_INITIALIZER(_graph_, "n6", FN6, ("n4"), MONGO_NO_DEPENDENTS);         \
-        ASSERT_ADD_INITIALIZER(_graph_, "n7", FN7, ("n3"), MONGO_NO_DEPENDENTS);         \
-        ASSERT_ADD_INITIALIZER(_graph_, "n8", FN8, ("n5", "n6", "n7"), MONGO_NO_DEPENDENTS); \
+        ASSERT_ADD_INITIALIZER(_graph_, "n2", FN2, ("n0", "n1"), MONGO_NO_DEPENDENTS);           \
+        ASSERT_ADD_INITIALIZER(_graph_, "n3", FN3, ("n0", "n2"), MONGO_NO_DEPENDENTS);           \
+        ASSERT_ADD_INITIALIZER(_graph_, "n4", FN4, ("n2", "n1"), MONGO_NO_DEPENDENTS);           \
+        ASSERT_ADD_INITIALIZER(_graph_, "n5", FN5, ("n3", "n4"), MONGO_NO_DEPENDENTS);           \
+        ASSERT_ADD_INITIALIZER(_graph_, "n6", FN6, ("n4"), MONGO_NO_DEPENDENTS);                 \
+        ASSERT_ADD_INITIALIZER(_graph_, "n7", FN7, ("n3"), MONGO_NO_DEPENDENTS);                 \
+        ASSERT_ADD_INITIALIZER(_graph_, "n8", FN8, ("n5", "n6", "n7"), MONGO_NO_DEPENDENTS);     \
     } while (false)
 
 namespace mongo {
 namespace {
 
-    int globalCounts[9];
+int globalCounts[9];
 
-    Status doNothing(InitializerContext*) { return Status::OK(); }
+Status doNothing(InitializerContext*) {
+    return Status::OK();
+}
 
-    Status set0(InitializerContext*) {
-        globalCounts[0] = 1;
-        return Status::OK();
-    }
+Status set0(InitializerContext*) {
+    globalCounts[0] = 1;
+    return Status::OK();
+}
 
-    Status set1(InitializerContext*) {
-        globalCounts[1] = 1;
-        return Status::OK();
-    }
+Status set1(InitializerContext*) {
+    globalCounts[1] = 1;
+    return Status::OK();
+}
 
-    Status set2(InitializerContext*) {
-        if (!globalCounts[0] || !globalCounts[1])
-            return Status(ErrorCodes::UnknownError, "one of 0 or 1 not already set");
-        globalCounts[2] = 1;
-        return Status::OK();
-    }
+Status set2(InitializerContext*) {
+    if (!globalCounts[0] || !globalCounts[1])
+        return Status(ErrorCodes::UnknownError, "one of 0 or 1 not already set");
+    globalCounts[2] = 1;
+    return Status::OK();
+}
 
-    Status set3(InitializerContext*) {
-        if (!globalCounts[0] || !globalCounts[2])
-            return Status(ErrorCodes::UnknownError, "one of 0 or 2 not already set");
-        globalCounts[3] = 1;
-        return Status::OK();
-    }
+Status set3(InitializerContext*) {
+    if (!globalCounts[0] || !globalCounts[2])
+        return Status(ErrorCodes::UnknownError, "one of 0 or 2 not already set");
+    globalCounts[3] = 1;
+    return Status::OK();
+}
 
-    Status set4(InitializerContext*) {
-        if (!globalCounts[1] || !globalCounts[2])
-            return Status(ErrorCodes::UnknownError, "one of 1 or 2 not already set");
-        globalCounts[4] = 1;
-        return Status::OK();
-    }
+Status set4(InitializerContext*) {
+    if (!globalCounts[1] || !globalCounts[2])
+        return Status(ErrorCodes::UnknownError, "one of 1 or 2 not already set");
+    globalCounts[4] = 1;
+    return Status::OK();
+}
 
-    Status set5(InitializerContext*) {
-        if (!globalCounts[3] || !globalCounts[4])
-            return Status(ErrorCodes::UnknownError, "one of 3 or 4 not already set");
-        globalCounts[5] = 1;
-        return Status::OK();
-    }
+Status set5(InitializerContext*) {
+    if (!globalCounts[3] || !globalCounts[4])
+        return Status(ErrorCodes::UnknownError, "one of 3 or 4 not already set");
+    globalCounts[5] = 1;
+    return Status::OK();
+}
 
-    Status set6(InitializerContext*) {
-        if (!globalCounts[4])
-            return Status(ErrorCodes::UnknownError, "4 not already set");
-        globalCounts[6] = 1;
-        return Status::OK();
-    }
+Status set6(InitializerContext*) {
+    if (!globalCounts[4])
+        return Status(ErrorCodes::UnknownError, "4 not already set");
+    globalCounts[6] = 1;
+    return Status::OK();
+}
 
-    Status set7(InitializerContext*) {
-        if (!globalCounts[3])
-            return Status(ErrorCodes::UnknownError, "3 not already set");
-        globalCounts[7] = 1;
-        return Status::OK();
-    }
+Status set7(InitializerContext*) {
+    if (!globalCounts[3])
+        return Status(ErrorCodes::UnknownError, "3 not already set");
+    globalCounts[7] = 1;
+    return Status::OK();
+}
 
-    Status set8(InitializerContext*) {
-        if (!globalCounts[5] || !globalCounts[6] || !globalCounts[7])
-            return Status(ErrorCodes::UnknownError, "one of 5, 6, 7 not already set");
-        globalCounts[8] = 1;
-        return Status::OK();
-    }
+Status set8(InitializerContext*) {
+    if (!globalCounts[5] || !globalCounts[6] || !globalCounts[7])
+        return Status(ErrorCodes::UnknownError, "one of 5, 6, 7 not already set");
+    globalCounts[8] = 1;
+    return Status::OK();
+}
 
-    void clearCounts() {
-        for (size_t i = 0; i < 9; ++i)
-            globalCounts[i] = 0;
-    }
+void clearCounts() {
+    for (size_t i = 0; i < 9; ++i)
+        globalCounts[i] = 0;
+}
 
-    TEST(InitializerTest, SuccessfulInitialization) {
-        Initializer initializer;
-        CONSTRUCT_DEPENDENCY_GRAPH(initializer.getInitializerDependencyGraph(),
-                                   set0, set1, set2, set3, set4, set5, set6, set7, set8);
-        clearCounts();
-        ASSERT_OK(initializer.execute(InitializerContext::ArgumentVector(),
+TEST(InitializerTest, SuccessfulInitialization) {
+    Initializer initializer;
+    CONSTRUCT_DEPENDENCY_GRAPH(initializer.getInitializerDependencyGraph(),
+                               set0,
+                               set1,
+                               set2,
+                               set3,
+                               set4,
+                               set5,
+                               set6,
+                               set7,
+                               set8);
+    clearCounts();
+    ASSERT_OK(initializer.execute(InitializerContext::ArgumentVector(),
+                                  InitializerContext::EnvironmentMap()));
+    for (int i = 0; i < 9; ++i)
+        ASSERT_EQUALS(1, globalCounts[i]);
+}
+
+TEST(InitializerTest, Step5Misimplemented) {
+    Initializer initializer;
+    CONSTRUCT_DEPENDENCY_GRAPH(initializer.getInitializerDependencyGraph(),
+                               set0,
+                               set1,
+                               set2,
+                               set3,
+                               set4,
+                               doNothing,
+                               set6,
+                               set7,
+                               set8);
+    clearCounts();
+    ASSERT_EQUALS(ErrorCodes::UnknownError,
+                  initializer.execute(InitializerContext::ArgumentVector(),
                                       InitializerContext::EnvironmentMap()));
-        for (int i = 0; i < 9; ++i)
-            ASSERT_EQUALS(1, globalCounts[i]);
-    }
-
-    TEST(InitializerTest, Step5Misimplemented) {
-        Initializer initializer;
-        CONSTRUCT_DEPENDENCY_GRAPH(initializer.getInitializerDependencyGraph(),
-                                   set0, set1, set2, set3, set4, doNothing, set6, set7, set8);
-        clearCounts();
-        ASSERT_EQUALS(ErrorCodes::UnknownError,
-                      initializer.execute(InitializerContext::ArgumentVector(),
-                                          InitializerContext::EnvironmentMap()));
-        ASSERT_EQUALS(1, globalCounts[0]);
-        ASSERT_EQUALS(1, globalCounts[1]);
-        ASSERT_EQUALS(1, globalCounts[2]);
-        ASSERT_EQUALS(1, globalCounts[3]);
-        ASSERT_EQUALS(1, globalCounts[4]);
-        ASSERT_EQUALS(0, globalCounts[8]);
-    }
+    ASSERT_EQUALS(1, globalCounts[0]);
+    ASSERT_EQUALS(1, globalCounts[1]);
+    ASSERT_EQUALS(1, globalCounts[2]);
+    ASSERT_EQUALS(1, globalCounts[3]);
+    ASSERT_EQUALS(1, globalCounts[4]);
+    ASSERT_EQUALS(0, globalCounts[8]);
+}
 
 }  // namespace
 }  // namespace mongo

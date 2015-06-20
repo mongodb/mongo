@@ -41,372 +41,366 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::string;
+using std::unique_ptr;
+using std::string;
 
-    namespace {
-        class MyOperationContext : public OperationContextNoop {
-        public:
-            MyOperationContext( KVEngine* engine )
-                : OperationContextNoop( engine->newRecoveryUnit() ) {
-            }
-        };
+namespace {
+class MyOperationContext : public OperationContextNoop {
+public:
+    MyOperationContext(KVEngine* engine) : OperationContextNoop(engine->newRecoveryUnit()) {}
+};
+}
+
+TEST(KVEngineTestHarness, SimpleRS1) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
+    ASSERT(engine);
+
+    string ns = "a.b";
+    unique_ptr<RecordStore> rs;
+    {
+        MyOperationContext opCtx(engine);
+        ASSERT_OK(engine->createRecordStore(&opCtx, ns, ns, CollectionOptions()));
+        rs.reset(engine->getRecordStore(&opCtx, ns, ns, CollectionOptions()));
+        ASSERT(rs);
     }
 
-    TEST( KVEngineTestHarness, SimpleRS1 ) {
-        unique_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
-        KVEngine* engine = helper->getEngine();
-        ASSERT( engine );
 
-        string ns = "a.b";
+    RecordId loc;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        StatusWith<RecordId> res = rs->insertRecord(&opCtx, "abc", 4, false);
+        ASSERT_OK(res.getStatus());
+        loc = res.getValue();
+        uow.commit();
+    }
+
+    {
+        MyOperationContext opCtx(engine);
+        ASSERT_EQUALS(string("abc"), rs->dataFor(&opCtx, loc).data());
+    }
+
+    {
+        MyOperationContext opCtx(engine);
+        std::vector<std::string> all = engine->getAllIdents(&opCtx);
+        ASSERT_EQUALS(1U, all.size());
+        ASSERT_EQUALS(ns, all[0]);
+    }
+}
+
+TEST(KVEngineTestHarness, Restart1) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
+    ASSERT(engine);
+
+    string ns = "a.b";
+
+    // 'loc' holds location of "abc" and is referenced after restarting engine.
+    RecordId loc;
+    {
         unique_ptr<RecordStore> rs;
         {
-            MyOperationContext opCtx( engine );
-            ASSERT_OK( engine->createRecordStore( &opCtx, ns, ns, CollectionOptions() ) );
-            rs.reset( engine->getRecordStore( &opCtx, ns, ns, CollectionOptions() ) );
-            ASSERT( rs );
+            MyOperationContext opCtx(engine);
+            ASSERT_OK(engine->createRecordStore(&opCtx, ns, ns, CollectionOptions()));
+            rs.reset(engine->getRecordStore(&opCtx, ns, ns, CollectionOptions()));
+            ASSERT(rs);
         }
 
-
-        RecordId loc;
         {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            StatusWith<RecordId> res = rs->insertRecord( &opCtx, "abc", 4, false );
-            ASSERT_OK( res.getStatus() );
+            MyOperationContext opCtx(engine);
+            WriteUnitOfWork uow(&opCtx);
+            StatusWith<RecordId> res = rs->insertRecord(&opCtx, "abc", 4, false);
+            ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
         }
 
         {
-            MyOperationContext opCtx( engine );
-            ASSERT_EQUALS( string("abc"), rs->dataFor( &opCtx, loc ).data() );
+            MyOperationContext opCtx(engine);
+            ASSERT_EQUALS(string("abc"), rs->dataFor(&opCtx, loc).data());
         }
-
-        {
-            MyOperationContext opCtx( engine );
-            std::vector<std::string> all = engine->getAllIdents( &opCtx );
-            ASSERT_EQUALS( 1U, all.size() );
-            ASSERT_EQUALS( ns, all[0] );
-        }
-
     }
 
-    TEST( KVEngineTestHarness, Restart1 ) {
-        unique_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
-        KVEngine* engine = helper->getEngine();
-        ASSERT( engine );
+    engine = helper->restartEngine();
 
-        string ns = "a.b";
-
-        // 'loc' holds location of "abc" and is referenced after restarting engine.
-        RecordId loc;
-        {
-            unique_ptr<RecordStore> rs;
-            {
-                MyOperationContext opCtx( engine );
-                ASSERT_OK( engine->createRecordStore( &opCtx, ns, ns, CollectionOptions() ) );
-                rs.reset( engine->getRecordStore( &opCtx, ns, ns, CollectionOptions() ) );
-                ASSERT( rs );
-            }
-    
-            {
-                MyOperationContext opCtx( engine );
-                WriteUnitOfWork uow( &opCtx );
-                StatusWith<RecordId> res = rs->insertRecord( &opCtx, "abc", 4, false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-    
-            {
-                MyOperationContext opCtx( engine );
-                ASSERT_EQUALS( string("abc"), rs->dataFor( &opCtx, loc ).data() );
-            }
-        }
-
-        engine = helper->restartEngine();
-
-        {
-            unique_ptr<RecordStore> rs;
-            MyOperationContext opCtx( engine );
-            rs.reset( engine->getRecordStore( &opCtx, ns, ns, CollectionOptions() ) );
-            ASSERT_EQUALS( string("abc"), rs->dataFor( &opCtx, loc ).data() );
-        }
-
-    }
-
-
-    TEST( KVEngineTestHarness, SimpleSorted1 ) {
-        unique_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
-        KVEngine* engine = helper->getEngine();
-        ASSERT( engine );
-
-        string ident = "abc";
-        IndexDescriptor desc( NULL, "", BSON( "key" << BSON( "a" << 1 ) ) );
-        unique_ptr<SortedDataInterface> sorted;
-        {
-            MyOperationContext opCtx( engine );
-            ASSERT_OK( engine->createSortedDataInterface( &opCtx, ident, &desc ) );
-            sorted.reset( engine->getSortedDataInterface( &opCtx, ident, &desc ) );
-            ASSERT( sorted );
-        }
-
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( sorted->insert( &opCtx, BSON( "" << 5 ), RecordId( 6, 4 ), true ) );
-            uow.commit();
-        }
-
-        {
-            MyOperationContext opCtx( engine );
-            ASSERT_EQUALS( 1, sorted->numEntries( &opCtx ) );
-        }
-
-    }
-
-    TEST( KVCatalogTest, Coll1 ) {
-        unique_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
-        KVEngine* engine = helper->getEngine();
-
+    {
         unique_ptr<RecordStore> rs;
-        unique_ptr<KVCatalog> catalog;
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            catalog.reset( new KVCatalog( rs.get(), true, false, false) );
-            uow.commit();
-        }
+        MyOperationContext opCtx(engine);
+        rs.reset(engine->getRecordStore(&opCtx, ns, ns, CollectionOptions()));
+        ASSERT_EQUALS(string("abc"), rs->dataFor(&opCtx, loc).data());
+    }
+}
 
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
-            ASSERT_NOT_EQUALS( "a.b", catalog->getCollectionIdent( "a.b" ) );
-            uow.commit();
-        }
 
-        string ident = catalog->getCollectionIdent( "a.b" );
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            catalog.reset( new KVCatalog( rs.get(), true, false, false) );
-            catalog->init( &opCtx );
-            uow.commit();
-        }
-        ASSERT_EQUALS( ident, catalog->getCollectionIdent( "a.b" ) );
+TEST(KVEngineTestHarness, SimpleSorted1) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
+    ASSERT(engine);
 
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            catalog->dropCollection( &opCtx, "a.b" );
-            catalog->newCollection( &opCtx, "a.b", CollectionOptions() );
-            uow.commit();
-        }
-        ASSERT_NOT_EQUALS( ident, catalog->getCollectionIdent( "a.b" ) );
+    string ident = "abc";
+    IndexDescriptor desc(NULL, "", BSON("key" << BSON("a" << 1)));
+    unique_ptr<SortedDataInterface> sorted;
+    {
+        MyOperationContext opCtx(engine);
+        ASSERT_OK(engine->createSortedDataInterface(&opCtx, ident, &desc));
+        sorted.reset(engine->getSortedDataInterface(&opCtx, ident, &desc));
+        ASSERT(sorted);
     }
 
-
-    TEST( KVCatalogTest, Idx1 ) {
-        unique_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
-        KVEngine* engine = helper->getEngine();
-
-        unique_ptr<RecordStore> rs;
-        unique_ptr<KVCatalog> catalog;
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            catalog.reset( new KVCatalog( rs.get(), true, false, false) );
-            uow.commit();
-        }
-
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
-            ASSERT_NOT_EQUALS( "a.b", catalog->getCollectionIdent( "a.b" ) );
-            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
-            uow.commit();
-        }
-
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-
-            BSONCollectionCatalogEntry::MetaData md;
-            md.ns ="a.b";
-            md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
-                                                                             false,
-                                                                             RecordId(),
-                                                                             false ) );
-            catalog->putMetaData( &opCtx, "a.b", md );
-            uow.commit();
-        }
-
-        string idxIndent;
-        {
-            MyOperationContext opCtx( engine );
-            idxIndent = catalog->getIndexIdent( &opCtx, "a.b", "foo" );
-        }
-
-        {
-            MyOperationContext opCtx( engine );
-            ASSERT_EQUALS( idxIndent, catalog->getIndexIdent( &opCtx, "a.b", "foo" ) );
-            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
-        }
-
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-
-            BSONCollectionCatalogEntry::MetaData md;
-            md.ns ="a.b";
-            catalog->putMetaData( &opCtx, "a.b", md ); // remove index
-            md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
-                                                                             false,
-                                                                             RecordId(),
-                                                                             false ) );
-            catalog->putMetaData( &opCtx, "a.b", md );
-            uow.commit();
-        }
-
-        {
-            MyOperationContext opCtx( engine );
-            ASSERT_NOT_EQUALS( idxIndent, catalog->getIndexIdent( &opCtx, "a.b", "foo" ) );
-        }
-
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(sorted->insert(&opCtx, BSON("" << 5), RecordId(6, 4), true));
+        uow.commit();
     }
 
-    TEST( KVCatalogTest, DirectoryPerDb1 ) {
-        unique_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
-        KVEngine* engine = helper->getEngine();
+    {
+        MyOperationContext opCtx(engine);
+        ASSERT_EQUALS(1, sorted->numEntries(&opCtx));
+    }
+}
 
-        unique_ptr<RecordStore> rs;
-        unique_ptr<KVCatalog> catalog;
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            catalog.reset( new KVCatalog( rs.get(), true, true, false) );
-            uow.commit();
-        }
+TEST(KVCatalogTest, Coll1) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
 
-        { // collection
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
-            ASSERT_STRING_CONTAINS( catalog->getCollectionIdent( "a.b" ), "a/" );
-            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
-            uow.commit();
-        }
-
-        { // index
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-
-            BSONCollectionCatalogEntry::MetaData md;
-            md.ns ="a.b";
-            md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
-                                                                             false,
-                                                                             RecordId(),
-                                                                             false ) );
-            catalog->putMetaData( &opCtx, "a.b", md );
-            ASSERT_STRING_CONTAINS( catalog->getIndexIdent( &opCtx, "a.b", "foo" ), "a/" );
-            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
-            uow.commit();
-        }
-
+    unique_ptr<RecordStore> rs;
+    unique_ptr<KVCatalog> catalog;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(engine->createRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        rs.reset(engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        catalog.reset(new KVCatalog(rs.get(), true, false, false));
+        uow.commit();
     }
 
-    TEST( KVCatalogTest, Split1 ) {
-        unique_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
-        KVEngine* engine = helper->getEngine();
-
-        unique_ptr<RecordStore> rs;
-        unique_ptr<KVCatalog> catalog;
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            catalog.reset( new KVCatalog( rs.get(), true, false, true) );
-            uow.commit();
-        }
-
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
-            ASSERT_STRING_CONTAINS( catalog->getCollectionIdent( "a.b" ), "collection/" );
-            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
-            uow.commit();
-        }
-
-        { // index
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-
-            BSONCollectionCatalogEntry::MetaData md;
-            md.ns ="a.b";
-            md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
-                                                                             false,
-                                                                             RecordId(),
-                                                                             false ) );
-            catalog->putMetaData( &opCtx, "a.b", md );
-            ASSERT_STRING_CONTAINS( catalog->getIndexIdent( &opCtx, "a.b", "foo" ), "index/" );
-            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
-            uow.commit();
-        }
-
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(catalog->newCollection(&opCtx, "a.b", CollectionOptions()));
+        ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent("a.b"));
+        uow.commit();
     }
 
-    TEST( KVCatalogTest, DirectoryPerAndSplit1 ) {
-        unique_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
-        KVEngine* engine = helper->getEngine();
+    string ident = catalog->getCollectionIdent("a.b");
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        catalog.reset(new KVCatalog(rs.get(), true, false, false));
+        catalog->init(&opCtx);
+        uow.commit();
+    }
+    ASSERT_EQUALS(ident, catalog->getCollectionIdent("a.b"));
 
-        unique_ptr<RecordStore> rs;
-        unique_ptr<KVCatalog> catalog;
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            catalog.reset( new KVCatalog( rs.get(), true, true, true) );
-            uow.commit();
-        }
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        catalog->dropCollection(&opCtx, "a.b");
+        catalog->newCollection(&opCtx, "a.b", CollectionOptions());
+        uow.commit();
+    }
+    ASSERT_NOT_EQUALS(ident, catalog->getCollectionIdent("a.b"));
+}
 
-        {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
-            ASSERT_STRING_CONTAINS( catalog->getCollectionIdent( "a.b" ), "a/collection/" );
-            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
-            uow.commit();
-        }
 
-        { // index
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
+TEST(KVCatalogTest, Idx1) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
 
-            BSONCollectionCatalogEntry::MetaData md;
-            md.ns ="a.b";
-            md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
-                                                                             false,
-                                                                             RecordId(),
-                                                                             false ) );
-            catalog->putMetaData( &opCtx, "a.b", md );
-            ASSERT_STRING_CONTAINS( catalog->getIndexIdent( &opCtx, "a.b", "foo" ), "a/index/" );
-            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
-            uow.commit();
-        }
-
+    unique_ptr<RecordStore> rs;
+    unique_ptr<KVCatalog> catalog;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(engine->createRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        rs.reset(engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        catalog.reset(new KVCatalog(rs.get(), true, false, false));
+        uow.commit();
     }
 
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(catalog->newCollection(&opCtx, "a.b", CollectionOptions()));
+        ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent("a.b"));
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
+        uow.commit();
+    }
 
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+
+        BSONCollectionCatalogEntry::MetaData md;
+        md.ns = "a.b";
+        md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
+                                                                            << "foo"),
+                                                                       false,
+                                                                       RecordId(),
+                                                                       false));
+        catalog->putMetaData(&opCtx, "a.b", md);
+        uow.commit();
+    }
+
+    string idxIndent;
+    {
+        MyOperationContext opCtx(engine);
+        idxIndent = catalog->getIndexIdent(&opCtx, "a.b", "foo");
+    }
+
+    {
+        MyOperationContext opCtx(engine);
+        ASSERT_EQUALS(idxIndent, catalog->getIndexIdent(&opCtx, "a.b", "foo"));
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
+    }
+
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+
+        BSONCollectionCatalogEntry::MetaData md;
+        md.ns = "a.b";
+        catalog->putMetaData(&opCtx, "a.b", md);  // remove index
+        md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
+                                                                            << "foo"),
+                                                                       false,
+                                                                       RecordId(),
+                                                                       false));
+        catalog->putMetaData(&opCtx, "a.b", md);
+        uow.commit();
+    }
+
+    {
+        MyOperationContext opCtx(engine);
+        ASSERT_NOT_EQUALS(idxIndent, catalog->getIndexIdent(&opCtx, "a.b", "foo"));
+    }
+}
+
+TEST(KVCatalogTest, DirectoryPerDb1) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
+
+    unique_ptr<RecordStore> rs;
+    unique_ptr<KVCatalog> catalog;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(engine->createRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        rs.reset(engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        catalog.reset(new KVCatalog(rs.get(), true, true, false));
+        uow.commit();
+    }
+
+    {  // collection
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(catalog->newCollection(&opCtx, "a.b", CollectionOptions()));
+        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent("a.b"), "a/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
+        uow.commit();
+    }
+
+    {  // index
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+
+        BSONCollectionCatalogEntry::MetaData md;
+        md.ns = "a.b";
+        md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
+                                                                            << "foo"),
+                                                                       false,
+                                                                       RecordId(),
+                                                                       false));
+        catalog->putMetaData(&opCtx, "a.b", md);
+        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "a/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
+        uow.commit();
+    }
+}
+
+TEST(KVCatalogTest, Split1) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
+
+    unique_ptr<RecordStore> rs;
+    unique_ptr<KVCatalog> catalog;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(engine->createRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        rs.reset(engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        catalog.reset(new KVCatalog(rs.get(), true, false, true));
+        uow.commit();
+    }
+
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(catalog->newCollection(&opCtx, "a.b", CollectionOptions()));
+        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent("a.b"), "collection/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
+        uow.commit();
+    }
+
+    {  // index
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+
+        BSONCollectionCatalogEntry::MetaData md;
+        md.ns = "a.b";
+        md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
+                                                                            << "foo"),
+                                                                       false,
+                                                                       RecordId(),
+                                                                       false));
+        catalog->putMetaData(&opCtx, "a.b", md);
+        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "index/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
+        uow.commit();
+    }
+}
+
+TEST(KVCatalogTest, DirectoryPerAndSplit1) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
+
+    unique_ptr<RecordStore> rs;
+    unique_ptr<KVCatalog> catalog;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(engine->createRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        rs.reset(engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        catalog.reset(new KVCatalog(rs.get(), true, true, true));
+        uow.commit();
+    }
+
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(catalog->newCollection(&opCtx, "a.b", CollectionOptions()));
+        ASSERT_STRING_CONTAINS(catalog->getCollectionIdent("a.b"), "a/collection/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
+        uow.commit();
+    }
+
+    {  // index
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+
+        BSONCollectionCatalogEntry::MetaData md;
+        md.ns = "a.b";
+        md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
+                                                                            << "foo"),
+                                                                       false,
+                                                                       RecordId(),
+                                                                       false));
+        catalog->putMetaData(&opCtx, "a.b", md);
+        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "a/index/");
+        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
+        uow.commit();
+    }
+}
 }

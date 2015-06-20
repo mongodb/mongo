@@ -35,34 +35,33 @@
 #include "mongo/util/quick_exit.h"
 
 namespace mongo {
-    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoShellOptions)(InitializerContext* context) {
-        return addMongoShellOptions(&moe::startupOptions);
+MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoShellOptions)(InitializerContext* context) {
+    return addMongoShellOptions(&moe::startupOptions);
+}
+
+MONGO_STARTUP_OPTIONS_VALIDATE(MongoShellOptions)(InitializerContext* context) {
+    if (!handlePreValidationMongoShellOptions(moe::startupOptionsParsed, context->args())) {
+        quickExit(EXIT_SUCCESS);
+    }
+    Status ret = moe::startupOptionsParsed.validate();
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = validateMongoShellOptions(moe::startupOptionsParsed);
+    if (!ret.isOK()) {
+        return ret;
     }
 
-    MONGO_STARTUP_OPTIONS_VALIDATE(MongoShellOptions)(InitializerContext* context) {
-        if (!handlePreValidationMongoShellOptions(moe::startupOptionsParsed, context->args())) {
-            quickExit(EXIT_SUCCESS);
-        }
-        Status ret = moe::startupOptionsParsed.validate();
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = validateMongoShellOptions(moe::startupOptionsParsed);
-        if (!ret.isOK()) {
-            return ret;
-        }
+    return Status::OK();
+}
 
-        return Status::OK();
+MONGO_STARTUP_OPTIONS_STORE(MongoShellOptions)(InitializerContext* context) {
+    Status ret = storeMongoShellOptions(moe::startupOptionsParsed, context->args());
+    if (!ret.isOK()) {
+        std::cerr << ret.toString() << std::endl;
+        std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
+        quickExit(EXIT_BADOPTIONS);
     }
-
-    MONGO_STARTUP_OPTIONS_STORE(MongoShellOptions)(InitializerContext* context) {
-        Status ret = storeMongoShellOptions(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            std::cerr << ret.toString() << std::endl;
-            std::cerr << "try '" << context->args()[0] << " --help' for more information"
-                      << std::endl;
-            quickExit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
-    }
+    return Status::OK();
+}
 }

@@ -49,172 +49,185 @@
 namespace mongo {
 namespace {
 
-    using std::vector;
+using std::vector;
 
-    TEST(RoleParsingTest, BuildRoleBSON) {
-        RoleGraph graph;
-        RoleName roleA("roleA", "dbA");
-        RoleName roleB("roleB", "dbB");
-        RoleName roleC("roleC", "dbC");
-        ActionSet actions;
-        actions.addAction(ActionType::find);
-        actions.addAction(ActionType::insert);
+TEST(RoleParsingTest, BuildRoleBSON) {
+    RoleGraph graph;
+    RoleName roleA("roleA", "dbA");
+    RoleName roleB("roleB", "dbB");
+    RoleName roleC("roleC", "dbC");
+    ActionSet actions;
+    actions.addAction(ActionType::find);
+    actions.addAction(ActionType::insert);
 
-        ASSERT_OK(graph.createRole(roleA));
-        ASSERT_OK(graph.createRole(roleB));
-        ASSERT_OK(graph.createRole(roleC));
+    ASSERT_OK(graph.createRole(roleA));
+    ASSERT_OK(graph.createRole(roleB));
+    ASSERT_OK(graph.createRole(roleC));
 
-        ASSERT_OK(graph.addRoleToRole(roleA, roleC));
-        ASSERT_OK(graph.addRoleToRole(roleA, roleB));
-        ASSERT_OK(graph.addRoleToRole(roleB, roleC));
+    ASSERT_OK(graph.addRoleToRole(roleA, roleC));
+    ASSERT_OK(graph.addRoleToRole(roleA, roleB));
+    ASSERT_OK(graph.addRoleToRole(roleB, roleC));
 
-        ASSERT_OK(graph.addPrivilegeToRole(
-                roleA, Privilege(ResourcePattern::forAnyNormalResource(), actions)));
-        ASSERT_OK(graph.addPrivilegeToRole(
-                roleB, Privilege(ResourcePattern::forExactNamespace(NamespaceString("dbB.foo")),
-                                 actions)));
-        ASSERT_OK(graph.addPrivilegeToRole(
-                roleC, Privilege(ResourcePattern::forClusterResource(), actions)));
-        ASSERT_OK(graph.recomputePrivilegeData());
+    ASSERT_OK(graph.addPrivilegeToRole(
+        roleA, Privilege(ResourcePattern::forAnyNormalResource(), actions)));
+    ASSERT_OK(graph.addPrivilegeToRole(
+        roleB, Privilege(ResourcePattern::forExactNamespace(NamespaceString("dbB.foo")), actions)));
+    ASSERT_OK(
+        graph.addPrivilegeToRole(roleC, Privilege(ResourcePattern::forClusterResource(), actions)));
+    ASSERT_OK(graph.recomputePrivilegeData());
 
 
-        // Role A
-        mutablebson::Document doc;
-        ASSERT_OK(AuthorizationManager::getBSONForRole(&graph, roleA, doc.root()));
-        BSONObj roleDoc = doc.getObject();
+    // Role A
+    mutablebson::Document doc;
+    ASSERT_OK(AuthorizationManager::getBSONForRole(&graph, roleA, doc.root()));
+    BSONObj roleDoc = doc.getObject();
 
-        ASSERT_EQUALS("dbA.roleA", roleDoc["_id"].String());
-        ASSERT_EQUALS("roleA", roleDoc["role"].String());
-        ASSERT_EQUALS("dbA", roleDoc["db"].String());
+    ASSERT_EQUALS("dbA.roleA", roleDoc["_id"].String());
+    ASSERT_EQUALS("roleA", roleDoc["role"].String());
+    ASSERT_EQUALS("dbA", roleDoc["db"].String());
 
-        vector<BSONElement> privs = roleDoc["privileges"].Array();
-        ASSERT_EQUALS(1U, privs.size());
-        ASSERT_EQUALS("", privs[0].Obj()["resource"].Obj()["db"].String());
-        ASSERT_EQUALS("", privs[0].Obj()["resource"].Obj()["collection"].String());
-        ASSERT(privs[0].Obj()["resource"].Obj()["cluster"].eoo());
-        vector<BSONElement> actionElements = privs[0].Obj()["actions"].Array();
-        ASSERT_EQUALS(2U, actionElements.size());
-        ASSERT_EQUALS("find", actionElements[0].String());
-        ASSERT_EQUALS("insert", actionElements[1].String());
+    vector<BSONElement> privs = roleDoc["privileges"].Array();
+    ASSERT_EQUALS(1U, privs.size());
+    ASSERT_EQUALS("", privs[0].Obj()["resource"].Obj()["db"].String());
+    ASSERT_EQUALS("", privs[0].Obj()["resource"].Obj()["collection"].String());
+    ASSERT(privs[0].Obj()["resource"].Obj()["cluster"].eoo());
+    vector<BSONElement> actionElements = privs[0].Obj()["actions"].Array();
+    ASSERT_EQUALS(2U, actionElements.size());
+    ASSERT_EQUALS("find", actionElements[0].String());
+    ASSERT_EQUALS("insert", actionElements[1].String());
 
-        vector<BSONElement> roles = roleDoc["roles"].Array();
-        ASSERT_EQUALS(2U, roles.size());
-        ASSERT_EQUALS("roleC", roles[0].Obj()["role"].String());
-        ASSERT_EQUALS("dbC", roles[0].Obj()["db"].String());
-        ASSERT_EQUALS("roleB", roles[1].Obj()["role"].String());
-        ASSERT_EQUALS("dbB", roles[1].Obj()["db"].String());
+    vector<BSONElement> roles = roleDoc["roles"].Array();
+    ASSERT_EQUALS(2U, roles.size());
+    ASSERT_EQUALS("roleC", roles[0].Obj()["role"].String());
+    ASSERT_EQUALS("dbC", roles[0].Obj()["db"].String());
+    ASSERT_EQUALS("roleB", roles[1].Obj()["role"].String());
+    ASSERT_EQUALS("dbB", roles[1].Obj()["db"].String());
 
-        // Role B
-        doc.reset();
-        ASSERT_OK(AuthorizationManager::getBSONForRole(&graph, roleB, doc.root()));
-        roleDoc = doc.getObject();
+    // Role B
+    doc.reset();
+    ASSERT_OK(AuthorizationManager::getBSONForRole(&graph, roleB, doc.root()));
+    roleDoc = doc.getObject();
 
-        ASSERT_EQUALS("dbB.roleB", roleDoc["_id"].String());
-        ASSERT_EQUALS("roleB", roleDoc["role"].String());
-        ASSERT_EQUALS("dbB", roleDoc["db"].String());
+    ASSERT_EQUALS("dbB.roleB", roleDoc["_id"].String());
+    ASSERT_EQUALS("roleB", roleDoc["role"].String());
+    ASSERT_EQUALS("dbB", roleDoc["db"].String());
 
-        privs = roleDoc["privileges"].Array();
-        ASSERT_EQUALS(1U, privs.size());
-        ASSERT_EQUALS("dbB", privs[0].Obj()["resource"].Obj()["db"].String());
-        ASSERT_EQUALS("foo", privs[0].Obj()["resource"].Obj()["collection"].String());
-        ASSERT(privs[0].Obj()["resource"].Obj()["cluster"].eoo());
-        actionElements = privs[0].Obj()["actions"].Array();
-        ASSERT_EQUALS(2U, actionElements.size());
-        ASSERT_EQUALS("find", actionElements[0].String());
-        ASSERT_EQUALS("insert", actionElements[1].String());
+    privs = roleDoc["privileges"].Array();
+    ASSERT_EQUALS(1U, privs.size());
+    ASSERT_EQUALS("dbB", privs[0].Obj()["resource"].Obj()["db"].String());
+    ASSERT_EQUALS("foo", privs[0].Obj()["resource"].Obj()["collection"].String());
+    ASSERT(privs[0].Obj()["resource"].Obj()["cluster"].eoo());
+    actionElements = privs[0].Obj()["actions"].Array();
+    ASSERT_EQUALS(2U, actionElements.size());
+    ASSERT_EQUALS("find", actionElements[0].String());
+    ASSERT_EQUALS("insert", actionElements[1].String());
 
-        roles = roleDoc["roles"].Array();
-        ASSERT_EQUALS(1U, roles.size());
-        ASSERT_EQUALS("roleC", roles[0].Obj()["role"].String());
-        ASSERT_EQUALS("dbC", roles[0].Obj()["db"].String());
+    roles = roleDoc["roles"].Array();
+    ASSERT_EQUALS(1U, roles.size());
+    ASSERT_EQUALS("roleC", roles[0].Obj()["role"].String());
+    ASSERT_EQUALS("dbC", roles[0].Obj()["db"].String());
 
-        // Role C
-        doc.reset();
-        ASSERT_OK(AuthorizationManager::getBSONForRole(&graph, roleC, doc.root()));
-        roleDoc = doc.getObject();
+    // Role C
+    doc.reset();
+    ASSERT_OK(AuthorizationManager::getBSONForRole(&graph, roleC, doc.root()));
+    roleDoc = doc.getObject();
 
-        ASSERT_EQUALS("dbC.roleC", roleDoc["_id"].String());
-        ASSERT_EQUALS("roleC", roleDoc["role"].String());
-        ASSERT_EQUALS("dbC", roleDoc["db"].String());
+    ASSERT_EQUALS("dbC.roleC", roleDoc["_id"].String());
+    ASSERT_EQUALS("roleC", roleDoc["role"].String());
+    ASSERT_EQUALS("dbC", roleDoc["db"].String());
 
-        privs = roleDoc["privileges"].Array();
-        ASSERT_EQUALS(1U, privs.size());
-        ASSERT(privs[0].Obj()["resource"].Obj()["cluster"].Bool());
-        ASSERT(privs[0].Obj()["resource"].Obj()["db"].eoo());
-        ASSERT(privs[0].Obj()["resource"].Obj()["collection"].eoo());
-        actionElements = privs[0].Obj()["actions"].Array();
-        ASSERT_EQUALS(2U, actionElements.size());
-        ASSERT_EQUALS("find", actionElements[0].String());
-        ASSERT_EQUALS("insert", actionElements[1].String());
+    privs = roleDoc["privileges"].Array();
+    ASSERT_EQUALS(1U, privs.size());
+    ASSERT(privs[0].Obj()["resource"].Obj()["cluster"].Bool());
+    ASSERT(privs[0].Obj()["resource"].Obj()["db"].eoo());
+    ASSERT(privs[0].Obj()["resource"].Obj()["collection"].eoo());
+    actionElements = privs[0].Obj()["actions"].Array();
+    ASSERT_EQUALS(2U, actionElements.size());
+    ASSERT_EQUALS("find", actionElements[0].String());
+    ASSERT_EQUALS("insert", actionElements[1].String());
 
-        roles = roleDoc["roles"].Array();
-        ASSERT_EQUALS(0U, roles.size());
+    roles = roleDoc["roles"].Array();
+    ASSERT_EQUALS(0U, roles.size());
+}
+
+class AuthorizationManagerTest : public ::mongo::unittest::Test {
+public:
+    virtual ~AuthorizationManagerTest() {
+        if (authzManager)
+            authzManager->invalidateUserCache();
     }
 
-    class AuthorizationManagerTest : public ::mongo::unittest::Test {
-    public:
-        virtual ~AuthorizationManagerTest() {
-            if (authzManager)
-                authzManager->invalidateUserCache();
-        }
-
-        void setUp() {
-            auto localExternalState = stdx::make_unique<AuthzManagerExternalStateMock>();
-            externalState = localExternalState.get();
-            externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-            authzManager = stdx::make_unique<AuthorizationManager>(std::move(localExternalState));
-            externalState->setAuthorizationManager(authzManager.get());
-            authzManager->setAuthEnabled(true);
-        }
-
-        std::unique_ptr<AuthorizationManager> authzManager;
-        AuthzManagerExternalStateMock* externalState;
-    };
-
-    TEST_F(AuthorizationManagerTest, testAcquireV2User) {
+    void setUp() {
+        auto localExternalState = stdx::make_unique<AuthzManagerExternalStateMock>();
+        externalState = localExternalState.get();
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-
-        OperationContextNoop txn;
-
-        ASSERT_OK(externalState->insertPrivilegeDocument(
-                &txn,
-                BSON("_id" << "admin.v2read" <<
-                     "user" << "v2read" <<
-                     "db" << "test" <<
-                     "credentials" << BSON("MONGODB-CR" << "password") <<
-                     "roles" << BSON_ARRAY(BSON("role" << "read" << "db" << "test"))),
-                BSONObj()));
-        ASSERT_OK(externalState->insertPrivilegeDocument(
-                &txn,
-                BSON("_id" << "admin.v2cluster" <<
-                     "user" << "v2cluster" <<
-                     "db" << "admin" <<
-                     "credentials" << BSON("MONGODB-CR" << "password") <<
-                     "roles" << BSON_ARRAY(BSON("role" << "clusterAdmin" << "db" << "admin"))),
-                BSONObj()));
-
-        User* v2read;
-        ASSERT_OK(authzManager->acquireUser(&txn, UserName("v2read", "test"), &v2read));
-        ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
-        ASSERT(v2read->isValid());
-        ASSERT_EQUALS(1U, v2read->getRefCount());
-        RoleNameIterator roles = v2read->getRoles();
-        ASSERT_EQUALS(RoleName("read", "test"), roles.next());
-        ASSERT_FALSE(roles.more());
-        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
-        authzManager->releaseUser(v2read);
-
-        User* v2cluster;
-        ASSERT_OK(authzManager->acquireUser(&txn, UserName("v2cluster", "admin"), &v2cluster));
-        ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
-        ASSERT(v2cluster->isValid());
-        ASSERT_EQUALS(1U, v2cluster->getRefCount());
-        RoleNameIterator clusterRoles = v2cluster->getRoles();
-        ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
-        ASSERT_FALSE(clusterRoles.more());
-        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
-        authzManager->releaseUser(v2cluster);
+        authzManager = stdx::make_unique<AuthorizationManager>(std::move(localExternalState));
+        externalState->setAuthorizationManager(authzManager.get());
+        authzManager->setAuthEnabled(true);
     }
+
+    std::unique_ptr<AuthorizationManager> authzManager;
+    AuthzManagerExternalStateMock* externalState;
+};
+
+TEST_F(AuthorizationManagerTest, testAcquireV2User) {
+    externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+
+    OperationContextNoop txn;
+
+    ASSERT_OK(
+        externalState->insertPrivilegeDocument(&txn,
+                                               BSON("_id"
+                                                    << "admin.v2read"
+                                                    << "user"
+                                                    << "v2read"
+                                                    << "db"
+                                                    << "test"
+                                                    << "credentials" << BSON("MONGODB-CR"
+                                                                             << "password")
+                                                    << "roles" << BSON_ARRAY(BSON("role"
+                                                                                  << "read"
+                                                                                  << "db"
+                                                                                  << "test"))),
+                                               BSONObj()));
+    ASSERT_OK(
+        externalState->insertPrivilegeDocument(&txn,
+                                               BSON("_id"
+                                                    << "admin.v2cluster"
+                                                    << "user"
+                                                    << "v2cluster"
+                                                    << "db"
+                                                    << "admin"
+                                                    << "credentials" << BSON("MONGODB-CR"
+                                                                             << "password")
+                                                    << "roles" << BSON_ARRAY(BSON("role"
+                                                                                  << "clusterAdmin"
+                                                                                  << "db"
+                                                                                  << "admin"))),
+                                               BSONObj()));
+
+    User* v2read;
+    ASSERT_OK(authzManager->acquireUser(&txn, UserName("v2read", "test"), &v2read));
+    ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
+    ASSERT(v2read->isValid());
+    ASSERT_EQUALS(1U, v2read->getRefCount());
+    RoleNameIterator roles = v2read->getRoles();
+    ASSERT_EQUALS(RoleName("read", "test"), roles.next());
+    ASSERT_FALSE(roles.more());
+    // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+    authzManager->releaseUser(v2read);
+
+    User* v2cluster;
+    ASSERT_OK(authzManager->acquireUser(&txn, UserName("v2cluster", "admin"), &v2cluster));
+    ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
+    ASSERT(v2cluster->isValid());
+    ASSERT_EQUALS(1U, v2cluster->getRefCount());
+    RoleNameIterator clusterRoles = v2cluster->getRoles();
+    ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
+    ASSERT_FALSE(clusterRoles.more());
+    // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+    authzManager->releaseUser(v2cluster);
+}
 
 }  // namespace
 }  // namespace mongo

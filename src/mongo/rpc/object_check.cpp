@@ -38,12 +38,12 @@
 
 namespace mongo {
 
-    Status Validator<BSONObj>::validateLoad(const char* ptr, size_t length) {
-        return serverGlobalParams.objcheck ? validateBSON(ptr, length) : Status::OK();
-    }
+Status Validator<BSONObj>::validateLoad(const char* ptr, size_t length) {
+    return serverGlobalParams.objcheck ? validateBSON(ptr, length) : Status::OK();
+}
 
-    Status Validator<BSONObj>::validateStore(const BSONObj& toStore) {
-        return Status::OK();
-    }
+Status Validator<BSONObj>::validateStore(const BSONObj& toStore) {
+    return Status::OK();
+}
 
 }  // namespace mongo

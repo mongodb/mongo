@@ -38,91 +38,85 @@
 
 namespace mongo {
 
-    using boost::intrusive_ptr;
-    using std::string;
-    using std::vector;
+using boost::intrusive_ptr;
+using std::string;
+using std::vector;
 
-    const char DocumentSourceProject::projectName[] = "$project";
+const char DocumentSourceProject::projectName[] = "$project";
 
-    DocumentSourceProject::DocumentSourceProject(const intrusive_ptr<ExpressionContext>& pExpCtx,
-                                                 const intrusive_ptr<ExpressionObject>& exprObj)
-        : DocumentSource(pExpCtx)
-        , pEO(exprObj)
-    { }
+DocumentSourceProject::DocumentSourceProject(const intrusive_ptr<ExpressionContext>& pExpCtx,
+                                             const intrusive_ptr<ExpressionObject>& exprObj)
+    : DocumentSource(pExpCtx), pEO(exprObj) {}
 
-    const char *DocumentSourceProject::getSourceName() const {
-        return projectName;
-    }
+const char* DocumentSourceProject::getSourceName() const {
+    return projectName;
+}
 
-    boost::optional<Document> DocumentSourceProject::getNext() {
-        pExpCtx->checkForInterrupt();
+boost::optional<Document> DocumentSourceProject::getNext() {
+    pExpCtx->checkForInterrupt();
 
-        boost::optional<Document> input = pSource->getNext();
-        if (!input)
-            return boost::none;
+    boost::optional<Document> input = pSource->getNext();
+    if (!input)
+        return boost::none;
 
-        /* create the result document */
-        const size_t sizeHint = pEO->getSizeHint();
-        MutableDocument out (sizeHint);
-        out.copyMetaDataFrom(*input);
+    /* create the result document */
+    const size_t sizeHint = pEO->getSizeHint();
+    MutableDocument out(sizeHint);
+    out.copyMetaDataFrom(*input);
 
-        /*
-          Use the ExpressionObject to create the base result.
+    /*
+      Use the ExpressionObject to create the base result.
 
-          If we're excluding fields at the top level, leave out the _id if
-          it is found, because we took care of it above.
-        */
-        _variables->setRoot(*input);
-        pEO->addToDocument(out, *input, _variables.get());
-        _variables->clearRoot();
+      If we're excluding fields at the top level, leave out the _id if
+      it is found, because we took care of it above.
+    */
+    _variables->setRoot(*input);
+    pEO->addToDocument(out, *input, _variables.get());
+    _variables->clearRoot();
 
-        return out.freeze();
-    }
+    return out.freeze();
+}
 
-    intrusive_ptr<DocumentSource> DocumentSourceProject::optimize() {
-        intrusive_ptr<Expression> pE(pEO->optimize());
-        pEO = boost::dynamic_pointer_cast<ExpressionObject>(pE);
-        return this;
-    }
+intrusive_ptr<DocumentSource> DocumentSourceProject::optimize() {
+    intrusive_ptr<Expression> pE(pEO->optimize());
+    pEO = boost::dynamic_pointer_cast<ExpressionObject>(pE);
+    return this;
+}
 
-    Value DocumentSourceProject::serialize(bool explain) const {
-        return Value(DOC(getSourceName() << pEO->serialize(explain)));
-    }
+Value DocumentSourceProject::serialize(bool explain) const {
+    return Value(DOC(getSourceName() << pEO->serialize(explain)));
+}
 
-    intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
-            BSONElement elem,
-            const intrusive_ptr<ExpressionContext> &pExpCtx) {
+intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    /* validate */
+    uassert(15969,
+            str::stream() << projectName << " specification must be an object",
+            elem.type() == Object);
 
-        /* validate */
-        uassert(15969, str::stream() << projectName <<
-                " specification must be an object",
-                elem.type() == Object);
+    Expression::ObjectCtx objectCtx(Expression::ObjectCtx::DOCUMENT_OK |
+                                    Expression::ObjectCtx::TOP_LEVEL |
+                                    Expression::ObjectCtx::INCLUSION_OK);
 
-        Expression::ObjectCtx objectCtx(
-              Expression::ObjectCtx::DOCUMENT_OK
-            | Expression::ObjectCtx::TOP_LEVEL
-            | Expression::ObjectCtx::INCLUSION_OK
-            );
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
+    intrusive_ptr<Expression> parsed = Expression::parseObject(elem.Obj(), &objectCtx, vps);
+    ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(parsed.get());
+    massert(16402, "parseObject() returned wrong type of Expression", exprObj);
+    uassert(16403, "$projection requires at least one output field", exprObj->getFieldCount());
 
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        intrusive_ptr<Expression> parsed = Expression::parseObject(elem.Obj(), &objectCtx, vps);
-        ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(parsed.get());
-        massert(16402, "parseObject() returned wrong type of Expression", exprObj);
-        uassert(16403, "$projection requires at least one output field", exprObj->getFieldCount());
+    intrusive_ptr<DocumentSourceProject> pProject(new DocumentSourceProject(pExpCtx, exprObj));
+    pProject->_variables.reset(new Variables(idGenerator.getIdCount()));
 
-        intrusive_ptr<DocumentSourceProject> pProject(new DocumentSourceProject(pExpCtx, exprObj));
-        pProject->_variables.reset(new Variables(idGenerator.getIdCount()));
+    BSONObj projectObj = elem.Obj();
+    pProject->_raw = projectObj.getOwned();
 
-        BSONObj projectObj = elem.Obj();
-        pProject->_raw = projectObj.getOwned();
+    return pProject;
+}
 
-        return pProject;
-    }
-
-    DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(DepsTracker* deps) const {
-        vector<string> path; // empty == top-level
-        pEO->addDependencies(deps, &path);
-        return EXHAUSTIVE_FIELDS;
-    }
+DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(DepsTracker* deps) const {
+    vector<string> path;  // empty == top-level
+    pEO->addDependencies(deps, &path);
+    return EXHAUSTIVE_FIELDS;
+}
 }

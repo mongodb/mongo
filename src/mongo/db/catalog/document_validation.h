@@ -33,40 +33,40 @@
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
-    /**
-     * If true, Collection should do no validation of writes from this OperationContext.
-     *
-     * Note that Decorations are value-constructed so this defaults to false.
-     */
-    extern const OperationContext::Decoration<bool> documentValidationDisabled;
+/**
+ * If true, Collection should do no validation of writes from this OperationContext.
+ *
+ * Note that Decorations are value-constructed so this defaults to false.
+ */
+extern const OperationContext::Decoration<bool> documentValidationDisabled;
 
-    inline StringData bypassDocumentValidationCommandOption() {
-        return "bypassDocumentValidation";
+inline StringData bypassDocumentValidationCommandOption() {
+    return "bypassDocumentValidation";
+}
+
+inline bool shouldBypassDocumentValidationForCommand(const BSONObj& cmdObj) {
+    return cmdObj[bypassDocumentValidationCommandOption()].trueValue();
+}
+
+/**
+ * Disables document validation on a single OperationContext while in scope.
+ * Resets to original value when leaving scope so they are safe to nest.
+ */
+class DisableDocumentValidation {
+    MONGO_DISALLOW_COPYING(DisableDocumentValidation);
+
+public:
+    DisableDocumentValidation(OperationContext* txn)
+        : _txn(txn), _initialState(documentValidationDisabled(_txn)) {
+        documentValidationDisabled(_txn) = true;
     }
 
-    inline bool shouldBypassDocumentValidationForCommand(const BSONObj& cmdObj) {
-        return cmdObj[bypassDocumentValidationCommandOption()].trueValue();
+    ~DisableDocumentValidation() {
+        documentValidationDisabled(_txn) = _initialState;
     }
 
-    /**
-     * Disables document validation on a single OperationContext while in scope.
-     * Resets to original value when leaving scope so they are safe to nest.
-     */
-    class DisableDocumentValidation {
-        MONGO_DISALLOW_COPYING(DisableDocumentValidation);
-    public:
-        DisableDocumentValidation(OperationContext* txn)
-                : _txn(txn)
-                , _initialState(documentValidationDisabled(_txn)) {
-            documentValidationDisabled(_txn) = true;
-        }
-
-        ~DisableDocumentValidation() {
-            documentValidationDisabled(_txn) = _initialState;
-        }
-
-    private:
-        OperationContext* const _txn;
-        const bool _initialState;
-    };
+private:
+    OperationContext* const _txn;
+    const bool _initialState;
+};
 }

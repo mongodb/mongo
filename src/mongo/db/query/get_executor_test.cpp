@@ -41,105 +41,102 @@ using namespace mongo;
 
 namespace {
 
-    using std::unique_ptr;
+using std::unique_ptr;
 
-    static const char* ns = "somebogusns";
+static const char* ns = "somebogusns";
 
-    /**
-     * Utility functions to create a CanonicalQuery
-     */
-    CanonicalQuery* canonicalize(const char* queryStr, const char* sortStr,
-                                 const char* projStr) {
-        BSONObj queryObj = fromjson(queryStr);
-        BSONObj sortObj = fromjson(sortStr);
-        BSONObj projObj = fromjson(projStr);
-        CanonicalQuery* cq;
-        Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj,
-                                                     projObj,
-                                                     &cq);
-        ASSERT_OK(result);
-        return cq;
+/**
+ * Utility functions to create a CanonicalQuery
+ */
+CanonicalQuery* canonicalize(const char* queryStr, const char* sortStr, const char* projStr) {
+    BSONObj queryObj = fromjson(queryStr);
+    BSONObj sortObj = fromjson(sortStr);
+    BSONObj projObj = fromjson(projStr);
+    CanonicalQuery* cq;
+    Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, &cq);
+    ASSERT_OK(result);
+    return cq;
+}
+
+//
+// get_executor tests
+//
+
+//
+// filterAllowedIndexEntries
+//
+
+/**
+ * Test function to check filterAllowedIndexEntries
+ */
+void testAllowedIndices(const char* hintKeyPatterns[],
+                        const char* indexCatalogKeyPatterns[],
+                        const char* expectedFilteredKeyPatterns[]) {
+    PlanCache planCache;
+    QuerySettings querySettings;
+    AllowedIndices* allowedIndicesRaw;
+
+    // getAllowedIndices should return false when query shape is not yet in query settings.
+    unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}"));
+    PlanCacheKey key = planCache.computeKey(*cq);
+    ASSERT_FALSE(querySettings.getAllowedIndices(key, &allowedIndicesRaw));
+
+    // Add entry to query settings.
+    std::vector<BSONObj> indexKeyPatterns;
+    for (int i = 0; hintKeyPatterns[i] != NULL; ++i) {
+        indexKeyPatterns.push_back(fromjson(hintKeyPatterns[i]));
+    }
+    querySettings.setAllowedIndices(*cq, key, indexKeyPatterns);
+
+    // Index entry vector should contain 1 entry after filtering.
+    ASSERT_TRUE(querySettings.getAllowedIndices(key, &allowedIndicesRaw));
+    ASSERT_FALSE(key.empty());
+    ASSERT(NULL != allowedIndicesRaw);
+    unique_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
+
+    // Indexes from index catalog.
+    std::vector<IndexEntry> indexEntries;
+    for (int i = 0; indexCatalogKeyPatterns[i] != NULL; ++i) {
+        indexEntries.push_back(IndexEntry(fromjson(indexCatalogKeyPatterns[i])));
     }
 
-    //
-    // get_executor tests
-    //
-
-    //
-    // filterAllowedIndexEntries
-    //
-
-    /**
-     * Test function to check filterAllowedIndexEntries
-     */
-    void testAllowedIndices(const char* hintKeyPatterns[],
-                            const char* indexCatalogKeyPatterns[],
-                            const char* expectedFilteredKeyPatterns[]) {
-         PlanCache planCache;
-         QuerySettings querySettings;
-         AllowedIndices *allowedIndicesRaw;
-
-         // getAllowedIndices should return false when query shape is not yet in query settings.
-         unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}"));
-         PlanCacheKey key = planCache.computeKey(*cq);
-         ASSERT_FALSE(querySettings.getAllowedIndices(key, &allowedIndicesRaw));
-
-         // Add entry to query settings.
-         std::vector<BSONObj> indexKeyPatterns;
-         for (int i=0; hintKeyPatterns[i] != NULL; ++i) {
-             indexKeyPatterns.push_back(fromjson(hintKeyPatterns[i]));
-         }
-         querySettings.setAllowedIndices(*cq, key, indexKeyPatterns);
-
-         // Index entry vector should contain 1 entry after filtering.
-         ASSERT_TRUE(querySettings.getAllowedIndices(key, &allowedIndicesRaw));
-         ASSERT_FALSE(key.empty());
-         ASSERT(NULL != allowedIndicesRaw);
-         unique_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
-
-         // Indexes from index catalog.
-         std::vector<IndexEntry> indexEntries;
-         for (int i=0; indexCatalogKeyPatterns[i] != NULL; ++i) {
-             indexEntries.push_back(IndexEntry(fromjson(indexCatalogKeyPatterns[i])));
-         }
-
-         // Apply filter in allowed indices.
-         filterAllowedIndexEntries(*allowedIndices, &indexEntries);
-         size_t numExpected = 0;
-         while (expectedFilteredKeyPatterns[numExpected] != NULL) {
-             ASSERT_LESS_THAN(numExpected, indexEntries.size());
-             ASSERT_EQUALS(indexEntries[numExpected].keyPattern,
-                           fromjson(expectedFilteredKeyPatterns[numExpected]));
-             numExpected++;
-         }
-         ASSERT_EQUALS(indexEntries.size(), numExpected);
-     }
-
-    // Use of index filters to select compound index over single key index.
-    TEST(GetExecutorTest, GetAllowedIndices) {
-        const char* hintKeyPatterns[] = {"{a: 1, b: 1}", NULL};
-        const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: 1, b: 1}", "{a: 1, c: 1}", NULL};
-        const char* expectedFilteredKeyPatterns[] = {"{a: 1, b: 1}", NULL};
-        testAllowedIndices(hintKeyPatterns, indexCatalogKeyPatterns,  expectedFilteredKeyPatterns);
+    // Apply filter in allowed indices.
+    filterAllowedIndexEntries(*allowedIndices, &indexEntries);
+    size_t numExpected = 0;
+    while (expectedFilteredKeyPatterns[numExpected] != NULL) {
+        ASSERT_LESS_THAN(numExpected, indexEntries.size());
+        ASSERT_EQUALS(indexEntries[numExpected].keyPattern,
+                      fromjson(expectedFilteredKeyPatterns[numExpected]));
+        numExpected++;
     }
+    ASSERT_EQUALS(indexEntries.size(), numExpected);
+}
 
-    // Setting index filter referring to non-existent indexes
-    // will effectively disregard the index catalog and
-    // result in the planner generating a collection scan.
-    TEST(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
-        const char* hintKeyPatterns[] = {"{nosuchfield: 1}", NULL};
-        const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: 1, b: 1}", "{a: 1, c: 1}", NULL};
-        const char* expectedFilteredKeyPatterns[] = {NULL};
-        testAllowedIndices(hintKeyPatterns, indexCatalogKeyPatterns,  expectedFilteredKeyPatterns);
-    }
+// Use of index filters to select compound index over single key index.
+TEST(GetExecutorTest, GetAllowedIndices) {
+    const char* hintKeyPatterns[] = {"{a: 1, b: 1}", NULL};
+    const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: 1, b: 1}", "{a: 1, c: 1}", NULL};
+    const char* expectedFilteredKeyPatterns[] = {"{a: 1, b: 1}", NULL};
+    testAllowedIndices(hintKeyPatterns, indexCatalogKeyPatterns, expectedFilteredKeyPatterns);
+}
 
-    // This test case shows how to force query execution to use
-    // an index that orders items in descending order.
-    TEST(GetExecutorTest, GetAllowedIndicesDescendingOrder) {
-        const char* hintKeyPatterns[] = {"{a: -1}", NULL};
-        const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: -1}", NULL};
-        const char* expectedFilteredKeyPatterns[] = {"{a: -1}", NULL};
-        testAllowedIndices(hintKeyPatterns, indexCatalogKeyPatterns,  expectedFilteredKeyPatterns);
-    }
+// Setting index filter referring to non-existent indexes
+// will effectively disregard the index catalog and
+// result in the planner generating a collection scan.
+TEST(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
+    const char* hintKeyPatterns[] = {"{nosuchfield: 1}", NULL};
+    const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: 1, b: 1}", "{a: 1, c: 1}", NULL};
+    const char* expectedFilteredKeyPatterns[] = {NULL};
+    testAllowedIndices(hintKeyPatterns, indexCatalogKeyPatterns, expectedFilteredKeyPatterns);
+}
+
+// This test case shows how to force query execution to use
+// an index that orders items in descending order.
+TEST(GetExecutorTest, GetAllowedIndicesDescendingOrder) {
+    const char* hintKeyPatterns[] = {"{a: -1}", NULL};
+    const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: -1}", NULL};
+    const char* expectedFilteredKeyPatterns[] = {"{a: -1}", NULL};
+    testAllowedIndices(hintKeyPatterns, indexCatalogKeyPatterns, expectedFilteredKeyPatterns);
+}
 
 }  // namespace

@@ -38,145 +38,151 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
-    using std::vector;
+using std::string;
+using std::stringstream;
+using std::vector;
 
-    /**
-     * Mongod-side command for merging chunks.
-     */
-    class MergeChunksCommand : public Command {
-    public:
-        MergeChunksCommand() : Command("mergeChunks") {}
+/**
+ * Mongod-side command for merging chunks.
+ */
+class MergeChunksCommand : public Command {
+public:
+    MergeChunksCommand() : Command("mergeChunks") {}
 
-        virtual void help(stringstream& h) const {
-            h << "Merge Chunks command\n"
-              << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ],"
-              << " (opt) epoch : <epoch>, (opt) config : <configdb string>,"
-              << " (opt) shardName : <shard name> }";
+    virtual void help(stringstream& h) const {
+        h << "Merge Chunks command\n"
+          << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ],"
+          << " (opt) epoch : <epoch>, (opt) config : <configdb string>,"
+          << " (opt) shardName : <shard name> }";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
+                ActionType::splitChunk)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
-                    ActionType::splitChunk)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-            return Status::OK();
-        }
-
-        virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-            return parseNsFullyQualified(dbname, cmdObj);
-        }
-
-        virtual bool adminOnly() const { return true; }
-        virtual bool slaveOk() const { return false; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        // Required
-        static BSONField<string> nsField;
-        static BSONField<vector<BSONObj> > boundsField;
-        // Optional, if the merge is only valid for a particular epoch
-        static BSONField<OID> epochField;
-        // Optional, if our sharding state has not previously been initializeed
-        static BSONField<string> shardNameField;
-        static BSONField<string> configField;
-
-        bool run(OperationContext* txn, const string& dbname,
-                  BSONObj& cmdObj,
-                  int,
-                  string& errmsg,
-                  BSONObjBuilder& result) {
-
-            string ns = parseNs(dbname, cmdObj);
-
-            if ( ns.size() == 0 ) {
-                errmsg = "no namespace specified";
-                return false;
-            }
-
-            vector<BSONObj> bounds;
-            if ( !FieldParser::extract( cmdObj, boundsField, &bounds, &errmsg ) ) {
-                return false;
-            }
-
-            if ( bounds.size() == 0 ) {
-                errmsg = "no bounds were specified";
-                return false;
-            }
-
-            if ( bounds.size() != 2 ) {
-                errmsg = "only a min and max bound may be specified";
-                return false;
-            }
-
-            BSONObj minKey = bounds[0];
-            BSONObj maxKey = bounds[1];
-
-            if ( minKey.isEmpty() ) {
-                errmsg = "no min key specified";
-                return false;
-            }
-
-            if ( maxKey.isEmpty() ) {
-                errmsg = "no max key specified";
-                return false;
-            }
-
-            //
-            // This might be the first call from mongos, so we may need to pass the config and shard
-            // information to initialize the shardingState.
-            //
-
-            string config;
-            FieldParser::FieldState extracted = FieldParser::extract( cmdObj,
-                                                                      configField,
-                                                                      &config,
-                                                                      &errmsg );
-            if (!shardingState.enabled()) {
-                if (!extracted || extracted == FieldParser::FIELD_NONE) {
-                    errmsg = "sharding state must be enabled or "
-                             "config server specified to merge chunks";
-                    return false;
-                }
-
-                ShardingState::initialize(config);
-            }
-
-            // ShardName is optional, but might not be set yet
-            string shardName;
-            extracted = FieldParser::extract( cmdObj, shardNameField, &shardName, &errmsg );
-
-            if ( !extracted ) return false;
-            if ( extracted != FieldParser::FIELD_NONE ) {
-                shardingState.gotShardName( shardName );
-            }
-
-            //
-            // Epoch is optional, and if not set indicates we should use the latest epoch
-            //
-
-            OID epoch;
-            if ( !FieldParser::extract( cmdObj, epochField, &epoch, &errmsg ) ) {
-                return false;
-            }
-
-            return mergeChunks( txn, NamespaceString( ns ), minKey, maxKey, epoch, &errmsg );
-        }
-    };
-
-    BSONField<string> MergeChunksCommand::nsField( "mergeChunks" );
-    BSONField<vector<BSONObj> > MergeChunksCommand::boundsField( "bounds" );
-
-    BSONField<string> MergeChunksCommand::configField( "config" );
-    BSONField<string> MergeChunksCommand::shardNameField( "shardName" );
-    BSONField<OID> MergeChunksCommand::epochField( "epoch" );
-
-    MONGO_INITIALIZER(InitMergeChunksCommand)(InitializerContext* context) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new MergeChunksCommand();
         return Status::OK();
     }
+
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+        return parseNsFullyQualified(dbname, cmdObj);
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+    virtual bool slaveOk() const {
+        return false;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    // Required
+    static BSONField<string> nsField;
+    static BSONField<vector<BSONObj>> boundsField;
+    // Optional, if the merge is only valid for a particular epoch
+    static BSONField<OID> epochField;
+    // Optional, if our sharding state has not previously been initializeed
+    static BSONField<string> shardNameField;
+    static BSONField<string> configField;
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        string ns = parseNs(dbname, cmdObj);
+
+        if (ns.size() == 0) {
+            errmsg = "no namespace specified";
+            return false;
+        }
+
+        vector<BSONObj> bounds;
+        if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {
+            return false;
+        }
+
+        if (bounds.size() == 0) {
+            errmsg = "no bounds were specified";
+            return false;
+        }
+
+        if (bounds.size() != 2) {
+            errmsg = "only a min and max bound may be specified";
+            return false;
+        }
+
+        BSONObj minKey = bounds[0];
+        BSONObj maxKey = bounds[1];
+
+        if (minKey.isEmpty()) {
+            errmsg = "no min key specified";
+            return false;
+        }
+
+        if (maxKey.isEmpty()) {
+            errmsg = "no max key specified";
+            return false;
+        }
+
+        //
+        // This might be the first call from mongos, so we may need to pass the config and shard
+        // information to initialize the shardingState.
+        //
+
+        string config;
+        FieldParser::FieldState extracted =
+            FieldParser::extract(cmdObj, configField, &config, &errmsg);
+        if (!shardingState.enabled()) {
+            if (!extracted || extracted == FieldParser::FIELD_NONE) {
+                errmsg =
+                    "sharding state must be enabled or "
+                    "config server specified to merge chunks";
+                return false;
+            }
+
+            ShardingState::initialize(config);
+        }
+
+        // ShardName is optional, but might not be set yet
+        string shardName;
+        extracted = FieldParser::extract(cmdObj, shardNameField, &shardName, &errmsg);
+
+        if (!extracted)
+            return false;
+        if (extracted != FieldParser::FIELD_NONE) {
+            shardingState.gotShardName(shardName);
+        }
+
+        //
+        // Epoch is optional, and if not set indicates we should use the latest epoch
+        //
+
+        OID epoch;
+        if (!FieldParser::extract(cmdObj, epochField, &epoch, &errmsg)) {
+            return false;
+        }
+
+        return mergeChunks(txn, NamespaceString(ns), minKey, maxKey, epoch, &errmsg);
+    }
+};
+
+BSONField<string> MergeChunksCommand::nsField("mergeChunks");
+BSONField<vector<BSONObj>> MergeChunksCommand::boundsField("bounds");
+
+BSONField<string> MergeChunksCommand::configField("config");
+BSONField<string> MergeChunksCommand::shardNameField("shardName");
+BSONField<OID> MergeChunksCommand::epochField("epoch");
+
+MONGO_INITIALIZER(InitMergeChunksCommand)(InitializerContext* context) {
+    // Leaked intentionally: a Command registers itself when constructed.
+    new MergeChunksCommand();
+    return Status::OK();
+}
 }

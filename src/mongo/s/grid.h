@@ -35,82 +35,89 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class CatalogCache;
-    class CatalogManager;
-    class DBConfig;
-    class SettingsType;
-    class ShardRegistry;
-    template<typename T> class StatusWith;
+class BSONObj;
+class CatalogCache;
+class CatalogManager;
+class DBConfig;
+class SettingsType;
+class ShardRegistry;
+template <typename T>
+class StatusWith;
 
+
+/**
+ * Holds the global sharding context. Single instance exists for a running server. Exists on
+ * both MongoD and MongoS.
+ */
+class Grid {
+public:
+    Grid();
 
     /**
-     * Holds the global sharding context. Single instance exists for a running server. Exists on
-     * both MongoD and MongoS.
+     * Called at startup time so the global sharding services (catalog manager, shard registry)
+     * can be set. This method must be called once and once only for the lifetime of the
+     * service.
+     *
+     * NOTE: Unit-tests are allowed to call it more than once, provided they reset the object's
+     *       state using clearForUnitTests.
      */
-    class Grid {
-    public:
-        Grid();
+    void init(std::unique_ptr<CatalogManager> catalogManager,
+              std::unique_ptr<ShardRegistry> shardRegistry);
 
-        /**
-         * Called at startup time so the global sharding services (catalog manager, shard registry)
-         * can be set. This method must be called once and once only for the lifetime of the
-         * service.
-         *
-         * NOTE: Unit-tests are allowed to call it more than once, provided they reset the object's
-         *       state using clearForUnitTests.
-         */
-        void init(std::unique_ptr<CatalogManager> catalogManager,
-                  std::unique_ptr<ShardRegistry> shardRegistry);
+    /**
+     * Implicitly creates the specified database as non-sharded.
+     */
+    StatusWith<std::shared_ptr<DBConfig>> implicitCreateDb(const std::string& dbName);
 
-        /**
-         * Implicitly creates the specified database as non-sharded.
-         */
-        StatusWith<std::shared_ptr<DBConfig>> implicitCreateDb(const std::string& dbName);
+    /**
+     * @return true if shards and config servers are allowed to use 'localhost' in address
+     */
+    bool allowLocalHost() const;
 
-        /**
-         * @return true if shards and config servers are allowed to use 'localhost' in address
-         */
-        bool allowLocalHost() const;
+    /**
+     * @param whether to allow shards and config servers to use 'localhost' in address
+     */
+    void setAllowLocalHost(bool allow);
 
-        /**
-         * @param whether to allow shards and config servers to use 'localhost' in address
-         */
-        void setAllowLocalHost( bool allow );
+    /**
+     * Returns true if the balancer should be running. Caller is responsible
+     * for making sure settings has the balancer key.
+     */
+    bool shouldBalance(const SettingsType& balancerSettings) const;
 
-        /**
-         * Returns true if the balancer should be running. Caller is responsible
-         * for making sure settings has the balancer key.
-         */
-        bool shouldBalance(const SettingsType& balancerSettings) const;
+    /**
+     * Returns true if the config server settings indicate that the balancer should be active.
+     */
+    bool getConfigShouldBalance() const;
 
-        /**
-         * Returns true if the config server settings indicate that the balancer should be active.
-         */
-        bool getConfigShouldBalance() const;
+    CatalogManager* catalogManager() const {
+        return _catalogManager.get();
+    }
+    CatalogCache* catalogCache() const {
+        return _catalogCache.get();
+    }
+    ShardRegistry* shardRegistry() const {
+        return _shardRegistry.get();
+    }
 
-        CatalogManager* catalogManager() const { return _catalogManager.get(); }
-        CatalogCache* catalogCache() const { return _catalogCache.get(); }
-        ShardRegistry* shardRegistry() const { return _shardRegistry.get(); }
+    /**
+     * Clears the grid object so that it can be reused between test executions. This will not
+     * be necessary if grid is hanging off the global ServiceContext and each test gets its
+     * own service context.
+     *
+     * NOTE: Do not use this outside of unit-tests.
+     */
+    void clearForUnitTests();
 
-        /**
-         * Clears the grid object so that it can be reused between test executions. This will not
-         * be necessary if grid is hanging off the global ServiceContext and each test gets its
-         * own service context.
-         *
-         * NOTE: Do not use this outside of unit-tests.
-         */
-        void clearForUnitTests();
+private:
+    std::unique_ptr<CatalogManager> _catalogManager;
+    std::unique_ptr<CatalogCache> _catalogCache;
+    std::unique_ptr<ShardRegistry> _shardRegistry;
 
-    private:
-        std::unique_ptr<CatalogManager> _catalogManager;
-        std::unique_ptr<CatalogCache> _catalogCache;
-        std::unique_ptr<ShardRegistry> _shardRegistry;
+    // can 'localhost' be used in shard addresses?
+    bool _allowLocalShard;
+};
 
-        // can 'localhost' be used in shard addresses?
-        bool _allowLocalShard;
-    };
+extern Grid grid;
 
-    extern Grid grid;
-
-} // namespace mongo
+}  // namespace mongo

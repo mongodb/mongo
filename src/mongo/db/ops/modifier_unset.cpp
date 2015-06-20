@@ -37,149 +37,131 @@
 
 namespace mongo {
 
-    namespace str = mongoutils::str;
+namespace str = mongoutils::str;
 
-    struct ModifierUnset::PreparedState {
+struct ModifierUnset::PreparedState {
+    PreparedState(mutablebson::Document* targetDoc)
+        : doc(*targetDoc), idxFound(0), elemFound(doc.end()), noOp(false) {}
 
-        PreparedState(mutablebson::Document* targetDoc)
-            : doc(*targetDoc)
-            , idxFound(0)
-            , elemFound(doc.end())
-            , noOp(false) {
-        }
+    // Document that is going to be changed.
+    mutablebson::Document& doc;
 
-        // Document that is going to be changed.
-        mutablebson::Document& doc;
+    // Index in _fieldRef for which an Element exist in the document.
+    size_t idxFound;
 
-        // Index in _fieldRef for which an Element exist in the document.
-        size_t idxFound;
+    // Element corresponding to _fieldRef[0.._idxFound].
+    mutablebson::Element elemFound;
 
-        // Element corresponding to _fieldRef[0.._idxFound].
-        mutablebson::Element elemFound;
+    // This $set is a no-op?
+    bool noOp;
+};
 
-        // This $set is a no-op?
-        bool noOp;
+ModifierUnset::ModifierUnset() : _fieldRef(), _posDollar(0), _val() {}
 
-    };
+ModifierUnset::~ModifierUnset() {}
 
-    ModifierUnset::ModifierUnset()
-        : _fieldRef()
-        , _posDollar(0)
-        , _val() {
+Status ModifierUnset::init(const BSONElement& modExpr, const Options& opts, bool* positional) {
+    //
+    // field name analysis
+    //
+
+    // Perform standard field name and updateable checks.
+    _fieldRef.parse(modExpr.fieldName());
+    Status status = fieldchecker::isUpdatable(_fieldRef);
+    if (!status.isOK()) {
+        return status;
     }
 
-    ModifierUnset::~ModifierUnset() {
+    // If a $-positional operator was used, get the index in which it occurred
+    // and ensure only one occurrence.
+    size_t foundCount;
+    bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
+
+    if (positional)
+        *positional = foundDollar;
+
+    if (foundDollar && foundCount > 1) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                    << _fieldRef.dottedField() << "'");
     }
 
-    Status ModifierUnset::init(const BSONElement& modExpr, const Options& opts,
-                               bool* positional) {
 
-        //
-        // field name analysis
-        //
+    //
+    // value analysis
+    //
 
-        // Perform standard field name and updateable checks.
-        _fieldRef.parse(modExpr.fieldName());
-        Status status = fieldchecker::isUpdatable(_fieldRef);
-        if (! status.isOK()) {
-            return status;
-        }
+    // Unset takes any value, since there is no semantics attached to such value.
+    _val = modExpr;
 
-        // If a $-positional operator was used, get the index in which it occurred
-        // and ensure only one occurrence.
-        size_t foundCount;
-        bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
+    return Status::OK();
+}
 
-        if (positional)
-            *positional = foundDollar;
+Status ModifierUnset::prepare(mutablebson::Element root,
+                              StringData matchedField,
+                              ExecInfo* execInfo) {
+    _preparedState.reset(new PreparedState(&root.getDocument()));
 
-        if (foundDollar && foundCount > 1) {
+    // If we have a $-positional field, it is time to bind it to an actual field part.
+    if (_posDollar) {
+        if (matchedField.empty()) {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                        << _fieldRef.dottedField() << "'");
+                          str::stream() << "The positional operator did not find the match "
+                                           "needed from the query. Unexpanded update: "
+                                        << _fieldRef.dottedField());
         }
-
-
-        //
-        // value analysis
-        //
-
-        // Unset takes any value, since there is no semantics attached to such value.
-        _val = modExpr;
-
-        return Status::OK();
+        _fieldRef.setPart(_posDollar, matchedField);
     }
 
-    Status ModifierUnset::prepare(mutablebson::Element root,
-                                  StringData matchedField,
-                                  ExecInfo* execInfo) {
 
-        _preparedState.reset(new PreparedState(&root.getDocument()));
-
-        // If we have a $-positional field, it is time to bind it to an actual field part.
-        if (_posDollar) {
-            if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "The positional operator did not find the match "
-                                               "needed from the query. Unexpanded update: "
-                                            << _fieldRef.dottedField());
-            }
-            _fieldRef.setPart(_posDollar, matchedField);
-        }
-
-
-        // Locate the field name in 'root'. Note that if we don't have the full path in the
-        // doc, there isn't anything to unset, really.
-        Status status = pathsupport::findLongestPrefix(_fieldRef,
-                                                       root,
-                                                       &_preparedState->idxFound,
-                                                       &_preparedState->elemFound);
-        if (!status.isOK() ||
-            _preparedState->idxFound != (_fieldRef.numParts() -1)) {
-            execInfo->noOp = _preparedState->noOp = true;
-            execInfo->fieldRef[0] = &_fieldRef;
-
-            return Status::OK();
-        }
-
-        // If there is indeed something to unset, we register so, along with the interest in
-        // the field name. The driver needs this info to sort out if there is any conflict
-        // among mods.
+    // Locate the field name in 'root'. Note that if we don't have the full path in the
+    // doc, there isn't anything to unset, really.
+    Status status = pathsupport::findLongestPrefix(
+        _fieldRef, root, &_preparedState->idxFound, &_preparedState->elemFound);
+    if (!status.isOK() || _preparedState->idxFound != (_fieldRef.numParts() - 1)) {
+        execInfo->noOp = _preparedState->noOp = true;
         execInfo->fieldRef[0] = &_fieldRef;
 
-        // The only way for an $unset to be inplace is for its target field to be the last one
-        // of the object. That is, it is always the right child on its paths. The current
-        // rationale is that there should be no holes in a BSONObj and, to be in place, no
-        // field boundaries must change.
-        //
-        // TODO:
-        // mutablebson::Element curr = _preparedState->elemFound;
-        // while (curr.ok()) {
-        //     if (curr.rightSibling().ok()) {
-        //     }
-        //     curr = curr.parent();
-        // }
-
         return Status::OK();
     }
 
-    Status ModifierUnset::apply() const {
-        dassert(!_preparedState->noOp);
+    // If there is indeed something to unset, we register so, along with the interest in
+    // the field name. The driver needs this info to sort out if there is any conflict
+    // among mods.
+    execInfo->fieldRef[0] = &_fieldRef;
 
-        // Our semantics says that, if we're unseting an element of an array, we swap that
-        // value to null. The rationale is that we don't want other array elements to change
-        // indices. (That could be achieved with $pull-ing element from it.)
-        if (_preparedState->elemFound.parent().ok() &&
-            _preparedState->elemFound.parent().getType() == Array) {
-            return _preparedState->elemFound.setValueNull();
-        }
-        else {
-            return _preparedState->elemFound.remove();
-        }
+    // The only way for an $unset to be inplace is for its target field to be the last one
+    // of the object. That is, it is always the right child on its paths. The current
+    // rationale is that there should be no holes in a BSONObj and, to be in place, no
+    // field boundaries must change.
+    //
+    // TODO:
+    // mutablebson::Element curr = _preparedState->elemFound;
+    // while (curr.ok()) {
+    //     if (curr.rightSibling().ok()) {
+    //     }
+    //     curr = curr.parent();
+    // }
+
+    return Status::OK();
+}
+
+Status ModifierUnset::apply() const {
+    dassert(!_preparedState->noOp);
+
+    // Our semantics says that, if we're unseting an element of an array, we swap that
+    // value to null. The rationale is that we don't want other array elements to change
+    // indices. (That could be achieved with $pull-ing element from it.)
+    if (_preparedState->elemFound.parent().ok() &&
+        _preparedState->elemFound.parent().getType() == Array) {
+        return _preparedState->elemFound.setValueNull();
+    } else {
+        return _preparedState->elemFound.remove();
     }
+}
 
-    Status ModifierUnset::log(LogBuilder* logBuilder) const {
-        return logBuilder->addToUnsets(_fieldRef.dottedField());
-    }
+Status ModifierUnset::log(LogBuilder* logBuilder) const {
+    return logBuilder->addToUnsets(_fieldRef.dottedField());
+}
 
-} // namespace mongo
+}  // namespace mongo

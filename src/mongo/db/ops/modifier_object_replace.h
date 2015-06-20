@@ -37,62 +37,57 @@
 
 namespace mongo {
 
-    class LogBuilder;
+class LogBuilder;
 
-    class ModifierObjectReplace : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(ModifierObjectReplace);
+class ModifierObjectReplace : public ModifierInterface {
+    MONGO_DISALLOW_COPYING(ModifierObjectReplace);
 
-    public:
+public:
+    ModifierObjectReplace();
 
-        ModifierObjectReplace();
+    //
+    // Modifier interface implementation
+    //
 
-        //
-        // Modifier interface implementation
-        //
-
-        virtual ~ModifierObjectReplace();
+    virtual ~ModifierObjectReplace();
 
 
-        /**
-         * Returns true and takes the embedded object contained in 'modExpr' to be the object
-         * we're replacing for. The field name of 'modExpr' is ignored. If 'modExpr' is in an
-         * unexpected format or if it can't be parsed for some reason, returns an error status
-         * describing the error.
-         */
-        virtual Status init(const BSONElement& modExpr, const Options& opts,
-                            bool* positional = NULL);
+    /**
+     * Returns true and takes the embedded object contained in 'modExpr' to be the object
+     * we're replacing for. The field name of 'modExpr' is ignored. If 'modExpr' is in an
+     * unexpected format or if it can't be parsed for some reason, returns an error status
+     * describing the error.
+     */
+    virtual Status init(const BSONElement& modExpr, const Options& opts, bool* positional = NULL);
 
-        /**
-         * Registers the that 'root' is in the document that we want to fully replace.
-         * prepare() returns OK and always fills 'execInfo' with true for
-         * noOp.
-         */
-        virtual Status prepare(mutablebson::Element root,
-                               StringData matchedField,
-                               ExecInfo* execInfo);
+    /**
+     * Registers the that 'root' is in the document that we want to fully replace.
+     * prepare() returns OK and always fills 'execInfo' with true for
+     * noOp.
+     */
+    virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
-        /**
-         * Replaces the document passed in prepare() for the object passed in init().  Returns
-         * OK if successful or a status describing the error.
-         */
-        virtual Status apply() const;
+    /**
+     * Replaces the document passed in prepare() for the object passed in init().  Returns
+     * OK if successful or a status describing the error.
+     */
+    virtual Status apply() const;
 
-        /**
-         * Adds a log entry to logRoot corresponding to full object replacement. Returns OK if
-         * successful or a status describing the error.
-         */
-        virtual Status log(LogBuilder* logBuilder) const;
+    /**
+     * Adds a log entry to logRoot corresponding to full object replacement. Returns OK if
+     * successful or a status describing the error.
+     */
+    virtual Status log(LogBuilder* logBuilder) const;
 
-    private:
+private:
+    // Object to replace with.
+    BSONObj _val;
 
-        // Object to replace with.
-        BSONObj _val;
+    // The document whose value needs to be replaced. This state is valid after a prepare()
+    // was issued and until a log() is issued. The document this mod is being prepared
+    // against must e live throughout all the calls.
+    struct PreparedState;
+    std::unique_ptr<PreparedState> _preparedState;
+};
 
-        // The document whose value needs to be replaced. This state is valid after a prepare()
-        // was issued and until a log() is issued. The document this mod is being prepared
-        // against must e live throughout all the calls.
-        struct PreparedState;
-        std::unique_ptr<PreparedState> _preparedState;
-    };
-
-} // namespace mongo
+}  // namespace mongo

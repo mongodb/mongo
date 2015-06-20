@@ -31,11 +31,11 @@
 #include <string>
 
 namespace mongo {
-    
-    SaslServerConversation::~SaslServerConversation() {};
-    
-    std::string SaslServerConversation::getPrincipalId() {
-        return _user;
-    }
+
+SaslServerConversation::~SaslServerConversation(){};
+
+std::string SaslServerConversation::getPrincipalId() {
+    return _user;
+}
 
 }  // namespace mongo

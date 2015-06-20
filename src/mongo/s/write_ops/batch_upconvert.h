@@ -37,29 +37,28 @@
 
 namespace mongo {
 
-    //
-    // Utility functions for up-converting incoming write messages into batch write requests.
-    // NOTE: These functions throw on invalid message format.
-    //
+//
+// Utility functions for up-converting incoming write messages into batch write requests.
+// NOTE: These functions throw on invalid message format.
+//
 
-    void msgToBatchRequests( const Message& msg, std::vector<BatchedCommandRequest*>* requests );
+void msgToBatchRequests(const Message& msg, std::vector<BatchedCommandRequest*>* requests);
 
-    // Batch inserts may get mapped to multiple batch requests, to avoid spilling MaxBSONObjSize
-    void msgToBatchInserts( const Message& insertMsg,
-                            std::vector<BatchedCommandRequest*>* insertRequests );
+// Batch inserts may get mapped to multiple batch requests, to avoid spilling MaxBSONObjSize
+void msgToBatchInserts(const Message& insertMsg,
+                       std::vector<BatchedCommandRequest*>* insertRequests);
 
-    BatchedCommandRequest* msgToBatchUpdate( const Message& updateMsg );
+BatchedCommandRequest* msgToBatchUpdate(const Message& updateMsg);
 
-    BatchedCommandRequest* msgToBatchDelete( const Message& deleteMsg );
+BatchedCommandRequest* msgToBatchDelete(const Message& deleteMsg);
 
-    /**
-     * Utility function for recording completed batch writes into the LastError object.
-     * (Interpreting the response requires the request object as well.)
-     *
-     * Returns true if an error occurred in the batch.
-     */
-    bool batchErrorToLastError( const BatchedCommandRequest& request,
-                                const BatchedCommandResponse& response,
-                                LastError* error );
-
+/**
+ * Utility function for recording completed batch writes into the LastError object.
+ * (Interpreting the response requires the request object as well.)
+ *
+ * Returns true if an error occurred in the batch.
+ */
+bool batchErrorToLastError(const BatchedCommandRequest& request,
+                           const BatchedCommandResponse& response,
+                           LastError* error);
 }

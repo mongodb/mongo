@@ -40,56 +40,53 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 
 namespace mongo {
-    Status createCollection(OperationContext* txn,
-                            const std::string& dbName,
-                            const BSONObj& cmdObj) {
-        BSONObjIterator it(cmdObj);
+Status createCollection(OperationContext* txn, const std::string& dbName, const BSONObj& cmdObj) {
+    BSONObjIterator it(cmdObj);
 
-        // Extract ns from first cmdObj element.
-        BSONElement firstElt = it.next();
-        uassert(15888,
-                "must pass name of collection to create",
-                firstElt.valuestrsafe()[0] != '\0');
+    // Extract ns from first cmdObj element.
+    BSONElement firstElt = it.next();
+    uassert(15888, "must pass name of collection to create", firstElt.valuestrsafe()[0] != '\0');
 
-        Status status = userAllowedCreateNS(dbName, firstElt.valuestr());
+    Status status = userAllowedCreateNS(dbName, firstElt.valuestr());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    NamespaceString nss(dbName, firstElt.valuestrsafe());
+
+    // Build options object from remaining cmdObj elements.
+    BSONObjBuilder optionsBuilder;
+    while (it.more()) {
+        optionsBuilder.append(it.next());
+    }
+
+    BSONObj options = optionsBuilder.obj();
+    uassert(14832,
+            "specify size:<n> when capped is true",
+            !options["capped"].trueValue() || options["size"].isNumber() ||
+                options.hasField("$nExtents"));
+
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction transaction(txn, MODE_IX);
+        Lock::DBLock dbXLock(txn->lockState(), dbName, MODE_X);
+        OldClientContext ctx(txn, nss.ns());
+        if (txn->writesAreReplicated() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while creating collection " << nss.ns());
+        }
+
+        WriteUnitOfWork wunit(txn);
+
+        // Create collection.
+        status = userCreateNS(txn, ctx.db(), nss.ns(), options);
         if (!status.isOK()) {
             return status;
         }
 
-        NamespaceString nss(dbName, firstElt.valuestrsafe());
-
-        // Build options object from remaining cmdObj elements.
-        BSONObjBuilder optionsBuilder;
-        while (it.more()) {
-            optionsBuilder.append(it.next());
-        }
-
-        BSONObj options = optionsBuilder.obj();
-        uassert(14832,
-                "specify size:<n> when capped is true",
-                !options["capped"].trueValue() || options["size"].isNumber() ||
-                    options.hasField("$nExtents"));
-
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbXLock(txn->lockState(), dbName, MODE_X);
-            OldClientContext ctx(txn, nss.ns());
-            if (txn->writesAreReplicated() && 
-                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
-                return Status(ErrorCodes::NotMaster, str::stream() <<
-                              "Not primary while creating collection " << nss.ns());
-            }
-
-            WriteUnitOfWork wunit(txn);
-
-            // Create collection.
-            status = userCreateNS(txn, ctx.db(), nss.ns(), options);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            wunit.commit();
-        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "create", nss.ns());
-        return Status::OK();
+        wunit.commit();
     }
-} // namespace mongo
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "create", nss.ns());
+    return Status::OK();
+}
+}  // namespace mongo

@@ -39,257 +39,256 @@
 
 namespace {
 
-    using mongo::BSONObj;
-    using mongo::LogBuilder;
-    using mongo::ModifierCompare;
-    using mongo::ModifierInterface;
-    using mongo::Status;
-    using mongo::StringData;
-    using mongo::fromjson;
-    using mongo::mutablebson::ConstElement;
-    using mongo::mutablebson::Document;
-    using mongo::mutablebson::Element;
+using mongo::BSONObj;
+using mongo::LogBuilder;
+using mongo::ModifierCompare;
+using mongo::ModifierInterface;
+using mongo::Status;
+using mongo::StringData;
+using mongo::fromjson;
+using mongo::mutablebson::ConstElement;
+using mongo::mutablebson::Document;
+using mongo::mutablebson::Element;
 
-    const char kModNameMin[] = "$min";
-    const char kModNameMax[] = "$max";
+const char kModNameMin[] = "$min";
+const char kModNameMax[] = "$max";
 
-    /** Helper to build and manipulate a $min/max mod. */
-    class Mod {
-    public:
-        Mod() : _mod() {}
+/** Helper to build and manipulate a $min/max mod. */
+class Mod {
+public:
+    Mod() : _mod() {}
 
-        explicit Mod(BSONObj modObj)
-            : _modObj(modObj)
-            , _mod((modObj.firstElement().fieldNameStringData() == "$min") ?
-                                                                ModifierCompare::MIN :
-                                                                ModifierCompare::MAX) {
-            StringData modName = modObj.firstElement().fieldName();
-            ASSERT_OK(_mod.init(modObj[modName].embeddedObject().firstElement(),
-                                ModifierInterface::Options::normal()));
-        }
-
-        Status prepare(Element root,
-                       StringData matchedField,
-                       ModifierInterface::ExecInfo* execInfo) {
-            return _mod.prepare(root, matchedField, execInfo);
-        }
-
-        Status apply() const {
-            return _mod.apply();
-        }
-
-        Status log(LogBuilder* logBuilder) const {
-            return _mod.log(logBuilder);
-        }
-
-        ModifierCompare& mod() { return _mod; }
-
-    private:
-        BSONObj _modObj;
-        ModifierCompare _mod;
-    };
-
-    TEST(Init, ValidValues) {
-        BSONObj modObj;
-        ModifierCompare mod;
-
-        modObj = fromjson("{ $min : { a : 2 } }");
-        ASSERT_OK(mod.init(modObj[kModNameMin].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
-
-        modObj = fromjson("{ $max : { a : 1 } }");
-        ASSERT_OK(mod.init(modObj[kModNameMax].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
-
-        modObj = fromjson("{ $min : { a : {$date : 0 } } }");
-        ASSERT_OK(mod.init(modObj[kModNameMin].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
+    explicit Mod(BSONObj modObj)
+        : _modObj(modObj),
+          _mod((modObj.firstElement().fieldNameStringData() == "$min") ? ModifierCompare::MIN
+                                                                       : ModifierCompare::MAX) {
+        StringData modName = modObj.firstElement().fieldName();
+        ASSERT_OK(_mod.init(modObj[modName].embeddedObject().firstElement(),
+                            ModifierInterface::Options::normal()));
     }
 
-    TEST(ExistingNumber, MaxSameNumber) {
-        Document doc(fromjson("{a: 1 }"));
-        Mod mod(fromjson("{$max: {a: 1} }"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
+    Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
+        return _mod.prepare(root, matchedField, execInfo);
     }
 
-    TEST(ExistingNumber, MinSameNumber) {
-        Document doc(fromjson("{a: 1 }"));
-        Mod mod(fromjson("{$min: {a: 1} }"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
+    Status apply() const {
+        return _mod.apply();
     }
 
-    TEST(ExistingNumber, MaxNumberIsLess) {
-        Document doc(fromjson("{a: 1 }"));
-        Mod mod(fromjson("{$max: {a: 0} }"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
+    Status log(LogBuilder* logBuilder) const {
+        return _mod.log(logBuilder);
     }
 
-    TEST(ExistingNumber, MinNumberIsMore) {
-        Document doc(fromjson("{a: 1 }"));
-        Mod mod(fromjson("{$min: {a: 2} }"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
+    ModifierCompare& mod() {
+        return _mod;
     }
 
-    TEST(ExistingDouble, MaxSameValInt) {
-        Document doc(fromjson("{a: 1.0 }"));
-        Mod mod(BSON("$max" << BSON("a" << 1LL)));
+private:
+    BSONObj _modObj;
+    ModifierCompare _mod;
+};
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
-    }
+TEST(Init, ValidValues) {
+    BSONObj modObj;
+    ModifierCompare mod;
 
-    TEST(ExistingDoubleZero, MaxSameValIntZero) {
-        Document doc(fromjson("{a: 0.0 }"));
-        Mod mod(BSON("$max" << BSON("a" << 0LL)));
+    modObj = fromjson("{ $min : { a : 2 } }");
+    ASSERT_OK(mod.init(modObj[kModNameMin].embeddedObject().firstElement(),
+                       ModifierInterface::Options::normal()));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
-    }
+    modObj = fromjson("{ $max : { a : 1 } }");
+    ASSERT_OK(mod.init(modObj[kModNameMax].embeddedObject().firstElement(),
+                       ModifierInterface::Options::normal()));
 
-    TEST(ExistingDoubleZero, MinSameValIntZero) {
-        Document doc(fromjson("{a: 0.0 }"));
-        Mod mod(BSON("$min" << BSON("a" << 0LL)));
+    modObj = fromjson("{ $min : { a : {$date : 0 } } }");
+    ASSERT_OK(mod.init(modObj[kModNameMin].embeddedObject().firstElement(),
+                       ModifierInterface::Options::normal()));
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
-    }
+TEST(ExistingNumber, MaxSameNumber) {
+    Document doc(fromjson("{a: 1 }"));
+    Mod mod(fromjson("{$max: {a: 1} }"));
 
-    TEST(MissingField, MinNumber) {
-        Document doc(fromjson("{}"));
-        Mod mod(fromjson("{$min: {a: 0} }"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
+TEST(ExistingNumber, MinSameNumber) {
+    Document doc(fromjson("{a: 1 }"));
+    Mod mod(fromjson("{$min: {a: 1} }"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(fromjson("{a : 0}"), doc);
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{ $set : { a : 0 } }"), logDoc);
-    }
+TEST(ExistingNumber, MaxNumberIsLess) {
+    Document doc(fromjson("{a: 1 }"));
+    Mod mod(fromjson("{$max: {a: 0} }"));
 
-    TEST(ExistingNumber, MinNumber) {
-        Document doc(fromjson("{a: 1 }"));
-        Mod mod(fromjson("{$min: {a: 0} }"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
+TEST(ExistingNumber, MinNumberIsMore) {
+    Document doc(fromjson("{a: 1 }"));
+    Mod mod(fromjson("{$min: {a: 2} }"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(fromjson("{a : 0}"), doc);
-        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{ $set : { a : 0 } }"), logDoc);
-    }
+TEST(ExistingDouble, MaxSameValInt) {
+    Document doc(fromjson("{a: 1.0 }"));
+    Mod mod(BSON("$max" << BSON("a" << 1LL)));
 
-    TEST(MissingField, MaxNumber) {
-        Document doc(fromjson("{}"));
-        Mod mod(fromjson("{$max: {a: 0} }"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
+TEST(ExistingDoubleZero, MaxSameValIntZero) {
+    Document doc(fromjson("{a: 0.0 }"));
+    Mod mod(BSON("$max" << BSON("a" << 0LL)));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(fromjson("{a : 0}"), doc);
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{ $set : { a : 0 } }"), logDoc);
-    }
+TEST(ExistingDoubleZero, MinSameValIntZero) {
+    Document doc(fromjson("{a: 0.0 }"));
+    Mod mod(BSON("$min" << BSON("a" << 0LL)));
 
-    TEST(ExistingNumber, MaxNumber) {
-        Document doc(fromjson("{a: 1 }"));
-        Mod mod(fromjson("{$max: {a: 2} }"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
+TEST(MissingField, MinNumber) {
+    Document doc(fromjson("{}"));
+    Mod mod(fromjson("{$min: {a: 0} }"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(fromjson("{a : 2}"), doc);
-        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{ $set : { a : 2 } }"), logDoc);
-    }
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(fromjson("{a : 0}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    TEST(ExistingDate, MaxDate) {
-        Document doc(fromjson("{a: {$date: 0} }"));
-        Mod mod(fromjson("{$max: {a: {$date: 123123123}} }"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : 0 } }"), logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
+TEST(ExistingNumber, MinNumber) {
+    Document doc(fromjson("{a: 1 }"));
+    Mod mod(fromjson("{$min: {a: 0} }"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(fromjson("{a: {$date: 123123123}}"), doc);
-        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{$set: {a: {$date: 123123123}} }"), logDoc);
-    }
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(fromjson("{a : 0}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    TEST(ExistingEmbeddedDoc, MaxDoc) {
-        Document doc(fromjson("{a: {b: 2}}"));
-        Mod mod(fromjson("{$max: {a: {b: 3}}}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : 0 } }"), logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
+TEST(MissingField, MaxNumber) {
+    Document doc(fromjson("{}"));
+    Mod mod(fromjson("{$max: {a: 0} }"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(fromjson("{a: {b: 3}}}"), doc);
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{$set: {a: {b: 3}} }"), logDoc);
-    }
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(fromjson("{a : 0}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    TEST(ExistingEmbeddedDoc, MaxNumber) {
-        Document doc(fromjson("{a: {b: 2}}"));
-        Mod mod(fromjson("{$max: {a: 3}}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : 0 } }"), logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
-        ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
-    }
+TEST(ExistingNumber, MaxNumber) {
+    Document doc(fromjson("{a: 1 }"));
+    Mod mod(fromjson("{$max: {a: 2} }"));
 
-} // namespace
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
+
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(fromjson("{a : 2}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : 2 } }"), logDoc);
+}
+
+TEST(ExistingDate, MaxDate) {
+    Document doc(fromjson("{a: {$date: 0} }"));
+    Mod mod(fromjson("{$max: {a: {$date: 123123123}} }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
+
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(fromjson("{a: {$date: 123123123}}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{$set: {a: {$date: 123123123}} }"), logDoc);
+}
+
+TEST(ExistingEmbeddedDoc, MaxDoc) {
+    Document doc(fromjson("{a: {b: 2}}"));
+    Mod mod(fromjson("{$max: {a: {b: 3}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
+
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(fromjson("{a: {b: 3}}}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{$set: {a: {b: 3}} }"), logDoc);
+}
+
+TEST(ExistingEmbeddedDoc, MaxNumber) {
+    Document doc(fromjson("{a: {b: 2}}"));
+    Mod mod(fromjson("{$max: {a: 3}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+    ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
+}
+
+}  // namespace

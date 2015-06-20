@@ -38,74 +38,73 @@
 
 namespace mongo {
 
-    class BSONObjBuilder;
-    class CollectionCatalogEntry;
-    class IndexAccessMethod;
-    class IndexCatalogEntry;
-    class OperationContext;
-    class RecordStore;
+class BSONObjBuilder;
+class CollectionCatalogEntry;
+class IndexAccessMethod;
+class IndexCatalogEntry;
+class OperationContext;
+class RecordStore;
 
-    struct CollectionOptions;
+struct CollectionOptions;
 
-    class DatabaseCatalogEntry {
-    public:
-        DatabaseCatalogEntry( StringData name )
-            : _name( name.toString() ) {
-        }
+class DatabaseCatalogEntry {
+public:
+    DatabaseCatalogEntry(StringData name) : _name(name.toString()) {}
 
-        virtual ~DatabaseCatalogEntry(){ }
+    virtual ~DatabaseCatalogEntry() {}
 
-        const std::string& name() const { return _name; }
+    const std::string& name() const {
+        return _name;
+    }
 
-        virtual bool exists() const = 0;
-        virtual bool isEmpty() const = 0;
-        virtual bool hasUserData() const = 0;
+    virtual bool exists() const = 0;
+    virtual bool isEmpty() const = 0;
+    virtual bool hasUserData() const = 0;
 
-        virtual int64_t sizeOnDisk( OperationContext* opCtx ) const = 0;
+    virtual int64_t sizeOnDisk(OperationContext* opCtx) const = 0;
 
-        virtual void appendExtraStats( OperationContext* opCtx,
-                                       BSONObjBuilder* out,
-                                       double scale ) const = 0;
+    virtual void appendExtraStats(OperationContext* opCtx,
+                                  BSONObjBuilder* out,
+                                  double scale) const = 0;
 
-        // these are hacks :(
-        virtual bool isOlderThan24( OperationContext* opCtx ) const = 0;
-        virtual void markIndexSafe24AndUp( OperationContext* opCtx ) = 0;
+    // these are hacks :(
+    virtual bool isOlderThan24(OperationContext* opCtx) const = 0;
+    virtual void markIndexSafe24AndUp(OperationContext* opCtx) = 0;
 
-        /**
-         * @return true if current files on disk are compatibile with the current version.
-         *              if we return false, then an upgrade will be required
-         */
-        virtual bool currentFilesCompatible( OperationContext* opCtx ) const = 0;
+    /**
+     * @return true if current files on disk are compatibile with the current version.
+     *              if we return false, then an upgrade will be required
+     */
+    virtual bool currentFilesCompatible(OperationContext* opCtx) const = 0;
 
-        // ----
+    // ----
 
-        virtual void getCollectionNamespaces( std::list<std::string>* out ) const = 0;
+    virtual void getCollectionNamespaces(std::list<std::string>* out) const = 0;
 
-        // The DatabaseCatalogEntry owns this, do not delete
-        virtual CollectionCatalogEntry* getCollectionCatalogEntry( StringData ns ) const = 0;
+    // The DatabaseCatalogEntry owns this, do not delete
+    virtual CollectionCatalogEntry* getCollectionCatalogEntry(StringData ns) const = 0;
 
-        // The DatabaseCatalogEntry owns this, do not delete
-        virtual RecordStore* getRecordStore( StringData ns ) const = 0;
+    // The DatabaseCatalogEntry owns this, do not delete
+    virtual RecordStore* getRecordStore(StringData ns) const = 0;
 
-        // Ownership passes to caller
-        virtual IndexAccessMethod* getIndex( OperationContext* txn,
-                                             const CollectionCatalogEntry* collection,
-                                             IndexCatalogEntry* index ) = 0;
+    // Ownership passes to caller
+    virtual IndexAccessMethod* getIndex(OperationContext* txn,
+                                        const CollectionCatalogEntry* collection,
+                                        IndexCatalogEntry* index) = 0;
 
-        virtual Status createCollection( OperationContext* txn,
-                                         StringData ns,
-                                         const CollectionOptions& options,
-                                         bool allocateDefaultSpace ) = 0;
+    virtual Status createCollection(OperationContext* txn,
+                                    StringData ns,
+                                    const CollectionOptions& options,
+                                    bool allocateDefaultSpace) = 0;
 
-        virtual Status renameCollection( OperationContext* txn,
-                                         StringData fromNS,
-                                         StringData toNS,
-                                         bool stayTemp ) = 0;
+    virtual Status renameCollection(OperationContext* txn,
+                                    StringData fromNS,
+                                    StringData toNS,
+                                    bool stayTemp) = 0;
 
-        virtual Status dropCollection( OperationContext* opCtx,
-                                       StringData ns ) = 0;
+    virtual Status dropCollection(OperationContext* opCtx, StringData ns) = 0;
 
-    private:
-        std::string _name;
-    };
+private:
+    std::string _name;
+};
 }

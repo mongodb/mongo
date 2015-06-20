@@ -37,36 +37,35 @@
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
+/**
+ * Class for storing FailPoint instances.
+ */
+class FailPointRegistry {
+public:
+    FailPointRegistry();
+
     /**
-     * Class for storing FailPoint instances.
+     * Adds a new fail point to this registry. Duplicate names are not allowed.
+     *
+     * @return the status code under these circumstances:
+     *     OK - if successful.
+     *     DuplicateKey - if the given name already exists in this registry.
+     *     CannotMutateObject - if this registry is already frozen.
      */
-    class FailPointRegistry {
-    public:
-        FailPointRegistry();
+    Status addFailPoint(const std::string& name, FailPoint* failPoint);
 
-        /**
-         * Adds a new fail point to this registry. Duplicate names are not allowed.
-         *
-         * @return the status code under these circumstances:
-         *     OK - if successful.
-         *     DuplicateKey - if the given name already exists in this registry.
-         *     CannotMutateObject - if this registry is already frozen.
-         */
-        Status addFailPoint(const std::string& name, FailPoint* failPoint);
+    /**
+     * @return the fail point object registered. Returns NULL if it was not registered.
+     */
+    FailPoint* getFailPoint(const std::string& name) const;
 
-        /**
-         * @return the fail point object registered. Returns NULL if it was not registered.
-         */
-        FailPoint* getFailPoint(const std::string& name) const;
+    /**
+     * Freezes this registry from being modified.
+     */
+    void freeze();
 
-        /**
-         * Freezes this registry from being modified.
-         */
-        void freeze();
-
-    private:
-        bool _frozen;
-        unordered_map<std::string, FailPoint*> _fpMap;
-    };
+private:
+    bool _frozen;
+    unordered_map<std::string, FailPoint*> _fpMap;
+};
 }
-

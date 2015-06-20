@@ -44,121 +44,130 @@
 namespace mongo {
 namespace {
 
-    using std::unique_ptr;
-    using std::string;
-    using std::stringstream;
+using std::unique_ptr;
+using std::string;
+using std::stringstream;
 
-    /**
-     * Implements the MongoD side of the count command.
-     */
-    class CmdCount : public Command {
-    public:
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        CmdCount() : Command("count") { }
-        virtual bool slaveOk() const {
-            // ok on --slave setups
-            return repl::getGlobalReplicationCoordinator()->getSettings().slave == repl::SimpleSlave;
-        }
-        virtual bool slaveOverrideOk() const { return true; }
-        virtual bool maintenanceOk() const { return false; }
-        virtual bool adminOnly() const { return false; }
-        virtual void help( stringstream& help ) const { help << "count objects in collection"; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-        }
+/**
+ * Implements the MongoD side of the count command.
+ */
+class CmdCount : public Command {
+public:
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    CmdCount() : Command("count") {}
+    virtual bool slaveOk() const {
+        // ok on --slave setups
+        return repl::getGlobalReplicationCoordinator()->getSettings().slave == repl::SimpleSlave;
+    }
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
+    virtual bool maintenanceOk() const {
+        return false;
+    }
+    virtual bool adminOnly() const {
+        return false;
+    }
+    virtual void help(stringstream& help) const {
+        help << "count objects in collection";
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::find);
+        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
 
-        virtual Status explain(OperationContext* txn,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               ExplainCommon::Verbosity verbosity,
-                               BSONObjBuilder* out) const {
-
-            auto request = CountRequest::parseFromBSON(dbname, cmdObj);
-            if (!request.isOK()) {
-                return request.getStatus();
-            }
-
-            // Acquire the db read lock.
-            AutoGetCollectionForRead ctx(txn, request.getValue().getNs());
-            Collection* collection = ctx.getCollection();
-
-            // Prevent chunks from being cleaned up during yields - this allows us to only check the
-            // version on initial entry into count.
-            RangePreserver preserver(collection);
-
-            PlanExecutor* rawExec;
-            Status getExecStatus = getExecutorCount(txn,
-                                                    collection,
-                                                    request.getValue(),
-                                                    true,   // explain
-                                                    PlanExecutor::YIELD_AUTO,
-                                                    &rawExec);
-            if (!getExecStatus.isOK()) {
-                return getExecStatus;
-            }
-
-            unique_ptr<PlanExecutor> exec(rawExec);
-
-            Explain::explainStages(exec.get(), verbosity, out);
-            return Status::OK();
+    virtual Status explain(OperationContext* txn,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           ExplainCommon::Verbosity verbosity,
+                           BSONObjBuilder* out) const {
+        auto request = CountRequest::parseFromBSON(dbname, cmdObj);
+        if (!request.isOK()) {
+            return request.getStatus();
         }
 
-        virtual bool run(OperationContext* txn,
-                         const string& dbname,
-                         BSONObj& cmdObj,
-                         int, string& errmsg,
-                         BSONObjBuilder& result) {
+        // Acquire the db read lock.
+        AutoGetCollectionForRead ctx(txn, request.getValue().getNs());
+        Collection* collection = ctx.getCollection();
 
-            auto request = CountRequest::parseFromBSON(dbname, cmdObj);
-            if (!request.isOK()) {
-                return appendCommandStatus(result, request.getStatus());
-            }
+        // Prevent chunks from being cleaned up during yields - this allows us to only check the
+        // version on initial entry into count.
+        RangePreserver preserver(collection);
 
-            AutoGetCollectionForRead ctx(txn, request.getValue().getNs());
-            Collection* collection = ctx.getCollection();
-
-            // Prevent chunks from being cleaned up during yields - this allows us to only check the
-            // version on initial entry into count.
-            RangePreserver preserver(collection);
-
-            PlanExecutor* rawExec;
-            Status getExecStatus = getExecutorCount(txn,
-                                                    collection,
-                                                    request.getValue(),
-                                                    false,  // !explain
-                                                    PlanExecutor::YIELD_AUTO,
-                                                    &rawExec);
-            if (!getExecStatus.isOK()) {
-                return appendCommandStatus(result, getExecStatus);
-            }
-
-            unique_ptr<PlanExecutor> exec(rawExec);
-
-            // Store the plan summary string in CurOp.
-            if (NULL != CurOp::get(txn)) {
-                CurOp::get(txn)->debug().planSummary = Explain::getPlanSummary(exec.get());
-            }
-
-            Status execPlanStatus = exec->executePlan();
-            if (!execPlanStatus.isOK()) {
-                return appendCommandStatus(result, execPlanStatus);
-            }
-
-            // Plan is done executing. We just need to pull the count out of the root stage.
-            invariant(STAGE_COUNT == exec->getRootStage()->stageType());
-            CountStage* countStage = static_cast<CountStage*>(exec->getRootStage());
-            const CountStats* countStats =
-                static_cast<const CountStats*>(countStage->getSpecificStats());
-
-            result.appendNumber("n", countStats->nCounted);
-            return true;
+        PlanExecutor* rawExec;
+        Status getExecStatus = getExecutorCount(txn,
+                                                collection,
+                                                request.getValue(),
+                                                true,  // explain
+                                                PlanExecutor::YIELD_AUTO,
+                                                &rawExec);
+        if (!getExecStatus.isOK()) {
+            return getExecStatus;
         }
 
-    } cmdCount;
+        unique_ptr<PlanExecutor> exec(rawExec);
 
-} // namespace
-} // namespace mongo
+        Explain::explainStages(exec.get(), verbosity, out);
+        return Status::OK();
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const string& dbname,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
+        auto request = CountRequest::parseFromBSON(dbname, cmdObj);
+        if (!request.isOK()) {
+            return appendCommandStatus(result, request.getStatus());
+        }
+
+        AutoGetCollectionForRead ctx(txn, request.getValue().getNs());
+        Collection* collection = ctx.getCollection();
+
+        // Prevent chunks from being cleaned up during yields - this allows us to only check the
+        // version on initial entry into count.
+        RangePreserver preserver(collection);
+
+        PlanExecutor* rawExec;
+        Status getExecStatus = getExecutorCount(txn,
+                                                collection,
+                                                request.getValue(),
+                                                false,  // !explain
+                                                PlanExecutor::YIELD_AUTO,
+                                                &rawExec);
+        if (!getExecStatus.isOK()) {
+            return appendCommandStatus(result, getExecStatus);
+        }
+
+        unique_ptr<PlanExecutor> exec(rawExec);
+
+        // Store the plan summary string in CurOp.
+        if (NULL != CurOp::get(txn)) {
+            CurOp::get(txn)->debug().planSummary = Explain::getPlanSummary(exec.get());
+        }
+
+        Status execPlanStatus = exec->executePlan();
+        if (!execPlanStatus.isOK()) {
+            return appendCommandStatus(result, execPlanStatus);
+        }
+
+        // Plan is done executing. We just need to pull the count out of the root stage.
+        invariant(STAGE_COUNT == exec->getRootStage()->stageType());
+        CountStage* countStage = static_cast<CountStage*>(exec->getRootStage());
+        const CountStats* countStats =
+            static_cast<const CountStats*>(countStage->getSpecificStats());
+
+        result.appendNumber("n", countStats->nCounted);
+        return true;
+    }
+
+} cmdCount;
+
+}  // namespace
+}  // namespace mongo

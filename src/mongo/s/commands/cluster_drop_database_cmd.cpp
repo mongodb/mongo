@@ -40,85 +40,83 @@
 
 namespace mongo {
 
-    using std::shared_ptr;
+using std::shared_ptr;
 
 namespace {
 
-    class DropDatabaseCmd : public Command {
-    public:
-        DropDatabaseCmd() : Command("dropDatabase") { }
+class DropDatabaseCmd : public Command {
+public:
+    DropDatabaseCmd() : Command("dropDatabase") {}
 
-        virtual bool slaveOk() const {
-            return true;
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual bool adminOnly() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::dropDatabase);
+        out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        // Disallow dropping the config database from mongos
+        if (dbname == "config") {
+            return appendCommandStatus(
+                result, Status(ErrorCodes::IllegalOperation, "Cannot drop the config database"));
         }
 
-        virtual bool adminOnly() const {
+        BSONElement e = cmdObj.firstElement();
+
+        if (!e.isNumber() || e.number() != 1) {
+            errmsg = "invalid params";
+            return 0;
+        }
+
+        // Refresh the database metadata
+        grid.catalogCache()->invalidate(dbname);
+
+        auto status = grid.catalogCache()->getDatabase(dbname);
+        if (!status.isOK()) {
+            if (status == ErrorCodes::DatabaseNotFound) {
+                result.append("info", "database does not exist");
+                return true;
+            }
+
+            return appendCommandStatus(result, status.getStatus());
+        }
+
+        log() << "DROP DATABASE: " << dbname;
+
+        shared_ptr<DBConfig> conf = status.getValue();
+
+        // TODO: Make dropping logic saner and more tolerant of partial drops.  This is
+        // particularly important since a database drop can be aborted by *any* collection
+        // with a distributed namespace lock taken (migrates/splits)
+
+        if (!conf->dropDatabase(errmsg)) {
             return false;
         }
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
-        }
+        result.append("dropped", dbname);
+        return true;
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+} clusterDropDatabaseCmd;
 
-            ActionSet actions;
-            actions.addAction(ActionType::dropDatabase);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-        }
-
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
-
-            // Disallow dropping the config database from mongos
-            if (dbname == "config") {
-                return appendCommandStatus(result, Status(ErrorCodes::IllegalOperation,
-                                                          "Cannot drop the config database"));
-            }
-
-            BSONElement e = cmdObj.firstElement();
-
-            if (!e.isNumber() || e.number() != 1) {
-                errmsg = "invalid params";
-                return 0;
-            }
-
-            // Refresh the database metadata
-            grid.catalogCache()->invalidate(dbname);
-
-            auto status = grid.catalogCache()->getDatabase(dbname);
-            if (!status.isOK()) {
-                if (status == ErrorCodes::DatabaseNotFound) {
-                    result.append("info", "database does not exist");
-                    return true;
-                }
-
-                return appendCommandStatus(result, status.getStatus());
-            }
-
-            log() << "DROP DATABASE: " << dbname;
-
-            shared_ptr<DBConfig> conf = status.getValue();
-
-            // TODO: Make dropping logic saner and more tolerant of partial drops.  This is
-            // particularly important since a database drop can be aborted by *any* collection
-            // with a distributed namespace lock taken (migrates/splits)
-
-            if (!conf->dropDatabase(errmsg)) {
-                return false;
-            }
-
-            result.append("dropped", dbname);
-            return true;
-        }
-
-    } clusterDropDatabaseCmd;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

@@ -36,185 +36,180 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::vector;
+using std::unique_ptr;
+using std::vector;
 
-    // static
-    const char* CountStage::kStageType = "COUNT";
+// static
+const char* CountStage::kStageType = "COUNT";
 
-    CountStage::CountStage(OperationContext* txn,
-                           Collection* collection,
-                           const CountRequest& request,
-                           WorkingSet* ws,
-                           PlanStage* child)
-        : _txn(txn),
-          _collection(collection),
-          _request(request),
-          _leftToSkip(request.getSkip()),
-          _ws(ws),
-          _child(child),
-          _commonStats(kStageType) { }
+CountStage::CountStage(OperationContext* txn,
+                       Collection* collection,
+                       const CountRequest& request,
+                       WorkingSet* ws,
+                       PlanStage* child)
+    : _txn(txn),
+      _collection(collection),
+      _request(request),
+      _leftToSkip(request.getSkip()),
+      _ws(ws),
+      _child(child),
+      _commonStats(kStageType) {}
 
-    CountStage::~CountStage() { }
+CountStage::~CountStage() {}
 
-    bool CountStage::isEOF() {
-        if (_specificStats.trivialCount) {
-            return true;
-        }
-
-        if (_request.getLimit() > 0 && _specificStats.nCounted >= _request.getLimit()) {
-            return true;
-        }
-
-        return NULL != _child.get() && _child->isEOF();
+bool CountStage::isEOF() {
+    if (_specificStats.trivialCount) {
+        return true;
     }
 
-    void CountStage::trivialCount() {
-        invariant(_collection);
-        long long nCounted = _collection->numRecords(_txn);
-
-        if (0 != _request.getSkip()) {
-            nCounted -= _request.getSkip();
-            if (nCounted < 0) {
-                nCounted = 0;
-            }
-        }
-
-        long long limit = _request.getLimit();
-        if (limit < 0) {
-            limit = -limit;
-        }
-
-        if (limit < nCounted && 0 != limit) {
-            nCounted = limit;
-        }
-
-        _specificStats.nCounted = nCounted;
-        _specificStats.nSkipped = _request.getSkip();
-        _specificStats.trivialCount = true;
+    if (_request.getLimit() > 0 && _specificStats.nCounted >= _request.getLimit()) {
+        return true;
     }
 
-    PlanStage::StageState CountStage::work(WorkingSetID* out) {
-        ++_commonStats.works;
+    return NULL != _child.get() && _child->isEOF();
+}
 
-        // Adds the amount of time taken by work() to executionTimeMillis.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
+void CountStage::trivialCount() {
+    invariant(_collection);
+    long long nCounted = _collection->numRecords(_txn);
 
-        // This stage never returns a working set member.
-        *out = WorkingSet::INVALID_ID;
-
-        // If we don't have a query and we have a non-NULL collection, then we can execute this
-        // as a trivial count (just ask the collection for how many records it has).
-        if (_request.getQuery().isEmpty() && NULL != _collection) {
-            trivialCount();
-            return PlanStage::IS_EOF;
-        }
-
-        if (isEOF()) {
-            _commonStats.isEOF = true;
-            return PlanStage::IS_EOF;
-        }
-
-        // For non-trivial counts, we should always have a child stage from which we can retrieve
-        // results.
-        invariant(_child.get());
-        WorkingSetID id = WorkingSet::INVALID_ID;
-        PlanStage::StageState state = _child->work(&id);
-
-        if (PlanStage::IS_EOF == state) {
-            _commonStats.isEOF = true;
-            return PlanStage::IS_EOF;
-        }
-        else if (PlanStage::DEAD == state) {
-            return state;
-        }
-        else if (PlanStage::FAILURE == state || PlanStage::DEAD == state) {
-            *out = id;
-            // If a stage fails, it may create a status WSM to indicate why it failed, in which
-            // case 'id' is valid. If ID is invalid, we create our own error message.
-            if (WorkingSet::INVALID_ID == id) {
-                const std::string errmsg = "count stage failed to read result from child";
-                Status status = Status(ErrorCodes::InternalError, errmsg);
-                *out = WorkingSetCommon::allocateStatusMember(_ws, status);
-            }
-            return state;
-        }
-        else if (PlanStage::ADVANCED == state) {
-            // We got a result. If we're still skipping, then decrement the number left to skip.
-            // Otherwise increment the count until we hit the limit.
-            if (_leftToSkip > 0) {
-                _leftToSkip--;
-                _specificStats.nSkipped++;
-            }
-            else {
-                _specificStats.nCounted++;
-            }
-
-            // Count doesn't need the actual results, so we just discard any valid working
-            // set members that got returned from the child.
-            if (WorkingSet::INVALID_ID != id) {
-                _ws->free(id);
-            }
-        }
-        else if (PlanStage::NEED_YIELD == state) {
-            *out = id;
-            _commonStats.needYield++;
-            return PlanStage::NEED_YIELD;
-        }
-
-        _commonStats.needTime++;
-        return PlanStage::NEED_TIME;
-    }
-
-    void CountStage::saveState() {
-        _txn = NULL;
-        ++_commonStats.yields;
-        if (_child.get()) {
-            _child->saveState();
+    if (0 != _request.getSkip()) {
+        nCounted -= _request.getSkip();
+        if (nCounted < 0) {
+            nCounted = 0;
         }
     }
 
-    void CountStage::restoreState(OperationContext* opCtx) {
-        invariant(_txn == NULL);
-        _txn = opCtx;
-        ++_commonStats.unyields;
-        if (_child.get()) {
-            _child->restoreState(opCtx);
+    long long limit = _request.getLimit();
+    if (limit < 0) {
+        limit = -limit;
+    }
+
+    if (limit < nCounted && 0 != limit) {
+        nCounted = limit;
+    }
+
+    _specificStats.nCounted = nCounted;
+    _specificStats.nSkipped = _request.getSkip();
+    _specificStats.trivialCount = true;
+}
+
+PlanStage::StageState CountStage::work(WorkingSetID* out) {
+    ++_commonStats.works;
+
+    // Adds the amount of time taken by work() to executionTimeMillis.
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
+
+    // This stage never returns a working set member.
+    *out = WorkingSet::INVALID_ID;
+
+    // If we don't have a query and we have a non-NULL collection, then we can execute this
+    // as a trivial count (just ask the collection for how many records it has).
+    if (_request.getQuery().isEmpty() && NULL != _collection) {
+        trivialCount();
+        return PlanStage::IS_EOF;
+    }
+
+    if (isEOF()) {
+        _commonStats.isEOF = true;
+        return PlanStage::IS_EOF;
+    }
+
+    // For non-trivial counts, we should always have a child stage from which we can retrieve
+    // results.
+    invariant(_child.get());
+    WorkingSetID id = WorkingSet::INVALID_ID;
+    PlanStage::StageState state = _child->work(&id);
+
+    if (PlanStage::IS_EOF == state) {
+        _commonStats.isEOF = true;
+        return PlanStage::IS_EOF;
+    } else if (PlanStage::DEAD == state) {
+        return state;
+    } else if (PlanStage::FAILURE == state || PlanStage::DEAD == state) {
+        *out = id;
+        // If a stage fails, it may create a status WSM to indicate why it failed, in which
+        // case 'id' is valid. If ID is invalid, we create our own error message.
+        if (WorkingSet::INVALID_ID == id) {
+            const std::string errmsg = "count stage failed to read result from child";
+            Status status = Status(ErrorCodes::InternalError, errmsg);
+            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
         }
-    }
-
-    void CountStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-        ++_commonStats.invalidates;
-        if (_child.get()) {
-            _child->invalidate(txn, dl, type);
+        return state;
+    } else if (PlanStage::ADVANCED == state) {
+        // We got a result. If we're still skipping, then decrement the number left to skip.
+        // Otherwise increment the count until we hit the limit.
+        if (_leftToSkip > 0) {
+            _leftToSkip--;
+            _specificStats.nSkipped++;
+        } else {
+            _specificStats.nCounted++;
         }
-    }
 
-    vector<PlanStage*> CountStage::getChildren() const {
-        vector<PlanStage*> children;
-        if (_child.get()) {
-            children.push_back(_child.get());
+        // Count doesn't need the actual results, so we just discard any valid working
+        // set members that got returned from the child.
+        if (WorkingSet::INVALID_ID != id) {
+            _ws->free(id);
         }
-        return children;
+    } else if (PlanStage::NEED_YIELD == state) {
+        *out = id;
+        _commonStats.needYield++;
+        return PlanStage::NEED_YIELD;
     }
 
-    PlanStageStats* CountStage::getStats() {
-        _commonStats.isEOF = isEOF();
-        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT));
-        CountStats* countStats = new CountStats(_specificStats);
-        ret->specific.reset(countStats);
-        if (_child.get()) {
-            ret->children.push_back(_child->getStats());
-        }
-        return ret.release();
-    }
+    _commonStats.needTime++;
+    return PlanStage::NEED_TIME;
+}
 
-    const CommonStats* CountStage::getCommonStats() const {
-        return &_commonStats;
+void CountStage::saveState() {
+    _txn = NULL;
+    ++_commonStats.yields;
+    if (_child.get()) {
+        _child->saveState();
     }
+}
 
-    const SpecificStats* CountStage::getSpecificStats() const {
-        return &_specificStats;
+void CountStage::restoreState(OperationContext* opCtx) {
+    invariant(_txn == NULL);
+    _txn = opCtx;
+    ++_commonStats.unyields;
+    if (_child.get()) {
+        _child->restoreState(opCtx);
     }
+}
+
+void CountStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    ++_commonStats.invalidates;
+    if (_child.get()) {
+        _child->invalidate(txn, dl, type);
+    }
+}
+
+vector<PlanStage*> CountStage::getChildren() const {
+    vector<PlanStage*> children;
+    if (_child.get()) {
+        children.push_back(_child.get());
+    }
+    return children;
+}
+
+PlanStageStats* CountStage::getStats() {
+    _commonStats.isEOF = isEOF();
+    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT));
+    CountStats* countStats = new CountStats(_specificStats);
+    ret->specific.reset(countStats);
+    if (_child.get()) {
+        ret->children.push_back(_child->getStats());
+    }
+    return ret.release();
+}
+
+const CommonStats* CountStage::getCommonStats() const {
+    return &_commonStats;
+}
+
+const SpecificStats* CountStage::getSpecificStats() const {
+    return &_specificStats;
+}
 
 }  // namespace mongo

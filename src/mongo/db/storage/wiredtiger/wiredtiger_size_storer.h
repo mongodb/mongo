@@ -41,53 +41,51 @@
 
 namespace mongo {
 
-    class WiredTigerRecordStore;
-    class WiredTigerSession;
+class WiredTigerRecordStore;
+class WiredTigerSession;
 
-    class WiredTigerSizeStorer {
-    public:
-        WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri);
-        ~WiredTigerSizeStorer();
+class WiredTigerSizeStorer {
+public:
+    WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri);
+    ~WiredTigerSizeStorer();
 
-        void onCreate( WiredTigerRecordStore* rs, long long nr, long long ds );
-        void onDestroy( WiredTigerRecordStore* rs );
+    void onCreate(WiredTigerRecordStore* rs, long long nr, long long ds);
+    void onDestroy(WiredTigerRecordStore* rs);
 
-        void storeToCache( StringData uri, long long numRecords, long long dataSize );
+    void storeToCache(StringData uri, long long numRecords, long long dataSize);
 
-        void loadFromCache( StringData uri, long long* numRecords, long long* dataSize ) const;
+    void loadFromCache(StringData uri, long long* numRecords, long long* dataSize) const;
 
-        /**
-         * Loads from the underlying table.
-         */
-        void fillCache();
+    /**
+     * Loads from the underlying table.
+     */
+    void fillCache();
 
-        /**
-         * Writes all changes to the underlying table.
-         */
-        void syncCache(bool syncToDisk);
+    /**
+     * Writes all changes to the underlying table.
+     */
+    void syncCache(bool syncToDisk);
 
-    private:
-        void _checkMagic() const;
+private:
+    void _checkMagic() const;
 
-        struct Entry {
-            Entry() : numRecords(0), dataSize(0), dirty(false), rs(NULL){}
-            long long numRecords;
-            long long dataSize;
-            bool dirty;
-            WiredTigerRecordStore* rs; // not owned
-        };
-
-        int _magic;
-
-        // Guards _cursor. Acquire *before* _entriesMutex.
-        mutable stdx::mutex _cursorMutex;
-        const WiredTigerSession _session;
-        WT_CURSOR* _cursor; // pointer is const after constructor
-
-        typedef std::map<std::string,Entry> Map;
-        Map _entries;
-        mutable stdx::mutex _entriesMutex;
-
+    struct Entry {
+        Entry() : numRecords(0), dataSize(0), dirty(false), rs(NULL) {}
+        long long numRecords;
+        long long dataSize;
+        bool dirty;
+        WiredTigerRecordStore* rs;  // not owned
     };
 
+    int _magic;
+
+    // Guards _cursor. Acquire *before* _entriesMutex.
+    mutable stdx::mutex _cursorMutex;
+    const WiredTigerSession _session;
+    WT_CURSOR* _cursor;  // pointer is const after constructor
+
+    typedef std::map<std::string, Entry> Map;
+    Map _entries;
+    mutable stdx::mutex _entriesMutex;
+};
 }

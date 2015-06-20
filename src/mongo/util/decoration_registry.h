@@ -37,103 +37,102 @@
 
 namespace mongo {
 
+/**
+ * Registry of decorations.
+ *
+ * A decoration registry corresponds to the "type" of a DecorationContainer.  For example, if
+ * you have two registries, r1 and r2, a DecorationContainer constructed from r1 has instances
+ * the decorations declared on r1, and a DecorationContainer constructed from r2 has instances
+ * of the decorations declared on r2.
+ */
+class DecorationRegistry {
+    MONGO_DISALLOW_COPYING(DecorationRegistry);
+
+public:
+    DecorationRegistry() = default;
+
     /**
-     * Registry of decorations.
+     * Declares a decoration of type T, constructed with T's default constructor, and
+     * returns a descriptor for accessing that decoration.
      *
-     * A decoration registry corresponds to the "type" of a DecorationContainer.  For example, if
-     * you have two registries, r1 and r2, a DecorationContainer constructed from r1 has instances
-     * the decorations declared on r1, and a DecorationContainer constructed from r2 has instances
-     * of the decorations declared on r2.
+     * NOTE: T's destructor must not throw exceptions.
      */
-    class DecorationRegistry {
-        MONGO_DISALLOW_COPYING(DecorationRegistry);
-    public:
-        DecorationRegistry() = default;
-
-        /**
-         * Declares a decoration of type T, constructed with T's default constructor, and
-         * returns a descriptor for accessing that decoration.
-         *
-         * NOTE: T's destructor must not throw exceptions.
-         */
-        template <typename T>
-        DecorationContainer::DecorationDescriptorWithType<T> declareDecoration() {
-#if !defined(_MSC_VER) || (_MSC_VER > 1800) // Try again with MSVC 2015
-            static_assert(std::is_nothrow_destructible<T>::value,
-                          "Decorations must be nothrow destructible");
+    template <typename T>
+    DecorationContainer::DecorationDescriptorWithType<T> declareDecoration() {
+#if !defined(_MSC_VER) || (_MSC_VER > 1800)  // Try again with MSVC 2015
+        static_assert(std::is_nothrow_destructible<T>::value,
+                      "Decorations must be nothrow destructible");
 #endif
-            return DecorationContainer::DecorationDescriptorWithType<T>(
-                    std::move(declareDecoration(sizeof(T),
-                                                std::alignment_of<T>::value,
-                                                &constructAt<T>,
-                                                &destructAt<T>)));
-        }
+        return DecorationContainer::DecorationDescriptorWithType<T>(std::move(declareDecoration(
+            sizeof(T), std::alignment_of<T>::value, &constructAt<T>, &destructAt<T>)));
+    }
 
-        size_t getDecorationBufferSizeBytes() const { return _totalSizeBytes; }
+    size_t getDecorationBufferSizeBytes() const {
+        return _totalSizeBytes;
+    }
 
-        /**
-         * Constructs the decorations declared in this registry on the given instance of
-         * "decorable".
-         *
-         * Called by the DecorationContainer constructor. Do not call directly.
-         */
-        void construct(DecorationContainer* decorable) const;
+    /**
+     * Constructs the decorations declared in this registry on the given instance of
+     * "decorable".
+     *
+     * Called by the DecorationContainer constructor. Do not call directly.
+     */
+    void construct(DecorationContainer* decorable) const;
 
-        /**
-         * Destroys the decorations declared in this registry on the given instance of "decorable".
-         *
-         * Called by the DecorationContainer destructor.  Do not call directly.
-         */
-        void destruct(DecorationContainer* decorable) const;
+    /**
+     * Destroys the decorations declared in this registry on the given instance of "decorable".
+     *
+     * Called by the DecorationContainer destructor.  Do not call directly.
+     */
+    void destruct(DecorationContainer* decorable) const;
 
-    private:
-        /**
-         * Function that constructs (initializes) a single instance of a decoration.
-         */
-        using DecorationConstructorFn = stdx::function<void (void*)>;
+private:
+    /**
+     * Function that constructs (initializes) a single instance of a decoration.
+     */
+    using DecorationConstructorFn = stdx::function<void(void*)>;
 
-        /**
-         * Function that destructs (deinitializes) a single instance of a decoration.
-         */
-        using DecorationDestructorFn = stdx::function<void (void*)>;
+    /**
+     * Function that destructs (deinitializes) a single instance of a decoration.
+     */
+    using DecorationDestructorFn = stdx::function<void(void*)>;
 
-        struct DecorationInfo {
-            DecorationInfo() {}
-            DecorationInfo(DecorationContainer::DecorationDescriptor descriptor,
-                           DecorationConstructorFn constructor,
-                           DecorationDestructorFn destructor);
+    struct DecorationInfo {
+        DecorationInfo() {}
+        DecorationInfo(DecorationContainer::DecorationDescriptor descriptor,
+                       DecorationConstructorFn constructor,
+                       DecorationDestructorFn destructor);
 
-            DecorationContainer::DecorationDescriptor descriptor;
-            DecorationConstructorFn constructor;
-            DecorationDestructorFn destructor;
-        };
-
-        using DecorationInfoVector = std::vector<DecorationInfo>;
-
-        template <typename T>
-        static void constructAt(void* location) {
-            new (location) T();
-        }
-
-        template <typename T>
-        static void destructAt(void* location) {
-            static_cast<T*>(location)->~T();
-        }
-
-        /**
-         * Declares a decoration with given "constructor" and "destructor" functions,
-         * of "sizeBytes" bytes.
-         *
-         * NOTE: "destructor" must not throw exceptions.
-         */
-        DecorationContainer::DecorationDescriptor declareDecoration(
-                size_t sizeBytes,
-                size_t alignBytes,
-                DecorationConstructorFn constructor,
-                DecorationDestructorFn destructor);
-
-        DecorationInfoVector _decorationInfo;
-        size_t _totalSizeBytes { 0 };
+        DecorationContainer::DecorationDescriptor descriptor;
+        DecorationConstructorFn constructor;
+        DecorationDestructorFn destructor;
     };
+
+    using DecorationInfoVector = std::vector<DecorationInfo>;
+
+    template <typename T>
+    static void constructAt(void* location) {
+        new (location) T();
+    }
+
+    template <typename T>
+    static void destructAt(void* location) {
+        static_cast<T*>(location)->~T();
+    }
+
+    /**
+     * Declares a decoration with given "constructor" and "destructor" functions,
+     * of "sizeBytes" bytes.
+     *
+     * NOTE: "destructor" must not throw exceptions.
+     */
+    DecorationContainer::DecorationDescriptor declareDecoration(size_t sizeBytes,
+                                                                size_t alignBytes,
+                                                                DecorationConstructorFn constructor,
+                                                                DecorationDestructorFn destructor);
+
+    DecorationInfoVector _decorationInfo;
+    size_t _totalSizeBytes{0};
+};
 
 }  // namespace mongo

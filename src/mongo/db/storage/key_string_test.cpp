@@ -61,61 +61,60 @@ TEST(KeyStringTest, Simple1) {
                      KeyString(b, ALL_ASCENDING, RecordId()));
 }
 
-#define ROUNDTRIP_ORDER(x, order) do {                           \
-        const BSONObj _orig = x;                                 \
-        const KeyString _ks(_orig, order);                       \
-        const BSONObj _converted = toBson(_ks, order);           \
-        ASSERT_EQ(_converted, _orig);                            \
-        ASSERT(_converted.binaryEqual(_orig));                   \
+#define ROUNDTRIP_ORDER(x, order)                      \
+    do {                                               \
+        const BSONObj _orig = x;                       \
+        const KeyString _ks(_orig, order);             \
+        const BSONObj _converted = toBson(_ks, order); \
+        ASSERT_EQ(_converted, _orig);                  \
+        ASSERT(_converted.binaryEqual(_orig));         \
     } while (0)
 
-#define ROUNDTRIP(x) do {                                            \
-        ROUNDTRIP_ORDER(x, ALL_ASCENDING);                           \
-        ROUNDTRIP_ORDER(x, ONE_DESCENDING);                          \
+#define ROUNDTRIP(x)                        \
+    do {                                    \
+        ROUNDTRIP_ORDER(x, ALL_ASCENDING);  \
+        ROUNDTRIP_ORDER(x, ONE_DESCENDING); \
     } while (0)
 
-#define COMPARES_SAME(_x,_y) do {                                \
-        KeyString _xKS(_x, ONE_ASCENDING);                       \
-        KeyString _yKS(_y, ONE_ASCENDING);                       \
-        if (_x == _y) {                                          \
-            ASSERT_EQUALS(_xKS, _yKS);                           \
-        }                                                        \
-        else if (_x < _y) {                                      \
-            ASSERT_LESS_THAN(_xKS, _yKS);                        \
-        }                                                        \
-        else {                                                   \
-            ASSERT_LESS_THAN(_yKS, _xKS);                        \
-        }                                                        \
-                                                                 \
-        _xKS.resetToKey(_x, ONE_DESCENDING);                     \
-        _yKS.resetToKey(_y, ONE_DESCENDING);                     \
-        if (_x == _y) {                                          \
-            ASSERT_EQUALS(_xKS, _yKS);                           \
-        }                                                        \
-        else if (_x < _y) {                                      \
-            ASSERT_GREATER_THAN(_xKS, _yKS);                     \
-        }                                                        \
-        else {                                                   \
-            ASSERT_GREATER_THAN(_yKS, _xKS);                     \
-        }                                                        \
+#define COMPARES_SAME(_x, _y)                \
+    do {                                     \
+        KeyString _xKS(_x, ONE_ASCENDING);   \
+        KeyString _yKS(_y, ONE_ASCENDING);   \
+        if (_x == _y) {                      \
+            ASSERT_EQUALS(_xKS, _yKS);       \
+        } else if (_x < _y) {                \
+            ASSERT_LESS_THAN(_xKS, _yKS);    \
+        } else {                             \
+            ASSERT_LESS_THAN(_yKS, _xKS);    \
+        }                                    \
+                                             \
+        _xKS.resetToKey(_x, ONE_DESCENDING); \
+        _yKS.resetToKey(_y, ONE_DESCENDING); \
+        if (_x == _y) {                      \
+            ASSERT_EQUALS(_xKS, _yKS);       \
+        } else if (_x < _y) {                \
+            ASSERT_GREATER_THAN(_xKS, _yKS); \
+        } else {                             \
+            ASSERT_GREATER_THAN(_yKS, _xKS); \
+        }                                    \
     } while (0)
 
 TEST(KeyStringTest, ActualBytesDouble) {
     // just one test like this for utter sanity
 
-    BSONObj a = BSON("" << 5.5 );
+    BSONObj a = BSON("" << 5.5);
     KeyString ks(a, ALL_ASCENDING);
     log() << "size: " << ks.getSize() << " hex [" << toHex(ks.getBuffer(), ks.getSize()) << "]";
 
     ASSERT_EQUALS(10U, ks.getSize());
 
-    string hex = "2B" // kNumericPositive1ByteInt
-        "0B" // (5 << 1) | 1
-        "02000000000000" // fractional bytes of double
-        "04"; // kEnd
+    string hex =
+        "2B"              // kNumericPositive1ByteInt
+        "0B"              // (5 << 1) | 1
+        "02000000000000"  // fractional bytes of double
+        "04";             // kEnd
 
-    ASSERT_EQUALS(hex,
-                  toHex(ks.getBuffer(), ks.getSize()));
+    ASSERT_EQUALS(hex, toHex(ks.getBuffer(), ks.getSize()));
 
     ks.resetToKey(a, Ordering::make(BSON("a" << -1)));
 
@@ -124,23 +123,23 @@ TEST(KeyStringTest, ActualBytesDouble) {
 
     // last byte (kEnd) doesn't get flipped
     string hexFlipped;
-    for ( size_t i = 0; i < hex.size()-2; i += 2 ) {
+    for (size_t i = 0; i < hex.size() - 2; i += 2) {
         char c = fromHex(hex.c_str() + i);
         c = ~c;
         hexFlipped += toHex(&c, 1);
     }
-    hexFlipped += hex.substr(hex.size()-2);
+    hexFlipped += hex.substr(hex.size() - 2);
 
-    ASSERT_EQUALS(hexFlipped,
-                  toHex(ks.getBuffer(), ks.getSize()));
+    ASSERT_EQUALS(hexFlipped, toHex(ks.getBuffer(), ks.getSize()));
 }
 
 TEST(KeyStringTest, AllTypesSimple) {
     ROUNDTRIP(BSON("" << 5.5));
-    ROUNDTRIP(BSON("" << "abc"));
+    ROUNDTRIP(BSON(""
+                   << "abc"));
     ROUNDTRIP(BSON("" << BSON("a" << 5)));
     ROUNDTRIP(BSON("" << BSON_ARRAY("a" << 5)));
-    ROUNDTRIP(BSON("" << BSONBinData( "abc", 3, bdtCustom )));
+    ROUNDTRIP(BSON("" << BSONBinData("abc", 3, bdtCustom)));
     ROUNDTRIP(BSON("" << BSONUndefined));
     ROUNDTRIP(BSON("" << OID("abcdefabcdefabcdefabcdef")));
     ROUNDTRIP(BSON("" << true));
@@ -148,7 +147,9 @@ TEST(KeyStringTest, AllTypesSimple) {
     ROUNDTRIP(BSON("" << BSONRegEx("asdf", "x")));
     ROUNDTRIP(BSON("" << BSONDBRef("db.c", OID("010203040506070809101112"))));
     ROUNDTRIP(BSON("" << BSONCode("abc_code")));
-    ROUNDTRIP(BSON("" << BSONCodeWScope("def_code", BSON("x_scope" << "a"))));
+    ROUNDTRIP(BSON("" << BSONCodeWScope("def_code",
+                                        BSON("x_scope"
+                                             << "a"))));
     ROUNDTRIP(BSON("" << 5));
     ROUNDTRIP(BSON("" << Timestamp(123123, 123)));
     ROUNDTRIP(BSON("" << 1235123123123LL));
@@ -176,26 +177,27 @@ TEST(KeyStringTest, Array1) {
         KeyString b(emptyArray, ALL_ASCENDING, RecordId(5));
         ASSERT_LESS_THAN(a, b);
     }
-
 }
 
 TEST(KeyStringTest, SubDoc1) {
     ROUNDTRIP(BSON("" << BSON("foo" << 2)));
-    ROUNDTRIP(BSON("" << BSON("foo" << 2 << "bar" << "asd")));
+    ROUNDTRIP(BSON("" << BSON("foo" << 2 << "bar"
+                                    << "asd")));
     ROUNDTRIP(BSON("" << BSON("foo" << BSON_ARRAY(2 << 4))));
 }
 
 TEST(KeyStringTest, SubDoc2) {
-    BSONObj a = BSON("" << BSON("a" << "foo"));
+    BSONObj a = BSON("" << BSON("a"
+                                << "foo"));
     BSONObj b = BSON("" << BSON("b" << 5.5));
     BSONObj c = BSON("" << BSON("c" << BSON("x" << 5)));
     ROUNDTRIP(a);
     ROUNDTRIP(b);
     ROUNDTRIP(c);
 
-    COMPARES_SAME(a,b);
-    COMPARES_SAME(a,c);
-    COMPARES_SAME(b,c);
+    COMPARES_SAME(a, b);
+    COMPARES_SAME(a, c);
+    COMPARES_SAME(b, c);
 }
 
 
@@ -248,7 +250,6 @@ TEST(KeyStringTest, LotsOfNumbers1) {
         ROUNDTRIP(BSON("" << -(static_cast<int>(x) + 1)));
         ROUNDTRIP(BSON("" << -(static_cast<double>(x) + 1)));
         ROUNDTRIP(BSON("" << -(static_cast<double>(x) + 1.1)));
-
     }
 }
 
@@ -264,7 +265,6 @@ TEST(KeyStringTest, LotsOfNumbers2) {
 }
 
 TEST(KeyStringTest, RecordIdOrder1) {
-
     Ordering ordering = Ordering::make(BSON("a" << 1));
 
     KeyString a(BSON("" << 5), ordering, RecordId::min());
@@ -277,11 +277,9 @@ TEST(KeyStringTest, RecordIdOrder1) {
     ASSERT_LESS_THAN(b, c);
     ASSERT_LESS_THAN(c, d);
     ASSERT_LESS_THAN(d, e);
-
 }
 
 TEST(KeyStringTest, RecordIdOrder2) {
-
     Ordering ordering = Ordering::make(BSON("a" << -1 << "b" << -1));
 
     KeyString a(BSON("" << 5 << "" << 6), ordering, RecordId::min());
@@ -298,7 +296,6 @@ TEST(KeyStringTest, RecordIdOrder2) {
 }
 
 TEST(KeyStringTest, RecordIdOrder2Double) {
-
     Ordering ordering = Ordering::make(BSON("a" << -1 << "b" << -1));
 
     KeyString a(BSON("" << 5.0 << "" << 6.0), ordering, RecordId::min());
@@ -311,7 +308,6 @@ TEST(KeyStringTest, RecordIdOrder2Double) {
 }
 
 TEST(KeyStringTest, Timestamp) {
-
     BSONObj a = BSON("" << Timestamp(0, 0));
     BSONObj b = BSON("" << Timestamp(1234, 1));
     BSONObj c = BSON("" << Timestamp(1234, 2));
@@ -356,20 +352,19 @@ TEST(KeyStringTest, Timestamp) {
         ASSERT(kb.compare(kc) > 0);
         ASSERT(kc.compare(kd) > 0);
     }
-
 }
 
 TEST(KeyStringTest, AllTypesRoundtrip) {
-    for ( int i = 1; i <= JSTypeMax; i++ ) {
+    for (int i = 1; i <= JSTypeMax; i++) {
         {
             BSONObjBuilder b;
-            b.appendMinForType("", i );
+            b.appendMinForType("", i);
             BSONObj o = b.obj();
             ROUNDTRIP(o);
         }
         {
             BSONObjBuilder b;
-            b.appendMaxForType("", i );
+            b.appendMaxForType("", i);
             BSONObj o = b.obj();
             ROUNDTRIP(o);
         }
@@ -382,7 +377,7 @@ const std::vector<BSONObj>& getInterestingElements() {
     if (!elements.empty()) {
         return elements;
     }
-    
+
     // These are used to test strings that include NUL bytes.
     const StringData ball("ball", StringData::LiteralTag());
     const StringData ball00n("ball\0\0n", StringData::LiteralTag());
@@ -407,8 +402,10 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << -2.2));
     elements.push_back(BSON("" << -12312312.2123123123123));
     elements.push_back(BSON("" << 12312312.2123123123123));
-    elements.push_back(BSON("" << "aaa"));
-    elements.push_back(BSON("" << "AAA"));
+    elements.push_back(BSON(""
+                            << "aaa"));
+    elements.push_back(BSON(""
+                            << "AAA"));
     elements.push_back(BSON("" << ball));
     elements.push_back(BSON("" << ball00n));
     elements.push_back(BSON("" << BSONSymbol(ball)));
@@ -424,22 +421,22 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << BSONCode("abc_code")));
     elements.push_back(BSON("" << BSONCode(ball)));
     elements.push_back(BSON("" << BSONCode(ball00n)));
-    elements.push_back(BSON("" << BSONCodeWScope("def_code1", BSON("x_scope" << "a"))));
-    elements.push_back(BSON("" << BSONCodeWScope("def_code2", BSON("x_scope" << "a"))));
-    elements.push_back(BSON("" << BSONCodeWScope("def_code2", BSON("x_scope" << "b"))));
+    elements.push_back(BSON("" << BSONCodeWScope("def_code1",
+                                                 BSON("x_scope"
+                                                      << "a"))));
+    elements.push_back(BSON("" << BSONCodeWScope("def_code2",
+                                                 BSON("x_scope"
+                                                      << "a"))));
+    elements.push_back(BSON("" << BSONCodeWScope("def_code2",
+                                                 BSON("x_scope"
+                                                      << "b"))));
     elements.push_back(BSON("" << BSONCodeWScope(ball, BSON("a" << 1))));
     elements.push_back(BSON("" << BSONCodeWScope(ball00n, BSON("a" << 1))));
     elements.push_back(BSON("" << true));
     elements.push_back(BSON("" << false));
 
     // Something that needs multiple bytes of typeBits
-    elements.push_back(BSON("" << BSON_ARRAY(""
-                                          << BSONSymbol("")
-                                          << 0
-                                          << 0ll
-                                          << 0.0
-                                          << -0.0
-                                          )));
+    elements.push_back(BSON("" << BSON_ARRAY("" << BSONSymbol("") << 0 << 0ll << 0.0 << -0.0)));
 
     //
     // Interesting numeric cases
@@ -488,12 +485,12 @@ const std::vector<BSONObj>& getInterestingElements() {
         elements.push_back(BSON("" << (-lNum + 1)));
         elements.push_back(BSON("" << (-lNum - 1)));
 
-        if (powerOfTwo <= 52) { // is dNum - 0.5 representable?
+        if (powerOfTwo <= 52) {  // is dNum - 0.5 representable?
             elements.push_back(BSON("" << (dNum - 0.5)));
             elements.push_back(BSON("" << -(dNum - 0.5)));
         }
 
-        if (powerOfTwo <= 51) { // is dNum + 0.5 representable?
+        if (powerOfTwo <= 51) {  // is dNum + 0.5 representable?
             elements.push_back(BSON("" << (dNum + 0.5)));
             elements.push_back(BSON("" << -(dNum + 0.5)));
         }
@@ -503,8 +500,8 @@ const std::vector<BSONObj>& getInterestingElements() {
         // Numbers around +/- numeric_limits<long long>::max() which can't be represented
         // precisely as a double.
         const long long maxLL = std::numeric_limits<long long>::max();
-        const double closestAbove = 9223372036854775808.0; // 2**63
-        const double closestBelow = 9223372036854774784.0; // 2**63 - epsilon
+        const double closestAbove = 9223372036854775808.0;  // 2**63
+        const double closestBelow = 9223372036854774784.0;  // 2**63 - epsilon
 
         elements.push_back(BSON("" << maxLL));
         elements.push_back(BSON("" << (maxLL - 1)));
@@ -521,9 +518,9 @@ const std::vector<BSONObj>& getInterestingElements() {
         // Numbers around numeric_limits<long long>::min() which can be represented precisely as
         // a double, but not as a positive long long.
         const long long minLL = std::numeric_limits<long long>::min();
-        const double closestBelow = -9223372036854777856.0; // -2**63 - epsilon
-        const double equal = -9223372036854775808.0; // 2**63
-        const double closestAbove = -9223372036854774784.0; // -2**63 + epsilon
+        const double closestBelow = -9223372036854777856.0;  // -2**63 - epsilon
+        const double equal = -9223372036854775808.0;         // 2**63
+        const double closestAbove = -9223372036854774784.0;  // -2**63 + epsilon
 
         elements.push_back(BSON("" << minLL));
         elements.push_back(BSON("" << equal));
@@ -537,44 +534,45 @@ const std::vector<BSONObj>& getInterestingElements() {
 void testPermutation(const std::vector<BSONObj>& elementsOrig,
                      const std::vector<BSONObj>& orderings,
                      bool debug) {
-
     // Since KeyStrings are compared using memcmp we can assume it provides a total ordering such
     // that there won't be cases where (a < b && b < c && !(a < c)). This test still needs to ensure
     // that it provides the *correct* total ordering.
     for (size_t k = 0; k < orderings.size(); k++) {
         BSONObj orderObj = orderings[k];
         Ordering ordering = Ordering::make(orderObj);
-        if (debug) log() << "ordering: " << orderObj;
+        if (debug)
+            log() << "ordering: " << orderObj;
 
         std::vector<BSONObj> elements = elementsOrig;
         std::stable_sort(elements.begin(), elements.end(), BSONObjCmp(orderObj));
 
         for (size_t i = 0; i < elements.size(); i++) {
             const BSONObj& o1 = elements[i];
-            if (debug) log() << "\to1: " << o1;
+            if (debug)
+                log() << "\to1: " << o1;
             ROUNDTRIP_ORDER(o1, ordering);
 
             KeyString k1(o1, ordering);
 
-            KeyString l1(BSON("l" << o1.firstElement()), ordering); // kLess
-            KeyString g1(BSON("g" << o1.firstElement()), ordering); // kGreater
+            KeyString l1(BSON("l" << o1.firstElement()), ordering);  // kLess
+            KeyString g1(BSON("g" << o1.firstElement()), ordering);  // kGreater
             ASSERT_LT(l1, k1);
             ASSERT_GT(g1, k1);
 
             if (i + 1 < elements.size()) {
                 const BSONObj& o2 = elements[i + 1];
-                if (debug) log() << "\t\t o2: " << o2;
+                if (debug)
+                    log() << "\t\t o2: " << o2;
                 KeyString k2(o2, ordering);
                 KeyString g2(BSON("g" << o2.firstElement()), ordering);
                 KeyString l2(BSON("l" << o2.firstElement()), ordering);
 
                 int bsonCmp = o1.woCompare(o2, ordering);
-                invariant(bsonCmp <= 0); // We should be sorted...
+                invariant(bsonCmp <= 0);  // We should be sorted...
 
                 if (bsonCmp == 0) {
                     ASSERT_EQ(k1, k2);
-                }
-                else {
+                } else {
                     ASSERT_LT(k1, k2);
                 }
 
@@ -592,8 +590,7 @@ void testPermutation(const std::vector<BSONObj>& elementsOrig,
                     ASSERT_EQ(g1, g2);
                     ASSERT_LT(l1, k2);
                     ASSERT_GT(g1, k2);
-                }
-                else {
+                } else {
                     // k1 is less than k2. Less(k2) and Greater(k1) should be between them.
                     ASSERT_LT(g1, k2);
                     ASSERT_GT(l2, k1);
@@ -619,7 +616,7 @@ TEST(KeyStringTest, AllPermCompare) {
 }
 
 TEST(KeyStringTest, AllPerm2Compare) {
-    // This test can take over a minute without optimizations. Re-enable if you need to debug it.
+// This test can take over a minute without optimizations. Re-enable if you need to debug it.
 #if !defined(MONGO_CONFIG_OPTIMIZED_BUILD)
     log() << "\t\t\tskipping test on non-optimized build";
     return;
@@ -654,13 +651,12 @@ TEST(KeyStringTest, AllPerm2Compare) {
     testPermutation(elements, orderings, false);
 }
 
-#define COMPARE_HELPER(LHS, RHS)                        \
-    (((LHS) < (RHS)) ? -1 : (((LHS) == (RHS)) ? 0 : 1))
+#define COMPARE_HELPER(LHS, RHS) (((LHS) < (RHS)) ? -1 : (((LHS) == (RHS)) ? 0 : 1))
 
 int compareLongToDouble(long long lhs, double rhs) {
     if (rhs >= std::numeric_limits<long long>::max())
         return -1;
-    if (rhs < std::numeric_limits<long long>::min() )
+    if (rhs < std::numeric_limits<long long>::min())
         return 1;
 
     if (fabs(rhs) >= (1LL << 52)) {
@@ -670,7 +666,7 @@ int compareLongToDouble(long long lhs, double rhs) {
     return COMPARE_HELPER(static_cast<double>(lhs), rhs);
 }
 
-int compareNumbers(const BSONElement& lhs, const BSONElement& rhs ) {
+int compareNumbers(const BSONElement& lhs, const BSONElement& rhs) {
     invariant(lhs.isNumber());
     invariant(rhs.isNumber());
 
@@ -679,8 +675,7 @@ int compareNumbers(const BSONElement& lhs, const BSONElement& rhs ) {
             return COMPARE_HELPER(lhs.numberLong(), rhs.numberLong());
         }
         return compareLongToDouble(lhs.numberLong(), rhs.Double());
-    }
-    else { // double
+    } else {  // double
         if (rhs.type() == NumberDouble) {
             return COMPARE_HELPER(lhs.Double(), rhs.Double());
         }
@@ -769,15 +764,13 @@ TEST(KeyStringTest, NumberOrderLots) {
             const KeyString& b = *keyStrings[j];
             ASSERT_EQUALS(a.compare(b), -b.compare(a));
 
-            if (a.compare(b) != compareNumbers(numbers[i].firstElement(),
-                                               numbers[j].firstElement())) {
+            if (a.compare(b) !=
+                compareNumbers(numbers[i].firstElement(), numbers[j].firstElement())) {
                 log() << numbers[i] << " " << numbers[j];
             }
 
             ASSERT_EQUALS(a.compare(b),
-                          compareNumbers(numbers[i].firstElement(),
-                                         numbers[j].firstElement()));
-
+                          compareNumbers(numbers[i].firstElement(), numbers[j].firstElement()));
         }
     }
 }
@@ -786,7 +779,7 @@ TEST(KeyStringTest, RecordIds) {
     for (int i = 0; i < 63; i++) {
         const RecordId rid = RecordId(1ll << i);
 
-        { // Test encoding / decoding of single RecordIds
+        {  // Test encoding / decoding of single RecordIds
             const KeyString ks(rid);
             ASSERT_GTE(ks.getSize(), 2u);
             ASSERT_LTE(ks.getSize(), 10u);
@@ -812,18 +805,21 @@ TEST(KeyStringTest, RecordIds) {
         for (int j = 0; j < 63; j++) {
             RecordId other = RecordId(1ll << j);
 
-            if (rid == other) ASSERT_EQ(KeyString(rid), KeyString(other));
-            if (rid < other) ASSERT_LT(KeyString(rid), KeyString(other));
-            if (rid > other) ASSERT_GT(KeyString(rid), KeyString(other));
+            if (rid == other)
+                ASSERT_EQ(KeyString(rid), KeyString(other));
+            if (rid < other)
+                ASSERT_LT(KeyString(rid), KeyString(other));
+            if (rid > other)
+                ASSERT_GT(KeyString(rid), KeyString(other));
 
             {
                 // Test concatenating RecordIds like in a unique index.
                 KeyString ks;
-                ks.appendRecordId(RecordId::max()); // uses all bytes
+                ks.appendRecordId(RecordId::max());  // uses all bytes
                 ks.appendRecordId(rid);
-                ks.appendRecordId(RecordId(0xDEADBEEF)); // uses some extra bytes
+                ks.appendRecordId(RecordId(0xDEADBEEF));  // uses some extra bytes
                 ks.appendRecordId(rid);
-                ks.appendRecordId(RecordId(1)); // uses no extra bytes
+                ks.appendRecordId(RecordId(1));  // uses no extra bytes
                 ks.appendRecordId(rid);
                 ks.appendRecordId(other);
 
@@ -843,4 +839,3 @@ TEST(KeyStringTest, RecordIds) {
         }
     }
 }
-

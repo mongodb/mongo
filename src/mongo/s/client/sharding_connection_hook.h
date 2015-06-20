@@ -32,22 +32,22 @@
 
 namespace mongo {
 
-    class DBClientBase;
+class DBClientBase;
 
-    /**
-     * Intercepts creation of sharded connections and transparently performs the internal
-     * authentication on them.
-     */
-    class ShardingConnectionHook : public DBConnectionHook {
-    public:
-        ShardingConnectionHook(bool shardedConnections);
+/**
+ * Intercepts creation of sharded connections and transparently performs the internal
+ * authentication on them.
+ */
+class ShardingConnectionHook : public DBConnectionHook {
+public:
+    ShardingConnectionHook(bool shardedConnections);
 
-        virtual void onCreate(DBClientBase* conn);
-        virtual void onDestroy(DBClientBase* conn);
-        virtual void onRelease(DBClientBase* conn);
+    virtual void onCreate(DBClientBase* conn);
+    virtual void onDestroy(DBClientBase* conn);
+    virtual void onRelease(DBClientBase* conn);
 
-    private:
-        bool _shardedConnections;
-    };
+private:
+    bool _shardedConnections;
+};
 
-} // namespace mongo
+}  // namespace mongo

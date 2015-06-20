@@ -37,52 +37,51 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
+using std::unique_ptr;
 
-    StatusWithMatchExpression expressionParserGeoCallbackReal( const char* name,
-                                                               int type,
-                                                               const BSONObj& section ) {
-        if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
-            unique_ptr<GeoExpression> gq(new GeoExpression(name));
-            Status parseStatus = gq->parseFrom(section);
+StatusWithMatchExpression expressionParserGeoCallbackReal(const char* name,
+                                                          int type,
+                                                          const BSONObj& section) {
+    if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
+        unique_ptr<GeoExpression> gq(new GeoExpression(name));
+        Status parseStatus = gq->parseFrom(section);
 
-            if (!parseStatus.isOK()) return StatusWithMatchExpression(parseStatus);
+        if (!parseStatus.isOK())
+            return StatusWithMatchExpression(parseStatus);
 
-            unique_ptr<GeoMatchExpression> e( new GeoMatchExpression() );
+        unique_ptr<GeoMatchExpression> e(new GeoMatchExpression());
 
-            // Until the index layer accepts non-BSON predicates, or special indices are moved into
-            // stages, we have to clean up the raw object so it can be passed down to the index
-            // layer.
-            BSONObjBuilder bob;
-            bob.append(name, section);
-            Status s = e->init( name, gq.release(), bob.obj() );
-            if ( !s.isOK() )
-                return StatusWithMatchExpression( s );
-            return StatusWithMatchExpression( e.release() );
+        // Until the index layer accepts non-BSON predicates, or special indices are moved into
+        // stages, we have to clean up the raw object so it can be passed down to the index
+        // layer.
+        BSONObjBuilder bob;
+        bob.append(name, section);
+        Status s = e->init(name, gq.release(), bob.obj());
+        if (!s.isOK())
+            return StatusWithMatchExpression(s);
+        return StatusWithMatchExpression(e.release());
+    } else {
+        verify(BSONObj::opNEAR == type);
+        unique_ptr<GeoNearExpression> nq(new GeoNearExpression(name));
+        Status s = nq->parseFrom(section);
+        if (!s.isOK()) {
+            return StatusWithMatchExpression(s);
         }
-        else {
-            verify(BSONObj::opNEAR == type);
-            unique_ptr<GeoNearExpression> nq(new GeoNearExpression(name));
-            Status s = nq->parseFrom( section );
-            if ( !s.isOK() ) {
-                return StatusWithMatchExpression( s );
-            }
-            unique_ptr<GeoNearMatchExpression> e( new GeoNearMatchExpression() );
-            // Until the index layer accepts non-BSON predicates, or special indices are moved into
-            // stages, we have to clean up the raw object so it can be passed down to the index
-            // layer.
-            BSONObjBuilder bob;
-            bob.append(name, section);
-            s = e->init( name, nq.release(), bob.obj() );
-            if ( !s.isOK() )
-                return StatusWithMatchExpression( s );
-            return StatusWithMatchExpression( e.release() );
-        }
+        unique_ptr<GeoNearMatchExpression> e(new GeoNearMatchExpression());
+        // Until the index layer accepts non-BSON predicates, or special indices are moved into
+        // stages, we have to clean up the raw object so it can be passed down to the index
+        // layer.
+        BSONObjBuilder bob;
+        bob.append(name, section);
+        s = e->init(name, nq.release(), bob.obj());
+        if (!s.isOK())
+            return StatusWithMatchExpression(s);
+        return StatusWithMatchExpression(e.release());
     }
+}
 
-    MONGO_INITIALIZER( MatchExpressionParserGeo )( ::mongo::InitializerContext* context ) {
-        expressionParserGeoCallback = expressionParserGeoCallbackReal;
-        return Status::OK();
-    }
-
+MONGO_INITIALIZER(MatchExpressionParserGeo)(::mongo::InitializerContext* context) {
+    expressionParserGeoCallback = expressionParserGeoCallbackReal;
+    return Status::OK();
+}
 }

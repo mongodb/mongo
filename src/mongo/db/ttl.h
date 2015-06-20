@@ -31,5 +31,5 @@
 #pragma once
 
 namespace mongo {
-    void startTTLBackgroundJob();
+void startTTLBackgroundJob();
 }

@@ -42,154 +42,157 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
+
+/**
+ * The SubplanStage is used for rooted $or queries. It plans each clause of the $or
+ * individually, and then creates an overall query plan based on the winning plan from
+ * each clause.
+ *
+ * Uses the MultiPlanStage in order to rank plans for the individual clauses.
+ *
+ * Notes on caching strategy:
+ *
+ *   --Interaction with the plan cache is done on a per-clause basis. For a given clause C,
+ *   if there is a plan in the cache for shape C, then C is planned using the index tags
+ *   obtained from the plan cache entry. If no cached plan is found for C, then a MultiPlanStage
+ *   is used to determine the best plan for the clause; unless there is a tie between multiple
+ *   candidate plans, the winner is inserted into the plan cache and used to plan subsequent
+ *   executions of C. These subsequent executions of shape C could be either as a clause in
+ *   another rooted $or query, or shape C as its own query.
+ *
+ *   --Plans for entire rooted $or queries are neither written to nor read from the plan cache.
+ */
+class SubplanStage : public PlanStage {
+public:
+    SubplanStage(OperationContext* txn,
+                 Collection* collection,
+                 WorkingSet* ws,
+                 const QueryPlannerParams& params,
+                 CanonicalQuery* cq);
+
+    static bool canUseSubplanning(const CanonicalQuery& query);
+
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
+
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_SUBPLAN;
+    }
+
+    PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats() const;
+
+    virtual const SpecificStats* getSpecificStats() const;
+
+    static const char* kStageType;
 
     /**
-     * The SubplanStage is used for rooted $or queries. It plans each clause of the $or
-     * individually, and then creates an overall query plan based on the winning plan from
-     * each clause.
+     * Selects a plan using subplanning. First uses the query planning results from
+     * planSubqueries() and the multi plan stage to select the best plan for each branch.
      *
-     * Uses the MultiPlanStage in order to rank plans for the individual clauses.
+     * If this effort fails, then falls back on planning the whole query normally rather
+     * then planning $or branches independently.
      *
-     * Notes on caching strategy:
+     * If 'yieldPolicy' is non-NULL, then all locks may be yielded in between round-robin
+     * works of the candidate plans. By default, 'yieldPolicy' is NULL and no yielding will
+     * take place.
      *
-     *   --Interaction with the plan cache is done on a per-clause basis. For a given clause C,
-     *   if there is a plan in the cache for shape C, then C is planned using the index tags
-     *   obtained from the plan cache entry. If no cached plan is found for C, then a MultiPlanStage
-     *   is used to determine the best plan for the clause; unless there is a tie between multiple
-     *   candidate plans, the winner is inserted into the plan cache and used to plan subsequent
-     *   executions of C. These subsequent executions of shape C could be either as a clause in
-     *   another rooted $or query, or shape C as its own query.
-     *
-     *   --Plans for entire rooted $or queries are neither written to nor read from the plan cache.
+     * Returns a non-OK status if the plan was killed during yield or if planning fails.
      */
-    class SubplanStage : public PlanStage {
+    Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
+
+    //
+    // For testing.
+    //
+
+    /**
+     * Returns true if the i-th branch was planned by retrieving a cached solution,
+     * otherwise returns false.
+     */
+    bool branchPlannedFromCache(size_t i) const;
+
+private:
+    /**
+     * A class used internally in order to keep track of the results of planning
+     * a particular $or branch.
+     */
+    struct BranchPlanningResult {
+        MONGO_DISALLOW_COPYING(BranchPlanningResult);
+
     public:
-        SubplanStage(OperationContext* txn,
-                     Collection* collection,
-                     WorkingSet* ws,
-                     const QueryPlannerParams& params,
-                     CanonicalQuery* cq);
+        BranchPlanningResult() {}
 
-        static bool canUseSubplanning(const CanonicalQuery& query);
+        // A parsed version of one branch of the $or.
+        std::unique_ptr<CanonicalQuery> canonicalQuery;
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+        // If there is cache data available, then we store it here rather than generating
+        // a set of alternate plans for the branch. The index tags from the cache data
+        // can be applied directly to the parent $or MatchExpression when generating the
+        // composite solution.
+        std::unique_ptr<CachedSolution> cachedSolution;
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-        virtual std::vector<PlanStage*> getChildren() const;
-
-        virtual StageType stageType() const { return STAGE_SUBPLAN; }
-
-        PlanStageStats* getStats();
-
-        virtual const CommonStats* getCommonStats() const;
-
-        virtual const SpecificStats* getSpecificStats() const;
-
-        static const char* kStageType;
-
-        /**
-         * Selects a plan using subplanning. First uses the query planning results from
-         * planSubqueries() and the multi plan stage to select the best plan for each branch.
-         *
-         * If this effort fails, then falls back on planning the whole query normally rather
-         * then planning $or branches independently.
-         *
-         * If 'yieldPolicy' is non-NULL, then all locks may be yielded in between round-robin
-         * works of the candidate plans. By default, 'yieldPolicy' is NULL and no yielding will
-         * take place.
-         *
-         * Returns a non-OK status if the plan was killed during yield or if planning fails.
-         */
-        Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
-
-        //
-        // For testing.
-        //
-
-        /**
-         * Returns true if the i-th branch was planned by retrieving a cached solution,
-         * otherwise returns false.
-         */
-        bool branchPlannedFromCache(size_t i) const;
-
-    private:
-        /**
-         * A class used internally in order to keep track of the results of planning
-         * a particular $or branch.
-         */
-        struct BranchPlanningResult {
-            MONGO_DISALLOW_COPYING(BranchPlanningResult);
-        public:
-            BranchPlanningResult() { }
-
-            // A parsed version of one branch of the $or.
-            std::unique_ptr<CanonicalQuery> canonicalQuery;
-
-            // If there is cache data available, then we store it here rather than generating
-            // a set of alternate plans for the branch. The index tags from the cache data
-            // can be applied directly to the parent $or MatchExpression when generating the
-            // composite solution.
-            std::unique_ptr<CachedSolution> cachedSolution;
-
-            // Query solutions resulting from planning the $or branch.
-            OwnedPointerVector<QuerySolution> solutions;
-        };
-
-        /**
-         * Plan each branch of the $or independently, and store the resulting
-         * lists of query solutions in '_solutions'.
-         *
-         * Called from SubplanStage::make so that construction of the subplan stage
-         * fails immediately, rather than returning a plan executor and subsequently
-         * through getNext(...).
-         */
-        Status planSubqueries();
-
-        /**
-         * Uses the query planning results from planSubqueries() and the multi plan stage
-         * to select the best plan for each branch.
-         *
-         * Helper for pickBestPlan().
-         */
-        Status choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy);
-
-        /**
-         * Used as a fallback if subplanning fails. Helper for pickBestPlan().
-         */
-        Status choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy);
-
-        // transactional context for read locks. Not owned by us
-        OperationContext* _txn;
-
-        // Not owned here. Must be non-null.
-        Collection* _collection;
-
-        // Not owned here.
-        WorkingSet* _ws;
-
-        QueryPlannerParams _plannerParams;
-
-        // Not owned here.
-        CanonicalQuery* _query;
-
-        // If we successfully create a "composite solution" by planning each $or branch
-        // independently, that solution is owned here.
-        std::unique_ptr<QuerySolution> _compositeSolution;
-
-        std::unique_ptr<PlanStage> _child;
-
-        // Holds a list of the results from planning each branch.
-        OwnedPointerVector<BranchPlanningResult> _branchResults;
-
-        // We need this to extract cache-friendly index data from the index assignments.
-        std::map<BSONObj, size_t> _indexMap;
-
-        CommonStats _commonStats;
+        // Query solutions resulting from planning the $or branch.
+        OwnedPointerVector<QuerySolution> solutions;
     };
+
+    /**
+     * Plan each branch of the $or independently, and store the resulting
+     * lists of query solutions in '_solutions'.
+     *
+     * Called from SubplanStage::make so that construction of the subplan stage
+     * fails immediately, rather than returning a plan executor and subsequently
+     * through getNext(...).
+     */
+    Status planSubqueries();
+
+    /**
+     * Uses the query planning results from planSubqueries() and the multi plan stage
+     * to select the best plan for each branch.
+     *
+     * Helper for pickBestPlan().
+     */
+    Status choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy);
+
+    /**
+     * Used as a fallback if subplanning fails. Helper for pickBestPlan().
+     */
+    Status choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy);
+
+    // transactional context for read locks. Not owned by us
+    OperationContext* _txn;
+
+    // Not owned here. Must be non-null.
+    Collection* _collection;
+
+    // Not owned here.
+    WorkingSet* _ws;
+
+    QueryPlannerParams _plannerParams;
+
+    // Not owned here.
+    CanonicalQuery* _query;
+
+    // If we successfully create a "composite solution" by planning each $or branch
+    // independently, that solution is owned here.
+    std::unique_ptr<QuerySolution> _compositeSolution;
+
+    std::unique_ptr<PlanStage> _child;
+
+    // Holds a list of the results from planning each branch.
+    OwnedPointerVector<BranchPlanningResult> _branchResults;
+
+    // We need this to extract cache-friendly index data from the index assignments.
+    std::map<BSONObj, size_t> _indexMap;
+
+    CommonStats _commonStats;
+};
 
 }  // namespace mongo

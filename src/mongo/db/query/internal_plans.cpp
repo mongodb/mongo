@@ -40,91 +40,80 @@
 
 namespace mongo {
 
-    // static
-    PlanExecutor* InternalPlanner::collectionScan(OperationContext* txn,
-                                                  StringData ns,
-                                                  Collection* collection,
-                                                  const Direction direction,
-                                                  const RecordId startLoc) {
-        WorkingSet* ws = new WorkingSet();
+// static
+PlanExecutor* InternalPlanner::collectionScan(OperationContext* txn,
+                                              StringData ns,
+                                              Collection* collection,
+                                              const Direction direction,
+                                              const RecordId startLoc) {
+    WorkingSet* ws = new WorkingSet();
 
-        if (NULL == collection) {
-            EOFStage* eof = new EOFStage();
-            PlanExecutor* exec;
-            // Takes ownership of 'ws' and 'eof'.
-            Status execStatus =  PlanExecutor::make(txn,
-                                                    ws,
-                                                    eof,
-                                                    ns.toString(),
-                                                    PlanExecutor::YIELD_MANUAL,
-                                                    &exec);
-            invariant(execStatus.isOK());
-            return exec;
-        }
-
-        invariant( ns == collection->ns().ns() );
-
-        CollectionScanParams params;
-        params.collection = collection;
-        params.start = startLoc;
-
-        if (FORWARD == direction) {
-            params.direction = CollectionScanParams::FORWARD;
-        }
-        else {
-            params.direction = CollectionScanParams::BACKWARD;
-        }
-
-        CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
+    if (NULL == collection) {
+        EOFStage* eof = new EOFStage();
         PlanExecutor* exec;
-        // Takes ownership of 'ws' and 'cs'.
-        Status execStatus = PlanExecutor::make(txn,
-                                               ws,
-                                               cs,
-                                               collection,
-                                               PlanExecutor::YIELD_MANUAL,
-                                               &exec);
+        // Takes ownership of 'ws' and 'eof'.
+        Status execStatus =
+            PlanExecutor::make(txn, ws, eof, ns.toString(), PlanExecutor::YIELD_MANUAL, &exec);
         invariant(execStatus.isOK());
         return exec;
     }
 
-    // static
-    PlanExecutor* InternalPlanner::indexScan(OperationContext* txn,
-                                             const Collection* collection,
-                                             const IndexDescriptor* descriptor,
-                                             const BSONObj& startKey, const BSONObj& endKey,
-                                             bool endKeyInclusive, Direction direction,
-                                             int options) {
-        invariant(collection);
-        invariant(descriptor);
+    invariant(ns == collection->ns().ns());
 
-        IndexScanParams params;
-        params.descriptor = descriptor;
-        params.direction = direction;
-        params.bounds.isSimpleRange = true;
-        params.bounds.startKey = startKey;
-        params.bounds.endKey = endKey;
-        params.bounds.endKeyInclusive = endKeyInclusive;
+    CollectionScanParams params;
+    params.collection = collection;
+    params.start = startLoc;
 
-        WorkingSet* ws = new WorkingSet();
-        IndexScan* ix = new IndexScan(txn, params, ws, NULL);
-
-        PlanStage* root = ix;
-
-        if (IXSCAN_FETCH & options) {
-            root = new FetchStage(txn, ws, root, NULL, collection);
-        }
-
-        PlanExecutor* exec;
-        // Takes ownership of 'ws' and 'root'.
-        Status execStatus = PlanExecutor::make(txn,
-                                               ws,
-                                               root,
-                                               collection,
-                                               PlanExecutor::YIELD_MANUAL,
-                                               &exec);
-        invariant(execStatus.isOK());
-        return exec;
+    if (FORWARD == direction) {
+        params.direction = CollectionScanParams::FORWARD;
+    } else {
+        params.direction = CollectionScanParams::BACKWARD;
     }
+
+    CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
+    PlanExecutor* exec;
+    // Takes ownership of 'ws' and 'cs'.
+    Status execStatus =
+        PlanExecutor::make(txn, ws, cs, collection, PlanExecutor::YIELD_MANUAL, &exec);
+    invariant(execStatus.isOK());
+    return exec;
+}
+
+// static
+PlanExecutor* InternalPlanner::indexScan(OperationContext* txn,
+                                         const Collection* collection,
+                                         const IndexDescriptor* descriptor,
+                                         const BSONObj& startKey,
+                                         const BSONObj& endKey,
+                                         bool endKeyInclusive,
+                                         Direction direction,
+                                         int options) {
+    invariant(collection);
+    invariant(descriptor);
+
+    IndexScanParams params;
+    params.descriptor = descriptor;
+    params.direction = direction;
+    params.bounds.isSimpleRange = true;
+    params.bounds.startKey = startKey;
+    params.bounds.endKey = endKey;
+    params.bounds.endKeyInclusive = endKeyInclusive;
+
+    WorkingSet* ws = new WorkingSet();
+    IndexScan* ix = new IndexScan(txn, params, ws, NULL);
+
+    PlanStage* root = ix;
+
+    if (IXSCAN_FETCH & options) {
+        root = new FetchStage(txn, ws, root, NULL, collection);
+    }
+
+    PlanExecutor* exec;
+    // Takes ownership of 'ws' and 'root'.
+    Status execStatus =
+        PlanExecutor::make(txn, ws, root, collection, PlanExecutor::YIELD_MANUAL, &exec);
+    invariant(execStatus.isOK());
+    return exec;
+}
 
 }  // namespace mongo

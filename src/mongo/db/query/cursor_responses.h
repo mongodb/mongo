@@ -30,36 +30,36 @@
 
 namespace mongo {
 
-    class BSONObjBuilder;
-    class StringData;
-    struct BSONArray;
+class BSONObjBuilder;
+class StringData;
+struct BSONArray;
 
-    /**
-     * Builds a cursor response object from the provided cursor identifiers and "firstBatch",
-     * and appends the response object to the provided builder under the field name "cursor".
-     * If the node is a member of a replSet, also appends the current term, primary, and 
-     * lastOp information.
-     *
-     * The response object has the following format:
-     *   { id: <NumberLong>, ns: <String>, firstBatch: <Array> }.
-     */
-    void appendCursorResponseObject(long long cursorId,
-                                    StringData cursorNamespace,
-                                    BSONArray firstBatch,
-                                    BSONObjBuilder* builder);
+/**
+ * Builds a cursor response object from the provided cursor identifiers and "firstBatch",
+ * and appends the response object to the provided builder under the field name "cursor".
+ * If the node is a member of a replSet, also appends the current term, primary, and
+ * lastOp information.
+ *
+ * The response object has the following format:
+ *   { id: <NumberLong>, ns: <String>, firstBatch: <Array> }.
+ */
+void appendCursorResponseObject(long long cursorId,
+                                StringData cursorNamespace,
+                                BSONArray firstBatch,
+                                BSONObjBuilder* builder);
 
-    /**
-     * Builds a getMore response object from the provided cursor identifiers and "nextBatch",
-     * and appends the response object to the provided builder under the field name "cursor".
-     * If the node is a member of a replSet, also appends the current term, primary, and
-     * lastOp information.
-     *
-     * The response object has the following format:
-     *   { id: <NumberLong>, ns: <String>, nextBatch: <Array> }.
-     */
-    void appendGetMoreResponseObject(long long cursorId,
-                                     StringData cursorNamespace,
-                                     BSONArray nextBatch,
-                                     BSONObjBuilder* builder);
+/**
+ * Builds a getMore response object from the provided cursor identifiers and "nextBatch",
+ * and appends the response object to the provided builder under the field name "cursor".
+ * If the node is a member of a replSet, also appends the current term, primary, and
+ * lastOp information.
+ *
+ * The response object has the following format:
+ *   { id: <NumberLong>, ns: <String>, nextBatch: <Array> }.
+ */
+void appendGetMoreResponseObject(long long cursorId,
+                                 StringData cursorNamespace,
+                                 BSONArray nextBatch,
+                                 BSONObjBuilder* builder);
 
-} // namespace mongo
+}  // namespace mongo

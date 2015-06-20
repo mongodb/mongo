@@ -37,111 +37,118 @@
 namespace mongo {
 namespace {
 
-    using std::unique_ptr;
-    using std::string;
-    using std::vector;
+using std::unique_ptr;
+using std::string;
+using std::vector;
+
+/**
+ * Implements the find command on mongos.
+ *
+ * TODO: this is just a placeholder. It needs to be implemented for real under SERVER-15176.
+ */
+class ClusterFindCmd : public Command {
+    MONGO_DISALLOW_COPYING(ClusterFindCmd);
+
+public:
+    ClusterFindCmd() : Command("find") {}
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
+
+    virtual bool maintenanceOk() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return false;
+    }
+
+    virtual void help(std::stringstream& help) const {
+        help << "query for documents";
+    }
 
     /**
-     * Implements the find command on mongos.
-     *
-     * TODO: this is just a placeholder. It needs to be implemented for real under SERVER-15176.
+     * In order to run the find command, you must be authorized for the "find" action
+     * type on the collection.
      */
-    class ClusterFindCmd : public Command {
-        MONGO_DISALLOW_COPYING(ClusterFindCmd);
-    public:
-        ClusterFindCmd() : Command("find") { }
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        AuthorizationSession* authzSession = AuthorizationSession::get(client);
+        ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool slaveOverrideOk() const { return true; }
-
-        virtual bool maintenanceOk() const { return false; }
-
-        virtual bool adminOnly() const { return false; }
-
-        virtual void help(std::stringstream& help) const {
-            help << "query for documents";
+        if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::find)) {
+            return Status::OK();
         }
 
-        /**
-         * In order to run the find command, you must be authorized for the "find" action
-         * type on the collection.
-         */
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    }
 
-            AuthorizationSession* authzSession = AuthorizationSession::get(client);
-            ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
-
-            if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::find)) {
-                return Status::OK();
-            }
-
-            return Status(ErrorCodes::Unauthorized, "unauthorized");
+    virtual Status explain(OperationContext* txn,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           ExplainCommon::Verbosity verbosity,
+                           BSONObjBuilder* out) const {
+        const string fullns = parseNs(dbname, cmdObj);
+        const NamespaceString nss(fullns);
+        if (!nss.isValid()) {
+            return {ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid collection name: " << nss.ns()};
         }
 
-        virtual Status explain(OperationContext* txn,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               ExplainCommon::Verbosity verbosity,
-                               BSONObjBuilder* out) const {
-
-            const string fullns = parseNs(dbname, cmdObj);
-            const NamespaceString nss(fullns);
-            if (!nss.isValid()) {
-                return {ErrorCodes::InvalidNamespace,
-                        str::stream() << "Invalid collection name: " << nss.ns()};
-            }
-
-            // Parse the command BSON to a LiteParsedQuery.
-            bool isExplain = true;
-            auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
-            if (!lpqStatus.isOK()) {
-                return lpqStatus.getStatus();
-            }
-
-            auto& lpq = lpqStatus.getValue();
-
-            BSONObjBuilder explainCmdBob;
-            ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
-
-            // We will time how long it takes to run the commands on the shards.
-            Timer timer;
-
-            vector<Strategy::CommandResult> shardResults;
-            Strategy::commandOp(dbname,
-                                explainCmdBob.obj(),
-                                lpq->getOptions(),
-                                fullns,
-                                lpq->getFilter(),
-                                &shardResults);
-
-            long long millisElapsed = timer.millis();
-
-            const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
-
-            return ClusterExplain::buildExplainResult(shardResults,
-                                                      mongosStageName,
-                                                      millisElapsed,
-                                                      out);
+        // Parse the command BSON to a LiteParsedQuery.
+        bool isExplain = true;
+        auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
+        if (!lpqStatus.isOK()) {
+            return lpqStatus.getStatus();
         }
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj, int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
+        auto& lpq = lpqStatus.getValue();
 
-            // Currently only explains of finds run through the find command. Queries that are not
-            // explained use the legacy OP_QUERY path.
-            errmsg = "find command not yet implemented";
-            return false;
-        }
+        BSONObjBuilder explainCmdBob;
+        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
 
-    } cmdFindCluster;
+        // We will time how long it takes to run the commands on the shards.
+        Timer timer;
 
-} // namespace
-} // namespace mongo
+        vector<Strategy::CommandResult> shardResults;
+        Strategy::commandOp(dbname,
+                            explainCmdBob.obj(),
+                            lpq->getOptions(),
+                            fullns,
+                            lpq->getFilter(),
+                            &shardResults);
+
+        long long millisElapsed = timer.millis();
+
+        const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
+
+        return ClusterExplain::buildExplainResult(
+            shardResults, mongosStageName, millisElapsed, out);
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        // Currently only explains of finds run through the find command. Queries that are not
+        // explained use the legacy OP_QUERY path.
+        errmsg = "find command not yet implemented";
+        return false;
+    }
+
+} cmdFindCluster;
+
+}  // namespace
+}  // namespace mongo

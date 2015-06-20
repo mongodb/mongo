@@ -33,16 +33,16 @@
 
 namespace mongo {
 
-    /**
-     * Wrapper around std::malloc().
-     * If std::malloc() fails, reports error with stack trace and exit.
-     */
-    void* mongoMalloc(size_t size);
+/**
+ * Wrapper around std::malloc().
+ * If std::malloc() fails, reports error with stack trace and exit.
+ */
+void* mongoMalloc(size_t size);
 
-    /**
-     * Wrapper around std::realloc().
-     * If std::realloc() fails, reports error with stack trace and exit.
-     */
-    void* mongoRealloc(void* ptr, size_t size);
+/**
+ * Wrapper around std::realloc().
+ * If std::realloc() fails, reports error with stack trace and exit.
+ */
+void* mongoRealloc(void* ptr, size_t size);
 
-} // namespace mongo
+}  // namespace mongo

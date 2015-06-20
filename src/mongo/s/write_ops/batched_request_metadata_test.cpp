@@ -22,32 +22,32 @@
 
 namespace {
 
-    using mongo::BSONArray;
-    using mongo::BSONArrayBuilder;
-    using mongo::BSONObj;
-    using mongo::BatchedRequestMetadata;
-    using mongo::OID;
-    using mongo::Timestamp;
-    using std::string;
+using mongo::BSONArray;
+using mongo::BSONArrayBuilder;
+using mongo::BSONObj;
+using mongo::BatchedRequestMetadata;
+using mongo::OID;
+using mongo::Timestamp;
+using std::string;
 
-    TEST(RoundTrip, Normal) {
-        // The BSON_ARRAY macro doesn't support Timestamps.
-        BSONArrayBuilder arrBuilder;
-        arrBuilder.append(Timestamp(1,1));
-        arrBuilder.append(OID::gen());
-        BSONArray shardVersionArray = arrBuilder.arr();
+TEST(RoundTrip, Normal) {
+    // The BSON_ARRAY macro doesn't support Timestamps.
+    BSONArrayBuilder arrBuilder;
+    arrBuilder.append(Timestamp(1, 1));
+    arrBuilder.append(OID::gen());
+    BSONArray shardVersionArray = arrBuilder.arr();
 
-        BSONObj metadataObj(BSON(BatchedRequestMetadata::shardName("shard0000") <<
-                BatchedRequestMetadata::shardVersion() << shardVersionArray <<
-                BatchedRequestMetadata::session(100)));
+    BSONObj metadataObj(BSON(BatchedRequestMetadata::shardName("shard0000")
+                             << BatchedRequestMetadata::shardVersion() << shardVersionArray
+                             << BatchedRequestMetadata::session(100)));
 
-        string errMsg;
-        BatchedRequestMetadata metadata;
-        bool ok = metadata.parseBSON(metadataObj, &errMsg);
-        ASSERT_TRUE(ok);
+    string errMsg;
+    BatchedRequestMetadata metadata;
+    bool ok = metadata.parseBSON(metadataObj, &errMsg);
+    ASSERT_TRUE(ok);
 
-        BSONObj genMetadataObj = metadata.toBSON();
-        ASSERT_EQUALS(0, genMetadataObj.woCompare(metadataObj));
-    }
+    BSONObj genMetadataObj = metadata.toBSON();
+    ASSERT_EQUALS(0, genMetadataObj.woCompare(metadataObj));
+}
 
-} // unnamed namespace
+}  // unnamed namespace

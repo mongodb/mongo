@@ -44,103 +44,104 @@
 namespace mongo {
 namespace repl {
 
-    class ReplicationCoordinatorExternalStateMock : public ReplicationCoordinatorExternalState {
-        MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateMock);
-    public:
-        class GlobalSharedLockAcquirer;
+class ReplicationCoordinatorExternalStateMock : public ReplicationCoordinatorExternalState {
+    MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateMock);
 
-        ReplicationCoordinatorExternalStateMock();
-        virtual ~ReplicationCoordinatorExternalStateMock();
-        virtual void startThreads();
-        virtual void startMasterSlave(OperationContext*);
-        virtual void shutdown();
-        virtual void initiateOplog(OperationContext* txn);
-        virtual void forwardSlaveProgress();
-        virtual OID ensureMe(OperationContext*);
-        virtual bool isSelf(const HostAndPort& host);
-        virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
-        virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
-        virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
-        virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
-        virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
-        virtual void setGlobalTimestamp(const Timestamp& newTime);
-        virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
-        virtual void closeConnections();
-        virtual void killAllUserOperations(OperationContext* txn);
-        virtual void clearShardingState();
-        virtual void signalApplierToChooseNewSyncSource();
-        virtual OperationContext* createOperationContext(const std::string& threadName);
-        virtual void dropAllTempCollections(OperationContext* txn);
+public:
+    class GlobalSharedLockAcquirer;
 
-        /**
-         * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"
-         * messages.
-         */
-        void addSelf(const HostAndPort& host);
+    ReplicationCoordinatorExternalStateMock();
+    virtual ~ReplicationCoordinatorExternalStateMock();
+    virtual void startThreads();
+    virtual void startMasterSlave(OperationContext*);
+    virtual void shutdown();
+    virtual void initiateOplog(OperationContext* txn);
+    virtual void forwardSlaveProgress();
+    virtual OID ensureMe(OperationContext*);
+    virtual bool isSelf(const HostAndPort& host);
+    virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
+    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
+    virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
+    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
+    virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
+    virtual void setGlobalTimestamp(const Timestamp& newTime);
+    virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
+    virtual void closeConnections();
+    virtual void killAllUserOperations(OperationContext* txn);
+    virtual void clearShardingState();
+    virtual void signalApplierToChooseNewSyncSource();
+    virtual OperationContext* createOperationContext(const std::string& threadName);
+    virtual void dropAllTempCollections(OperationContext* txn);
 
-        /**
-         * Sets the return value for subsequent calls to loadLocalConfigDocument().
-         */
-        void setLocalConfigDocument(const StatusWith<BSONObj>& localConfigDocument);
+    /**
+     * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"
+     * messages.
+     */
+    void addSelf(const HostAndPort& host);
 
-        /**
-         * Sets the return value for subsequent calls to loadLocalLastVoteDocument().
-         */
-        void setLocalLastVoteDocument(const StatusWith<LastVote>& localLastVoteDocument);
+    /**
+     * Sets the return value for subsequent calls to loadLocalConfigDocument().
+     */
+    void setLocalConfigDocument(const StatusWith<BSONObj>& localConfigDocument);
 
-        /**
-         * Sets the return value for subsequent calls to getClientHostAndPort().
-         */
-        void setClientHostAndPort(const HostAndPort& clientHostAndPort);
+    /**
+     * Sets the return value for subsequent calls to loadLocalLastVoteDocument().
+     */
+    void setLocalLastVoteDocument(const StatusWith<LastVote>& localLastVoteDocument);
 
-        /**
-         * Sets the return value for subsequent calls to loadLastOpTimeApplied.
-         */
-        void setLastOpTime(const StatusWith<OpTime>& lastApplied);
+    /**
+     * Sets the return value for subsequent calls to getClientHostAndPort().
+     */
+    void setClientHostAndPort(const HostAndPort& clientHostAndPort);
 
-        /**
-         * Sets the return value for subsequent calls to storeLocalConfigDocument().
-         * If "status" is Status::OK(), the subsequent calls will call the underlying funtion.
-         */ 
-        void setStoreLocalConfigDocumentStatus(Status status);
+    /**
+     * Sets the return value for subsequent calls to loadLastOpTimeApplied.
+     */
+    void setLastOpTime(const StatusWith<OpTime>& lastApplied);
 
-        /**
-         * Sets whether or not subsequent calls to storeLocalConfigDocument() should hang
-         * indefinitely or not based on the value of "hang".
-         */
-        void setStoreLocalConfigDocumentToHang(bool hang);
+    /**
+     * Sets the return value for subsequent calls to storeLocalConfigDocument().
+     * If "status" is Status::OK(), the subsequent calls will call the underlying funtion.
+     */
+    void setStoreLocalConfigDocumentStatus(Status status);
 
-        /**
-         * Sets the return value for subsequent calls to storeLocalLastVoteDocument().
-         * If "status" is Status::OK(), the subsequent calls will call the underlying funtion.
-         */ 
-        void setStoreLocalLastVoteDocumentStatus(Status status);
+    /**
+     * Sets whether or not subsequent calls to storeLocalConfigDocument() should hang
+     * indefinitely or not based on the value of "hang".
+     */
+    void setStoreLocalConfigDocumentToHang(bool hang);
 
-        /**
-         * Sets whether or not subsequent calls to storeLocalLastVoteDocument() should hang
-         * indefinitely or not based on the value of "hang".
-         */
-        void setStoreLocalLastVoteDocumentToHang(bool hang);
+    /**
+     * Sets the return value for subsequent calls to storeLocalLastVoteDocument().
+     * If "status" is Status::OK(), the subsequent calls will call the underlying funtion.
+     */
+    void setStoreLocalLastVoteDocumentStatus(Status status);
 
-    private:
-        StatusWith<BSONObj> _localRsConfigDocument;
-        StatusWith<LastVote> _localRsLastVoteDocument;
-        StatusWith<OpTime>  _lastOpTime;
-        std::vector<HostAndPort> _selfHosts;
-        bool _canAcquireGlobalSharedLock;
-        Status _storeLocalConfigDocumentStatus;
-        Status _storeLocalLastVoteDocumentStatus;
-        // mutex and cond var for controlling stroeLocalConfigDocument()'s hanging
-        stdx::mutex _shouldHangConfigMutex;
-        stdx::condition_variable _shouldHangConfigCondVar;
-        // mutex and cond var for controlling stroeLocalLastVoteDocument()'s hanging
-        stdx::mutex _shouldHangLastVoteMutex;
-        stdx::condition_variable _shouldHangLastVoteCondVar;
-        bool _storeLocalConfigDocumentShouldHang;
-        bool _storeLocalLastVoteDocumentShouldHang;
-        bool _connectionsClosed;
-        HostAndPort _clientHostAndPort;
-    };
+    /**
+     * Sets whether or not subsequent calls to storeLocalLastVoteDocument() should hang
+     * indefinitely or not based on the value of "hang".
+     */
+    void setStoreLocalLastVoteDocumentToHang(bool hang);
 
-} // namespace repl
-} // namespace mongo
+private:
+    StatusWith<BSONObj> _localRsConfigDocument;
+    StatusWith<LastVote> _localRsLastVoteDocument;
+    StatusWith<OpTime> _lastOpTime;
+    std::vector<HostAndPort> _selfHosts;
+    bool _canAcquireGlobalSharedLock;
+    Status _storeLocalConfigDocumentStatus;
+    Status _storeLocalLastVoteDocumentStatus;
+    // mutex and cond var for controlling stroeLocalConfigDocument()'s hanging
+    stdx::mutex _shouldHangConfigMutex;
+    stdx::condition_variable _shouldHangConfigCondVar;
+    // mutex and cond var for controlling stroeLocalLastVoteDocument()'s hanging
+    stdx::mutex _shouldHangLastVoteMutex;
+    stdx::condition_variable _shouldHangLastVoteCondVar;
+    bool _storeLocalConfigDocumentShouldHang;
+    bool _storeLocalLastVoteDocumentShouldHang;
+    bool _connectionsClosed;
+    HostAndPort _clientHostAndPort;
+};
+
+}  // namespace repl
+}  // namespace mongo

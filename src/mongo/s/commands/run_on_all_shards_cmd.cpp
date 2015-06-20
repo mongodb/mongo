@@ -44,141 +44,128 @@
 
 namespace mongo {
 
-    RunOnAllShardsCommand::RunOnAllShardsCommand(const char* name,
-                                                 const char* oldName,
-                                                 bool useShardConn,
-                                                 bool implicitCreateDb)
-        : Command(name, false, oldName),
-          _useShardConn(useShardConn),
-          _implicitCreateDb(implicitCreateDb) {
+RunOnAllShardsCommand::RunOnAllShardsCommand(const char* name,
+                                             const char* oldName,
+                                             bool useShardConn,
+                                             bool implicitCreateDb)
+    : Command(name, false, oldName),
+      _useShardConn(useShardConn),
+      _implicitCreateDb(implicitCreateDb) {}
 
+void RunOnAllShardsCommand::aggregateResults(const std::vector<ShardAndReply>& results,
+                                             BSONObjBuilder& output) {}
+
+BSONObj RunOnAllShardsCommand::specialErrorHandler(const std::string& server,
+                                                   const std::string& db,
+                                                   const BSONObj& cmdObj,
+                                                   const BSONObj& originalResult) const {
+    return originalResult;
+}
+
+void RunOnAllShardsCommand::getShardIds(const std::string& db,
+                                        BSONObj& cmdObj,
+                                        std::vector<ShardId>& shardIds) {
+    grid.shardRegistry()->getAllShardIds(&shardIds);
+}
+
+bool RunOnAllShardsCommand::run(OperationContext* txn,
+                                const std::string& dbName,
+                                BSONObj& cmdObj,
+                                int options,
+                                std::string& errmsg,
+                                BSONObjBuilder& output) {
+    LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj;
+
+    if (_implicitCreateDb) {
+        uassertStatusOK(grid.implicitCreateDb(dbName));
     }
 
-    void RunOnAllShardsCommand::aggregateResults(const std::vector<ShardAndReply>& results,
-                                                 BSONObjBuilder& output)
-    {}
+    std::vector<ShardId> shardIds;
+    getShardIds(dbName, cmdObj, shardIds);
 
-    BSONObj RunOnAllShardsCommand::specialErrorHandler(const std::string& server,
-                                                       const std::string& db,
-                                                       const BSONObj& cmdObj,
-                                                       const BSONObj& originalResult) const {
-        return originalResult;
-    }
-
-    void RunOnAllShardsCommand::getShardIds(const std::string& db,
-                                            BSONObj& cmdObj,
-                                            std::vector<ShardId>& shardIds) {
-        grid.shardRegistry()->getAllShardIds(&shardIds);
-    }
-
-    bool RunOnAllShardsCommand::run(OperationContext* txn,
-                                    const std::string& dbName,
-                                    BSONObj& cmdObj,
-                                    int options,
-                                    std::string& errmsg,
-                                    BSONObjBuilder& output) {
-
-        LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj;
-
-        if (_implicitCreateDb) {
-            uassertStatusOK(grid.implicitCreateDb(dbName));
+    std::list<std::shared_ptr<Future::CommandResult>> futures;
+    for (const ShardId& shardId : shardIds) {
+        const auto shard = grid.shardRegistry()->getShard(shardId);
+        if (!shard) {
+            continue;
         }
 
-        std::vector<ShardId> shardIds;
-        getShardIds(dbName, cmdObj, shardIds);
+        futures.push_back(Future::spawnCommand(
+            shard->getConnString().toString(), dbName, cmdObj, 0, NULL, _useShardConn));
+    }
 
-        std::list<std::shared_ptr<Future::CommandResult>> futures;
-        for (const ShardId& shardId : shardIds) {
-            const auto shard = grid.shardRegistry()->getShard(shardId);
-            if (!shard) {
-                continue;
-            }
+    std::vector<ShardAndReply> results;
+    BSONObjBuilder subobj(output.subobjStart("raw"));
+    BSONObjBuilder errors;
+    int commonErrCode = -1;
 
-            futures.push_back(Future::spawnCommand(shard->getConnString().toString(),
-                                                   dbName,
-                                                   cmdObj,
-                                                   0,
-                                                   NULL,
-                                                   _useShardConn));
-        }
+    std::list<std::shared_ptr<Future::CommandResult>>::iterator futuresit;
+    std::vector<ShardId>::const_iterator shardIdsIt;
+    // We iterate over the set of shard ids and their corresponding futures in parallel.
+    // TODO: replace with zip iterator if we ever decide to use one from Boost or elsewhere
+    for (futuresit = futures.begin(), shardIdsIt = shardIds.cbegin();
+         futuresit != futures.end() && shardIdsIt != shardIds.end();
+         ++futuresit, ++shardIdsIt) {
+        std::shared_ptr<Future::CommandResult> res = *futuresit;
 
-        std::vector<ShardAndReply> results;
-        BSONObjBuilder subobj (output.subobjStart("raw"));
-        BSONObjBuilder errors;
-        int commonErrCode = -1;
-
-        std::list< std::shared_ptr<Future::CommandResult> >::iterator futuresit;
-        std::vector<ShardId>::const_iterator shardIdsIt;
-        // We iterate over the set of shard ids and their corresponding futures in parallel.
-        // TODO: replace with zip iterator if we ever decide to use one from Boost or elsewhere
-        for (futuresit = futures.begin(), shardIdsIt = shardIds.cbegin();
-              futuresit != futures.end() && shardIdsIt != shardIds.end();
-              ++futuresit, ++shardIdsIt) {
-
-            std::shared_ptr<Future::CommandResult> res = *futuresit;
-
-            if ( res->join() ) {
-                // success :)
-                BSONObj result = res->result();
-                results.emplace_back(*shardIdsIt, result );
-                subobj.append( res->getServer(), result );
-                continue;
-            }
-
+        if (res->join()) {
+            // success :)
             BSONObj result = res->result();
-
-            if ( result["errmsg"].type() ||
-                 result["code"].numberInt() != 0 ) {
-                result = specialErrorHandler( res->getServer(), dbName, cmdObj, result );
-
-                BSONElement errmsg = result["errmsg"];
-                if ( errmsg.eoo() || errmsg.String().empty() ) {
-                    // it was fixed!
-                    results.emplace_back(*shardIdsIt, result );
-                    subobj.append( res->getServer(), result );
-                    continue;
-                }
-            }
-
-            // Handle "errmsg".
-            if( ! result["errmsg"].eoo() ){
-                errors.appendAs(result["errmsg"], res->getServer());
-            }
-            else {
-                // Can happen if message is empty, for some reason
-                errors.append( res->getServer(), str::stream() <<
-                               "result without error message returned : " << result );
-            }
-
-            // Handle "code".
-            int errCode = result["code"].numberInt();
-            if ( commonErrCode == -1 ) {
-                commonErrCode = errCode;
-            }
-            else if ( commonErrCode != errCode ) {
-                commonErrCode = 0;
-            }
-            results.emplace_back(*shardIdsIt, result );
-            subobj.append( res->getServer(), result );
+            results.emplace_back(*shardIdsIt, result);
+            subobj.append(res->getServer(), result);
+            continue;
         }
 
-        subobj.done();
+        BSONObj result = res->result();
 
-        BSONObj errobj = errors.done();
-        if (! errobj.isEmpty()) {
-            errmsg = errobj.toString(false, true);
+        if (result["errmsg"].type() || result["code"].numberInt() != 0) {
+            result = specialErrorHandler(res->getServer(), dbName, cmdObj, result);
 
-            // If every error has a code, and the code for all errors is the same, then add
-            // a top-level field "code" with this value to the output object.
-            if ( commonErrCode > 0 ) {
-                output.append( "code", commonErrCode );
+            BSONElement errmsg = result["errmsg"];
+            if (errmsg.eoo() || errmsg.String().empty()) {
+                // it was fixed!
+                results.emplace_back(*shardIdsIt, result);
+                subobj.append(res->getServer(), result);
+                continue;
             }
-
-            return false;
         }
 
-        aggregateResults(results, output);
-        return true;
+        // Handle "errmsg".
+        if (!result["errmsg"].eoo()) {
+            errors.appendAs(result["errmsg"], res->getServer());
+        } else {
+            // Can happen if message is empty, for some reason
+            errors.append(res->getServer(),
+                          str::stream() << "result without error message returned : " << result);
+        }
+
+        // Handle "code".
+        int errCode = result["code"].numberInt();
+        if (commonErrCode == -1) {
+            commonErrCode = errCode;
+        } else if (commonErrCode != errCode) {
+            commonErrCode = 0;
+        }
+        results.emplace_back(*shardIdsIt, result);
+        subobj.append(res->getServer(), result);
     }
 
+    subobj.done();
+
+    BSONObj errobj = errors.done();
+    if (!errobj.isEmpty()) {
+        errmsg = errobj.toString(false, true);
+
+        // If every error has a code, and the code for all errors is the same, then add
+        // a top-level field "code" with this value to the output object.
+        if (commonErrCode > 0) {
+            output.append("code", commonErrCode);
+        }
+
+        return false;
+    }
+
+    aggregateResults(results, output);
+    return true;
+}
 }

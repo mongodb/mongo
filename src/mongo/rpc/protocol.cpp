@@ -41,41 +41,36 @@ namespace rpc {
 
 namespace {
 
-    /**
-     * Protocols supported by order of preference.
-     */
-    const Protocol kPreferredProtos[] = {
-        Protocol::kOpCommandV1,
-        Protocol::kOpQuery
-    };
+/**
+ * Protocols supported by order of preference.
+ */
+const Protocol kPreferredProtos[] = {Protocol::kOpCommandV1, Protocol::kOpQuery};
 
-    const char kNone[] = "none";
-    const char kOpQueryOnly[] = "opQueryOnly";
-    const char kOpCommandOnly[] = "opCommandOnly";
-    const char kAll[] = "all";
+const char kNone[] = "none";
+const char kOpQueryOnly[] = "opQueryOnly";
+const char kOpCommandOnly[] = "opCommandOnly";
+const char kAll[] = "all";
 
 }  // namespace
 
-    StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd) {
-        using std::begin;
-        using std::end;
+StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd) {
+    using std::begin;
+    using std::end;
 
-        ProtocolSet common = fst & snd;
+    ProtocolSet common = fst & snd;
 
-        auto it =
-            std::find_if(begin(kPreferredProtos), end(kPreferredProtos), [common](Protocol p) {
-                return common & static_cast<ProtocolSet>(p);
-        });
+    auto it = std::find_if(begin(kPreferredProtos),
+                           end(kPreferredProtos),
+                           [common](Protocol p) { return common & static_cast<ProtocolSet>(p); });
 
-        if (it == end(kPreferredProtos)) {
-            return Status(ErrorCodes::RPCProtocolNegotiationFailed,
-                          "No common protocol found.");
-        }
-        return *it;
+    if (it == end(kPreferredProtos)) {
+        return Status(ErrorCodes::RPCProtocolNegotiationFailed, "No common protocol found.");
     }
+    return *it;
+}
 
-    StatusWith<StringData> toString(ProtocolSet protocols) {
-        switch (protocols) {
+StatusWith<StringData> toString(ProtocolSet protocols) {
+    switch (protocols) {
         case supports::kNone:
             return StringData(kNone);
         case supports::kOpQueryOnly:
@@ -90,28 +85,25 @@ namespace {
                                         << " to a string, only the predefined ProtocolSet "
                                         << "constants 'none' (0x0), 'opQueryOnly' (0x1), "
                                         << "'opCommandOnly' (0x2), and 'all' (0x3) are supported.");
-        }
     }
+}
 
-    StatusWith<ProtocolSet> parseProtocolSet(StringData repr) {
-        if (repr == kNone) {
-            return supports::kNone;
-        }
-        else if (repr == kOpQueryOnly) {
-            return supports::kOpQueryOnly;
-        }
-        else if (repr == kOpCommandOnly) {
-            return supports::kOpCommandOnly;
-        }
-        else if (repr == kAll) {
-            return supports::kAll;
-        }
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Can not parse a ProtocolSet from " << repr
-                                    << " only the predefined ProtocolSet constants "
-                                    << "'none' (0x0), 'opQueryOnly' (0x1), 'opCommandOnly' (0x2), "
-                                    << "and 'all' (0x3) are supported.");
+StatusWith<ProtocolSet> parseProtocolSet(StringData repr) {
+    if (repr == kNone) {
+        return supports::kNone;
+    } else if (repr == kOpQueryOnly) {
+        return supports::kOpQueryOnly;
+    } else if (repr == kOpCommandOnly) {
+        return supports::kOpCommandOnly;
+    } else if (repr == kAll) {
+        return supports::kAll;
     }
+    return Status(ErrorCodes::BadValue,
+                  str::stream() << "Can not parse a ProtocolSet from " << repr
+                                << " only the predefined ProtocolSet constants "
+                                << "'none' (0x0), 'opQueryOnly' (0x1), 'opCommandOnly' (0x2), "
+                                << "and 'all' (0x3) are supported.");
+}
 
 }  // namespace rpc
 }  // namespace mongo

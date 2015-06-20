@@ -34,267 +34,307 @@
 
 namespace {
 
-    using namespace mongo;
-    using std::set;
+using namespace mongo;
+using std::set;
 
-    // Pull nested types to top-level scope
-    typedef ReplicaSetMonitor::SetState SetState;
-    typedef SetState::Node Node;
-    typedef SetState::Nodes Nodes;
+// Pull nested types to top-level scope
+typedef ReplicaSetMonitor::SetState SetState;
+typedef SetState::Node Node;
+typedef SetState::Nodes Nodes;
 
-    bool isCompatible(const Node& node, ReadPreference pref, const TagSet& tagSet) {
-        set<HostAndPort> seeds;
-        seeds.insert(node.host);
-        SetState set("name", seeds);
-        set.nodes.push_back(node);
+bool isCompatible(const Node& node, ReadPreference pref, const TagSet& tagSet) {
+    set<HostAndPort> seeds;
+    seeds.insert(node.host);
+    SetState set("name", seeds);
+    set.nodes.push_back(node);
 
-        ReadPreferenceSetting criteria(pref, tagSet);
-        return !set.getMatchingHost(criteria).empty();
-    }
+    ReadPreferenceSetting criteria(pref, tagSet);
+    return !set.getMatchingHost(criteria).empty();
+}
 
-    const BSONObj SampleIsMasterDoc = BSON("tags" << BSON("dc" << "NYC" <<
-                                                          "p" << "2" <<
-                                                          "region" << "NA"));
-    const BSONObj SampleTags = SampleIsMasterDoc["tags"].Obj();
-    const BSONObj NoTags = BSONObj();
-    const BSONObj NoTagIsMasterDoc = BSON("isMaster" << true);
+const BSONObj SampleIsMasterDoc = BSON("tags" << BSON("dc"
+                                                      << "NYC"
+                                                      << "p"
+                                                      << "2"
+                                                      << "region"
+                                                      << "NA"));
+const BSONObj SampleTags = SampleIsMasterDoc["tags"].Obj();
+const BSONObj NoTags = BSONObj();
+const BSONObj NoTagIsMasterDoc = BSON("isMaster" << true);
 
 
-    TEST(ReplSetMonitorNode, SimpleGoodMatch) {
-        Node node(((HostAndPort())));
-        node.tags = BSON("dc" << "sf");
-        ASSERT(node.matches(BSON("dc" << "sf")));
-    }
+TEST(ReplSetMonitorNode, SimpleGoodMatch) {
+    Node node(((HostAndPort())));
+    node.tags = BSON("dc"
+                     << "sf");
+    ASSERT(node.matches(BSON("dc"
+                             << "sf")));
+}
 
-    TEST(ReplSetMonitorNode, SimpleBadMatch) {
-        Node node((HostAndPort()));
-        node.tags = BSON("dc" << "nyc");
-        ASSERT(!node.matches(BSON("dc" << "sf")));
-    }
+TEST(ReplSetMonitorNode, SimpleBadMatch) {
+    Node node((HostAndPort()));
+    node.tags = BSON("dc"
+                     << "nyc");
+    ASSERT(!node.matches(BSON("dc"
+                              << "sf")));
+}
 
-    TEST(ReplSetMonitorNode, ExactMatch) {
-        Node node((HostAndPort()));
-        node.tags = SampleTags;
-        ASSERT(node.matches(SampleIsMasterDoc["tags"].Obj()));
-    }
+TEST(ReplSetMonitorNode, ExactMatch) {
+    Node node((HostAndPort()));
+    node.tags = SampleTags;
+    ASSERT(node.matches(SampleIsMasterDoc["tags"].Obj()));
+}
 
-    TEST(ReplSetMonitorNode, EmptyTag) {
-        Node node((HostAndPort()));
-        node.tags = SampleTags;
-        ASSERT(node.matches(BSONObj()));
-    }
+TEST(ReplSetMonitorNode, EmptyTag) {
+    Node node((HostAndPort()));
+    node.tags = SampleTags;
+    ASSERT(node.matches(BSONObj()));
+}
 
-    TEST(ReplSetMonitorNode, MemberNoTagMatchesEmptyTag) {
-        Node node((HostAndPort()));
-        node.tags = NoTags;
-        ASSERT(node.matches(BSONObj()));
-    }
+TEST(ReplSetMonitorNode, MemberNoTagMatchesEmptyTag) {
+    Node node((HostAndPort()));
+    node.tags = NoTags;
+    ASSERT(node.matches(BSONObj()));
+}
 
-    TEST(ReplSetMonitorNode, MemberNoTagDoesNotMatch) {
-        Node node((HostAndPort()));
-        node.tags = NoTags;
-        ASSERT(!node.matches(BSON("dc" << "NYC")));
-    }
+TEST(ReplSetMonitorNode, MemberNoTagDoesNotMatch) {
+    Node node((HostAndPort()));
+    node.tags = NoTags;
+    ASSERT(!node.matches(BSON("dc"
+                              << "NYC")));
+}
 
-    TEST(ReplSetMonitorNode, IncompleteMatch) {
-        Node node((HostAndPort()));
-        node.tags = SampleTags;
-        ASSERT(!node.matches(BSON("dc" << "NYC"
-            << "p" << "2"
-            << "hello" << "world")));
-    }
+TEST(ReplSetMonitorNode, IncompleteMatch) {
+    Node node((HostAndPort()));
+    node.tags = SampleTags;
+    ASSERT(!node.matches(BSON("dc"
+                              << "NYC"
+                              << "p"
+                              << "2"
+                              << "hello"
+                              << "world")));
+}
 
-    TEST(ReplSetMonitorNode, PartialMatch) {
-        Node node((HostAndPort()));
-        node.tags = SampleTags;
-        ASSERT(node.matches(BSON("dc" << "NYC"
-            << "p" << "2")));
-    }
+TEST(ReplSetMonitorNode, PartialMatch) {
+    Node node((HostAndPort()));
+    node.tags = SampleTags;
+    ASSERT(node.matches(BSON("dc"
+                             << "NYC"
+                             << "p"
+                             << "2")));
+}
 
-    TEST(ReplSetMonitorNode, SingleTagCrit) {
-        Node node((HostAndPort()));
-        node.tags = SampleTags;
-        ASSERT(node.matches(BSON("p" << "2")));
-    }
+TEST(ReplSetMonitorNode, SingleTagCrit) {
+    Node node((HostAndPort()));
+    node.tags = SampleTags;
+    ASSERT(node.matches(BSON("p"
+                             << "2")));
+}
 
-    TEST(ReplSetMonitorNode, BadSingleTagCrit) {
-        Node node((HostAndPort()));
-        node.tags = SampleTags;
-        ASSERT(!node.matches(BSON("dc" << "SF")));
-    }
+TEST(ReplSetMonitorNode, BadSingleTagCrit) {
+    Node node((HostAndPort()));
+    node.tags = SampleTags;
+    ASSERT(!node.matches(BSON("dc"
+                              << "SF")));
+}
 
-    TEST(ReplSetMonitorNode, NonExistingFieldTag) {
-        Node node((HostAndPort()));
-        node.tags = SampleTags;
-        ASSERT(!node.matches(BSON("noSQL" << "Mongo")));
-    }
+TEST(ReplSetMonitorNode, NonExistingFieldTag) {
+    Node node((HostAndPort()));
+    node.tags = SampleTags;
+    ASSERT(!node.matches(BSON("noSQL"
+                              << "Mongo")));
+}
 
-    TEST(ReplSetMonitorNode, UnorederedMatching) {
-        Node node((HostAndPort()));
-        node.tags = SampleTags;
-        ASSERT(node.matches(BSON("p" << "2" << "dc" << "NYC")));
-    }
+TEST(ReplSetMonitorNode, UnorederedMatching) {
+    Node node((HostAndPort()));
+    node.tags = SampleTags;
+    ASSERT(node.matches(BSON("p"
+                             << "2"
+                             << "dc"
+                             << "NYC")));
+}
 
-    TEST(ReplSetMonitorNode, SameValueDiffKey) {
-        Node node((HostAndPort()));
-        node.tags = SampleTags;
-        ASSERT(!node.matches(BSON("datacenter" << "NYC")));
-    }
+TEST(ReplSetMonitorNode, SameValueDiffKey) {
+    Node node((HostAndPort()));
+    node.tags = SampleTags;
+    ASSERT(!node.matches(BSON("datacenter"
+                              << "NYC")));
+}
 
-    TEST(ReplSetMonitorNode, PriNodeCompatibleTag) {
-        Node node(HostAndPort("dummy", 3));
-        node.tags = SampleTags;
+TEST(ReplSetMonitorNode, PriNodeCompatibleTag) {
+    Node node(HostAndPort("dummy", 3));
+    node.tags = SampleTags;
 
-        node.isUp = true;
-        node.isMaster = true;
+    node.isUp = true;
+    node.isMaster = true;
 
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "NYC"));
+    BSONArrayBuilder builder;
+    builder.append(BSON("dc"
+                        << "NYC"));
 
-        TagSet tags(BSONArray(builder.done()));
+    TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
-    }
+    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
+}
 
-    TEST(ReplSetMonitorNode, SecNodeCompatibleTag) {
-        Node node(HostAndPort("dummy", 3));
-        node.tags = SampleTags;
+TEST(ReplSetMonitorNode, SecNodeCompatibleTag) {
+    Node node(HostAndPort("dummy", 3));
+    node.tags = SampleTags;
 
-        node.isUp = true;
-        node.isMaster = false;
+    node.isUp = true;
+    node.isMaster = false;
 
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "NYC"));
+    BSONArrayBuilder builder;
+    builder.append(BSON("dc"
+                        << "NYC"));
 
-        TagSet tags(BSONArray(builder.done()));
+    TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
-    }
+    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
+}
 
-    TEST(ReplSetMonitorNode, PriNodeNotCompatibleTag) {
-        Node node(HostAndPort("dummy", 3));
-        node.tags = SampleTags;
+TEST(ReplSetMonitorNode, PriNodeNotCompatibleTag) {
+    Node node(HostAndPort("dummy", 3));
+    node.tags = SampleTags;
 
-        node.isUp = true;
-        node.isMaster = true;
+    node.isUp = true;
+    node.isMaster = true;
 
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "SF"));
+    BSONArrayBuilder builder;
+    builder.append(BSON("dc"
+                        << "SF"));
 
-        TagSet tags(BSONArray(builder.done()));
+    TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
-    }
+    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
+}
 
-    TEST(ReplSetMonitorNode, SecNodeNotCompatibleTag) {
-        Node node(HostAndPort("dummy", 3));
-        node.tags = SampleTags;
+TEST(ReplSetMonitorNode, SecNodeNotCompatibleTag) {
+    Node node(HostAndPort("dummy", 3));
+    node.tags = SampleTags;
 
-        node.isUp = true;
-        node.isMaster = false;
+    node.isUp = true;
+    node.isMaster = false;
 
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "SF"));
+    BSONArrayBuilder builder;
+    builder.append(BSON("dc"
+                        << "SF"));
 
-        TagSet tags(BSONArray(builder.done()));
+    TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
-    }
+    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
+}
 
-    TEST(ReplSetMonitorNode, PriNodeCompatiblMultiTag) {
-        Node node(HostAndPort("dummy", 3));
-        node.tags = SampleTags;
+TEST(ReplSetMonitorNode, PriNodeCompatiblMultiTag) {
+    Node node(HostAndPort("dummy", 3));
+    node.tags = SampleTags;
 
-        node.isUp = true;
-        node.isMaster = true;
+    node.isUp = true;
+    node.isMaster = true;
 
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "RP"));
-        builder.append(BSON("dc" << "NYC" << "p" << "2"));
+    BSONArrayBuilder builder;
+    builder.append(BSON("dc"
+                        << "RP"));
+    builder.append(BSON("dc"
+                        << "NYC"
+                        << "p"
+                        << "2"));
 
-        TagSet tags(BSONArray(builder.done()));
+    TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
-    }
+    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
+}
 
-    TEST(ReplSetMonitorNode, SecNodeCompatibleMultiTag) {
-        Node node(HostAndPort("dummy", 3));
-        node.tags = SampleTags;
+TEST(ReplSetMonitorNode, SecNodeCompatibleMultiTag) {
+    Node node(HostAndPort("dummy", 3));
+    node.tags = SampleTags;
 
-        node.isUp = true;
-        node.isMaster = false;
+    node.isUp = true;
+    node.isMaster = false;
 
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "RP"));
-        builder.append(BSON("dc" << "NYC" << "p" << "2"));
+    BSONArrayBuilder builder;
+    builder.append(BSON("dc"
+                        << "RP"));
+    builder.append(BSON("dc"
+                        << "NYC"
+                        << "p"
+                        << "2"));
 
-        TagSet tags(BSONArray(builder.done()));
+    TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
-    }
+    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
+}
 
-    TEST(ReplSetMonitorNode, PriNodeNotCompatibleMultiTag) {
-        Node node(HostAndPort("dummy", 3));
-        node.tags = SampleTags;
+TEST(ReplSetMonitorNode, PriNodeNotCompatibleMultiTag) {
+    Node node(HostAndPort("dummy", 3));
+    node.tags = SampleTags;
 
-        node.isUp = true;
-        node.isMaster = true;
+    node.isUp = true;
+    node.isMaster = true;
 
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "sf"));
-        builder.append(BSON("dc" << "NYC" << "P" << "4"));
+    BSONArrayBuilder builder;
+    builder.append(BSON("dc"
+                        << "sf"));
+    builder.append(BSON("dc"
+                        << "NYC"
+                        << "P"
+                        << "4"));
 
-        TagSet tags(BSONArray(builder.done()));
+    TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
-    }
+    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
+}
 
-    TEST(ReplSetMonitorNode, SecNodeNotCompatibleMultiTag) {
-        Node node(HostAndPort("dummy", 3));
-        node.tags = SampleTags;
+TEST(ReplSetMonitorNode, SecNodeNotCompatibleMultiTag) {
+    Node node(HostAndPort("dummy", 3));
+    node.tags = SampleTags;
 
-        node.isUp = true;
-        node.isMaster = false;
+    node.isUp = true;
+    node.isMaster = false;
 
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "sf"));
-        builder.append(BSON("dc" << "NYC" << "P" << "4"));
+    BSONArrayBuilder builder;
+    builder.append(BSON("dc"
+                        << "sf"));
+    builder.append(BSON("dc"
+                        << "NYC"
+                        << "P"
+                        << "4"));
 
-        TagSet tags(BSONArray(builder.done()));
+    TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
-    }
+    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+    ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
+}
 
-} // namespace
+}  // namespace

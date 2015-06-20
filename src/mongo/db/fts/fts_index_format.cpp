@@ -40,178 +40,168 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        using std::string;
-        using std::vector;
+using std::string;
+using std::vector;
 
-        namespace {
-            BSONObj nullObj;
-            BSONElement nullElt;
+namespace {
+BSONObj nullObj;
+BSONElement nullElt;
 
-            // New in textIndexVersion 2.
-            // If the term is longer than 32 characters, it may
-            // result in the generated key being too large
-            // for the index. In that case, we generate a 64-character key
-            // from the concatenation of the first 32 characters
-            // and the hex string of the murmur3 hash value of the entire
-            // term value.
-            const size_t termKeyPrefixLength = 32U;
-            // 128-bit hash value expressed in hex = 32 characters
-            const size_t termKeySuffixLength = 32U;
-            const size_t termKeyLength = termKeyPrefixLength + termKeySuffixLength;
+// New in textIndexVersion 2.
+// If the term is longer than 32 characters, it may
+// result in the generated key being too large
+// for the index. In that case, we generate a 64-character key
+// from the concatenation of the first 32 characters
+// and the hex string of the murmur3 hash value of the entire
+// term value.
+const size_t termKeyPrefixLength = 32U;
+// 128-bit hash value expressed in hex = 32 characters
+const size_t termKeySuffixLength = 32U;
+const size_t termKeyLength = termKeyPrefixLength + termKeySuffixLength;
 
-            /**
-             * Returns size of buffer required to store term in index key.
-             * In version 1, terms are stored verbatim in key.
-             * In version 2, terms longer than 32 characters are hashed and combined
-             * with a prefix.
-             */
-            int guessTermSize( const std::string& term, TextIndexVersion textIndexVersion ) {
-                if ( TEXT_INDEX_VERSION_1 == textIndexVersion ) {
-                    return term.size();
-                }
-                else {
-                    invariant( TEXT_INDEX_VERSION_2 == textIndexVersion );
-                    if ( term.size() <= termKeyPrefixLength ) {
-                        return term.size();
-                    }
-                    return termKeyLength;
-                }
-            }
+/**
+ * Returns size of buffer required to store term in index key.
+ * In version 1, terms are stored verbatim in key.
+ * In version 2, terms longer than 32 characters are hashed and combined
+ * with a prefix.
+ */
+int guessTermSize(const std::string& term, TextIndexVersion textIndexVersion) {
+    if (TEXT_INDEX_VERSION_1 == textIndexVersion) {
+        return term.size();
+    } else {
+        invariant(TEXT_INDEX_VERSION_2 == textIndexVersion);
+        if (term.size() <= termKeyPrefixLength) {
+            return term.size();
         }
-
-        MONGO_INITIALIZER( FTSIndexFormat )( InitializerContext* context ) {
-            BSONObjBuilder b;
-            b.appendNull( "" );
-            nullObj = b.obj();
-            nullElt = nullObj.firstElement();
-            return Status::OK();
-        }
-
-        void FTSIndexFormat::getKeys( const FTSSpec& spec,
-                                      const BSONObj& obj,
-                                      BSONObjSet* keys ) {
-
-            int extraSize = 0;
-            vector<BSONElement> extrasBefore;
-            vector<BSONElement> extrasAfter;
-
-            // compute the non FTS key elements
-            for ( unsigned i = 0; i < spec.numExtraBefore(); i++ ) {
-                BSONElement e = obj.getFieldDotted(spec.extraBefore(i));
-                if ( e.eoo() )
-                    e = nullElt;
-                uassert( 16675, "cannot have a multi-key as a prefix to a text index",
-                         e.type() != Array );
-                extrasBefore.push_back(e);
-                extraSize += e.size();
-            }
-            for ( unsigned i = 0; i < spec.numExtraAfter(); i++ ) {
-                BSONElement e = obj.getFieldDotted(spec.extraAfter(i));
-                if ( e.eoo() )
-                    e = nullElt;
-                extrasAfter.push_back(e);
-                extraSize += e.size();
-            }
-
-
-            TermFrequencyMap term_freqs;
-            spec.scoreDocument( obj, &term_freqs );
-
-            // create index keys from raw scores
-            // only 1 per string
-
-            uassert( 16732,
-                     mongoutils::str::stream() << "too many unique keys for a single document to"
-                     << " have a text index, max is " << term_freqs.size() << obj["_id"],
-                     term_freqs.size() <= 400000 );
-
-            long long keyBSONSize = 0;
-            const int MaxKeyBSONSizeMB = 4;
-
-            for ( TermFrequencyMap::const_iterator i = term_freqs.begin(); i != term_freqs.end(); ++i ) {
-
-                const string& term = i->first;
-                double weight = i->second;
-
-                // guess the total size of the btree entry based on the size of the weight, term tuple
-                int guess =
-                    5 /* bson overhead */ +
-                    10 /* weight */ +
-                    8 /* term overhead */ +
-                    /* term size (could be truncated/hashed) */
-                    guessTermSize( term, spec.getTextIndexVersion() ) +
-                    extraSize;
-
-                BSONObjBuilder b(guess); // builds a BSON object with guess length.
-                for ( unsigned k = 0; k < extrasBefore.size(); k++ ) {
-                    b.appendAs( extrasBefore[k], "" );
-                }
-                _appendIndexKey( b, weight, term, spec.getTextIndexVersion() );
-                for ( unsigned k = 0; k < extrasAfter.size(); k++ ) {
-                    b.appendAs( extrasAfter[k], "" );
-                }
-                BSONObj res = b.obj();
-
-                verify( guess >= res.objsize() );
-
-                keys->insert( res );
-                keyBSONSize += res.objsize();
-
-                uassert( 16733,
-                         mongoutils::str::stream()
-                         << "trying to index text where term list is too big, max is "
-                         << MaxKeyBSONSizeMB << "mb " << obj["_id"],
-                         keyBSONSize <= ( MaxKeyBSONSizeMB * 1024 * 1024 ) );
-
-            }
-        }
-
-        BSONObj FTSIndexFormat::getIndexKey( double weight,
-                                             const string& term,
-                                             const BSONObj& indexPrefix,
-                                             TextIndexVersion textIndexVersion ) {
-            BSONObjBuilder b;
-
-            BSONObjIterator i( indexPrefix );
-            while ( i.more() ) {
-                b.appendAs( i.next(), "" );
-            }
-
-            _appendIndexKey( b, weight, term, textIndexVersion );
-            return b.obj();
-        }
-
-        void FTSIndexFormat::_appendIndexKey( BSONObjBuilder& b, double weight, const string& term,
-                                              TextIndexVersion textIndexVersion ) {
-            verify( weight >= 0 && weight <= MAX_WEIGHT ); // FTSmaxweight =  defined in fts_header
-            // Terms are added to index key verbatim.
-            if ( TEXT_INDEX_VERSION_1 == textIndexVersion ) {
-                b.append( "", term );
-                b.append( "", weight );
-            }
-            // See comments at the top of file for termKeyPrefixLength.
-            // Apply hash for text index version 2 to long terms (longer than 32 characters).
-            else {
-                invariant( TEXT_INDEX_VERSION_2 == textIndexVersion );
-                if ( term.size() <= termKeyPrefixLength ) {
-                    b.append( "", term );
-                }
-                else {
-                    union {
-                        uint64_t hash[2];
-                        char data[16];
-                    } t;
-                    uint32_t seed = 0;
-                    MurmurHash3_x64_128( term.data(), term.size(), seed, t.hash );
-                    string keySuffix = mongo::toHexLower( t.data, sizeof( t.data ) );
-                    invariant( termKeySuffixLength == keySuffix.size() );
-                    b.append( "", term.substr( 0, termKeyPrefixLength ) +
-                              keySuffix );
-                }
-                b.append( "", weight );
-            }
-        }
+        return termKeyLength;
     }
+}
+}
+
+MONGO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
+    BSONObjBuilder b;
+    b.appendNull("");
+    nullObj = b.obj();
+    nullElt = nullObj.firstElement();
+    return Status::OK();
+}
+
+void FTSIndexFormat::getKeys(const FTSSpec& spec, const BSONObj& obj, BSONObjSet* keys) {
+    int extraSize = 0;
+    vector<BSONElement> extrasBefore;
+    vector<BSONElement> extrasAfter;
+
+    // compute the non FTS key elements
+    for (unsigned i = 0; i < spec.numExtraBefore(); i++) {
+        BSONElement e = obj.getFieldDotted(spec.extraBefore(i));
+        if (e.eoo())
+            e = nullElt;
+        uassert(16675, "cannot have a multi-key as a prefix to a text index", e.type() != Array);
+        extrasBefore.push_back(e);
+        extraSize += e.size();
+    }
+    for (unsigned i = 0; i < spec.numExtraAfter(); i++) {
+        BSONElement e = obj.getFieldDotted(spec.extraAfter(i));
+        if (e.eoo())
+            e = nullElt;
+        extrasAfter.push_back(e);
+        extraSize += e.size();
+    }
+
+
+    TermFrequencyMap term_freqs;
+    spec.scoreDocument(obj, &term_freqs);
+
+    // create index keys from raw scores
+    // only 1 per string
+
+    uassert(16732,
+            mongoutils::str::stream() << "too many unique keys for a single document to"
+                                      << " have a text index, max is " << term_freqs.size()
+                                      << obj["_id"],
+            term_freqs.size() <= 400000);
+
+    long long keyBSONSize = 0;
+    const int MaxKeyBSONSizeMB = 4;
+
+    for (TermFrequencyMap::const_iterator i = term_freqs.begin(); i != term_freqs.end(); ++i) {
+        const string& term = i->first;
+        double weight = i->second;
+
+        // guess the total size of the btree entry based on the size of the weight, term tuple
+        int guess = 5 /* bson overhead */ + 10 /* weight */ + 8 /* term overhead */ +
+            /* term size (could be truncated/hashed) */
+            guessTermSize(term, spec.getTextIndexVersion()) + extraSize;
+
+        BSONObjBuilder b(guess);  // builds a BSON object with guess length.
+        for (unsigned k = 0; k < extrasBefore.size(); k++) {
+            b.appendAs(extrasBefore[k], "");
+        }
+        _appendIndexKey(b, weight, term, spec.getTextIndexVersion());
+        for (unsigned k = 0; k < extrasAfter.size(); k++) {
+            b.appendAs(extrasAfter[k], "");
+        }
+        BSONObj res = b.obj();
+
+        verify(guess >= res.objsize());
+
+        keys->insert(res);
+        keyBSONSize += res.objsize();
+
+        uassert(16733,
+                mongoutils::str::stream()
+                    << "trying to index text where term list is too big, max is "
+                    << MaxKeyBSONSizeMB << "mb " << obj["_id"],
+                keyBSONSize <= (MaxKeyBSONSizeMB * 1024 * 1024));
+    }
+}
+
+BSONObj FTSIndexFormat::getIndexKey(double weight,
+                                    const string& term,
+                                    const BSONObj& indexPrefix,
+                                    TextIndexVersion textIndexVersion) {
+    BSONObjBuilder b;
+
+    BSONObjIterator i(indexPrefix);
+    while (i.more()) {
+        b.appendAs(i.next(), "");
+    }
+
+    _appendIndexKey(b, weight, term, textIndexVersion);
+    return b.obj();
+}
+
+void FTSIndexFormat::_appendIndexKey(BSONObjBuilder& b,
+                                     double weight,
+                                     const string& term,
+                                     TextIndexVersion textIndexVersion) {
+    verify(weight >= 0 && weight <= MAX_WEIGHT);  // FTSmaxweight =  defined in fts_header
+    // Terms are added to index key verbatim.
+    if (TEXT_INDEX_VERSION_1 == textIndexVersion) {
+        b.append("", term);
+        b.append("", weight);
+    }
+    // See comments at the top of file for termKeyPrefixLength.
+    // Apply hash for text index version 2 to long terms (longer than 32 characters).
+    else {
+        invariant(TEXT_INDEX_VERSION_2 == textIndexVersion);
+        if (term.size() <= termKeyPrefixLength) {
+            b.append("", term);
+        } else {
+            union {
+                uint64_t hash[2];
+                char data[16];
+            } t;
+            uint32_t seed = 0;
+            MurmurHash3_x64_128(term.data(), term.size(), seed, t.hash);
+            string keySuffix = mongo::toHexLower(t.data, sizeof(t.data));
+            invariant(termKeySuffixLength == keySuffix.size());
+            b.append("", term.substr(0, termKeyPrefixLength) + keySuffix);
+        }
+        b.append("", weight);
+    }
+}
+}
 }

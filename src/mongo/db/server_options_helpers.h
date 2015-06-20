@@ -34,37 +34,36 @@
 
 namespace mongo {
 
-    namespace optionenvironment {
-        class OptionSection;
-        class Environment;
-    } // namespace optionenvironment
+namespace optionenvironment {
+class OptionSection;
+class Environment;
+}  // namespace optionenvironment
 
-    namespace moe = mongo::optionenvironment;
+namespace moe = mongo::optionenvironment;
 
-    Status addGeneralServerOptions(moe::OptionSection* options);
+Status addGeneralServerOptions(moe::OptionSection* options);
 
-    Status addWindowsServerOptions(moe::OptionSection* options);
+Status addWindowsServerOptions(moe::OptionSection* options);
 
-    Status addSSLServerOptions(moe::OptionSection* options);
+Status addSSLServerOptions(moe::OptionSection* options);
 
-    /**
-     * Handle custom validation of server options that can not currently be done by using
-     * Constraints in the Environment.  See the "validate" function in the Environment class for
-     * more details.
-     */
-    Status validateServerOptions(const moe::Environment& params);
+/**
+ * Handle custom validation of server options that can not currently be done by using
+ * Constraints in the Environment.  See the "validate" function in the Environment class for
+ * more details.
+ */
+Status validateServerOptions(const moe::Environment& params);
 
-    /**
-     * Canonicalize server options for the given environment.
-     *
-     * For example, the options "objcheck", "noobjcheck", and "net.wireObjectCheck" should all be
-     * merged into "net.wireObjectCheck".
-     */
-    Status canonicalizeServerOptions(moe::Environment* params);
+/**
+ * Canonicalize server options for the given environment.
+ *
+ * For example, the options "objcheck", "noobjcheck", and "net.wireObjectCheck" should all be
+ * merged into "net.wireObjectCheck".
+ */
+Status canonicalizeServerOptions(moe::Environment* params);
 
-    Status storeServerOptions(const moe::Environment& params,
-                              const std::vector<std::string>& args);
+Status storeServerOptions(const moe::Environment& params, const std::vector<std::string>& args);
 
-    void printCommandLineOpts();
+void printCommandLineOpts();
 
-} // namespace mongo
+}  // namespace mongo

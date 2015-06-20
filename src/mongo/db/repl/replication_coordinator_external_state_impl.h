@@ -37,61 +37,61 @@
 namespace mongo {
 namespace repl {
 
-    class ReplicationCoordinatorExternalStateImpl : public ReplicationCoordinatorExternalState {
-        MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateImpl);
-    public:
+class ReplicationCoordinatorExternalStateImpl : public ReplicationCoordinatorExternalState {
+    MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateImpl);
 
-        ReplicationCoordinatorExternalStateImpl();
-        virtual ~ReplicationCoordinatorExternalStateImpl();
-        virtual void startThreads();
-        virtual void startMasterSlave(OperationContext* txn);
-        virtual void shutdown();
-        virtual void initiateOplog(OperationContext* txn);
-        virtual void forwardSlaveProgress();
-        virtual OID ensureMe(OperationContext* txn);
-        virtual bool isSelf(const HostAndPort& host);
-        virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
-        virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
-        virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
-        virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
-        virtual void setGlobalTimestamp(const Timestamp& newTime);
-        virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
-        virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
-        virtual void closeConnections();
-        virtual void killAllUserOperations(OperationContext* txn);
-        virtual void clearShardingState();
-        virtual void signalApplierToChooseNewSyncSource();
-        virtual OperationContext* createOperationContext(const std::string& threadName);
-        virtual void dropAllTempCollections(OperationContext* txn);
+public:
+    ReplicationCoordinatorExternalStateImpl();
+    virtual ~ReplicationCoordinatorExternalStateImpl();
+    virtual void startThreads();
+    virtual void startMasterSlave(OperationContext* txn);
+    virtual void shutdown();
+    virtual void initiateOplog(OperationContext* txn);
+    virtual void forwardSlaveProgress();
+    virtual OID ensureMe(OperationContext* txn);
+    virtual bool isSelf(const HostAndPort& host);
+    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
+    virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
+    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
+    virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
+    virtual void setGlobalTimestamp(const Timestamp& newTime);
+    virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
+    virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
+    virtual void closeConnections();
+    virtual void killAllUserOperations(OperationContext* txn);
+    virtual void clearShardingState();
+    virtual void signalApplierToChooseNewSyncSource();
+    virtual OperationContext* createOperationContext(const std::string& threadName);
+    virtual void dropAllTempCollections(OperationContext* txn);
 
-        std::string getNextOpContextThreadName();
+    std::string getNextOpContextThreadName();
 
-    private:
-        // Guards starting threads and setting _startedThreads
-        stdx::mutex _threadMutex;
+private:
+    // Guards starting threads and setting _startedThreads
+    stdx::mutex _threadMutex;
 
-        // True when the threads have been started
-        bool _startedThreads;
+    // True when the threads have been started
+    bool _startedThreads;
 
-        // The SyncSourceFeedback class is responsible for sending replSetUpdatePosition commands
-        // for forwarding replication progress information upstream when there is chained
-        // replication.
-        SyncSourceFeedback _syncSourceFeedback;
+    // The SyncSourceFeedback class is responsible for sending replSetUpdatePosition commands
+    // for forwarding replication progress information upstream when there is chained
+    // replication.
+    SyncSourceFeedback _syncSourceFeedback;
 
-        // Thread running SyncSourceFeedback::run().
-        std::unique_ptr<stdx::thread> _syncSourceFeedbackThread;
+    // Thread running SyncSourceFeedback::run().
+    std::unique_ptr<stdx::thread> _syncSourceFeedbackThread;
 
-        // Thread running runSyncThread().
-        std::unique_ptr<stdx::thread> _applierThread;
+    // Thread running runSyncThread().
+    std::unique_ptr<stdx::thread> _applierThread;
 
-        // Thread running BackgroundSync::producerThread().
-        std::unique_ptr<stdx::thread> _producerThread;
+    // Thread running BackgroundSync::producerThread().
+    std::unique_ptr<stdx::thread> _producerThread;
 
-        // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
-        stdx::mutex _nextThreadIdMutex;
-        // Number used to uniquely name threads.
-        long long _nextThreadId;
-    };
+    // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
+    stdx::mutex _nextThreadIdMutex;
+    // Number used to uniquely name threads.
+    long long _nextThreadId;
+};
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

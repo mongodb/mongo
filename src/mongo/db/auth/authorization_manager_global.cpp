@@ -38,51 +38,50 @@
 
 namespace mongo {
 namespace {
-    class AuthzVersionParameter : public ServerParameter {
-        MONGO_DISALLOW_COPYING(AuthzVersionParameter);
-    public:
-        AuthzVersionParameter(ServerParameterSet* sps, const std::string& name);
-        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
-        virtual Status set(const BSONElement& newValueElement);
-        virtual Status setFromString(const std::string& str);
-    };
+class AuthzVersionParameter : public ServerParameter {
+    MONGO_DISALLOW_COPYING(AuthzVersionParameter);
 
-    MONGO_INITIALIZER_GENERAL(AuthzSchemaParameter,
-                              MONGO_NO_PREREQUISITES,
-                              ("BeginStartupOptionParsing"))(InitializerContext*) {
-        new AuthzVersionParameter(ServerParameterSet::getGlobal(),
-                                  authSchemaVersionServerParameter);
-        return Status::OK();
-    }
+public:
+    AuthzVersionParameter(ServerParameterSet* sps, const std::string& name);
+    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual Status set(const BSONElement& newValueElement);
+    virtual Status setFromString(const std::string& str);
+};
 
-    AuthzVersionParameter::AuthzVersionParameter(ServerParameterSet* sps, const std::string& name) :
-        ServerParameter(sps, name, false, false) {}
+MONGO_INITIALIZER_GENERAL(AuthzSchemaParameter,
+                          MONGO_NO_PREREQUISITES,
+                          ("BeginStartupOptionParsing"))(InitializerContext*) {
+    new AuthzVersionParameter(ServerParameterSet::getGlobal(), authSchemaVersionServerParameter);
+    return Status::OK();
+}
 
-    void AuthzVersionParameter::append(
-                    OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-        int authzVersion;
-        uassertStatusOK(
-                getGlobalAuthorizationManager()->getAuthorizationVersion(txn, &authzVersion));
-        b.append(name, authzVersion);
-    }
+AuthzVersionParameter::AuthzVersionParameter(ServerParameterSet* sps, const std::string& name)
+    : ServerParameter(sps, name, false, false) {}
 
-    Status AuthzVersionParameter::set(const BSONElement& newValueElement) {
-        return Status(ErrorCodes::InternalError, "set called on unsettable server parameter");
-    }
+void AuthzVersionParameter::append(OperationContext* txn,
+                                   BSONObjBuilder& b,
+                                   const std::string& name) {
+    int authzVersion;
+    uassertStatusOK(getGlobalAuthorizationManager()->getAuthorizationVersion(txn, &authzVersion));
+    b.append(name, authzVersion);
+}
 
-    Status AuthzVersionParameter::setFromString(const std::string& newValueString) {
-        return Status(ErrorCodes::InternalError, "set called on unsettable server parameter");
-    }
+Status AuthzVersionParameter::set(const BSONElement& newValueElement) {
+    return Status(ErrorCodes::InternalError, "set called on unsettable server parameter");
+}
+
+Status AuthzVersionParameter::setFromString(const std::string& newValueString) {
+    return Status(ErrorCodes::InternalError, "set called on unsettable server parameter");
+}
 
 }  // namespace
 
-    const std::string authSchemaVersionServerParameter = "authSchemaVersion";
+const std::string authSchemaVersionServerParameter = "authSchemaVersion";
 
-    AuthorizationManager* getGlobalAuthorizationManager() {
-        AuthorizationManager* globalAuthManager = AuthorizationManager::get(
-                getGlobalServiceContext());
-        fassert(16842, globalAuthManager != nullptr);
-        return globalAuthManager;
-    }
+AuthorizationManager* getGlobalAuthorizationManager() {
+    AuthorizationManager* globalAuthManager = AuthorizationManager::get(getGlobalServiceContext());
+    fassert(16842, globalAuthManager != nullptr);
+    return globalAuthManager;
+}
 
-} // namespace mongo
+}  // namespace mongo

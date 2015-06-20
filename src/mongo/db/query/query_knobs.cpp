@@ -32,40 +32,40 @@
 
 namespace mongo {
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationWorks, int, 10000);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationWorks, int, 10000);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationCollFraction, double, 0.3);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationCollFraction, double, 0.3);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationMaxResults, int, 101);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationMaxResults, int, 101);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheSize, int, 5000);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheSize, int, 5000);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheFeedbacksStored, int, 20);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheFeedbacksStored, int, 20);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheEvictionRatio, double, 10.0);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheEvictionRatio, double, 10.0);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheWriteOpsBetweenFlush, int, 1000);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheWriteOpsBetweenFlush, int, 1000);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerMaxIndexedSolutions, int, 64);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerMaxIndexedSolutions, int, 64);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxOrSolutions, int, 10);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxOrSolutions, int, 10);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxIntersectPerAnd, int, 3);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxIntersectPerAnd, int, 3);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryForceIntersectionPlans, bool, false);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryForceIntersectionPlans, bool, false);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerEnableIndexIntersection, bool, true);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerEnableIndexIntersection, bool, true);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerEnableHashIntersection, bool, false);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerEnableHashIntersection, bool, false);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanOrChildrenIndependently, bool, true);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanOrChildrenIndependently, bool, true);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryMaxScansToExplode, int, 200);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryMaxScansToExplode, int, 200);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecMaxBlockingSortBytes, int, 32 * 1024 * 1024);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecMaxBlockingSortBytes, int, 32 * 1024 * 1024);
 
-    // Yield every 128 cycles or 10ms.
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldIterations, int, 128);
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldPeriodMS, int, 10);
+// Yield every 128 cycles or 10ms.
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldIterations, int, 128);
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldPeriodMS, int, 10);
 
 }  // namespace mongo

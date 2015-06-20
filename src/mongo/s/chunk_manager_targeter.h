@@ -36,130 +36,130 @@
 
 namespace mongo {
 
-    class ChunkManager;
-    struct ChunkVersion;
-    class Shard;
+class ChunkManager;
+struct ChunkVersion;
+class Shard;
 
-    struct TargeterStats {
-        // Map of chunk shard minKey -> approximate delta. This is used for deciding
-        // whether a chunk might need splitting or not.
-        std::map<BSONObj, int> chunkSizeDelta;
-    };
+struct TargeterStats {
+    // Map of chunk shard minKey -> approximate delta. This is used for deciding
+    // whether a chunk might need splitting or not.
+    std::map<BSONObj, int> chunkSizeDelta;
+};
+
+/**
+ * NSTargeter based on a ChunkManager implementation.  Wraps all exception codepaths and
+ * returns DatabaseNotFound statuses on applicable failures.
+ *
+ * Must be initialized before use, and initialization may fail.
+ */
+class ChunkManagerTargeter : public NSTargeter {
+public:
+    ChunkManagerTargeter(const NamespaceString& nss);
 
     /**
-     * NSTargeter based on a ChunkManager implementation.  Wraps all exception codepaths and
-     * returns DatabaseNotFound statuses on applicable failures.
+     * Initializes the ChunkManagerTargeter with the latest targeting information for the
+     * namespace.  May need to block and load information from a remote config server.
      *
-     * Must be initialized before use, and initialization may fail.
+     * Returns !OK if the information could not be initialized.
      */
-    class ChunkManagerTargeter : public NSTargeter {
-    public:
-        ChunkManagerTargeter(const NamespaceString& nss);
+    Status init();
 
-        /**
-         * Initializes the ChunkManagerTargeter with the latest targeting information for the
-         * namespace.  May need to block and load information from a remote config server.
-         *
-         * Returns !OK if the information could not be initialized.
-         */
-        Status init();
+    const NamespaceString& getNS() const;
 
-        const NamespaceString& getNS() const;
+    // Returns ShardKeyNotFound if document does not have a full shard key.
+    Status targetInsert(const BSONObj& doc, ShardEndpoint** endpoint) const;
 
-        // Returns ShardKeyNotFound if document does not have a full shard key.
-        Status targetInsert( const BSONObj& doc, ShardEndpoint** endpoint ) const;
+    // Returns ShardKeyNotFound if the update can't be targeted without a shard key.
+    Status targetUpdate(const BatchedUpdateDocument& updateDoc,
+                        std::vector<ShardEndpoint*>* endpoints) const;
 
-        // Returns ShardKeyNotFound if the update can't be targeted without a shard key.
-        Status targetUpdate( const BatchedUpdateDocument& updateDoc,
-                             std::vector<ShardEndpoint*>* endpoints ) const;
+    // Returns ShardKeyNotFound if the delete can't be targeted without a shard key.
+    Status targetDelete(const BatchedDeleteDocument& deleteDoc,
+                        std::vector<ShardEndpoint*>* endpoints) const;
 
-        // Returns ShardKeyNotFound if the delete can't be targeted without a shard key.
-        Status targetDelete( const BatchedDeleteDocument& deleteDoc,
-                             std::vector<ShardEndpoint*>* endpoints ) const;
+    Status targetCollection(std::vector<ShardEndpoint*>* endpoints) const;
 
-        Status targetCollection( std::vector<ShardEndpoint*>* endpoints ) const;
+    Status targetAllShards(std::vector<ShardEndpoint*>* endpoints) const;
 
-        Status targetAllShards( std::vector<ShardEndpoint*>* endpoints ) const;
+    void noteStaleResponse(const ShardEndpoint& endpoint, const BSONObj& staleInfo);
 
-        void noteStaleResponse( const ShardEndpoint& endpoint, const BSONObj& staleInfo );
+    void noteCouldNotTarget();
 
-        void noteCouldNotTarget();
+    /**
+     * Replaces the targeting information with the latest information from the cache.  If this
+     * information is stale WRT the noted stale responses or a remote refresh is needed due
+     * to a targeting failure, will contact the config servers to reload the metadata.
+     *
+     * Reports wasChanged = true if the metadata is different after this reload.
+     *
+     * Also see NSTargeter::refreshIfNeeded().
+     */
+    Status refreshIfNeeded(bool* wasChanged);
 
-        /**
-         * Replaces the targeting information with the latest information from the cache.  If this
-         * information is stale WRT the noted stale responses or a remote refresh is needed due
-         * to a targeting failure, will contact the config servers to reload the metadata.
-         *
-         * Reports wasChanged = true if the metadata is different after this reload.
-         *
-         * Also see NSTargeter::refreshIfNeeded().
-         */
-        Status refreshIfNeeded( bool* wasChanged );
+    /**
+     * Returns the stats. Note that the returned stats object is still owned by this targeter.
+     */
+    const TargeterStats* getStats() const;
 
-        /**
-         * Returns the stats. Note that the returned stats object is still owned by this targeter.
-         */
-        const TargeterStats* getStats() const;
-
-    private:
-        // Different ways we can refresh metadata
-        enum RefreshType {
-            // No refresh is needed
-            RefreshType_None,
-            // The version has gone up, but the collection hasn't been dropped
-            RefreshType_RefreshChunkManager,
-            // The collection may have been dropped, so we need to reload the db
-            RefreshType_ReloadDatabase
-        };
-
-        typedef std::map<std::string, ChunkVersion> ShardVersionMap;
-
-
-        /**
-         * Performs an actual refresh from the config server.
-         */
-        Status refreshNow( RefreshType refreshType );
-
-        /**
-         * Returns a vector of ShardEndpoints where a document might need to be placed.
-         *
-         * Returns !OK with message if replacement could not be targeted
-         */
-        Status targetDoc(const BSONObj& doc, std::vector<ShardEndpoint*>* endpoints) const;
-
-        /**
-         * Returns a vector of ShardEndpoints for a potentially multi-shard query.
-         *
-         * Returns !OK with message if query could not be targeted.
-         */
-        Status targetQuery( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const;
-
-        /**
-         * Returns a ShardEndpoint for an exact shard key query.
-         *
-         * Also has the side effect of updating the chunks stats with an estimate of the amount of
-         * data targeted at this shard key.
-         */
-        Status targetShardKey(const BSONObj& doc,
-                              long long estDataSize,
-                              ShardEndpoint** endpoint) const;
-
-        // Full namespace of the collection for this targeter
-        const NamespaceString _nss;
-
-        // Stores whether we need to check the remote server on refresh
-        bool _needsTargetingRefresh;
-
-        // Represents only the view and not really part of the targeter state.
-        mutable TargeterStats _stats;
-
-        // Zero or one of these are filled at all times
-        // If sharded, _manager, if unsharded, _primary, on error, neither
-        std::shared_ptr<ChunkManager> _manager;
-        std::shared_ptr<Shard> _primary;
-
-        // Map of shard->remote shard version reported from stale errors
-        ShardVersionMap _remoteShardVersions;
+private:
+    // Different ways we can refresh metadata
+    enum RefreshType {
+        // No refresh is needed
+        RefreshType_None,
+        // The version has gone up, but the collection hasn't been dropped
+        RefreshType_RefreshChunkManager,
+        // The collection may have been dropped, so we need to reload the db
+        RefreshType_ReloadDatabase
     };
 
-} // namespace mongo
+    typedef std::map<std::string, ChunkVersion> ShardVersionMap;
+
+
+    /**
+     * Performs an actual refresh from the config server.
+     */
+    Status refreshNow(RefreshType refreshType);
+
+    /**
+     * Returns a vector of ShardEndpoints where a document might need to be placed.
+     *
+     * Returns !OK with message if replacement could not be targeted
+     */
+    Status targetDoc(const BSONObj& doc, std::vector<ShardEndpoint*>* endpoints) const;
+
+    /**
+     * Returns a vector of ShardEndpoints for a potentially multi-shard query.
+     *
+     * Returns !OK with message if query could not be targeted.
+     */
+    Status targetQuery(const BSONObj& query, std::vector<ShardEndpoint*>* endpoints) const;
+
+    /**
+     * Returns a ShardEndpoint for an exact shard key query.
+     *
+     * Also has the side effect of updating the chunks stats with an estimate of the amount of
+     * data targeted at this shard key.
+     */
+    Status targetShardKey(const BSONObj& doc,
+                          long long estDataSize,
+                          ShardEndpoint** endpoint) const;
+
+    // Full namespace of the collection for this targeter
+    const NamespaceString _nss;
+
+    // Stores whether we need to check the remote server on refresh
+    bool _needsTargetingRefresh;
+
+    // Represents only the view and not really part of the targeter state.
+    mutable TargeterStats _stats;
+
+    // Zero or one of these are filled at all times
+    // If sharded, _manager, if unsharded, _primary, on error, neither
+    std::shared_ptr<ChunkManager> _manager;
+    std::shared_ptr<Shard> _primary;
+
+    // Map of shard->remote shard version reported from stale errors
+    ShardVersionMap _remoteShardVersions;
+};
+
+}  // namespace mongo

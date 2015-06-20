@@ -34,59 +34,56 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-    struct CollectionOptions;
-    class NamespaceString;
-    class OperationContext;
+struct CollectionOptions;
+class NamespaceString;
+class OperationContext;
 
-    struct oplogUpdateEntryArgs {
-        std::string ns;
-        BSONObj update;
-        BSONObj criteria;
-        bool fromMigrate;
-    };
+struct oplogUpdateEntryArgs {
+    std::string ns;
+    BSONObj update;
+    BSONObj criteria;
+    bool fromMigrate;
+};
 
-    class OpObserver {
-        MONGO_DISALLOW_COPYING(OpObserver);
+class OpObserver {
+    MONGO_DISALLOW_COPYING(OpObserver);
 
-    public:
-        OpObserver() {}
-        ~OpObserver() {}
-        void onCreateIndex(OperationContext* txn,
-                           const std::string& ns,
-                           BSONObj indexDoc,
-                           bool fromMigrate = false);
-        void onInsert(OperationContext* txn,
-                      const NamespaceString& ns,
-                      BSONObj doc,
-                      bool fromMigrate = false);
-        void onUpdate(OperationContext* txn,
-                      oplogUpdateEntryArgs args);
-        void onDelete(OperationContext* txn,
-                      const std::string& ns,
-                      const BSONObj& idDoc,
-                      bool fromMigrate = false);
-        void onOpMessage(OperationContext* txn, const BSONObj& msgObj);
-        void onCreateCollection(OperationContext* txn,
-                                const NamespaceString& collectionName,
-                                const CollectionOptions& options);
-        void onCollMod(OperationContext* txn, const std::string& dbName, const BSONObj& collModCmd);
-        void onDropDatabase(OperationContext* txn, const std::string& dbName);
-        void onDropCollection(OperationContext* txn, const NamespaceString& collectionName);
-        void onDropIndex(OperationContext* txn,
-                         const std::string& dbName,
-                         const BSONObj& idxDescriptor);
-        void onRenameCollection(OperationContext* txn,
-                                const NamespaceString& fromCollection,
-                                const NamespaceString& toCollection,
-                                bool dropTarget,
-                                bool stayTemp);
-        void onApplyOps(OperationContext* txn,
-                        const std::string& dbName,
-                        const BSONObj& applyOpCmd);
-        void onEmptyCapped(OperationContext* txn, const NamespaceString& collectionName);
-        void onConvertToCapped(OperationContext* txn,
-                               const NamespaceString& collectionName,
-                               double size);
-    };
+public:
+    OpObserver() {}
+    ~OpObserver() {}
+    void onCreateIndex(OperationContext* txn,
+                       const std::string& ns,
+                       BSONObj indexDoc,
+                       bool fromMigrate = false);
+    void onInsert(OperationContext* txn,
+                  const NamespaceString& ns,
+                  BSONObj doc,
+                  bool fromMigrate = false);
+    void onUpdate(OperationContext* txn, oplogUpdateEntryArgs args);
+    void onDelete(OperationContext* txn,
+                  const std::string& ns,
+                  const BSONObj& idDoc,
+                  bool fromMigrate = false);
+    void onOpMessage(OperationContext* txn, const BSONObj& msgObj);
+    void onCreateCollection(OperationContext* txn,
+                            const NamespaceString& collectionName,
+                            const CollectionOptions& options);
+    void onCollMod(OperationContext* txn, const std::string& dbName, const BSONObj& collModCmd);
+    void onDropDatabase(OperationContext* txn, const std::string& dbName);
+    void onDropCollection(OperationContext* txn, const NamespaceString& collectionName);
+    void onDropIndex(OperationContext* txn,
+                     const std::string& dbName,
+                     const BSONObj& idxDescriptor);
+    void onRenameCollection(OperationContext* txn,
+                            const NamespaceString& fromCollection,
+                            const NamespaceString& toCollection,
+                            bool dropTarget,
+                            bool stayTemp);
+    void onApplyOps(OperationContext* txn, const std::string& dbName, const BSONObj& applyOpCmd);
+    void onEmptyCapped(OperationContext* txn, const NamespaceString& collectionName);
+    void onConvertToCapped(OperationContext* txn,
+                           const NamespaceString& collectionName,
+                           double size);
+};
 
-} // namespace mongo
+}  // namespace mongo

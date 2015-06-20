@@ -36,167 +36,162 @@
 
 namespace mongo {
 
-    class ConstDataCursor : public ConstDataView {
-    public:
+class ConstDataCursor : public ConstDataView {
+public:
+    typedef ConstDataView view_type;
 
-        typedef ConstDataView view_type;
+    ConstDataCursor(ConstDataView::bytes_type bytes) : ConstDataView(bytes) {}
 
-        ConstDataCursor(ConstDataView::bytes_type bytes)
-            : ConstDataView(bytes) {
-        }
+    ConstDataCursor operator+(std::size_t s) const {
+        return view() + s;
+    }
 
-        ConstDataCursor operator+(std::size_t s) const {
-            return view() + s;
-        }
+    ConstDataCursor& operator+=(std::size_t s) {
+        *this = view() + s;
+        return *this;
+    }
 
-        ConstDataCursor& operator+=(std::size_t s) {
-            *this = view() + s;
-            return *this;
-        }
+    ConstDataCursor operator-(std::size_t s) const {
+        return view() - s;
+    }
 
-        ConstDataCursor operator-(std::size_t s) const {
-            return view() - s;
-        }
+    ConstDataCursor& operator-=(std::size_t s) {
+        *this = view() - s;
+        return *this;
+    }
 
-        ConstDataCursor& operator-=(std::size_t s) {
-            *this = view() - s;
-            return *this;
-        }
+    ConstDataCursor& operator++() {
+        return operator+=(1);
+    }
 
-        ConstDataCursor& operator++() {
-            return operator+=(1);
-        }
+    ConstDataCursor operator++(int) {
+        ConstDataCursor tmp = *this;
+        operator++();
+        return tmp;
+    }
 
-        ConstDataCursor operator++(int) {
-            ConstDataCursor tmp = *this;
-            operator++();
-            return tmp;
-        }
+    ConstDataCursor& operator--() {
+        return operator-=(1);
+    }
 
-        ConstDataCursor& operator--() {
-            return operator-=(1);
-        }
+    ConstDataCursor operator--(int) {
+        ConstDataCursor tmp = *this;
+        operator--();
+        return tmp;
+    }
 
-        ConstDataCursor operator--(int) {
-            ConstDataCursor tmp = *this;
-            operator--();
-            return tmp;
-        }
+    template <typename T>
+    ConstDataCursor& skip() {
+        size_t advance = 0;
 
-        template <typename T>
-        ConstDataCursor& skip() {
-            size_t advance = 0;
+        DataType::unsafeLoad<T>(nullptr, view(), &advance);
+        *this += advance;
 
-            DataType::unsafeLoad<T>(nullptr, view(), &advance);
-            *this += advance;
+        return *this;
+    }
 
-            return *this;
-        }
+    template <typename T>
+    ConstDataCursor& readAndAdvance(T* t) {
+        size_t advance = 0;
 
-        template <typename T>
-        ConstDataCursor& readAndAdvance(T* t) {
-            size_t advance = 0;
+        DataType::unsafeLoad(t, view(), &advance);
+        *this += advance;
 
-            DataType::unsafeLoad(t, view(), &advance);
-            *this += advance;
+        return *this;
+    }
 
-            return *this;
-        }
+    template <typename T>
+    T readAndAdvance() {
+        T out(DataType::defaultConstruct<T>());
+        readAndAdvance(&out);
+        return out;
+    }
+};
 
-        template <typename T>
-        T readAndAdvance() {
-            T out(DataType::defaultConstruct<T>());
-            readAndAdvance(&out);
-            return out;
-        }
-    };
+class DataCursor : public DataView {
+public:
+    typedef DataView view_type;
 
-    class DataCursor : public DataView {
-    public:
+    DataCursor(DataView::bytes_type bytes) : DataView(bytes) {}
 
-        typedef DataView view_type;
+    operator ConstDataCursor() const {
+        return view();
+    }
 
-        DataCursor(DataView::bytes_type bytes)
-            : DataView(bytes) {}
+    DataCursor operator+(std::size_t s) const {
+        return view() + s;
+    }
 
-        operator ConstDataCursor() const {
-            return view();
-        }
+    DataCursor& operator+=(std::size_t s) {
+        *this = view() + s;
+        return *this;
+    }
 
-        DataCursor operator+(std::size_t s) const {
-            return view() + s;
-        }
+    DataCursor operator-(std::size_t s) const {
+        return view() - s;
+    }
 
-        DataCursor& operator+=(std::size_t s) {
-            *this = view() + s;
-            return *this;
-        }
+    DataCursor& operator-=(std::size_t s) {
+        *this = view() - s;
+        return *this;
+    }
 
-        DataCursor operator-(std::size_t s) const {
-            return view() - s;
-        }
+    DataCursor& operator++() {
+        return operator+=(1);
+    }
 
-        DataCursor& operator-=(std::size_t s) {
-            *this = view() - s;
-            return *this;
-        }
+    DataCursor operator++(int) {
+        DataCursor tmp = *this;
+        operator++();
+        return tmp;
+    }
 
-        DataCursor& operator++() {
-            return operator+=(1);
-        }
+    DataCursor& operator--() {
+        return operator-=(1);
+    }
 
-        DataCursor operator++(int) {
-            DataCursor tmp = *this;
-            operator++();
-            return tmp;
-        }
+    DataCursor operator--(int) {
+        DataCursor tmp = *this;
+        operator--();
+        return tmp;
+    }
 
-        DataCursor& operator--() {
-            return operator-=(1);
-        }
+    template <typename T>
+    DataCursor& skip() {
+        size_t advance = 0;
 
-        DataCursor operator--(int) {
-            DataCursor tmp = *this;
-            operator--();
-            return tmp;
-        }
+        DataType::unsafeLoad<T>(nullptr, view(), &advance);
+        *this += advance;
 
-        template <typename T>
-        DataCursor& skip() {
-            size_t advance = 0;
+        return *this;
+    }
 
-            DataType::unsafeLoad<T>(nullptr, view(), &advance);
-            *this += advance;
+    template <typename T>
+    DataCursor& readAndAdvance(T* t) {
+        size_t advance = 0;
 
-            return *this;
-        }
+        DataType::unsafeLoad(t, view(), &advance);
+        *this += advance;
 
-        template <typename T>
-        DataCursor& readAndAdvance(T* t) {
-            size_t advance = 0;
+        return *this;
+    }
 
-            DataType::unsafeLoad(t, view(), &advance);
-            *this += advance;
+    template <typename T>
+    T readAndAdvance() {
+        T out(DataType::defaultConstruct<T>());
+        readAndAdvance(&out);
+        return out;
+    }
 
-            return *this;
-        }
+    template <typename T>
+    DataCursor& writeAndAdvance(const T& value) {
+        size_t advance = 0;
 
-        template <typename T>
-        T readAndAdvance() {
-            T out(DataType::defaultConstruct<T>());
-            readAndAdvance(&out);
-            return out;
-        }
+        DataType::unsafeStore(value, view(), &advance);
+        *this += advance;
 
-        template <typename T>
-        DataCursor& writeAndAdvance(const T& value) {
-            size_t advance = 0;
+        return *this;
+    }
+};
 
-            DataType::unsafeStore(value, view(), &advance);
-            *this += advance;
-
-            return *this;
-        }
-    };
-
-} // namespace mongo
+}  // namespace mongo

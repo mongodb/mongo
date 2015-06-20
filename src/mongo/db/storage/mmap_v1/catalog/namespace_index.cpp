@@ -47,211 +47,194 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::list;
-    using std::string;
+using std::endl;
+using std::list;
+using std::string;
 
-    NamespaceIndex::NamespaceIndex(const std::string& dir, const std::string& database)
-        : _dir(dir),
-          _database(database),
-          _ht(nullptr) {
+NamespaceIndex::NamespaceIndex(const std::string& dir, const std::string& database)
+    : _dir(dir), _database(database), _ht(nullptr) {}
 
-    }
+NamespaceIndex::~NamespaceIndex() {}
 
-    NamespaceIndex::~NamespaceIndex() {
-
-    }
-
-    NamespaceDetails* NamespaceIndex::details(StringData ns) const {
-        const Namespace n(ns);
-        return details(n);
-    }
-
-    NamespaceDetails* NamespaceIndex::details(const Namespace& ns) const {
-        return _ht->get(ns);
-    }
-
-    void NamespaceIndex::add_ns( OperationContext* txn,
-                                 StringData ns, const DiskLoc& loc, bool capped) {
-        NamespaceDetails details( loc, capped );
-        add_ns( txn, ns, &details );
-    }
-
-    void NamespaceIndex::add_ns( OperationContext* txn,
-                                 StringData ns,
-                                 const NamespaceDetails* details ) {
-        Namespace n(ns);
-        add_ns( txn, n, details );
-    }
-
-    void NamespaceIndex::add_ns( OperationContext* txn,
-                                 const Namespace& ns,
-                                 const NamespaceDetails* details ) {
-        const NamespaceString nss(ns.toString());
-        invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
-
-        massert(17315, "no . in ns", nsIsFull(nss.toString()));
-
-        uassert(10081, "too many namespaces/collections", _ht->put(txn, ns, *details));
-    }
-
-    void NamespaceIndex::kill_ns( OperationContext* txn, StringData ns) {
-        const NamespaceString nss(ns.toString());
-        invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
-
-        const Namespace n(ns);
-        _ht->kill(txn, n);
-
-        if (ns.size() <= Namespace::MaxNsColletionLen) {
-            // Larger namespace names don't have room for $extras so they can't exist. The code
-            // below would cause an "$extra: ns too large" error and stacktrace to be printed to the
-            // log even though everything is fine.
-            for( int i = 0; i<=1; i++ ) {
-                try {
-                    Namespace extra(n.extraName(i));
-                    _ht->kill(txn, extra);
-                }
-                catch(DBException&) {
-                    LOG(3) << "caught exception in kill_ns" << endl;
-                }
-            }
-        }
-    }
-
-    bool NamespaceIndex::pathExists() const {
-        return boost::filesystem::exists(path());
-    }
-
-    boost::filesystem::path NamespaceIndex::path() const {
-        boost::filesystem::path ret( _dir );
-        if (storageGlobalParams.directoryperdb)
-            ret /= _database;
-        ret /= ( _database + ".ns" );
-        return ret;
-    }
-
-    static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , list<string>* l ) {
-        if ( ! k.hasDollarSign() || k == "local.oplog.$main" ) {
-            // we call out local.oplog.$main specifically as its the only "normal"
-            // collection that has a $, so we make sure it gets added
-            l->push_back( k.toString() );
-        }
-    }
-
-    void NamespaceIndex::getCollectionNamespaces( list<string>* tofill ) const {
-        _ht->iterAll(stdx::bind(namespaceGetNamespacesCallback,
-                                stdx::placeholders::_1,
-                                stdx::placeholders::_2,
-                                tofill));
-    }
-
-    void NamespaceIndex::maybeMkdir() const {
-        if (!storageGlobalParams.directoryperdb)
-            return;
-        boost::filesystem::path dir( _dir );
-        dir /= _database;
-        if ( !boost::filesystem::exists( dir ) )
-            MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( boost::filesystem::create_directory( dir ), "create dir for db " );
-    }
-
-    void NamespaceIndex::init(OperationContext* txn) {
-        invariant(!_ht.get());
-
-        unsigned long long len = 0;
-
-        const boost::filesystem::path nsPath = path();
-        const std::string pathString = nsPath.string();
-
-        void* p = 0;
-
-        if (boost::filesystem::exists(nsPath)) {
-            if (_f.open(pathString, true)) {
-                len = _f.length();
-
-                if (len % (1024 * 1024) != 0) {
-                    StringBuilder sb;
-                    sb << "Invalid length: " << len
-                       << " for .ns file: " << pathString << ". Cannot open database";
-
-                    log() << sb.str();
-                    uassert(10079, sb.str(), len % (1024 * 1024) == 0);
-                }
-
-                p = _f.getView();
-            }
-        }
-        else {
-            // use mmapv1GlobalOptions.lenForNewNsFiles, we are making a new database
-            massert(10343,
-                    "bad mmapv1GlobalOptions.lenForNewNsFiles",
-                    mmapv1GlobalOptions.lenForNewNsFiles >= 1024*1024);
-
-            maybeMkdir();
-
-            unsigned long long l = mmapv1GlobalOptions.lenForNewNsFiles;
-            log() << "allocating new ns file " << pathString << ", filling with zeroes..." << endl;
-
-            {
-                // Due to SERVER-15369 we need to explicitly write zero-bytes to the NS file.
-                const unsigned long long kBlockSize = 1024*1024;
-                invariant(l % kBlockSize == 0); // ns files can only be multiples of 1MB
-                const std::vector<char> zeros(kBlockSize, 0);
-
-                File file;
-                file.open(pathString.c_str());
-
-                massert(18825,
-                        str::stream() << "couldn't create file " << pathString,
-                        file.is_open());
-
-                for (fileofs ofs = 0; ofs < l && !file.bad(); ofs += kBlockSize) {
-                    file.write(ofs, &zeros[0], kBlockSize);
-                }
-
-                if (file.bad()) {
-                    try {
-                        boost::filesystem::remove(pathString);
-                    } catch (const std::exception& e) {
-                        StringBuilder ss;
-                        ss << "error removing file: " << e.what();
-                        massert(18909, ss.str(), 0);
-                    }
-                }
-                else {
-                    file.fsync();
-                }
-
-                massert(18826,
-                        str::stream() << "failure writing file " << pathString,
-                        !file.bad());
-            }
-
-            if (_f.create(pathString, l, true)) {
-                // The writes done in this function must not be rolled back. This will leave the
-                // file empty, but available for future use. That is why we go directly to the
-                // global dur dirty list rather than going through the OperationContext.
-                getDur().createdFile(pathString, l);
-
-                // Commit the journal and all changes to disk so that even if exceptions occur
-                // during subsequent initialization, we won't have uncommited changes during file
-                // close.
-                getDur().commitNow(txn);
-
-                len = l;
-                invariant(len == mmapv1GlobalOptions.lenForNewNsFiles);
-
-                p = _f.getView();
-            }
-        }
-
-        if (p == 0) {
-            severe() << "error couldn't open file " << pathString << " terminating" << endl;
-            invariant(false);
-        }
-
-        invariant(len <= 0x7fffffff);
-        _ht.reset(new NamespaceHashTable(p, (int) len, "namespace index"));
-    }
-
+NamespaceDetails* NamespaceIndex::details(StringData ns) const {
+    const Namespace n(ns);
+    return details(n);
 }
 
+NamespaceDetails* NamespaceIndex::details(const Namespace& ns) const {
+    return _ht->get(ns);
+}
+
+void NamespaceIndex::add_ns(OperationContext* txn, StringData ns, const DiskLoc& loc, bool capped) {
+    NamespaceDetails details(loc, capped);
+    add_ns(txn, ns, &details);
+}
+
+void NamespaceIndex::add_ns(OperationContext* txn, StringData ns, const NamespaceDetails* details) {
+    Namespace n(ns);
+    add_ns(txn, n, details);
+}
+
+void NamespaceIndex::add_ns(OperationContext* txn,
+                            const Namespace& ns,
+                            const NamespaceDetails* details) {
+    const NamespaceString nss(ns.toString());
+    invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+
+    massert(17315, "no . in ns", nsIsFull(nss.toString()));
+
+    uassert(10081, "too many namespaces/collections", _ht->put(txn, ns, *details));
+}
+
+void NamespaceIndex::kill_ns(OperationContext* txn, StringData ns) {
+    const NamespaceString nss(ns.toString());
+    invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+
+    const Namespace n(ns);
+    _ht->kill(txn, n);
+
+    if (ns.size() <= Namespace::MaxNsColletionLen) {
+        // Larger namespace names don't have room for $extras so they can't exist. The code
+        // below would cause an "$extra: ns too large" error and stacktrace to be printed to the
+        // log even though everything is fine.
+        for (int i = 0; i <= 1; i++) {
+            try {
+                Namespace extra(n.extraName(i));
+                _ht->kill(txn, extra);
+            } catch (DBException&) {
+                LOG(3) << "caught exception in kill_ns" << endl;
+            }
+        }
+    }
+}
+
+bool NamespaceIndex::pathExists() const {
+    return boost::filesystem::exists(path());
+}
+
+boost::filesystem::path NamespaceIndex::path() const {
+    boost::filesystem::path ret(_dir);
+    if (storageGlobalParams.directoryperdb)
+        ret /= _database;
+    ret /= (_database + ".ns");
+    return ret;
+}
+
+static void namespaceGetNamespacesCallback(const Namespace& k,
+                                           NamespaceDetails& v,
+                                           list<string>* l) {
+    if (!k.hasDollarSign() || k == "local.oplog.$main") {
+        // we call out local.oplog.$main specifically as its the only "normal"
+        // collection that has a $, so we make sure it gets added
+        l->push_back(k.toString());
+    }
+}
+
+void NamespaceIndex::getCollectionNamespaces(list<string>* tofill) const {
+    _ht->iterAll(stdx::bind(
+        namespaceGetNamespacesCallback, stdx::placeholders::_1, stdx::placeholders::_2, tofill));
+}
+
+void NamespaceIndex::maybeMkdir() const {
+    if (!storageGlobalParams.directoryperdb)
+        return;
+    boost::filesystem::path dir(_dir);
+    dir /= _database;
+    if (!boost::filesystem::exists(dir))
+        MONGO_ASSERT_ON_EXCEPTION_WITH_MSG(boost::filesystem::create_directory(dir),
+                                           "create dir for db ");
+}
+
+void NamespaceIndex::init(OperationContext* txn) {
+    invariant(!_ht.get());
+
+    unsigned long long len = 0;
+
+    const boost::filesystem::path nsPath = path();
+    const std::string pathString = nsPath.string();
+
+    void* p = 0;
+
+    if (boost::filesystem::exists(nsPath)) {
+        if (_f.open(pathString, true)) {
+            len = _f.length();
+
+            if (len % (1024 * 1024) != 0) {
+                StringBuilder sb;
+                sb << "Invalid length: " << len << " for .ns file: " << pathString
+                   << ". Cannot open database";
+
+                log() << sb.str();
+                uassert(10079, sb.str(), len % (1024 * 1024) == 0);
+            }
+
+            p = _f.getView();
+        }
+    } else {
+        // use mmapv1GlobalOptions.lenForNewNsFiles, we are making a new database
+        massert(10343,
+                "bad mmapv1GlobalOptions.lenForNewNsFiles",
+                mmapv1GlobalOptions.lenForNewNsFiles >= 1024 * 1024);
+
+        maybeMkdir();
+
+        unsigned long long l = mmapv1GlobalOptions.lenForNewNsFiles;
+        log() << "allocating new ns file " << pathString << ", filling with zeroes..." << endl;
+
+        {
+            // Due to SERVER-15369 we need to explicitly write zero-bytes to the NS file.
+            const unsigned long long kBlockSize = 1024 * 1024;
+            invariant(l % kBlockSize == 0);  // ns files can only be multiples of 1MB
+            const std::vector<char> zeros(kBlockSize, 0);
+
+            File file;
+            file.open(pathString.c_str());
+
+            massert(18825, str::stream() << "couldn't create file " << pathString, file.is_open());
+
+            for (fileofs ofs = 0; ofs < l && !file.bad(); ofs += kBlockSize) {
+                file.write(ofs, &zeros[0], kBlockSize);
+            }
+
+            if (file.bad()) {
+                try {
+                    boost::filesystem::remove(pathString);
+                } catch (const std::exception& e) {
+                    StringBuilder ss;
+                    ss << "error removing file: " << e.what();
+                    massert(18909, ss.str(), 0);
+                }
+            } else {
+                file.fsync();
+            }
+
+            massert(18826, str::stream() << "failure writing file " << pathString, !file.bad());
+        }
+
+        if (_f.create(pathString, l, true)) {
+            // The writes done in this function must not be rolled back. This will leave the
+            // file empty, but available for future use. That is why we go directly to the
+            // global dur dirty list rather than going through the OperationContext.
+            getDur().createdFile(pathString, l);
+
+            // Commit the journal and all changes to disk so that even if exceptions occur
+            // during subsequent initialization, we won't have uncommited changes during file
+            // close.
+            getDur().commitNow(txn);
+
+            len = l;
+            invariant(len == mmapv1GlobalOptions.lenForNewNsFiles);
+
+            p = _f.getView();
+        }
+    }
+
+    if (p == 0) {
+        severe() << "error couldn't open file " << pathString << " terminating" << endl;
+        invariant(false);
+    }
+
+    invariant(len <= 0x7fffffff);
+    _ht.reset(new NamespaceHashTable(p, (int)len, "namespace index"));
+}
+}

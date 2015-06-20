@@ -33,58 +33,58 @@
 
 namespace mongo {
 namespace {
-    Counter64 returnedCounter;
-    Counter64 insertedCounter;
-    Counter64 updatedCounter;
-    Counter64 deletedCounter;
-    Counter64 scannedCounter;
-    Counter64 scannedObjectCounter;
+Counter64 returnedCounter;
+Counter64 insertedCounter;
+Counter64 updatedCounter;
+Counter64 deletedCounter;
+Counter64 scannedCounter;
+Counter64 scannedObjectCounter;
 
-    ServerStatusMetricField<Counter64> displayReturned("document.returned", &returnedCounter);
-    ServerStatusMetricField<Counter64> displayUpdated("document.updated", &updatedCounter);
-    ServerStatusMetricField<Counter64> displayInserted("document.inserted", &insertedCounter);
-    ServerStatusMetricField<Counter64> displayDeleted("document.deleted", &deletedCounter);
-    ServerStatusMetricField<Counter64> displayScanned("queryExecutor.scanned", &scannedCounter);
-    ServerStatusMetricField<Counter64> displayScannedObjects("queryExecutor.scannedObjects",
-                                                             &scannedObjectCounter);
+ServerStatusMetricField<Counter64> displayReturned("document.returned", &returnedCounter);
+ServerStatusMetricField<Counter64> displayUpdated("document.updated", &updatedCounter);
+ServerStatusMetricField<Counter64> displayInserted("document.inserted", &insertedCounter);
+ServerStatusMetricField<Counter64> displayDeleted("document.deleted", &deletedCounter);
+ServerStatusMetricField<Counter64> displayScanned("queryExecutor.scanned", &scannedCounter);
+ServerStatusMetricField<Counter64> displayScannedObjects("queryExecutor.scannedObjects",
+                                                         &scannedObjectCounter);
 
-    Counter64 idhackCounter;
-    Counter64 scanAndOrderCounter;
-    Counter64 fastmodCounter;
-    Counter64 writeConflictsCounter;
+Counter64 idhackCounter;
+Counter64 scanAndOrderCounter;
+Counter64 fastmodCounter;
+Counter64 writeConflictsCounter;
 
-    ServerStatusMetricField<Counter64> displayIdhack("operation.idhack", &idhackCounter);
-    ServerStatusMetricField<Counter64> displayScanAndOrder("operation.scanAndOrder",
-                                                           &scanAndOrderCounter);
-    ServerStatusMetricField<Counter64> displayFastMod("operation.fastmod", &fastmodCounter);
-    ServerStatusMetricField<Counter64> displayWriteConflicts("operation.writeConflicts",
-                                                                     &writeConflictsCounter);
+ServerStatusMetricField<Counter64> displayIdhack("operation.idhack", &idhackCounter);
+ServerStatusMetricField<Counter64> displayScanAndOrder("operation.scanAndOrder",
+                                                       &scanAndOrderCounter);
+ServerStatusMetricField<Counter64> displayFastMod("operation.fastmod", &fastmodCounter);
+ServerStatusMetricField<Counter64> displayWriteConflicts("operation.writeConflicts",
+                                                         &writeConflictsCounter);
 
 }  // namespace
 
-    void recordCurOpMetrics(OperationContext* opCtx) {
-        const OpDebug& debug = CurOp::get(opCtx)->debug();
-        if (debug.nreturned > 0)
-            returnedCounter.increment(debug.nreturned);
-        if (debug.ninserted > 0)
-            insertedCounter.increment(debug.ninserted);
-        if (debug.nMatched > 0)
-            updatedCounter.increment(debug.nMatched);
-        if (debug.ndeleted > 0)
-            deletedCounter.increment(debug.ndeleted);
-        if (debug.nscanned > 0)
-            scannedCounter.increment(debug.nscanned);
-        if (debug.nscannedObjects > 0)
-            scannedObjectCounter.increment(debug.nscannedObjects);
+void recordCurOpMetrics(OperationContext* opCtx) {
+    const OpDebug& debug = CurOp::get(opCtx)->debug();
+    if (debug.nreturned > 0)
+        returnedCounter.increment(debug.nreturned);
+    if (debug.ninserted > 0)
+        insertedCounter.increment(debug.ninserted);
+    if (debug.nMatched > 0)
+        updatedCounter.increment(debug.nMatched);
+    if (debug.ndeleted > 0)
+        deletedCounter.increment(debug.ndeleted);
+    if (debug.nscanned > 0)
+        scannedCounter.increment(debug.nscanned);
+    if (debug.nscannedObjects > 0)
+        scannedObjectCounter.increment(debug.nscannedObjects);
 
-        if (debug.idhack)
-            idhackCounter.increment();
-        if (debug.scanAndOrder)
-            scanAndOrderCounter.increment();
-        if (debug.fastmod)
-            fastmodCounter.increment();
-        if (debug.writeConflicts)
-            writeConflictsCounter.increment(debug.writeConflicts);
-    }
+    if (debug.idhack)
+        idhackCounter.increment();
+    if (debug.scanAndOrder)
+        scanAndOrderCounter.increment();
+    if (debug.fastmod)
+        fastmodCounter.increment();
+    if (debug.writeConflicts)
+        writeConflictsCounter.increment(debug.writeConflicts);
+}
 
 }  // namespace mongo

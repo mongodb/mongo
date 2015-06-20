@@ -46,76 +46,76 @@
 namespace mongo {
 namespace logger {
 
-    /*
-     * Looks up a component by its short name, or returns kNumLogComponents
-     * if the shortName is invalid
-     */
-    const LogComponent _getComponentForShortName(StringData shortName) {
-        for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
-            LogComponent component = static_cast<LogComponent::Value>(i);
-            if (component.getShortName() == shortName)
-                return component;
+/*
+ * Looks up a component by its short name, or returns kNumLogComponents
+ * if the shortName is invalid
+ */
+const LogComponent _getComponentForShortName(StringData shortName) {
+    for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
+        LogComponent component = static_cast<LogComponent::Value>(i);
+        if (component.getShortName() == shortName)
+            return component;
+    }
+    return static_cast<LogComponent::Value>(LogComponent::kNumLogComponents);
+}
+
+StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSONObj& settings) {
+    typedef std::vector<LogComponentSetting> Result;
+
+    std::vector<LogComponentSetting> levelsToSet;
+    std::vector<BSONObjIterator> iterators;
+
+    LogComponent parentComponent = LogComponent::kDefault;
+    BSONObjIterator iter(settings);
+
+    while (iter.moreWithEOO()) {
+        BSONElement elem = iter.next();
+        if (elem.eoo()) {
+            if (!iterators.empty()) {
+                iter = iterators.back();
+                iterators.pop_back();
+                parentComponent = parentComponent.parent();
+            }
+            continue;
         }
-        return static_cast<LogComponent::Value>(LogComponent::kNumLogComponents);
+        if (elem.fieldNameStringData() == "verbosity") {
+            if (!elem.isNumber()) {
+                return StatusWith<Result>(ErrorCodes::BadValue,
+                                          str::stream() << "Expected "
+                                                        << parentComponent.getDottedName()
+                                                        << ".verbosity to be a number, but found "
+                                                        << typeName(elem.type()));
+            }
+            levelsToSet.push_back((LogComponentSetting(parentComponent, elem.numberInt())));
+            continue;
+        }
+        const StringData shortName = elem.fieldNameStringData();
+        const LogComponent curr = _getComponentForShortName(shortName);
+
+        if (curr == LogComponent::kNumLogComponents || curr.parent() != parentComponent) {
+            return StatusWith<Result>(ErrorCodes::BadValue,
+                                      str::stream() << "Invalid component name "
+                                                    << parentComponent.getDottedName() << "."
+                                                    << shortName);
+        }
+        if (elem.isNumber()) {
+            levelsToSet.push_back(LogComponentSetting(curr, elem.numberInt()));
+            continue;
+        }
+        if (elem.type() != Object) {
+            return StatusWith<Result>(
+                ErrorCodes::BadValue,
+                str::stream() << "Invalid type " << typeName(elem.type()) << "for component "
+                              << parentComponent.getDottedName() << "." << shortName);
+        }
+        iterators.push_back(iter);
+        parentComponent = curr;
+        iter = BSONObjIterator(elem.Obj());
     }
 
-    StatusWith< std::vector<LogComponentSetting> > parseLogComponentSettings(
-            const BSONObj& settings) {
-
-        typedef std::vector<LogComponentSetting> Result;
-
-        std::vector<LogComponentSetting> levelsToSet;
-        std::vector<BSONObjIterator> iterators;
-
-        LogComponent parentComponent = LogComponent::kDefault;
-        BSONObjIterator iter(settings);
-
-        while (iter.moreWithEOO()) {
-            BSONElement elem = iter.next();
-            if (elem.eoo()) {
-                if (!iterators.empty()) {
-                    iter = iterators.back();
-                    iterators.pop_back();
-                    parentComponent = parentComponent.parent();
-                }
-                continue;
-            }
-            if (elem.fieldNameStringData() == "verbosity") {
-                if (!elem.isNumber()) {
-                    return StatusWith<Result>(ErrorCodes::BadValue, str::stream()
-                                              << "Expected " << parentComponent.getDottedName()
-                                              << ".verbosity to be a number, but found "
-                                              << typeName(elem.type()));
-                }
-                levelsToSet.push_back((LogComponentSetting(parentComponent,
-                                                           elem.numberInt())));
-                continue;
-            }
-            const StringData shortName = elem.fieldNameStringData();
-            const LogComponent curr = _getComponentForShortName(shortName);
-
-            if (curr == LogComponent::kNumLogComponents || curr.parent() != parentComponent) {
-                return StatusWith<Result>(ErrorCodes::BadValue, str::stream()
-                       << "Invalid component name "
-                       << parentComponent.getDottedName() << "." << shortName);
-            }
-            if (elem.isNumber()) {
-                levelsToSet.push_back(LogComponentSetting(curr, elem.numberInt()));
-                continue;
-            }
-            if (elem.type() != Object) {
-                return StatusWith<Result>(ErrorCodes::BadValue, str::stream()
-                        << "Invalid type " << typeName(elem.type()) << "for component "
-                        << parentComponent.getDottedName() << "." << shortName);
-            }
-            iterators.push_back(iter);
-            parentComponent = curr;
-            iter = BSONObjIterator(elem.Obj());
-        }
-
-        // Done walking settings
-        return StatusWith<Result>(levelsToSet);
-    }
+    // Done walking settings
+    return StatusWith<Result>(levelsToSet);
+}
 
 }  // namespace logger
 }  // namespace mongo

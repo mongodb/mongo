@@ -36,95 +36,110 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class Status;
-    template<typename T> class StatusWith;
+class BSONObj;
+class Status;
+template <typename T>
+class StatusWith;
+
+/**
+ * This class represents the layout and contents of documents contained in the
+ * config.chunks collection. All manipulation of documents coming from that
+ * collection should be done with this class.
+ */
+class ChunkType {
+public:
+    // Name of the chunks collection in the config server.
+    static const std::string ConfigNS;
+
+    // Field names and types in the chunks collection type.
+    static const BSONField<std::string> name;
+    static const BSONField<std::string> ns;
+    static const BSONField<BSONObj> min;
+    static const BSONField<BSONObj> max;
+    static const BSONField<BSONArray> version;
+    static const BSONField<std::string> shard;
+    static const BSONField<bool> jumbo;
+    static const BSONField<Date_t> DEPRECATED_lastmod;
+    static const BSONField<OID> DEPRECATED_epoch;
+
 
     /**
-     * This class represents the layout and contents of documents contained in the
-     * config.chunks collection. All manipulation of documents coming from that
-     * collection should be done with this class.
+     * Constructs a new ChunkType object from BSON.
+     * Also does validation of the contents.
      */
-    class ChunkType {
-    public:
+    static StatusWith<ChunkType> fromBSON(const BSONObj& source);
 
-        // Name of the chunks collection in the config server.
-        static const std::string ConfigNS;
+    /**
+     * Returns OK if all fields have been set. Otherwise returns NoSuchKey
+     * and information about the first field that is missing.
+     */
+    Status validate() const;
 
-        // Field names and types in the chunks collection type.
-        static const BSONField<std::string> name;
-        static const BSONField<std::string> ns;
-        static const BSONField<BSONObj> min;
-        static const BSONField<BSONObj> max;
-        static const BSONField<BSONArray> version;
-        static const BSONField<std::string> shard;
-        static const BSONField<bool> jumbo;
-        static const BSONField<Date_t> DEPRECATED_lastmod;
-        static const BSONField<OID> DEPRECATED_epoch;
+    /**
+     * Returns the BSON representation of the entry.
+     */
+    BSONObj toBSON() const;
 
+    /**
+     * Returns a std::string representation of the current internal state.
+     */
+    std::string toString() const;
 
-        /**
-         * Constructs a new ChunkType object from BSON.
-         * Also does validation of the contents.
-         */
-        static StatusWith<ChunkType> fromBSON(const BSONObj& source);
+    const std::string& getName() const {
+        return _name.get();
+    }
+    void setName(const std::string& name);
 
-        /**
-         * Returns OK if all fields have been set. Otherwise returns NoSuchKey
-         * and information about the first field that is missing.
-         */
-        Status validate() const;
+    const std::string& getNS() const {
+        return _ns.get();
+    }
+    void setNS(const std::string& name);
 
-        /**
-         * Returns the BSON representation of the entry.
-         */
-        BSONObj toBSON() const;
+    const BSONObj& getMin() const {
+        return _min.get();
+    }
+    void setMin(const BSONObj& min);
 
-        /**
-         * Returns a std::string representation of the current internal state.
-         */
-        std::string toString() const;
+    const BSONObj& getMax() const {
+        return _max.get();
+    }
+    void setMax(const BSONObj& max);
 
-        const std::string& getName() const { return _name.get(); }
-        void setName(const std::string& name);
+    bool isVersionSet() const {
+        return _version.is_initialized();
+    }
+    const ChunkVersion& getVersion() const {
+        return _version.get();
+    }
+    void setVersion(const ChunkVersion& version);
 
-        const std::string& getNS() const { return _ns.get(); }
-        void setNS(const std::string& name);
+    const std::string& getShard() const {
+        return _shard.get();
+    }
+    void setShard(const std::string& shard);
 
-        const BSONObj& getMin() const { return _min.get(); }
-        void setMin(const BSONObj& min);
+    bool getJumbo() const {
+        return _jumbo.get_value_or(false);
+    }
+    void setJumbo(bool jumbo);
 
-        const BSONObj& getMax() const { return _max.get(); }
-        void setMax(const BSONObj& max);
+private:
+    // Convention: (M)andatory, (O)ptional, (S)pecial rule.
 
-        bool isVersionSet() const { return _version.is_initialized(); }
-        const ChunkVersion& getVersion() const { return _version.get(); }
-        void setVersion(const ChunkVersion& version);
+    // (M)  chunk's id
+    boost::optional<std::string> _name;
+    // (M)  collection this chunk is in
+    boost::optional<std::string> _ns;
+    // (M)  first key of the range, inclusive
+    boost::optional<BSONObj> _min;
+    // (M)  last key of the range, non-inclusive
+    boost::optional<BSONObj> _max;
+    // (M)  version of this chunk
+    boost::optional<ChunkVersion> _version;
+    // (M)  shard this chunk lives in
+    boost::optional<std::string> _shard;
+    // (O)  too big to move?
+    boost::optional<bool> _jumbo;
+};
 
-        const std::string& getShard() const { return _shard.get(); }
-        void setShard(const std::string& shard);
-
-        bool getJumbo() const { return _jumbo.get_value_or(false); }
-        void setJumbo(bool jumbo);
-
-    private:
-
-        // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-
-        // (M)  chunk's id
-        boost::optional<std::string> _name;
-        // (M)  collection this chunk is in
-        boost::optional<std::string> _ns;
-        // (M)  first key of the range, inclusive
-        boost::optional<BSONObj> _min;
-        // (M)  last key of the range, non-inclusive
-        boost::optional<BSONObj> _max;
-        // (M)  version of this chunk
-        boost::optional<ChunkVersion> _version;
-        // (M)  shard this chunk lives in
-        boost::optional<std::string> _shard;
-        // (O)  too big to move?
-        boost::optional<bool> _jumbo;
-    };
-
-} // namespace mongo
+}  // namespace mongo

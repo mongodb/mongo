@@ -37,49 +37,56 @@
 
 namespace mongo {
 
-    class ServiceContext;
+class ServiceContext;
+
+/**
+ * this is the base class for Client and ClientInfo
+ * Client is for mongod
+ * ClientInfo is for mongos
+ * They should converge slowly
+ * The idea is this has the basic api so that not all code has to be duplicated
+ */
+class ClientBasic : public Decorable<ClientBasic> {
+    MONGO_DISALLOW_COPYING(ClientBasic);
+
+public:
+    bool getIsLocalHostConnection() {
+        if (!hasRemote()) {
+            return false;
+        }
+        return getRemote().isLocalHost();
+    }
+
+    bool hasRemote() const {
+        return _messagingPort;
+    }
+    HostAndPort getRemote() const {
+        verify(_messagingPort);
+        return _messagingPort->remote();
+    }
 
     /**
-     * this is the base class for Client and ClientInfo
-     * Client is for mongod
-     * ClientInfo is for mongos
-     * They should converge slowly
-     * The idea is this has the basic api so that not all code has to be duplicated
+     * Returns the ServiceContext that owns this client session context.
      */
-    class ClientBasic : public Decorable<ClientBasic> {
-        MONGO_DISALLOW_COPYING(ClientBasic);
-    public:
-        bool getIsLocalHostConnection() {
-            if (!hasRemote()) {
-                return false;
-            }
-            return getRemote().isLocalHost();
-        }
+    ServiceContext* getServiceContext() const {
+        return _serviceContext;
+    }
 
-        bool hasRemote() const { return _messagingPort; }
-        HostAndPort getRemote() const {
-            verify( _messagingPort );
-            return _messagingPort->remote();
-        }
+    /**
+     * Returns the AbstractMessagePort to which this client session is bound, if any.
+     */
+    AbstractMessagingPort* port() const {
+        return _messagingPort;
+    }
 
-        /**
-         * Returns the ServiceContext that owns this client session context.
-         */
-        ServiceContext* getServiceContext() const { return _serviceContext; }
+    static ClientBasic* getCurrent();
 
-        /**
-         * Returns the AbstractMessagePort to which this client session is bound, if any.
-         */
-        AbstractMessagingPort * port() const { return _messagingPort; }
+protected:
+    ClientBasic(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort);
+    ~ClientBasic();
 
-        static ClientBasic* getCurrent();
-
-    protected:
-        ClientBasic(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort);
-        ~ClientBasic();
-
-    private:
-        ServiceContext* const _serviceContext;
-        AbstractMessagingPort* const _messagingPort;
-    };
+private:
+    ServiceContext* const _serviceContext;
+    AbstractMessagingPort* const _messagingPort;
+};
 }

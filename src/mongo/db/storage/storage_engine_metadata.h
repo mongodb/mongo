@@ -38,83 +38,82 @@
 
 namespace mongo {
 
+/**
+ * This reads and write the storage engine metadata file 'storage.bson'
+ * in the data directory (See --dbpath).
+ * 'storage.engine' is the only mandatory field in the BSON metadata file.
+ * Fields other than 'storage.engine' are ignored.
+ */
+class StorageEngineMetadata {
+    MONGO_DISALLOW_COPYING(StorageEngineMetadata);
+
+public:
     /**
-     * This reads and write the storage engine metadata file 'storage.bson'
-     * in the data directory (See --dbpath).
-     * 'storage.engine' is the only mandatory field in the BSON metadata file.
-     * Fields other than 'storage.engine' are ignored.
+     * Returns a metadata object describing the storage engine that backs the data files
+     * contained in 'dbpath', and nullptr otherwise.
      */
-    class StorageEngineMetadata {
-        MONGO_DISALLOW_COPYING(StorageEngineMetadata);
+    static std::unique_ptr<StorageEngineMetadata> forPath(const std::string& dbpath);
 
-    public:
+    /**
+     * Returns the name of the storage engine that backs the data files contained in 'dbpath',
+     * and none otherwise.
+     */
+    static boost::optional<std::string> getStorageEngineForPath(const std::string& dbpath);
 
-        /**
-         * Returns a metadata object describing the storage engine that backs the data files
-         * contained in 'dbpath', and nullptr otherwise.
-         */
-        static std::unique_ptr<StorageEngineMetadata> forPath(const std::string& dbpath);
+    /**
+     * Sets fields to defaults.
+     * Use read() load metadata from file.
+     */
+    StorageEngineMetadata(const std::string& dbpath);
 
-        /**
-         * Returns the name of the storage engine that backs the data files contained in 'dbpath',
-         * and none otherwise.
-         */
-        static boost::optional<std::string> getStorageEngineForPath(const std::string& dbpath);
+    virtual ~StorageEngineMetadata();
 
-        /**
-         * Sets fields to defaults.
-         * Use read() load metadata from file.
-         */
-        StorageEngineMetadata(const std::string& dbpath);
+    /**
+     * Returns name of storage engine in metadata.
+     */
+    const std::string& getStorageEngine() const;
 
-        virtual ~StorageEngineMetadata();
+    /**
+     * Returns storage engine options in metadata.
+     */
+    const BSONObj& getStorageEngineOptions() const;
 
-        /**
-         * Returns name of storage engine in metadata.
-         */
-        const std::string& getStorageEngine() const;
+    /**
+     * Sets name of storage engine in metadata.
+     */
+    void setStorageEngine(const std::string& storageEngine);
 
-        /**
-         * Returns storage engine options in metadata.
-         */
-        const BSONObj& getStorageEngineOptions() const;
+    /**
+     * Sets storage engine options in metadata.
+     */
+    void setStorageEngineOptions(const BSONObj& storageEngineOptions);
 
-        /**
-         * Sets name of storage engine in metadata.
-         */
-        void setStorageEngine(const std::string& storageEngine);
+    /**
+     * Resets fields to default values.
+     */
+    void reset();
 
-        /**
-         * Sets storage engine options in metadata.
-         */
-        void setStorageEngineOptions(const BSONObj& storageEngineOptions);
+    /**
+     * Reads metadata from 'storage.bson' in 'dbpath' directory.
+     */
+    Status read();
 
-        /**
-         * Resets fields to default values.
-         */
-        void reset();
+    /**
+     * Writes metadata to file.
+     */
+    Status write() const;
 
-        /**
-         * Reads metadata from 'storage.bson' in 'dbpath' directory.
-         */
-        Status read();
+    /**
+     * Validates a single field in the storage engine options.
+     * Currently, only boolean fields are supported.
+     */
+    template <typename T>
+    Status validateStorageEngineOption(StringData fieldName, T expectedValue) const;
 
-        /**
-         * Writes metadata to file.
-         */
-        Status write() const;
-
-        /**
-         * Validates a single field in the storage engine options.
-         * Currently, only boolean fields are supported.
-         */
-        template <typename T>
-        Status validateStorageEngineOption(StringData fieldName, T expectedValue) const;
-
-    private:
-        std::string _dbpath;
-        std::string _storageEngine;
-        BSONObj _storageEngineOptions;
-    };
+private:
+    std::string _dbpath;
+    std::string _storageEngine;
+    BSONObj _storageEngineOptions;
+};
 
 }  // namespace mongo

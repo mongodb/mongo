@@ -33,41 +33,41 @@
 
 namespace mongo {
 
-    class Locker;
+class Locker;
 
 namespace repl {
 
-    /**
-     * Mock implementation of OperationContext that can be used with real instances of LockManager.
-     * Note this is not thread safe and the setter methods should only be called in the context
-     * where access to this object is guaranteed to be serialized.
-     */
-    class OperationContextReplMock : public OperationContextNoop {
-    public:
-        OperationContextReplMock();
-        explicit OperationContextReplMock(unsigned int opNum);
-        OperationContextReplMock(Client* client, unsigned int opNum);
-        virtual ~OperationContextReplMock();
+/**
+ * Mock implementation of OperationContext that can be used with real instances of LockManager.
+ * Note this is not thread safe and the setter methods should only be called in the context
+ * where access to this object is guaranteed to be serialized.
+ */
+class OperationContextReplMock : public OperationContextNoop {
+public:
+    OperationContextReplMock();
+    explicit OperationContextReplMock(unsigned int opNum);
+    OperationContextReplMock(Client* client, unsigned int opNum);
+    virtual ~OperationContextReplMock();
 
-        virtual void checkForInterrupt() override;
+    virtual void checkForInterrupt() override;
 
-        virtual Status checkForInterruptNoAssert() override;
+    virtual Status checkForInterruptNoAssert() override;
 
-        void setCheckForInterruptStatus(Status status);
+    void setCheckForInterruptStatus(Status status);
 
-        virtual uint64_t getRemainingMaxTimeMicros() const override;
+    virtual uint64_t getRemainingMaxTimeMicros() const override;
 
-        void setRemainingMaxTimeMicros(uint64_t micros);
+    void setRemainingMaxTimeMicros(uint64_t micros);
 
-        void setReplicatedWrites(bool writesAreReplicated = true) override;
+    void setReplicatedWrites(bool writesAreReplicated = true) override;
 
-        bool writesAreReplicated() const override;
+    bool writesAreReplicated() const override;
 
-    private:
-        Status _checkForInterruptStatus;
-        uint64_t _maxTimeMicrosRemaining;
-        bool _writesAreReplicated;
-    };
+private:
+    Status _checkForInterruptStatus;
+    uint64_t _maxTimeMicrosRemaining;
+    bool _writesAreReplicated;
+};
 
 }  // namespace repl
 }  // namespace mongo

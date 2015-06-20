@@ -32,169 +32,165 @@
 
 namespace mongo {
 
-    BSONCollectionCatalogEntry::BSONCollectionCatalogEntry( StringData ns )
-        : CollectionCatalogEntry( ns ) {
+BSONCollectionCatalogEntry::BSONCollectionCatalogEntry(StringData ns)
+    : CollectionCatalogEntry(ns) {}
+
+CollectionOptions BSONCollectionCatalogEntry::getCollectionOptions(OperationContext* txn) const {
+    MetaData md = _getMetaData(txn);
+    return md.options;
+}
+
+int BSONCollectionCatalogEntry::getTotalIndexCount(OperationContext* txn) const {
+    MetaData md = _getMetaData(txn);
+
+    return static_cast<int>(md.indexes.size());
+}
+
+int BSONCollectionCatalogEntry::getCompletedIndexCount(OperationContext* txn) const {
+    MetaData md = _getMetaData(txn);
+
+    int num = 0;
+    for (unsigned i = 0; i < md.indexes.size(); i++) {
+        if (md.indexes[i].ready)
+            num++;
     }
+    return num;
+}
 
-    CollectionOptions BSONCollectionCatalogEntry::getCollectionOptions( OperationContext* txn ) const {
-        MetaData md = _getMetaData( txn );
-        return md.options;
+BSONObj BSONCollectionCatalogEntry::getIndexSpec(OperationContext* txn,
+                                                 StringData indexName) const {
+    MetaData md = _getMetaData(txn);
+
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].spec.getOwned();
+}
+
+
+void BSONCollectionCatalogEntry::getAllIndexes(OperationContext* txn,
+                                               std::vector<std::string>* names) const {
+    MetaData md = _getMetaData(txn);
+
+    for (unsigned i = 0; i < md.indexes.size(); i++) {
+        names->push_back(md.indexes[i].spec["name"].String());
     }
+}
 
-    int BSONCollectionCatalogEntry::getTotalIndexCount( OperationContext* txn ) const {
-        MetaData md = _getMetaData( txn );
+bool BSONCollectionCatalogEntry::isIndexMultikey(OperationContext* txn,
+                                                 StringData indexName) const {
+    MetaData md = _getMetaData(txn);
 
-        return static_cast<int>( md.indexes.size() );
-    }
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].multikey;
+}
 
-    int BSONCollectionCatalogEntry::getCompletedIndexCount( OperationContext* txn ) const {
-        MetaData md = _getMetaData( txn );
+RecordId BSONCollectionCatalogEntry::getIndexHead(OperationContext* txn,
+                                                  StringData indexName) const {
+    MetaData md = _getMetaData(txn);
 
-        int num = 0;
-        for ( unsigned i = 0; i < md.indexes.size(); i++ ) {
-            if ( md.indexes[i].ready )
-                num++;
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].head;
+}
+
+bool BSONCollectionCatalogEntry::isIndexReady(OperationContext* txn, StringData indexName) const {
+    MetaData md = _getMetaData(txn);
+
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].ready;
+}
+
+// --------------------------
+
+void BSONCollectionCatalogEntry::IndexMetaData::updateTTLSetting(long long newExpireSeconds) {
+    BSONObjBuilder b;
+    for (BSONObjIterator bi(spec); bi.more();) {
+        BSONElement e = bi.next();
+        if (e.fieldNameStringData() == "expireAfterSeconds") {
+            continue;
         }
-        return num;
+        b.append(e);
     }
 
-    BSONObj BSONCollectionCatalogEntry::getIndexSpec( OperationContext* txn,
-                                                      StringData indexName ) const {
-        MetaData md = _getMetaData( txn );
+    b.append("expireAfterSeconds", newExpireSeconds);
+    spec = b.obj();
+}
 
-        int offset = md.findIndexOffset( indexName );
-        invariant( offset >= 0 );
-        return md.indexes[offset].spec.getOwned();
+// --------------------------
+
+int BSONCollectionCatalogEntry::MetaData::findIndexOffset(StringData name) const {
+    for (unsigned i = 0; i < indexes.size(); i++)
+        if (indexes[i].name() == name)
+            return i;
+    return -1;
+}
+
+bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
+    int indexOffset = findIndexOffset(name);
+
+    if (indexOffset < 0) {
+        return false;
     }
 
+    indexes.erase(indexes.begin() + indexOffset);
+    return true;
+}
 
-    void BSONCollectionCatalogEntry::getAllIndexes( OperationContext* txn,
-                                                    std::vector<std::string>* names ) const {
-        MetaData md = _getMetaData( txn );
-
-        for ( unsigned i = 0; i < md.indexes.size(); i++ ) {
-            names->push_back( md.indexes[i].spec["name"].String() );
-        }
-    }
-
-    bool BSONCollectionCatalogEntry::isIndexMultikey( OperationContext* txn,
-                                                      StringData indexName) const {
-        MetaData md = _getMetaData( txn );
-
-        int offset = md.findIndexOffset( indexName );
-        invariant( offset >= 0 );
-        return md.indexes[offset].multikey;
-    }
-
-    RecordId BSONCollectionCatalogEntry::getIndexHead( OperationContext* txn,
-                                                      StringData indexName ) const {
-        MetaData md = _getMetaData( txn );
-
-        int offset = md.findIndexOffset( indexName );
-        invariant( offset >= 0 );
-        return md.indexes[offset].head;
-    }
-
-    bool BSONCollectionCatalogEntry::isIndexReady( OperationContext* txn,
-                                                   StringData indexName ) const {
-        MetaData md = _getMetaData( txn );
-
-        int offset = md.findIndexOffset( indexName );
-        invariant( offset >= 0 );
-        return md.indexes[offset].ready;
-    }
-
-    // --------------------------
-
-    void BSONCollectionCatalogEntry::IndexMetaData::updateTTLSetting( long long newExpireSeconds ) {
+void BSONCollectionCatalogEntry::MetaData::rename(StringData toNS) {
+    ns = toNS.toString();
+    for (size_t i = 0; i < indexes.size(); i++) {
+        BSONObj spec = indexes[i].spec;
         BSONObjBuilder b;
-        for ( BSONObjIterator bi( spec ); bi.more(); ) {
-            BSONElement e = bi.next();
-            if ( e.fieldNameStringData() == "expireAfterSeconds" ) {
-                continue;
+        b.append("ns", toNS);
+        b.appendElementsUnique(spec);
+        indexes[i].spec = b.obj();
+    }
+}
+
+BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
+    BSONObjBuilder b;
+    b.append("ns", ns);
+    b.append("options", options.toBSON());
+    {
+        BSONArrayBuilder arr(b.subarrayStart("indexes"));
+        for (unsigned i = 0; i < indexes.size(); i++) {
+            BSONObjBuilder sub(arr.subobjStart());
+            sub.append("spec", indexes[i].spec);
+            sub.appendBool("ready", indexes[i].ready);
+            sub.appendBool("multikey", indexes[i].multikey);
+            sub.append("head", static_cast<long long>(indexes[i].head.repr()));
+            sub.done();
+        }
+        arr.done();
+    }
+    return b.obj();
+}
+
+void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
+    ns = obj["ns"].valuestrsafe();
+
+    if (obj["options"].isABSONObj()) {
+        options.parse(obj["options"].Obj());
+    }
+
+    BSONElement e = obj["indexes"];
+    if (e.isABSONObj()) {
+        std::vector<BSONElement> entries = e.Array();
+        for (unsigned i = 0; i < entries.size(); i++) {
+            BSONObj idx = entries[i].Obj();
+            IndexMetaData imd;
+            imd.spec = idx["spec"].Obj().getOwned();
+            imd.ready = idx["ready"].trueValue();
+            if (idx.hasField("head")) {
+                imd.head = RecordId(idx["head"].Long());
+            } else {
+                imd.head = RecordId(idx["head_a"].Int(), idx["head_b"].Int());
             }
-            b.append( e );
-        }
-
-        b.append( "expireAfterSeconds", newExpireSeconds );
-        spec = b.obj();
-    }
-
-    // --------------------------
-
-    int BSONCollectionCatalogEntry::MetaData::findIndexOffset( StringData name ) const {
-        for ( unsigned i = 0; i < indexes.size(); i++ )
-            if ( indexes[i].name() == name )
-                return i;
-        return -1;
-    }
-
-    bool BSONCollectionCatalogEntry::MetaData::eraseIndex( StringData name ) {
-        int indexOffset = findIndexOffset( name );
-
-        if ( indexOffset < 0 ) {
-            return false;
-        }
-
-        indexes.erase( indexes.begin() + indexOffset );
-        return true;
-    }
-
-    void BSONCollectionCatalogEntry::MetaData::rename( StringData toNS ) {
-        ns = toNS.toString();
-        for ( size_t i = 0; i < indexes.size(); i++ ) {
-            BSONObj spec = indexes[i].spec;
-            BSONObjBuilder b;
-            b.append( "ns", toNS );
-            b.appendElementsUnique( spec );
-            indexes[i].spec = b.obj();
+            imd.multikey = idx["multikey"].trueValue();
+            indexes.push_back(imd);
         }
     }
-
-    BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
-        BSONObjBuilder b;
-        b.append( "ns", ns );
-        b.append( "options", options.toBSON() );
-        {
-            BSONArrayBuilder arr( b.subarrayStart( "indexes" ) );
-            for ( unsigned i = 0; i < indexes.size(); i++ ) {
-                BSONObjBuilder sub( arr.subobjStart() );
-                sub.append( "spec", indexes[i].spec );
-                sub.appendBool( "ready", indexes[i].ready );
-                sub.appendBool( "multikey", indexes[i].multikey );
-                sub.append( "head", static_cast<long long>(indexes[i].head.repr()) );
-                sub.done();
-            }
-            arr.done();
-        }
-        return b.obj();
-    }
-
-    void BSONCollectionCatalogEntry::MetaData::parse( const BSONObj& obj ) {
-        ns = obj["ns"].valuestrsafe();
-
-        if ( obj["options"].isABSONObj() ) {
-            options.parse( obj["options"].Obj() );
-        }
-
-        BSONElement e = obj["indexes"];
-        if ( e.isABSONObj() ) {
-            std::vector<BSONElement> entries = e.Array();
-            for ( unsigned i = 0; i < entries.size(); i++ ) {
-                BSONObj idx = entries[i].Obj();
-                IndexMetaData imd;
-                imd.spec = idx["spec"].Obj().getOwned();
-                imd.ready = idx["ready"].trueValue();
-                if (idx.hasField("head")) {
-                    imd.head = RecordId(idx["head"].Long());
-                }
-                else {
-                    imd.head = RecordId( idx["head_a"].Int(),
-                                         idx["head_b"].Int() );
-                }
-                imd.multikey = idx["multikey"].trueValue();
-                indexes.push_back( imd );
-            }
-        }
-    }
+}
 }

@@ -62,4 +62,4 @@
  */
 
 extern int mk_wcwidth(int ucs);
-extern int mk_wcswidth(const int *pwcs, size_t n);
+extern int mk_wcswidth(const int* pwcs, size_t n);

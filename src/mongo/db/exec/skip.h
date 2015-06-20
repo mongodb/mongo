@@ -35,46 +35,48 @@
 
 namespace mongo {
 
-    /**
-     * This stage implements skip functionality.  It drops the first 'toSkip' results from its child
-     * then returns the rest verbatim.
-     *
-     * Preconditions: None.
-     */
-    class SkipStage : public PlanStage {
-    public:
-        SkipStage(int toSkip, WorkingSet* ws, PlanStage* child);
-        virtual ~SkipStage();
+/**
+ * This stage implements skip functionality.  It drops the first 'toSkip' results from its child
+ * then returns the rest verbatim.
+ *
+ * Preconditions: None.
+ */
+class SkipStage : public PlanStage {
+public:
+    SkipStage(int toSkip, WorkingSet* ws, PlanStage* child);
+    virtual ~SkipStage();
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual StageType stageType() const { return STAGE_SKIP; }
+    virtual StageType stageType() const {
+        return STAGE_SKIP;
+    }
 
-        virtual PlanStageStats* getStats();
+    virtual PlanStageStats* getStats();
 
-        virtual const CommonStats* getCommonStats() const;
+    virtual const CommonStats* getCommonStats() const;
 
-        virtual const SpecificStats* getSpecificStats() const;
+    virtual const SpecificStats* getSpecificStats() const;
 
-        static const char* kStageType;
+    static const char* kStageType;
 
-    private:
-        WorkingSet* _ws;
-        std::unique_ptr<PlanStage> _child;
+private:
+    WorkingSet* _ws;
+    std::unique_ptr<PlanStage> _child;
 
-        // We drop the first _toSkip results that we would have returned.
-        int _toSkip;
+    // We drop the first _toSkip results that we would have returned.
+    int _toSkip;
 
-        // Stats
-        CommonStats _commonStats;
-        SkipStats _specificStats;
-    };
+    // Stats
+    CommonStats _commonStats;
+    SkipStats _specificStats;
+};
 
 }  // namespace mongo

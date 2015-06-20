@@ -32,28 +32,28 @@
 
 namespace mongo {
 
-    class FieldRef;
+class FieldRef;
 
-    namespace fieldchecker {
+namespace fieldchecker {
 
-        /**
-         * Returns OK if all the below conditions on 'field' are valid:
-         *   + Non-empty
-         *   + Does not start or end with a '.'
-         * Otherwise returns a code indicating cause of failure.
-         */
-        Status isUpdatable(const FieldRef& field);
+/**
+ * Returns OK if all the below conditions on 'field' are valid:
+ *   + Non-empty
+ *   + Does not start or end with a '.'
+ * Otherwise returns a code indicating cause of failure.
+ */
+Status isUpdatable(const FieldRef& field);
 
-        /**
-         * Returns true, the position 'pos' of the first $-sign if present in 'fieldRef', and
-         * how many other $-signs were found in 'count'. Otherwise return false.
-         *
-         * Note:
-         *   isPositional assumes that the field is updatable. Call isUpdatable() above to
-         *   verify.
-         */
-        bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count = NULL);
+/**
+ * Returns true, the position 'pos' of the first $-sign if present in 'fieldRef', and
+ * how many other $-signs were found in 'count'. Otherwise return false.
+ *
+ * Note:
+ *   isPositional assumes that the field is updatable. Call isUpdatable() above to
+ *   verify.
+ */
+bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count = NULL);
 
-    } // namespace fieldchecker
+}  // namespace fieldchecker
 
-} // namespace mongo
+}  // namespace mongo

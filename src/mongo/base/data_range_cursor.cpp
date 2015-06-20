@@ -31,20 +31,20 @@
 
 namespace mongo {
 
-    Status ConstDataRangeCursor::makeAdvanceStatus(size_t advance) const {
-        mongoutils::str::stream ss;
-        ss << "Invalid advance (" << advance << ") past end of buffer[" << length()
-           << "] at offset: " << _debug_offset;
+Status ConstDataRangeCursor::makeAdvanceStatus(size_t advance) const {
+    mongoutils::str::stream ss;
+    ss << "Invalid advance (" << advance << ") past end of buffer[" << length()
+       << "] at offset: " << _debug_offset;
 
-        return Status(ErrorCodes::Overflow, ss);
-    }
+    return Status(ErrorCodes::Overflow, ss);
+}
 
-    Status DataRangeCursor::makeAdvanceStatus(size_t advance) const {
-        mongoutils::str::stream ss;
-        ss << "Invalid advance (" << advance << ") past end of buffer[" << length()
-           << "] at offset: " << _debug_offset;
+Status DataRangeCursor::makeAdvanceStatus(size_t advance) const {
+    mongoutils::str::stream ss;
+    ss << "Invalid advance (" << advance << ") past end of buffer[" << length()
+       << "] at offset: " << _debug_offset;
 
-        return Status(ErrorCodes::Overflow, ss);
-    }
+    return Status(ErrorCodes::Overflow, ss);
+}
 
 }  // namespace mongo

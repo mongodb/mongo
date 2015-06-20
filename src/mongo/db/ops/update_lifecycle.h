@@ -32,42 +32,41 @@
 
 namespace mongo {
 
-    class Collection;
-    class FieldRef;
-    class OperationContext;
-    class UpdateIndexData;
+class Collection;
+class FieldRef;
+class OperationContext;
+class UpdateIndexData;
 
 
-    class UpdateLifecycle {
-    public:
+class UpdateLifecycle {
+public:
+    virtual ~UpdateLifecycle() {}
 
-        virtual ~UpdateLifecycle() {}
+    /**
+     * Update the cached collection pointer that this lifecycle object uses.
+     */
+    virtual void setCollection(Collection* collection) = 0;
 
-        /**
-         * Update the cached collection pointer that this lifecycle object uses.
-         */
-        virtual void setCollection(Collection* collection) = 0;
+    /**
+     * Can the update continue?
+     *
+     * The (only) implementation will check the following:
+     *  1.) Collection still exists
+     *  2.) Shard version has not changed (indicating that the query/update is not valid
+     */
+    virtual bool canContinue() const = 0;
 
-        /**
-         * Can the update continue?
-         *
-         * The (only) implementation will check the following:
-         *  1.) Collection still exists
-         *  2.) Shard version has not changed (indicating that the query/update is not valid
-         */
-        virtual bool canContinue() const = 0;
+    /**
+     * Return a pointer to any indexes if there is a collection.
+     */
+    virtual const UpdateIndexData* getIndexKeys(OperationContext* opCtx) const = 0;
 
-        /**
-         * Return a pointer to any indexes if there is a collection.
-         */
-        virtual const UpdateIndexData* getIndexKeys( OperationContext* opCtx ) const = 0;
+    /**
+     * Returns the shard keys as immutable fields
+     * Immutable fields in this case mean that they are required to exist, cannot change values
+     * and must not be multi-valued (in an array, or an array)
+     */
+    virtual const std::vector<FieldRef*>* getImmutableFields() const = 0;
+};
 
-        /**
-         * Returns the shard keys as immutable fields
-         * Immutable fields in this case mean that they are required to exist, cannot change values
-         * and must not be multi-valued (in an array, or an array)
-         */
-        virtual const std::vector<FieldRef*>* getImmutableFields() const = 0;
-    };
-
-} // namespace mongo
+}  // namespace mongo

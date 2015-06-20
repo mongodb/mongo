@@ -42,86 +42,83 @@
 
 namespace mongo {
 
-    using std::shared_ptr;
+using std::shared_ptr;
 
 namespace {
 
-    class GetShardVersion : public Command {
-    public:
-        GetShardVersion() : Command("getShardVersion", false, "getshardversion") { }
+class GetShardVersion : public Command {
+public:
+    GetShardVersion() : Command("getShardVersion", false, "getshardversion") {}
 
-        virtual bool slaveOk() const {
-            return true;
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(std::stringstream& help) const {
+        help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
+                ActionType::getShardVersion)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
-        virtual bool adminOnly() const {
-            return true;
+        return Status::OK();
+    }
+
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+        return parseNsFullyQualified(dbname, cmdObj);
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        const NamespaceString nss(parseNs(dbname, cmdObj));
+        if (nss.size() == 0) {
+            return appendCommandStatus(
+                result, Status(ErrorCodes::InvalidNamespace, "no namespace specified"));
         }
 
-        virtual bool isWriteCommandForConfigServer() const {
+        auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status.getStatus());
+        }
+
+        std::shared_ptr<DBConfig> config = status.getValue();
+        if (!config->isSharded(nss.ns())) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::NamespaceNotSharded, "ns [" + nss.ns() + " is not sharded."));
+        }
+
+        ChunkManagerPtr cm = config->getChunkManagerIfExists(nss.ns());
+        if (!cm) {
+            errmsg = "no chunk manager?";
             return false;
         }
 
-        virtual void help(std::stringstream& help) const {
-            help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
-        }
+        cm->_printChunks();
+        cm->getVersion().addToBSON(result);
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
+        return true;
+    }
 
-            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                                                        ResourcePattern::forExactNamespace(
-                                                            NamespaceString(parseNs(dbname,
-                                                                                    cmdObj))),
-                                                        ActionType::getShardVersion)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
+} getShardVersionCmd;
 
-            return Status::OK();
-        }
-
-        virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-            return parseNsFullyQualified(dbname, cmdObj);
-        }
-
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
-
-            const NamespaceString nss(parseNs(dbname, cmdObj));
-            if (nss.size() == 0) {
-                return appendCommandStatus(result, Status(ErrorCodes::InvalidNamespace,
-                                                          "no namespace specified"));
-            }
-
-            auto status = grid.catalogCache()->getDatabase(nss.db().toString());
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status.getStatus());
-            }
-
-            std::shared_ptr<DBConfig> config = status.getValue();
-            if (!config->isSharded(nss.ns())) {
-                return appendCommandStatus(result, Status(ErrorCodes::NamespaceNotSharded,
-                                                   "ns [" + nss.ns() + " is not sharded."));
-            }
-
-            ChunkManagerPtr cm = config->getChunkManagerIfExists(nss.ns());
-            if (!cm) {
-                errmsg = "no chunk manager?";
-                return false;
-            }
-
-            cm->_printChunks();
-            cm->getVersion().addToBSON(result);
-
-            return true;
-        }
-
-    } getShardVersionCmd;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

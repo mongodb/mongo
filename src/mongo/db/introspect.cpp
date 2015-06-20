@@ -46,153 +46,144 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::endl;
-    using std::string;
+using std::unique_ptr;
+using std::endl;
+using std::string;
 
 namespace {
 
-    void _appendUserInfo(const CurOp& c,
-                         BSONObjBuilder& builder,
-                         AuthorizationSession* authSession) {
-        UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
+void _appendUserInfo(const CurOp& c, BSONObjBuilder& builder, AuthorizationSession* authSession) {
+    UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
 
-        UserName bestUser;
-        if (nameIter.more())
+    UserName bestUser;
+    if (nameIter.more())
+        bestUser = *nameIter;
+
+    std::string opdb(nsToDatabase(c.getNS()));
+
+    BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
+    for (; nameIter.more(); nameIter.next()) {
+        BSONObjBuilder nextUser(allUsers.subobjStart());
+        nextUser.append(AuthorizationManager::USER_NAME_FIELD_NAME, nameIter->getUser());
+        nextUser.append(AuthorizationManager::USER_DB_FIELD_NAME, nameIter->getDB());
+        nextUser.doneFast();
+
+        if (nameIter->getDB() == opdb) {
             bestUser = *nameIter;
-
-        std::string opdb( nsToDatabase( c.getNS() ) );
-
-        BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
-        for ( ; nameIter.more(); nameIter.next()) {
-            BSONObjBuilder nextUser(allUsers.subobjStart());
-            nextUser.append(AuthorizationManager::USER_NAME_FIELD_NAME, nameIter->getUser());
-            nextUser.append(AuthorizationManager::USER_DB_FIELD_NAME, nameIter->getDB());
-            nextUser.doneFast();
-
-            if (nameIter->getDB() == opdb) {
-                bestUser = *nameIter;
-            }
-        }
-        allUsers.doneFast();
-
-        builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getFullName());
-
-    }
-
-} // namespace
-
-
-    void profile(OperationContext* txn, int op) {
-        // Initialize with 1kb at start in order to avoid realloc later
-        BufBuilder profileBufBuilder(1024);
-
-        BSONObjBuilder b(profileBufBuilder);
-
-        {
-            Locker::LockerInfo lockerInfo;
-            txn->lockState()->getLockerInfo(&lockerInfo);
-            CurOp::get(txn)->debug().append(*CurOp::get(txn), lockerInfo.stats, b);
-        }
-
-        b.appendDate("ts", jsTime());
-        b.append("client", txn->getClient()->clientAddress());
-
-        AuthorizationSession * authSession = AuthorizationSession::get(txn->getClient());
-        _appendUserInfo(*CurOp::get(txn), b, authSession);
-
-        const BSONObj p = b.done();
-
-        const bool wasLocked = txn->lockState()->isLocked();
-
-        const string dbName(nsToDatabase(CurOp::get(txn)->getNS()));
-
-        try {
-            bool acquireDbXLock = false;
-            while (true) {
-                ScopedTransaction scopedXact(txn, MODE_IX);
-
-                std::unique_ptr<AutoGetDb> autoGetDb;
-                if (acquireDbXLock) {
-                    autoGetDb.reset(new AutoGetDb(txn, dbName, MODE_X));
-                    if (autoGetDb->getDb()) {
-                        createProfileCollection(txn, autoGetDb->getDb());
-                    }
-                }
-                else {
-                    autoGetDb.reset(new AutoGetDb(txn, dbName, MODE_IX));
-                }
-
-                Database* const db = autoGetDb->getDb();
-                if (!db) {
-                    // Database disappeared
-                    log() << "note: not profiling because db went away for "
-                          << CurOp::get(txn)->getNS();
-                    break;
-                }
-
-                Lock::CollectionLock collLock(txn->lockState(), db->getProfilingNS(), MODE_IX);
-
-                Collection* const coll = db->getCollection(db->getProfilingNS());
-                if (coll) {
-                    WriteUnitOfWork wuow(txn);
-                    coll->insertDocument(txn, p, false);
-                    wuow.commit();
-
-                    break;
-                }
-                else if (!acquireDbXLock &&
-                            (!wasLocked || txn->lockState()->isDbLockedForMode(dbName, MODE_X))) {
-                    // Try to create the collection only if we are not under lock, in order to
-                    // avoid deadlocks due to lock conversion. This would only be hit if someone
-                    // deletes the profiler collection after setting profile level.
-                    acquireDbXLock = true;
-                }
-                else {
-                    // Cannot write the profile information
-                    break;
-                }
-            }
-        }
-        catch (const AssertionException& assertionEx) {
-            warning() << "Caught Assertion while trying to profile "
-                      << opToString(op)
-                      << " against " << CurOp::get(txn)->getNS()
-                      << ": " << assertionEx.toString() << endl;
         }
     }
+    allUsers.doneFast();
+
+    builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getFullName());
+}
+
+}  // namespace
 
 
-    Status createProfileCollection(OperationContext* txn, Database *db) {
-        invariant(txn->lockState()->isDbLockedForMode(db->name(), MODE_X));
+void profile(OperationContext* txn, int op) {
+    // Initialize with 1kb at start in order to avoid realloc later
+    BufBuilder profileBufBuilder(1024);
 
-        const std::string dbProfilingNS(db->getProfilingNS());
+    BSONObjBuilder b(profileBufBuilder);
 
-        Collection* const collection = db->getCollection(dbProfilingNS);
-        if (collection) {
-            if (!collection->isCapped()) {
-                return Status(ErrorCodes::NamespaceExists,
-                              str::stream() << dbProfilingNS << " exists but isn't capped");
+    {
+        Locker::LockerInfo lockerInfo;
+        txn->lockState()->getLockerInfo(&lockerInfo);
+        CurOp::get(txn)->debug().append(*CurOp::get(txn), lockerInfo.stats, b);
+    }
+
+    b.appendDate("ts", jsTime());
+    b.append("client", txn->getClient()->clientAddress());
+
+    AuthorizationSession* authSession = AuthorizationSession::get(txn->getClient());
+    _appendUserInfo(*CurOp::get(txn), b, authSession);
+
+    const BSONObj p = b.done();
+
+    const bool wasLocked = txn->lockState()->isLocked();
+
+    const string dbName(nsToDatabase(CurOp::get(txn)->getNS()));
+
+    try {
+        bool acquireDbXLock = false;
+        while (true) {
+            ScopedTransaction scopedXact(txn, MODE_IX);
+
+            std::unique_ptr<AutoGetDb> autoGetDb;
+            if (acquireDbXLock) {
+                autoGetDb.reset(new AutoGetDb(txn, dbName, MODE_X));
+                if (autoGetDb->getDb()) {
+                    createProfileCollection(txn, autoGetDb->getDb());
+                }
+            } else {
+                autoGetDb.reset(new AutoGetDb(txn, dbName, MODE_IX));
             }
 
-            return Status::OK();
+            Database* const db = autoGetDb->getDb();
+            if (!db) {
+                // Database disappeared
+                log() << "note: not profiling because db went away for "
+                      << CurOp::get(txn)->getNS();
+                break;
+            }
+
+            Lock::CollectionLock collLock(txn->lockState(), db->getProfilingNS(), MODE_IX);
+
+            Collection* const coll = db->getCollection(db->getProfilingNS());
+            if (coll) {
+                WriteUnitOfWork wuow(txn);
+                coll->insertDocument(txn, p, false);
+                wuow.commit();
+
+                break;
+            } else if (!acquireDbXLock &&
+                       (!wasLocked || txn->lockState()->isDbLockedForMode(dbName, MODE_X))) {
+                // Try to create the collection only if we are not under lock, in order to
+                // avoid deadlocks due to lock conversion. This would only be hit if someone
+                // deletes the profiler collection after setting profile level.
+                acquireDbXLock = true;
+            } else {
+                // Cannot write the profile information
+                break;
+            }
         }
+    } catch (const AssertionException& assertionEx) {
+        warning() << "Caught Assertion while trying to profile " << opToString(op) << " against "
+                  << CurOp::get(txn)->getNS() << ": " << assertionEx.toString() << endl;
+    }
+}
 
-        // system.profile namespace doesn't exist; create it
-        log() << "Creating profile collection: " << dbProfilingNS << endl;
 
-        CollectionOptions collectionOptions;
-        collectionOptions.capped = true;
-        collectionOptions.cappedSize = 1024 * 1024;
+Status createProfileCollection(OperationContext* txn, Database* db) {
+    invariant(txn->lockState()->isDbLockedForMode(db->name(), MODE_X));
 
-        WriteUnitOfWork wunit(txn);
-        bool shouldReplicateWrites = txn->writesAreReplicated();
-        txn->setReplicatedWrites(false);
-        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
-        invariant(db->createCollection(txn, dbProfilingNS, collectionOptions));
-        wunit.commit();
+    const std::string dbProfilingNS(db->getProfilingNS());
+
+    Collection* const collection = db->getCollection(dbProfilingNS);
+    if (collection) {
+        if (!collection->isCapped()) {
+            return Status(ErrorCodes::NamespaceExists,
+                          str::stream() << dbProfilingNS << " exists but isn't capped");
+        }
 
         return Status::OK();
     }
 
-} // namespace mongo
+    // system.profile namespace doesn't exist; create it
+    log() << "Creating profile collection: " << dbProfilingNS << endl;
+
+    CollectionOptions collectionOptions;
+    collectionOptions.capped = true;
+    collectionOptions.cappedSize = 1024 * 1024;
+
+    WriteUnitOfWork wunit(txn);
+    bool shouldReplicateWrites = txn->writesAreReplicated();
+    txn->setReplicatedWrites(false);
+    ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
+    invariant(db->createCollection(txn, dbProfilingNS, collectionOptions));
+    wunit.commit();
+
+    return Status::OK();
+}
+
+}  // namespace mongo

@@ -32,91 +32,92 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
-    const std::string LockpingsType::ConfigNS = "config.lockpings";
+const std::string LockpingsType::ConfigNS = "config.lockpings";
 
-    const BSONField<std::string> LockpingsType::process("_id");
-    const BSONField<Date_t> LockpingsType::ping("ping");
+const BSONField<std::string> LockpingsType::process("_id");
+const BSONField<Date_t> LockpingsType::ping("ping");
 
-    LockpingsType::LockpingsType() {
-        clear();
+LockpingsType::LockpingsType() {
+    clear();
+}
+
+LockpingsType::~LockpingsType() {}
+
+bool LockpingsType::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    LockpingsType::~LockpingsType() {
+    // All the mandatory fields must be present.
+    if (!_isProcessSet) {
+        *errMsg = stream() << "missing " << process.name() << " field";
+        return false;
+    }
+    if (!_isPingSet) {
+        *errMsg = stream() << "missing " << ping.name() << " field";
+        return false;
     }
 
-    bool LockpingsType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
+    return true;
+}
 
-        // All the mandatory fields must be present.
-        if (!_isProcessSet) {
-            *errMsg = stream() << "missing " << process.name() << " field";
-            return false;
-        }
-        if (!_isPingSet) {
-            *errMsg = stream() << "missing " << ping.name() << " field";
-            return false;
-        }
+BSONObj LockpingsType::toBSON() const {
+    BSONObjBuilder builder;
 
-        return true;
-    }
+    if (_isProcessSet)
+        builder.append(process(), _process);
+    if (_isPingSet)
+        builder.append(ping(), _ping);
 
-    BSONObj LockpingsType::toBSON() const {
-        BSONObjBuilder builder;
+    return builder.obj();
+}
 
-        if (_isProcessSet) builder.append(process(), _process);
-        if (_isPingSet) builder.append(ping(), _ping);
+bool LockpingsType::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-        return builder.obj();
-    }
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-    bool LockpingsType::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+    FieldParser::FieldState fieldState;
+    fieldState = FieldParser::extract(source, process, &_process, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isProcessSet = fieldState == FieldParser::FIELD_SET;
 
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
+    fieldState = FieldParser::extract(source, ping, &_ping, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isPingSet = fieldState == FieldParser::FIELD_SET;
 
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, process, &_process, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isProcessSet = fieldState == FieldParser::FIELD_SET;
+    return true;
+}
 
-        fieldState = FieldParser::extract(source, ping, &_ping, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isPingSet = fieldState == FieldParser::FIELD_SET;
+void LockpingsType::clear() {
+    _process.clear();
+    _isProcessSet = false;
 
-        return true;
-    }
+    _ping = Date_t();
+    _isPingSet = false;
+}
 
-    void LockpingsType::clear() {
+void LockpingsType::cloneTo(LockpingsType* other) const {
+    other->clear();
 
-        _process.clear();
-        _isProcessSet = false;
+    other->_process = _process;
+    other->_isProcessSet = _isProcessSet;
 
-        _ping = Date_t();
-        _isPingSet = false;
+    other->_ping = _ping;
+    other->_isPingSet = _isPingSet;
+}
 
-    }
+std::string LockpingsType::toString() const {
+    return toBSON().toString();
+}
 
-    void LockpingsType::cloneTo(LockpingsType* other) const {
-        other->clear();
-
-        other->_process = _process;
-        other->_isProcessSet = _isProcessSet;
-
-        other->_ping = _ping;
-        other->_isPingSet = _isPingSet;
-
-    }
-
-    std::string LockpingsType::toString() const {
-        return toBSON().toString();
-    }
-
-} // namespace mongo
+}  // namespace mongo

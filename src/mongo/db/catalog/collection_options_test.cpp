@@ -35,156 +35,156 @@
 
 namespace mongo {
 
-    void checkRoundTrip( const CollectionOptions& options1 ) {
-        CollectionOptions options2;
-        options2.parse( options1.toBSON() );
-        ASSERT_EQUALS( options1.toBSON(), options2.toBSON() );
-    }
+void checkRoundTrip(const CollectionOptions& options1) {
+    CollectionOptions options2;
+    options2.parse(options1.toBSON());
+    ASSERT_EQUALS(options1.toBSON(), options2.toBSON());
+}
 
-    TEST( CollectionOptions, SimpleRoundTrip ) {
-        CollectionOptions options;
-        checkRoundTrip( options );
+TEST(CollectionOptions, SimpleRoundTrip) {
+    CollectionOptions options;
+    checkRoundTrip(options);
 
-        options.capped = true;
-        options.cappedSize = 10240;
-        options.cappedMaxDocs = 1111;
-        checkRoundTrip( options );
+    options.capped = true;
+    options.cappedSize = 10240;
+    options.cappedMaxDocs = 1111;
+    checkRoundTrip(options);
 
-        options.setNoIdIndex();
-        options.flags = 5;
-        checkRoundTrip( options );
-    }
+    options.setNoIdIndex();
+    options.flags = 5;
+    checkRoundTrip(options);
+}
 
-    TEST(CollectionOptions, IsValid) {
-        CollectionOptions options;
-        ASSERT_TRUE(options.isValid());
+TEST(CollectionOptions, IsValid) {
+    CollectionOptions options;
+    ASSERT_TRUE(options.isValid());
 
-        options.storageEngine = fromjson("{storageEngine1: 1}");
-        ASSERT_FALSE(options.isValid());
-    }
+    options.storageEngine = fromjson("{storageEngine1: 1}");
+    ASSERT_FALSE(options.isValid());
+}
 
-    TEST(CollectionOptions, Validate) {
-        CollectionOptions options;
-        ASSERT_OK(options.validate());
+TEST(CollectionOptions, Validate) {
+    CollectionOptions options;
+    ASSERT_OK(options.validate());
 
-        options.storageEngine = fromjson("{storageEngine1: 1}");
-        ASSERT_NOT_OK(options.validate());
-    }
+    options.storageEngine = fromjson("{storageEngine1: 1}");
+    ASSERT_NOT_OK(options.validate());
+}
 
-    TEST(CollectionOptions, Validator) {
-        CollectionOptions options;
+TEST(CollectionOptions, Validator) {
+    CollectionOptions options;
 
-        ASSERT_NOT_OK(options.parse(fromjson("{validator: 'notAnObject'}")));
+    ASSERT_NOT_OK(options.parse(fromjson("{validator: 'notAnObject'}")));
 
-        ASSERT_OK(options.parse(fromjson("{validator: {a: 1}}")));
-        ASSERT_EQ(options.validator, fromjson("{a: 1}"));
+    ASSERT_OK(options.parse(fromjson("{validator: {a: 1}}")));
+    ASSERT_EQ(options.validator, fromjson("{a: 1}"));
 
-        options.validator = fromjson("{b: 1}");
-        ASSERT_EQ(options.toBSON()["validator"].Obj(), fromjson("{b: 1}"));
+    options.validator = fromjson("{b: 1}");
+    ASSERT_EQ(options.toBSON()["validator"].Obj(), fromjson("{b: 1}"));
 
-        options.reset();
-        ASSERT_EQ(options.validator, BSONObj());
-        ASSERT(!options.toBSON()["validator"]);
-    }
+    options.reset();
+    ASSERT_EQ(options.validator, BSONObj());
+    ASSERT(!options.toBSON()["validator"]);
+}
 
-    TEST( CollectionOptions, ErrorBadSize ) {
-        ASSERT_NOT_OK( CollectionOptions().parse( fromjson( "{capped: true, size: -1}" ) ) );
-        ASSERT_NOT_OK( CollectionOptions().parse( fromjson( "{capped: false, size: -1}" ) ) );
-    }
+TEST(CollectionOptions, ErrorBadSize) {
+    ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{capped: true, size: -1}")));
+    ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{capped: false, size: -1}")));
+}
 
-    TEST( CollectionOptions, ErrorBadMax ) {
-        ASSERT_NOT_OK( CollectionOptions().parse( BSON( "capped" << true << "max"
-                                                                 << ( 1LL << 31 ) ) ) );
-    }
+TEST(CollectionOptions, ErrorBadMax) {
+    ASSERT_NOT_OK(CollectionOptions().parse(BSON("capped" << true << "max" << (1LL << 31))));
+}
 
-    TEST( CollectionOptions, IgnoreSizeWrongType ) {
-        CollectionOptions options;
-        ASSERT_OK( options.parse( fromjson( "{size: undefined, capped: undefined}" ) ) );
-        ASSERT_EQUALS( options.capped, false );
-        ASSERT_EQUALS( options.cappedSize, 0 );
-    }
+TEST(CollectionOptions, IgnoreSizeWrongType) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{size: undefined, capped: undefined}")));
+    ASSERT_EQUALS(options.capped, false);
+    ASSERT_EQUALS(options.cappedSize, 0);
+}
 
-    TEST( CollectionOptions, IgnoreMaxWrongType ) {
-        CollectionOptions options;
-        ASSERT_OK( options.parse( fromjson( "{capped: true, size: 1024, max: ''}" ) ) );
-        ASSERT_EQUALS( options.capped, true );
-        ASSERT_EQUALS( options.cappedSize, 1024 );
-        ASSERT_EQUALS( options.cappedMaxDocs, 0 );
-    }
+TEST(CollectionOptions, IgnoreMaxWrongType) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{capped: true, size: 1024, max: ''}")));
+    ASSERT_EQUALS(options.capped, true);
+    ASSERT_EQUALS(options.cappedSize, 1024);
+    ASSERT_EQUALS(options.cappedMaxDocs, 0);
+}
 
-    TEST( CollectionOptions, IgnoreUnregisteredFields ) {
-        ASSERT_OK( CollectionOptions().parse( BSON( "create" << "c" ) ) );
-        ASSERT_OK( CollectionOptions().parse( BSON( "foo" << "bar" ) ) );
-    }
+TEST(CollectionOptions, IgnoreUnregisteredFields) {
+    ASSERT_OK(CollectionOptions().parse(BSON("create"
+                                             << "c")));
+    ASSERT_OK(CollectionOptions().parse(BSON("foo"
+                                             << "bar")));
+}
 
-    TEST(CollectionOptions, InvalidStorageEngineField) {
-        // "storageEngine" field has to be an object if present.
-        ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{storageEngine: 1}")));
+TEST(CollectionOptions, InvalidStorageEngineField) {
+    // "storageEngine" field has to be an object if present.
+    ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{storageEngine: 1}")));
 
-        // Every field under "storageEngine" has to be an object.
-        ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{storageEngine: {storageEngine1: 1}}")));
+    // Every field under "storageEngine" has to be an object.
+    ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{storageEngine: {storageEngine1: 1}}")));
 
-        // Empty "storageEngine" not allowed
-        ASSERT_OK(CollectionOptions().parse(fromjson("{storageEngine: {}}")));
-    }
+    // Empty "storageEngine" not allowed
+    ASSERT_OK(CollectionOptions().parse(fromjson("{storageEngine: {}}")));
+}
 
-    TEST(CollectionOptions, ParseEngineField) {
-        CollectionOptions opts;
-        ASSERT_OK(opts.parse(fromjson("{unknownField: 1, "
-            "storageEngine: {storageEngine1: {x: 1, y: 2}, storageEngine2: {a: 1, b:2}}}")));
-        checkRoundTrip(opts);
+TEST(CollectionOptions, ParseEngineField) {
+    CollectionOptions opts;
+    ASSERT_OK(opts.parse(fromjson(
+        "{unknownField: 1, "
+        "storageEngine: {storageEngine1: {x: 1, y: 2}, storageEngine2: {a: 1, b:2}}}")));
+    checkRoundTrip(opts);
 
-        // Unrecognized field should not be present in BSON representation.
-        BSONObj obj = opts.toBSON();
-        ASSERT_FALSE(obj.hasField("unknownField"));
+    // Unrecognized field should not be present in BSON representation.
+    BSONObj obj = opts.toBSON();
+    ASSERT_FALSE(obj.hasField("unknownField"));
 
-        // Check "storageEngine" field.
-        ASSERT_TRUE(obj.hasField("storageEngine"));
-        ASSERT_TRUE(obj.getField("storageEngine").isABSONObj());
-        BSONObj storageEngine = obj.getObjectField("storageEngine");
+    // Check "storageEngine" field.
+    ASSERT_TRUE(obj.hasField("storageEngine"));
+    ASSERT_TRUE(obj.getField("storageEngine").isABSONObj());
+    BSONObj storageEngine = obj.getObjectField("storageEngine");
 
-        // Check individual storage storageEngine fields.
-        ASSERT_TRUE(storageEngine.getField("storageEngine1").isABSONObj());
-        BSONObj storageEngine1 = storageEngine.getObjectField("storageEngine1");
-        ASSERT_EQUALS(1, storageEngine1.getIntField("x"));
-        ASSERT_EQUALS(2, storageEngine1.getIntField("y"));
+    // Check individual storage storageEngine fields.
+    ASSERT_TRUE(storageEngine.getField("storageEngine1").isABSONObj());
+    BSONObj storageEngine1 = storageEngine.getObjectField("storageEngine1");
+    ASSERT_EQUALS(1, storageEngine1.getIntField("x"));
+    ASSERT_EQUALS(2, storageEngine1.getIntField("y"));
 
-        ASSERT_TRUE(storageEngine.getField("storageEngine2").isABSONObj());
-        BSONObj storageEngine2 = storageEngine.getObjectField("storageEngine2");
-        ASSERT_EQUALS(1, storageEngine2.getIntField("a"));
-        ASSERT_EQUALS(2, storageEngine2.getIntField("b"));
+    ASSERT_TRUE(storageEngine.getField("storageEngine2").isABSONObj());
+    BSONObj storageEngine2 = storageEngine.getObjectField("storageEngine2");
+    ASSERT_EQUALS(1, storageEngine2.getIntField("a"));
+    ASSERT_EQUALS(2, storageEngine2.getIntField("b"));
+}
 
-    }
+TEST(CollectionOptions, ResetStorageEngineField) {
+    CollectionOptions opts;
+    ASSERT_OK(opts.parse(fromjson("{storageEngine: {storageEngine1: {x: 1}}}")));
+    checkRoundTrip(opts);
 
-    TEST(CollectionOptions, ResetStorageEngineField) {
-        CollectionOptions opts;
-        ASSERT_OK(opts.parse(fromjson(
-            "{storageEngine: {storageEngine1: {x: 1}}}")));
-        checkRoundTrip(opts);
+    opts.reset();
 
-        opts.reset();
+    ASSERT_TRUE(opts.storageEngine.isEmpty());
+}
 
-        ASSERT_TRUE(opts.storageEngine.isEmpty());
-    }
+TEST(CollectionOptions, ModifyStorageEngineField) {
+    CollectionOptions opts;
 
-    TEST(CollectionOptions, ModifyStorageEngineField) {
-        CollectionOptions opts;
+    // Directly modify storageEngine field in collection options.
+    opts.storageEngine = fromjson("{storageEngine1: {x: 1}}");
 
-        // Directly modify storageEngine field in collection options.
-        opts.storageEngine = fromjson("{storageEngine1: {x: 1}}");
+    // Unrecognized field should not be present in BSON representation.
+    BSONObj obj = opts.toBSON();
+    ASSERT_FALSE(obj.hasField("unknownField"));
 
-        // Unrecognized field should not be present in BSON representation.
-        BSONObj obj = opts.toBSON();
-        ASSERT_FALSE(obj.hasField("unknownField"));
+    // Check "storageEngine" field.
+    ASSERT_TRUE(obj.hasField("storageEngine"));
+    ASSERT_TRUE(obj.getField("storageEngine").isABSONObj());
+    BSONObj storageEngine = obj.getObjectField("storageEngine");
 
-        // Check "storageEngine" field.
-        ASSERT_TRUE(obj.hasField("storageEngine"));
-        ASSERT_TRUE(obj.getField("storageEngine").isABSONObj());
-        BSONObj storageEngine = obj.getObjectField("storageEngine");
-
-        // Check individual storage storageEngine fields.
-        ASSERT_TRUE(storageEngine.getField("storageEngine1").isABSONObj());
-        BSONObj storageEngine1 = storageEngine.getObjectField("storageEngine1");
-        ASSERT_EQUALS(1, storageEngine1.getIntField("x"));
-    }
+    // Check individual storage storageEngine fields.
+    ASSERT_TRUE(storageEngine.getField("storageEngine1").isABSONObj());
+    BSONObj storageEngine1 = storageEngine.getObjectField("storageEngine1");
+    ASSERT_EQUALS(1, storageEngine1.getIntField("x"));
+}
 }

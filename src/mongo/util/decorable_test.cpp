@@ -42,138 +42,136 @@
 namespace mongo {
 namespace {
 
-    static int numConstructedAs;
-    static int numDestructedAs;
+static int numConstructedAs;
+static int numDestructedAs;
 
-    class A {
-    public:
-        A() : value(0) {
-            ++numConstructedAs;
-        }
-        ~A() {
-            ++numDestructedAs;
-        }
-        int value;
-    };
+class A {
+public:
+    A() : value(0) {
+        ++numConstructedAs;
+    }
+    ~A() {
+        ++numDestructedAs;
+    }
+    int value;
+};
 
-    class ThrowA {
-    public:
-        ThrowA() : value(0) {
-            uasserted(ErrorCodes::Unauthorized, "Throwing in a constructor");
-        }
-
-        int value;
-    };
-
-    TEST(DecorableTest, DecorableType) {
-        class MyDecorable : public Decorable<MyDecorable> {
-        };
-        const auto dd1 = MyDecorable::declareDecoration<A>();
-        const auto dd2 = MyDecorable::declareDecoration<A>();
-        const auto dd3 = MyDecorable::declareDecoration<int>();
-        numConstructedAs = 0;
-        numDestructedAs = 0;
-        {
-            MyDecorable decorable1;
-            ASSERT_EQ(2, numConstructedAs);
-            ASSERT_EQ(0, numDestructedAs);
-            MyDecorable decorable2;
-            ASSERT_EQ(4, numConstructedAs);
-            ASSERT_EQ(0, numDestructedAs);
-
-            ASSERT_EQ(0, dd1(decorable1).value);
-            ASSERT_EQ(0, dd2(decorable1).value);
-            ASSERT_EQ(0, dd1(decorable2).value);
-            ASSERT_EQ(0, dd2(decorable2).value);
-            ASSERT_EQ(0, dd3(decorable2));
-            dd1(decorable1).value = 1;
-            dd2(decorable1).value = 2;
-            dd1(decorable2).value = 3;
-            dd2(decorable2).value = 4;
-            dd3(decorable2) = 5;
-            ASSERT_EQ(1, dd1(decorable1).value);
-            ASSERT_EQ(2, dd2(decorable1).value);
-            ASSERT_EQ(3, dd1(decorable2).value);
-            ASSERT_EQ(4, dd2(decorable2).value);
-            ASSERT_EQ(5, dd3(decorable2));
-        }
-        ASSERT_EQ(4, numDestructedAs);
+class ThrowA {
+public:
+    ThrowA() : value(0) {
+        uasserted(ErrorCodes::Unauthorized, "Throwing in a constructor");
     }
 
-    TEST(DecorableTest, SimpleDecoration) {
-        numConstructedAs = 0;
-        numDestructedAs = 0;
-        DecorationRegistry registry;
-        const auto dd1 = registry.declareDecoration<A>();
-        const auto dd2 = registry.declareDecoration<A>();
-        const auto dd3 = registry.declareDecoration<int>();
+    int value;
+};
 
-        {
-            DecorationContainer decorable1(&registry);
-            ASSERT_EQ(2, numConstructedAs);
-            ASSERT_EQ(0, numDestructedAs);
-            DecorationContainer decorable2(&registry);
-            ASSERT_EQ(4, numConstructedAs);
-            ASSERT_EQ(0, numDestructedAs);
+TEST(DecorableTest, DecorableType) {
+    class MyDecorable : public Decorable<MyDecorable> {};
+    const auto dd1 = MyDecorable::declareDecoration<A>();
+    const auto dd2 = MyDecorable::declareDecoration<A>();
+    const auto dd3 = MyDecorable::declareDecoration<int>();
+    numConstructedAs = 0;
+    numDestructedAs = 0;
+    {
+        MyDecorable decorable1;
+        ASSERT_EQ(2, numConstructedAs);
+        ASSERT_EQ(0, numDestructedAs);
+        MyDecorable decorable2;
+        ASSERT_EQ(4, numConstructedAs);
+        ASSERT_EQ(0, numDestructedAs);
 
-            ASSERT_EQ(0, decorable1.getDecoration(dd1).value);
-            ASSERT_EQ(0, decorable1.getDecoration(dd2).value);
-            ASSERT_EQ(0, decorable2.getDecoration(dd1).value);
-            ASSERT_EQ(0, decorable2.getDecoration(dd2).value);
-            ASSERT_EQ(0, decorable2.getDecoration(dd3));
-            decorable1.getDecoration(dd1).value = 1;
-            decorable1.getDecoration(dd2).value = 2;
-            decorable2.getDecoration(dd1).value = 3;
-            decorable2.getDecoration(dd2).value = 4;
-            decorable2.getDecoration(dd3) = 5;
-            ASSERT_EQ(1, decorable1.getDecoration(dd1).value);
-            ASSERT_EQ(2, decorable1.getDecoration(dd2).value);
-            ASSERT_EQ(3, decorable2.getDecoration(dd1).value);
-            ASSERT_EQ(4, decorable2.getDecoration(dd2).value);
-            ASSERT_EQ(5, decorable2.getDecoration(dd3));
-        }
-        ASSERT_EQ(4, numDestructedAs);
+        ASSERT_EQ(0, dd1(decorable1).value);
+        ASSERT_EQ(0, dd2(decorable1).value);
+        ASSERT_EQ(0, dd1(decorable2).value);
+        ASSERT_EQ(0, dd2(decorable2).value);
+        ASSERT_EQ(0, dd3(decorable2));
+        dd1(decorable1).value = 1;
+        dd2(decorable1).value = 2;
+        dd1(decorable2).value = 3;
+        dd2(decorable2).value = 4;
+        dd3(decorable2) = 5;
+        ASSERT_EQ(1, dd1(decorable1).value);
+        ASSERT_EQ(2, dd2(decorable1).value);
+        ASSERT_EQ(3, dd1(decorable2).value);
+        ASSERT_EQ(4, dd2(decorable2).value);
+        ASSERT_EQ(5, dd3(decorable2));
     }
+    ASSERT_EQ(4, numDestructedAs);
+}
 
-    TEST(DecorableTest, ThrowingConstructor) {
-        numConstructedAs = 0;
-        numDestructedAs = 0;
+TEST(DecorableTest, SimpleDecoration) {
+    numConstructedAs = 0;
+    numDestructedAs = 0;
+    DecorationRegistry registry;
+    const auto dd1 = registry.declareDecoration<A>();
+    const auto dd2 = registry.declareDecoration<A>();
+    const auto dd3 = registry.declareDecoration<int>();
 
-        DecorationRegistry registry;
-        registry.declareDecoration<A>();
-        registry.declareDecoration<ThrowA>();
-        registry.declareDecoration<A>();
+    {
+        DecorationContainer decorable1(&registry);
+        ASSERT_EQ(2, numConstructedAs);
+        ASSERT_EQ(0, numDestructedAs);
+        DecorationContainer decorable2(&registry);
+        ASSERT_EQ(4, numConstructedAs);
+        ASSERT_EQ(0, numDestructedAs);
 
-        try {
-            DecorationContainer d(&registry);
-        }
-        catch (const UserException& ex) {
-            ASSERT_EQ(ErrorCodes::Unauthorized, ex.getCode());
-        }
-        ASSERT_EQ(1, numConstructedAs);
-        ASSERT_EQ(1, numDestructedAs);
+        ASSERT_EQ(0, decorable1.getDecoration(dd1).value);
+        ASSERT_EQ(0, decorable1.getDecoration(dd2).value);
+        ASSERT_EQ(0, decorable2.getDecoration(dd1).value);
+        ASSERT_EQ(0, decorable2.getDecoration(dd2).value);
+        ASSERT_EQ(0, decorable2.getDecoration(dd3));
+        decorable1.getDecoration(dd1).value = 1;
+        decorable1.getDecoration(dd2).value = 2;
+        decorable2.getDecoration(dd1).value = 3;
+        decorable2.getDecoration(dd2).value = 4;
+        decorable2.getDecoration(dd3) = 5;
+        ASSERT_EQ(1, decorable1.getDecoration(dd1).value);
+        ASSERT_EQ(2, decorable1.getDecoration(dd2).value);
+        ASSERT_EQ(3, decorable2.getDecoration(dd1).value);
+        ASSERT_EQ(4, decorable2.getDecoration(dd2).value);
+        ASSERT_EQ(5, decorable2.getDecoration(dd3));
     }
+    ASSERT_EQ(4, numDestructedAs);
+}
 
-    TEST(DecorableTest, Alignment) {
-        DecorationRegistry registry;
-        const auto firstChar = registry.declareDecoration<char>();
-        const auto firstInt = registry.declareDecoration<int>();
-        const auto secondChar = registry.declareDecoration<int>();
-        const auto secondInt = registry.declareDecoration<int>();
+TEST(DecorableTest, ThrowingConstructor) {
+    numConstructedAs = 0;
+    numDestructedAs = 0;
+
+    DecorationRegistry registry;
+    registry.declareDecoration<A>();
+    registry.declareDecoration<ThrowA>();
+    registry.declareDecoration<A>();
+
+    try {
         DecorationContainer d(&registry);
-        ASSERT_EQ(0U,
-                  reinterpret_cast<uintptr_t>(&d.getDecoration(firstChar)) %
-                  std::alignment_of<char>::value);
-        ASSERT_EQ(0U,
-                  reinterpret_cast<uintptr_t>(&d.getDecoration(secondChar)) %
-                  std::alignment_of<char>::value);
-        ASSERT_EQ(0U,
-                  reinterpret_cast<uintptr_t>(&d.getDecoration(firstInt)) %
-                  std::alignment_of<int>::value);
-        ASSERT_EQ(0U,
-                  reinterpret_cast<uintptr_t>(&d.getDecoration(secondInt)) %
-                  std::alignment_of<int>::value);
+    } catch (const UserException& ex) {
+        ASSERT_EQ(ErrorCodes::Unauthorized, ex.getCode());
     }
+    ASSERT_EQ(1, numConstructedAs);
+    ASSERT_EQ(1, numDestructedAs);
+}
+
+TEST(DecorableTest, Alignment) {
+    DecorationRegistry registry;
+    const auto firstChar = registry.declareDecoration<char>();
+    const auto firstInt = registry.declareDecoration<int>();
+    const auto secondChar = registry.declareDecoration<int>();
+    const auto secondInt = registry.declareDecoration<int>();
+    DecorationContainer d(&registry);
+    ASSERT_EQ(0U,
+              reinterpret_cast<uintptr_t>(&d.getDecoration(firstChar)) %
+                  std::alignment_of<char>::value);
+    ASSERT_EQ(0U,
+              reinterpret_cast<uintptr_t>(&d.getDecoration(secondChar)) %
+                  std::alignment_of<char>::value);
+    ASSERT_EQ(0U,
+              reinterpret_cast<uintptr_t>(&d.getDecoration(firstInt)) %
+                  std::alignment_of<int>::value);
+    ASSERT_EQ(0U,
+              reinterpret_cast<uintptr_t>(&d.getDecoration(secondInt)) %
+                  std::alignment_of<int>::value);
+}
 
 }  // namespace
 }  // namespace mongo

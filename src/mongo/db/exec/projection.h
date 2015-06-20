@@ -37,123 +37,122 @@
 
 namespace mongo {
 
-    struct ProjectionStageParams {
-        enum ProjectionImplementation {
-            // The default case.  Will handle every projection.
-            NO_FAST_PATH,
+struct ProjectionStageParams {
+    enum ProjectionImplementation {
+        // The default case.  Will handle every projection.
+        NO_FAST_PATH,
 
-            // The projection is simple inclusion and is totally covered by one index.
-            COVERED_ONE_INDEX,
+        // The projection is simple inclusion and is totally covered by one index.
+        COVERED_ONE_INDEX,
 
-            // The projection is simple inclusion and we expect an object.
-            SIMPLE_DOC
-        };
-
-        ProjectionStageParams(const MatchExpressionParser::WhereCallback& wc) 
-            : projImpl(NO_FAST_PATH), fullExpression(NULL), whereCallback(&wc) { }
-
-        ProjectionImplementation projImpl;
-
-        // The projection object.  We lack a ProjectionExpression or similar so we use a BSONObj.
-        BSONObj projObj;
-
-        // If we have a positional or elemMatch projection we need a MatchExpression to pull out the
-        // right data.
-        // Not owned here, we do not take ownership.
-        const MatchExpression* fullExpression;
-
-        // If (COVERED_ONE_INDEX == projObj) this is the key pattern we're extracting covered data
-        // from.  Otherwise, this field is ignored.
-        BSONObj coveredKeyObj;
-
-        // Used for creating context for the $where clause processing. Not owned.
-        const MatchExpressionParser::WhereCallback* whereCallback;
+        // The projection is simple inclusion and we expect an object.
+        SIMPLE_DOC
     };
+
+    ProjectionStageParams(const MatchExpressionParser::WhereCallback& wc)
+        : projImpl(NO_FAST_PATH), fullExpression(NULL), whereCallback(&wc) {}
+
+    ProjectionImplementation projImpl;
+
+    // The projection object.  We lack a ProjectionExpression or similar so we use a BSONObj.
+    BSONObj projObj;
+
+    // If we have a positional or elemMatch projection we need a MatchExpression to pull out the
+    // right data.
+    // Not owned here, we do not take ownership.
+    const MatchExpression* fullExpression;
+
+    // If (COVERED_ONE_INDEX == projObj) this is the key pattern we're extracting covered data
+    // from.  Otherwise, this field is ignored.
+    BSONObj coveredKeyObj;
+
+    // Used for creating context for the $where clause processing. Not owned.
+    const MatchExpressionParser::WhereCallback* whereCallback;
+};
+
+/**
+ * This stage computes a projection.
+ */
+class ProjectionStage : public PlanStage {
+public:
+    ProjectionStage(const ProjectionStageParams& params, WorkingSet* ws, PlanStage* child);
+
+    virtual ~ProjectionStage();
+
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
+
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_PROJECTION;
+    }
+
+    PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats() const;
+
+    virtual const SpecificStats* getSpecificStats() const;
+
+    typedef unordered_set<StringData, StringData::Hasher> FieldSet;
 
     /**
-     * This stage computes a projection.
+     * Given the projection spec for a simple inclusion projection,
+     * 'projObj', populates 'includedFields' with the set of field
+     * names to be included.
      */
-    class ProjectionStage : public PlanStage {
-    public:
-        ProjectionStage(const ProjectionStageParams& params,
-                        WorkingSet* ws,
-                        PlanStage* child);
+    static void getSimpleInclusionFields(const BSONObj& projObj, FieldSet* includedFields);
 
-        virtual ~ProjectionStage();
+    /**
+     * Applies a simple inclusion projection to 'in', including
+     * only the fields specified by 'includedFields'.
+     *
+     * The resulting document is constructed using 'bob'.
+     */
+    static void transformSimpleInclusion(const BSONObj& in,
+                                         const FieldSet& includedFields,
+                                         BSONObjBuilder& bob);
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+    static const char* kStageType;
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+private:
+    Status transform(WorkingSetMember* member);
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    std::unique_ptr<ProjectionExec> _exec;
 
-        virtual StageType stageType() const { return STAGE_PROJECTION; }
+    // _ws is not owned by us.
+    WorkingSet* _ws;
+    std::unique_ptr<PlanStage> _child;
 
-        PlanStageStats* getStats();
+    // Stats
+    CommonStats _commonStats;
+    ProjectionStats _specificStats;
 
-        virtual const CommonStats* getCommonStats() const;
+    // Fast paths:
+    ProjectionStageParams::ProjectionImplementation _projImpl;
 
-        virtual const SpecificStats* getSpecificStats() const;
+    // Used by all projection implementations.
+    BSONObj _projObj;
 
-        typedef unordered_set<StringData, StringData::Hasher> FieldSet;
+    // Data used for both SIMPLE_DOC and COVERED_ONE_INDEX paths.
+    // Has the field names present in the simple projection.
+    unordered_set<StringData, StringData::Hasher> _includedFields;
 
-        /**
-         * Given the projection spec for a simple inclusion projection,
-         * 'projObj', populates 'includedFields' with the set of field
-         * names to be included.
-         */
-        static void getSimpleInclusionFields(const BSONObj& projObj,
-                                             FieldSet* includedFields);
+    //
+    // Used for the COVERED_ONE_INDEX path.
+    //
+    BSONObj _coveredKeyObj;
 
-        /**
-         * Applies a simple inclusion projection to 'in', including
-         * only the fields specified by 'includedFields'.
-         *
-         * The resulting document is constructed using 'bob'.
-         */
-        static void transformSimpleInclusion(const BSONObj& in,
-                                             const FieldSet& includedFields,
-                                             BSONObjBuilder& bob);
+    // Field names can be empty in 2.4 and before so we can't use them as a sentinel value.
+    // If the i-th entry is true we include the i-th field in the key.
+    std::vector<bool> _includeKey;
 
-        static const char* kStageType;
-
-    private:
-        Status transform(WorkingSetMember* member);
-
-        std::unique_ptr<ProjectionExec> _exec;
-
-        // _ws is not owned by us.
-        WorkingSet* _ws;
-        std::unique_ptr<PlanStage> _child;
-
-        // Stats
-        CommonStats _commonStats;
-        ProjectionStats _specificStats;
-
-        // Fast paths:
-        ProjectionStageParams::ProjectionImplementation _projImpl;
-
-        // Used by all projection implementations.
-        BSONObj _projObj;
-
-        // Data used for both SIMPLE_DOC and COVERED_ONE_INDEX paths.
-        // Has the field names present in the simple projection.
-        unordered_set<StringData, StringData::Hasher> _includedFields;
-
-        //
-        // Used for the COVERED_ONE_INDEX path.
-        //
-        BSONObj _coveredKeyObj;
-
-        // Field names can be empty in 2.4 and before so we can't use them as a sentinel value.
-        // If the i-th entry is true we include the i-th field in the key.
-        std::vector<bool> _includeKey;
-
-        // If the i-th entry of _includeKey is true this is the field name for the i-th key field.
-        std::vector<StringData> _keyFieldNames;
-    };
+    // If the i-th entry of _includeKey is true this is the field name for the i-th key field.
+    std::vector<StringData> _keyFieldNames;
+};
 
 }  // namespace mongo

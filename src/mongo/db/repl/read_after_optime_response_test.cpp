@@ -34,49 +34,49 @@ namespace mongo {
 namespace repl {
 namespace {
 
-    TEST(ReadAfterResponse, Default) {
-        ReadAfterOpTimeResponse response;
+TEST(ReadAfterResponse, Default) {
+    ReadAfterOpTimeResponse response;
 
-        ASSERT_FALSE(response.didWait());
+    ASSERT_FALSE(response.didWait());
 
-        BSONObjBuilder builder;
-        response.appendInfo(&builder);
+    BSONObjBuilder builder;
+    response.appendInfo(&builder);
 
-        BSONObj obj(builder.done());
-        ASSERT_TRUE(obj.isEmpty());
-    }
+    BSONObj obj(builder.done());
+    ASSERT_TRUE(obj.isEmpty());
+}
 
-    TEST(ReadAfterResponse, WithStatus) {
-        ReadAfterOpTimeResponse response(Status(ErrorCodes::InternalError, "test"));
+TEST(ReadAfterResponse, WithStatus) {
+    ReadAfterOpTimeResponse response(Status(ErrorCodes::InternalError, "test"));
 
-        ASSERT_FALSE(response.didWait());
+    ASSERT_FALSE(response.didWait());
 
-        ASSERT_EQ(ErrorCodes::InternalError, response.getStatus().code());
+    ASSERT_EQ(ErrorCodes::InternalError, response.getStatus().code());
 
-        BSONObjBuilder builder;
-        response.appendInfo(&builder);
+    BSONObjBuilder builder;
+    response.appendInfo(&builder);
 
-        BSONObj obj(builder.done());
-        ASSERT_TRUE(obj.isEmpty());
-    }
+    BSONObj obj(builder.done());
+    ASSERT_TRUE(obj.isEmpty());
+}
 
-    TEST(ReadAfterResponse, WaitedWithDuration) {
-        ReadAfterOpTimeResponse response(Status(ErrorCodes::InternalError, "test"),
-                                         stdx::chrono::milliseconds(7));
+TEST(ReadAfterResponse, WaitedWithDuration) {
+    ReadAfterOpTimeResponse response(Status(ErrorCodes::InternalError, "test"),
+                                     stdx::chrono::milliseconds(7));
 
-        ASSERT_TRUE(response.didWait());
-        ASSERT_EQUALS(Milliseconds(7), response.getDuration());
-        ASSERT_EQ(ErrorCodes::InternalError, response.getStatus().code());
+    ASSERT_TRUE(response.didWait());
+    ASSERT_EQUALS(Milliseconds(7), response.getDuration());
+    ASSERT_EQ(ErrorCodes::InternalError, response.getStatus().code());
 
-        BSONObjBuilder builder;
-        response.appendInfo(&builder);
+    BSONObjBuilder builder;
+    response.appendInfo(&builder);
 
-        BSONObj obj(builder.done());
-        auto waitedMSElem = obj[ReadAfterOpTimeResponse::kWaitedMSFieldName];
-        ASSERT_TRUE(waitedMSElem.isNumber());
-        ASSERT_EQ(7, waitedMSElem.numberLong());
-    }
+    BSONObj obj(builder.done());
+    auto waitedMSElem = obj[ReadAfterOpTimeResponse::kWaitedMSFieldName];
+    ASSERT_TRUE(waitedMSElem.isNumber());
+    ASSERT_EQ(7, waitedMSElem.numberLong());
+}
 
-} // unnamed namespace
-} // namespace repl
-} // namespace mongo
+}  // unnamed namespace
+}  // namespace repl
+}  // namespace mongo

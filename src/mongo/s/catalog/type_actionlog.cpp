@@ -32,124 +32,129 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    using mongo::str::stream;
+using mongo::str::stream;
 
-    const std::string ActionLogType::ConfigNS = "config.actionlog";
+const std::string ActionLogType::ConfigNS = "config.actionlog";
 
-    const BSONField<std::string> ActionLogType::server("server");
-    const BSONField<std::string> ActionLogType::what("what");
-    const BSONField<Date_t> ActionLogType::time("time");
-    const BSONField<BSONObj> ActionLogType::details("details");
+const BSONField<std::string> ActionLogType::server("server");
+const BSONField<std::string> ActionLogType::what("what");
+const BSONField<Date_t> ActionLogType::time("time");
+const BSONField<BSONObj> ActionLogType::details("details");
 
-    ActionLogType::ActionLogType() {
-        clear();
+ActionLogType::ActionLogType() {
+    clear();
+}
+
+ActionLogType::~ActionLogType() {}
+
+bool ActionLogType::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    ActionLogType::~ActionLogType() {
+    // All the mandatory fields must be present.
+    if (!_isServerSet) {
+        *errMsg = stream() << "missing " << server.name() << " field";
+        return false;
+    }
+    if (!_isTimeSet) {
+        *errMsg = stream() << "missing " << time.name() << " field";
+        return false;
+    }
+    if (!_isWhatSet) {
+        *errMsg = stream() << "missing " << what.name() << " field";
+        return false;
+    }
+    if (!_isDetailsSet) {
+        *errMsg = stream() << "missing " << details.name() << " field";
+        return false;
     }
 
-    bool ActionLogType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
+    return true;
+}
 
-        // All the mandatory fields must be present.
-        if (!_isServerSet) {
-            *errMsg = stream() << "missing " << server.name() << " field";
-            return false;
-        }
-        if (!_isTimeSet) {
-            *errMsg = stream() << "missing " << time.name() << " field";
-            return false;
-        }
-        if (!_isWhatSet) {
-            *errMsg = stream() << "missing " << what.name() << " field";
-            return false;
-        }
-        if (!_isDetailsSet) {
-            *errMsg = stream() << "missing " << details.name() << " field";
-            return false;
-        }
+BSONObj ActionLogType::toBSON() const {
+    BSONObjBuilder builder;
 
-        return true;
-    }
+    if (_isServerSet)
+        builder.append(server(), _server);
+    if (_isTimeSet)
+        builder.append(time(), _time);
+    if (_isWhatSet)
+        builder.append(what(), _what);
+    if (_isDetailsSet)
+        builder.append(details(), _details);
 
-    BSONObj ActionLogType::toBSON() const {
-        BSONObjBuilder builder;
+    return builder.obj();
+}
 
-        if (_isServerSet) builder.append(server(), _server);
-        if (_isTimeSet) builder.append(time(), _time);
-        if (_isWhatSet) builder.append(what(), _what);
-        if (_isDetailsSet) builder.append(details(), _details);
+bool ActionLogType::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-        return builder.obj();
-    }
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-    bool ActionLogType::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+    FieldParser::FieldState fieldState;
 
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
+    fieldState = FieldParser::extract(source, server, &_server, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isServerSet = fieldState == FieldParser::FIELD_SET;
 
-        FieldParser::FieldState fieldState;
+    fieldState = FieldParser::extract(source, time, &_time, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isTimeSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, server, &_server, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isServerSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, what, &_what, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isWhatSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, time, &_time, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isTimeSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, details, &_details, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isDetailsSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, what, &_what, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWhatSet = fieldState == FieldParser::FIELD_SET;
+    return true;
+}
 
-        fieldState = FieldParser::extract(source, details, &_details, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isDetailsSet = fieldState == FieldParser::FIELD_SET;
+void ActionLogType::clear() {
+    _server.clear();
+    _isServerSet = false;
 
-        return true;
-    }
+    _what.clear();
+    _isWhatSet = false;
 
-    void ActionLogType::clear() {
+    _time = Date_t();
+    _isTimeSet = false;
 
-        _server.clear();
-        _isServerSet = false;
+    _details = BSONObj();
+    _isDetailsSet = false;
+}
 
-        _what.clear();
-        _isWhatSet = false;
+void ActionLogType::cloneTo(ActionLogType* other) const {
+    other->clear();
 
-        _time = Date_t();
-        _isTimeSet = false;
+    other->_server = _server;
+    other->_isServerSet = _isServerSet;
 
-        _details = BSONObj();
-        _isDetailsSet = false;
+    other->_what = _what;
+    other->_isWhatSet = _isWhatSet;
 
-    }
+    other->_time = _time;
+    other->_isTimeSet = _isTimeSet;
 
-    void ActionLogType::cloneTo(ActionLogType* other) const {
-        other->clear();
+    other->_details = _details;
+    other->_isDetailsSet = _isDetailsSet;
+}
 
-        other->_server = _server;
-        other->_isServerSet = _isServerSet;
+std::string ActionLogType::toString() const {
+    return toBSON().toString();
+}
 
-        other->_what = _what;
-        other->_isWhatSet = _isWhatSet;
-
-        other->_time = _time;
-        other->_isTimeSet = _isTimeSet;
-
-        other->_details = _details;
-        other->_isDetailsSet = _isDetailsSet;
-
-    }
-
-    std::string ActionLogType::toString() const {
-        return toBSON().toString();
-    }
-
-} // namespace mongo
+}  // namespace mongo

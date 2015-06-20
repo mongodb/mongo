@@ -39,15 +39,15 @@
 
 namespace mongo {
 
-    /* db response format
+/* db response format
 
-       Query or GetMore: // see struct QueryResult
-          int resultFlags;
-          int64 cursorID;
-          int startingFrom;
-          int nReturned;
-          list of marshalled JSObjects;
-    */
+   Query or GetMore: // see struct QueryResult
+      int resultFlags;
+      int64 cursorID;
+      int startingFrom;
+      int nReturned;
+      list of marshalled JSObjects;
+*/
 
 /* db request message format
 
@@ -91,254 +91,264 @@ namespace mongo {
    Note that the update field layout is very similar layout to Query.
 */
 
-    namespace QueryResult {
+namespace QueryResult {
 #pragma pack(1)
-        /* see http://dochub.mongodb.org/core/mongowireprotocol
-        */
-        struct Layout {
-            MsgData::Layout msgdata;
-            int64_t cursorId;
-            int32_t startingFrom;
-            int32_t nReturned;
-        };
+/* see http://dochub.mongodb.org/core/mongowireprotocol
+*/
+struct Layout {
+    MsgData::Layout msgdata;
+    int64_t cursorId;
+    int32_t startingFrom;
+    int32_t nReturned;
+};
 #pragma pack()
 
-        class ConstView {
-        public:
-            ConstView(const char* storage) : _storage(storage) { }
+class ConstView {
+public:
+    ConstView(const char* storage) : _storage(storage) {}
 
-            const char* view2ptr() const {
-                return storage().view();
-            }
+    const char* view2ptr() const {
+        return storage().view();
+    }
 
-            MsgData::ConstView msgdata() const {
-                return storage().view(offsetof(Layout, msgdata));
-            }
+    MsgData::ConstView msgdata() const {
+        return storage().view(offsetof(Layout, msgdata));
+    }
 
-            int64_t getCursorId() const {
-                return storage().read<LittleEndian<int64_t>>(offsetof(Layout, cursorId));
-            }
+    int64_t getCursorId() const {
+        return storage().read<LittleEndian<int64_t>>(offsetof(Layout, cursorId));
+    }
 
-            int32_t getStartingFrom() const {
-                return storage().read<LittleEndian<int32_t>>(offsetof(Layout, startingFrom));
-            }
+    int32_t getStartingFrom() const {
+        return storage().read<LittleEndian<int32_t>>(offsetof(Layout, startingFrom));
+    }
 
-            int32_t getNReturned() const {
-                return storage().read<LittleEndian<int32_t>>(offsetof(Layout, nReturned));
-            }
+    int32_t getNReturned() const {
+        return storage().read<LittleEndian<int32_t>>(offsetof(Layout, nReturned));
+    }
 
-            const char* data() const {
-                return storage().view(sizeof(Layout));
-            }
+    const char* data() const {
+        return storage().view(sizeof(Layout));
+    }
 
-        protected:
-            const ConstDataView& storage() const {
-                return _storage;
-            }
+protected:
+    const ConstDataView& storage() const {
+        return _storage;
+    }
 
-        private:
-            ConstDataView _storage;
-        };
+private:
+    ConstDataView _storage;
+};
 
-        class View : public ConstView {
-        public:
-            View(char* data) : ConstView(data) {}
+class View : public ConstView {
+public:
+    View(char* data) : ConstView(data) {}
 
-            using ConstView::view2ptr;
-            char* view2ptr() {
-                return storage().view();
-            }
+    using ConstView::view2ptr;
+    char* view2ptr() {
+        return storage().view();
+    }
 
-            using ConstView::msgdata;
-            MsgData::View msgdata() {
-                return storage().view(offsetof(Layout, msgdata));
-            }
+    using ConstView::msgdata;
+    MsgData::View msgdata() {
+        return storage().view(offsetof(Layout, msgdata));
+    }
 
-            void setCursorId(int64_t value) {
-                storage().write(tagLittleEndian(value), offsetof(Layout, cursorId));
-            }
+    void setCursorId(int64_t value) {
+        storage().write(tagLittleEndian(value), offsetof(Layout, cursorId));
+    }
 
-            void setStartingFrom(int32_t value) {
-                storage().write(tagLittleEndian(value), offsetof(Layout, startingFrom));
-            }
+    void setStartingFrom(int32_t value) {
+        storage().write(tagLittleEndian(value), offsetof(Layout, startingFrom));
+    }
 
-            void setNReturned(int32_t value) {
-                storage().write(tagLittleEndian(value), offsetof(Layout, nReturned));
-            }
+    void setNReturned(int32_t value) {
+        storage().write(tagLittleEndian(value), offsetof(Layout, nReturned));
+    }
 
-            int32_t getResultFlags() {
-                return DataView(msgdata().data()).read<LittleEndian<int32_t>>();
-            }
+    int32_t getResultFlags() {
+        return DataView(msgdata().data()).read<LittleEndian<int32_t>>();
+    }
 
-            void setResultFlags(int32_t value) {
-                DataView(msgdata().data()).write(tagLittleEndian(value));
-            }
+    void setResultFlags(int32_t value) {
+        DataView(msgdata().data()).write(tagLittleEndian(value));
+    }
 
-            void setResultFlagsToOk() {
-                setResultFlags(ResultFlag_AwaitCapable);
-            }
+    void setResultFlagsToOk() {
+        setResultFlags(ResultFlag_AwaitCapable);
+    }
 
-            void initializeResultFlags() {
-                setResultFlags(0);
-            }
+    void initializeResultFlags() {
+        setResultFlags(0);
+    }
 
-        private:
-            DataView storage() const {
-                return const_cast<char*>(ConstView::view2ptr());
-            }
-        };
+private:
+    DataView storage() const {
+        return const_cast<char*>(ConstView::view2ptr());
+    }
+};
 
-        class Value : public EncodedValueStorage<Layout, ConstView, View> {
-        public:
-            Value() {
-                BOOST_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
-            }
+class Value : public EncodedValueStorage<Layout, ConstView, View> {
+public:
+    Value() {
+        BOOST_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
+    }
 
-            Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
-        };
+    Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
+};
 
-    } // namespace QueryResult
+}  // namespace QueryResult
 
-    /* For the database/server protocol, these objects and functions encapsulate
-       the various messages transmitted over the connection.
+/* For the database/server protocol, these objects and functions encapsulate
+   the various messages transmitted over the connection.
 
-       See http://dochub.mongodb.org/core/mongowireprotocol
-    */
-    class DbMessage {
+   See http://dochub.mongodb.org/core/mongowireprotocol
+*/
+class DbMessage {
     // Assume sizeof(int) == 4 bytes
     BOOST_STATIC_ASSERT(sizeof(int) == 4);
 
-    public:
-        // Note: DbMessage constructor reads the first 4 bytes and stores it in reserved
-        DbMessage(const Message& msg);
+public:
+    // Note: DbMessage constructor reads the first 4 bytes and stores it in reserved
+    DbMessage(const Message& msg);
 
-        // Indicates whether this message is expected to have a ns
-        // or in the case of dbMsg, a string in the same place as ns
-        bool messageShouldHaveNs() const {
-            return (_msg.operation() >= dbMsg) & (_msg.operation() <= dbDelete);
-        }
+    // Indicates whether this message is expected to have a ns
+    // or in the case of dbMsg, a string in the same place as ns
+    bool messageShouldHaveNs() const {
+        return (_msg.operation() >= dbMsg) & (_msg.operation() <= dbDelete);
+    }
 
-        /** the 32 bit field before the ns
-         * track all bit usage here as its cross op
-         * 0: InsertOption_ContinueOnError
-         * 1: fromWriteback
-         */
-        int reservedField() const { return _reserved; }
+    /** the 32 bit field before the ns
+     * track all bit usage here as its cross op
+     * 0: InsertOption_ContinueOnError
+     * 1: fromWriteback
+     */
+    int reservedField() const {
+        return _reserved;
+    }
 
-        const char * getns() const;
-        int getQueryNToReturn() const;
+    const char* getns() const;
+    int getQueryNToReturn() const;
 
-        int pullInt();
-        long long pullInt64();
-        const char* getArray(size_t count) const;
+    int pullInt();
+    long long pullInt64();
+    const char* getArray(size_t count) const;
 
-        /* for insert and update msgs */
-        bool moreJSObjs() const {
-            return _nextjsobj != 0;
-        }
+    /* for insert and update msgs */
+    bool moreJSObjs() const {
+        return _nextjsobj != 0;
+    }
 
-        BSONObj nextJsObj();
+    BSONObj nextJsObj();
 
-        const Message& msg() const { return _msg; }
+    const Message& msg() const {
+        return _msg;
+    }
 
-        const char * markGet() const {
-            return _nextjsobj;
-        }
+    const char* markGet() const {
+        return _nextjsobj;
+    }
 
-        void markSet() {
-            _mark = _nextjsobj;
-        }
+    void markSet() {
+        _mark = _nextjsobj;
+    }
 
-        void markReset(const char * toMark);
+    void markReset(const char* toMark);
 
-    private:
-        // Check if we have enough data to read
-        template<typename T>
-        void checkRead(const char* start, size_t count = 0) const;
+private:
+    // Check if we have enough data to read
+    template <typename T>
+    void checkRead(const char* start, size_t count = 0) const;
 
-        // Read some type without advancing our position
-        template<typename T>
-        T read() const;
+    // Read some type without advancing our position
+    template <typename T>
+    T read() const;
 
-        // Read some type, and advance our position
-        template<typename T> T readAndAdvance();
+    // Read some type, and advance our position
+    template <typename T>
+    T readAndAdvance();
 
-        const Message& _msg;
-        int _reserved; // flags or zero depending on packet, starts the packet
+    const Message& _msg;
+    int _reserved;  // flags or zero depending on packet, starts the packet
 
-        const char* _nsStart; // start of namespace string, +4 from message start
-        const char* _nextjsobj; // current position reading packet
-        const char* _theEnd; // end of packet
+    const char* _nsStart;    // start of namespace string, +4 from message start
+    const char* _nextjsobj;  // current position reading packet
+    const char* _theEnd;     // end of packet
 
-        const char* _mark;
+    const char* _mark;
 
-        unsigned int _nsLen;
-    };
+    unsigned int _nsLen;
+};
 
 
-    /* a request to run a query, received from the database */
-    class QueryMessage {
-    public:
-        const char *ns;
-        int ntoskip;
-        int ntoreturn;
-        int queryOptions;
-        BSONObj query;
-        BSONObj fields;
-
-        /**
-         * parses the message into the above fields
-         * Warning: constructor mutates DbMessage.
-         */
-        QueryMessage(DbMessage& d) {
-            ns = d.getns();
-            ntoskip = d.pullInt();
-            ntoreturn = d.pullInt();
-            query = d.nextJsObj();
-            if ( d.moreJSObjs() ) {
-                fields = d.nextJsObj();
-            }
-            queryOptions = DataView(d.msg().header().data()).read<LittleEndian<int32_t>>();
-        }
-    };
+/* a request to run a query, received from the database */
+class QueryMessage {
+public:
+    const char* ns;
+    int ntoskip;
+    int ntoreturn;
+    int queryOptions;
+    BSONObj query;
+    BSONObj fields;
 
     /**
-     * A response to a DbMessage.
+     * parses the message into the above fields
+     * Warning: constructor mutates DbMessage.
      */
-    struct DbResponse {
-        Message *response;
-        MSGID responseTo;
-        std::string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
-        DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt){ }
-        DbResponse() {
-            response = 0;
+    QueryMessage(DbMessage& d) {
+        ns = d.getns();
+        ntoskip = d.pullInt();
+        ntoreturn = d.pullInt();
+        query = d.nextJsObj();
+        if (d.moreJSObjs()) {
+            fields = d.nextJsObj();
         }
-        ~DbResponse() { delete response; }
-    };
+        queryOptions = DataView(d.msg().header().data()).read<LittleEndian<int32_t>>();
+    }
+};
 
-    void replyToQuery(int queryResultFlags,
-                      AbstractMessagingPort* p, Message& requestMsg,
-                      void *data, int size,
-                      int nReturned, int startingFrom = 0,
-                      long long cursorId = 0
-                      );
+/**
+ * A response to a DbMessage.
+ */
+struct DbResponse {
+    Message* response;
+    MSGID responseTo;
+    std::string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
+    DbResponse(Message* r, MSGID rt) : response(r), responseTo(rt) {}
+    DbResponse() {
+        response = 0;
+    }
+    ~DbResponse() {
+        delete response;
+    }
+};
+
+void replyToQuery(int queryResultFlags,
+                  AbstractMessagingPort* p,
+                  Message& requestMsg,
+                  void* data,
+                  int size,
+                  int nReturned,
+                  int startingFrom = 0,
+                  long long cursorId = 0);
 
 
-    /* object reply helper. */
-    void replyToQuery(int queryResultFlags,
-                      AbstractMessagingPort* p, Message& requestMsg,
-                      const BSONObj& responseObj);
+/* object reply helper. */
+void replyToQuery(int queryResultFlags,
+                  AbstractMessagingPort* p,
+                  Message& requestMsg,
+                  const BSONObj& responseObj);
 
-    /* helper to do a reply using a DbResponse object */
-    void replyToQuery( int queryResultFlags, Message& m, DbResponse& dbresponse, BSONObj obj );
+/* helper to do a reply using a DbResponse object */
+void replyToQuery(int queryResultFlags, Message& m, DbResponse& dbresponse, BSONObj obj);
 
-    /**
-     * Helper method for setting up a response object.
-     *
-     * @param queryResultFlags The flags to set to the response object.
-     * @param response The object to be used for building the response. The internal buffer of
-     *     this object will contain the raw data from resultObj after a successful call.
-     * @param resultObj The bson object that contains the reply data.
-     */
-    void replyToQuery( int queryResultFlags, Message& response, const BSONObj& resultObj );
-} // namespace mongo
+/**
+ * Helper method for setting up a response object.
+ *
+ * @param queryResultFlags The flags to set to the response object.
+ * @param response The object to be used for building the response. The internal buffer of
+ *     this object will contain the raw data from resultObj after a successful call.
+ * @param resultObj The bson object that contains the reply data.
+ */
+void replyToQuery(int queryResultFlags, Message& response, const BSONObj& resultObj);
+}  // namespace mongo

@@ -39,36 +39,38 @@
 
 namespace mongo {
 
-    class MiniWebServer : public Listener {
-    public:
-        MiniWebServer(const std::string& name, const std::string &ip, int _port);
-        virtual ~MiniWebServer() {}
+class MiniWebServer : public Listener {
+public:
+    MiniWebServer(const std::string& name, const std::string& ip, int _port);
+    virtual ~MiniWebServer() {}
 
-        virtual void doRequest(
-            const char *rq, // the full request
-            std::string url,
-            // set these and return them:
-            std::string& responseMsg,
-            int& responseCode,
-            std::vector<std::string>& headers, // if completely empty, content-type: text/html will be added
-            const SockAddr &from
-        ) = 0;
+    virtual void doRequest(
+        const char* rq,  // the full request
+        std::string url,
+        // set these and return them:
+        std::string& responseMsg,
+        int& responseCode,
+        std::vector<std::string>&
+            headers,  // if completely empty, content-type: text/html will be added
+        const SockAddr& from) = 0;
 
-        // --- static helpers ----
+    // --- static helpers ----
 
-        static void parseParams( BSONObj & params , std::string query );
+    static void parseParams(BSONObj& params, std::string query);
 
-        static std::string parseURL( const char * buf );
-        static std::string parseMethod( const char * headers );
-        static std::string getHeader( const char * headers , const std::string& name );
-        static const char *body( const char *buf );
+    static std::string parseURL(const char* buf);
+    static std::string parseMethod(const char* headers);
+    static std::string getHeader(const char* headers, const std::string& name);
+    static const char* body(const char* buf);
 
-        static std::string urlDecode(const char* s);
-        static std::string urlDecode(const std::string& s) {return urlDecode(s.c_str());}
+    static std::string urlDecode(const char* s);
+    static std::string urlDecode(const std::string& s) {
+        return urlDecode(s.c_str());
+    }
 
-    private:
-        void accepted(std::shared_ptr<Socket> psocket, long long connectionId );
-        static bool fullReceive( const char *buf );
-    };
+private:
+    void accepted(std::shared_ptr<Socket> psocket, long long connectionId);
+    static bool fullReceive(const char* buf);
+};
 
-} // namespace mongo
+}  // namespace mongo

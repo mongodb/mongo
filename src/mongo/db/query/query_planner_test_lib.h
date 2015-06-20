@@ -41,20 +41,20 @@
 
 namespace mongo {
 
-    class QueryPlannerTestLib {
-    public:
-        /**
-         * @param testSoln -- a BSON representation of a query solution
-         * @param trueSoln -- the root node of a query solution tree
-         *
-         * Returns true if the BSON representation matches the actual
-         * tree, otherwise returns false.
-         */
-        static bool solutionMatches(const BSONObj& testSoln, const QuerySolutionNode* trueSoln);
+class QueryPlannerTestLib {
+public:
+    /**
+     * @param testSoln -- a BSON representation of a query solution
+     * @param trueSoln -- the root node of a query solution tree
+     *
+     * Returns true if the BSON representation matches the actual
+     * tree, otherwise returns false.
+     */
+    static bool solutionMatches(const BSONObj& testSoln, const QuerySolutionNode* trueSoln);
 
-        static bool solutionMatches(const std::string& testSoln, const QuerySolutionNode* trueSoln) {
-            return solutionMatches(fromjson(testSoln), trueSoln);
-        }
-    };
+    static bool solutionMatches(const std::string& testSoln, const QuerySolutionNode* trueSoln) {
+        return solutionMatches(fromjson(testSoln), trueSoln);
+    }
+};
 
 }  // namespace mongo

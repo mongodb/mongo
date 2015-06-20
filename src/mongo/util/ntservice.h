@@ -44,59 +44,58 @@
 
 namespace mongo {
 
-    namespace optionenvironment {
-        class OptionSection;
-        class Environment;
-    } // namespace optionenvironment
+namespace optionenvironment {
+class OptionSection;
+class Environment;
+}  // namespace optionenvironment
 
-    namespace moe = mongo::optionenvironment;
+namespace moe = mongo::optionenvironment;
 
 namespace ntservice {
-    struct NtServiceDefaultStrings {
-        const wchar_t* serviceName;
-        const wchar_t* displayName;
-        const wchar_t* serviceDescription;
-    };
+struct NtServiceDefaultStrings {
+    const wchar_t* serviceName;
+    const wchar_t* displayName;
+    const wchar_t* serviceDescription;
+};
 
-    typedef ExitCode (*ServiceCallback)(void);
+typedef ExitCode (*ServiceCallback)(void);
 
-    /**
-     * Configure the service.
-     *
-     * Also performs service installation and removal.
-     *
-     * This function calls _exit() with an error if bad parameters are passed in.  If
-     * the parameters specify that the service should be installed, removed, etc, performs that
-     * operation and exits.
-     *
-     * If this function returns to the caller, the caller should either call startService, or run
-     * the service as a regular process, depending on the return value of shouldStartService().
-     */
-    void configureService(
-            ServiceCallback serviceCallback,
-            const moe::Environment& params,
-            const NtServiceDefaultStrings& defaultStrings,
-            const std::vector<std::string>& disallowedOptions,
-            const std::vector<std::string>& argv);
+/**
+ * Configure the service.
+ *
+ * Also performs service installation and removal.
+ *
+ * This function calls _exit() with an error if bad parameters are passed in.  If
+ * the parameters specify that the service should be installed, removed, etc, performs that
+ * operation and exits.
+ *
+ * If this function returns to the caller, the caller should either call startService, or run
+ * the service as a regular process, depending on the return value of shouldStartService().
+ */
+void configureService(ServiceCallback serviceCallback,
+                      const moe::Environment& params,
+                      const NtServiceDefaultStrings& defaultStrings,
+                      const std::vector<std::string>& disallowedOptions,
+                      const std::vector<std::string>& argv);
 
-    bool shouldStartService();
+bool shouldStartService();
 
-    /**
-     * Construct an argv array that Windows should use to start mongod/mongos as a service
-     * if mongo was started with "inputArgv", which is assumed to be an argument vector that
-     * dictates that Windows should install mongo as a service.
-     *
-     * The result is suitable for passing to mongo::constructUtf8WindowsCommandLine() to construct
-     * a properly quoted command line string.
-     */
-    std::vector<std::string> constructServiceArgv(const std::vector<std::string>& inputArgv);
+/**
+ * Construct an argv array that Windows should use to start mongod/mongos as a service
+ * if mongo was started with "inputArgv", which is assumed to be an argument vector that
+ * dictates that Windows should install mongo as a service.
+ *
+ * The result is suitable for passing to mongo::constructUtf8WindowsCommandLine() to construct
+ * a properly quoted command line string.
+ */
+std::vector<std::string> constructServiceArgv(const std::vector<std::string>& inputArgv);
 
-    /**
-     * Start the service.  Never returns.
-     */
-    MONGO_COMPILER_NORETURN void startService();
+/**
+ * Start the service.  Never returns.
+ */
+MONGO_COMPILER_NORETURN void startService();
 
-    bool reportStatus(DWORD reportState, DWORD waitHint = 0, DWORD exitCode = 0);
+bool reportStatus(DWORD reportState, DWORD waitHint = 0, DWORD exitCode = 0);
 
 }  // namespace ntservice
 }  // namespace mongo

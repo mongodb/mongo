@@ -52,121 +52,117 @@
 
 namespace mongo {
 
-    namespace {
+namespace {
 
-        std::set<NamespaceString> _backgroundThreadNamespaces;
-        stdx::mutex _backgroundThreadMutex;
+std::set<NamespaceString> _backgroundThreadNamespaces;
+stdx::mutex _backgroundThreadMutex;
 
-        class WiredTigerRecordStoreThread : public BackgroundJob {
-        public:
-            WiredTigerRecordStoreThread(const NamespaceString& ns)
-                : BackgroundJob(true /* deleteSelf */), _ns(ns) {
-                _name = std::string("WiredTigerRecordStoreThread for ") + _ns.toString();
-            }
-
-            virtual std::string name() const {
-                return _name;
-            }
-
-            /**
-             * @return Number of documents deleted.
-             */
-            int64_t _deleteExcessDocuments() {
-                if (!getGlobalServiceContext()->getGlobalStorageEngine()) {
-                    LOG(1) << "no global storage engine yet";
-                    return 0;
-                }
-
-                OperationContextImpl txn;
-                checked_cast<WiredTigerRecoveryUnit*>(txn.recoveryUnit())->markNoTicketRequired();
-
-                try {
-                    ScopedTransaction transaction(&txn, MODE_IX);
-
-                    AutoGetDb autoDb(&txn, _ns.db(), MODE_IX);
-                    Database* db = autoDb.getDb();
-                    if (!db) {
-                        LOG(2) << "no local database yet";
-                        return 0;
-                    }
-
-                    Lock::CollectionLock collectionLock(txn.lockState(), _ns.ns(), MODE_IX);
-                    Collection* collection = db->getCollection(_ns);
-                    if (!collection) {
-                        LOG(2) << "no collection " << _ns;
-                        return 0;
-                    }
-
-                    OldClientContext ctx(&txn, _ns, false);
-                    WiredTigerRecordStore* rs =
-                        checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
-                    WriteUnitOfWork wuow(&txn);
-                    stdx::lock_guard<stdx::timed_mutex> lock(rs->cappedDeleterMutex());
-                    int64_t removed = rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
-                    wuow.commit();
-                    return removed;
-                }
-                catch (const std::exception& e) {
-                    severe() << "error in WiredTigerRecordStoreThread: " << e.what();
-                    fassertFailedNoTrace(!"error in WiredTigerRecordStoreThread");
-                }
-                catch (...) {
-                    fassertFailedNoTrace(!"unknown error in WiredTigerRecordStoreThread");
-                }
-            }
-
-            virtual void run() {
-                Client::initThread(_name.c_str());
-
-                while (!inShutdown()) {
-                    int64_t removed = _deleteExcessDocuments();
-                    LOG(2) << "WiredTigerRecordStoreThread deleted " << removed;
-                    if (removed == 0) {
-                        // If we removed 0 documents, sleep a bit in case we're on a laptop
-                        // or something to be nice.
-                        sleepmillis(1000);
-                    }
-                    else if(removed < 1000) {
-                        // 1000 is the batch size, so we didn't even do a full batch,
-                        // which is the most efficient.
-                        sleepmillis(10);
-                    }
-                }
-
-                log() << "shutting down";
-            }
-
-        private:
-            NamespaceString _ns;
-            std::string _name;
-        };
-
-    }  // namespace
-
-    // static
-    bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
-        if (!NamespaceString::oplog(ns)) {
-            return false;
-        }
-
-        if (storageGlobalParams.repair) {
-            LOG(1) << "not starting WiredTigerRecordStoreThread for " << ns
-                   << " because we are in repair";
-            return false;
-        }
-
-        stdx::lock_guard<stdx::mutex> lock(_backgroundThreadMutex);
-        NamespaceString nss(ns);
-        if (_backgroundThreadNamespaces.count(nss)) {
-            log() << "WiredTigerRecordStoreThread " << ns << " already started";
-        }
-        else {
-            log() << "Starting WiredTigerRecordStoreThread " << ns;
-            BackgroundJob* backgroundThread = new WiredTigerRecordStoreThread(nss);
-            backgroundThread->go();
-            _backgroundThreadNamespaces.insert(nss);
-        }
-        return true;
+class WiredTigerRecordStoreThread : public BackgroundJob {
+public:
+    WiredTigerRecordStoreThread(const NamespaceString& ns)
+        : BackgroundJob(true /* deleteSelf */), _ns(ns) {
+        _name = std::string("WiredTigerRecordStoreThread for ") + _ns.toString();
     }
+
+    virtual std::string name() const {
+        return _name;
+    }
+
+    /**
+     * @return Number of documents deleted.
+     */
+    int64_t _deleteExcessDocuments() {
+        if (!getGlobalServiceContext()->getGlobalStorageEngine()) {
+            LOG(1) << "no global storage engine yet";
+            return 0;
+        }
+
+        OperationContextImpl txn;
+        checked_cast<WiredTigerRecoveryUnit*>(txn.recoveryUnit())->markNoTicketRequired();
+
+        try {
+            ScopedTransaction transaction(&txn, MODE_IX);
+
+            AutoGetDb autoDb(&txn, _ns.db(), MODE_IX);
+            Database* db = autoDb.getDb();
+            if (!db) {
+                LOG(2) << "no local database yet";
+                return 0;
+            }
+
+            Lock::CollectionLock collectionLock(txn.lockState(), _ns.ns(), MODE_IX);
+            Collection* collection = db->getCollection(_ns);
+            if (!collection) {
+                LOG(2) << "no collection " << _ns;
+                return 0;
+            }
+
+            OldClientContext ctx(&txn, _ns, false);
+            WiredTigerRecordStore* rs =
+                checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
+            WriteUnitOfWork wuow(&txn);
+            stdx::lock_guard<stdx::timed_mutex> lock(rs->cappedDeleterMutex());
+            int64_t removed = rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
+            wuow.commit();
+            return removed;
+        } catch (const std::exception& e) {
+            severe() << "error in WiredTigerRecordStoreThread: " << e.what();
+            fassertFailedNoTrace(!"error in WiredTigerRecordStoreThread");
+        } catch (...) {
+            fassertFailedNoTrace(!"unknown error in WiredTigerRecordStoreThread");
+        }
+    }
+
+    virtual void run() {
+        Client::initThread(_name.c_str());
+
+        while (!inShutdown()) {
+            int64_t removed = _deleteExcessDocuments();
+            LOG(2) << "WiredTigerRecordStoreThread deleted " << removed;
+            if (removed == 0) {
+                // If we removed 0 documents, sleep a bit in case we're on a laptop
+                // or something to be nice.
+                sleepmillis(1000);
+            } else if (removed < 1000) {
+                // 1000 is the batch size, so we didn't even do a full batch,
+                // which is the most efficient.
+                sleepmillis(10);
+            }
+        }
+
+        log() << "shutting down";
+    }
+
+private:
+    NamespaceString _ns;
+    std::string _name;
+};
+
+}  // namespace
+
+// static
+bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
+    if (!NamespaceString::oplog(ns)) {
+        return false;
+    }
+
+    if (storageGlobalParams.repair) {
+        LOG(1) << "not starting WiredTigerRecordStoreThread for " << ns
+               << " because we are in repair";
+        return false;
+    }
+
+    stdx::lock_guard<stdx::mutex> lock(_backgroundThreadMutex);
+    NamespaceString nss(ns);
+    if (_backgroundThreadNamespaces.count(nss)) {
+        log() << "WiredTigerRecordStoreThread " << ns << " already started";
+    } else {
+        log() << "Starting WiredTigerRecordStoreThread " << ns;
+        BackgroundJob* backgroundThread = new WiredTigerRecordStoreThread(nss);
+        backgroundThread->go();
+        _backgroundThreadNamespaces.insert(nss);
+    }
+    return true;
+}
 
 }  // namespace mongo

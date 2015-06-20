@@ -37,65 +37,65 @@
 
 namespace mongo {
 
-    /**
-     * This class represents the layout and content of a delete document runCommand,
-     * in the resquest side.
-     */
-    class BatchedDeleteDocument : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(BatchedDeleteDocument);
-    public:
+/**
+ * This class represents the layout and content of a delete document runCommand,
+ * in the resquest side.
+ */
+class BatchedDeleteDocument : public BSONSerializable {
+    MONGO_DISALLOW_COPYING(BatchedDeleteDocument);
 
-        //
-        // schema declarations
-        //
+public:
+    //
+    // schema declarations
+    //
 
-        static const BSONField<BSONObj> query;
-        static const BSONField<int> limit;
+    static const BSONField<BSONObj> query;
+    static const BSONField<int> limit;
 
-        //
-        // construction / destruction
-        //
+    //
+    // construction / destruction
+    //
 
-        BatchedDeleteDocument();
-        virtual ~BatchedDeleteDocument();
+    BatchedDeleteDocument();
+    virtual ~BatchedDeleteDocument();
 
-        /** Copies all the fields present in 'this' to 'other'. */
-        void cloneTo(BatchedDeleteDocument* other) const;
+    /** Copies all the fields present in 'this' to 'other'. */
+    void cloneTo(BatchedDeleteDocument* other) const;
 
-        //
-        // bson serializable interface implementation
-        //
+    //
+    // bson serializable interface implementation
+    //
 
-        virtual bool isValid(std::string* errMsg) const;
-        virtual BSONObj toBSON() const;
-        virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-        virtual void clear();
-        virtual std::string toString() const;
+    virtual bool isValid(std::string* errMsg) const;
+    virtual BSONObj toBSON() const;
+    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
+    virtual void clear();
+    virtual std::string toString() const;
 
-        //
-        // individual field accessors
-        //
+    //
+    // individual field accessors
+    //
 
-        void setQuery(const BSONObj& query);
-        void unsetQuery();
-        bool isQuerySet() const;
-        const BSONObj& getQuery() const;
+    void setQuery(const BSONObj& query);
+    void unsetQuery();
+    bool isQuerySet() const;
+    const BSONObj& getQuery() const;
 
-        void setLimit(int limit);
-        void unsetLimit();
-        bool isLimitSet() const;
-        int getLimit() const;
+    void setLimit(int limit);
+    void unsetLimit();
+    bool isLimitSet() const;
+    int getLimit() const;
 
-    private:
-        // Convention: (M)andatory, (O)ptional
+private:
+    // Convention: (M)andatory, (O)ptional
 
-        // (M)  query whose result the delete will remove
-        BSONObj _query;
-        bool _isQuerySet;
+    // (M)  query whose result the delete will remove
+    BSONObj _query;
+    bool _isQuerySet;
 
-        // (M)  the maximum number of documents to be deleted
-        int _limit;
-        bool _isLimitSet;
-    };
+    // (M)  the maximum number of documents to be deleted
+    int _limit;
+    bool _isLimitSet;
+};
 
-} // namespace mongo
+}  // namespace mongo

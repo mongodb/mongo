@@ -42,56 +42,54 @@
 namespace mongo {
 namespace fts {
 
-    using std::string;
+using std::string;
 
-    BasicFTSTokenizer::BasicFTSTokenizer(const FTSLanguage* language)
-        : _language(language), _stemmer(language), _stopWords(StopWords::getStopWords(language)) {
-    }
+BasicFTSTokenizer::BasicFTSTokenizer(const FTSLanguage* language)
+    : _language(language), _stemmer(language), _stopWords(StopWords::getStopWords(language)) {}
 
-    void BasicFTSTokenizer::reset(StringData document, Options options) {
-        _options = options;
-        _document = document.toString();
-        _tokenizer = stdx::make_unique<Tokenizer>(_language, _document);
-    }
+void BasicFTSTokenizer::reset(StringData document, Options options) {
+    _options = options;
+    _document = document.toString();
+    _tokenizer = stdx::make_unique<Tokenizer>(_language, _document);
+}
 
-    bool BasicFTSTokenizer::moveNext() {
-        while (true) {
-            bool hasMore = _tokenizer->more();
-            if (!hasMore) {
-                _stem = "";
-                return false;
-            }
-
-            Token token = _tokenizer->next();
-
-            // Do not return delimiters
-            if (token.type != Token::TEXT) {
-                continue;
-            }
-
-            string word = token.data.toString();
-
-            word = tolowerString(token.data);
-
-            // Stop words are case-sensitive so we need them to be lower cased to check
-            // against the stop word list
-            if ((_options & FTSTokenizer::FilterStopWords) &&
-                _stopWords->isStopWord(word)) {
-                continue;
-            }
-
-            if (_options & FTSTokenizer::GenerateCaseSensitiveTokens) {
-                word = token.data.toString();
-            }
-
-            _stem = _stemmer.stem(word);
-            return true;
+bool BasicFTSTokenizer::moveNext() {
+    while (true) {
+        bool hasMore = _tokenizer->more();
+        if (!hasMore) {
+            _stem = "";
+            return false;
         }
-    }
 
-    StringData BasicFTSTokenizer::get() const {
-        return _stem;
-    }
+        Token token = _tokenizer->next();
 
-} // namespace fts
-} // namespace mongo
+        // Do not return delimiters
+        if (token.type != Token::TEXT) {
+            continue;
+        }
+
+        string word = token.data.toString();
+
+        word = tolowerString(token.data);
+
+        // Stop words are case-sensitive so we need them to be lower cased to check
+        // against the stop word list
+        if ((_options & FTSTokenizer::FilterStopWords) && _stopWords->isStopWord(word)) {
+            continue;
+        }
+
+        if (_options & FTSTokenizer::GenerateCaseSensitiveTokens) {
+            word = token.data.toString();
+        }
+
+        _stem = _stemmer.stem(word);
+        return true;
+    }
+}
+
+StringData BasicFTSTokenizer::get() const {
+    return _stem;
+}
+
+}  // namespace fts
+}  // namespace mongo

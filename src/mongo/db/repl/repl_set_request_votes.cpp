@@ -36,36 +36,35 @@
 namespace mongo {
 namespace repl {
 
-    class CmdReplSetRequestVotes : public ReplSetCommand {
-    public:
-        CmdReplSetRequestVotes() : ReplSetCommand("replSetRequestVotes") { }
-    private:
-        bool run(OperationContext* txn,
-                 const std::string&,
-                 BSONObj& cmdObj,
-                 int,
-                 std::string& errmsg,
-                 BSONObjBuilder& result) final {
+class CmdReplSetRequestVotes : public ReplSetCommand {
+public:
+    CmdReplSetRequestVotes() : ReplSetCommand("replSetRequestVotes") {}
 
-            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-
-            ReplSetRequestVotesArgs parsedArgs;
-            status = parsedArgs.initialize(cmdObj);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-
-            ReplSetRequestVotesResponse response;
-            status = getGlobalReplicationCoordinator()->processReplSetRequestVotes(txn,
-                                                                                   parsedArgs,
-                                                                                   &response);
-            response.addToBSON(&result);
+private:
+    bool run(OperationContext* txn,
+             const std::string&,
+             BSONObj& cmdObj,
+             int,
+             std::string& errmsg,
+             BSONObjBuilder& result) final {
+        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-    } cmdReplSetRequestVotes;
 
-} // namespace repl
-} // namespace mongo
+        ReplSetRequestVotesArgs parsedArgs;
+        status = parsedArgs.initialize(cmdObj);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
+        }
+
+        ReplSetRequestVotesResponse response;
+        status = getGlobalReplicationCoordinator()->processReplSetRequestVotes(
+            txn, parsedArgs, &response);
+        response.addToBSON(&result);
+        return appendCommandStatus(result, status);
+    }
+} cmdReplSetRequestVotes;
+
+}  // namespace repl
+}  // namespace mongo

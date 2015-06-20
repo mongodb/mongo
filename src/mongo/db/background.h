@@ -43,34 +43,34 @@
 
 namespace mongo {
 
-    /* these are administrative operations / jobs
-       for a namespace running in the background, and that if in progress,
-       you aren't allowed to do other NamespaceDetails major manipulations
-       (such as dropping ns or db) even in the foreground and must
-       instead uassert.
+/* these are administrative operations / jobs
+   for a namespace running in the background, and that if in progress,
+   you aren't allowed to do other NamespaceDetails major manipulations
+   (such as dropping ns or db) even in the foreground and must
+   instead uassert.
 
-       It's assumed this is not for super-high RPS things, so we don't do
-       anything special in the implementation here to be fast.
-    */
-    class BackgroundOperation {
-        MONGO_DISALLOW_COPYING(BackgroundOperation);
-    public:
-        static bool inProgForDb(StringData db);
-        static bool inProgForNs(StringData ns);
-        static void assertNoBgOpInProgForDb(StringData db);
-        static void assertNoBgOpInProgForNs(StringData ns);
-        static void awaitNoBgOpInProgForDb(StringData db);
-        static void awaitNoBgOpInProgForNs(StringData ns);
-        static void dump(std::ostream&);
+   It's assumed this is not for super-high RPS things, so we don't do
+   anything special in the implementation here to be fast.
+*/
+class BackgroundOperation {
+    MONGO_DISALLOW_COPYING(BackgroundOperation);
 
-        /* check for in progress before instantiating */
-        BackgroundOperation(StringData ns);
+public:
+    static bool inProgForDb(StringData db);
+    static bool inProgForNs(StringData ns);
+    static void assertNoBgOpInProgForDb(StringData db);
+    static void assertNoBgOpInProgForNs(StringData ns);
+    static void awaitNoBgOpInProgForDb(StringData db);
+    static void awaitNoBgOpInProgForNs(StringData ns);
+    static void dump(std::ostream&);
 
-        virtual ~BackgroundOperation();
+    /* check for in progress before instantiating */
+    BackgroundOperation(StringData ns);
 
-    private:
-        NamespaceString _ns;
-    };
+    virtual ~BackgroundOperation();
 
-} // namespace mongo
+private:
+    NamespaceString _ns;
+};
 
+}  // namespace mongo

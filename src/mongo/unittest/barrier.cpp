@@ -35,28 +35,25 @@
 namespace mongo {
 namespace unittest {
 
-    Barrier::Barrier(size_t threadCount)
-        : _threadCount(threadCount),
-          _threadsWaiting(threadCount),
-          _generation(0) {
-        invariant(_threadCount > 0);
-    }
+Barrier::Barrier(size_t threadCount)
+    : _threadCount(threadCount), _threadsWaiting(threadCount), _generation(0) {
+    invariant(_threadCount > 0);
+}
 
-    void Barrier::countDownAndWait() {
-        stdx::unique_lock<stdx::mutex> _lock(_mutex);
-        _threadsWaiting--;
-        if (_threadsWaiting == 0) {
-            _generation++;
-            _threadsWaiting = _threadCount;
-            _condition.notify_all();
-        }
-        else {
-            uint64_t currentGeneration = _generation;
-            while (currentGeneration == _generation) {
-                _condition.wait(_lock);
-            }
+void Barrier::countDownAndWait() {
+    stdx::unique_lock<stdx::mutex> _lock(_mutex);
+    _threadsWaiting--;
+    if (_threadsWaiting == 0) {
+        _generation++;
+        _threadsWaiting = _threadCount;
+        _condition.notify_all();
+    } else {
+        uint64_t currentGeneration = _generation;
+        while (currentGeneration == _generation) {
+            _condition.wait(_lock);
         }
     }
+}
 
-} // namespace unittest
-} // namespace mongo
+}  // namespace unittest
+}  // namespace mongo

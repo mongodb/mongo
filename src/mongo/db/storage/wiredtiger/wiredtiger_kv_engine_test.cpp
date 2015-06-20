@@ -36,31 +36,32 @@
 
 namespace mongo {
 
-    class WiredTigerKVHarnessHelper : public KVHarnessHelper {
-    public:
-        WiredTigerKVHarnessHelper()
-            : _dbpath( "wt-kv-harness" ) {
-            _engine.reset( new WiredTigerKVEngine( _dbpath.path() ) );
-        }
-
-        virtual ~WiredTigerKVHarnessHelper() {
-            _engine.reset( NULL );
-        }
-
-        virtual KVEngine* restartEngine() {
-            _engine.reset( NULL );
-            _engine.reset( new WiredTigerKVEngine( _dbpath.path() ) );
-            return _engine.get();
-        }
-
-        virtual KVEngine* getEngine() { return _engine.get(); }
-
-    private:
-        unittest::TempDir _dbpath;
-        std::unique_ptr<WiredTigerKVEngine> _engine;
-    };
-
-    KVHarnessHelper* KVHarnessHelper::create() {
-        return new WiredTigerKVHarnessHelper();
+class WiredTigerKVHarnessHelper : public KVHarnessHelper {
+public:
+    WiredTigerKVHarnessHelper() : _dbpath("wt-kv-harness") {
+        _engine.reset(new WiredTigerKVEngine(_dbpath.path()));
     }
+
+    virtual ~WiredTigerKVHarnessHelper() {
+        _engine.reset(NULL);
+    }
+
+    virtual KVEngine* restartEngine() {
+        _engine.reset(NULL);
+        _engine.reset(new WiredTigerKVEngine(_dbpath.path()));
+        return _engine.get();
+    }
+
+    virtual KVEngine* getEngine() {
+        return _engine.get();
+    }
+
+private:
+    unittest::TempDir _dbpath;
+    std::unique_ptr<WiredTigerKVEngine> _engine;
+};
+
+KVHarnessHelper* KVHarnessHelper::create() {
+    return new WiredTigerKVHarnessHelper();
+}
 }

@@ -33,36 +33,38 @@
 
 namespace mongo {
 
-    /**
-     * This stage just returns EOF immediately.
-     */
-    class EOFStage : public PlanStage {
-    public:
-        EOFStage();
+/**
+ * This stage just returns EOF immediately.
+ */
+class EOFStage : public PlanStage {
+public:
+    EOFStage();
 
-        virtual ~EOFStage();
+    virtual ~EOFStage();
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual StageType stageType() const { return STAGE_EOF; }
+    virtual StageType stageType() const {
+        return STAGE_EOF;
+    }
 
-        PlanStageStats* getStats();
+    PlanStageStats* getStats();
 
-        virtual const CommonStats* getCommonStats() const;
+    virtual const CommonStats* getCommonStats() const;
 
-        virtual const SpecificStats* getSpecificStats() const;
+    virtual const SpecificStats* getSpecificStats() const;
 
-        static const char* kStageType;
+    static const char* kStageType;
 
-    private:
-        CommonStats _commonStats;
-    };
+private:
+    CommonStats _commonStats;
+};
 
 }  // namespace mongo

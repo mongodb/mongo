@@ -32,18 +32,18 @@
 
 namespace mongo {
 
-    /**
-     * Targeter factory that instantiates remote command targeters based on the type of the
-     * connection. It will return RemoteCommandTargeterStandalone for a single node (MASTER) or
-     * custom (CUSTOM) connection string and RemoteCommandTargeterRS for a SET connection string.
-     * All other connection strings are not supported and will cause a failed invariant error.
-     */
-    class RemoteCommandTargeterFactoryImpl final : public RemoteCommandTargeterFactory {
-    public:
-        RemoteCommandTargeterFactoryImpl();
-        ~RemoteCommandTargeterFactoryImpl();
+/**
+ * Targeter factory that instantiates remote command targeters based on the type of the
+ * connection. It will return RemoteCommandTargeterStandalone for a single node (MASTER) or
+ * custom (CUSTOM) connection string and RemoteCommandTargeterRS for a SET connection string.
+ * All other connection strings are not supported and will cause a failed invariant error.
+ */
+class RemoteCommandTargeterFactoryImpl final : public RemoteCommandTargeterFactory {
+public:
+    RemoteCommandTargeterFactoryImpl();
+    ~RemoteCommandTargeterFactoryImpl();
 
-        std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) override;
-    };
+    std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) override;
+};
 
-} // namespace mongo
+}  // namespace mongo

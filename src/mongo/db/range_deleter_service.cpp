@@ -33,17 +33,17 @@
 
 namespace {
 
-    mongo::RangeDeleter* _deleter = NULL;
+mongo::RangeDeleter* _deleter = NULL;
 }
 
 namespace mongo {
 
-    MONGO_INITIALIZER(RangeDeleterInit)(InitializerContext* context) {
-        _deleter = new RangeDeleter(new RangeDeleterDBEnv);
-        return Status::OK();
-    }
+MONGO_INITIALIZER(RangeDeleterInit)(InitializerContext* context) {
+    _deleter = new RangeDeleter(new RangeDeleterDBEnv);
+    return Status::OK();
+}
 
-    RangeDeleter* getDeleter() {
-        return _deleter;
-    }
+RangeDeleter* getDeleter() {
+    return _deleter;
+}
 }

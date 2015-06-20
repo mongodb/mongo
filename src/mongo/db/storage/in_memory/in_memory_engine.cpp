@@ -37,70 +37,66 @@
 
 namespace mongo {
 
-    RecoveryUnit* InMemoryEngine::newRecoveryUnit() {
-        return new InMemoryRecoveryUnit();
-    }
+RecoveryUnit* InMemoryEngine::newRecoveryUnit() {
+    return new InMemoryRecoveryUnit();
+}
 
-    Status InMemoryEngine::createRecordStore(OperationContext* opCtx,
-                                          StringData ns,
-                                          StringData ident,
-                                          const CollectionOptions& options) {
-        // All work done in getRecordStore
-        return Status::OK();
-    }
+Status InMemoryEngine::createRecordStore(OperationContext* opCtx,
+                                         StringData ns,
+                                         StringData ident,
+                                         const CollectionOptions& options) {
+    // All work done in getRecordStore
+    return Status::OK();
+}
 
-    RecordStore* InMemoryEngine::getRecordStore(OperationContext* opCtx,
-                                             StringData ns,
-                                             StringData ident,
-                                             const CollectionOptions& options) {
+RecordStore* InMemoryEngine::getRecordStore(OperationContext* opCtx,
+                                            StringData ns,
+                                            StringData ident,
+                                            const CollectionOptions& options) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (options.capped) {
+        return new InMemoryRecordStore(ns,
+                                       &_dataMap[ident],
+                                       true,
+                                       options.cappedSize ? options.cappedSize : 4096,
+                                       options.cappedMaxDocs ? options.cappedMaxDocs : -1);
+    } else {
+        return new InMemoryRecordStore(ns, &_dataMap[ident]);
+    }
+}
+
+Status InMemoryEngine::createSortedDataInterface(OperationContext* opCtx,
+                                                 StringData ident,
+                                                 const IndexDescriptor* desc) {
+    // All work done in getSortedDataInterface
+    return Status::OK();
+}
+
+SortedDataInterface* InMemoryEngine::getSortedDataInterface(OperationContext* opCtx,
+                                                            StringData ident,
+                                                            const IndexDescriptor* desc) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return getInMemoryBtreeImpl(Ordering::make(desc->keyPattern()), &_dataMap[ident]);
+}
+
+Status InMemoryEngine::dropIdent(OperationContext* opCtx, StringData ident) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _dataMap.erase(ident);
+    return Status::OK();
+}
+
+int64_t InMemoryEngine::getIdentSize(OperationContext* opCtx, StringData ident) {
+    return 1;
+}
+
+std::vector<std::string> InMemoryEngine::getAllIdents(OperationContext* opCtx) const {
+    std::vector<std::string> all;
+    {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (options.capped) {
-            return new InMemoryRecordStore(ns,
-                                           &_dataMap[ident],
-                                           true,
-                                           options.cappedSize ? options.cappedSize : 4096,
-                                           options.cappedMaxDocs ? options.cappedMaxDocs : -1);
-        }
-        else {
-            return new InMemoryRecordStore(ns, &_dataMap[ident]);
+        for (DataMap::const_iterator it = _dataMap.begin(); it != _dataMap.end(); ++it) {
+            all.push_back(it->first);
         }
     }
-
-    Status InMemoryEngine::createSortedDataInterface(OperationContext* opCtx,
-                                                  StringData ident,
-                                                  const IndexDescriptor* desc) {
-
-        // All work done in getSortedDataInterface
-        return Status::OK();
-    }
-
-    SortedDataInterface* InMemoryEngine::getSortedDataInterface(OperationContext* opCtx,
-                                                             StringData ident,
-                                                             const IndexDescriptor* desc) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return getInMemoryBtreeImpl(Ordering::make(desc->keyPattern()), &_dataMap[ident]);
-    }
-
-    Status InMemoryEngine::dropIdent(OperationContext* opCtx,
-                                     StringData ident) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _dataMap.erase(ident);
-        return Status::OK();
-    }
-
-    int64_t InMemoryEngine::getIdentSize( OperationContext* opCtx,
-                                       StringData ident ) {
-        return 1;
-    }
-
-    std::vector<std::string> InMemoryEngine::getAllIdents( OperationContext* opCtx ) const {
-        std::vector<std::string> all;
-        {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            for ( DataMap::const_iterator it = _dataMap.begin(); it != _dataMap.end(); ++it ) {
-                all.push_back( it->first );
-            }
-        }
-        return all;
-    }
+    return all;
+}
 }

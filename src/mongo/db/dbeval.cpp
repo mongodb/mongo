@@ -48,33 +48,31 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::dec;
-    using std::endl;
-    using std::string;
-    using std::stringstream;
+using std::unique_ptr;
+using std::dec;
+using std::endl;
+using std::string;
+using std::stringstream;
 
 namespace {
 
-    const int edebug=0;
+const int edebug = 0;
 
-    bool dbEval(OperationContext* txn,
-                const string& dbName,
-                const BSONObj& cmd,
-                BSONObjBuilder& result,
-                string& errmsg) {
+bool dbEval(OperationContext* txn,
+            const string& dbName,
+            const BSONObj& cmd,
+            BSONObjBuilder& result,
+            string& errmsg) {
+    RARELY {
+        warning() << "the eval command is deprecated" << startupWarningsLog;
+    }
 
-        RARELY {
-            warning() << "the eval command is deprecated" << startupWarningsLog;
-        }
+    const BSONElement e = cmd.firstElement();
+    uassert(
+        10046, "eval needs Code", e.type() == Code || e.type() == CodeWScope || e.type() == String);
 
-        const BSONElement e = cmd.firstElement();
-        uassert(10046,
-                "eval needs Code",
-                e.type() == Code || e.type() == CodeWScope || e.type() == String);
-
-        const char *code = 0;
-        switch ( e.type() ) {
+    const char* code = 0;
+    switch (e.type()) {
         case String:
         case Code:
             code = e.valuestr();
@@ -84,112 +82,114 @@ namespace {
             break;
         default:
             verify(0);
-        }
-
-        verify(code);
-
-        if (!globalScriptEngine) {
-            errmsg = "db side execution is disabled";
-            return false;
-        }
-
-        unique_ptr<Scope> s(globalScriptEngine->newScope());
-        s->registerOperation(txn);
-
-        ScriptingFunction f = s->createFunction(code);
-        if (f == 0) {
-            errmsg = string("compile failed: ") + s->getError();
-            return false;
-        }
-
-        s->localConnectForDbEval(txn, dbName.c_str());
-
-        if (e.type() == CodeWScope) {
-            s->init(e.codeWScopeScopeDataUnsafe());
-        }
-
-        BSONObj args;
-        {
-            BSONElement argsElement = cmd.getField("args");
-            if ( argsElement.type() == Array ) {
-                args = argsElement.embeddedObject();
-                if ( edebug ) {
-                    log() << "args:" << args.toString() << endl;
-                    log() << "code:\n" << code << endl;
-                }
-            }
-        }
-
-        int res;
-        {
-            Timer t;
-            res = s->invoke(f, &args, 0, 0);
-            int m = t.millis();
-            if (m > serverGlobalParams.slowMS) {
-                log() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;
-                if ( m >= 1000 ) log() << code << endl;
-                else OCCASIONALLY log() << code << endl;
-            }
-        }
-
-        if (res || s->isLastRetNativeCode()) {
-            result.append("errno", (double) res);
-            errmsg = "invoke failed: ";
-            if (s->isLastRetNativeCode())
-                errmsg += "cannot return native function";
-            else
-                errmsg += s->getError();
-
-            return false;
-        }
-
-        s->append(result, "retval", "__returnValue");
-
-        return true;
     }
 
+    verify(code);
 
-    class CmdEval : public Command {
-    public:
-        virtual bool slaveOk() const {
-            return false;
-        }
+    if (!globalScriptEngine) {
+        errmsg = "db side execution is disabled";
+        return false;
+    }
 
-        virtual void help(stringstream &help) const {
-            help << "DEPRECATED\n"
-                 << "Evaluate javascript at the server.\n"
-                 << "http://dochub.mongodb.org/core/serversidecodeexecution";
-        }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+    unique_ptr<Scope> s(globalScriptEngine->newScope());
+    s->registerOperation(txn);
 
-            RoleGraph::generateUniversalPrivileges(out);
-        }
+    ScriptingFunction f = s->createFunction(code);
+    if (f == 0) {
+        errmsg = string("compile failed: ") + s->getError();
+        return false;
+    }
 
-        CmdEval() : Command("eval", false, "$eval") { }
+    s->localConnectForDbEval(txn, dbName.c_str());
 
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
+    if (e.type() == CodeWScope) {
+        s->init(e.codeWScopeScopeDataUnsafe());
+    }
 
-            if (cmdObj["nolock"].trueValue()) {
-                return dbEval(txn, dbname, cmdObj, result, errmsg);
+    BSONObj args;
+    {
+        BSONElement argsElement = cmd.getField("args");
+        if (argsElement.type() == Array) {
+            args = argsElement.embeddedObject();
+            if (edebug) {
+                log() << "args:" << args.toString() << endl;
+                log() << "code:\n" << code << endl;
             }
+        }
+    }
 
-            ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lk(txn->lockState());
+    int res;
+    {
+        Timer t;
+        res = s->invoke(f, &args, 0, 0);
+        int m = t.millis();
+        if (m > serverGlobalParams.slowMS) {
+            log() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;
+            if (m >= 1000)
+                log() << code << endl;
+            else
+                OCCASIONALLY log() << code << endl;
+        }
+    }
 
-            OldClientContext ctx(txn, dbname);
+    if (res || s->isLastRetNativeCode()) {
+        result.append("errno", (double)res);
+        errmsg = "invoke failed: ";
+        if (s->isLastRetNativeCode())
+            errmsg += "cannot return native function";
+        else
+            errmsg += s->getError();
 
+        return false;
+    }
+
+    s->append(result, "retval", "__returnValue");
+
+    return true;
+}
+
+
+class CmdEval : public Command {
+public:
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual void help(stringstream& help) const {
+        help << "DEPRECATED\n"
+             << "Evaluate javascript at the server.\n"
+             << "http://dochub.mongodb.org/core/serversidecodeexecution";
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        RoleGraph::generateUniversalPrivileges(out);
+    }
+
+    CmdEval() : Command("eval", false, "$eval") {}
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        if (cmdObj["nolock"].trueValue()) {
             return dbEval(txn, dbname, cmdObj, result, errmsg);
         }
 
-    } cmdeval;
+        ScopedTransaction transaction(txn, MODE_X);
+        Lock::GlobalWrite lk(txn->lockState());
 
-} // namespace
-} // namespace mongo
+        OldClientContext ctx(txn, dbname);
+
+        return dbEval(txn, dbname, cmdObj, result, errmsg);
+    }
+
+} cmdeval;
+
+}  // namespace
+}  // namespace mongo

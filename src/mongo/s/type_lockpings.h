@@ -35,131 +35,130 @@
 
 namespace mongo {
 
+/**
+ * This class represents the layout and contents of documents contained in the
+ * config.lockpings collection. All manipulation of documents coming from that
+ * collection should be done with this class.
+ *
+ * Usage Example:
+ *
+ *     // Contact the config. 'conn' has been obtained before.
+ *     DBClientBase* conn;
+ *     BSONObj query = QUERY(LockpingsType::exampleField("exampleFieldName"));
+ *     exampleDoc = conn->findOne(LockpingsType::ConfigNS, query);
+ *
+ *     // Process the response.
+ *     LockpingsType exampleType;
+ *     std::string errMsg;
+ *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+ *         // Can't use 'exampleType'. Take action.
+ *     }
+ *     // use 'exampleType'
+ *
+ */
+class LockpingsType {
+public:
+    //
+    // schema declarations
+    //
+
+    // Name of the lockpings collection in the config server.
+    static const std::string ConfigNS;
+
+    // Field names and types in the lockpings collection type.
+    static const BSONField<std::string> process;
+    static const BSONField<Date_t> ping;
+
+    //
+    // lockpings type methods
+    //
+
+    LockpingsType();
+    ~LockpingsType();
+
     /**
-     * This class represents the layout and contents of documents contained in the
-     * config.lockpings collection. All manipulation of documents coming from that
-     * collection should be done with this class.
-     *
-     * Usage Example:
-     *
-     *     // Contact the config. 'conn' has been obtained before.
-     *     DBClientBase* conn;
-     *     BSONObj query = QUERY(LockpingsType::exampleField("exampleFieldName"));
-     *     exampleDoc = conn->findOne(LockpingsType::ConfigNS, query);
-     *
-     *     // Process the response.
-     *     LockpingsType exampleType;
-     *     std::string errMsg;
-     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
-     *         // Can't use 'exampleType'. Take action.
-     *     }
-     *     // use 'exampleType'
-     *
+     * Returns true if all the mandatory fields are present and have valid
+     * representations. Otherwise returns false and fills in the optional 'errMsg' string.
      */
-    class LockpingsType {
-    public:
+    bool isValid(std::string* errMsg) const;
 
-        //
-        // schema declarations
-        //
+    /**
+     * Returns the BSON representation of the entry.
+     */
+    BSONObj toBSON() const;
 
-        // Name of the lockpings collection in the config server.
-        static const std::string ConfigNS;
+    /**
+     * Clears and populates the internal state using the 'source' BSON object if the
+     * latter contains valid values. Otherwise sets errMsg and returns false.
+     */
+    bool parseBSON(const BSONObj& source, std::string* errMsg);
 
-        // Field names and types in the lockpings collection type.
-        static const BSONField<std::string> process;
-        static const BSONField<Date_t> ping;
+    /**
+     * Clears the internal state.
+     */
+    void clear();
 
-        //
-        // lockpings type methods
-        //
+    /**
+     * Copies all the fields present in 'this' to 'other'.
+     */
+    void cloneTo(LockpingsType* other) const;
 
-        LockpingsType();
-        ~LockpingsType();
+    /**
+     * Returns a std::string representation of the current internal state.
+     */
+    std::string toString() const;
 
-        /**
-         * Returns true if all the mandatory fields are present and have valid
-         * representations. Otherwise returns false and fills in the optional 'errMsg' string.
-         */
-        bool isValid(std::string* errMsg) const;
+    //
+    // individual field accessors
+    //
 
-        /**
-         * Returns the BSON representation of the entry.
-         */
-        BSONObj toBSON() const;
+    // Mandatory Fields
+    void setProcess(StringData process) {
+        _process = process.toString();
+        _isProcessSet = true;
+    }
 
-        /**
-         * Clears and populates the internal state using the 'source' BSON object if the
-         * latter contains valid values. Otherwise sets errMsg and returns false.
-         */
-        bool parseBSON(const BSONObj& source, std::string* errMsg);
+    void unsetProcess() {
+        _isProcessSet = false;
+    }
 
-        /**
-         * Clears the internal state.
-         */
-        void clear();
+    bool isProcessSet() const {
+        return _isProcessSet;
+    }
 
-        /**
-         * Copies all the fields present in 'this' to 'other'.
-         */
-        void cloneTo(LockpingsType* other) const;
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string& getProcess() const {
+        dassert(_isProcessSet);
+        return _process;
+    }
 
-        /**
-         * Returns a std::string representation of the current internal state.
-         */
-        std::string toString() const;
+    void setPing(const Date_t ping) {
+        _ping = ping;
+        _isPingSet = true;
+    }
 
-        //
-        // individual field accessors
-        //
+    void unsetPing() {
+        _isPingSet = false;
+    }
 
-        // Mandatory Fields
-        void setProcess(StringData process) {
-            _process = process.toString();
-            _isProcessSet = true;
-        }
+    bool isPingSet() const {
+        return _isPingSet;
+    }
 
-        void unsetProcess() {
-            _isProcessSet = false;
-        }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const Date_t getPing() const {
+        dassert(_isPingSet);
+        return _ping;
+    }
 
-        bool isProcessSet() const {
-            return _isProcessSet;
-        }
+    // Optional Fields
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getProcess() const {
-            dassert(_isProcessSet);
-            return _process;
-        }
+private:
+    // Convention: (M)andatory, (O)ptional, (S)pecial rule.
+    std::string _process;  // (M)  std::string describing the process holding the lock
+    bool _isProcessSet;
+    Date_t _ping;  // (M)  last time the holding process updated this document
+    bool _isPingSet;
+};
 
-        void setPing(const Date_t ping) {
-            _ping = ping;
-            _isPingSet = true;
-        }
-
-        void unsetPing() {
-            _isPingSet = false;
-        }
-
-        bool isPingSet() const {
-            return _isPingSet;
-        }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const Date_t getPing() const {
-            dassert(_isPingSet);
-            return _ping;
-        }
-
-        // Optional Fields
-
-    private:
-        // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _process; // (M)  std::string describing the process holding the lock
-        bool _isProcessSet;
-        Date_t _ping; // (M)  last time the holding process updated this document
-        bool _isPingSet;
-    };
-
-} // namespace mongo
+}  // namespace mongo

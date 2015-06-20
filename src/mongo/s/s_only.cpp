@@ -49,130 +49,121 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
+using std::string;
+using std::stringstream;
 
 
-    bool isMongos() {
-        return true;
+bool isMongos() {
+    return true;
+}
+
+/** When this callback is run, we record a shard that we've used for useful work
+ *  in an operation to be read later by getLastError()
+*/
+void usingAShardConnection(const std::string& addr) {
+    ClusterLastErrorInfo::get(cc()).addShardHost(addr);
+}
+
+// called into by the web server. For now we just translate the parameters
+// to their old style equivalents.
+void Command::execCommand(OperationContext* txn,
+                          Command* command,
+                          const rpc::RequestInterface& request,
+                          rpc::ReplyBuilderInterface* replyBuilder) {
+    int queryFlags = 0;
+    BSONObj cmdObj;
+
+    std::tie(cmdObj, queryFlags) = uassertStatusOK(
+        rpc::downconvertRequestMetadata(request.getCommandArgs(), request.getMetadata()));
+
+    std::string db = request.getDatabase().rawData();
+    BSONObjBuilder result;
+
+    execCommandClientBasic(txn,
+                           command,
+                           *txn->getClient(),
+                           queryFlags,
+                           request.getDatabase().rawData(),
+                           cmdObj,
+                           result);
+
+    replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(result.done());
+}
+
+void Command::execCommandClientBasic(OperationContext* txn,
+                                     Command* c,
+                                     ClientBasic& client,
+                                     int queryOptions,
+                                     const char* ns,
+                                     BSONObj& cmdObj,
+                                     BSONObjBuilder& result) {
+    std::string dbname = nsToDatabase(ns);
+
+    if (cmdObj.getBoolField("help")) {
+        stringstream help;
+        help << "help for: " << c->name << " ";
+        c->help(help);
+        result.append("help", help.str());
+        result.append("lockType", c->isWriteCommandForConfigServer() ? 1 : 0);
+        appendCommandStatus(result, true, "");
+        return;
     }
 
-    /** When this callback is run, we record a shard that we've used for useful work
-     *  in an operation to be read later by getLastError()
-    */
-    void usingAShardConnection(const std::string& addr) {
-        ClusterLastErrorInfo::get(cc()).addShardHost(addr);
+    Status status = _checkAuthorization(c, &client, dbname, cmdObj);
+    if (!status.isOK()) {
+        appendCommandStatus(result, status);
+        return;
     }
 
-    // called into by the web server. For now we just translate the parameters
-    // to their old style equivalents.
-    void Command::execCommand(OperationContext* txn,
-                              Command* command,
-                              const rpc::RequestInterface& request,
-                              rpc::ReplyBuilderInterface* replyBuilder) {
+    c->_commandsExecuted.increment();
 
-        int queryFlags = 0;
-        BSONObj cmdObj;
+    std::string errmsg;
+    bool ok;
+    try {
+        ok = c->run(txn, dbname, cmdObj, queryOptions, errmsg, result);
+    } catch (const DBException& e) {
+        ok = false;
+        int code = e.getCode();
+        if (code == RecvStaleConfigCode) {  // code for StaleConfigException
+            throw;
+        }
 
-        std::tie(cmdObj, queryFlags) = uassertStatusOK(
-            rpc::downconvertRequestMetadata(request.getCommandArgs(),
-                                            request.getMetadata())
-        );
-
-        std::string db = request.getDatabase().rawData();
-        BSONObjBuilder result;
-
-        execCommandClientBasic(txn,
-                               command,
-                               *txn->getClient(),
-                               queryFlags,
-                               request.getDatabase().rawData(),
-                               cmdObj,
-                               result);
-
-        replyBuilder
-            ->setMetadata(rpc::makeEmptyMetadata())
-            .setCommandReply(result.done());
+        errmsg = e.what();
+        result.append("code", code);
     }
 
-    void Command::execCommandClientBasic(OperationContext* txn,
-                                         Command * c ,
-                                         ClientBasic& client,
-                                         int queryOptions,
-                                         const char *ns,
-                                         BSONObj& cmdObj,
-                                         BSONObjBuilder& result) {
-        std::string dbname = nsToDatabase(ns);
-
-        if (cmdObj.getBoolField("help")) {
-            stringstream help;
-            help << "help for: " << c->name << " ";
-            c->help( help );
-            result.append( "help" , help.str() );
-            result.append("lockType", c->isWriteCommandForConfigServer() ? 1 : 0);
-            appendCommandStatus(result, true, "");
-            return;
-        }
-
-        Status status = _checkAuthorization(c, &client, dbname, cmdObj);
-        if (!status.isOK()) {
-            appendCommandStatus(result, status);
-            return;
-        }
-
-        c->_commandsExecuted.increment();
-
-        std::string errmsg;
-        bool ok;
-        try {
-            ok = c->run(txn, dbname , cmdObj, queryOptions, errmsg, result);
-        }
-        catch (const DBException& e) {
-            ok = false;
-            int code = e.getCode();
-            if (code == RecvStaleConfigCode) { // code for StaleConfigException
-                throw;
-            }
-
-            errmsg = e.what();
-            result.append("code", code);
-        }
-
-        if ( !ok ) {
-            c->_commandsFailed.increment();
-        }
-
-        appendCommandStatus(result, ok, errmsg);
+    if (!ok) {
+        c->_commandsFailed.increment();
     }
 
-    void Command::runAgainstRegistered(const char *ns,
-                                       BSONObj& jsobj,
-                                       BSONObjBuilder& anObjBuilder,
-                                       int queryOptions) {
+    appendCommandStatus(result, ok, errmsg);
+}
 
-        // It should be impossible for this uassert to fail since there should be no way to get
-        // into this function with any other collection name.
-        uassert(16618,
+void Command::runAgainstRegistered(const char* ns,
+                                   BSONObj& jsobj,
+                                   BSONObjBuilder& anObjBuilder,
+                                   int queryOptions) {
+    // It should be impossible for this uassert to fail since there should be no way to get
+    // into this function with any other collection name.
+    uassert(16618,
             "Illegal attempt to run a command against a namespace other than $cmd.",
             nsToCollectionSubstring(ns) == "$cmd");
 
-        BSONElement e = jsobj.firstElement();
-        std::string commandName = e.fieldName();
-        Command* c = e.type() ? Command::findCommand(commandName) : NULL;
-        if (!c) {
-            Command::appendCommandStatus(anObjBuilder,
-                                         false,
-                                         str::stream() << "no such cmd: " << commandName);
-            anObjBuilder.append("code", ErrorCodes::CommandNotFound);
-            Command::unknownCommands.increment();
-            return;
-        }
-
-        auto txn = cc().makeOperationContext();
-        execCommandClientBasic(txn.get(), c, cc(), queryOptions, ns, jsobj, anObjBuilder);
+    BSONElement e = jsobj.firstElement();
+    std::string commandName = e.fieldName();
+    Command* c = e.type() ? Command::findCommand(commandName) : NULL;
+    if (!c) {
+        Command::appendCommandStatus(
+            anObjBuilder, false, str::stream() << "no such cmd: " << commandName);
+        anObjBuilder.append("code", ErrorCodes::CommandNotFound);
+        Command::unknownCommands.increment();
+        return;
     }
 
-    void Command::registerError(OperationContext* txn, const DBException& exception) {
-    }
+    auto txn = cc().makeOperationContext();
+    execCommandClientBasic(txn.get(), c, cc(), queryOptions, ns, jsobj, anObjBuilder);
+}
 
-} //namespace mongo
+void Command::registerError(OperationContext* txn, const DBException& exception) {}
+
+}  // namespace mongo

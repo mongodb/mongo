@@ -34,187 +34,204 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-    namespace fts {
+namespace fts {
 
-        TEST( FTSMatcher, NegWild1 ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "foo -bar", "english", false, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
+TEST(FTSMatcher, NegWild1) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("foo -bar", "english", false, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("$**"
+                                                             << "text")))));
 
-            ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "bar" ) ) ) );
-            ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "bar" ) ) ) );
-        }
+    ASSERT(m.hasNegativeTerm(BSON("x" << BSON("y"
+                                              << "bar"))));
+    ASSERT(m.hasNegativeTerm(BSON("x" << BSON("y"
+                                              << "bar"))));
+}
 
-        // Regression test for SERVER-11994.
-        TEST( FTSMatcher, NegWild2 ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "pizza -restaurant", "english", false, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
+// Regression test for SERVER-11994.
+TEST(FTSMatcher, NegWild2) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("pizza -restaurant", "english", false, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("$**"
+                                                             << "text")))));
 
-            ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "pizza restaurant" ) ) ) );
-            ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "PIZZA RESTAURANT" ) ) ) );
-        }
+    ASSERT(m.hasNegativeTerm(BSON("x" << BSON("y"
+                                              << "pizza restaurant"))));
+    ASSERT(m.hasNegativeTerm(BSON("x" << BSON("y"
+                                              << "PIZZA RESTAURANT"))));
+}
 
-        TEST( FTSMatcher, Phrase1 ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "foo \"table top\"", "english", false, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
-            
-            ASSERT( m.positivePhrasesMatch( BSON( "x" << "table top" ) ) );
-            ASSERT( m.positivePhrasesMatch( BSON( "x" << " asd table top asd" ) ) );
-            ASSERT( !m.positivePhrasesMatch( BSON( "x" << "tablz top" ) ) );
-            ASSERT( !m.positivePhrasesMatch( BSON( "x" << " asd tablz top asd" ) ) );
+TEST(FTSMatcher, Phrase1) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("foo \"table top\"", "english", false, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("$**"
+                                                             << "text")))));
 
-            ASSERT( m.positivePhrasesMatch( BSON( "x" << "table top" ) ) );
-            ASSERT( !m.positivePhrasesMatch( BSON( "x" << "table a top" ) ) );
+    ASSERT(m.positivePhrasesMatch(BSON("x"
+                                       << "table top")));
+    ASSERT(m.positivePhrasesMatch(BSON("x"
+                                       << " asd table top asd")));
+    ASSERT(!m.positivePhrasesMatch(BSON("x"
+                                        << "tablz top")));
+    ASSERT(!m.positivePhrasesMatch(BSON("x"
+                                        << " asd tablz top asd")));
 
-        }
+    ASSERT(m.positivePhrasesMatch(BSON("x"
+                                       << "table top")));
+    ASSERT(!m.positivePhrasesMatch(BSON("x"
+                                        << "table a top")));
+}
 
-        TEST( FTSMatcher, Phrase2 ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "foo \"table top\"", "english", false, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
-            ASSERT( m.positivePhrasesMatch( BSON( "x" << BSON_ARRAY( "table top" ) ) ) );
-        }
+TEST(FTSMatcher, Phrase2) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("foo \"table top\"", "english", false, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("x"
+                                                             << "text")))));
+    ASSERT(m.positivePhrasesMatch(BSON("x" << BSON_ARRAY("table top"))));
+}
 
-        // Test that the matcher parses the document with the document language, not the search
-        // language.
-        TEST( FTSMatcher, ParsesUsingDocLanguage ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "-glad", "none", false, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+// Test that the matcher parses the document with the document language, not the search
+// language.
+TEST(FTSMatcher, ParsesUsingDocLanguage) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("-glad", "none", false, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("x"
+                                                             << "text")))));
 
-            // Even though the search language is "none", the document {x: "gladly"} should be
-            // parsed using the English stemmer, and as such should match the negated term "glad".
-            ASSERT( m.hasNegativeTerm( BSON( "x" << "gladly" ) ) );
-        }
+    // Even though the search language is "none", the document {x: "gladly"} should be
+    // parsed using the English stemmer, and as such should match the negated term "glad".
+    ASSERT(m.hasNegativeTerm(BSON("x"
+                                  << "gladly")));
+}
 
-        // Test the matcher does not filter out stop words from positive terms
-        TEST( FTSMatcher, MatcherDoesNotFilterStopWordsNeg ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "-the", "none", false, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+// Test the matcher does not filter out stop words from positive terms
+TEST(FTSMatcher, MatcherDoesNotFilterStopWordsNeg) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("-the", "none", false, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("x"
+                                                             << "text")))));
 
-            ASSERT( m.hasNegativeTerm( BSON( "x" << "the" ) ) );
-        }
+    ASSERT(m.hasNegativeTerm(BSON("x"
+                                  << "the")));
+}
 
-        // Test the matcher does not filter out stop words from negative terms
-        TEST( FTSMatcher, MatcherDoesNotFilterStopWordsPos ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "the", "none", false, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+// Test the matcher does not filter out stop words from negative terms
+TEST(FTSMatcher, MatcherDoesNotFilterStopWordsPos) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("the", "none", false, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("x"
+                                                             << "text")))));
 
-            ASSERT( m.hasPositiveTerm( BSON( "x" << "the" ) ) );
-        }
+    ASSERT(m.hasPositiveTerm(BSON("x"
+                                  << "the")));
+}
 
-        // Returns whether a document indexed with text data 'doc' contains any positive terms from
-        // case-sensitive text query 'search'.
-        static bool docHasPositiveTermWithCase( const std::string& doc,
-                                                const std::string& search ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( search, "english", true, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+// Returns whether a document indexed with text data 'doc' contains any positive terms from
+// case-sensitive text query 'search'.
+static bool docHasPositiveTermWithCase(const std::string& doc, const std::string& search) {
+    FTSQuery q;
+    ASSERT_OK(q.parse(search, "english", true, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("x"
+                                                             << "text")))));
 
-            return m.hasPositiveTerm( BSON( "x" << doc ) );
-        }
+    return m.hasPositiveTerm(BSON("x" << doc));
+}
 
-        TEST( FTSMatcher, HasPositiveTermCaseSensitive ) {
-            ASSERT_TRUE( docHasPositiveTermWithCase( "hello world", "hello" ) );
-            ASSERT_TRUE( docHasPositiveTermWithCase( "Hello World", "Hello" ) );
-            ASSERT_TRUE( docHasPositiveTermWithCase( "Hello World", "World Hello" ) );
-            ASSERT_TRUE( docHasPositiveTermWithCase( "Hello World", "World GoodBye" ) );
-            ASSERT_TRUE( docHasPositiveTermWithCase( "John Runs", "Runs" ) );
-            ASSERT_TRUE( docHasPositiveTermWithCase( "John Runs", "Running" ) );
-            ASSERT_TRUE( docHasPositiveTermWithCase( "John Runs", "Run" ) );
+TEST(FTSMatcher, HasPositiveTermCaseSensitive) {
+    ASSERT_TRUE(docHasPositiveTermWithCase("hello world", "hello"));
+    ASSERT_TRUE(docHasPositiveTermWithCase("Hello World", "Hello"));
+    ASSERT_TRUE(docHasPositiveTermWithCase("Hello World", "World Hello"));
+    ASSERT_TRUE(docHasPositiveTermWithCase("Hello World", "World GoodBye"));
+    ASSERT_TRUE(docHasPositiveTermWithCase("John Runs", "Runs"));
+    ASSERT_TRUE(docHasPositiveTermWithCase("John Runs", "Running"));
+    ASSERT_TRUE(docHasPositiveTermWithCase("John Runs", "Run"));
 
-            ASSERT_FALSE( docHasPositiveTermWithCase( "John Runs", "run" ) );
-            ASSERT_FALSE( docHasPositiveTermWithCase( "Hello World", "HELLO" ) );
-            ASSERT_FALSE( docHasPositiveTermWithCase( "hello world", "Hello" ) );
-            ASSERT_FALSE( docHasPositiveTermWithCase( "Hello World", "hello" ) );
-        }
+    ASSERT_FALSE(docHasPositiveTermWithCase("John Runs", "run"));
+    ASSERT_FALSE(docHasPositiveTermWithCase("Hello World", "HELLO"));
+    ASSERT_FALSE(docHasPositiveTermWithCase("hello world", "Hello"));
+    ASSERT_FALSE(docHasPositiveTermWithCase("Hello World", "hello"));
+}
 
-        // Returns whether a document indexed with text data 'doc' contains any negative terms from
-        // case-sensitive text query 'search'.
-        static bool docHasNegativeTermWithCase( const std::string& doc,
-                                                const std::string& search ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( search, "english", true, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+// Returns whether a document indexed with text data 'doc' contains any negative terms from
+// case-sensitive text query 'search'.
+static bool docHasNegativeTermWithCase(const std::string& doc, const std::string& search) {
+    FTSQuery q;
+    ASSERT_OK(q.parse(search, "english", true, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("x"
+                                                             << "text")))));
 
-            return m.hasNegativeTerm( BSON( "x" << doc ) );
-        }
+    return m.hasNegativeTerm(BSON("x" << doc));
+}
 
-        TEST( FTSMatcher, HasNegativeTermCaseSensitive ) {
-            ASSERT_TRUE( docHasNegativeTermWithCase( "hello world", "hello -world" ) );
-            ASSERT_TRUE( docHasNegativeTermWithCase( "Hello World", "Hello -World" ) );
-            ASSERT_TRUE( docHasNegativeTermWithCase( "Hello World", "-World -Hello" ) );
-            ASSERT_TRUE( docHasNegativeTermWithCase( "Hello World", "-Goodbye -World" ) );
-            ASSERT_TRUE( docHasNegativeTermWithCase( "John Runs", "-Runs" ) );
-            ASSERT_TRUE( docHasNegativeTermWithCase( "John Runs", "-Running" ) );
-            ASSERT_TRUE( docHasNegativeTermWithCase( "John Runs", "-Run" ) );
+TEST(FTSMatcher, HasNegativeTermCaseSensitive) {
+    ASSERT_TRUE(docHasNegativeTermWithCase("hello world", "hello -world"));
+    ASSERT_TRUE(docHasNegativeTermWithCase("Hello World", "Hello -World"));
+    ASSERT_TRUE(docHasNegativeTermWithCase("Hello World", "-World -Hello"));
+    ASSERT_TRUE(docHasNegativeTermWithCase("Hello World", "-Goodbye -World"));
+    ASSERT_TRUE(docHasNegativeTermWithCase("John Runs", "-Runs"));
+    ASSERT_TRUE(docHasNegativeTermWithCase("John Runs", "-Running"));
+    ASSERT_TRUE(docHasNegativeTermWithCase("John Runs", "-Run"));
 
-            ASSERT_FALSE( docHasNegativeTermWithCase( "John Runs", "-run" ) );
-            ASSERT_FALSE( docHasNegativeTermWithCase( "Hello World", "Hello -WORLD" ) );
-            ASSERT_FALSE( docHasNegativeTermWithCase( "hello world", "hello -World" ) );
-            ASSERT_FALSE( docHasNegativeTermWithCase( "Hello World", "Hello -world" ) );
-        }
+    ASSERT_FALSE(docHasNegativeTermWithCase("John Runs", "-run"));
+    ASSERT_FALSE(docHasNegativeTermWithCase("Hello World", "Hello -WORLD"));
+    ASSERT_FALSE(docHasNegativeTermWithCase("hello world", "hello -World"));
+    ASSERT_FALSE(docHasNegativeTermWithCase("Hello World", "Hello -world"));
+}
 
-        // Returns whether a document indexed with text data 'doc' contains all positive phrases
-        // from case-sensitive text query 'search'.
-        static bool docPositivePhrasesMatchWithCase( const std::string& doc,
-                                                     const std::string& search ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( search, "english", true, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+// Returns whether a document indexed with text data 'doc' contains all positive phrases
+// from case-sensitive text query 'search'.
+static bool docPositivePhrasesMatchWithCase(const std::string& doc, const std::string& search) {
+    FTSQuery q;
+    ASSERT_OK(q.parse(search, "english", true, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("x"
+                                                             << "text")))));
 
-            return m.positivePhrasesMatch( BSON( "x" << doc ) );
-        }
+    return m.positivePhrasesMatch(BSON("x" << doc));
+}
 
-        TEST( FTSMatcher, PositivePhrasesMatchWithCase ) {
-            ASSERT_TRUE( docPositivePhrasesMatchWithCase( "John Runs", "\"John Runs\"" ) );
-            ASSERT_TRUE( docPositivePhrasesMatchWithCase( "John Runs", "\"John Run\"" ) );
-            ASSERT_TRUE( docPositivePhrasesMatchWithCase( "John Runs", "\"John\" \"Run\"" ) );
-            ASSERT_TRUE( docPositivePhrasesMatchWithCase( "John Runs", "\"n R\"" ) );
+TEST(FTSMatcher, PositivePhrasesMatchWithCase) {
+    ASSERT_TRUE(docPositivePhrasesMatchWithCase("John Runs", "\"John Runs\""));
+    ASSERT_TRUE(docPositivePhrasesMatchWithCase("John Runs", "\"John Run\""));
+    ASSERT_TRUE(docPositivePhrasesMatchWithCase("John Runs", "\"John\" \"Run\""));
+    ASSERT_TRUE(docPositivePhrasesMatchWithCase("John Runs", "\"n R\""));
 
-            ASSERT_FALSE( docPositivePhrasesMatchWithCase( "John Runs", "\"john runs\"" ) );
-            ASSERT_FALSE( docPositivePhrasesMatchWithCase( "john runs", "\"John Runs\"" ) );
-            ASSERT_FALSE( docPositivePhrasesMatchWithCase( "John Runs", "\"John\" \"Running\"" ) );
-        }
+    ASSERT_FALSE(docPositivePhrasesMatchWithCase("John Runs", "\"john runs\""));
+    ASSERT_FALSE(docPositivePhrasesMatchWithCase("john runs", "\"John Runs\""));
+    ASSERT_FALSE(docPositivePhrasesMatchWithCase("John Runs", "\"John\" \"Running\""));
+}
 
-        // Returns whether a document indexed with text data 'doc' contains zero negative phrases
-        // from case-sensitive text query 'search'.
-        static bool docNegativePhrasesMatchWithCase( const std::string& doc,
-                                                     const std::string& search ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( search, "english", true, TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+// Returns whether a document indexed with text data 'doc' contains zero negative phrases
+// from case-sensitive text query 'search'.
+static bool docNegativePhrasesMatchWithCase(const std::string& doc, const std::string& search) {
+    FTSQuery q;
+    ASSERT_OK(q.parse(search, "english", true, TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("x"
+                                                             << "text")))));
 
-            return m.negativePhrasesMatch( BSON( "x" << doc ) );
-        }
+    return m.negativePhrasesMatch(BSON("x" << doc));
+}
 
-        TEST( FTSMatcher, NegativePhrasesMatchWithCase ) {
-            ASSERT_TRUE( docNegativePhrasesMatchWithCase( "John Runs", "-\"john runs\"" ) );
-            ASSERT_TRUE( docNegativePhrasesMatchWithCase( "john runs", "-\"John Runs\"" ) );
-            ASSERT_TRUE( docNegativePhrasesMatchWithCase( "john runs", "-\"John\" -\"Runs\"" ) );
+TEST(FTSMatcher, NegativePhrasesMatchWithCase) {
+    ASSERT_TRUE(docNegativePhrasesMatchWithCase("John Runs", "-\"john runs\""));
+    ASSERT_TRUE(docNegativePhrasesMatchWithCase("john runs", "-\"John Runs\""));
+    ASSERT_TRUE(docNegativePhrasesMatchWithCase("john runs", "-\"John\" -\"Runs\""));
 
-            ASSERT_FALSE( docNegativePhrasesMatchWithCase( "John Runs", "-\"John Runs\"" ) );
-            ASSERT_FALSE( docNegativePhrasesMatchWithCase( "John Runs", "-\"John Run\"" ) );
-            ASSERT_FALSE( docNegativePhrasesMatchWithCase( "John Runs", "-\"John\" -\"Run\"" ) );
-            ASSERT_FALSE( docNegativePhrasesMatchWithCase( "John Runs", "-\"n R\"" ) );
-            ASSERT_FALSE( docNegativePhrasesMatchWithCase( "John Runs",
-                                                           "-\"John\" -\"Running\"" ) );
-        }
-
-    }
+    ASSERT_FALSE(docNegativePhrasesMatchWithCase("John Runs", "-\"John Runs\""));
+    ASSERT_FALSE(docNegativePhrasesMatchWithCase("John Runs", "-\"John Run\""));
+    ASSERT_FALSE(docNegativePhrasesMatchWithCase("John Runs", "-\"John\" -\"Run\""));
+    ASSERT_FALSE(docNegativePhrasesMatchWithCase("John Runs", "-\"n R\""));
+    ASSERT_FALSE(docNegativePhrasesMatchWithCase("John Runs", "-\"John\" -\"Running\""));
+}
+}
 }

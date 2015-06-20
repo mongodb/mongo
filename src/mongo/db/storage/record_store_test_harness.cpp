@@ -36,407 +36,395 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::string;
+using std::unique_ptr;
+using std::string;
 
-    TEST( RecordStoreTestHarness, Simple1 ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+TEST(RecordStoreTestHarness, Simple1) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    string s = "eliot was here";
+
+    RecordId loc1;
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            loc1 = res.getValue();
+            uow.commit();
         }
 
-        string s = "eliot was here";
+        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc1).data());
+    }
 
-        RecordId loc1;
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc1).data());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
 
+        RecordData rd;
+        ASSERT(!rs->findRecord(opCtx.get(), RecordId(111, 17), &rd));
+        ASSERT(rd.data() == NULL);
+
+        ASSERT(rs->findRecord(opCtx.get(), loc1, &rd));
+        ASSERT_EQUALS(s, rd.data());
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
-                ASSERT_OK( res.getStatus() );
-                loc1 = res.getValue();
-                uow.commit();
-            }
-
-            ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc1 ).data() );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc1 ).data() );
-            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
-
-            RecordData rd;
-            ASSERT( !rs->findRecord( opCtx.get(), RecordId(111,17), &rd ) );
-            ASSERT( rd.data() == NULL );
-
-            ASSERT( rs->findRecord( opCtx.get(), loc1, &rd ) );
-            ASSERT_EQUALS( s, rd.data() );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
-                ASSERT_OK( res.getStatus() );
-                uow.commit();
-            }
-
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, rs->numRecords( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            uow.commit();
         }
     }
 
-    namespace {
-        class DummyDocWriter : public DocWriter {
-        public:
-            virtual ~DummyDocWriter(){}
-            virtual void writeDocument( char* buf ) const {
-                memcpy( buf, "eliot", 6 );
-            }
-            virtual size_t documentSize() const { return 6; }
-            virtual bool addPadding() const { return false; }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
+    }
+}
 
-        };
+namespace {
+class DummyDocWriter : public DocWriter {
+public:
+    virtual ~DummyDocWriter() {}
+    virtual void writeDocument(char* buf) const {
+        memcpy(buf, "eliot", 6);
+    }
+    virtual size_t documentSize() const {
+        return 6;
+    }
+    virtual bool addPadding() const {
+        return false;
+    }
+};
+}
+
+
+TEST(RecordStoreTestHarness, Simple1InsertDocWroter) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    RecordId loc1;
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            DummyDocWriter dw;
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), &dw, false);
+            ASSERT_OK(res.getStatus());
+            loc1 = res.getValue();
+            uow.commit();
+        }
+
+        ASSERT_EQUALS(string("eliot"), rs->dataFor(opCtx.get(), loc1).data());
+    }
+}
+
+TEST(RecordStoreTestHarness, Delete1) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
+    string s = "eliot was here";
 
-    TEST( RecordStoreTestHarness, Simple1InsertDocWroter ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-        
-        RecordId loc1;
+    RecordId loc;
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
 
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                DummyDocWriter dw;
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), &dw, false );
-                ASSERT_OK( res.getStatus() );
-                loc1 = res.getValue();
-                uow.commit();
-            }
-
-            ASSERT_EQUALS( string("eliot"), rs->dataFor( opCtx.get(), loc1 ).data() );
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
         }
+
+        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
     }
 
-    TEST( RecordStoreTestHarness, Delete1 ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        string s = "eliot was here";
-
-        RecordId loc;
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-
-            ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc ).data() );
-
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                rs->deleteRecord( opCtx.get(), loc );
-                uow.commit();
-            }
-
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 
-    TEST( RecordStoreTestHarness, Delete2 ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
 
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            rs->deleteRecord(opCtx.get(), loc);
+            uow.commit();
         }
 
-        string s = "eliot was here";
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+}
 
-        RecordId loc;
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+TEST(RecordStoreTestHarness, Delete2) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
-                ASSERT_OK( res.getStatus() );
-                res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
 
-        }
+    string s = "eliot was here";
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc ).data() );
-            ASSERT_EQUALS( 2, rs->numRecords( opCtx.get() ) );
-        }
+    RecordId loc;
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
 
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                rs->deleteRecord( opCtx.get(), loc );
-                uow.commit();
-            }
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            res = rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
         }
     }
 
-    TEST( RecordStoreTestHarness, Update1 ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        string s1 = "eliot was here";
-        string s2 = "eliot was here again";
-
-        RecordId loc;
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                           s1.c_str(), s1.size() + 1,
-                                                           false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( s1, rs->dataFor( opCtx.get(), loc ).data() );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->updateRecord( opCtx.get(), loc,
-                                                           s2.c_str(), s2.size() + 1,
-                                                           false, NULL );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
-            ASSERT_EQUALS( s2, rs->dataFor( opCtx.get(), loc ).data() );
-        }
-
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
     }
 
-    TEST( RecordStoreTestHarness, UpdateInPlace1 ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-
-        if (!rs->updateWithDamagesSupported())
-            return;
-
-        string s1 = "aaa111bbb";
-        string s2 = "aaa222bbb";
-
-        RecordId loc;
-        const RecordData s1Rec(s1.c_str(), s1.size() + 1);
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            s1Rec.data(),
-                                                            s1Rec.size(),
-                                                            -1 );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-
+            WriteUnitOfWork uow(opCtx.get());
+            rs->deleteRecord(opCtx.get(), loc);
+            uow.commit();
         }
+    }
+}
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( s1, rs->dataFor( opCtx.get(), loc ).data() );
-        }
+TEST(RecordStoreTestHarness, Update1) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                const char* damageSource = "222";
-                mutablebson::DamageVector dv;
-                dv.push_back( mutablebson::DamageEvent() );
-                dv[0].sourceOffset = 0;
-                dv[0].targetOffset = 3;
-                dv[0].size = 3;
-                Status res = rs->updateWithDamages( opCtx.get(),
-                                                   loc,
-                                                   s1Rec,
-                                                   damageSource,
-                                                   dv );
-                ASSERT_OK( res );
-                uow.commit();
-            }
-        }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
 
+    string s1 = "eliot was here";
+    string s2 = "eliot was here again";
+
+    RecordId loc;
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( s2, rs->dataFor( opCtx.get(), loc ).data() );
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), s1.c_str(), s1.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
         }
     }
 
-
-    TEST( RecordStoreTestHarness, Truncate1 ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        string s = "eliot was here";
-
-        RecordId loc;
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-
-        }
-
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc ).data() );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                rs->truncate( opCtx.get() );
-                uow.commit();
-            }
-
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(s1, rs->dataFor(opCtx.get(), loc).data());
     }
 
-    TEST( RecordStoreTestHarness, Cursor1 ) {
-        const int N = 10;
-
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->updateRecord(opCtx.get(), loc, s2.c_str(), s2.size() + 1, false, NULL);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
         }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                for ( int i = 0; i < N; i++ ) {
-                    string s = str::stream() << "eliot" << i;
-                    ASSERT_OK( rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false ).getStatus() );
-                }
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( N, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            int x = 0;
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            auto cursor = rs->getCursor(opCtx.get());
-            while (auto record = cursor->next()) {
-                string s = str::stream() << "eliot" << x++;
-                ASSERT_EQUALS(s, record->data.data());
-            }
-            ASSERT_EQUALS( N, x );
-            ASSERT(!cursor->next());
-        }
-
-        {
-            int x = N;
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            auto cursor = rs->getCursor(opCtx.get(), false);
-            while (auto record = cursor->next()) {
-                string s = str::stream() << "eliot" << --x;
-                ASSERT_EQUALS(s, record->data.data());
-            }
-            ASSERT_EQUALS( 0, x );
-            ASSERT(!cursor->next());
-        }
-
     }
 
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(s2, rs->dataFor(opCtx.get(), loc).data());
+    }
+}
+
+TEST(RecordStoreTestHarness, UpdateInPlace1) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    if (!rs->updateWithDamagesSupported())
+        return;
+
+    string s1 = "aaa111bbb";
+    string s2 = "aaa222bbb";
+
+    RecordId loc;
+    const RecordData s1Rec(s1.c_str(), s1.size() + 1);
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), s1Rec.data(), s1Rec.size(), -1);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
+        }
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(s1, rs->dataFor(opCtx.get(), loc).data());
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            const char* damageSource = "222";
+            mutablebson::DamageVector dv;
+            dv.push_back(mutablebson::DamageEvent());
+            dv[0].sourceOffset = 0;
+            dv[0].targetOffset = 3;
+            dv[0].size = 3;
+            Status res = rs->updateWithDamages(opCtx.get(), loc, s1Rec, damageSource, dv);
+            ASSERT_OK(res);
+            uow.commit();
+        }
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(s2, rs->dataFor(opCtx.get(), loc).data());
+    }
+}
+
+
+TEST(RecordStoreTestHarness, Truncate1) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    string s = "eliot was here";
+
+    RecordId loc;
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
+        }
+    }
+
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            rs->truncate(opCtx.get());
+            uow.commit();
+        }
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+}
+
+TEST(RecordStoreTestHarness, Cursor1) {
+    const int N = 10;
+
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            for (int i = 0; i < N; i++) {
+                string s = str::stream() << "eliot" << i;
+                ASSERT_OK(
+                    rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, false).getStatus());
+            }
+            uow.commit();
+        }
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(N, rs->numRecords(opCtx.get()));
+    }
+
+    {
+        int x = 0;
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        auto cursor = rs->getCursor(opCtx.get());
+        while (auto record = cursor->next()) {
+            string s = str::stream() << "eliot" << x++;
+            ASSERT_EQUALS(s, record->data.data());
+        }
+        ASSERT_EQUALS(N, x);
+        ASSERT(!cursor->next());
+    }
+
+    {
+        int x = N;
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        auto cursor = rs->getCursor(opCtx.get(), false);
+        while (auto record = cursor->next()) {
+            string s = str::stream() << "eliot" << --x;
+            ASSERT_EQUALS(s, record->data.data());
+        }
+        ASSERT_EQUALS(0, x);
+        ASSERT(!cursor->next());
+    }
+}
 }

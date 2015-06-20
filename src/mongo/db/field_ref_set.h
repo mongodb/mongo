@@ -38,98 +38,98 @@
 
 namespace mongo {
 
-    /**
-     * A FieldRefSet holds a number of unique FieldRefs - a set of dotted paths into a document.
-     *
-     * The FieldRefSet provides helpful functions for efficiently finding conflicts between field
-     * ref paths - field ref paths conflict if they are equal to each other or if one is a prefix.
-     * To maintain a FieldRefSet of non-conflicting paths, always use the insert method which
-     * returns conflicting FieldRefs.
-     *
-     * FieldRefSets do not own the FieldRef paths they contain.
-     */
-    class FieldRefSet {
-        MONGO_DISALLOW_COPYING(FieldRefSet);
+/**
+ * A FieldRefSet holds a number of unique FieldRefs - a set of dotted paths into a document.
+ *
+ * The FieldRefSet provides helpful functions for efficiently finding conflicts between field
+ * ref paths - field ref paths conflict if they are equal to each other or if one is a prefix.
+ * To maintain a FieldRefSet of non-conflicting paths, always use the insert method which
+ * returns conflicting FieldRefs.
+ *
+ * FieldRefSets do not own the FieldRef paths they contain.
+ */
+class FieldRefSet {
+    MONGO_DISALLOW_COPYING(FieldRefSet);
 
-        struct FieldRefPtrLessThan {
-            bool operator()(const FieldRef* lhs, const FieldRef* rhs) const;
-        };
-
-        typedef std::set<const FieldRef*, FieldRefPtrLessThan> FieldSet;
-
-    public:
-        typedef FieldSet::iterator iterator;
-        typedef FieldSet::const_iterator const_iterator;
-
-        FieldRefSet();
-
-        FieldRefSet(const std::vector<FieldRef*>& paths);
-
-        /** Returns 'true' if the set is empty */
-        bool empty() const {
-            return _fieldSet.empty();
-        }
-
-        inline const_iterator begin() const {
-            return _fieldSet.begin();
-        }
-
-        inline const_iterator end() const {
-            return _fieldSet.end();
-        }
-
-        /**
-         * Returns true if the path does not already exist in the set, false otherwise.
-         *
-         * Note that *no* conflict resolution occurs - any path can be inserted into a set.
-         */
-        inline bool insert(const FieldRef* path) {
-            return _fieldSet.insert(path).second;
-        }
-
-        /**
-         * Returns true if the field 'toInsert' can be added in the set without
-         * conflicts. Otherwise returns false and fill in '*conflict' with the field 'toInsert'
-         * clashed with.
-         *
-         * There is no ownership transfer of 'toInsert'. The caller is responsible for
-         * maintaining it alive for as long as the FieldRefSet is so. By the same token
-         * 'conflict' can only be referred to while the FieldRefSet can.
-         */
-        bool insert(const FieldRef* toInsert, const FieldRef** conflict);
-
-        /**
-         * Fills the set with the supplied FieldRef*s
-         *
-         * Note that *no* conflict resolution occurs here.
-         */
-        void fillFrom(const std::vector<FieldRef*>& fields);
-
-        /**
-         * Replace any existing conflicting FieldRef with the shortest (closest to root) one
-         */
-        void keepShortest(const FieldRef* toInsert);
-
-        /**
-         * Find all inserted fields which conflict with the FieldRef 'toCheck' by the semantics
-         * of 'insert', and add those fields to the 'conflicts' set.
-         *
-         * Return true if conflicts were found.
-         */
-        bool findConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const;
-
-        void clear() {
-            _fieldSet.clear();
-        }
-
-        /**
-         * A debug/log-able string
-         */
-        const std::string toString() const;
-
-    private:
-        // A set of field_ref pointers, none of which is owned here.
-        FieldSet _fieldSet;
+    struct FieldRefPtrLessThan {
+        bool operator()(const FieldRef* lhs, const FieldRef* rhs) const;
     };
 
-} // namespace mongo
+    typedef std::set<const FieldRef*, FieldRefPtrLessThan> FieldSet;
+
+public:
+    typedef FieldSet::iterator iterator;
+    typedef FieldSet::const_iterator const_iterator;
+
+    FieldRefSet();
+
+    FieldRefSet(const std::vector<FieldRef*>& paths);
+
+    /** Returns 'true' if the set is empty */
+    bool empty() const {
+        return _fieldSet.empty();
+    }
+
+    inline const_iterator begin() const {
+        return _fieldSet.begin();
+    }
+
+    inline const_iterator end() const {
+        return _fieldSet.end();
+    }
+
+    /**
+     * Returns true if the path does not already exist in the set, false otherwise.
+     *
+     * Note that *no* conflict resolution occurs - any path can be inserted into a set.
+     */
+    inline bool insert(const FieldRef* path) {
+        return _fieldSet.insert(path).second;
+    }
+
+    /**
+     * Returns true if the field 'toInsert' can be added in the set without
+     * conflicts. Otherwise returns false and fill in '*conflict' with the field 'toInsert'
+     * clashed with.
+     *
+     * There is no ownership transfer of 'toInsert'. The caller is responsible for
+     * maintaining it alive for as long as the FieldRefSet is so. By the same token
+     * 'conflict' can only be referred to while the FieldRefSet can.
+     */
+    bool insert(const FieldRef* toInsert, const FieldRef** conflict);
+
+    /**
+     * Fills the set with the supplied FieldRef*s
+     *
+     * Note that *no* conflict resolution occurs here.
+     */
+    void fillFrom(const std::vector<FieldRef*>& fields);
+
+    /**
+     * Replace any existing conflicting FieldRef with the shortest (closest to root) one
+     */
+    void keepShortest(const FieldRef* toInsert);
+
+    /**
+     * Find all inserted fields which conflict with the FieldRef 'toCheck' by the semantics
+     * of 'insert', and add those fields to the 'conflicts' set.
+     *
+     * Return true if conflicts were found.
+     */
+    bool findConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const;
+
+    void clear() {
+        _fieldSet.clear();
+    }
+
+    /**
+     * A debug/log-able string
+     */
+    const std::string toString() const;
+
+private:
+    // A set of field_ref pointers, none of which is owned here.
+    FieldSet _fieldSet;
+};
+
+}  // namespace mongo

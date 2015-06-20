@@ -53,270 +53,265 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
+using std::string;
+using std::stringstream;
 
-    namespace {
+namespace {
 
-        MONGO_INITIALIZER(RegisterWriteCommands)(InitializerContext* context) {
-            // Leaked intentionally: a Command registers itself when constructed.
-            new CmdInsert();
-            new CmdUpdate();
-            new CmdDelete();
-            return Status::OK();
+MONGO_INITIALIZER(RegisterWriteCommands)(InitializerContext* context) {
+    // Leaked intentionally: a Command registers itself when constructed.
+    new CmdInsert();
+    new CmdUpdate();
+    new CmdDelete();
+    return Status::OK();
+}
+
+}  // namespace
+
+WriteCmd::WriteCmd(StringData name, BatchedCommandRequest::BatchType writeType)
+    : Command(name), _writeType(writeType) {}
+
+void WriteCmd::redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
+    namespace mmb = mutablebson;
+    mmb::Element root = cmdObj->root();
+    mmb::Element field = root.findFirstChildNamed(fieldName);
+
+    // If the cmdObj is too large, it will be a "too big" message given by CachedBSONObj.get()
+    if (!field.ok()) {
+        return;
+    }
+
+    // Redact the log if there are more than one documents or operations.
+    if (field.countChildren() > 1) {
+        field.setValueInt(field.countChildren());
+    }
+}
+
+// Slaves can't perform writes.
+bool WriteCmd::slaveOk() const {
+    return false;
+}
+
+bool WriteCmd::isWriteCommandForConfigServer() const {
+    return false;
+}
+
+Status WriteCmd::checkAuthForCommand(ClientBasic* client,
+                                     const std::string& dbname,
+                                     const BSONObj& cmdObj) {
+    Status status(auth::checkAuthForWriteCommand(AuthorizationSession::get(client),
+                                                 _writeType,
+                                                 NamespaceString(parseNs(dbname, cmdObj)),
+                                                 cmdObj));
+
+    // TODO: Remove this when we standardize GLE reporting from commands
+    if (!status.isOK()) {
+        LastError::get(client).setLastError(status.code(), status.reason());
+    }
+
+    return status;
+}
+
+// Write commands are counted towards their corresponding opcounters, not command opcounters.
+bool WriteCmd::shouldAffectCommandCounter() const {
+    return false;
+}
+
+bool WriteCmd::run(OperationContext* txn,
+                   const string& dbName,
+                   BSONObj& cmdObj,
+                   int options,
+                   string& errMsg,
+                   BSONObjBuilder& result) {
+    // Can't be run on secondaries.
+    dassert(txn->writesAreReplicated());
+    BatchedCommandRequest request(_writeType);
+    BatchedCommandResponse response;
+
+    if (!request.parseBSON(cmdObj, &errMsg) || !request.isValid(&errMsg)) {
+        return appendCommandStatus(result, Status(ErrorCodes::FailedToParse, errMsg));
+    }
+
+    // Note that this is a runCommmand, and therefore, the database and the collection name
+    // are in different parts of the grammar for the command. But it's more convenient to
+    // work with a NamespaceString. We built it here and replace it in the parsed command.
+    // Internally, everything work with the namespace string as opposed to just the
+    // collection name.
+    NamespaceString nss(dbName, request.getNS());
+    request.setNSS(nss);
+
+    StatusWith<WriteConcernOptions> wcStatus = extractWriteConcern(cmdObj);
+
+    if (!wcStatus.isOK()) {
+        return appendCommandStatus(result, wcStatus.getStatus());
+    }
+    txn->setWriteConcern(wcStatus.getValue());
+
+    WriteBatchExecutor writeBatchExecutor(
+        txn, &globalOpCounters, &LastError::get(txn->getClient()));
+
+    writeBatchExecutor.executeBatch(request, &response);
+
+    result.appendElements(response.toBSON());
+    return response.getOk();
+}
+
+Status WriteCmd::explain(OperationContext* txn,
+                         const std::string& dbname,
+                         const BSONObj& cmdObj,
+                         ExplainCommon::Verbosity verbosity,
+                         BSONObjBuilder* out) const {
+    // For now we only explain update and delete write commands.
+    if (BatchedCommandRequest::BatchType_Update != _writeType &&
+        BatchedCommandRequest::BatchType_Delete != _writeType) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "Only update and delete write ops can be explained");
+    }
+
+    // Parse the batch request.
+    BatchedCommandRequest request(_writeType);
+    std::string errMsg;
+    if (!request.parseBSON(cmdObj, &errMsg) || !request.isValid(&errMsg)) {
+        return Status(ErrorCodes::FailedToParse, errMsg);
+    }
+
+    // Note that this is a runCommmand, and therefore, the database and the collection name
+    // are in different parts of the grammar for the command. But it's more convenient to
+    // work with a NamespaceString. We built it here and replace it in the parsed command.
+    // Internally, everything work with the namespace string as opposed to just the
+    // collection name.
+    NamespaceString nsString(dbname, request.getNS());
+    request.setNSS(nsString);
+
+    // Do the validation of the batch that is shared with non-explained write batches.
+    Status isValid = WriteBatchExecutor::validateBatch(request);
+    if (!isValid.isOK()) {
+        return isValid;
+    }
+
+    // Explain must do one additional piece of validation: For now we only explain
+    // singleton batches.
+    if (request.sizeWriteOps() != 1u) {
+        return Status(ErrorCodes::InvalidLength, "explained write batches must be of size 1");
+    }
+
+    ScopedTransaction scopedXact(txn, MODE_IX);
+
+    // Get a reference to the singleton batch item (it's the 0th item in the batch).
+    BatchItemRef batchItem(&request, 0);
+
+    if (BatchedCommandRequest::BatchType_Update == _writeType) {
+        // Create the update request.
+        UpdateRequest updateRequest(nsString);
+        updateRequest.setQuery(batchItem.getUpdate()->getQuery());
+        updateRequest.setUpdates(batchItem.getUpdate()->getUpdateExpr());
+        updateRequest.setMulti(batchItem.getUpdate()->getMulti());
+        updateRequest.setUpsert(batchItem.getUpdate()->getUpsert());
+        UpdateLifecycleImpl updateLifecycle(true, updateRequest.getNamespaceString());
+        updateRequest.setLifecycle(&updateLifecycle);
+        updateRequest.setExplain();
+
+        // Explained updates can yield.
+        updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+
+        OpDebug* debug = &CurOp::get(txn)->debug();
+
+        ParsedUpdate parsedUpdate(txn, &updateRequest);
+        Status parseStatus = parsedUpdate.parseRequest();
+        if (!parseStatus.isOK()) {
+            return parseStatus;
         }
 
-    } // namespace
+        // Explains of write commands are read-only, but we take write locks so
+        // that timing info is more accurate.
+        AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
+        Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-    WriteCmd::WriteCmd( StringData name, BatchedCommandRequest::BatchType writeType ) :
-        Command( name ), _writeType( writeType ) {
-    }
+        ensureShardVersionOKOrThrow(txn->getClient(), nsString.ns());
 
-    void WriteCmd::redactTooLongLog( mutablebson::Document* cmdObj, StringData fieldName ) {
-        namespace mmb = mutablebson;
-        mmb::Element root = cmdObj->root();
-        mmb::Element field = root.findFirstChildNamed( fieldName );
-
-        // If the cmdObj is too large, it will be a "too big" message given by CachedBSONObj.get()
-        if ( !field.ok() ) {
-            return;
+        // Get a pointer to the (possibly NULL) collection.
+        Collection* collection = NULL;
+        if (autoDb.getDb()) {
+            collection = autoDb.getDb()->getCollection(nsString.ns());
         }
 
-        // Redact the log if there are more than one documents or operations.
-        if ( field.countChildren() > 1 ) {
-            field.setValueInt( field.countChildren() );
-        }
-    }
+        PlanExecutor* rawExec;
+        uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug, &rawExec));
+        std::unique_ptr<PlanExecutor> exec(rawExec);
 
-    // Slaves can't perform writes.
-    bool WriteCmd::slaveOk() const { return false; }
+        // Explain the plan tree.
+        Explain::explainStages(exec.get(), verbosity, out);
+        return Status::OK();
+    } else {
+        invariant(BatchedCommandRequest::BatchType_Delete == _writeType);
 
-    bool WriteCmd::isWriteCommandForConfigServer() const { return false; }
+        // Create the delete request.
+        DeleteRequest deleteRequest(nsString);
+        deleteRequest.setQuery(batchItem.getDelete()->getQuery());
+        deleteRequest.setMulti(batchItem.getDelete()->getLimit() != 1);
+        deleteRequest.setGod(false);
+        deleteRequest.setExplain();
 
-    Status WriteCmd::checkAuthForCommand( ClientBasic* client,
-                                          const std::string& dbname,
-                                          const BSONObj& cmdObj ) {
+        // Explained deletes can yield.
+        deleteRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-        Status status( auth::checkAuthForWriteCommand( AuthorizationSession::get(client),
-                _writeType,
-                NamespaceString( parseNs( dbname, cmdObj ) ),
-                cmdObj ));
-
-        // TODO: Remove this when we standardize GLE reporting from commands
-        if ( !status.isOK() ) {
-            LastError::get(client).setLastError(status.code(), status.reason());
-        }
-
-        return status;
-    }
-
-    // Write commands are counted towards their corresponding opcounters, not command opcounters.
-    bool WriteCmd::shouldAffectCommandCounter() const { return false; }
-
-    bool WriteCmd::run(OperationContext* txn,
-                       const string& dbName,
-                       BSONObj& cmdObj,
-                       int options,
-                       string& errMsg,
-                       BSONObjBuilder& result) {
-        // Can't be run on secondaries.
-        dassert(txn->writesAreReplicated());
-        BatchedCommandRequest request( _writeType );
-        BatchedCommandResponse response;
-
-        if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
-            return appendCommandStatus( result, Status( ErrorCodes::FailedToParse, errMsg ) );
+        ParsedDelete parsedDelete(txn, &deleteRequest);
+        Status parseStatus = parsedDelete.parseRequest();
+        if (!parseStatus.isOK()) {
+            return parseStatus;
         }
 
-        // Note that this is a runCommmand, and therefore, the database and the collection name
-        // are in different parts of the grammar for the command. But it's more convenient to
-        // work with a NamespaceString. We built it here and replace it in the parsed command.
-        // Internally, everything work with the namespace string as opposed to just the
-        // collection name.
-        NamespaceString nss(dbName, request.getNS());
-        request.setNSS(nss);
+        // Explains of write commands are read-only, but we take write locks so that timing
+        // info is more accurate.
+        AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
+        Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-        StatusWith<WriteConcernOptions> wcStatus = extractWriteConcern(cmdObj);
+        ensureShardVersionOKOrThrow(txn->getClient(), nsString.ns());
 
-        if (!wcStatus.isOK()) {
-            return appendCommandStatus(result, wcStatus.getStatus());
-        }
-        txn->setWriteConcern(wcStatus.getValue());
-
-        WriteBatchExecutor writeBatchExecutor(txn,
-                                              &globalOpCounters,
-                                              &LastError::get(txn->getClient()));
-
-        writeBatchExecutor.executeBatch( request, &response );
-
-        result.appendElements( response.toBSON() );
-        return response.getOk();
-    }
-
-    Status WriteCmd::explain(OperationContext* txn,
-                             const std::string& dbname,
-                             const BSONObj& cmdObj,
-                             ExplainCommon::Verbosity verbosity,
-                             BSONObjBuilder* out) const {
-        // For now we only explain update and delete write commands.
-        if ( BatchedCommandRequest::BatchType_Update != _writeType &&
-             BatchedCommandRequest::BatchType_Delete != _writeType ) {
-            return Status( ErrorCodes::IllegalOperation,
-                           "Only update and delete write ops can be explained" );
+        // Get a pointer to the (possibly NULL) collection.
+        Collection* collection = NULL;
+        if (autoDb.getDb()) {
+            collection = autoDb.getDb()->getCollection(nsString.ns());
         }
 
-        // Parse the batch request.
-        BatchedCommandRequest request( _writeType );
-        std::string errMsg;
-        if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
-            return Status( ErrorCodes::FailedToParse, errMsg );
-        }
+        PlanExecutor* rawExec;
+        uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
+        std::unique_ptr<PlanExecutor> exec(rawExec);
 
-        // Note that this is a runCommmand, and therefore, the database and the collection name
-        // are in different parts of the grammar for the command. But it's more convenient to
-        // work with a NamespaceString. We built it here and replace it in the parsed command.
-        // Internally, everything work with the namespace string as opposed to just the
-        // collection name.
-        NamespaceString nsString(dbname, request.getNS());
-        request.setNSS(nsString);
-
-        // Do the validation of the batch that is shared with non-explained write batches.
-        Status isValid = WriteBatchExecutor::validateBatch( request );
-        if (!isValid.isOK()) {
-            return isValid;
-        }
-
-        // Explain must do one additional piece of validation: For now we only explain
-        // singleton batches.
-        if ( request.sizeWriteOps() != 1u ) {
-            return Status( ErrorCodes::InvalidLength,
-                           "explained write batches must be of size 1" );
-        }
-
-        ScopedTransaction scopedXact(txn, MODE_IX);
-
-        // Get a reference to the singleton batch item (it's the 0th item in the batch).
-        BatchItemRef batchItem( &request, 0 );
-
-        if ( BatchedCommandRequest::BatchType_Update == _writeType ) {
-            // Create the update request.
-            UpdateRequest updateRequest( nsString );
-            updateRequest.setQuery( batchItem.getUpdate()->getQuery() );
-            updateRequest.setUpdates( batchItem.getUpdate()->getUpdateExpr() );
-            updateRequest.setMulti( batchItem.getUpdate()->getMulti() );
-            updateRequest.setUpsert( batchItem.getUpdate()->getUpsert() );
-            UpdateLifecycleImpl updateLifecycle( true, updateRequest.getNamespaceString() );
-            updateRequest.setLifecycle( &updateLifecycle );
-            updateRequest.setExplain();
-
-            // Explained updates can yield.
-            updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
-
-            OpDebug* debug = &CurOp::get(txn)->debug();
-
-            ParsedUpdate parsedUpdate( txn, &updateRequest );
-            Status parseStatus = parsedUpdate.parseRequest();
-            if ( !parseStatus.isOK() ) {
-                return parseStatus;
-            }
-
-            // Explains of write commands are read-only, but we take write locks so
-            // that timing info is more accurate.
-            AutoGetDb autoDb( txn, nsString.db(), MODE_IX );
-            Lock::CollectionLock colLock( txn->lockState(), nsString.ns(), MODE_IX );
-
-            ensureShardVersionOKOrThrow( txn->getClient(), nsString.ns() );
-
-            // Get a pointer to the (possibly NULL) collection.
-            Collection* collection = NULL;
-            if ( autoDb.getDb() ) {
-                collection = autoDb.getDb()->getCollection( nsString.ns() );
-            }
-
-            PlanExecutor* rawExec;
-            uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug, &rawExec));
-            std::unique_ptr<PlanExecutor> exec(rawExec);
-
-            // Explain the plan tree.
-            Explain::explainStages( exec.get(), verbosity, out );
-            return Status::OK();
-        }
-        else {
-            invariant( BatchedCommandRequest::BatchType_Delete == _writeType );
-
-            // Create the delete request.
-            DeleteRequest deleteRequest( nsString );
-            deleteRequest.setQuery( batchItem.getDelete()->getQuery() );
-            deleteRequest.setMulti( batchItem.getDelete()->getLimit() != 1 );
-            deleteRequest.setGod( false );
-            deleteRequest.setExplain();
-
-            // Explained deletes can yield.
-            deleteRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
-
-            ParsedDelete parsedDelete(txn, &deleteRequest);
-            Status parseStatus = parsedDelete.parseRequest();
-            if (!parseStatus.isOK()) {
-                return parseStatus;
-            }
-
-            // Explains of write commands are read-only, but we take write locks so that timing
-            // info is more accurate.
-            AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
-            Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
-
-            ensureShardVersionOKOrThrow( txn->getClient(), nsString.ns() );
-
-            // Get a pointer to the (possibly NULL) collection.
-            Collection* collection = NULL;
-            if (autoDb.getDb()) {
-                collection = autoDb.getDb()->getCollection(nsString.ns());
-            }
-
-            PlanExecutor* rawExec;
-            uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
-            std::unique_ptr<PlanExecutor> exec(rawExec);
-
-            // Explain the plan tree.
-            Explain::explainStages(exec.get(), verbosity, out);
-            return Status::OK();
-        }
+        // Explain the plan tree.
+        Explain::explainStages(exec.get(), verbosity, out);
+        return Status::OK();
     }
+}
 
-    CmdInsert::CmdInsert() :
-        WriteCmd( "insert", BatchedCommandRequest::BatchType_Insert ) {
-    }
+CmdInsert::CmdInsert() : WriteCmd("insert", BatchedCommandRequest::BatchType_Insert) {}
 
-    void CmdInsert::redactForLogging( mutablebson::Document* cmdObj ) {
-        redactTooLongLog( cmdObj, StringData( "documents", StringData::LiteralTag() ) );
-    }
+void CmdInsert::redactForLogging(mutablebson::Document* cmdObj) {
+    redactTooLongLog(cmdObj, StringData("documents", StringData::LiteralTag()));
+}
 
-    void CmdInsert::help( stringstream& help ) const {
-        help << "insert documents";
-    }
+void CmdInsert::help(stringstream& help) const {
+    help << "insert documents";
+}
 
-    CmdUpdate::CmdUpdate() :
-        WriteCmd( "update", BatchedCommandRequest::BatchType_Update ) {
-    }
+CmdUpdate::CmdUpdate() : WriteCmd("update", BatchedCommandRequest::BatchType_Update) {}
 
-    void CmdUpdate::redactForLogging( mutablebson::Document* cmdObj ) {
-        redactTooLongLog( cmdObj, StringData( "updates", StringData::LiteralTag() ) );
-    }
+void CmdUpdate::redactForLogging(mutablebson::Document* cmdObj) {
+    redactTooLongLog(cmdObj, StringData("updates", StringData::LiteralTag()));
+}
 
-    void CmdUpdate::help( stringstream& help ) const {
-        help << "update documents";
-    }
+void CmdUpdate::help(stringstream& help) const {
+    help << "update documents";
+}
 
-    CmdDelete::CmdDelete() :
-        WriteCmd( "delete", BatchedCommandRequest::BatchType_Delete ) {
-    }
+CmdDelete::CmdDelete() : WriteCmd("delete", BatchedCommandRequest::BatchType_Delete) {}
 
-    void CmdDelete::redactForLogging( mutablebson::Document* cmdObj ) {
-        redactTooLongLog( cmdObj, StringData( "deletes", StringData::LiteralTag() ) );
-    }
+void CmdDelete::redactForLogging(mutablebson::Document* cmdObj) {
+    redactTooLongLog(cmdObj, StringData("deletes", StringData::LiteralTag()));
+}
 
-    void CmdDelete::help( stringstream& help ) const {
-        help << "delete documents";
-    }
+void CmdDelete::help(stringstream& help) const {
+    help << "delete documents";
+}
 
-} // namespace mongo
+}  // namespace mongo

@@ -39,42 +39,43 @@
 
 namespace mongo {
 
-    TEST( MatchExpressionParserGeo, WithinBox ) {
-        BSONObj query = fromjson("{a:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
+TEST(MatchExpressionParserGeo, WithinBox) {
+    BSONObj query = fromjson("{a:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
 
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
-        ASSERT(!result.getValue()->matchesBSON(fromjson("{a: [3,4]}")));
-        ASSERT(result.getValue()->matchesBSON(fromjson("{a: [4,4]}")));
-        ASSERT(result.getValue()->matchesBSON(fromjson("{a: [5,5]}")));
-        ASSERT(result.getValue()->matchesBSON(fromjson("{a: [5,5.1]}")));
-        ASSERT(result.getValue()->matchesBSON(fromjson("{a: {x: 5, y:5.1}}")));
+    ASSERT(!result.getValue()->matchesBSON(fromjson("{a: [3,4]}")));
+    ASSERT(result.getValue()->matchesBSON(fromjson("{a: [4,4]}")));
+    ASSERT(result.getValue()->matchesBSON(fromjson("{a: [5,5]}")));
+    ASSERT(result.getValue()->matchesBSON(fromjson("{a: [5,5.1]}")));
+    ASSERT(result.getValue()->matchesBSON(fromjson("{a: {x: 5, y:5.1}}")));
+}
 
-    }
+TEST(MatchExpressionParserGeoNear, ParseNear) {
+    BSONObj query = fromjson(
+        "{loc:{$near:{$maxDistance:100, "
+        "$geometry:{type:\"Point\", coordinates:[0,0]}}}}");
 
-    TEST( MatchExpressionParserGeoNear, ParseNear ) {
-        BSONObj query = fromjson("{loc:{$near:{$maxDistance:100, "
-                                 "$geometry:{type:\"Point\", coordinates:[0,0]}}}}");
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        std::unique_ptr<MatchExpression> destroy(result.getValue());
+    MatchExpression* exp = result.getValue();
+    ASSERT_EQUALS(MatchExpression::GEO_NEAR, exp->matchType());
 
-        MatchExpression* exp = result.getValue();
-        ASSERT_EQUALS(MatchExpression::GEO_NEAR, exp->matchType());
+    GeoNearMatchExpression* gnexp = static_cast<GeoNearMatchExpression*>(exp);
+    ASSERT_EQUALS(gnexp->getData().maxDistance, 100);
+}
 
-        GeoNearMatchExpression* gnexp = static_cast<GeoNearMatchExpression*>(exp);
-        ASSERT_EQUALS(gnexp->getData().maxDistance, 100);
-    }
+// $near must be the only field in the expression object.
+TEST(MatchExpressionParserGeoNear, ParseNearExtraField) {
+    BSONObj query = fromjson(
+        "{loc:{$near:{$maxDistance:100, "
+        "$geometry:{type:\"Point\", coordinates:[0,0]}}, foo: 1}}");
 
-    // $near must be the only field in the expression object.
-    TEST( MatchExpressionParserGeoNear, ParseNearExtraField ) {
-        BSONObj query = fromjson("{loc:{$near:{$maxDistance:100, "
-                                 "$geometry:{type:\"Point\", coordinates:[0,0]}}, foo: 1}}");
-
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
 }

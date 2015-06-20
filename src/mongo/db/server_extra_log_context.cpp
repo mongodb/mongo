@@ -41,41 +41,40 @@
 namespace mongo {
 namespace {
 
-    // Server parameter controlling whether or not user ids are included in log entries.
-    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(logUserIds, bool, false);
+// Server parameter controlling whether or not user ids are included in log entries.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(logUserIds, bool, false);
 
-    /**
-     * Note: When appending new strings to the builder, make sure to pass false to the
-     * includeEndingNull parameter.
-     */
-    void appendServerExtraLogContext(BufBuilder& builder) {
-        ClientBasic* clientBasic = ClientBasic::getCurrent();
-        if (!clientBasic)
-            return;
-        if (!AuthorizationSession::exists(clientBasic))
-            return;
+/**
+ * Note: When appending new strings to the builder, make sure to pass false to the
+ * includeEndingNull parameter.
+ */
+void appendServerExtraLogContext(BufBuilder& builder) {
+    ClientBasic* clientBasic = ClientBasic::getCurrent();
+    if (!clientBasic)
+        return;
+    if (!AuthorizationSession::exists(clientBasic))
+        return;
 
-        UserNameIterator users =
-            AuthorizationSession::get(clientBasic)->getAuthenticatedUserNames();
+    UserNameIterator users = AuthorizationSession::get(clientBasic)->getAuthenticatedUserNames();
 
-        if (!users.more())
-            return;
+    if (!users.more())
+        return;
 
-        builder.appendStr("user:", false);
+    builder.appendStr("user:", false);
+    builder.appendStr(users.next().toString(), false);
+    while (users.more()) {
+        builder.appendChar(',');
         builder.appendStr(users.next().toString(), false);
-        while (users.more()) {
-            builder.appendChar(',');
-            builder.appendStr(users.next().toString(), false);
-        }
-        builder.appendChar(' ');
     }
+    builder.appendChar(' ');
+}
 
-    MONGO_INITIALIZER(SetServerLogContextFunction)(InitializerContext*) {
-        if (!logUserIds)
-            return Status::OK();
+MONGO_INITIALIZER(SetServerLogContextFunction)(InitializerContext*) {
+    if (!logUserIds)
+        return Status::OK();
 
-        return logger::registerExtraLogContextFn(appendServerExtraLogContext);
-    }
+    return logger::registerExtraLogContextFn(appendServerExtraLogContext);
+}
 
 }  // namespace
 }  // namespace mongo

@@ -38,157 +38,147 @@
 
 namespace mongo {
 
-    class ConstDataRangeCursor : public ConstDataRange {
-    public:
+class ConstDataRangeCursor : public ConstDataRange {
+public:
+    ConstDataRangeCursor(const char* begin, const char* end, std::ptrdiff_t debug_offset = 0)
+        : ConstDataRange(begin, end, debug_offset) {}
 
-        ConstDataRangeCursor(const char* begin, const char* end, std::ptrdiff_t debug_offset = 0)
-            : ConstDataRange(begin, end, debug_offset) {
+    ConstDataRangeCursor(ConstDataRange cdr) : ConstDataRange(cdr) {}
+
+    Status advance(size_t advance) {
+        if (advance > length()) {
+            return makeAdvanceStatus(advance);
         }
 
-        ConstDataRangeCursor(ConstDataRange cdr)
-            : ConstDataRange(cdr) {
+        _begin += advance;
+        _debug_offset += advance;
+
+        return Status::OK();
+    }
+
+    template <typename T>
+    Status skip() {
+        size_t advanced = 0;
+
+        Status x = DataType::load<T>(nullptr, _begin, _end - _begin, &advanced, _debug_offset);
+
+        if (x.isOK()) {
+            _begin += advanced;
+            _debug_offset += advanced;
         }
 
-        Status advance(size_t advance) {
-            if (advance > length()) {
-                return makeAdvanceStatus(advance);
-            }
+        return x;
+    }
 
-            _begin += advance;
-            _debug_offset += advance;
+    template <typename T>
+    Status readAndAdvance(T* t) {
+        size_t advanced = 0;
 
-            return Status::OK();
+        Status x = DataType::load(t, _begin, _end - _begin, &advanced, _debug_offset);
+
+        if (x.isOK()) {
+            _begin += advanced;
+            _debug_offset += advanced;
         }
 
-        template <typename T>
-        Status skip() {
-            size_t advanced = 0;
+        return x;
+    }
 
-            Status x = DataType::load<T>(nullptr, _begin, _end - _begin, &advanced, _debug_offset);
+    template <typename T>
+    StatusWith<T> readAndAdvance() {
+        T out(DataType::defaultConstruct<T>());
+        Status x = readAndAdvance(&out);
 
-            if (x.isOK()) {
-                _begin += advanced;
-                _debug_offset += advanced;
-            }
+        if (x.isOK()) {
+            return StatusWith<T>(std::move(out));
+        } else {
+            return StatusWith<T>(std::move(x));
+        }
+    }
 
-            return x;
+private:
+    Status makeAdvanceStatus(size_t advance) const;
+};
+
+class DataRangeCursor : public DataRange {
+public:
+    DataRangeCursor(char* begin, char* end, std::ptrdiff_t debug_offset = 0)
+        : DataRange(begin, end, debug_offset) {}
+
+    DataRangeCursor(DataRange range) : DataRange(range) {}
+
+    operator ConstDataRangeCursor() const {
+        return ConstDataRangeCursor(ConstDataRange(_begin, _end, _debug_offset));
+    }
+
+    Status advance(size_t advance) {
+        if (advance > length()) {
+            return makeAdvanceStatus(advance);
         }
 
-        template <typename T>
-        Status readAndAdvance(T* t) {
-            size_t advanced = 0;
+        _begin += advance;
+        _debug_offset += advance;
 
-            Status x = DataType::load(t, _begin, _end - _begin, &advanced, _debug_offset);
+        return Status::OK();
+    }
 
-            if (x.isOK()) {
-                _begin += advanced;
-                _debug_offset += advanced;
-            }
+    template <typename T>
+    Status skip() {
+        size_t advanced = 0;
 
-            return x;
+        Status x = DataType::load<T>(nullptr, _begin, _end - _begin, &advanced, _debug_offset);
+
+        if (x.isOK()) {
+            _begin += advanced;
+            _debug_offset += advanced;
         }
 
-        template <typename T>
-        StatusWith<T> readAndAdvance() {
-            T out(DataType::defaultConstruct<T>());
-            Status x = readAndAdvance(&out);
+        return x;
+    }
 
-            if (x.isOK()) {
-                return StatusWith<T>(std::move(out));
-            } else {
-                return StatusWith<T>(std::move(x));
-            }
+    template <typename T>
+    Status readAndAdvance(T* t) {
+        size_t advanced = 0;
+
+        Status x = DataType::load(t, _begin, _end - _begin, &advanced, _debug_offset);
+
+        if (x.isOK()) {
+            _begin += advanced;
+            _debug_offset += advanced;
         }
 
-    private:
+        return x;
+    }
 
-        Status makeAdvanceStatus(size_t advance) const;
+    template <typename T>
+    StatusWith<T> readAndAdvance() {
+        T out(DataType::defaultConstruct<T>());
+        Status x = readAndAdvance(&out);
 
-    };
+        if (x.isOK()) {
+            return StatusWith<T>(std::move(out));
+        } else {
+            return StatusWith<T>(std::move(x));
+        }
+    }
 
-    class DataRangeCursor : public DataRange {
-    public:
+    template <typename T>
+    Status writeAndAdvance(const T& value) {
+        size_t advanced = 0;
 
-        DataRangeCursor(char *begin, char *end, std::ptrdiff_t debug_offset = 0)
-            : DataRange(begin, end, debug_offset) {}
+        Status x = DataType::store(
+            value, const_cast<char*>(_begin), _end - _begin, &advanced, _debug_offset);
 
-        DataRangeCursor(DataRange range)
-            : DataRange(range) {}
-
-        operator ConstDataRangeCursor() const {
-            return ConstDataRangeCursor(ConstDataRange(_begin, _end, _debug_offset));
+        if (x.isOK()) {
+            _begin += advanced;
+            _debug_offset += advanced;
         }
 
-        Status advance(size_t advance) {
-            if (advance > length()) {
-                return makeAdvanceStatus(advance);
-            }
+        return x;
+    }
 
-            _begin += advance;
-            _debug_offset += advance;
+private:
+    Status makeAdvanceStatus(size_t advance) const;
+};
 
-            return Status::OK();
-        }
-
-        template <typename T>
-        Status skip() {
-            size_t advanced = 0;
-
-            Status x = DataType::load<T>(nullptr, _begin, _end - _begin, &advanced, _debug_offset);
-
-            if (x.isOK()) {
-                _begin += advanced;
-                _debug_offset += advanced;
-            }
-
-            return x;
-        }
-
-        template <typename T>
-        Status readAndAdvance(T* t) {
-            size_t advanced = 0;
-
-            Status x = DataType::load(t, _begin, _end - _begin, &advanced, _debug_offset);
-
-            if (x.isOK()) {
-                _begin += advanced;
-                _debug_offset += advanced;
-            }
-
-            return x;
-        }
-
-        template <typename T>
-        StatusWith<T> readAndAdvance() {
-            T out(DataType::defaultConstruct<T>());
-            Status x = readAndAdvance(&out);
-
-            if (x.isOK()) {
-                return StatusWith<T>(std::move(out));
-            } else {
-                return StatusWith<T>(std::move(x));
-            }
-        }
-
-        template <typename T>
-        Status writeAndAdvance(const T& value) {
-            size_t advanced = 0;
-
-            Status x = DataType::store(value, const_cast<char*>(_begin), _end - _begin, &advanced,
-                                       _debug_offset);
-
-            if (x.isOK()) {
-                _begin += advanced;
-                _debug_offset += advanced;
-            }
-
-            return x;
-        }
-
-    private:
-
-        Status makeAdvanceStatus(size_t advance) const;
-
-    };
-
-} // namespace mongo
+}  // namespace mongo

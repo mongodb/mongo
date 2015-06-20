@@ -37,22 +37,21 @@
 
 namespace mongo {
 
-    MONGO_MODULE_STARTUP_OPTIONS_REGISTER(WiredTigerOptions)(InitializerContext* context) {
-        return wiredTigerGlobalOptions.add(&moe::startupOptions);
-    }
+MONGO_MODULE_STARTUP_OPTIONS_REGISTER(WiredTigerOptions)(InitializerContext* context) {
+    return wiredTigerGlobalOptions.add(&moe::startupOptions);
+}
 
-    MONGO_STARTUP_OPTIONS_VALIDATE(WiredTigerOptions)(InitializerContext* context) {
-        return Status::OK();
-    }
+MONGO_STARTUP_OPTIONS_VALIDATE(WiredTigerOptions)(InitializerContext* context) {
+    return Status::OK();
+}
 
-    MONGO_STARTUP_OPTIONS_STORE(WiredTigerOptions)(InitializerContext* context) {
-        Status ret = wiredTigerGlobalOptions.store(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            std::cerr << ret.toString() << std::endl;
-            std::cerr << "try '" << context->args()[0] << " --help' for more information"
-                      << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
+MONGO_STARTUP_OPTIONS_STORE(WiredTigerOptions)(InitializerContext* context) {
+    Status ret = wiredTigerGlobalOptions.store(moe::startupOptionsParsed, context->args());
+    if (!ret.isOK()) {
+        std::cerr << ret.toString() << std::endl;
+        std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
+        ::_exit(EXIT_BADOPTIONS);
     }
+    return Status::OK();
+}
 }

@@ -41,108 +41,111 @@
 
 namespace mongo {
 
+/**
+ * Holds allowed indices.
+ */
+class AllowedIndices {
+private:
+    MONGO_DISALLOW_COPYING(AllowedIndices);
+
+public:
+    AllowedIndices(const std::vector<BSONObj>& indexKeyPatterns);
+    ~AllowedIndices();
+
+    // These are the index key patterns that
+    // we will use to override the indexes retrieved from
+    // the index catalog.
+    std::vector<BSONObj> indexKeyPatterns;
+};
+
+/**
+ * Value type for query settings.
+ * Holds:
+ *     query shape (query, sort, projection)
+ *     vector of index specs
+ */
+class AllowedIndexEntry {
+private:
+    MONGO_DISALLOW_COPYING(AllowedIndexEntry);
+
+public:
+    AllowedIndexEntry(const BSONObj& query,
+                      const BSONObj& sort,
+                      const BSONObj& projection,
+                      const std::vector<BSONObj>& indexKeyPatterns);
+    ~AllowedIndexEntry();
+    AllowedIndexEntry* clone() const;
+
+    // _query, _sort and _projection collectively
+    // represent the query shape that we are storing hint overrides for.
+    BSONObj query;
+    BSONObj sort;
+    BSONObj projection;
+
+    // These are the index key patterns that
+    // we will use to override the indexes retrieved from
+    // the index catalog.
+    std::vector<BSONObj> indexKeyPatterns;
+};
+
+/**
+ * Holds the index filters in a collection.
+ */
+class QuerySettings {
+private:
+    MONGO_DISALLOW_COPYING(QuerySettings);
+
+public:
+    QuerySettings();
+
+    ~QuerySettings();
+
     /**
-     * Holds allowed indices.
+     * Returns true and fills out allowedIndicesOut if a hint is set in the query settings
+     * for the query.
+     * Returns false and sets allowedIndicesOut to NULL otherwise.
+     * Caller owns AllowedIndices.
      */
-    class AllowedIndices {
-    private:
-        MONGO_DISALLOW_COPYING(AllowedIndices);
-    public:
-        AllowedIndices(const std::vector<BSONObj>& indexKeyPatterns);
-        ~AllowedIndices();
-
-        // These are the index key patterns that
-        // we will use to override the indexes retrieved from
-        // the index catalog.
-        std::vector<BSONObj> indexKeyPatterns;
-    };
+    bool getAllowedIndices(const PlanCacheKey& query, AllowedIndices** allowedIndicesOut) const;
 
     /**
-     * Value type for query settings.
-     * Holds:
-     *     query shape (query, sort, projection)
-     *     vector of index specs
+     * Returns copies all overrides for the collection..
+     * Caller owns overrides in vector.
      */
-    class AllowedIndexEntry {
-    private:
-        MONGO_DISALLOW_COPYING(AllowedIndexEntry);
-    public:
-        AllowedIndexEntry(const BSONObj& query, const BSONObj& sort,
-                          const BSONObj& projection,
-                          const std::vector<BSONObj>& indexKeyPatterns);
-        ~AllowedIndexEntry();
-        AllowedIndexEntry* clone() const;
-
-        // _query, _sort and _projection collectively
-        // represent the query shape that we are storing hint overrides for.
-        BSONObj query;
-        BSONObj sort;
-        BSONObj projection;
-
-        // These are the index key patterns that
-        // we will use to override the indexes retrieved from
-        // the index catalog.
-        std::vector<BSONObj> indexKeyPatterns;
-    };
+    std::vector<AllowedIndexEntry*> getAllAllowedIndices() const;
 
     /**
-     * Holds the index filters in a collection.
+     * Adds or replaces entry in query settings.
+     * If existing entry is found for the same key,
+     * frees resources for existing entry before replacing.
      */
-    class QuerySettings {
-    private:
-        MONGO_DISALLOW_COPYING(QuerySettings);
-    public:
-        QuerySettings();
+    void setAllowedIndices(const CanonicalQuery& canonicalQuery,
+                           const PlanCacheKey& key,
+                           const std::vector<BSONObj>& indexes);
 
-        ~QuerySettings();
+    /**
+     * Removes single entry from query settings. No effect if query shape is not found.
+     */
+    void removeAllowedIndices(const PlanCacheKey& canonicalQuery);
 
-        /**
-         * Returns true and fills out allowedIndicesOut if a hint is set in the query settings
-         * for the query.
-         * Returns false and sets allowedIndicesOut to NULL otherwise.
-         * Caller owns AllowedIndices.
-         */
-        bool getAllowedIndices(const PlanCacheKey& query,
-                               AllowedIndices** allowedIndicesOut) const;
+    /**
+     * Clears all allowed indices from query settings.
+     */
+    void clearAllowedIndices();
 
-        /**
-         * Returns copies all overrides for the collection..
-         * Caller owns overrides in vector.
-         */
-        std::vector<AllowedIndexEntry*> getAllAllowedIndices() const;
+private:
+    /**
+     * Clears entries without acquiring mutex.
+     */
+    void _clear();
 
-        /**
-         * Adds or replaces entry in query settings.
-         * If existing entry is found for the same key,
-         * frees resources for existing entry before replacing.
-         */
-        void setAllowedIndices(const CanonicalQuery& canonicalQuery,
-                               const PlanCacheKey& key,
-                               const std::vector<BSONObj>& indexes);
+    typedef unordered_map<PlanCacheKey, AllowedIndexEntry*> AllowedIndexEntryMap;
+    AllowedIndexEntryMap _allowedIndexEntryMap;
 
-        /**
-         * Removes single entry from query settings. No effect if query shape is not found.
-         */
-        void removeAllowedIndices(const PlanCacheKey& canonicalQuery);
-
-        /**
-         * Clears all allowed indices from query settings.
-         */
-        void clearAllowedIndices();
-
-    private:
-        /**
-         * Clears entries without acquiring mutex.
-         */
-        void _clear();
-
-        typedef unordered_map<PlanCacheKey, AllowedIndexEntry*> AllowedIndexEntryMap;
-        AllowedIndexEntryMap _allowedIndexEntryMap;
-
-        /**
-         * Protects data in query settings.
-         */
-        mutable stdx::mutex _mutex;
-    };
+    /**
+     * Protects data in query settings.
+     */
+    mutable stdx::mutex _mutex;
+};
 
 }  // namespace mongo

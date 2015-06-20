@@ -39,121 +39,123 @@
 
 namespace mongo {
 
-    using boost::intrusive_ptr;
-    using std::string;
-    using std::vector;
+using boost::intrusive_ptr;
+using std::string;
+using std::vector;
 
-    const char DocumentSourceMatch::matchName[] = "$match";
+const char DocumentSourceMatch::matchName[] = "$match";
 
-    const char *DocumentSourceMatch::getSourceName() const {
-        return matchName;
+const char* DocumentSourceMatch::getSourceName() const {
+    return matchName;
+}
+
+Value DocumentSourceMatch::serialize(bool explain) const {
+    return Value(DOC(getSourceName() << Document(getQuery())));
+}
+
+intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
+    return getQuery().isEmpty() ? nullptr : this;
+}
+
+boost::optional<Document> DocumentSourceMatch::getNext() {
+    pExpCtx->checkForInterrupt();
+
+    // The user facing error should have been generated earlier.
+    massert(17309, "Should never call getNext on a $match stage with $text clause", !_isTextQuery);
+
+    while (boost::optional<Document> next = pSource->getNext()) {
+        // The matcher only takes BSON documents, so we have to make one.
+        if (matcher->matches(next->toBson()))
+            return next;
     }
 
-    Value DocumentSourceMatch::serialize(bool explain) const {
-        return Value(DOC(getSourceName() << Document(getQuery())));
-    }
+    // Nothing matched
+    return boost::none;
+}
 
-    intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
-        return getQuery().isEmpty() ? nullptr : this;
-    }
+bool DocumentSourceMatch::coalesce(const intrusive_ptr<DocumentSource>& nextSource) {
+    DocumentSourceMatch* otherMatch = dynamic_cast<DocumentSourceMatch*>(nextSource.get());
+    if (!otherMatch)
+        return false;
 
-    boost::optional<Document> DocumentSourceMatch::getNext() {
-        pExpCtx->checkForInterrupt();
+    if (otherMatch->_isTextQuery) {
+        // Non-initial text queries are disallowed (enforced by setSource below). This prevents
+        // "hiding" a non-initial text query by combining it with another match.
+        return false;
 
-        // The user facing error should have been generated earlier.
-        massert(17309, "Should never call getNext on a $match stage with $text clause",
-                !_isTextQuery);
+        // The rest of this block is for once we support non-initial text queries.
 
-        while (boost::optional<Document> next = pSource->getNext()) {
-            // The matcher only takes BSON documents, so we have to make one.
-            if (matcher->matches(next->toBson()))
-                return next;
+        if (_isTextQuery) {
+            // The score should only come from the last $match. We can't combine since then this
+            // match's score would impact otherMatch's.
+            return false;
         }
 
-        // Nothing matched
-        return boost::none;
+        _isTextQuery = true;
     }
 
-    bool DocumentSourceMatch::coalesce(const intrusive_ptr<DocumentSource>& nextSource) {
-        DocumentSourceMatch* otherMatch = dynamic_cast<DocumentSourceMatch*>(nextSource.get());
-        if (!otherMatch)
-            return false;
+    // Replace our matcher with the $and of ours and theirs.
+    matcher.reset(new Matcher(BSON("$and" << BSON_ARRAY(getQuery() << otherMatch->getQuery())),
+                              MatchExpressionParser::WhereCallback()));
 
-        if (otherMatch->_isTextQuery) {
-            // Non-initial text queries are disallowed (enforced by setSource below). This prevents
-            // "hiding" a non-initial text query by combining it with another match.
-            return false;
-
-            // The rest of this block is for once we support non-initial text queries.
-
-            if (_isTextQuery) {
-                // The score should only come from the last $match. We can't combine since then this
-                // match's score would impact otherMatch's.
-                return false;
-            }
-
-            _isTextQuery = true;
-        }
-
-        // Replace our matcher with the $and of ours and theirs.
-        matcher.reset(new Matcher(BSON("$and" << BSON_ARRAY(getQuery() 
-                                              << otherMatch->getQuery())),
-                                  MatchExpressionParser::WhereCallback()));
-
-        return true;
-    }
+    return true;
+}
 
 namespace {
-    // This block contains the functions that make up the implementation of
-    // DocumentSourceMatch::redactSafePortion(). They will only be called after
-    // the Match expression has been successfully parsed so they can assume that
-    // input is well formed.
+// This block contains the functions that make up the implementation of
+// DocumentSourceMatch::redactSafePortion(). They will only be called after
+// the Match expression has been successfully parsed so they can assume that
+// input is well formed.
 
-    bool isAllDigits(StringData str) {
-        if (str.empty())
+bool isAllDigits(StringData str) {
+    if (str.empty())
+        return false;
+
+    for (size_t i = 0; i < str.size(); i++) {
+        if (!isdigit(str[i]))
             return false;
-
-        for (size_t i=0; i < str.size(); i++) {
-            if (!isdigit(str[i]))
-                return false;
-        }
-        return true;
     }
+    return true;
+}
 
-    bool isFieldnameRedactSafe(StringData fieldName) {
-        // Can't have numeric elements in the dotted path since redacting elements from an array
-        // would change the indexes.
+bool isFieldnameRedactSafe(StringData fieldName) {
+    // Can't have numeric elements in the dotted path since redacting elements from an array
+    // would change the indexes.
 
-        const size_t dotPos = fieldName.find('.');
-        if (dotPos == string::npos)
-            return !isAllDigits(fieldName);
+    const size_t dotPos = fieldName.find('.');
+    if (dotPos == string::npos)
+        return !isAllDigits(fieldName);
 
-        const StringData part = fieldName.substr(0, dotPos);
-        const StringData rest = fieldName.substr(dotPos + 1);
-        return !isAllDigits(part) && isFieldnameRedactSafe(rest);
-    }
+    const StringData part = fieldName.substr(0, dotPos);
+    const StringData rest = fieldName.substr(dotPos + 1);
+    return !isAllDigits(part) && isFieldnameRedactSafe(rest);
+}
 
-    bool isTypeRedactSafeInComparison(BSONType type) {
-        if (type == Array) return false;
-        if (type == Object) return false;
-        if (type == jstNULL) return false;
-        if (type == Undefined) return false; // Currently a Matcher parse error.
+bool isTypeRedactSafeInComparison(BSONType type) {
+    if (type == Array)
+        return false;
+    if (type == Object)
+        return false;
+    if (type == jstNULL)
+        return false;
+    if (type == Undefined)
+        return false;  // Currently a Matcher parse error.
 
-        return true;
-    }
+    return true;
+}
 
-    Document redactSafePortionTopLevel(BSONObj query); // mutually recursive with next function
+Document redactSafePortionTopLevel(BSONObj query);  // mutually recursive with next function
 
-    // Returns the redact-safe portion of an "inner" match expression. This is the layer like
-    // {$gt: 5} which does not include the field name. Returns an empty document if none of the
-    // expression can safely be promoted in front of a $redact.
-    Document redactSafePortionDollarOps(BSONObj expr) {
-        MutableDocument output;
-        BSONForEach(field, expr) {
-            if (field.fieldName()[0] != '$')
-                continue;
+// Returns the redact-safe portion of an "inner" match expression. This is the layer like
+// {$gt: 5} which does not include the field name. Returns an empty document if none of the
+// expression can safely be promoted in front of a $redact.
+Document redactSafePortionDollarOps(BSONObj expr) {
+    MutableDocument output;
+    BSONForEach(field, expr) {
+        if (field.fieldName()[0] != '$')
+            continue;
 
-            switch(BSONObj::MatchType(field.getGtLtOp(BSONObj::Equality))) {
+        switch (BSONObj::MatchType(field.getGtLtOp(BSONObj::Equality))) {
             // These are always ok
             case BSONObj::opTYPE:
             case BSONObj::opREGEX:
@@ -218,7 +220,7 @@ namespace {
             }
 
             // These are never allowed
-            case BSONObj::Equality: // This actually means unknown
+            case BSONObj::Equality:  // This actually means unknown
             case BSONObj::opMAX_DISTANCE:
             case BSONObj::opNEAR:
             case BSONObj::NE:
@@ -228,55 +230,57 @@ namespace {
             case BSONObj::opWITHIN:
             case BSONObj::opGEO_INTERSECTS:
                 continue;
-            }
         }
-        return output.freeze();
     }
+    return output.freeze();
+}
 
-    // Returns the redact-safe portion of an "outer" match expression. This is the layer like
-    // {fieldName: {...}} which does include the field name. Returns an empty document if none of
-    // the expression can safely be promoted in front of a $redact.
-    Document redactSafePortionTopLevel(BSONObj query) {
-        MutableDocument output;
-        BSONForEach(field, query) {
-            if (field.fieldName()[0] == '$') {
-                if (str::equals(field.fieldName(), "$or")) {
-                    // $or must be all-or-nothing (line $in). Can't include subset of elements.
-                    vector<Value> okClauses;
-                    BSONForEach(elem, field.Obj()) {
-                        Document clause = redactSafePortionTopLevel(elem.Obj());
-                        if (clause.empty()) {
-                            okClauses.clear();
-                            break;
-                        }
+// Returns the redact-safe portion of an "outer" match expression. This is the layer like
+// {fieldName: {...}} which does include the field name. Returns an empty document if none of
+// the expression can safely be promoted in front of a $redact.
+Document redactSafePortionTopLevel(BSONObj query) {
+    MutableDocument output;
+    BSONForEach(field, query) {
+        if (field.fieldName()[0] == '$') {
+            if (str::equals(field.fieldName(), "$or")) {
+                // $or must be all-or-nothing (line $in). Can't include subset of elements.
+                vector<Value> okClauses;
+                BSONForEach(elem, field.Obj()) {
+                    Document clause = redactSafePortionTopLevel(elem.Obj());
+                    if (clause.empty()) {
+                        okClauses.clear();
+                        break;
+                    }
+                    okClauses.push_back(Value(clause));
+                }
+
+                if (!okClauses.empty())
+                    output["$or"] = Value(std::move(okClauses));
+            } else if (str::equals(field.fieldName(), "$and")) {
+                // $and can include subset of elements (like $all).
+                vector<Value> okClauses;
+                BSONForEach(elem, field.Obj()) {
+                    Document clause = redactSafePortionTopLevel(elem.Obj());
+                    if (!clause.empty())
                         okClauses.push_back(Value(clause));
-                    }
-
-                    if (!okClauses.empty())
-                        output["$or"] = Value(std::move(okClauses));
                 }
-                else if (str::equals(field.fieldName(), "$and")) {
-                    // $and can include subset of elements (like $all).
-                    vector<Value> okClauses;
-                    BSONForEach(elem, field.Obj()) {
-                        Document clause = redactSafePortionTopLevel(elem.Obj());
-                        if (!clause.empty())
-                            okClauses.push_back(Value(clause));
-                    }
-                    if (!okClauses.empty())
-                        output["$and"] = Value(std::move(okClauses));
-                }
-
-                continue;
+                if (!okClauses.empty())
+                    output["$and"] = Value(std::move(okClauses));
             }
 
-            if (!isFieldnameRedactSafe(field.fieldNameStringData()))
-                continue;
+            continue;
+        }
 
-            switch (field.type()) {
-            case Array: continue; // exact matches on arrays are never allowed
-            case jstNULL: continue; // can't look for missing fields
-            case Undefined: continue; // Currently a Matcher parse error.
+        if (!isFieldnameRedactSafe(field.fieldNameStringData()))
+            continue;
+
+        switch (field.type()) {
+            case Array:
+                continue;  // exact matches on arrays are never allowed
+            case jstNULL:
+                continue;  // can't look for missing fields
+            case Undefined:
+                continue;  // Currently a Matcher parse error.
 
             case Object: {
                 Document sub = redactSafePortionDollarOps(field.Obj());
@@ -290,69 +294,68 @@ namespace {
             default:
                 output[field.fieldNameStringData()] = Value(field);
                 break;
-            }
         }
-        return output.freeze();
+    }
+    return output.freeze();
+}
+}
+
+BSONObj DocumentSourceMatch::redactSafePortion() const {
+    return redactSafePortionTopLevel(getQuery()).toBson();
+}
+
+void DocumentSourceMatch::setSource(DocumentSource* source) {
+    uassert(17313, "$match with $text is only allowed as the first pipeline stage", !_isTextQuery);
+
+    DocumentSource::setSource(source);
+}
+
+bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
+    BSONForEach(e, query) {
+        const StringData fieldName = e.fieldNameStringData();
+        if (fieldName == StringData("$text", StringData::LiteralTag()))
+            return true;
+
+        if (e.isABSONObj() && isTextQuery(e.Obj()))
+            return true;
+    }
+    return false;
+}
+
+static void uassertNoDisallowedClauses(BSONObj query) {
+    BSONForEach(e, query) {
+        // can't use the Matcher API because this would segfault the constructor
+        uassert(16395,
+                "$where is not allowed inside of a $match aggregation expression",
+                !str::equals(e.fieldName(), "$where"));
+        // geo breaks if it is not the first portion of the pipeline
+        uassert(16424,
+                "$near is not allowed inside of a $match aggregation expression",
+                !str::equals(e.fieldName(), "$near"));
+        uassert(16426,
+                "$nearSphere is not allowed inside of a $match aggregation expression",
+                !str::equals(e.fieldName(), "$nearSphere"));
+        if (e.isABSONObj())
+            uassertNoDisallowedClauses(e.Obj());
     }
 }
 
-    BSONObj DocumentSourceMatch::redactSafePortion() const {
-        return redactSafePortionTopLevel(getQuery()).toBson();
-    }
+intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    uassert(15959, "the match filter must be an expression in an object", elem.type() == Object);
 
-    void DocumentSourceMatch::setSource(DocumentSource* source) {
-        uassert(17313, "$match with $text is only allowed as the first pipeline stage",
-                !_isTextQuery);
+    uassertNoDisallowedClauses(elem.Obj());
 
-        DocumentSource::setSource(source);
-    }
+    return new DocumentSourceMatch(elem.Obj(), pExpCtx);
+}
 
-    bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
-        BSONForEach(e, query) {
-            const StringData fieldName = e.fieldNameStringData();
-            if (fieldName == StringData("$text", StringData::LiteralTag()))
-                return true;
+BSONObj DocumentSourceMatch::getQuery() const {
+    return *(matcher->getQuery());
+}
 
-            if (e.isABSONObj() && isTextQuery(e.Obj()))
-                return true;
-        }
-        return false;
-    }
-
-    static void uassertNoDisallowedClauses(BSONObj query) {
-        BSONForEach(e, query) {
-            // can't use the Matcher API because this would segfault the constructor
-            uassert(16395, "$where is not allowed inside of a $match aggregation expression",
-                    ! str::equals(e.fieldName(), "$where"));
-            // geo breaks if it is not the first portion of the pipeline
-            uassert(16424, "$near is not allowed inside of a $match aggregation expression",
-                    ! str::equals(e.fieldName(), "$near"));
-            uassert(16426, "$nearSphere is not allowed inside of a $match aggregation expression",
-                    ! str::equals(e.fieldName(), "$nearSphere"));
-            if (e.isABSONObj())
-                uassertNoDisallowedClauses(e.Obj());
-        }
-    }
-
-    intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
-            BSONElement elem,
-            const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        uassert(15959, "the match filter must be an expression in an object",
-                elem.type() == Object);
-
-        uassertNoDisallowedClauses(elem.Obj());
-
-        return new DocumentSourceMatch(elem.Obj(), pExpCtx);
-    }
-
-    BSONObj DocumentSourceMatch::getQuery() const {
-        return *(matcher->getQuery());
-    }
-
-    DocumentSourceMatch::DocumentSourceMatch(const BSONObj &query,
-                                             const intrusive_ptr<ExpressionContext> &pExpCtx)
-        : DocumentSource(pExpCtx),
-          matcher(new Matcher(query.getOwned(), MatchExpressionParser::WhereCallback())),
-          _isTextQuery(isTextQuery(query))
-    {}
+DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
+                                         const intrusive_ptr<ExpressionContext>& pExpCtx)
+    : DocumentSource(pExpCtx),
+      matcher(new Matcher(query.getOwned(), MatchExpressionParser::WhereCallback())),
+      _isTextQuery(isTextQuery(query)) {}
 }

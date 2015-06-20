@@ -41,86 +41,80 @@
 namespace mongo {
 namespace repl {
 
-    ElectionWinnerDeclarer::Algorithm::Algorithm(const std::string& setName,
-                                                 long long winnerId,
-                                                 long long term,
-                                                 const std::vector<HostAndPort>& targets) :
-            _setName(setName),
-            _winnerId(winnerId),
-            _term(term),
-            _targets(targets) {}
+ElectionWinnerDeclarer::Algorithm::Algorithm(const std::string& setName,
+                                             long long winnerId,
+                                             long long term,
+                                             const std::vector<HostAndPort>& targets)
+    : _setName(setName), _winnerId(winnerId), _term(term), _targets(targets) {}
 
-    ElectionWinnerDeclarer::Algorithm::~Algorithm() {}
+ElectionWinnerDeclarer::Algorithm::~Algorithm() {}
 
-    std::vector<RemoteCommandRequest>
-    ElectionWinnerDeclarer::Algorithm::getRequests() const {
-        BSONObjBuilder declareElectionWinnerCmdBuilder;
-        declareElectionWinnerCmdBuilder.append("replSetDeclareElectionWinner", 1);
-        declareElectionWinnerCmdBuilder.append("setName", _setName);
-        declareElectionWinnerCmdBuilder.append("winnerId", _winnerId);
-        declareElectionWinnerCmdBuilder.append("term", _term);
-        const BSONObj declareElectionWinnerCmd = declareElectionWinnerCmdBuilder.obj();
+std::vector<RemoteCommandRequest> ElectionWinnerDeclarer::Algorithm::getRequests() const {
+    BSONObjBuilder declareElectionWinnerCmdBuilder;
+    declareElectionWinnerCmdBuilder.append("replSetDeclareElectionWinner", 1);
+    declareElectionWinnerCmdBuilder.append("setName", _setName);
+    declareElectionWinnerCmdBuilder.append("winnerId", _winnerId);
+    declareElectionWinnerCmdBuilder.append("term", _term);
+    const BSONObj declareElectionWinnerCmd = declareElectionWinnerCmdBuilder.obj();
 
-        std::vector<RemoteCommandRequest> requests;
-        for (const auto& target : _targets) {
-            requests.push_back(RemoteCommandRequest(
-                        target,
-                        "admin",
-                        declareElectionWinnerCmd,
-                        Milliseconds(30*1000)));   // trying to match current Socket timeout
-        }
-
-        return requests;
+    std::vector<RemoteCommandRequest> requests;
+    for (const auto& target : _targets) {
+        requests.push_back(RemoteCommandRequest(
+            target,
+            "admin",
+            declareElectionWinnerCmd,
+            Milliseconds(30 * 1000)));  // trying to match current Socket timeout
     }
 
-    void ElectionWinnerDeclarer::Algorithm::processResponse(
-            const RemoteCommandRequest& request,
-            const ResponseStatus& response) {
-        _responsesProcessed++;
-        if (!response.isOK()) { // failed response
-            log() << "ElectionWinnerDeclarer: Got failed response from " << request.target
-                  << ": " << response.getStatus();
-            return;
-        }
+    return requests;
+}
 
-        Status cmdResponseStatus = getStatusFromCommandResult(response.getValue().data);
-        if (!cmdResponseStatus.isOK()) { // disagreement response
-            _failed = true;
-            _status = cmdResponseStatus;
-            log() << "ElectionWinnerDeclarer: Got error response from " << request.target
-                  << " with term: " << response.getValue().data["term"].Number()
-                  << " and error: " << cmdResponseStatus;
-        }
+void ElectionWinnerDeclarer::Algorithm::processResponse(const RemoteCommandRequest& request,
+                                                        const ResponseStatus& response) {
+    _responsesProcessed++;
+    if (!response.isOK()) {  // failed response
+        log() << "ElectionWinnerDeclarer: Got failed response from " << request.target << ": "
+              << response.getStatus();
+        return;
     }
 
-    bool ElectionWinnerDeclarer::Algorithm::hasReceivedSufficientResponses() const {
-        return _failed || _responsesProcessed == static_cast<int>(_targets.size());
+    Status cmdResponseStatus = getStatusFromCommandResult(response.getValue().data);
+    if (!cmdResponseStatus.isOK()) {  // disagreement response
+        _failed = true;
+        _status = cmdResponseStatus;
+        log() << "ElectionWinnerDeclarer: Got error response from " << request.target
+              << " with term: " << response.getValue().data["term"].Number()
+              << " and error: " << cmdResponseStatus;
     }
+}
 
-    ElectionWinnerDeclarer::ElectionWinnerDeclarer() : _isCanceled(false) {}
-    ElectionWinnerDeclarer::~ElectionWinnerDeclarer() {}
+bool ElectionWinnerDeclarer::Algorithm::hasReceivedSufficientResponses() const {
+    return _failed || _responsesProcessed == static_cast<int>(_targets.size());
+}
 
-    StatusWith<ReplicationExecutor::EventHandle> ElectionWinnerDeclarer::start(
-            ReplicationExecutor* executor,
-            const std::string& setName,
-            long long winnerId,
-            long long term,
-            const std::vector<HostAndPort>& targets,
-            const stdx::function<void ()>& onCompletion) {
+ElectionWinnerDeclarer::ElectionWinnerDeclarer() : _isCanceled(false) {}
+ElectionWinnerDeclarer::~ElectionWinnerDeclarer() {}
 
-        _algorithm.reset(new Algorithm(setName, winnerId, term, targets));
-        _runner.reset(new ScatterGatherRunner(_algorithm.get()));
-        return _runner->start(executor, onCompletion);
-    }
+StatusWith<ReplicationExecutor::EventHandle> ElectionWinnerDeclarer::start(
+    ReplicationExecutor* executor,
+    const std::string& setName,
+    long long winnerId,
+    long long term,
+    const std::vector<HostAndPort>& targets,
+    const stdx::function<void()>& onCompletion) {
+    _algorithm.reset(new Algorithm(setName, winnerId, term, targets));
+    _runner.reset(new ScatterGatherRunner(_algorithm.get()));
+    return _runner->start(executor, onCompletion);
+}
 
-    void ElectionWinnerDeclarer::cancel(ReplicationExecutor* executor) {
-        _isCanceled = true;
-        _runner->cancel(executor);
-    }
+void ElectionWinnerDeclarer::cancel(ReplicationExecutor* executor) {
+    _isCanceled = true;
+    _runner->cancel(executor);
+}
 
-    Status ElectionWinnerDeclarer::getStatus() const {
-        return _algorithm->getStatus();
-    }
+Status ElectionWinnerDeclarer::getStatus() const {
+    return _algorithm->getStatus();
+}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

@@ -39,23 +39,24 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        /**
-         * maintains case
-         * but works
-         * running/Running -> run/Run
-         */
-        class Stemmer {
-            MONGO_DISALLOW_COPYING( Stemmer );
-        public:
-            Stemmer( const FTSLanguage* language );
-            ~Stemmer();
+/**
+ * maintains case
+ * but works
+ * running/Running -> run/Run
+ */
+class Stemmer {
+    MONGO_DISALLOW_COPYING(Stemmer);
 
-            std::string stem( StringData word ) const;
-        private:
-            struct sb_stemmer* _stemmer;
-        };
-    }
+public:
+    Stemmer(const FTSLanguage* language);
+    ~Stemmer();
+
+    std::string stem(StringData word) const;
+
+private:
+    struct sb_stemmer* _stemmer;
+};
 }
-
+}

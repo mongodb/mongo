@@ -45,204 +45,198 @@
 
 namespace mongo {
 
-    class DataFile;
-    class DataFileVersion;
-    class MmapV1RecordHeader;
-    class OperationContext;
+class DataFile;
+class DataFileVersion;
+class MmapV1RecordHeader;
+class OperationContext;
 
-    struct Extent;
+struct Extent;
+
+/**
+ * ExtentManager basics
+ *  - one per database
+ *  - responsible for managing <db>.# files
+ *  - NOT responsible for .ns file
+ *  - gives out extents
+ *  - responsible for figuring out how to get a new extent
+ *  - can use any method it wants to do so
+ *  - this structure is NOT stored on disk
+ *  - this class is thread safe, except as indicated below
+ *
+ * Implementation:
+ *  - ExtentManager holds a preallocated list of DataFile
+ *  - files will not be removed from the EM, so _files access can be lock-free
+ *  - extent size and loc are immutable
+ *  - Any non-const public operations on an ExtentManager will acquire an MODE_X lock on its
+ *    RESOURCE_MMAPv1_EXTENT_MANAGER resource from the lock-manager, which will extend life
+ *    to during WriteUnitOfWorks that might need rollback. Private methods will only
+ *    be called from public ones.
+ */
+class MmapV1ExtentManager : public ExtentManager {
+    MONGO_DISALLOW_COPYING(MmapV1ExtentManager);
+
+public:
+    /**
+     * @param freeListDetails this is a reference into the .ns file
+     *        while a bit odd, this is not a layer violation as extents
+     *        are a peer to the .ns file, without any layering
+     */
+    MmapV1ExtentManager(StringData dbname, StringData path, bool directoryPerDB);
 
     /**
-     * ExtentManager basics
-     *  - one per database
-     *  - responsible for managing <db>.# files
-     *  - NOT responsible for .ns file
-     *  - gives out extents
-     *  - responsible for figuring out how to get a new extent
-     *  - can use any method it wants to do so
-     *  - this structure is NOT stored on disk
-     *  - this class is thread safe, except as indicated below
-     *
-     * Implementation:
-     *  - ExtentManager holds a preallocated list of DataFile
-     *  - files will not be removed from the EM, so _files access can be lock-free
-     *  - extent size and loc are immutable
-     *  - Any non-const public operations on an ExtentManager will acquire an MODE_X lock on its
-     *    RESOURCE_MMAPv1_EXTENT_MANAGER resource from the lock-manager, which will extend life
-     *    to during WriteUnitOfWorks that might need rollback. Private methods will only
-     *    be called from public ones.
+     * opens all current files, not thread safe
      */
-    class MmapV1ExtentManager : public ExtentManager {
-        MONGO_DISALLOW_COPYING( MmapV1ExtentManager );
+    Status init(OperationContext* txn);
+
+    int numFiles() const;
+    long long fileSize() const;
+
+    // must call Extent::reuse on the returned extent
+    DiskLoc allocateExtent(OperationContext* txn, bool capped, int size, bool enforceQuota);
+
+    /**
+     * firstExt has to be == lastExt or a chain
+     */
+    void freeExtents(OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt);
+
+    /**
+     * frees a single extent
+     * ignores all fields in the Extent except: magic, myLoc, length
+     */
+    void freeExtent(OperationContext* txn, DiskLoc extent);
+
+    // For debug only: not thread safe
+    void printFreeList() const;
+
+    void freeListStats(OperationContext* txn, int* numExtents, int64_t* totalFreeSizeBytes) const;
+
+    /**
+     * @param loc - has to be for a specific MmapV1RecordHeader
+     * Note(erh): this sadly cannot be removed.
+     * A MmapV1RecordHeader DiskLoc has an offset from a file, while a RecordStore really wants an offset
+     * from an extent.  This intrinsically links an original record store to the original extent
+     * manager.
+     */
+    MmapV1RecordHeader* recordForV1(const DiskLoc& loc) const;
+
+    std::unique_ptr<RecordFetcher> recordNeedsFetch(const DiskLoc& loc) const final;
+
+    /**
+     * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)
+     * Note(erh) see comment on recordFor
+     */
+    Extent* extentForV1(const DiskLoc& loc) const;
+
+    /**
+     * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)
+     * Note(erh) see comment on recordFor
+     */
+    DiskLoc extentLocForV1(const DiskLoc& loc) const;
+
+    /**
+     * @param loc - has to be for a specific Extent
+     */
+    Extent* getExtent(const DiskLoc& loc, bool doSanityCheck = true) const;
+
+    /**
+     * Not thread safe, requires a database exclusive lock
+     */
+    DataFileVersion getFileFormat(OperationContext* txn) const;
+    void setFileFormat(OperationContext* txn, DataFileVersion newVersion);
+
+    const DataFile* getOpenFile(int n) const {
+        return _getOpenFile(n);
+    }
+
+    virtual int maxSize() const;
+
+    virtual CacheHint* cacheHint(const DiskLoc& extentLoc, const HintType& hint);
+
+private:
+    /**
+     * will return NULL if nothing suitable in free list
+     */
+    DiskLoc _allocFromFreeList(OperationContext* txn, int approxSize, bool capped);
+
+    /* allocate a new Extent, does not check free list
+    */
+    DiskLoc _createExtent(OperationContext* txn, int approxSize, bool enforceQuota);
+
+    DataFile* _addAFile(OperationContext* txn, int sizeNeeded, bool preallocateNextFile);
+
+
+    /**
+     * Shared record retrieval logic used by the public recordForV1() and likelyInPhysicalMem()
+     * above.
+     */
+    MmapV1RecordHeader* _recordForV1(const DiskLoc& loc) const;
+
+    DiskLoc _getFreeListStart() const;
+    DiskLoc _getFreeListEnd() const;
+    void _setFreeListStart(OperationContext* txn, DiskLoc loc);
+    void _setFreeListEnd(OperationContext* txn, DiskLoc loc);
+
+    const DataFile* _getOpenFile(int fileId) const;
+    DataFile* _getOpenFile(int fileId);
+
+    DiskLoc _createExtentInFile(
+        OperationContext* txn, int fileNo, DataFile* f, int size, bool enforceQuota);
+
+    boost::filesystem::path _fileName(int n) const;
+
+    // -----
+
+    const std::string _dbname;  // i.e. "test"
+    const std::string _path;    // i.e. "/data/db"
+    const bool _directoryPerDB;
+    const ResourceId _rid;
+
+    // This reference points into the MMAPv1 engine and is only valid as long as the
+    // engine is valid. Not owned here.
+    RecordAccessTracker* _recordAccessTracker;
+
+    /**
+     * Simple wrapper around an array object to allow append-only modification of the array,
+     * as well as concurrent read-accesses. This class has a minimal interface to keep
+     * implementation simple and easy to modify.
+     */
+    class FilesArray {
     public:
-        /**
-         * @param freeListDetails this is a reference into the .ns file
-         *        while a bit odd, this is not a layer violation as extents
-         *        are a peer to the .ns file, without any layering
-         */
-        MmapV1ExtentManager(StringData dbname, StringData path,
-                            bool directoryPerDB);
+        FilesArray() : _size(0) {}
+        ~FilesArray();
 
         /**
-         * opens all current files, not thread safe
+         * Returns file at location 'n' in the array, with 'n' less than number of files added.
+         * Will always return the same pointer for a given file.
          */
-        Status init(OperationContext* txn);
-
-        int numFiles() const;
-        long long fileSize() const;
-
-        // must call Extent::reuse on the returned extent
-        DiskLoc allocateExtent( OperationContext* txn,
-                                bool capped,
-                                int size,
-                                bool enforceQuota );
+        DataFile* operator[](int n) const {
+            invariant(n >= 0 && n < size());
+            return _files[n];
+        }
 
         /**
-         * firstExt has to be == lastExt or a chain
+         * Returns true iff no files were added
          */
-        void freeExtents( OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt );
+        bool empty() const {
+            return size() == 0;
+        }
 
         /**
-         * frees a single extent
-         * ignores all fields in the Extent except: magic, myLoc, length
+         * Returns number of files added to the array
          */
-        void freeExtent( OperationContext* txn, DiskLoc extent );
+        int size() const {
+            return _size.load();
+        }
 
-        // For debug only: not thread safe
-        void printFreeList() const;
-
-        void freeListStats(OperationContext* txn,
-                           int* numExtents,
-                           int64_t* totalFreeSizeBytes) const;
-
-        /**
-         * @param loc - has to be for a specific MmapV1RecordHeader
-         * Note(erh): this sadly cannot be removed.
-         * A MmapV1RecordHeader DiskLoc has an offset from a file, while a RecordStore really wants an offset
-         * from an extent.  This intrinsically links an original record store to the original extent
-         * manager.
-         */
-        MmapV1RecordHeader* recordForV1( const DiskLoc& loc ) const;
-
-        std::unique_ptr<RecordFetcher> recordNeedsFetch( const DiskLoc& loc ) const final;
-
-        /**
-         * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)
-         * Note(erh) see comment on recordFor
-         */
-        Extent* extentForV1( const DiskLoc& loc ) const;
-
-        /**
-         * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)
-         * Note(erh) see comment on recordFor
-         */
-        DiskLoc extentLocForV1( const DiskLoc& loc ) const;
-
-        /**
-         * @param loc - has to be for a specific Extent
-         */
-        Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const;
-
-        /**
-         * Not thread safe, requires a database exclusive lock
-         */
-        DataFileVersion getFileFormat(OperationContext* txn) const;
-        void setFileFormat(OperationContext* txn, DataFileVersion newVersion);
-
-        const DataFile* getOpenFile( int n ) const { return _getOpenFile( n ); }
-
-        virtual int maxSize() const;
-
-        virtual CacheHint* cacheHint( const DiskLoc& extentLoc, const HintType& hint );
+        // Appends val to the array, taking ownership of its pointer
+        void push_back(DataFile* val);
 
     private:
-        /**
-         * will return NULL if nothing suitable in free list
-         */
-        DiskLoc _allocFromFreeList( OperationContext* txn, int approxSize, bool capped );
-
-        /* allocate a new Extent, does not check free list
-        */
-        DiskLoc _createExtent( OperationContext* txn, int approxSize, bool enforceQuota );
-
-        DataFile* _addAFile( OperationContext* txn, int sizeNeeded, bool preallocateNextFile );
-
-
-        /**
-         * Shared record retrieval logic used by the public recordForV1() and likelyInPhysicalMem()
-         * above.
-         */
-        MmapV1RecordHeader* _recordForV1( const DiskLoc& loc ) const;
-
-        DiskLoc _getFreeListStart() const;
-        DiskLoc _getFreeListEnd() const;
-        void _setFreeListStart( OperationContext* txn, DiskLoc loc );
-        void _setFreeListEnd( OperationContext* txn, DiskLoc loc );
-
-        const DataFile* _getOpenFile(int fileId) const;
-        DataFile* _getOpenFile(int fileId);
-
-        DiskLoc _createExtentInFile( OperationContext* txn,
-                                     int fileNo,
-                                     DataFile* f,
-                                     int size,
-                                     bool enforceQuota );
-
-        boost::filesystem::path _fileName(int n) const;
-
-// -----
-
-        const std::string _dbname; // i.e. "test"
-        const std::string _path; // i.e. "/data/db"
-        const bool _directoryPerDB;
-        const ResourceId _rid;
-
-        // This reference points into the MMAPv1 engine and is only valid as long as the
-        // engine is valid. Not owned here.
-        RecordAccessTracker* _recordAccessTracker;
-
-        /**
-         * Simple wrapper around an array object to allow append-only modification of the array,
-         * as well as concurrent read-accesses. This class has a minimal interface to keep
-         * implementation simple and easy to modify.
-         */
-        class FilesArray {
-        public:
-            FilesArray() : _size(0) { }
-            ~FilesArray();
-
-            /**
-             * Returns file at location 'n' in the array, with 'n' less than number of files added.
-             * Will always return the same pointer for a given file.
-             */
-            DataFile* operator[](int n) const {
-                invariant(n >= 0 && n < size());
-                return _files[n];
-            }
-
-            /**
-             * Returns true iff no files were added
-             */
-            bool empty() const {
-                return size() == 0;
-            }
-
-            /**
-             * Returns number of files added to the array
-             */
-            int size() const {
-                return _size.load();
-            }
-
-            // Appends val to the array, taking ownership of its pointer
-            void push_back(DataFile* val);
-
-        private:
-            stdx::mutex _writersMutex;
-            AtomicInt32 _size; // number of files in the array
-            DataFile* _files[DiskLoc::MaxFiles];
-        };
-
-        FilesArray _files;
+        stdx::mutex _writersMutex;
+        AtomicInt32 _size;  // number of files in the array
+        DataFile* _files[DiskLoc::MaxFiles];
     };
+
+    FilesArray _files;
+};
 }

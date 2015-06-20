@@ -36,74 +36,74 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class CatalogManagerReplicaSet;
-    class DistLockManagerMock;
-    struct RemoteCommandRequest;
-    class RemoteCommandRunnerMock;
-    class ShardRegistry;
-    template<typename T> class StatusWith;
+class BSONObj;
+class CatalogManagerReplicaSet;
+class DistLockManagerMock;
+struct RemoteCommandRequest;
+class RemoteCommandRunnerMock;
+class ShardRegistry;
+template <typename T>
+class StatusWith;
 
 namespace executor {
 
-    class NetworkInterfaceMock;
+class NetworkInterfaceMock;
 
-} // namespace executor
+}  // namespace executor
+
+/**
+ * Sets up the mocked out objects for testing the replica-set backed catalog manager.
+ */
+class CatalogManagerReplSetTestFixture : public mongo::unittest::Test {
+public:
+    CatalogManagerReplSetTestFixture();
+    ~CatalogManagerReplSetTestFixture();
+
+protected:
+    /**
+     * Shortcut function to be used for generating mock responses to network requests.
+     *
+     * @param dbName Name of the database for which this request came.
+     * @param cmdObj Contents of the request.
+     *
+     * Return the BSON object representing the response(s) or an error, which will be passed
+     * back on the network.
+     */
+    using OnCommandFunction = std::function<StatusWith<BSONObj>(const RemoteCommandRequest&)>;
+
+    using OnFindCommandFunction =
+        std::function<StatusWith<std::vector<BSONObj>>(const RemoteCommandRequest&)>;
+
+    CatalogManagerReplicaSet* catalogManager() const;
+
+    ShardRegistry* shardRegistry() const;
+
+    RemoteCommandRunnerMock* commandRunner() const;
+
+    executor::NetworkInterfaceMock* network() const;
+
+    DistLockManagerMock* distLock() const;
 
     /**
-     * Sets up the mocked out objects for testing the replica-set backed catalog manager.
+     * Blocking methods, which receive one message from the network and respond using the
+     * responses returned from the input function. This is a syntactic sugar for simple,
+     * single request + response or find tests.
      */
-    class CatalogManagerReplSetTestFixture : public mongo::unittest::Test {
-    public:
-        CatalogManagerReplSetTestFixture();
-        ~CatalogManagerReplSetTestFixture();
+    void onCommand(OnCommandFunction func);
+    void onFindCommand(OnFindCommandFunction func);
 
-    protected:
-        /**
-         * Shortcut function to be used for generating mock responses to network requests.
-         *
-         * @param dbName Name of the database for which this request came.
-         * @param cmdObj Contents of the request.
-         *
-         * Return the BSON object representing the response(s) or an error, which will be passed
-         * back on the network.
-         */
-        using OnCommandFunction =
-            std::function<StatusWith<BSONObj>(const RemoteCommandRequest&)>;
+private:
+    void setUp() override;
 
-        using OnFindCommandFunction =
-            std::function<StatusWith<std::vector<BSONObj>>(const RemoteCommandRequest&)>;
+    void tearDown() override;
 
-        CatalogManagerReplicaSet* catalogManager() const;
+    // Mocked out network under the task executor. This pointer is owned by the executor on
+    // the ShardRegistry, so it must not be accessed once the executor has been shut down.
+    executor::NetworkInterfaceMock* _mockNetwork;
 
-        ShardRegistry* shardRegistry() const;
+    // Thread used to execute the task executor's loop. This thread will be busy until the
+    // shutdown is called on the shard registry's task executor.
+    std::thread _executorThread;
+};
 
-        RemoteCommandRunnerMock* commandRunner() const;
-
-        executor::NetworkInterfaceMock* network() const;
-
-        DistLockManagerMock* distLock() const;
-
-        /**
-         * Blocking methods, which receive one message from the network and respond using the
-         * responses returned from the input function. This is a syntactic sugar for simple,
-         * single request + response or find tests.
-         */
-        void onCommand(OnCommandFunction func);
-        void onFindCommand(OnFindCommandFunction func);
-
-    private:
-        void setUp() override;
-
-        void tearDown() override;
-
-        // Mocked out network under the task executor. This pointer is owned by the executor on
-        // the ShardRegistry, so it must not be accessed once the executor has been shut down.
-        executor::NetworkInterfaceMock* _mockNetwork;
-
-        // Thread used to execute the task executor's loop. This thread will be busy until the
-        // shutdown is called on the shard registry's task executor.
-        std::thread _executorThread;
-    };
-
-} // namespace mongo
+}  // namespace mongo

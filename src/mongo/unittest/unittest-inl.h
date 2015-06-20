@@ -29,13 +29,13 @@
 #pragma once
 
 namespace mongo {
-    namespace unittest {
+namespace unittest {
 
-        template <typename T>
-        Test::RegistrationAgent<T>::RegistrationAgent(const std::string& suiteName,
-                                                      const std::string& testName) {
-            Suite::getSuite(suiteName)->add<T>(testName);
-        }
+template <typename T>
+Test::RegistrationAgent<T>::RegistrationAgent(const std::string& suiteName,
+                                              const std::string& testName) {
+    Suite::getSuite(suiteName)->add<T>(testName);
+}
 
-    }  // namespace mongo
+}  // namespace mongo
 }  // namespace unittest

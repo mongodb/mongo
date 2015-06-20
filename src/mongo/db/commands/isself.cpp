@@ -36,36 +36,40 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
+using std::string;
+using std::stringstream;
 
-    class IsSelfCommand : public Command {
-    public:
-        IsSelfCommand() : Command("_isSelf") {}
-        virtual bool slaveOk() const { return true; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void help( stringstream &help ) const {
-            help << "{ _isSelf : 1 } INTERNAL ONLY";
-        }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            result.append( "id" , repl::instanceId );
-            return true;
-        }
-    };
-
-    MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterIsSelfCommand, ("GenerateInstanceId"))
-        (InitializerContext* context) {
-        // Leaked intentionally: a Command registers itself when constructed
-        new IsSelfCommand();
-        return Status::OK();
+class IsSelfCommand : public Command {
+public:
+    IsSelfCommand() : Command("_isSelf") {}
+    virtual bool slaveOk() const {
+        return true;
     }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual void help(stringstream& help) const {
+        help << "{ _isSelf : 1 } INTERNAL ONLY";
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {}  // No auth required
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        result.append("id", repl::instanceId);
+        return true;
+    }
+};
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterIsSelfCommand, ("GenerateInstanceId"))
+(InitializerContext* context) {
+    // Leaked intentionally: a Command registers itself when constructed
+    new IsSelfCommand();
+    return Status::OK();
+}
 
 }  // namespace mongo

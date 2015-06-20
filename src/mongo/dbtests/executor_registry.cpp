@@ -47,294 +47,298 @@
 
 namespace ExecutorRegistry {
 
-    using std::unique_ptr;
+using std::unique_ptr;
 
-    class ExecutorRegistryBase {
-    public:
-        ExecutorRegistryBase()
-            : _client(&_opCtx)
-        {
-            _ctx.reset(new OldClientWriteContext(&_opCtx, ns()));
-            _client.dropCollection(ns());
+class ExecutorRegistryBase {
+public:
+    ExecutorRegistryBase() : _client(&_opCtx) {
+        _ctx.reset(new OldClientWriteContext(&_opCtx, ns()));
+        _client.dropCollection(ns());
 
-            for (int i = 0; i < N(); ++i) {
-                _client.insert(ns(), BSON("foo" << i));
-            }
+        for (int i = 0; i < N(); ++i) {
+            _client.insert(ns(), BSON("foo" << i));
+        }
+    }
+
+    /**
+     * Return a plan executor that is going over the collection in ns().
+     */
+    PlanExecutor* getCollscan() {
+        unique_ptr<WorkingSet> ws(new WorkingSet());
+        CollectionScanParams params;
+        params.collection = collection();
+        params.direction = CollectionScanParams::FORWARD;
+        params.tailable = false;
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, ws.get(), NULL));
+
+        // Create a plan executor to hold it
+        CanonicalQuery* cq;
+        ASSERT(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
+        PlanExecutor* exec;
+        // Takes ownership of 'ws', 'scan', and 'cq'.
+        Status status = PlanExecutor::make(&_opCtx,
+                                           ws.release(),
+                                           scan.release(),
+                                           cq,
+                                           _ctx->db()->getCollection(ns()),
+                                           PlanExecutor::YIELD_MANUAL,
+                                           &exec);
+        ASSERT_OK(status);
+        return exec;
+    }
+
+    void registerExecutor(PlanExecutor* exec) {
+        WriteUnitOfWork wuow(&_opCtx);
+        _ctx->db()
+            ->getOrCreateCollection(&_opCtx, ns())
+            ->getCursorManager()
+            ->registerExecutor(exec);
+        wuow.commit();
+    }
+
+    void deregisterExecutor(PlanExecutor* exec) {
+        WriteUnitOfWork wuow(&_opCtx);
+        _ctx->db()
+            ->getOrCreateCollection(&_opCtx, ns())
+            ->getCursorManager()
+            ->deregisterExecutor(exec);
+        wuow.commit();
+    }
+
+    int N() {
+        return 50;
+    }
+
+    Collection* collection() {
+        return _ctx->db()->getCollection(ns());
+    }
+
+    static const char* ns() {
+        return "unittests.ExecutorRegistryDiskLocInvalidation";
+    }
+
+    // Order of these is important for initialization
+    OperationContextImpl _opCtx;
+    unique_ptr<OldClientWriteContext> _ctx;
+    DBDirectClient _client;
+};
+
+
+// Test that a registered runner receives invalidation notifications.
+class ExecutorRegistryDiskLocInvalid : public ExecutorRegistryBase {
+public:
+    void run() {
+        if (supportsDocLocking()) {
+            return;
         }
 
-        /**
-         * Return a plan executor that is going over the collection in ns().
-         */
-        PlanExecutor* getCollscan() {
-            unique_ptr<WorkingSet> ws(new WorkingSet());
-            CollectionScanParams params;
-            params.collection = collection();
-            params.direction = CollectionScanParams::FORWARD;
-            params.tailable = false;
-            unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, ws.get(), NULL));
+        unique_ptr<PlanExecutor> run(getCollscan());
+        BSONObj obj;
 
-            // Create a plan executor to hold it
-            CanonicalQuery* cq;
-            ASSERT(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
-            PlanExecutor* exec;
-            // Takes ownership of 'ws', 'scan', and 'cq'.
-            Status status = PlanExecutor::make(&_opCtx,
-                                               ws.release(),
-                                               scan.release(),
-                                               cq,
-                                               _ctx->db()->getCollection(ns()),
-                                               PlanExecutor::YIELD_MANUAL,
-                                               &exec);
-            ASSERT_OK(status);
-            return exec;
-        }
-
-        void registerExecutor( PlanExecutor* exec ) {
-            WriteUnitOfWork wuow(&_opCtx);
-            _ctx->db()->getOrCreateCollection(&_opCtx, ns())
-                      ->getCursorManager()
-                      ->registerExecutor(exec);
-            wuow.commit();
-        }
-
-        void deregisterExecutor( PlanExecutor* exec ) {
-            WriteUnitOfWork wuow(&_opCtx);
-            _ctx->db()->getOrCreateCollection(&_opCtx, ns())
-                      ->getCursorManager()
-                      ->deregisterExecutor(exec);
-            wuow.commit();
-        }
-
-        int N() { return 50; }
-
-        Collection* collection() {
-            return _ctx->db()->getCollection(ns());
-        }
-
-        static const char* ns() { return "unittests.ExecutorRegistryDiskLocInvalidation"; }
-
-        // Order of these is important for initialization
-        OperationContextImpl _opCtx;
-        unique_ptr<OldClientWriteContext> _ctx;
-        DBDirectClient _client;
-    };
-
-
-    // Test that a registered runner receives invalidation notifications.
-    class ExecutorRegistryDiskLocInvalid : public ExecutorRegistryBase {
-    public:
-        void run() {
-            if ( supportsDocLocking() ) {
-                return;
-            }
-
-            unique_ptr<PlanExecutor> run(getCollscan());
-            BSONObj obj;
-
-            // Read some of it.
-            for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
-                ASSERT_EQUALS(i, obj["foo"].numberInt());
-            }
-
-            // Register it.
-            run->saveState();
-            registerExecutor(run.get());
-            // At this point it's safe to yield.  forceYield would do that.  Let's now simulate some
-            // stuff going on in the yield.
-
-            // Delete some data, namely the next 2 things we'd expect.
-            _client.remove(ns(), BSON("foo" << 10));
-            _client.remove(ns(), BSON("foo" << 11));
-
-            // At this point, we're done yielding.  We recover our lock.
-
-            // Unregister the runner.
-            deregisterExecutor(run.get());
-
-            // And clean up anything that happened before.
-            run->restoreState(&_opCtx);
-
-            // Make sure that the runner moved forward over the deleted data.  We don't see foo==10
-            // or foo==11.
-            for (int i = 12; i < N(); ++i) {
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
-                ASSERT_EQUALS(i, obj["foo"].numberInt());
-            }
-
-            ASSERT_EQUALS(PlanExecutor::IS_EOF, run->getNext(&obj, NULL));
-        }
-    };
-
-    // Test that registered runners are killed when their collection is dropped.
-    class ExecutorRegistryDropCollection : public ExecutorRegistryBase {
-    public:
-        void run() {
-            unique_ptr<PlanExecutor> run(getCollscan());
-            BSONObj obj;
-
-            // Read some of it.
-            for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
-                ASSERT_EQUALS(i, obj["foo"].numberInt());
-            }
-
-            // Save state and register.
-            run->saveState();
-            registerExecutor(run.get());
-
-            // Drop a collection that's not ours.
-            _client.dropCollection("unittests.someboguscollection");
-
-            // Unregister and restore state.
-            deregisterExecutor(run.get());
-            run->restoreState(&_opCtx);
-
+        // Read some of it.
+        for (int i = 0; i < 10; ++i) {
             ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
-            ASSERT_EQUALS(10, obj["foo"].numberInt());
-
-            // Save state and register.
-            run->saveState();
-            registerExecutor(run.get());
-
-            // Drop our collection.
-            _client.dropCollection(ns());
-
-            // Unregister and restore state.
-            deregisterExecutor(run.get());
-            run->restoreState(&_opCtx);
-
-            // PlanExecutor was killed.
-            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(i, obj["foo"].numberInt());
         }
-    };
 
-    // Test that registered runners are killed when all indices are dropped on the collection.
-    class ExecutorRegistryDropAllIndices : public ExecutorRegistryBase {
-    public:
-        void run() {
-            unique_ptr<PlanExecutor> run(getCollscan());
-            BSONObj obj;
+        // Register it.
+        run->saveState();
+        registerExecutor(run.get());
+        // At this point it's safe to yield.  forceYield would do that.  Let's now simulate some
+        // stuff going on in the yield.
 
-            ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("foo" << 1)));
+        // Delete some data, namely the next 2 things we'd expect.
+        _client.remove(ns(), BSON("foo" << 10));
+        _client.remove(ns(), BSON("foo" << 11));
 
-            // Read some of it.
-            for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
-                ASSERT_EQUALS(i, obj["foo"].numberInt());
-            }
+        // At this point, we're done yielding.  We recover our lock.
 
-            // Save state and register.
-            run->saveState();
-            registerExecutor(run.get());
+        // Unregister the runner.
+        deregisterExecutor(run.get());
 
-            // Drop all indices.
-            _client.dropIndexes(ns());
+        // And clean up anything that happened before.
+        run->restoreState(&_opCtx);
 
-            // Unregister and restore state.
-            deregisterExecutor(run.get());
-            run->restoreState(&_opCtx);
-
-            // PlanExecutor was killed.
-            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
-        }
-    };
-
-    // Test that registered runners are killed when an index is dropped on the collection.
-    class ExecutorRegistryDropOneIndex : public ExecutorRegistryBase {
-    public:
-        void run() {
-            unique_ptr<PlanExecutor> run(getCollscan());
-            BSONObj obj;
-
-            ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("foo" << 1)));
-
-            // Read some of it.
-            for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
-                ASSERT_EQUALS(i, obj["foo"].numberInt());
-            }
-
-            // Save state and register.
-            run->saveState();
-            registerExecutor(run.get());
-
-            // Drop a specific index.
-            _client.dropIndex(ns(), BSON("foo" << 1));
-
-            // Unregister and restore state.
-            deregisterExecutor(run.get());
-            run->restoreState(&_opCtx);
-
-            // PlanExecutor was killed.
-            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
-        }
-    };
-
-    // Test that registered runners are killed when their database is dropped.
-    class ExecutorRegistryDropDatabase : public ExecutorRegistryBase {
-    public:
-        void run() {
-            unique_ptr<PlanExecutor> run(getCollscan());
-            BSONObj obj;
-
-            // Read some of it.
-            for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
-                ASSERT_EQUALS(i, obj["foo"].numberInt());
-            }
-
-            // Save state and register.
-            run->saveState();
-            registerExecutor(run.get());
-
-            // Drop a DB that's not ours.  We can't have a lock at all to do this as dropping a DB
-            // requires a "global write lock."
-            _ctx.reset();
-            _client.dropDatabase("somesillydb");
-            _ctx.reset(new OldClientWriteContext(&_opCtx, ns()));
-
-            // Unregister and restore state.
-            deregisterExecutor(run.get());
-            run->restoreState(&_opCtx);
-
+        // Make sure that the runner moved forward over the deleted data.  We don't see foo==10
+        // or foo==11.
+        for (int i = 12; i < N(); ++i) {
             ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
-            ASSERT_EQUALS(10, obj["foo"].numberInt());
-
-            // Save state and register.
-            run->saveState();
-            registerExecutor(run.get());
-
-            // Drop our DB.  Once again, must give up the lock.
-            _ctx.reset();
-            _client.dropDatabase("unittests");
-            _ctx.reset(new OldClientWriteContext(&_opCtx, ns()));
-
-            // Unregister and restore state.
-            deregisterExecutor(run.get());
-            run->restoreState(&_opCtx);
-            _ctx.reset();
-
-            // PlanExecutor was killed.
-            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(i, obj["foo"].numberInt());
         }
-    };
 
-    // TODO: Test that this works with renaming a collection.
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, run->getNext(&obj, NULL));
+    }
+};
 
-    class All : public Suite {
-    public:
-        All() : Suite( "executor_registry" ) { }
+// Test that registered runners are killed when their collection is dropped.
+class ExecutorRegistryDropCollection : public ExecutorRegistryBase {
+public:
+    void run() {
+        unique_ptr<PlanExecutor> run(getCollscan());
+        BSONObj obj;
 
-        void setupTests() {
-            add<ExecutorRegistryDiskLocInvalid>();
-            add<ExecutorRegistryDropCollection>();
-            add<ExecutorRegistryDropAllIndices>();
-            add<ExecutorRegistryDropOneIndex>();
-            add<ExecutorRegistryDropDatabase>();
+        // Read some of it.
+        for (int i = 0; i < 10; ++i) {
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(i, obj["foo"].numberInt());
         }
-    };
 
-    SuiteInstance<All> executorRegistryAll;
+        // Save state and register.
+        run->saveState();
+        registerExecutor(run.get());
+
+        // Drop a collection that's not ours.
+        _client.dropCollection("unittests.someboguscollection");
+
+        // Unregister and restore state.
+        deregisterExecutor(run.get());
+        run->restoreState(&_opCtx);
+
+        ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
+        ASSERT_EQUALS(10, obj["foo"].numberInt());
+
+        // Save state and register.
+        run->saveState();
+        registerExecutor(run.get());
+
+        // Drop our collection.
+        _client.dropCollection(ns());
+
+        // Unregister and restore state.
+        deregisterExecutor(run.get());
+        run->restoreState(&_opCtx);
+
+        // PlanExecutor was killed.
+        ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
+    }
+};
+
+// Test that registered runners are killed when all indices are dropped on the collection.
+class ExecutorRegistryDropAllIndices : public ExecutorRegistryBase {
+public:
+    void run() {
+        unique_ptr<PlanExecutor> run(getCollscan());
+        BSONObj obj;
+
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("foo" << 1)));
+
+        // Read some of it.
+        for (int i = 0; i < 10; ++i) {
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(i, obj["foo"].numberInt());
+        }
+
+        // Save state and register.
+        run->saveState();
+        registerExecutor(run.get());
+
+        // Drop all indices.
+        _client.dropIndexes(ns());
+
+        // Unregister and restore state.
+        deregisterExecutor(run.get());
+        run->restoreState(&_opCtx);
+
+        // PlanExecutor was killed.
+        ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
+    }
+};
+
+// Test that registered runners are killed when an index is dropped on the collection.
+class ExecutorRegistryDropOneIndex : public ExecutorRegistryBase {
+public:
+    void run() {
+        unique_ptr<PlanExecutor> run(getCollscan());
+        BSONObj obj;
+
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("foo" << 1)));
+
+        // Read some of it.
+        for (int i = 0; i < 10; ++i) {
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(i, obj["foo"].numberInt());
+        }
+
+        // Save state and register.
+        run->saveState();
+        registerExecutor(run.get());
+
+        // Drop a specific index.
+        _client.dropIndex(ns(), BSON("foo" << 1));
+
+        // Unregister and restore state.
+        deregisterExecutor(run.get());
+        run->restoreState(&_opCtx);
+
+        // PlanExecutor was killed.
+        ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
+    }
+};
+
+// Test that registered runners are killed when their database is dropped.
+class ExecutorRegistryDropDatabase : public ExecutorRegistryBase {
+public:
+    void run() {
+        unique_ptr<PlanExecutor> run(getCollscan());
+        BSONObj obj;
+
+        // Read some of it.
+        for (int i = 0; i < 10; ++i) {
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(i, obj["foo"].numberInt());
+        }
+
+        // Save state and register.
+        run->saveState();
+        registerExecutor(run.get());
+
+        // Drop a DB that's not ours.  We can't have a lock at all to do this as dropping a DB
+        // requires a "global write lock."
+        _ctx.reset();
+        _client.dropDatabase("somesillydb");
+        _ctx.reset(new OldClientWriteContext(&_opCtx, ns()));
+
+        // Unregister and restore state.
+        deregisterExecutor(run.get());
+        run->restoreState(&_opCtx);
+
+        ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
+        ASSERT_EQUALS(10, obj["foo"].numberInt());
+
+        // Save state and register.
+        run->saveState();
+        registerExecutor(run.get());
+
+        // Drop our DB.  Once again, must give up the lock.
+        _ctx.reset();
+        _client.dropDatabase("unittests");
+        _ctx.reset(new OldClientWriteContext(&_opCtx, ns()));
+
+        // Unregister and restore state.
+        deregisterExecutor(run.get());
+        run->restoreState(&_opCtx);
+        _ctx.reset();
+
+        // PlanExecutor was killed.
+        ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
+    }
+};
+
+// TODO: Test that this works with renaming a collection.
+
+class All : public Suite {
+public:
+    All() : Suite("executor_registry") {}
+
+    void setupTests() {
+        add<ExecutorRegistryDiskLocInvalid>();
+        add<ExecutorRegistryDropCollection>();
+        add<ExecutorRegistryDropAllIndices>();
+        add<ExecutorRegistryDropOneIndex>();
+        add<ExecutorRegistryDropDatabase>();
+    }
+};
+
+SuiteInstance<All> executorRegistryAll;
 
 }  // namespace ExecutorRegistry

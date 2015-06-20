@@ -35,67 +35,76 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class Status;
-    template<typename T> class StatusWith;
+class BSONObj;
+class Status;
+template <typename T>
+class StatusWith;
+
+
+/**
+ * This class represents the layout and contents of documents contained in the config.databases
+ * collection. All manipulation of documents coming from that collection should be done with
+ * this class.
+ */
+class DatabaseType {
+public:
+    // Name of the databases collection in the config server.
+    static const std::string ConfigNS;
+
+    static const BSONField<std::string> name;
+    static const BSONField<std::string> primary;
+    static const BSONField<bool> sharded;
 
 
     /**
-     * This class represents the layout and contents of documents contained in the config.databases
-     * collection. All manipulation of documents coming from that collection should be done with
-     * this class.
+     * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
      */
-    class DatabaseType {
-    public:
-        // Name of the databases collection in the config server.
-        static const std::string ConfigNS;
+    static StatusWith<DatabaseType> fromBSON(const BSONObj& source);
 
-        static const BSONField<std::string> name;
-        static const BSONField<std::string> primary;
-        static const BSONField<bool> sharded;
+    /**
+     * Returns OK if all fields have been set. Otherwise returns NoSuchKey and information
+     * about what is the first field which is missing.
+     */
+    Status validate() const;
 
+    /**
+     * Returns the BSON representation of the entry.
+     */
+    BSONObj toBSON() const;
 
-        /**
-         * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
-         */
-        static StatusWith<DatabaseType> fromBSON(const BSONObj& source);
+    /**
+     * Returns a std::string representation of the current internal state.
+     */
+    std::string toString() const;
 
-        /**
-         * Returns OK if all fields have been set. Otherwise returns NoSuchKey and information
-         * about what is the first field which is missing.
-         */
-        Status validate() const;
+    const std::string& getName() const {
+        return _name.get();
+    }
+    void setName(const std::string& name);
 
-        /**
-         * Returns the BSON representation of the entry.
-         */
-        BSONObj toBSON() const;
+    const std::string& getPrimary() const {
+        return _primary.get();
+    }
+    void setPrimary(const std::string& primary);
 
-        /**
-         * Returns a std::string representation of the current internal state.
-         */
-        std::string toString() const;
+    bool getSharded() const {
+        return _sharded.get();
+    }
+    void setSharded(bool sharded) {
+        _sharded = sharded;
+    }
 
-        const std::string& getName() const { return _name.get(); }
-        void setName(const std::string& name);
+private:
+    // Requred database name
+    boost::optional<std::string> _name;
 
-        const std::string& getPrimary() const { return _primary.get(); }
-        void setPrimary(const std::string& primary);
+    // Required primary shard (must be set even if the database is sharded, because there
+    // might be collections, which are unsharded).
+    boost::optional<std::string> _primary;
 
-        bool getSharded() const { return _sharded.get(); }
-        void setSharded(bool sharded) { _sharded = sharded; }
+    // Required whether sharding is enabled for this database. Even though this field is of
+    // type optional, it is only used as an indicator that the value was explicitly set.
+    boost::optional<bool> _sharded;
+};
 
-    private:
-        // Requred database name
-        boost::optional<std::string> _name;
-
-        // Required primary shard (must be set even if the database is sharded, because there
-        // might be collections, which are unsharded).
-        boost::optional<std::string> _primary;
-
-        // Required whether sharding is enabled for this database. Even though this field is of
-        // type optional, it is only used as an indicator that the value was explicitly set.
-        boost::optional<bool> _sharded;
-    };
-
-} // namespace mongo
+}  // namespace mongo

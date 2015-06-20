@@ -36,64 +36,65 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class MatchExpression;
-    struct IndexEntry;
+class BSONObj;
+class MatchExpression;
+struct IndexEntry;
 
-    using IndexabilityDiscriminator = stdx::function<bool(const MatchExpression* me)>;
-    using IndexabilityDiscriminators = std::vector<IndexabilityDiscriminator>;
+using IndexabilityDiscriminator = stdx::function<bool(const MatchExpression* me)>;
+using IndexabilityDiscriminators = std::vector<IndexabilityDiscriminator>;
+
+/**
+ * PlanCacheIndexabilityState holds a set of "indexability discriminators" for certain paths.
+ * An indexability discriminator is a binary predicate function, used to classify match
+ * expressions based on the data values in the expression.
+ */
+class PlanCacheIndexabilityState {
+    MONGO_DISALLOW_COPYING(PlanCacheIndexabilityState);
+
+public:
+    PlanCacheIndexabilityState() = default;
 
     /**
-     * PlanCacheIndexabilityState holds a set of "indexability discriminators" for certain paths.
-     * An indexability discriminator is a binary predicate function, used to classify match
-     * expressions based on the data values in the expression.
+     * Gets the set of discriminators associated with 'path'.  Returns an empty set if no
+     * discriminators are registered for 'path'.
+     *
+     * The object returned by reference is valid until the next call to updateDiscriminators()
+     * or until destruction of 'this', whichever is first.
      */
-    class PlanCacheIndexabilityState {
-        MONGO_DISALLOW_COPYING(PlanCacheIndexabilityState);
-    public:
-        PlanCacheIndexabilityState() = default;
+    const IndexabilityDiscriminators& getDiscriminators(StringData path) const;
 
-        /**
-         * Gets the set of discriminators associated with 'path'.  Returns an empty set if no
-         * discriminators are registered for 'path'.
-         *
-         * The object returned by reference is valid until the next call to updateDiscriminators()
-         * or until destruction of 'this', whichever is first.
-         */
-        const IndexabilityDiscriminators& getDiscriminators(StringData path) const;
+    /**
+     * Clears discriminators for all paths, and regenerate them from 'indexEntries'.
+     */
+    void updateDiscriminators(const std::vector<IndexEntry>& indexEntries);
 
-        /**
-         * Clears discriminators for all paths, and regenerate them from 'indexEntries'.
-         */
-        void updateDiscriminators(const std::vector<IndexEntry>& indexEntries);
+private:
+    /**
+     * Adds sparse index discriminators for the sparse index with the given key pattern to
+     * '_pathDiscriminatorsMap'.
+     *
+     * A sparse index discriminator distinguishes equality matches to null from other expression
+     * types.  For example, this allows the predicate {a: 1} to be considered of a different
+     * shape from the predicate {a: null}, if there is a sparse index defined with "a" as an
+     * element of the key pattern.  The former predicate is compatibile with this index, but the
+     * latter is not compatible.
+     */
+    void processSparseIndex(const BSONObj& keyPattern);
 
-    private:
-        /**
-         * Adds sparse index discriminators for the sparse index with the given key pattern to
-         * '_pathDiscriminatorsMap'.
-         *
-         * A sparse index discriminator distinguishes equality matches to null from other expression
-         * types.  For example, this allows the predicate {a: 1} to be considered of a different
-         * shape from the predicate {a: null}, if there is a sparse index defined with "a" as an
-         * element of the key pattern.  The former predicate is compatibile with this index, but the
-         * latter is not compatible.
-         */
-        void processSparseIndex(const BSONObj& keyPattern);
+    /**
+     * Adds partial index discriminators for the partial index with the given filter expression
+     * to '_pathDiscriminatorsMap'.
+     *
+     * A partial index discriminator distinguishes expressions that match a given partial index
+     * predicate from expressions that don't match the partial index predicate.  For example,
+     * this allows the predicate {a: {$gt: 5}} to be considered a different shape than the
+     * predicate {a: {$gt: -5}}, if there is a partial index defined with document filter {a:
+     * {$gt: 0}}.  The former is compatible with this index, but the latter is not compatible.
+     */
+    void processPartialIndex(const MatchExpression* filterExpr);
 
-        /**
-         * Adds partial index discriminators for the partial index with the given filter expression
-         * to '_pathDiscriminatorsMap'.
-         *
-         * A partial index discriminator distinguishes expressions that match a given partial index
-         * predicate from expressions that don't match the partial index predicate.  For example,
-         * this allows the predicate {a: {$gt: 5}} to be considered a different shape than the
-         * predicate {a: {$gt: -5}}, if there is a partial index defined with document filter {a:
-         * {$gt: 0}}.  The former is compatible with this index, but the latter is not compatible.
-         */
-        void processPartialIndex(const MatchExpression* filterExpr);
-
-        using PathDiscriminatorsMap = StringMap<IndexabilityDiscriminators>;
-        PathDiscriminatorsMap _pathDiscriminatorsMap;
-    };
+    using PathDiscriminatorsMap = StringMap<IndexabilityDiscriminators>;
+    PathDiscriminatorsMap _pathDiscriminatorsMap;
+};
 
 }  // namespace mongo

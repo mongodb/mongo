@@ -33,81 +33,76 @@
 
 namespace mongo {
 
-    /**
-     * Simple intrusive list implementation for the lock's granted and conflicting lists. Does not
-     * own its contents, just uses the intrusive pointers on the LockRequest structure to link them
-     * together. Therefore requests must outlive this list.
-     *
-     * Intentionally implemented as a POD in order to avoid constructor/destructor invocations.
-     *
-     * NOTE: This class should not be used for generic purposes and should not be used outside of
-     * the Lock Manager library.
-     */
-    class LockRequestList {
-    public:
+/**
+ * Simple intrusive list implementation for the lock's granted and conflicting lists. Does not
+ * own its contents, just uses the intrusive pointers on the LockRequest structure to link them
+ * together. Therefore requests must outlive this list.
+ *
+ * Intentionally implemented as a POD in order to avoid constructor/destructor invocations.
+ *
+ * NOTE: This class should not be used for generic purposes and should not be used outside of
+ * the Lock Manager library.
+ */
+class LockRequestList {
+public:
+    void push_front(LockRequest* request) {
+        // Sanity check that we do not reuse entries without cleaning them up
+        invariant(request->next == NULL);
+        invariant(request->prev == NULL);
 
-        void push_front(LockRequest* request) {
-            // Sanity check that we do not reuse entries without cleaning them up
-            invariant(request->next == NULL);
-            invariant(request->prev == NULL);
+        if (_front == NULL) {
+            _front = _back = request;
+        } else {
+            request->next = _front;
 
-            if (_front == NULL) {
-                _front = _back = request;
-            }
-            else {
-                request->next = _front;
+            _front->prev = request;
+            _front = request;
+        }
+    }
 
-                _front->prev = request;
-                _front = request;
-            }
+    void push_back(LockRequest* request) {
+        // Sanity check that we do not reuse entries without cleaning them up
+        invariant(request->next == NULL);
+        invariant(request->prev == NULL);
+
+        if (_front == NULL) {
+            _front = _back = request;
+        } else {
+            request->prev = _back;
+
+            _back->next = request;
+            _back = request;
+        }
+    }
+
+    void remove(LockRequest* request) {
+        if (request->prev != NULL) {
+            request->prev->next = request->next;
+        } else {
+            _front = request->next;
         }
 
-        void push_back(LockRequest* request) {
-            // Sanity check that we do not reuse entries without cleaning them up
-            invariant(request->next == NULL);
-            invariant(request->prev == NULL);
-
-            if (_front == NULL) {
-                _front = _back = request;
-            }
-            else {
-                request->prev = _back;
-
-                _back->next = request;
-                _back = request;
-            }
+        if (request->next != NULL) {
+            request->next->prev = request->prev;
+        } else {
+            _back = request->prev;
         }
 
-        void remove(LockRequest* request) {
-            if (request->prev != NULL) {
-                request->prev->next = request->next;
-            }
-            else {
-                _front = request->next;
-            }
+        request->prev = NULL;
+        request->next = NULL;
+    }
 
-            if (request->next != NULL) {
-                request->next->prev = request->prev;
-            }
-            else {
-                _back = request->prev;
-            }
+    void reset() {
+        _front = _back = NULL;
+    }
 
-            request->prev = NULL;
-            request->next = NULL;
-        }
+    bool empty() const {
+        return _front == NULL;
+    }
 
-        void reset() {
-            _front = _back = NULL;
-        }
+    // Pointers to the beginning and the end of the list
+    LockRequest* _front;
+    LockRequest* _back;
+};
 
-        bool empty() const {
-            return _front == NULL;
-        }
-
-        // Pointers to the beginning and the end of the list
-        LockRequest* _front;
-        LockRequest* _back;
-    };
-
-} // namespace mongo
+}  // namespace mongo

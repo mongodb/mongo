@@ -35,49 +35,43 @@ namespace repl {
 
 namespace {
 
-    class OplogIteratorMock : public OplogInterface::Iterator {
-    public:
+class OplogIteratorMock : public OplogInterface::Iterator {
+public:
+    OplogIteratorMock(OplogInterfaceMock::Operations::const_iterator iterator,
+                      OplogInterfaceMock::Operations::const_iterator iteratorEnd);
+    StatusWith<Value> next() override;
 
-        OplogIteratorMock(OplogInterfaceMock::Operations::const_iterator iterator,
-                          OplogInterfaceMock::Operations::const_iterator iteratorEnd);
-        StatusWith<Value> next() override;
+private:
+    OplogInterfaceMock::Operations::const_iterator _iterator;
+    OplogInterfaceMock::Operations::const_iterator _iteratorEnd;
+};
 
-    private:
+OplogIteratorMock::OplogIteratorMock(OplogInterfaceMock::Operations::const_iterator iter,
+                                     OplogInterfaceMock::Operations::const_iterator iterEnd)
+    : _iterator(iter), _iteratorEnd(iterEnd) {}
 
-        OplogInterfaceMock::Operations::const_iterator _iterator;
-        OplogInterfaceMock::Operations::const_iterator _iteratorEnd;
-
-    };
-
-    OplogIteratorMock::OplogIteratorMock(OplogInterfaceMock::Operations::const_iterator iter,
-                                         OplogInterfaceMock::Operations::const_iterator iterEnd)
-        : _iterator(iter),
-          _iteratorEnd(iterEnd) {}
-
-    StatusWith<OplogInterface::Iterator::Value> OplogIteratorMock::next() {
-        if (_iterator == _iteratorEnd) {
-            return StatusWith<OplogInterface::Iterator::Value>(ErrorCodes::NoSuchKey,
-                                                               "no more ops");
-        }
-        return *(_iterator++);
+StatusWith<OplogInterface::Iterator::Value> OplogIteratorMock::next() {
+    if (_iterator == _iteratorEnd) {
+        return StatusWith<OplogInterface::Iterator::Value>(ErrorCodes::NoSuchKey, "no more ops");
     }
+    return *(_iterator++);
+}
 
-} // namespace
+}  // namespace
 
-    OplogInterfaceMock::OplogInterfaceMock(std::initializer_list<Operation> operations)
-        : _operations(operations) {}
+OplogInterfaceMock::OplogInterfaceMock(std::initializer_list<Operation> operations)
+    : _operations(operations) {}
 
-    OplogInterfaceMock::OplogInterfaceMock(const Operations& operations)
-        : _operations(operations) {}
+OplogInterfaceMock::OplogInterfaceMock(const Operations& operations) : _operations(operations) {}
 
-    std::string OplogInterfaceMock::toString() const {
-        return "OplogInterfaceMock";
-    }
+std::string OplogInterfaceMock::toString() const {
+    return "OplogInterfaceMock";
+}
 
-    std::unique_ptr<OplogInterface::Iterator> OplogInterfaceMock::makeIterator() const {
-        return std::unique_ptr<OplogInterface::Iterator>(
-            new OplogIteratorMock(_operations.begin(), _operations.end()));
-    }
+std::unique_ptr<OplogInterface::Iterator> OplogInterfaceMock::makeIterator() const {
+    return std::unique_ptr<OplogInterface::Iterator>(
+        new OplogIteratorMock(_operations.begin(), _operations.end()));
+}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

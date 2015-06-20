@@ -35,72 +35,74 @@
 namespace mongo {
 namespace logger {
 
-    /**
-     * Log components.
-     * Debug messages logged using the LOG() or MONGO_LOG_COMPONENT().
-     * Macros may be associated with one or more log components.
-     */
-    class LogComponent {
-    public:
-        enum Value {
-            kDefault = 0,
-            kAccessControl,
-            kCommand,
-            kControl,
-            kExecutor,
-            kGeo,
-            kIndex,
-            kNetwork,
-            kQuery,
-            kReplication,
-            kSharding,
-            kStorage,
-            kJournal,
-            kWrite,
-            kNumLogComponents
-        };
-
-        /* implicit */ LogComponent(Value value) : _value(value) {}
-
-        operator Value() const { return _value; }
-
-        /**
-         * Returns parent component.
-         * Returns kNumComponents if parent component is not defined (for kDefault or
-         * kNumLogComponents).
-         */
-        LogComponent parent() const;
-
-        /**
-         * Returns short name as a StringData.
-         */
-        StringData toStringData() const;
-
-        /**
-         * Returns short name of log component.
-         * Used to generate server parameter names in the format "logLevel_<component short name>".
-         */
-        std::string getShortName() const;
-
-        /**
-         * Returns dotted name of log component - short name prefixed by dot-separated names of
-         * ancestors.
-         * Used to generate command line and config file option names.
-         */
-        std::string getDottedName() const;
-
-        /**
-         * Returns name suitable for inclusion in formatted log message.
-         * This is derived from upper-casing the short name with some padding to
-         * fit into a fixed length field.
-         */
-        StringData getNameForLog() const;
-
-    private:
-        Value _value;
+/**
+ * Log components.
+ * Debug messages logged using the LOG() or MONGO_LOG_COMPONENT().
+ * Macros may be associated with one or more log components.
+ */
+class LogComponent {
+public:
+    enum Value {
+        kDefault = 0,
+        kAccessControl,
+        kCommand,
+        kControl,
+        kExecutor,
+        kGeo,
+        kIndex,
+        kNetwork,
+        kQuery,
+        kReplication,
+        kSharding,
+        kStorage,
+        kJournal,
+        kWrite,
+        kNumLogComponents
     };
 
-    std::ostream& operator<<(std::ostream& os, LogComponent component);
+    /* implicit */ LogComponent(Value value) : _value(value) {}
+
+    operator Value() const {
+        return _value;
+    }
+
+    /**
+     * Returns parent component.
+     * Returns kNumComponents if parent component is not defined (for kDefault or
+     * kNumLogComponents).
+     */
+    LogComponent parent() const;
+
+    /**
+     * Returns short name as a StringData.
+     */
+    StringData toStringData() const;
+
+    /**
+     * Returns short name of log component.
+     * Used to generate server parameter names in the format "logLevel_<component short name>".
+     */
+    std::string getShortName() const;
+
+    /**
+     * Returns dotted name of log component - short name prefixed by dot-separated names of
+     * ancestors.
+     * Used to generate command line and config file option names.
+     */
+    std::string getDottedName() const;
+
+    /**
+     * Returns name suitable for inclusion in formatted log message.
+     * This is derived from upper-casing the short name with some padding to
+     * fit into a fixed length field.
+     */
+    StringData getNameForLog() const;
+
+private:
+    Value _value;
+};
+
+std::ostream& operator<<(std::ostream& os, LogComponent component);
 
 }  // namespace logger
 }  // namespace mongo

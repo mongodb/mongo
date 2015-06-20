@@ -39,135 +39,124 @@
 
 namespace mongo {
 
-    using boost::intrusive_ptr;
-    using std::vector;
+using boost::intrusive_ptr;
+using std::vector;
 
-    const char DocumentSourceRedact::redactName[] = "$redact";
+const char DocumentSourceRedact::redactName[] = "$redact";
 
-    DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext>& expCtx,
-                                               const intrusive_ptr<Expression>& expression)
-        : DocumentSource(expCtx)
-        , _expression(expression)
-    { }
+DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext>& expCtx,
+                                           const intrusive_ptr<Expression>& expression)
+    : DocumentSource(expCtx), _expression(expression) {}
 
-    const char *DocumentSourceRedact::getSourceName() const {
-        return redactName;
+const char* DocumentSourceRedact::getSourceName() const {
+    return redactName;
+}
+
+static const Value descendVal = Value("descend");
+static const Value pruneVal = Value("prune");
+static const Value keepVal = Value("keep");
+
+boost::optional<Document> DocumentSourceRedact::getNext() {
+    while (boost::optional<Document> in = pSource->getNext()) {
+        _variables->setRoot(*in);
+        _variables->setValue(_currentId, Value(*in));
+        if (boost::optional<Document> result = redactObject()) {
+            return result;
+        }
     }
 
-    static const Value descendVal = Value("descend");
-    static const Value pruneVal = Value("prune");
-    static const Value keepVal = Value("keep");
+    return boost::none;
+}
 
-    boost::optional<Document> DocumentSourceRedact::getNext() {
-        while (boost::optional<Document> in = pSource->getNext()) {
-            _variables->setRoot(*in);
-            _variables->setValue(_currentId, Value(*in));
-            if (boost::optional<Document> result = redactObject()) {
-                return result;
-            }
+Value DocumentSourceRedact::redactValue(const Value& in) {
+    const BSONType valueType = in.getType();
+    if (valueType == Object) {
+        _variables->setValue(_currentId, in);
+        const boost::optional<Document> result = redactObject();
+        if (result) {
+            return Value(*result);
+        } else {
+            return Value();
         }
-
-        return boost::none;
-    }
-
-    Value DocumentSourceRedact::redactValue(const Value& in) {
-        const BSONType valueType = in.getType();
-        if (valueType == Object) {
-            _variables->setValue(_currentId, in);
-            const boost::optional<Document> result = redactObject();
-            if (result) {
-                return Value(*result);
-            }
-            else {
-                return Value();
-            }
-        }
-        else if (valueType == Array) {
-            // TODO dont copy if possible
-            vector<Value> newArr;
-            const vector<Value>& arr = in.getArray();
-            for (size_t i = 0; i < arr.size(); i++) {
-                if (arr[i].getType() == Object || arr[i].getType() == Array) {
-                    const Value toAdd = redactValue(arr[i]) ;
-                    if (!toAdd.missing()) {
-                        newArr.push_back(toAdd);
-                    }
+    } else if (valueType == Array) {
+        // TODO dont copy if possible
+        vector<Value> newArr;
+        const vector<Value>& arr = in.getArray();
+        for (size_t i = 0; i < arr.size(); i++) {
+            if (arr[i].getType() == Object || arr[i].getType() == Array) {
+                const Value toAdd = redactValue(arr[i]);
+                if (!toAdd.missing()) {
+                    newArr.push_back(toAdd);
                 }
-                else {
-                    newArr.push_back(arr[i]);
-                }
+            } else {
+                newArr.push_back(arr[i]);
             }
-            return Value(std::move(newArr));
         }
-        else {
-            return in;
-        }
+        return Value(std::move(newArr));
+    } else {
+        return in;
     }
+}
 
-    boost::optional<Document> DocumentSourceRedact::redactObject() {
-        const Value expressionResult = _expression->evaluate(_variables.get());
+boost::optional<Document> DocumentSourceRedact::redactObject() {
+    const Value expressionResult = _expression->evaluate(_variables.get());
 
-        if (expressionResult == keepVal) {
-            return _variables->getDocument(_currentId);
-        }
-        else if (expressionResult == pruneVal) {
-            return boost::optional<Document>();
-        }
-        else if (expressionResult == descendVal) {
-            const Document in = _variables->getDocument(_currentId);
-            MutableDocument out;
-            out.copyMetaDataFrom(in);
-            FieldIterator fields(in);
-            while (fields.more()) {
-                const Document::FieldPair field(fields.next());
+    if (expressionResult == keepVal) {
+        return _variables->getDocument(_currentId);
+    } else if (expressionResult == pruneVal) {
+        return boost::optional<Document>();
+    } else if (expressionResult == descendVal) {
+        const Document in = _variables->getDocument(_currentId);
+        MutableDocument out;
+        out.copyMetaDataFrom(in);
+        FieldIterator fields(in);
+        while (fields.more()) {
+            const Document::FieldPair field(fields.next());
 
-                // This changes CURRENT so don't read from _variables after this
-                const Value val = redactValue(field.second);
-                if (!val.missing()) {
-                    out.addField(field.first, val);
-                }
+            // This changes CURRENT so don't read from _variables after this
+            const Value val = redactValue(field.second);
+            if (!val.missing()) {
+                out.addField(field.first, val);
             }
-            return out.freeze();
         }
-        else {
-            uasserted(17053, str::stream() << "$redact's expression should not return anything "
-                                           << "aside from the variables $$KEEP, $$DESCEND, and "
-                                           << "$$PRUNE, but returned "
-                                           << expressionResult.toString());
-        }
+        return out.freeze();
+    } else {
+        uasserted(17053,
+                  str::stream() << "$redact's expression should not return anything "
+                                << "aside from the variables $$KEEP, $$DESCEND, and "
+                                << "$$PRUNE, but returned " << expressionResult.toString());
     }
+}
 
-    intrusive_ptr<DocumentSource> DocumentSourceRedact::optimize() {
-        _expression = _expression->optimize();
-        return this;
-    }
+intrusive_ptr<DocumentSource> DocumentSourceRedact::optimize() {
+    _expression = _expression->optimize();
+    return this;
+}
 
-    Value DocumentSourceRedact::serialize(bool explain) const {
-        return Value(DOC(getSourceName() << _expression.get()->serialize(explain)));
-    }
+Value DocumentSourceRedact::serialize(bool explain) const {
+    return Value(DOC(getSourceName() << _expression.get()->serialize(explain)));
+}
 
-    intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(
-            BSONElement elem,
-            const intrusive_ptr<ExpressionContext>& expCtx) {
+intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
+    Variables::Id currentId = vps.defineVariable("CURRENT");  // will differ from ROOT
+    Variables::Id decendId = vps.defineVariable("DESCEND");
+    Variables::Id pruneId = vps.defineVariable("PRUNE");
+    Variables::Id keepId = vps.defineVariable("KEEP");
+    intrusive_ptr<Expression> expression = Expression::parseOperand(elem, vps);
+    intrusive_ptr<DocumentSourceRedact> source = new DocumentSourceRedact(expCtx, expression);
 
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        Variables::Id currentId = vps.defineVariable("CURRENT"); // will differ from ROOT
-        Variables::Id decendId = vps.defineVariable("DESCEND");
-        Variables::Id pruneId = vps.defineVariable("PRUNE");
-        Variables::Id keepId = vps.defineVariable("KEEP");
-        intrusive_ptr<Expression> expression = Expression::parseOperand(elem, vps);
-        intrusive_ptr<DocumentSourceRedact> source = new DocumentSourceRedact(expCtx, expression);
-
-        // TODO figure out how much of this belongs in constructor and how much here.
-        // Set up variables. Never need to reset DESCEND, PRUNE, or KEEP.
-        source->_currentId = currentId;
-        source->_variables.reset(new Variables(idGenerator.getIdCount()));
-        source->_variables->setValue(decendId, descendVal);
-        source->_variables->setValue(pruneId, pruneVal);
-        source->_variables->setValue(keepId, keepVal);
+    // TODO figure out how much of this belongs in constructor and how much here.
+    // Set up variables. Never need to reset DESCEND, PRUNE, or KEEP.
+    source->_currentId = currentId;
+    source->_variables.reset(new Variables(idGenerator.getIdCount()));
+    source->_variables->setValue(decendId, descendVal);
+    source->_variables->setValue(pruneId, pruneVal);
+    source->_variables->setValue(keepId, keepVal);
 
 
-        return source;
-    }
+    return source;
+}
 }

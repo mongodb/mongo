@@ -35,51 +35,57 @@
 
 namespace mongo {
 
-    class Client;
+class Client;
 
-    class Request {
-        MONGO_DISALLOW_COPYING(Request);
-    public:
-        Request(Message& m, AbstractMessagingPort* p);
+class Request {
+    MONGO_DISALLOW_COPYING(Request);
 
-        const char* getns() const {
-            return _d.getns();
-        }
+public:
+    Request(Message& m, AbstractMessagingPort* p);
 
-        int op() const {
-            return _m.operation();
-        }
+    const char* getns() const {
+        return _d.getns();
+    }
 
-        bool expectResponse() const {
-            return op() == dbQuery || op() == dbGetMore;
-        }
+    int op() const {
+        return _m.operation();
+    }
 
-        bool isCommand() const;
+    bool expectResponse() const {
+        return op() == dbQuery || op() == dbGetMore;
+    }
 
-        MSGID id() const {
-            return _id;
-        }
+    bool isCommand() const;
 
-        void reply(Message & response, const std::string& fromServer);
+    MSGID id() const {
+        return _id;
+    }
 
-        Message& m() { return _m; }
-        DbMessage& d() { return _d; }
-        AbstractMessagingPort* p() const { return _p; }
+    void reply(Message& response, const std::string& fromServer);
 
-        void process( int attempt = 0 );
+    Message& m() {
+        return _m;
+    }
+    DbMessage& d() {
+        return _d;
+    }
+    AbstractMessagingPort* p() const {
+        return _p;
+    }
 
-        void init();
+    void process(int attempt = 0);
 
-    private:
-        Client* const _clientInfo;
+    void init();
 
-        Message& _m;
-        DbMessage _d;
-        AbstractMessagingPort* const _p;
+private:
+    Client* const _clientInfo;
 
-        MSGID _id;
+    Message& _m;
+    DbMessage _d;
+    AbstractMessagingPort* const _p;
 
-        bool _didInit;
-    };
+    MSGID _id;
 
+    bool _didInit;
+};
 }

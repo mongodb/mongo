@@ -51,132 +51,127 @@
 namespace mongo {
 namespace {
 
-    // How often to check with the config servers whether authorization information has changed.
-    int userCacheInvalidationIntervalSecs = 30; // 30 second default
-    stdx::mutex invalidationIntervalMutex;
-    stdx::condition_variable invalidationIntervalChangedCondition;
-    Date_t lastInvalidationTime;
+// How often to check with the config servers whether authorization information has changed.
+int userCacheInvalidationIntervalSecs = 30;  // 30 second default
+stdx::mutex invalidationIntervalMutex;
+stdx::condition_variable invalidationIntervalChangedCondition;
+Date_t lastInvalidationTime;
 
-    class ExportedInvalidationIntervalParameter : public ExportedServerParameter<int> {
-    public:
-        ExportedInvalidationIntervalParameter() :
-            ExportedServerParameter<int>(ServerParameterSet::getGlobal(),
-                                         "userCacheInvalidationIntervalSecs",
-                                         &userCacheInvalidationIntervalSecs,
-                                         true,
-                                         true) {}
+class ExportedInvalidationIntervalParameter : public ExportedServerParameter<int> {
+public:
+    ExportedInvalidationIntervalParameter()
+        : ExportedServerParameter<int>(ServerParameterSet::getGlobal(),
+                                       "userCacheInvalidationIntervalSecs",
+                                       &userCacheInvalidationIntervalSecs,
+                                       true,
+                                       true) {}
 
-        virtual Status validate( const int& potentialNewValue )
-        {
-            if (potentialNewValue < 1 || potentialNewValue > 86400) {
-                return Status(ErrorCodes::BadValue,
-                              "userCacheInvalidationIntervalSecs must be between 1 "
-                              "and 86400 (24 hours)");
-            }
-            return Status::OK();
+    virtual Status validate(const int& potentialNewValue) {
+        if (potentialNewValue < 1 || potentialNewValue > 86400) {
+            return Status(ErrorCodes::BadValue,
+                          "userCacheInvalidationIntervalSecs must be between 1 "
+                          "and 86400 (24 hours)");
         }
-
-        // Without this the compiler complains that defining set(const int&)
-        // hides set(const BSONElement&)
-        using ExportedServerParameter<int>::set;
-
-        virtual Status set( const int& newValue ) {
-            stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
-            Status status = ExportedServerParameter<int>::set(newValue);
-            invalidationIntervalChangedCondition.notify_all();
-            return status;
-        }
-
-    } exportedIntervalParam;
-
-    StatusWith<OID> getCurrentCacheGeneration() {
-        try {
-            BSONObjBuilder result;
-            const bool ok = grid.catalogManager()->runUserManagementReadCommand(
-                    "admin",
-                    BSON("_getUserCacheGeneration" << 1),
-                    &result);
-            if (!ok) {
-                return Command::getStatusFromCommandResult(result.obj());
-            }
-            return result.obj()["cacheGeneration"].OID();
-        } catch (const DBException& e) {
-            return StatusWith<OID>(e.toStatus());
-        } catch (const std::exception& e) {
-            return StatusWith<OID>(ErrorCodes::UnknownError, e.what());
-        }
+        return Status::OK();
     }
 
-} // namespace
+    // Without this the compiler complains that defining set(const int&)
+    // hides set(const BSONElement&)
+    using ExportedServerParameter<int>::set;
 
-    UserCacheInvalidator::UserCacheInvalidator(AuthorizationManager* authzManager) :
-            _authzManager(authzManager) {
+    virtual Status set(const int& newValue) {
+        stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
+        Status status = ExportedServerParameter<int>::set(newValue);
+        invalidationIntervalChangedCondition.notify_all();
+        return status;
+    }
+
+} exportedIntervalParam;
+
+StatusWith<OID> getCurrentCacheGeneration() {
+    try {
+        BSONObjBuilder result;
+        const bool ok = grid.catalogManager()->runUserManagementReadCommand(
+            "admin", BSON("_getUserCacheGeneration" << 1), &result);
+        if (!ok) {
+            return Command::getStatusFromCommandResult(result.obj());
+        }
+        return result.obj()["cacheGeneration"].OID();
+    } catch (const DBException& e) {
+        return StatusWith<OID>(e.toStatus());
+    } catch (const std::exception& e) {
+        return StatusWith<OID>(ErrorCodes::UnknownError, e.what());
+    }
+}
+
+}  // namespace
+
+UserCacheInvalidator::UserCacheInvalidator(AuthorizationManager* authzManager)
+    : _authzManager(authzManager) {
+    StatusWith<OID> currentGeneration = getCurrentCacheGeneration();
+    if (currentGeneration.isOK()) {
+        _previousCacheGeneration = currentGeneration.getValue();
+        return;
+    }
+
+    if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
+        warning() << "_getUserCacheGeneration command not found while fetching initial user "
+                     "cache generation from the config server(s).  This most likely means you are "
+                     "running an outdated version of mongod on the config servers";
+    } else {
+        warning() << "An error occurred while fetching initial user cache generation from "
+                     "config servers: " << currentGeneration.getStatus();
+    }
+    _previousCacheGeneration = OID();
+}
+
+void UserCacheInvalidator::run() {
+    Client::initThread("UserCacheInvalidator");
+    lastInvalidationTime = Date_t::now();
+
+    while (true) {
+        stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
+        Date_t sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs);
+        Date_t now = Date_t::now();
+        while (now < sleepUntil) {
+            invalidationIntervalChangedCondition.wait_for(lock, sleepUntil - now);
+            sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs);
+            now = Date_t::now();
+        }
+        lastInvalidationTime = now;
+        lock.unlock();
+
+        if (inShutdown()) {
+            break;
+        }
 
         StatusWith<OID> currentGeneration = getCurrentCacheGeneration();
-        if (currentGeneration.isOK()) {
+        if (!currentGeneration.isOK()) {
+            if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
+                warning() << "_getUserCacheGeneration command not found on config server(s), "
+                             "this most likely means you are running an outdated version of mongod "
+                             "on the config servers" << std::endl;
+            } else {
+                warning() << "An error occurred while fetching current user cache generation "
+                             "to check if user cache needs invalidation: "
+                          << currentGeneration.getStatus() << std::endl;
+            }
+            // When in doubt, invalidate the cache
+            _authzManager->invalidateUserCache();
+            continue;
+        }
+
+        if (currentGeneration.getValue() != _previousCacheGeneration) {
+            log() << "User cache generation changed from " << _previousCacheGeneration << " to "
+                  << currentGeneration.getValue() << "; invalidating user cache" << std::endl;
+            _authzManager->invalidateUserCache();
             _previousCacheGeneration = currentGeneration.getValue();
-            return;
-        }
-
-        if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
-            warning() << "_getUserCacheGeneration command not found while fetching initial user "
-                    "cache generation from the config server(s).  This most likely means you are "
-                    "running an outdated version of mongod on the config servers";
-        } else {
-            warning() << "An error occurred while fetching initial user cache generation from "
-                    "config servers: " << currentGeneration.getStatus();
-        }
-        _previousCacheGeneration = OID();
-    }
-
-    void UserCacheInvalidator::run() {
-        Client::initThread("UserCacheInvalidator");
-        lastInvalidationTime = Date_t::now();
-
-        while (true) {
-            stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
-            Date_t sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs);
-            Date_t now = Date_t::now();
-            while (now < sleepUntil) {
-                invalidationIntervalChangedCondition.wait_for(lock, sleepUntil - now);
-                sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs);
-                now = Date_t::now();
-            }
-            lastInvalidationTime = now;
-            lock.unlock();
-
-            if (inShutdown()) {
-                break;
-            }
-
-            StatusWith<OID> currentGeneration = getCurrentCacheGeneration();
-            if (!currentGeneration.isOK()) {
-                if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
-                    warning() << "_getUserCacheGeneration command not found on config server(s), "
-                            "this most likely means you are running an outdated version of mongod "
-                            "on the config servers" << std::endl;
-                } else {
-                    warning() << "An error occurred while fetching current user cache generation "
-                            "to check if user cache needs invalidation: " <<
-                            currentGeneration.getStatus() << std::endl;
-                }
-                // When in doubt, invalidate the cache
-                _authzManager->invalidateUserCache();
-                continue;
-            }
-
-            if (currentGeneration.getValue() != _previousCacheGeneration) {
-                log() << "User cache generation changed from " << _previousCacheGeneration <<
-                        " to " << currentGeneration.getValue() << "; invalidating user cache" <<
-                        std::endl;
-                _authzManager->invalidateUserCache();
-                _previousCacheGeneration = currentGeneration.getValue();
-            }
         }
     }
+}
 
-    std::string UserCacheInvalidator::name() const {
-        return "UserCacheInvalidatorThread";
-    }
+std::string UserCacheInvalidator::name() const {
+    return "UserCacheInvalidatorThread";
+}
 
-} // namespace mongo
+}  // namespace mongo

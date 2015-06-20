@@ -39,43 +39,40 @@
 
 namespace mongo {
 
-    RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
-                                                     const std::vector<HostAndPort>& seedHosts)
-        : _rsName(rsName) {
+RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
+                                                 const std::vector<HostAndPort>& seedHosts)
+    : _rsName(rsName) {
+    _rsMonitor = ReplicaSetMonitor::get(rsName);
+    if (!_rsMonitor) {
+        std::set<HostAndPort> seedServers(seedHosts.begin(), seedHosts.end());
 
+        // TODO: Replica set monitor should be entirely owned and maintained by the remote
+        //       command targeter. Otherwise, there is a slight race condition here where the
+        //       RS monitor might be created, but then before the get call it gets removed so
+        //       we end up with a NULL _rsMonitor.
+        ReplicaSetMonitor::createIfNeeded(rsName, seedServers);
         _rsMonitor = ReplicaSetMonitor::get(rsName);
-        if (!_rsMonitor) {
-            std::set<HostAndPort> seedServers(seedHosts.begin(), seedHosts.end());
+    }
+}
 
-            // TODO: Replica set monitor should be entirely owned and maintained by the remote
-            //       command targeter. Otherwise, there is a slight race condition here where the
-            //       RS monitor might be created, but then before the get call it gets removed so
-            //       we end up with a NULL _rsMonitor.
-            ReplicaSetMonitor::createIfNeeded(rsName, seedServers);
-            _rsMonitor = ReplicaSetMonitor::get(rsName);
-        }
+StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(const ReadPreferenceSetting& readPref) {
+    if (!_rsMonitor) {
+        return Status(ErrorCodes::ReplicaSetNotFound,
+                      str::stream() << "unknown replica set " << _rsName);
     }
 
-    StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(
-                                    const ReadPreferenceSetting& readPref) {
-
-        if (!_rsMonitor) {
-            return Status(ErrorCodes::ReplicaSetNotFound,
-                          str::stream() << "unknown replica set " << _rsName);
+    HostAndPort hostAndPort = _rsMonitor->getHostOrRefresh(readPref);
+    if (hostAndPort.empty()) {
+        if (readPref.pref == ReadPreference::PrimaryOnly) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "No master found for set " << _rsName);
         }
-
-        HostAndPort hostAndPort = _rsMonitor->getHostOrRefresh(readPref);
-        if (hostAndPort.empty()) {
-            if (readPref.pref == ReadPreference::PrimaryOnly) {
-                return Status(ErrorCodes::NotMaster,
-                              str::stream() << "No master found for set " << _rsName);
-            }
-            return Status(ErrorCodes::FailedToSatisfyReadPreference,
-                          str::stream() << "could not find host matching read preference "
-                                        << readPref.toString() << " for set " << _rsName);
-        }
-
-        return hostAndPort;
+        return Status(ErrorCodes::FailedToSatisfyReadPreference,
+                      str::stream() << "could not find host matching read preference "
+                                    << readPref.toString() << " for set " << _rsName);
     }
 
-} // namespace mongo
+    return hostAndPort;
+}
+
+}  // namespace mongo

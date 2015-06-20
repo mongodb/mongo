@@ -39,71 +39,68 @@
 
 namespace mongo {
 
-    // static
-    const int MatchExpressionParser::kMaximumTreeDepth = 100;
+// static
+const int MatchExpressionParser::kMaximumTreeDepth = 100;
 
-    Status MatchExpressionParser::_parseTreeList( const BSONObj& arr,
-                                                  ListOfMatchExpression* out,
-                                                  int level ) {
-        if ( arr.isEmpty() )
-            return Status( ErrorCodes::BadValue,
-                           "$and/$or/$nor must be a nonempty array" );
+Status MatchExpressionParser::_parseTreeList(const BSONObj& arr,
+                                             ListOfMatchExpression* out,
+                                             int level) {
+    if (arr.isEmpty())
+        return Status(ErrorCodes::BadValue, "$and/$or/$nor must be a nonempty array");
 
-        BSONObjIterator i( arr );
-        while ( i.more() ) {
-            BSONElement e = i.next();
+    BSONObjIterator i(arr);
+    while (i.more()) {
+        BSONElement e = i.next();
 
-            if ( e.type() != Object )
-                return Status( ErrorCodes::BadValue,
-                               "$or/$and/$nor entries need to be full objects" );
+        if (e.type() != Object)
+            return Status(ErrorCodes::BadValue, "$or/$and/$nor entries need to be full objects");
 
-            StatusWithMatchExpression sub = _parse( e.Obj(), level );
-            if ( !sub.isOK() )
-                return sub.getStatus();
+        StatusWithMatchExpression sub = _parse(e.Obj(), level);
+        if (!sub.isOK())
+            return sub.getStatus();
 
-            out->add( sub.getValue() );
-        }
-        return Status::OK();
+        out->add(sub.getValue());
+    }
+    return Status::OK();
+}
+
+StatusWithMatchExpression MatchExpressionParser::_parseNot(const char* name,
+                                                           const BSONElement& e,
+                                                           int level) {
+    if (e.type() == RegEx) {
+        StatusWithMatchExpression s = _parseRegexElement(name, e);
+        if (!s.isOK())
+            return s;
+        std::unique_ptr<NotMatchExpression> n(new NotMatchExpression());
+        Status s2 = n->init(s.getValue());
+        if (!s2.isOK())
+            return StatusWithMatchExpression(s2);
+        return StatusWithMatchExpression(n.release());
     }
 
-    StatusWithMatchExpression MatchExpressionParser::_parseNot( const char* name,
-                                                                const BSONElement& e,
-                                                                int level ) {
-        if ( e.type() == RegEx ) {
-            StatusWithMatchExpression s = _parseRegexElement( name, e );
-            if ( !s.isOK() )
-                return s;
-            std::unique_ptr<NotMatchExpression> n( new NotMatchExpression() );
-            Status s2 = n->init( s.getValue() );
-            if ( !s2.isOK() )
-                return StatusWithMatchExpression( s2 );
-            return StatusWithMatchExpression( n.release() );
-        }
+    if (e.type() != Object)
+        return StatusWithMatchExpression(ErrorCodes::BadValue, "$not needs a regex or a document");
 
-        if ( e.type() != Object )
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "$not needs a regex or a document" );
+    BSONObj notObject = e.Obj();
+    if (notObject.isEmpty())
+        return StatusWithMatchExpression(ErrorCodes::BadValue, "$not cannot be empty");
 
-        BSONObj notObject = e.Obj();
-        if ( notObject.isEmpty() )
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "$not cannot be empty" );
+    std::unique_ptr<AndMatchExpression> theAnd(new AndMatchExpression());
+    Status s = _parseSub(name, notObject, theAnd.get(), level);
+    if (!s.isOK())
+        return StatusWithMatchExpression(s);
 
-        std::unique_ptr<AndMatchExpression> theAnd( new AndMatchExpression() );
-        Status s = _parseSub( name, notObject, theAnd.get(), level );
-        if ( !s.isOK() )
-            return StatusWithMatchExpression( s );
+    // TODO: this seems arbitrary?
+    // tested in jstests/not2.js
+    for (unsigned i = 0; i < theAnd->numChildren(); i++)
+        if (theAnd->getChild(i)->matchType() == MatchExpression::REGEX)
+            return StatusWithMatchExpression(ErrorCodes::BadValue, "$not cannot have a regex");
 
-        // TODO: this seems arbitrary?
-        // tested in jstests/not2.js
-        for ( unsigned i = 0; i < theAnd->numChildren(); i++ )
-            if ( theAnd->getChild(i)->matchType() == MatchExpression::REGEX )
-                return StatusWithMatchExpression( ErrorCodes::BadValue, "$not cannot have a regex" );
+    std::unique_ptr<NotMatchExpression> theNot(new NotMatchExpression());
+    s = theNot->init(theAnd.release());
+    if (!s.isOK())
+        return StatusWithMatchExpression(s);
 
-        std::unique_ptr<NotMatchExpression> theNot( new NotMatchExpression() );
-        s = theNot->init( theAnd.release() );
-        if ( !s.isOK() )
-            return StatusWithMatchExpression( s );
-
-        return StatusWithMatchExpression( theNot.release() );
-    }
-
+    return StatusWithMatchExpression(theNot.release());
+}
 }

@@ -38,85 +38,87 @@
 
 namespace mongo {
 
-    using std::set;
-    using std::string;
-    using std::stringstream;
-    using std::vector;
+using std::set;
+using std::string;
+using std::stringstream;
+using std::vector;
 
-    // XXX: remove and put into storage api
-    intmax_t dbSize( const string& database );
+// XXX: remove and put into storage api
+intmax_t dbSize(const string& database);
 
-    class CmdListDatabases : public Command {
-    public:
-        virtual bool slaveOk() const {
-            return false;
-        }
-        virtual bool slaveOverrideOk() const {
-            return true;
-        }
-        virtual bool adminOnly() const {
-            return true;
-        }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void help( stringstream& help ) const { help << "list databases on this server"; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::listDatabases);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
+class CmdListDatabases : public Command {
+public:
+    virtual bool slaveOk() const {
+        return false;
+    }
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
+    virtual bool adminOnly() const {
+        return true;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual void help(stringstream& help) const {
+        help << "list databases on this server";
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::listDatabases);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
 
-        CmdListDatabases() : Command("listDatabases" , true ) {}
+    CmdListDatabases() : Command("listDatabases", true) {}
 
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& jsobj,
-                 int,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& jsobj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        vector<string> dbNames;
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+        storageEngine->listDatabases(&dbNames);
 
-            vector< string > dbNames;
-            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-            storageEngine->listDatabases( &dbNames );
+        vector<BSONObj> dbInfos;
 
-            vector< BSONObj > dbInfos;
+        set<string> seen;
+        intmax_t totalSize = 0;
+        for (vector<string>::iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
+            const string& dbname = *i;
 
-            set<string> seen;
-            intmax_t totalSize = 0;
-            for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
-                const string& dbname = *i;
+            BSONObjBuilder b;
+            b.append("name", dbname);
 
-                BSONObjBuilder b;
-                b.append( "name", dbname );
+            {
+                ScopedTransaction transaction(txn, MODE_IS);
+                Lock::DBLock dbLock(txn->lockState(), dbname, MODE_IS);
 
-                {
-                    ScopedTransaction transaction(txn, MODE_IS);
-                    Lock::DBLock dbLock(txn->lockState(), dbname, MODE_IS);
+                Database* db = dbHolder().get(txn, dbname);
+                if (!db)
+                    continue;
 
-                    Database* db = dbHolder().get( txn, dbname );
-                    if ( !db )
-                        continue;
+                const DatabaseCatalogEntry* entry = db->getDatabaseCatalogEntry();
+                invariant(entry);
 
-                    const DatabaseCatalogEntry* entry = db->getDatabaseCatalogEntry();
-                    invariant( entry );
+                int64_t size = entry->sizeOnDisk(txn);
+                b.append("sizeOnDisk", static_cast<double>(size));
+                totalSize += size;
 
-                    int64_t size = entry->sizeOnDisk( txn );
-                    b.append( "sizeOnDisk", static_cast<double>( size ) );
-                    totalSize += size;
-
-                    b.appendBool("empty", size == 0);
-                }
-
-                dbInfos.push_back( b.obj() );
-
-                seen.insert( i->c_str() );
+                b.appendBool("empty", size == 0);
             }
 
-            result.append( "databases", dbInfos );
-            result.append( "totalSize", double( totalSize ) );
-            return true;
-        }
-    } cmdListDatabases;
+            dbInfos.push_back(b.obj());
 
+            seen.insert(i->c_str());
+        }
+
+        result.append("databases", dbInfos);
+        result.append("totalSize", double(totalSize));
+        return true;
+    }
+} cmdListDatabases;
 }

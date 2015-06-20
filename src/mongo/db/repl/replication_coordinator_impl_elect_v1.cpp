@@ -44,55 +44,56 @@ namespace mongo {
 namespace repl {
 
 namespace {
-    class LoseElectionGuardV1 {
-        MONGO_DISALLOW_COPYING(LoseElectionGuardV1);
-    public:
-        LoseElectionGuardV1(
-                TopologyCoordinator* topCoord,
-                ReplicationExecutor* executor,
-                std::unique_ptr<VoteRequester>* voteRequester,
-                std::unique_ptr<ElectionWinnerDeclarer>* electionWinnerDeclarer,
-                ReplicationExecutor::EventHandle* electionFinishedEvent)
-            : _topCoord(topCoord),
-              _executor(executor),
-              _voteRequester(voteRequester),
-              _electionWinnerDeclarer(electionWinnerDeclarer),
-              _electionFinishedEvent(electionFinishedEvent),
-              _dismissed(false) {
+class LoseElectionGuardV1 {
+    MONGO_DISALLOW_COPYING(LoseElectionGuardV1);
+
+public:
+    LoseElectionGuardV1(TopologyCoordinator* topCoord,
+                        ReplicationExecutor* executor,
+                        std::unique_ptr<VoteRequester>* voteRequester,
+                        std::unique_ptr<ElectionWinnerDeclarer>* electionWinnerDeclarer,
+                        ReplicationExecutor::EventHandle* electionFinishedEvent)
+        : _topCoord(topCoord),
+          _executor(executor),
+          _voteRequester(voteRequester),
+          _electionWinnerDeclarer(electionWinnerDeclarer),
+          _electionFinishedEvent(electionFinishedEvent),
+          _dismissed(false) {}
+
+    ~LoseElectionGuardV1() {
+        if (_dismissed) {
+            return;
         }
-
-        ~LoseElectionGuardV1() {
-            if (_dismissed) {
-                return;
-            }
-            _topCoord->processLoseElection();
-            _electionWinnerDeclarer->reset(nullptr);
-            _voteRequester->reset(nullptr);
-            if (_electionFinishedEvent->isValid()) {
-                _executor->signalEvent(*_electionFinishedEvent);
-            }
+        _topCoord->processLoseElection();
+        _electionWinnerDeclarer->reset(nullptr);
+        _voteRequester->reset(nullptr);
+        if (_electionFinishedEvent->isValid()) {
+            _executor->signalEvent(*_electionFinishedEvent);
         }
+    }
 
-        void dismiss() { _dismissed = true; }
+    void dismiss() {
+        _dismissed = true;
+    }
 
-    private:
-        TopologyCoordinator* const _topCoord;
-        ReplicationExecutor* const _executor;
-        std::unique_ptr<VoteRequester>* const _voteRequester;
-        std::unique_ptr<ElectionWinnerDeclarer>* const _electionWinnerDeclarer;
-        const ReplicationExecutor::EventHandle* _electionFinishedEvent;
-        bool _dismissed;
-    };
+private:
+    TopologyCoordinator* const _topCoord;
+    ReplicationExecutor* const _executor;
+    std::unique_ptr<VoteRequester>* const _voteRequester;
+    std::unique_ptr<ElectionWinnerDeclarer>* const _electionWinnerDeclarer;
+    const ReplicationExecutor::EventHandle* _electionFinishedEvent;
+    bool _dismissed;
+};
 
 }  // namespace
 
-    void ReplicationCoordinatorImpl::_startElectSelfV1() {
-        invariant(!_electionWinnerDeclarer);
-        invariant(!_voteRequester);
-        invariant(!_freshnessChecker);
+void ReplicationCoordinatorImpl::_startElectSelfV1() {
+    invariant(!_electionWinnerDeclarer);
+    invariant(!_voteRequester);
+    invariant(!_freshnessChecker);
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        switch (_rsConfigState) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    switch (_rsConfigState) {
         case kConfigSteady:
             break;
         case kConfigInitiating:
@@ -103,183 +104,175 @@ namespace {
             _topCoord->processLoseElection();
             return;
         default:
-            severe() << "Entered replica set election code while in illegal config state " <<
-                int(_rsConfigState);
+            severe() << "Entered replica set election code while in illegal config state "
+                     << int(_rsConfigState);
             fassertFailed(28641);
-        }
-
-        const StatusWith<ReplicationExecutor::EventHandle> finishEvh = _replExecutor.makeEvent();
-        if (finishEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return;
-        }
-        fassert(28642, finishEvh.getStatus());
-        _electionFinishedEvent = finishEvh.getValue();
-        LoseElectionGuardV1 lossGuard(_topCoord.get(),
-                                      &_replExecutor,
-                                      &_voteRequester,
-                                      &_electionWinnerDeclarer,
-                                      &_electionFinishedEvent);
-
-
-        invariant(_rsConfig.getMemberAt(_selfIndex).isElectable());
-        OpTime lastOpTimeApplied(_getMyLastOptime_inlock());
-
-        if (lastOpTimeApplied == OpTime()) {
-            log() << "not trying to elect self, "
-                "do not yet have a complete set of data from any point in time";
-            return;
-        }
-
-        log() << "conducting a dry run election to see if we could be elected";
-        _voteRequester.reset(new VoteRequester);
-
-        // This is necessary because the voteRequester may call directly into winning an
-        // election, if there are no other MaybeUp nodes.  Winning an election attempts to lock
-        // _mutex again.
-        lk.unlock();
-
-        long long term = _topCoord->getTerm();
-        StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
-                &_replExecutor,
-                _rsConfig,
-                _rsConfig.getMemberAt(_selfIndex).getId(),
-                _topCoord->getTerm(),
-                true, // dry run
-                getMyLastOptime(),
-                stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this, term));
-        if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return;
-        }
-        fassert(28685, nextPhaseEvh.getStatus());
-        lossGuard.dismiss();
     }
 
-    void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
-        invariant(_voteRequester);
-        invariant(!_electionWinnerDeclarer);
-        LoseElectionGuardV1 lossGuard(_topCoord.get(),
-                                      &_replExecutor,
-                                      &_voteRequester,
-                                      &_electionWinnerDeclarer,
-                                      &_electionFinishedEvent);
+    const StatusWith<ReplicationExecutor::EventHandle> finishEvh = _replExecutor.makeEvent();
+    if (finishEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28642, finishEvh.getStatus());
+    _electionFinishedEvent = finishEvh.getValue();
+    LoseElectionGuardV1 lossGuard(_topCoord.get(),
+                                  &_replExecutor,
+                                  &_voteRequester,
+                                  &_electionWinnerDeclarer,
+                                  &_electionFinishedEvent);
 
-        if (_topCoord->getTerm() != originalTerm) {
-            log() << "not running for primary, we have been superceded already";
-            return;
-        }
 
-        const VoteRequester::VoteRequestResult endResult = _voteRequester->getResult();
+    invariant(_rsConfig.getMemberAt(_selfIndex).isElectable());
+    OpTime lastOpTimeApplied(_getMyLastOptime_inlock());
 
-        if (endResult == VoteRequester::InsufficientVotes) {
-            log() << "not running for primary, we received insufficient votes";
-            return;
-        }
-        else if (endResult == VoteRequester::StaleTerm) {
-            log() << "not running for primary, we have been superceded already";
-            return;
-        }
-        else if (endResult != VoteRequester::SuccessfullyElected) {
-            log() << "not running for primary, we received an unexpected problem";
-            return;
-        }
-
-        log() << "dry election run succeeded, running for election";
-        _topCoord->incrementTerm();
-        // Secure our vote for ourself first
-        _topCoord->voteForMyselfV1();
-
-        _voteRequester.reset(new VoteRequester);
-
-        StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
-                &_replExecutor,
-                _rsConfig,
-                _rsConfig.getMemberAt(_selfIndex).getId(),
-                _topCoord->getTerm(),
-                false,
-                getMyLastOptime(),
-                stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete,
-                           this,
-                           originalTerm + 1));
-        if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return;
-        }
-        fassert(28643, nextPhaseEvh.getStatus());
-        lossGuard.dismiss();
+    if (lastOpTimeApplied == OpTime()) {
+        log() << "not trying to elect self, "
+                 "do not yet have a complete set of data from any point in time";
+        return;
     }
 
-    void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) {
-        invariant(_voteRequester);
-        invariant(!_electionWinnerDeclarer);
-        LoseElectionGuardV1 lossGuard(_topCoord.get(),
-                                    &_replExecutor,
-                                    &_voteRequester,
-                                    &_electionWinnerDeclarer,
-                                    &_electionFinishedEvent);
+    log() << "conducting a dry run election to see if we could be elected";
+    _voteRequester.reset(new VoteRequester);
 
-        if (_topCoord->getTerm() != originalTerm) {
-            log() << "not becoming primary, we have been superceded already";
-            return;
-        }
+    // This is necessary because the voteRequester may call directly into winning an
+    // election, if there are no other MaybeUp nodes.  Winning an election attempts to lock
+    // _mutex again.
+    lk.unlock();
 
-        const VoteRequester::VoteRequestResult endResult = _voteRequester->getResult();
+    long long term = _topCoord->getTerm();
+    StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
+        &_replExecutor,
+        _rsConfig,
+        _rsConfig.getMemberAt(_selfIndex).getId(),
+        _topCoord->getTerm(),
+        true,  // dry run
+        getMyLastOptime(),
+        stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this, term));
+    if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28685, nextPhaseEvh.getStatus());
+    lossGuard.dismiss();
+}
 
-        if (endResult == VoteRequester::InsufficientVotes) {
-            log() << "not becoming primary, we received insufficient votes";
-            return;
-        }
-        else if (endResult == VoteRequester::StaleTerm) {
-            log() << "not becoming primary, we have been superceded already";
-            return;
-        }
-        else if (endResult != VoteRequester::SuccessfullyElected) {
-            log() << "not becoming primary, we received an unexpected problem";
-            return;
-        }
+void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
+    invariant(_voteRequester);
+    invariant(!_electionWinnerDeclarer);
+    LoseElectionGuardV1 lossGuard(_topCoord.get(),
+                                  &_replExecutor,
+                                  &_voteRequester,
+                                  &_electionWinnerDeclarer,
+                                  &_electionFinishedEvent);
 
-        log() << "election succeeded, assuming primary role";
-        _performPostMemberStateUpdateAction(kActionWinElection);
-
-        _electionWinnerDeclarer.reset(new ElectionWinnerDeclarer);
-        StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _electionWinnerDeclarer->start(
-                &_replExecutor,
-                _rsConfig.getReplSetName(),
-                _rsConfig.getMemberAt(_selfIndex).getId(),
-                _topCoord->getTerm(),
-                _topCoord->getMaybeUpHostAndPorts(),
-                stdx::bind(&ReplicationCoordinatorImpl::_onElectionWinnerDeclarerComplete, this));
-        if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return;
-        }
-        fassert(28644, nextPhaseEvh.getStatus());
-        lossGuard.dismiss();
+    if (_topCoord->getTerm() != originalTerm) {
+        log() << "not running for primary, we have been superceded already";
+        return;
     }
 
-    void ReplicationCoordinatorImpl::_onElectionWinnerDeclarerComplete() {
-        LoseElectionGuardV1 lossGuard(_topCoord.get(),
-                                    &_replExecutor,
-                                    &_voteRequester,
-                                    &_electionWinnerDeclarer,
-                                    &_electionFinishedEvent);
+    const VoteRequester::VoteRequestResult endResult = _voteRequester->getResult();
 
-        invariant(_voteRequester);
-        invariant(_electionWinnerDeclarer);
-
-        const Status endResult = _electionWinnerDeclarer->getStatus();
-
-        if (!endResult.isOK()) {
-            log() << "stepping down from primary, because: " << endResult;
-            _topCoord->prepareForStepDown();
-            _replExecutor.scheduleWorkWithGlobalExclusiveLock(
-                    stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
-                               this,
-                               stdx::placeholders::_1));
-        }
-
-        lossGuard.dismiss();
-        _voteRequester.reset(nullptr);
-        _electionWinnerDeclarer.reset(nullptr);
-        _replExecutor.signalEvent(_electionFinishedEvent);
+    if (endResult == VoteRequester::InsufficientVotes) {
+        log() << "not running for primary, we received insufficient votes";
+        return;
+    } else if (endResult == VoteRequester::StaleTerm) {
+        log() << "not running for primary, we have been superceded already";
+        return;
+    } else if (endResult != VoteRequester::SuccessfullyElected) {
+        log() << "not running for primary, we received an unexpected problem";
+        return;
     }
+
+    log() << "dry election run succeeded, running for election";
+    _topCoord->incrementTerm();
+    // Secure our vote for ourself first
+    _topCoord->voteForMyselfV1();
+
+    _voteRequester.reset(new VoteRequester);
+
+    StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
+        &_replExecutor,
+        _rsConfig,
+        _rsConfig.getMemberAt(_selfIndex).getId(),
+        _topCoord->getTerm(),
+        false,
+        getMyLastOptime(),
+        stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this, originalTerm + 1));
+    if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28643, nextPhaseEvh.getStatus());
+    lossGuard.dismiss();
+}
+
+void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) {
+    invariant(_voteRequester);
+    invariant(!_electionWinnerDeclarer);
+    LoseElectionGuardV1 lossGuard(_topCoord.get(),
+                                  &_replExecutor,
+                                  &_voteRequester,
+                                  &_electionWinnerDeclarer,
+                                  &_electionFinishedEvent);
+
+    if (_topCoord->getTerm() != originalTerm) {
+        log() << "not becoming primary, we have been superceded already";
+        return;
+    }
+
+    const VoteRequester::VoteRequestResult endResult = _voteRequester->getResult();
+
+    if (endResult == VoteRequester::InsufficientVotes) {
+        log() << "not becoming primary, we received insufficient votes";
+        return;
+    } else if (endResult == VoteRequester::StaleTerm) {
+        log() << "not becoming primary, we have been superceded already";
+        return;
+    } else if (endResult != VoteRequester::SuccessfullyElected) {
+        log() << "not becoming primary, we received an unexpected problem";
+        return;
+    }
+
+    log() << "election succeeded, assuming primary role";
+    _performPostMemberStateUpdateAction(kActionWinElection);
+
+    _electionWinnerDeclarer.reset(new ElectionWinnerDeclarer);
+    StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _electionWinnerDeclarer->start(
+        &_replExecutor,
+        _rsConfig.getReplSetName(),
+        _rsConfig.getMemberAt(_selfIndex).getId(),
+        _topCoord->getTerm(),
+        _topCoord->getMaybeUpHostAndPorts(),
+        stdx::bind(&ReplicationCoordinatorImpl::_onElectionWinnerDeclarerComplete, this));
+    if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28644, nextPhaseEvh.getStatus());
+    lossGuard.dismiss();
+}
+
+void ReplicationCoordinatorImpl::_onElectionWinnerDeclarerComplete() {
+    LoseElectionGuardV1 lossGuard(_topCoord.get(),
+                                  &_replExecutor,
+                                  &_voteRequester,
+                                  &_electionWinnerDeclarer,
+                                  &_electionFinishedEvent);
+
+    invariant(_voteRequester);
+    invariant(_electionWinnerDeclarer);
+
+    const Status endResult = _electionWinnerDeclarer->getStatus();
+
+    if (!endResult.isOK()) {
+        log() << "stepping down from primary, because: " << endResult;
+        _topCoord->prepareForStepDown();
+        _replExecutor.scheduleWorkWithGlobalExclusiveLock(
+            stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish, this, stdx::placeholders::_1));
+    }
+
+    lossGuard.dismiss();
+    _voteRequester.reset(nullptr);
+    _electionWinnerDeclarer.reset(nullptr);
+    _replExecutor.signalEvent(_electionFinishedEvent);
+}
 
 }  // namespace repl
 }  // namespace mongo

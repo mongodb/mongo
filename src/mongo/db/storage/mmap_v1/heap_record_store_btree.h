@@ -38,174 +38,190 @@
 
 namespace mongo {
 
-    /**
-     * A RecordStore that stores all data on the heap. This implementation contains only the
-     * functionality necessary to test btree.
-     */
-    class HeapRecordStoreBtree : public RecordStore {
-        struct MmapV1RecordHeader;
+/**
+ * A RecordStore that stores all data on the heap. This implementation contains only the
+ * functionality necessary to test btree.
+ */
+class HeapRecordStoreBtree : public RecordStore {
+    struct MmapV1RecordHeader;
 
-    public:
-        // RecordId(0,0) isn't valid for records.
-        explicit HeapRecordStoreBtree(StringData ns): RecordStore(ns), _nextId(1) { }
+public:
+    // RecordId(0,0) isn't valid for records.
+    explicit HeapRecordStoreBtree(StringData ns) : RecordStore(ns), _nextId(1) {}
 
-        virtual RecordData dataFor(OperationContext* txn, const RecordId& loc) const;
+    virtual RecordData dataFor(OperationContext* txn, const RecordId& loc) const;
 
-        virtual bool findRecord(OperationContext* txn, const RecordId& loc, RecordData* out) const;
+    virtual bool findRecord(OperationContext* txn, const RecordId& loc, RecordData* out) const;
 
-        virtual void deleteRecord(OperationContext* txn, const RecordId& dl);
+    virtual void deleteRecord(OperationContext* txn, const RecordId& dl);
 
-        virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
-                                                 const char* data,
-                                                 int len,
-                                                 bool enforceQuota);
+    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
+                                              const char* data,
+                                              int len,
+                                              bool enforceQuota);
 
-        virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
-                                                 const DocWriter* doc,
-                                                 bool enforceQuota);
+    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
+                                              const DocWriter* doc,
+                                              bool enforceQuota);
 
-        virtual long long numRecords( OperationContext* txn ) const { return _records.size(); }
+    virtual long long numRecords(OperationContext* txn) const {
+        return _records.size();
+    }
 
-        virtual Status touch(OperationContext* txn, BSONObjBuilder* output) const;
+    virtual Status touch(OperationContext* txn, BSONObjBuilder* output) const;
 
-        // public methods below here are not necessary to test btree, and will crash when called.
+    // public methods below here are not necessary to test btree, and will crash when called.
 
-        // ------------------------------
+    // ------------------------------
 
-        virtual StatusWith<RecordId> updateRecord(OperationContext* txn,
-                                                 const RecordId& oldLocation,
-                                                 const char* data,
-                                                 int len,
-                                                 bool enforceQuota,
-                                                 UpdateNotifier* notifier) {
-            invariant(false);
-        }
+    virtual StatusWith<RecordId> updateRecord(OperationContext* txn,
+                                              const RecordId& oldLocation,
+                                              const char* data,
+                                              int len,
+                                              bool enforceQuota,
+                                              UpdateNotifier* notifier) {
+        invariant(false);
+    }
 
-        virtual bool updateWithDamagesSupported() const {
-            return true;
-        }
+    virtual bool updateWithDamagesSupported() const {
+        return true;
+    }
 
-        virtual Status updateWithDamages(OperationContext* txn,
-                                         const RecordId& loc,
-                                         const RecordData& oldRec,
-                                         const char* damageSource,
-                                         const mutablebson::DamageVector& damages) {
-            invariant(false);
-        }
+    virtual Status updateWithDamages(OperationContext* txn,
+                                     const RecordId& loc,
+                                     const RecordData& oldRec,
+                                     const char* damageSource,
+                                     const mutablebson::DamageVector& damages) {
+        invariant(false);
+    }
 
-        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final {
-            invariant(false);
-        }
+    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final {
+        invariant(false);
+    }
 
 
-        virtual Status truncate(OperationContext* txn) { invariant(false); }
+    virtual Status truncate(OperationContext* txn) {
+        invariant(false);
+    }
 
-        virtual void temp_cappedTruncateAfter(OperationContext* txn,
-                                              RecordId end,
-                                              bool inclusive) {
-            invariant(false);
-        }
+    virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
+        invariant(false);
+    }
 
-        virtual bool compactSupported() const { invariant(false); }
+    virtual bool compactSupported() const {
+        invariant(false);
+    }
 
-        virtual Status validate(OperationContext* txn,
-                                bool full,
-                                bool scanData,
-                                ValidateAdaptor* adaptor,
-                                ValidateResults* results, BSONObjBuilder* output) {
-            invariant(false);
-        }
+    virtual Status validate(OperationContext* txn,
+                            bool full,
+                            bool scanData,
+                            ValidateAdaptor* adaptor,
+                            ValidateResults* results,
+                            BSONObjBuilder* output) {
+        invariant(false);
+    }
 
-        virtual void appendCustomStats(OperationContext* txn,
-                                       BSONObjBuilder* result,
-                                       double scale) const {
-            invariant(false);
-        }
+    virtual void appendCustomStats(OperationContext* txn,
+                                   BSONObjBuilder* result,
+                                   double scale) const {
+        invariant(false);
+    }
 
-        virtual void increaseStorageSize(OperationContext* txn,  int size, bool enforceQuota) {
-            invariant(false);
-        }
+    virtual void increaseStorageSize(OperationContext* txn, int size, bool enforceQuota) {
+        invariant(false);
+    }
 
-        virtual int64_t storageSize(OperationContext* txn,
-                                    BSONObjBuilder* extraInfo = NULL,
-                                    int infoLevel = 0) const {
-            invariant(false);
-        }
+    virtual int64_t storageSize(OperationContext* txn,
+                                BSONObjBuilder* extraInfo = NULL,
+                                int infoLevel = 0) const {
+        invariant(false);
+    }
 
-        virtual long long dataSize(OperationContext* txn) const { invariant(false); }
+    virtual long long dataSize(OperationContext* txn) const {
+        invariant(false);
+    }
 
-        virtual MmapV1RecordHeader* recordFor(const RecordId& loc) const { invariant(false); }
+    virtual MmapV1RecordHeader* recordFor(const RecordId& loc) const {
+        invariant(false);
+    }
 
-        virtual bool isCapped() const { invariant(false); }
+    virtual bool isCapped() const {
+        invariant(false);
+    }
 
-        virtual const char* name() const { invariant(false); }
+    virtual const char* name() const {
+        invariant(false);
+    }
 
-        virtual void updateStatsAfterRepair(OperationContext* txn,
-                                            long long numRecords,
-                                            long long dataSize) {
-            invariant(false);
-        }
-        // more things that we actually care about below
+    virtual void updateStatsAfterRepair(OperationContext* txn,
+                                        long long numRecords,
+                                        long long dataSize) {
+        invariant(false);
+    }
+    // more things that we actually care about below
 
-    private:
-        struct MmapV1RecordHeader {
-            MmapV1RecordHeader(): dataSize(-1), data() { }
-            explicit MmapV1RecordHeader(int size): dataSize(size), data(new char[size]) { }
+private:
+    struct MmapV1RecordHeader {
+        MmapV1RecordHeader() : dataSize(-1), data() {}
+        explicit MmapV1RecordHeader(int size) : dataSize(size), data(new char[size]) {}
 
-            int dataSize;
-            boost::shared_array<char> data;
-        };
-
-        RecordId allocateLoc();
-
-        typedef std::map<RecordId, HeapRecordStoreBtree::MmapV1RecordHeader> Records;
-        Records _records;
-        int64_t _nextId;
+        int dataSize;
+        boost::shared_array<char> data;
     };
 
-    /**
-     * A RecoveryUnit for HeapRecordStoreBtree, this is for testing btree only.
-     */
-    class HeapRecordStoreBtreeRecoveryUnit : public RecoveryUnit {
-    public:
-        void beginUnitOfWork(OperationContext* opCtx) final { };
-        void commitUnitOfWork() final;
-        void abortUnitOfWork() final;
+    RecordId allocateLoc();
 
-        virtual bool waitUntilDurable() { return true; }
+    typedef std::map<RecordId, HeapRecordStoreBtree::MmapV1RecordHeader> Records;
+    Records _records;
+    int64_t _nextId;
+};
 
-        virtual void abandonSnapshot() {}
+/**
+ * A RecoveryUnit for HeapRecordStoreBtree, this is for testing btree only.
+ */
+class HeapRecordStoreBtreeRecoveryUnit : public RecoveryUnit {
+public:
+    void beginUnitOfWork(OperationContext* opCtx) final{};
+    void commitUnitOfWork() final;
+    void abortUnitOfWork() final;
 
-        virtual void registerChange(Change* change) { 
-            change->commit();
-            delete change; 
-        }
+    virtual bool waitUntilDurable() {
+        return true;
+    }
 
-        virtual void* writingPtr(void* data, size_t len);
+    virtual void abandonSnapshot() {}
 
-        virtual void setRollbackWritesDisabled() {}
+    virtual void registerChange(Change* change) {
+        change->commit();
+        delete change;
+    }
 
-        virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
+    virtual void* writingPtr(void* data, size_t len);
 
-        // -----------------------
+    virtual void setRollbackWritesDisabled() {}
 
-        void notifyInsert( HeapRecordStoreBtree* rs, const RecordId& loc );
-        static void notifyInsert( OperationContext* ctx,
-                                  HeapRecordStoreBtree* rs, const RecordId& loc );
+    virtual SnapshotId getSnapshotId() const {
+        return SnapshotId();
+    }
 
-    private:
-        struct InsertEntry {
-            HeapRecordStoreBtree* rs;
-            RecordId loc;
-        };
-        std::vector<InsertEntry> _insertions;
+    // -----------------------
 
-        struct ModEntry {
-            void* data;
-            size_t len;
-            boost::shared_array<char> old;
-        };
-        std::vector<ModEntry> _mods;
+    void notifyInsert(HeapRecordStoreBtree* rs, const RecordId& loc);
+    static void notifyInsert(OperationContext* ctx, HeapRecordStoreBtree* rs, const RecordId& loc);
+
+private:
+    struct InsertEntry {
+        HeapRecordStoreBtree* rs;
+        RecordId loc;
     };
+    std::vector<InsertEntry> _insertions;
 
-} // namespace mongo
+    struct ModEntry {
+        void* data;
+        size_t len;
+        boost::shared_array<char> old;
+    };
+    std::vector<ModEntry> _mods;
+};
+
+}  // namespace mongo

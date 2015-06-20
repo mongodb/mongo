@@ -35,56 +35,55 @@
 #include "mongo/rpc/protocol.h"
 
 namespace mongo {
-    class Message;
+class Message;
 
 namespace rpc {
 
+/**
+ * Immutable view of an OP_REPLY legacy-style command reply.
+ *
+ * TODO: BSON validation (SERVER-18167)
+ */
+class LegacyReply : public ReplyInterface {
+public:
     /**
-     * Immutable view of an OP_REPLY legacy-style command reply.
-     *
-     * TODO: BSON validation (SERVER-18167)
+     * Construct a Reply from a Message.
+     * The underlying message MUST outlive the Reply.
      */
-    class LegacyReply : public ReplyInterface {
-    public:
+    explicit LegacyReply(const Message* message);
 
-        /**
-         * Construct a Reply from a Message.
-         * The underlying message MUST outlive the Reply.
-         */
-        explicit LegacyReply(const Message* message);
+    /**
+     * Accessor for the metadata object. Metadata is generally used for information
+     * that is independent of any specific command, e.g. auditing information.
+     */
+    const BSONObj& getMetadata() const final;
 
-        /**
-         * Accessor for the metadata object. Metadata is generally used for information
-         * that is independent of any specific command, e.g. auditing information.
-         */
-        const BSONObj& getMetadata() const final;
+    /**
+     * The result of executing the command.
+     */
+    const BSONObj& getCommandReply() const final;
 
-        /**
-         * The result of executing the command.
-         */
-        const BSONObj& getCommandReply() const final;
+    /**
+     * A variable number of BSON documents returned by the command. It is valid for the
+     * returned range to be empty.
+     *
+     * Example usage:
+     *
+     * for (auto&& doc : reply.getOutputDocs()) {
+     *    ... do stuff with doc
+     * }
+     */
+    DocumentRange getOutputDocs() const final;
 
-        /**
-         * A variable number of BSON documents returned by the command. It is valid for the
-         * returned range to be empty.
-         *
-         * Example usage:
-         *
-         * for (auto&& doc : reply.getOutputDocs()) {
-         *    ... do stuff with doc
-         * }
-         */
-        DocumentRange getOutputDocs() const final;
+    Protocol getProtocol() const final;
 
-        Protocol getProtocol() const final;
+private:
+    const Message* _message;
 
-    private:
-        const Message* _message;
-
-        // TODO: SERVER-18236
-        BSONObj _metadata{};
-        BSONObj _commandReply{}; // will hold unowned
-    };
+    // TODO: SERVER-18236
+    BSONObj _metadata{};
+    BSONObj _commandReply{};  // will hold unowned
+};
 
 }  // namespace rpc
 }  // namespace mongo

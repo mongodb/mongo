@@ -39,57 +39,55 @@
 namespace mongo {
 namespace repl {
 
-    class RollBackLocalOperations {
-        MONGO_DISALLOW_COPYING(RollBackLocalOperations);
-    public:
+class RollBackLocalOperations {
+    MONGO_DISALLOW_COPYING(RollBackLocalOperations);
 
-        /**
-         * Type of function to roll back an operation or process it for future use.
-         * It can return any status except ErrorCodes::NoSuchKey. See onRemoteOperation().
-         */
-        using RollbackOperationFn = stdx::function<Status (const BSONObj&)>;
+public:
+    /**
+     * Type of function to roll back an operation or process it for future use.
+     * It can return any status except ErrorCodes::NoSuchKey. See onRemoteOperation().
+     */
+    using RollbackOperationFn = stdx::function<Status(const BSONObj&)>;
 
-        using RollbackCommonPoint = std::pair<Timestamp, RecordId>;
-
-        /**
-         * Initializes rollback processor with a valid local oplog.
-         * Whenever we encounter an operation in the local oplog that has to be rolled back,
-         * we will pass it to 'rollbackOperation'.
-         */
-        RollBackLocalOperations(const OplogInterface& localOplog,
-                                const RollbackOperationFn& rollbackOperation);
-
-        virtual ~RollBackLocalOperations() = default;
-
-        /**
-         * Process single remote operation.
-         * Returns ErrorCodes::NoSuchKey if common point has not been found and
-         * additional operations have to be read from the remote oplog.
-         */
-        StatusWith<RollbackCommonPoint> onRemoteOperation(const BSONObj& operation);
-
-    private:
-
-        std::unique_ptr<OplogInterface::Iterator> _localOplogIterator;
-        RollbackOperationFn _rollbackOperation;
-        OplogInterface::Iterator::Value _localOplogValue;
-        unsigned long long _scanned;
-
-    };
+    using RollbackCommonPoint = std::pair<Timestamp, RecordId>;
 
     /**
-     * Rolls back every operation in the local oplog that is not in the remote oplog, in reverse
-     * order.
-     *
+     * Initializes rollback processor with a valid local oplog.
      * Whenever we encounter an operation in the local oplog that has to be rolled back,
-     * we will pass it to 'rollbackOperation' starting with the most recent operation.
-     * It is up to 'rollbackOperation' to roll back this operation immediately or
-     * process it for future use.
+     * we will pass it to 'rollbackOperation'.
      */
-    StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperations(
-        const OplogInterface& localOplog,
-        const OplogInterface& remoteOplog,
-        const RollBackLocalOperations::RollbackOperationFn& rollbackOperation);
+    RollBackLocalOperations(const OplogInterface& localOplog,
+                            const RollbackOperationFn& rollbackOperation);
 
-} // namespace repl
-} // namespace mongo
+    virtual ~RollBackLocalOperations() = default;
+
+    /**
+     * Process single remote operation.
+     * Returns ErrorCodes::NoSuchKey if common point has not been found and
+     * additional operations have to be read from the remote oplog.
+     */
+    StatusWith<RollbackCommonPoint> onRemoteOperation(const BSONObj& operation);
+
+private:
+    std::unique_ptr<OplogInterface::Iterator> _localOplogIterator;
+    RollbackOperationFn _rollbackOperation;
+    OplogInterface::Iterator::Value _localOplogValue;
+    unsigned long long _scanned;
+};
+
+/**
+ * Rolls back every operation in the local oplog that is not in the remote oplog, in reverse
+ * order.
+ *
+ * Whenever we encounter an operation in the local oplog that has to be rolled back,
+ * we will pass it to 'rollbackOperation' starting with the most recent operation.
+ * It is up to 'rollbackOperation' to roll back this operation immediately or
+ * process it for future use.
+ */
+StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperations(
+    const OplogInterface& localOplog,
+    const OplogInterface& remoteOplog,
+    const RollBackLocalOperations::RollbackOperationFn& rollbackOperation);
+
+}  // namespace repl
+}  // namespace mongo

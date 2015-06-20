@@ -42,177 +42,172 @@
 namespace mongo {
 namespace mutablebson {
 
-    namespace {
+namespace {
 
-        inline void assertSameSign(int lhs, int rhs) {
-            if (lhs == 0) {
-                ASSERT_EQUALS(rhs, 0);
-            } else if (lhs < 0) {
-                ASSERT_LESS_THAN(rhs, 0);
-            } else {
-                ASSERT_GREATER_THAN(rhs, 0);
-            }
+inline void assertSameSign(int lhs, int rhs) {
+    if (lhs == 0) {
+        ASSERT_EQUALS(rhs, 0);
+    } else if (lhs < 0) {
+        ASSERT_LESS_THAN(rhs, 0);
+    } else {
+        ASSERT_GREATER_THAN(rhs, 0);
+    }
+}
+
+inline void assertOppositeSign(int lhs, int rhs) {
+    if (lhs == 0) {
+        ASSERT_EQUALS(rhs, 0);
+    } else if (lhs < 0) {
+        ASSERT_GREATER_THAN(rhs, 0);
+    } else {
+        ASSERT_LESS_THAN(rhs, 0);
+    }
+}
+
+void addChildrenToVector(ConstElement elt, std::vector<ConstElement>* accumulator) {
+    ConstElement current = elt.leftChild();
+    while (current.ok()) {
+        accumulator->push_back(current);
+        current = current.rightSibling();
+    }
+}
+
+bool checkDocNoOrderingImpl(ConstElement lhs, ConstElement rhs) {
+    const BSONType lhsType = lhs.getType();
+    const BSONType rhsType = rhs.getType();
+
+    if (lhsType == mongo::Object) {
+        if (rhsType != mongo::Object)
+            return false;
+
+        // For objects, sort the children by field name, then compare in that order.
+
+        std::vector<ConstElement> lhsChildren;
+        addChildrenToVector(lhs, &lhsChildren);
+        std::vector<ConstElement> rhsChildren;
+        addChildrenToVector(rhs, &rhsChildren);
+        if (lhsChildren.size() != rhsChildren.size())
+            return false;
+
+        // NOTE: if you have repeated field names, this is not necessarily going to
+        // work. This is unlikely to be a problem in practice, but we could write a
+        // more sophisticated comparator if we need to: perhaps one that ordered first
+        // by field name, then by type, then by woCompare. Performance isn't important
+        // here.
+        std::sort(lhsChildren.begin(), lhsChildren.end(), FieldNameLessThan());
+        std::sort(rhsChildren.begin(), rhsChildren.end(), FieldNameLessThan());
+
+        typedef std::vector<ConstElement>::const_iterator iter;
+        iter lhsWhere = lhsChildren.begin();
+        iter rhsWhere = rhsChildren.begin();
+        const iter lhsEnd = lhsChildren.end();
+
+        for (; lhsWhere != lhsEnd; ++lhsWhere, ++rhsWhere) {
+            if (lhsWhere->getFieldName() != rhsWhere->getFieldName())
+                return false;
+
+            if (!checkDocNoOrderingImpl(*lhsWhere, *rhsWhere))
+                return false;
         }
 
-        inline void assertOppositeSign(int lhs, int rhs) {
-            if (lhs == 0) {
-                ASSERT_EQUALS(rhs, 0);
-            } else if (lhs < 0) {
-                ASSERT_GREATER_THAN(rhs, 0);
-            } else {
-                ASSERT_LESS_THAN(rhs, 0);
-            }
+        return true;
+
+    } else if (lhsType == mongo::Array) {
+        if (rhsType != mongo::Array)
+            return false;
+
+        // For arrays, since they are ordered, we don't need the sorting step.
+        const size_t lhsChildren = countChildren(lhs);
+        const size_t rhsChildren = countChildren(rhs);
+
+        if (lhsChildren != rhsChildren)
+            return false;
+
+        if (lhsChildren == 0)
+            return true;
+
+        ConstElement lhsChild = lhs.leftChild();
+        ConstElement rhsChild = rhs.leftChild();
+
+        while (lhsChild.ok()) {
+            if (!checkDocNoOrderingImpl(lhsChild, rhsChild))
+                return false;
+
+            lhsChild = lhsChild.rightSibling();
+            rhsChild = rhsChild.rightSibling();
         }
 
-        void addChildrenToVector(ConstElement elt, std::vector<ConstElement>* accumulator) {
-            ConstElement current = elt.leftChild();
-            while (current.ok()) {
-                accumulator->push_back(current);
-                current = current.rightSibling();
-            }
-        }
+        return true;
 
-        bool checkDocNoOrderingImpl(ConstElement lhs, ConstElement rhs) {
-            const BSONType lhsType = lhs.getType();
-            const BSONType rhsType = rhs.getType();
-
-            if (lhsType == mongo::Object) {
-
-                if (rhsType != mongo::Object)
-                    return false;
-
-                // For objects, sort the children by field name, then compare in that order.
-
-                std::vector<ConstElement> lhsChildren;
-                addChildrenToVector(lhs, &lhsChildren);
-                std::vector<ConstElement> rhsChildren;
-                addChildrenToVector(rhs, &rhsChildren);
-                if (lhsChildren.size() != rhsChildren.size())
-                    return false;
-
-                // NOTE: if you have repeated field names, this is not necessarily going to
-                // work. This is unlikely to be a problem in practice, but we could write a
-                // more sophisticated comparator if we need to: perhaps one that ordered first
-                // by field name, then by type, then by woCompare. Performance isn't important
-                // here.
-                std::sort(lhsChildren.begin(), lhsChildren.end(), FieldNameLessThan());
-                std::sort(rhsChildren.begin(), rhsChildren.end(), FieldNameLessThan());
-
-                typedef std::vector<ConstElement>::const_iterator iter;
-                iter lhsWhere = lhsChildren.begin();
-                iter rhsWhere = rhsChildren.begin();
-                const iter lhsEnd = lhsChildren.end();
-
-                for (; lhsWhere != lhsEnd; ++lhsWhere, ++rhsWhere) {
-
-                    if (lhsWhere->getFieldName() != rhsWhere->getFieldName())
-                        return false;
-
-                    if (!checkDocNoOrderingImpl(*lhsWhere, *rhsWhere))
-                        return false;
-                }
-
-                return true;
-
-            } else if (lhsType == mongo::Array) {
-
-                if (rhsType != mongo::Array)
-                    return false;
-
-                // For arrays, since they are ordered, we don't need the sorting step.
-                const size_t lhsChildren = countChildren(lhs);
-                const size_t rhsChildren = countChildren(rhs);
-
-                if (lhsChildren != rhsChildren)
-                    return false;
-
-                if (lhsChildren == 0)
-                    return true;
-
-                ConstElement lhsChild = lhs.leftChild();
-                ConstElement rhsChild = rhs.leftChild();
-
-                while (lhsChild.ok()) {
-                    if (!checkDocNoOrderingImpl(lhsChild, rhsChild))
-                        return false;
-
-                    lhsChild = lhsChild.rightSibling();
-                    rhsChild = rhsChild.rightSibling();
-                }
-
-                return true;
-
-            } else {
-                // This is some leaf type. We've already checked or ignored field names, so
-                // don't recheck it here.
-                return lhs.compareWithElement(rhs, false) == 0;
-            }
-        }
-
-    } // namespace
-
-    // TODO: We should really update this to be an ASSERT_ something, so that we can print out
-    // the expected and actual documents.
-    bool checkDoc(const Document& lhs, const BSONObj& rhs) {
-
-        // Get the fundamental result via BSONObj's woCompare path. This is the best starting
-        // point, because we think that Document::getObject and the serialization mechanism is
-        // pretty well sorted.
-        BSONObj fromLhs = lhs.getObject();
-        const int primaryResult = fromLhs.woCompare(rhs);
-
-        // Validate primary result via other comparison paths.
-        const int secondaryResult = lhs.compareWithBSONObj(rhs);
-
-        assertSameSign(primaryResult, secondaryResult);
-
-        // Check that mutables serialized result matches against its origin.
-        ASSERT_EQUALS(0, lhs.compareWithBSONObj(fromLhs));
-
-        return (primaryResult == 0);
+    } else {
+        // This is some leaf type. We've already checked or ignored field names, so
+        // don't recheck it here.
+        return lhs.compareWithElement(rhs, false) == 0;
     }
+}
 
-    bool checkDoc(const Document& lhs, const Document& rhs) {
+}  // namespace
 
-        const int primaryResult = lhs.compareWith(rhs);
+// TODO: We should really update this to be an ASSERT_ something, so that we can print out
+// the expected and actual documents.
+bool checkDoc(const Document& lhs, const BSONObj& rhs) {
+    // Get the fundamental result via BSONObj's woCompare path. This is the best starting
+    // point, because we think that Document::getObject and the serialization mechanism is
+    // pretty well sorted.
+    BSONObj fromLhs = lhs.getObject();
+    const int primaryResult = fromLhs.woCompare(rhs);
 
-        const BSONObj fromLhs = lhs.getObject();
-        const BSONObj fromRhs = rhs.getObject();
+    // Validate primary result via other comparison paths.
+    const int secondaryResult = lhs.compareWithBSONObj(rhs);
 
-        const int result_d_o = lhs.compareWithBSONObj(fromRhs);
-        const int result_o_d = rhs.compareWithBSONObj(fromLhs);
+    assertSameSign(primaryResult, secondaryResult);
 
-        assertSameSign(primaryResult, result_d_o);
-        assertOppositeSign(primaryResult, result_o_d);
+    // Check that mutables serialized result matches against its origin.
+    ASSERT_EQUALS(0, lhs.compareWithBSONObj(fromLhs));
 
-        ASSERT_EQUALS(0, lhs.compareWithBSONObj(fromLhs));
-        ASSERT_EQUALS(0, rhs.compareWithBSONObj(fromRhs));
+    return (primaryResult == 0);
+}
 
-        return (primaryResult == 0);
-    }
+bool checkDoc(const Document& lhs, const Document& rhs) {
+    const int primaryResult = lhs.compareWith(rhs);
 
-    std::ostream& operator<<(std::ostream& stream, const Document& doc) {
-        stream << doc.toString();
-        return stream;
-    }
+    const BSONObj fromLhs = lhs.getObject();
+    const BSONObj fromRhs = rhs.getObject();
 
-    std::ostream& operator<<(std::ostream& stream, const ConstElement& elt) {
-        stream << elt.toString();
-        return stream;
-    }
+    const int result_d_o = lhs.compareWithBSONObj(fromRhs);
+    const int result_o_d = rhs.compareWithBSONObj(fromLhs);
 
-    bool checkEqualNoOrdering(const Document& lhs, const Document& rhs) {
-        return checkDocNoOrderingImpl(lhs.root(), rhs.root());
-    }
+    assertSameSign(primaryResult, result_d_o);
+    assertOppositeSign(primaryResult, result_o_d);
 
-    std::ostream& operator<<(std::ostream& stream, const UnorderedWrapper_Doc& uw_d) {
-        return stream << uw_d.doc;
-    }
+    ASSERT_EQUALS(0, lhs.compareWithBSONObj(fromLhs));
+    ASSERT_EQUALS(0, rhs.compareWithBSONObj(fromRhs));
 
-    std::ostream& operator<<(std::ostream& stream, const UnorderedWrapper_Obj& uw_o) {
-        const Document d(uw_o.obj);
-        return stream << d;
-    }
+    return (primaryResult == 0);
+}
 
-} // namespace mutablebson
-} // namespace mongo
+std::ostream& operator<<(std::ostream& stream, const Document& doc) {
+    stream << doc.toString();
+    return stream;
+}
+
+std::ostream& operator<<(std::ostream& stream, const ConstElement& elt) {
+    stream << elt.toString();
+    return stream;
+}
+
+bool checkEqualNoOrdering(const Document& lhs, const Document& rhs) {
+    return checkDocNoOrderingImpl(lhs.root(), rhs.root());
+}
+
+std::ostream& operator<<(std::ostream& stream, const UnorderedWrapper_Doc& uw_d) {
+    return stream << uw_d.doc;
+}
+
+std::ostream& operator<<(std::ostream& stream, const UnorderedWrapper_Obj& uw_o) {
+    const Document d(uw_o.obj);
+    return stream << d;
+}
+
+}  // namespace mutablebson
+}  // namespace mongo

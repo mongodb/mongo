@@ -35,163 +35,163 @@ using namespace mongo;
 
 namespace {
 
-    //
-    // Convenience functions
-    //
+//
+// Convenience functions
+//
 
-    void assertInKVStore(LRUKeyValue<int, int>& cache, int key, int value) {
-        int* cachedValue = NULL;
-        ASSERT_TRUE(cache.hasKey(key));
-        Status s = cache.get(key, &cachedValue);
-        ASSERT_OK(s);
-        ASSERT_EQUALS(*cachedValue, value);
+void assertInKVStore(LRUKeyValue<int, int>& cache, int key, int value) {
+    int* cachedValue = NULL;
+    ASSERT_TRUE(cache.hasKey(key));
+    Status s = cache.get(key, &cachedValue);
+    ASSERT_OK(s);
+    ASSERT_EQUALS(*cachedValue, value);
+}
+
+void assertNotInKVStore(LRUKeyValue<int, int>& cache, int key) {
+    int* cachedValue = NULL;
+    ASSERT_FALSE(cache.hasKey(key));
+    Status s = cache.get(key, &cachedValue);
+    ASSERT_NOT_OK(s);
+}
+
+/**
+ * Test that we can add an entry and get it back out.
+ */
+TEST(LRUKeyValueTest, BasicAddGet) {
+    LRUKeyValue<int, int> cache(100);
+    cache.add(1, new int(2));
+    assertInKVStore(cache, 1, 2);
+}
+
+/**
+ * A kv-store with a max size of 0 isn't too useful, but test
+ * that at the very least we don't blow up.
+ */
+TEST(LRUKeyValueTest, SizeZeroCache) {
+    LRUKeyValue<int, int> cache(0);
+    cache.add(1, new int(2));
+    assertNotInKVStore(cache, 1);
+}
+
+/**
+ * Make sure eviction and promotion work properly with
+ * a kv-store of size 1.
+ */
+TEST(LRUKeyValueTest, SizeOneCache) {
+    LRUKeyValue<int, int> cache(1);
+    cache.add(0, new int(0));
+    assertInKVStore(cache, 0, 0);
+
+    // Second entry should immediately evict the first.
+    cache.add(1, new int(1));
+    assertNotInKVStore(cache, 0);
+    assertInKVStore(cache, 1, 1);
+}
+
+/**
+ * Fill up a size 10 kv-store with 10 entries. Call get()
+ * on every entry except for one. Then call add() and
+ * make sure that the proper entry got evicted.
+ */
+TEST(LRUKeyValueTest, EvictionTest) {
+    int maxSize = 10;
+    LRUKeyValue<int, int> cache(maxSize);
+    for (int i = 0; i < maxSize; ++i) {
+        std::unique_ptr<int> evicted = cache.add(i, new int(i));
+        ASSERT(NULL == evicted.get());
     }
+    ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 
-    void assertNotInKVStore(LRUKeyValue<int, int>& cache, int key) {
-        int* cachedValue = NULL;
-        ASSERT_FALSE(cache.hasKey(key));
-        Status s = cache.get(key, &cachedValue);
-        ASSERT_NOT_OK(s);
-    }
-
-    /**
-     * Test that we can add an entry and get it back out.
-     */
-    TEST(LRUKeyValueTest, BasicAddGet) {
-        LRUKeyValue<int, int> cache(100);
-        cache.add(1, new int(2));
-        assertInKVStore(cache, 1, 2);
-    }
-
-    /**
-     * A kv-store with a max size of 0 isn't too useful, but test
-     * that at the very least we don't blow up.
-     */
-    TEST(LRUKeyValueTest, SizeZeroCache) {
-        LRUKeyValue<int, int> cache(0);
-        cache.add(1, new int(2));
-        assertNotInKVStore(cache, 1);
-    }
-
-    /**
-     * Make sure eviction and promotion work properly with
-     * a kv-store of size 1.
-     */
-    TEST(LRUKeyValueTest, SizeOneCache) {
-        LRUKeyValue<int, int> cache(1);
-        cache.add(0, new int(0));
-        assertInKVStore(cache, 0, 0);
-
-        // Second entry should immediately evict the first.
-        cache.add(1, new int(1));
-        assertNotInKVStore(cache, 0);
-        assertInKVStore(cache, 1, 1);
-    }
-
-    /**
-     * Fill up a size 10 kv-store with 10 entries. Call get()
-     * on every entry except for one. Then call add() and
-     * make sure that the proper entry got evicted.
-     */
-    TEST(LRUKeyValueTest, EvictionTest) {
-        int maxSize = 10;
-        LRUKeyValue<int, int> cache(maxSize);
-        for (int i = 0; i < maxSize; ++i) {
-            std::unique_ptr<int> evicted = cache.add(i, new int(i));
-            ASSERT(NULL == evicted.get());
+    // Call get() on all but one key.
+    int evictKey = 5;
+    for (int i = 0; i < maxSize; ++i) {
+        if (i == evictKey) {
+            continue;
         }
-        ASSERT_EQUALS(cache.size(), (size_t)maxSize);
+        assertInKVStore(cache, i, i);
+    }
 
-        // Call get() on all but one key.
-        int evictKey = 5;
-        for (int i = 0; i < maxSize; ++i) {
-            if (i == evictKey) { continue; }
+    // Adding another entry causes an eviction.
+    std::unique_ptr<int> evicted = cache.add(maxSize + 1, new int(maxSize + 1));
+    ASSERT_EQUALS(cache.size(), (size_t)maxSize);
+    ASSERT(NULL != evicted.get());
+    ASSERT_EQUALS(*evicted, evictKey);
+
+    // Check that the least recently accessed has been evicted.
+    for (int i = 0; i < maxSize; ++i) {
+        if (i == evictKey) {
+            assertNotInKVStore(cache, evictKey);
+        } else {
             assertInKVStore(cache, i, i);
         }
+    }
+}
 
-        // Adding another entry causes an eviction.
-        std::unique_ptr<int> evicted = cache.add(maxSize + 1, new int(maxSize + 1));
-        ASSERT_EQUALS(cache.size(), (size_t)maxSize);
+/**
+ * Fill up a size 10 kv-store with 10 entries. Call get()
+ * on a single entry to promote it to most recently
+ * accessed. Then cause 9 evictions and make sure only
+ * the entry on which we called get() remains.
+ */
+TEST(LRUKeyValueTest, PromotionTest) {
+    int maxSize = 10;
+    LRUKeyValue<int, int> cache(maxSize);
+    for (int i = 0; i < maxSize; ++i) {
+        std::unique_ptr<int> evicted = cache.add(i, new int(i));
+        ASSERT(NULL == evicted.get());
+    }
+    ASSERT_EQUALS(cache.size(), (size_t)maxSize);
+
+    // Call get() on a particular key.
+    int promoteKey = 5;
+    assertInKVStore(cache, promoteKey, promoteKey);
+
+    // Evict all but one of the original entries.
+    for (int i = maxSize; i < (maxSize + maxSize - 1); ++i) {
+        std::unique_ptr<int> evicted = cache.add(i, new int(i));
         ASSERT(NULL != evicted.get());
-        ASSERT_EQUALS(*evicted, evictKey);
+    }
+    ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 
-        // Check that the least recently accessed has been evicted.
-        for (int i = 0; i < maxSize; ++i) {
-            if (i == evictKey) {
-                assertNotInKVStore(cache, evictKey);
-            }
-            else {
-                assertInKVStore(cache, i, i);
-            }
+    // Check that the promoteKey has not been evicted.
+    for (int i = 0; i < maxSize; ++i) {
+        if (i == promoteKey) {
+            assertInKVStore(cache, promoteKey, promoteKey);
+        } else {
+            assertNotInKVStore(cache, i);
         }
     }
+}
 
-    /**
-     * Fill up a size 10 kv-store with 10 entries. Call get()
-     * on a single entry to promote it to most recently
-     * accessed. Then cause 9 evictions and make sure only
-     * the entry on which we called get() remains.
-     */
-    TEST(LRUKeyValueTest, PromotionTest) {
-        int maxSize = 10;
-        LRUKeyValue<int, int> cache(maxSize);
-        for (int i = 0; i < maxSize; ++i) {
-            std::unique_ptr<int> evicted = cache.add(i, new int(i));
-            ASSERT(NULL == evicted.get());
-        }
-        ASSERT_EQUALS(cache.size(), (size_t)maxSize);
+/**
+ * Test that calling add() with a key that already exists
+ * in the kv-store deletes the existing entry.
+ */
+TEST(LRUKeyValueTest, ReplaceKeyTest) {
+    LRUKeyValue<int, int> cache(10);
+    cache.add(4, new int(4));
+    assertInKVStore(cache, 4, 4);
+    cache.add(4, new int(5));
+    assertInKVStore(cache, 4, 5);
+}
 
-        // Call get() on a particular key.
-        int promoteKey = 5;
-        assertInKVStore(cache, promoteKey, promoteKey);
+/**
+ * Test iteration over the kv-store.
+ */
+TEST(LRUKeyValueTest, IterationTest) {
+    LRUKeyValue<int, int> cache(2);
+    cache.add(1, new int(1));
+    cache.add(2, new int(2));
 
-        // Evict all but one of the original entries.
-        for (int i = maxSize; i < (maxSize + maxSize - 1); ++i) {
-            std::unique_ptr<int> evicted = cache.add(i, new int(i));
-            ASSERT(NULL != evicted.get());
-        }
-        ASSERT_EQUALS(cache.size(), (size_t)maxSize);
-
-        // Check that the promoteKey has not been evicted.
-        for (int i = 0; i < maxSize; ++i) {
-            if (i == promoteKey) {
-                assertInKVStore(cache, promoteKey, promoteKey);
-            }
-            else {
-                assertNotInKVStore(cache, i);
-            }
-        }
-    }
-
-    /**
-     * Test that calling add() with a key that already exists
-     * in the kv-store deletes the existing entry.
-     */
-    TEST(LRUKeyValueTest, ReplaceKeyTest) {
-        LRUKeyValue<int, int> cache(10);
-        cache.add(4, new int(4));
-        assertInKVStore(cache, 4, 4);
-        cache.add(4, new int(5));
-        assertInKVStore(cache, 4, 5);
-    }
-
-    /**
-     * Test iteration over the kv-store.
-     */
-    TEST(LRUKeyValueTest, IterationTest) {
-        LRUKeyValue<int, int> cache(2);
-        cache.add(1, new int(1));
-        cache.add(2, new int(2));
-
-        typedef std::list< std::pair<int, int*> >::const_iterator CacheIterator;
-        CacheIterator i = cache.begin();
-        ASSERT_EQUALS(i->first, 2);
-        ASSERT_EQUALS(*i->second, 2);
-        ++i;
-        ASSERT_EQUALS(i->first, 1);
-        ASSERT_EQUALS(*i->second, 1);
-        ++i;
-        ASSERT(i == cache.end());
-    }
+    typedef std::list<std::pair<int, int*>>::const_iterator CacheIterator;
+    CacheIterator i = cache.begin();
+    ASSERT_EQUALS(i->first, 2);
+    ASSERT_EQUALS(*i->second, 2);
+    ++i;
+    ASSERT_EQUALS(i->first, 1);
+    ASSERT_EQUALS(*i->second, 1);
+    ++i;
+    ASSERT(i == cache.end());
+}
 
 }  // namespace

@@ -34,26 +34,27 @@
 
 namespace mongo {
 
-    const Milliseconds RemoteCommandRequest::kNoTimeout{-1};
-    const Date_t RemoteCommandRequest::kNoExpirationDate{Date_t::max()};
+const Milliseconds RemoteCommandRequest::kNoTimeout{-1};
+const Date_t RemoteCommandRequest::kNoExpirationDate{Date_t::max()};
 
-    std::string RemoteCommandRequest::toString() const {
-        str::stream out;
-        out << "RemoteCommand -- target:" << target.toString() << " db:" << dbname;
+std::string RemoteCommandRequest::toString() const {
+    str::stream out;
+    out << "RemoteCommand -- target:" << target.toString() << " db:" << dbname;
 
-        if (expirationDate != kNoExpirationDate) {
-            out << " expDate:" << expirationDate.toString();
-        }
-
-        out << " cmd:" << cmdObj.toString();
-        return out;
+    if (expirationDate != kNoExpirationDate) {
+        out << " expDate:" << expirationDate.toString();
     }
 
-    std::string RemoteCommandResponse::toString() const {
-        str::stream out;
-        out << "RemoteResponse -- " << " cmd:" << data.toString();
+    out << " cmd:" << cmdObj.toString();
+    return out;
+}
 
-        return out;
-    }
+std::string RemoteCommandResponse::toString() const {
+    str::stream out;
+    out << "RemoteResponse -- "
+        << " cmd:" << data.toString();
 
-} // namespace mongo
+    return out;
+}
+
+}  // namespace mongo

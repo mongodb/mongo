@@ -36,54 +36,58 @@
 namespace mongo {
 
 
-    /**
-     * Holds timing information in milliseconds
-     * keeps track of number of times and total milliseconds
-     * so a diff can be computed
-     */
-    class TimerStats {
-    public:
-        void recordMillis( int millis );
-
-        /**
-         * @return number of millis
-         */
-        int record( const Timer& timer );
-
-        BSONObj getReport() const;
-        operator BSONObj() const { return getReport(); }
-
-    private:
-        mutable SpinLock _lock;
-        long long _num;
-        long long _totalMillis;
-    };
+/**
+ * Holds timing information in milliseconds
+ * keeps track of number of times and total milliseconds
+ * so a diff can be computed
+ */
+class TimerStats {
+public:
+    void recordMillis(int millis);
 
     /**
-     * Holds an instance of a Timer such that we the time is recorded
-     * when the TimerHolder goes out of scope
+     * @return number of millis
      */
-    class TimerHolder {
-    public:
-        /** Destructor will record to TimerStats */
-        TimerHolder( TimerStats* stats );
-        /** Will record stats if recordMillis hasn't (based on _recorded)  */
-        ~TimerHolder();
+    int record(const Timer& timer);
 
-        /**
-         * returns elapsed millis from internal timer
-         */
-        int millis() const { return _t.millis(); }
+    BSONObj getReport() const;
+    operator BSONObj() const {
+        return getReport();
+    }
 
-        /**
-         * records the time in the TimerStats and marks that we've
-         * already recorded so the destructor doesn't
-         */
-        int recordMillis();
+private:
+    mutable SpinLock _lock;
+    long long _num;
+    long long _totalMillis;
+};
 
-    private:
-        TimerStats* _stats;
-        bool _recorded;
-        Timer _t;
-    };
+/**
+ * Holds an instance of a Timer such that we the time is recorded
+ * when the TimerHolder goes out of scope
+ */
+class TimerHolder {
+public:
+    /** Destructor will record to TimerStats */
+    TimerHolder(TimerStats* stats);
+    /** Will record stats if recordMillis hasn't (based on _recorded)  */
+    ~TimerHolder();
+
+    /**
+     * returns elapsed millis from internal timer
+     */
+    int millis() const {
+        return _t.millis();
+    }
+
+    /**
+     * records the time in the TimerStats and marks that we've
+     * already recorded so the destructor doesn't
+     */
+    int recordMillis();
+
+private:
+    TimerStats* _stats;
+    bool _recorded;
+    Timer _t;
+};
 }

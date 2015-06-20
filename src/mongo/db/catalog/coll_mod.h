@@ -29,17 +29,16 @@
 #include "mongo/base/status.h"
 
 namespace mongo {
-    class BSONObj;
-    class BSONObjBuilder;
-    class NamespaceString;
-    class OperationContext;
+class BSONObj;
+class BSONObjBuilder;
+class NamespaceString;
+class OperationContext;
 
-    /**
-     * Performs the collection modification described in "cmdObj" on the collection "ns".
-     */
-    Status collMod(OperationContext* txn,
-                   const NamespaceString& ns,
-                   const BSONObj& cmdObj,
-                   BSONObjBuilder* result);
-} // namespace mongo
-
+/**
+ * Performs the collection modification described in "cmdObj" on the collection "ns".
+ */
+Status collMod(OperationContext* txn,
+               const NamespaceString& ns,
+               const BSONObj& cmdObj,
+               BSONObjBuilder* result);
+}  // namespace mongo

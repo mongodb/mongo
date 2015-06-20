@@ -34,55 +34,63 @@
 
 namespace mongo {
 
-    class BSONObj;
+class BSONObj;
 
 namespace repl {
 
-    class ReplSetRequestVotesArgs {
-    public:
-        Status initialize(const BSONObj& argsObj);
+class ReplSetRequestVotesArgs {
+public:
+    Status initialize(const BSONObj& argsObj);
 
-        const std::string& getSetName() const;
-        long long getTerm() const;
-        long long getCandidateId() const;
-        long long getConfigVersion() const;
-        OpTime getLastCommittedOp() const;
-        bool isADryRun() const;
+    const std::string& getSetName() const;
+    long long getTerm() const;
+    long long getCandidateId() const;
+    long long getConfigVersion() const;
+    OpTime getLastCommittedOp() const;
+    bool isADryRun() const;
 
-        void addToBSON(BSONObjBuilder* builder) const;
+    void addToBSON(BSONObjBuilder* builder) const;
 
-    private:
-        std::string _setName; // Name of the replset
-        long long _term = -1; // Current known term of the command issuer
-        long long _candidateId = -1; // replSet id of the member who sent the replSetRequestVotesCmd
-        long long _cfgver = -1; // replSet config version known to the command issuer
-        OpTime _lastCommittedOp; // The last known committed op of the command issuer 
-        bool _dryRun = false; // Indicates this is a pre-election check when true
-    };
+private:
+    std::string _setName;         // Name of the replset
+    long long _term = -1;         // Current known term of the command issuer
+    long long _candidateId = -1;  // replSet id of the member who sent the replSetRequestVotesCmd
+    long long _cfgver = -1;       // replSet config version known to the command issuer
+    OpTime _lastCommittedOp;      // The last known committed op of the command issuer
+    bool _dryRun = false;         // Indicates this is a pre-election check when true
+};
 
-    class ReplSetRequestVotesResponse {
-    public:
-        Status initialize(const BSONObj& argsObj);
-        
-        void setOk(bool ok) { _ok = ok; }
-        void setVoteGranted(bool voteGranted) { _voteGranted = voteGranted; }
-        void setTerm(long long term) { _term = term; }
-        void setReason(const std::string& reason) { _reason = reason; }
+class ReplSetRequestVotesResponse {
+public:
+    Status initialize(const BSONObj& argsObj);
 
-        bool getOk() const;
-        long long getTerm() const;
-        bool getVoteGranted() const;
-        const std::string& getReason() const;
+    void setOk(bool ok) {
+        _ok = ok;
+    }
+    void setVoteGranted(bool voteGranted) {
+        _voteGranted = voteGranted;
+    }
+    void setTerm(long long term) {
+        _term = term;
+    }
+    void setReason(const std::string& reason) {
+        _reason = reason;
+    }
 
-        void addToBSON(BSONObjBuilder* builder) const;
-        BSONObj toBSON() const;
+    bool getOk() const;
+    long long getTerm() const;
+    bool getVoteGranted() const;
+    const std::string& getReason() const;
 
-    private:
-        bool _ok = false;
-        long long _term = -1;
-        bool _voteGranted = false;
-        std::string _reason;
-    };
+    void addToBSON(BSONObjBuilder* builder) const;
+    BSONObj toBSON() const;
 
-} // namespace repl
-} // namespace mongo
+private:
+    bool _ok = false;
+    long long _term = -1;
+    bool _voteGranted = false;
+    std::string _reason;
+};
+
+}  // namespace repl
+}  // namespace mongo

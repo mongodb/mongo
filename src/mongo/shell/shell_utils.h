@@ -35,56 +35,58 @@
 
 namespace mongo {
 
-    class Scope;
-    class DBClientWithCommands;
-    
-    namespace shell_utils {
+class Scope;
+class DBClientWithCommands;
 
-        extern std::string _dbConnect;
-        extern std::string _dbAuth;
-        extern bool _nokillop;
+namespace shell_utils {
 
-        void RecordMyLocation( const char *_argv0 );
-        void installShellUtils( Scope& scope );
+extern std::string _dbConnect;
+extern std::string _dbAuth;
+extern bool _nokillop;
 
-        void initScope( Scope &scope );
-        void onConnect( DBClientWithCommands &c );
+void RecordMyLocation(const char* _argv0);
+void installShellUtils(Scope& scope);
 
-        const char* getUserDir();
-        
-        BSONElement singleArg(const BSONObj& args);
-        extern const BSONObj undefinedReturn;
-        
-        /** Prompt for confirmation from cin. */
-        class Prompter {
-        public:
-            Prompter( const std::string &prompt );
-            /** @return prompted confirmation or cached confirmation. */
-            bool confirm();
-        private:
-            const std::string _prompt;
-            bool _confirmed;
-        };
+void initScope(Scope& scope);
+void onConnect(DBClientWithCommands& c);
 
-        /** Registry of server connections. */
-        class ConnectionRegistry {
-        public:
-            ConnectionRegistry();
-            void registerConnection( DBClientWithCommands &client );
-            void killOperationsOnAllConnections( bool withPrompt ) const;
-        private:
-            std::map<std::string,std::set<std::string> > _connectionUris;
-            mutable stdx::mutex _mutex;
-        };
-        
-        extern ConnectionRegistry connectionRegistry;
+const char* getUserDir();
 
-        // This mutex helps the shell serialize output on exit, to avoid deadlocks at shutdown. So
-        // it also protects the global dbexitCalled.
-        extern stdx::mutex &mongoProgramOutputMutex;
+BSONElement singleArg(const BSONObj& args);
+extern const BSONObj undefinedReturn;
 
-        // Helper to tell if a file exists cross platform
-        // TODO: Remove this when we have a cross platform file utility library
-        bool fileExists(const std::string& file);
-    }
+/** Prompt for confirmation from cin. */
+class Prompter {
+public:
+    Prompter(const std::string& prompt);
+    /** @return prompted confirmation or cached confirmation. */
+    bool confirm();
+
+private:
+    const std::string _prompt;
+    bool _confirmed;
+};
+
+/** Registry of server connections. */
+class ConnectionRegistry {
+public:
+    ConnectionRegistry();
+    void registerConnection(DBClientWithCommands& client);
+    void killOperationsOnAllConnections(bool withPrompt) const;
+
+private:
+    std::map<std::string, std::set<std::string>> _connectionUris;
+    mutable stdx::mutex _mutex;
+};
+
+extern ConnectionRegistry connectionRegistry;
+
+// This mutex helps the shell serialize output on exit, to avoid deadlocks at shutdown. So
+// it also protects the global dbexitCalled.
+extern stdx::mutex& mongoProgramOutputMutex;
+
+// Helper to tell if a file exists cross platform
+// TODO: Remove this when we have a cross platform file utility library
+bool fileExists(const std::string& file);
+}
 }

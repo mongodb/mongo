@@ -36,178 +36,179 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(SettingsType, MissingKey) {
-        BSONObj objNoKey = BSONObj();
-        StatusWith<SettingsType> result = SettingsType::fromBSON(objNoKey);
-        ASSERT_FALSE(result.isOK());
-        ASSERT_EQUALS(result.getStatus(), ErrorCodes::NoSuchKey);
-    }
+TEST(SettingsType, MissingKey) {
+    BSONObj objNoKey = BSONObj();
+    StatusWith<SettingsType> result = SettingsType::fromBSON(objNoKey);
+    ASSERT_FALSE(result.isOK());
+    ASSERT_EQUALS(result.getStatus(), ErrorCodes::NoSuchKey);
+}
 
-    TEST(SettingsType, ChunkSize) {
-        BSONObj objChunkSizeZero = BSON(SettingsType::key(SettingsType::ChunkSizeDocKey) <<
-                                        SettingsType::chunkSizeMB(0));
-        StatusWith<SettingsType> result = SettingsType::fromBSON(objChunkSizeZero);
-        ASSERT(result.isOK());
-        SettingsType settings = result.getValue();
-        ASSERT_EQUALS(settings.getChunkSizeMB(), 0);
-        Status validationStatus = settings.validate();
-        ASSERT_FALSE(validationStatus.isOK());
-        ASSERT_EQUALS(validationStatus, ErrorCodes::BadValue);
-    }
+TEST(SettingsType, ChunkSize) {
+    BSONObj objChunkSizeZero =
+        BSON(SettingsType::key(SettingsType::ChunkSizeDocKey) << SettingsType::chunkSizeMB(0));
+    StatusWith<SettingsType> result = SettingsType::fromBSON(objChunkSizeZero);
+    ASSERT(result.isOK());
+    SettingsType settings = result.getValue();
+    ASSERT_EQUALS(settings.getChunkSizeMB(), 0);
+    Status validationStatus = settings.validate();
+    ASSERT_FALSE(validationStatus.isOK());
+    ASSERT_EQUALS(validationStatus, ErrorCodes::BadValue);
+}
 
-    TEST(SettingsType, UnsupportedSetting) {
-        BSONObj objBadSetting = BSON(SettingsType::key("badsetting"));
-        StatusWith<SettingsType> result = SettingsType::fromBSON(objBadSetting);
-        ASSERT(result.isOK());
-        SettingsType settings = result.getValue();
-        Status validationStatus = settings.validate();
-        ASSERT_FALSE(validationStatus.isOK());
-        ASSERT_EQUALS(validationStatus, ErrorCodes::UnsupportedFormat);
-    }
+TEST(SettingsType, UnsupportedSetting) {
+    BSONObj objBadSetting = BSON(SettingsType::key("badsetting"));
+    StatusWith<SettingsType> result = SettingsType::fromBSON(objBadSetting);
+    ASSERT(result.isOK());
+    SettingsType settings = result.getValue();
+    Status validationStatus = settings.validate();
+    ASSERT_FALSE(validationStatus.isOK());
+    ASSERT_EQUALS(validationStatus, ErrorCodes::UnsupportedFormat);
+}
 
-    TEST(SettingsType, InvalidBalancerWindow) {
-        BSONObj objBalancerBadKeys = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                                          SettingsType::balancerActiveWindow(BSON("begin" <<
-                                                                                  "23:00" <<
-                                                                                  "end" << 
-                                                                                  "6:00" )));
-        StatusWith<SettingsType> result = SettingsType::fromBSON(objBalancerBadKeys);
-        ASSERT_FALSE(result.isOK());
+TEST(SettingsType, InvalidBalancerWindow) {
+    BSONObj objBalancerBadKeys = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                                      << SettingsType::balancerActiveWindow(BSON("begin"
+                                                                                 << "23:00"
+                                                                                 << "end"
+                                                                                 << "6:00")));
+    StatusWith<SettingsType> result = SettingsType::fromBSON(objBalancerBadKeys);
+    ASSERT_FALSE(result.isOK());
 
-        BSONObj objBalancerBadTimes = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                                           SettingsType::balancerActiveWindow(BSON("start" <<
-                                                                                   "23" <<
-                                                                                   "stop" <<
-                                                                                   "6" )));
-        result = SettingsType::fromBSON(objBalancerBadTimes);
-        ASSERT_FALSE(result.isOK());
-    }
+    BSONObj objBalancerBadTimes = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                                       << SettingsType::balancerActiveWindow(BSON("start"
+                                                                                  << "23"
+                                                                                  << "stop"
+                                                                                  << "6")));
+    result = SettingsType::fromBSON(objBalancerBadTimes);
+    ASSERT_FALSE(result.isOK());
+}
 
-    TEST(SettingsType, ValidValues) {
-        BSONObj objChunkSize = BSON(SettingsType::key(SettingsType::ChunkSizeDocKey) <<
-                                    SettingsType::chunkSizeMB(1));
-        StatusWith<SettingsType> result = SettingsType::fromBSON(objChunkSize);
-        SettingsType settings = result.getValue();
-        ASSERT(result.isOK());
-        Status validationStatus = settings.validate();
-        ASSERT(validationStatus.isOK());
-        ASSERT_EQUALS(settings.getKey(), SettingsType::ChunkSizeDocKey);
-        ASSERT_EQUALS(settings.getChunkSizeMB(), 1);
+TEST(SettingsType, ValidValues) {
+    BSONObj objChunkSize =
+        BSON(SettingsType::key(SettingsType::ChunkSizeDocKey) << SettingsType::chunkSizeMB(1));
+    StatusWith<SettingsType> result = SettingsType::fromBSON(objChunkSize);
+    SettingsType settings = result.getValue();
+    ASSERT(result.isOK());
+    Status validationStatus = settings.validate();
+    ASSERT(validationStatus.isOK());
+    ASSERT_EQUALS(settings.getKey(), SettingsType::ChunkSizeDocKey);
+    ASSERT_EQUALS(settings.getChunkSizeMB(), 1);
 
-        BSONObj objBalancer = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                                   SettingsType::balancerStopped(true) <<
-                                   SettingsType::balancerActiveWindow(BSON("start" << "23:00" <<
-                                                                           "stop" << "6:00" )) <<
-                                   SettingsType::migrationWriteConcern(BSON("w" << 2)));
-        result = SettingsType::fromBSON(objBalancer);
-        settings = result.getValue();
-        ASSERT(result.isOK());
-        validationStatus = settings.validate();
-        ASSERT(validationStatus.isOK());
-        ASSERT_EQUALS(settings.getKey(), SettingsType::BalancerDocKey);
-        ASSERT_EQUALS(settings.getBalancerStopped(), true);
+    BSONObj objBalancer = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                               << SettingsType::balancerStopped(true)
+                               << SettingsType::balancerActiveWindow(BSON("start"
+                                                                          << "23:00"
+                                                                          << "stop"
+                                                                          << "6:00"))
+                               << SettingsType::migrationWriteConcern(BSON("w" << 2)));
+    result = SettingsType::fromBSON(objBalancer);
+    settings = result.getValue();
+    ASSERT(result.isOK());
+    validationStatus = settings.validate();
+    ASSERT(validationStatus.isOK());
+    ASSERT_EQUALS(settings.getKey(), SettingsType::BalancerDocKey);
+    ASSERT_EQUALS(settings.getBalancerStopped(), true);
 
-        WriteConcernOptions wc;
-        wc.parse(BSON("w" << 2));
-        ASSERT_EQUALS(settings.getMigrationWriteConcern().toBSON(), wc.toBSON());
-    }
+    WriteConcernOptions wc;
+    wc.parse(BSON("w" << 2));
+    ASSERT_EQUALS(settings.getMigrationWriteConcern().toBSON(), wc.toBSON());
+}
 
-    TEST(SettingsType, ValidWithDeprecatedThrottle) {
-        BSONObj objChunkSize = BSON(SettingsType::key(SettingsType::ChunkSizeDocKey) <<
-                                    SettingsType::chunkSizeMB(1));
-        StatusWith<SettingsType> result = SettingsType::fromBSON(objChunkSize);
-        ASSERT(result.isOK());
-        SettingsType settings = result.getValue();
-        ASSERT_EQUALS(settings.getKey(), SettingsType::ChunkSizeDocKey);
-        ASSERT_EQUALS(settings.getChunkSizeMB(), 1);
+TEST(SettingsType, ValidWithDeprecatedThrottle) {
+    BSONObj objChunkSize =
+        BSON(SettingsType::key(SettingsType::ChunkSizeDocKey) << SettingsType::chunkSizeMB(1));
+    StatusWith<SettingsType> result = SettingsType::fromBSON(objChunkSize);
+    ASSERT(result.isOK());
+    SettingsType settings = result.getValue();
+    ASSERT_EQUALS(settings.getKey(), SettingsType::ChunkSizeDocKey);
+    ASSERT_EQUALS(settings.getChunkSizeMB(), 1);
 
-        BSONObj objBalancer = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                                   SettingsType::deprecated_secondaryThrottle(true));
-        result = SettingsType::fromBSON(objBalancer);
-        ASSERT_EQUALS(result.getStatus(), Status::OK());
-        settings = result.getValue();
-        ASSERT_EQUALS(settings.getKey(), SettingsType::BalancerDocKey);
-        ASSERT(settings.getSecondaryThrottle());
-    }
+    BSONObj objBalancer = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                               << SettingsType::deprecated_secondaryThrottle(true));
+    result = SettingsType::fromBSON(objBalancer);
+    ASSERT_EQUALS(result.getStatus(), Status::OK());
+    settings = result.getValue();
+    ASSERT_EQUALS(settings.getKey(), SettingsType::BalancerDocKey);
+    ASSERT(settings.getSecondaryThrottle());
+}
 
-    TEST(SettingsType, BadType) {
-        BSONObj badTypeObj = BSON(SettingsType::key() << 0);
-        StatusWith<SettingsType> result = SettingsType::fromBSON(badTypeObj);
-        ASSERT_FALSE(result.isOK());
-    }
+TEST(SettingsType, BadType) {
+    BSONObj badTypeObj = BSON(SettingsType::key() << 0);
+    StatusWith<SettingsType> result = SettingsType::fromBSON(badTypeObj);
+    ASSERT_FALSE(result.isOK());
+}
 
-    TEST(SettingsType, BalancingWindow) {
-        // T0 < T1 < now < T2 < T3 and Error
-        const std::string T0 = "9:00";
-        const std::string T1 = "11:00";
-        boost::posix_time::ptime now(currentDate(),
-                                     boost::posix_time::hours(13) +
-                                        boost::posix_time::minutes(48));
-        const std::string T2 = "17:00";
-        const std::string T3 = "21:30";
-        const std::string E = "28:35";
+TEST(SettingsType, BalancingWindow) {
+    // T0 < T1 < now < T2 < T3 and Error
+    const std::string T0 = "9:00";
+    const std::string T1 = "11:00";
+    boost::posix_time::ptime now(currentDate(),
+                                 boost::posix_time::hours(13) + boost::posix_time::minutes(48));
+    const std::string T2 = "17:00";
+    const std::string T3 = "21:30";
+    const std::string E = "28:35";
 
-        // closed in the past
-        BSONObj w1 = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                          SettingsType::balancerActiveWindow(BSON("start" << T0 << "stop" << T1)));
-        StatusWith<SettingsType> result = SettingsType::fromBSON(w1);
-        ASSERT(result.isOK());
-        ASSERT_FALSE(result.getValue().inBalancingWindow(now));
+    // closed in the past
+    BSONObj w1 = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                      << SettingsType::balancerActiveWindow(BSON("start" << T0 << "stop" << T1)));
+    StatusWith<SettingsType> result = SettingsType::fromBSON(w1);
+    ASSERT(result.isOK());
+    ASSERT_FALSE(result.getValue().inBalancingWindow(now));
 
-        // not opened until the future
-        BSONObj w2 = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                          SettingsType::balancerActiveWindow(BSON("start" << T2 << "stop" << T3)));
-        result = SettingsType::fromBSON(w2);
-        ASSERT(result.isOK());
-        ASSERT_FALSE(result.getValue().inBalancingWindow(now));
+    // not opened until the future
+    BSONObj w2 = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                      << SettingsType::balancerActiveWindow(BSON("start" << T2 << "stop" << T3)));
+    result = SettingsType::fromBSON(w2);
+    ASSERT(result.isOK());
+    ASSERT_FALSE(result.getValue().inBalancingWindow(now));
 
-        // open now
-        BSONObj w3 = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                          SettingsType::balancerActiveWindow(BSON("start" << T1 << "stop" << T2)));
-        result = SettingsType::fromBSON(w3);
-        ASSERT(result.isOK());
-        ASSERT(result.getValue().inBalancingWindow(now));
+    // open now
+    BSONObj w3 = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                      << SettingsType::balancerActiveWindow(BSON("start" << T1 << "stop" << T2)));
+    result = SettingsType::fromBSON(w3);
+    ASSERT(result.isOK());
+    ASSERT(result.getValue().inBalancingWindow(now));
 
-        // open since last day
-        BSONObj w4 = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                          SettingsType::balancerActiveWindow(BSON("start" << T3 << "stop" << T2)));
-        result = SettingsType::fromBSON(w4);
-        ASSERT(result.isOK());
-        ASSERT(result.getValue().inBalancingWindow(now));
+    // open since last day
+    BSONObj w4 = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                      << SettingsType::balancerActiveWindow(BSON("start" << T3 << "stop" << T2)));
+    result = SettingsType::fromBSON(w4);
+    ASSERT(result.isOK());
+    ASSERT(result.getValue().inBalancingWindow(now));
 
-        // bad input should not stop the balancer
+    // bad input should not stop the balancer
 
-        // empty window
-        BSONObj w5 = BSON(SettingsType::key(SettingsType::BalancerDocKey));
-        result = SettingsType::fromBSON(w5);
-        ASSERT(result.isOK());
-        ASSERT(result.getValue().inBalancingWindow(now));
+    // empty window
+    BSONObj w5 = BSON(SettingsType::key(SettingsType::BalancerDocKey));
+    result = SettingsType::fromBSON(w5);
+    ASSERT(result.isOK());
+    ASSERT(result.getValue().inBalancingWindow(now));
 
-        // missing stop
-        BSONObj w6 = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                          SettingsType::balancerActiveWindow(BSON("start" << 1)));
-        result = SettingsType::fromBSON(w6);
-        ASSERT_FALSE(result.isOK());
+    // missing stop
+    BSONObj w6 = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                      << SettingsType::balancerActiveWindow(BSON("start" << 1)));
+    result = SettingsType::fromBSON(w6);
+    ASSERT_FALSE(result.isOK());
 
-        // missing start
-        BSONObj w7 = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                          SettingsType::balancerActiveWindow(BSON("stop" << 1)));
-        result = SettingsType::fromBSON(w7);
-        ASSERT_FALSE(result.isOK());
+    // missing start
+    BSONObj w7 = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                      << SettingsType::balancerActiveWindow(BSON("stop" << 1)));
+    result = SettingsType::fromBSON(w7);
+    ASSERT_FALSE(result.isOK());
 
-        // active window marker missing
-        BSONObj w8 = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                          "wrongMarker" << BSON("start" << 1 << "stop" << 1));
-        result = SettingsType::fromBSON(w8);
-        ASSERT(result.isOK());
-        ASSERT(result.getValue().inBalancingWindow(now));
+    // active window marker missing
+    BSONObj w8 = BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                      << "wrongMarker" << BSON("start" << 1 << "stop" << 1));
+    result = SettingsType::fromBSON(w8);
+    ASSERT(result.isOK());
+    ASSERT(result.getValue().inBalancingWindow(now));
 
-        // garbage in window
-        BSONObj w9 = BSON(SettingsType::balancerActiveWindow(BSON("start" << T3 << "stop" << E)));
-        result = SettingsType::fromBSON(w9);
-        ASSERT_FALSE(result.isOK());
-    }
+    // garbage in window
+    BSONObj w9 = BSON(SettingsType::balancerActiveWindow(BSON("start" << T3 << "stop" << E)));
+    result = SettingsType::fromBSON(w9);
+    ASSERT_FALSE(result.isOK());
+}
 
-} // unnamed namespace
+}  // unnamed namespace

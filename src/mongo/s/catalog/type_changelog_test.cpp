@@ -34,145 +34,145 @@
 
 namespace {
 
-    using std::string;
-    using mongo::ChangelogType;
-    using mongo::BSONObj;
-    using mongo::Date_t;
+using std::string;
+using mongo::ChangelogType;
+using mongo::BSONObj;
+using mongo::Date_t;
 
-    TEST(ChangelogType, Empty) {
-        ChangelogType logEntry;
-        BSONObj emptyObj = BSONObj();
-        string errMsg;
-        ASSERT(logEntry.parseBSON(emptyObj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(logEntry.isValid(NULL));
-    }
+TEST(ChangelogType, Empty) {
+    ChangelogType logEntry;
+    BSONObj emptyObj = BSONObj();
+    string errMsg;
+    ASSERT(logEntry.parseBSON(emptyObj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(logEntry.isValid(NULL));
+}
 
-    TEST(ChangelogType, Valid) {
-        ChangelogType logEntry;
-        BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
-                           ChangelogType::server("host.local") <<
-                           ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
-                           ChangelogType::what("split") <<
-                           ChangelogType::ns("test.test") <<
-                           ChangelogType::details(BSON("dummy" << "info")));
-        string errMsg;
-        ASSERT(logEntry.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_TRUE(logEntry.isValid(NULL));
-        ASSERT_EQUALS(logEntry.getChangeID(), "host.local-2012-11-21T19:14:10-8");
-        ASSERT_EQUALS(logEntry.getServer(), "host.local");
-        ASSERT_EQUALS(logEntry.getClientAddr(), "192.168.0.189:51128");
-        ASSERT_EQUALS(logEntry.getTime(), Date_t::fromMillisSinceEpoch(1));
-        ASSERT_EQUALS(logEntry.getWhat(), "split");
-        ASSERT_EQUALS(logEntry.getNS(), "test.test");
-        ASSERT_EQUALS(logEntry.getDetails(), BSON("dummy" << "info"));
-    }
+TEST(ChangelogType, Valid) {
+    ChangelogType logEntry;
+    BSONObj obj = BSON(
+        ChangelogType::changeID("host.local-2012-11-21T19:14:10-8")
+        << ChangelogType::server("host.local") << ChangelogType::clientAddr("192.168.0.189:51128")
+        << ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) << ChangelogType::what("split")
+        << ChangelogType::ns("test.test") << ChangelogType::details(BSON("dummy"
+                                                                         << "info")));
+    string errMsg;
+    ASSERT(logEntry.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_TRUE(logEntry.isValid(NULL));
+    ASSERT_EQUALS(logEntry.getChangeID(), "host.local-2012-11-21T19:14:10-8");
+    ASSERT_EQUALS(logEntry.getServer(), "host.local");
+    ASSERT_EQUALS(logEntry.getClientAddr(), "192.168.0.189:51128");
+    ASSERT_EQUALS(logEntry.getTime(), Date_t::fromMillisSinceEpoch(1));
+    ASSERT_EQUALS(logEntry.getWhat(), "split");
+    ASSERT_EQUALS(logEntry.getNS(), "test.test");
+    ASSERT_EQUALS(logEntry.getDetails(),
+                  BSON("dummy"
+                       << "info"));
+}
 
-    TEST(ChangelogType, MissingChangeID) {
-        ChangelogType logEntry;
-        BSONObj obj = BSON(ChangelogType::server("host.local") <<
-                           ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
-                           ChangelogType::what("split") <<
-                           ChangelogType::ns("test.test") <<
-                           ChangelogType::details(BSON("dummy" << "info")));
-        string errMsg;
-        ASSERT(logEntry.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(logEntry.isValid(NULL));
-    }
+TEST(ChangelogType, MissingChangeID) {
+    ChangelogType logEntry;
+    BSONObj obj =
+        BSON(ChangelogType::server("host.local")
+             << ChangelogType::clientAddr("192.168.0.189:51128")
+             << ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) << ChangelogType::what("split")
+             << ChangelogType::ns("test.test") << ChangelogType::details(BSON("dummy"
+                                                                              << "info")));
+    string errMsg;
+    ASSERT(logEntry.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(logEntry.isValid(NULL));
+}
 
-    TEST(ChangelogType, MissingServer) {
-        ChangelogType logEntry;
-        BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
-                           ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
-                           ChangelogType::what("split") <<
-                           ChangelogType::ns("test.test") <<
-                           ChangelogType::details(BSON("dummy" << "info")));
-        string errMsg;
-        ASSERT(logEntry.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(logEntry.isValid(NULL));
-    }
+TEST(ChangelogType, MissingServer) {
+    ChangelogType logEntry;
+    BSONObj obj =
+        BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8")
+             << ChangelogType::clientAddr("192.168.0.189:51128")
+             << ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) << ChangelogType::what("split")
+             << ChangelogType::ns("test.test") << ChangelogType::details(BSON("dummy"
+                                                                              << "info")));
+    string errMsg;
+    ASSERT(logEntry.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(logEntry.isValid(NULL));
+}
 
-    TEST(ChangelogType, MissingClientAddr) {
-        ChangelogType logEntry;
-        BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
-                           ChangelogType::server("host.local") <<
-                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
-                           ChangelogType::what("split") <<
-                           ChangelogType::ns("test.test") <<
-                           ChangelogType::details(BSON("dummy" << "info")));
-        string errMsg;
-        ASSERT(logEntry.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(logEntry.isValid(NULL));
-    }
+TEST(ChangelogType, MissingClientAddr) {
+    ChangelogType logEntry;
+    BSONObj obj =
+        BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8")
+             << ChangelogType::server("host.local")
+             << ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) << ChangelogType::what("split")
+             << ChangelogType::ns("test.test") << ChangelogType::details(BSON("dummy"
+                                                                              << "info")));
+    string errMsg;
+    ASSERT(logEntry.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(logEntry.isValid(NULL));
+}
 
-    TEST(ChangelogType, MissingTime) {
-        ChangelogType logEntry;
-        BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
-                           ChangelogType::server("host.local") <<
-                           ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::what("split") <<
-                           ChangelogType::ns("test.test") <<
-                           ChangelogType::details(BSON("dummy" << "info")));
-        string errMsg;
-        ASSERT(logEntry.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(logEntry.isValid(NULL));
-    }
+TEST(ChangelogType, MissingTime) {
+    ChangelogType logEntry;
+    BSONObj obj =
+        BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8")
+             << ChangelogType::server("host.local")
+             << ChangelogType::clientAddr("192.168.0.189:51128") << ChangelogType::what("split")
+             << ChangelogType::ns("test.test") << ChangelogType::details(BSON("dummy"
+                                                                              << "info")));
+    string errMsg;
+    ASSERT(logEntry.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(logEntry.isValid(NULL));
+}
 
-    TEST(ChangelogType, MissingWhat) {
-        ChangelogType logEntry;
-        BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
-                           ChangelogType::server("host.local") <<
-                           ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
-                           ChangelogType::ns("test.test") <<
-                           ChangelogType::details(BSON("dummy" << "info")));
-        string errMsg;
-        ASSERT(logEntry.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(logEntry.isValid(NULL));
-    }
+TEST(ChangelogType, MissingWhat) {
+    ChangelogType logEntry;
+    BSONObj obj = BSON(
+        ChangelogType::changeID("host.local-2012-11-21T19:14:10-8")
+        << ChangelogType::server("host.local") << ChangelogType::clientAddr("192.168.0.189:51128")
+        << ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) << ChangelogType::ns("test.test")
+        << ChangelogType::details(BSON("dummy"
+                                       << "info")));
+    string errMsg;
+    ASSERT(logEntry.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(logEntry.isValid(NULL));
+}
 
-    TEST(ChangelogType, MissingNS) {
-        ChangelogType logEntry;
-        BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
-                           ChangelogType::server("host.local") <<
-                           ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
-                           ChangelogType::what("split") <<
-                           ChangelogType::details(BSON("dummy" << "info")));
-        string errMsg;
-        ASSERT(logEntry.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(logEntry.isValid(NULL));
-    }
+TEST(ChangelogType, MissingNS) {
+    ChangelogType logEntry;
+    BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8")
+                       << ChangelogType::server("host.local")
+                       << ChangelogType::clientAddr("192.168.0.189:51128")
+                       << ChangelogType::time(Date_t::fromMillisSinceEpoch(1))
+                       << ChangelogType::what("split") << ChangelogType::details(BSON("dummy"
+                                                                                      << "info")));
+    string errMsg;
+    ASSERT(logEntry.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(logEntry.isValid(NULL));
+}
 
-    TEST(ChangelogType, MissingDetails) {
-        ChangelogType logEntry;
-        BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
-                           ChangelogType::server("host.local") <<
-                           ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
-                           ChangelogType::what("split") <<
-                           ChangelogType::ns("test.test"));
-        string errMsg;
-        ASSERT(logEntry.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(logEntry.isValid(NULL));
-    }
+TEST(ChangelogType, MissingDetails) {
+    ChangelogType logEntry;
+    BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8")
+                       << ChangelogType::server("host.local")
+                       << ChangelogType::clientAddr("192.168.0.189:51128")
+                       << ChangelogType::time(Date_t::fromMillisSinceEpoch(1))
+                       << ChangelogType::what("split") << ChangelogType::ns("test.test"));
+    string errMsg;
+    ASSERT(logEntry.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(logEntry.isValid(NULL));
+}
 
-    TEST(ChangelogType, BadType) {
-        ChangelogType logEntry;
-        BSONObj obj = BSON(ChangelogType::changeID() << 0);
-        string errMsg;
-        ASSERT((!logEntry.parseBSON(obj, &errMsg)) && (errMsg != ""));
-    }
+TEST(ChangelogType, BadType) {
+    ChangelogType logEntry;
+    BSONObj obj = BSON(ChangelogType::changeID() << 0);
+    string errMsg;
+    ASSERT((!logEntry.parseBSON(obj, &errMsg)) && (errMsg != ""));
+}
 
-} // unnamed namespace
+}  // unnamed namespace

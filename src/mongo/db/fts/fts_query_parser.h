@@ -34,57 +34,54 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        struct QueryToken {
-            enum Type { WHITESPACE, DELIMITER, TEXT, INVALID };
-            QueryToken( Type type, StringData data, unsigned offset, bool previousWhiteSpace )
-                : type( type ),
-                  data( data ),
-                  offset( offset ),
-                  previousWhiteSpace( previousWhiteSpace ) {}
+struct QueryToken {
+    enum Type { WHITESPACE, DELIMITER, TEXT, INVALID };
+    QueryToken(Type type, StringData data, unsigned offset, bool previousWhiteSpace)
+        : type(type), data(data), offset(offset), previousWhiteSpace(previousWhiteSpace) {}
 
-            bool ok() const { return type != INVALID; }
-
-            Type type;
-            StringData data;
-            unsigned offset;
-            bool previousWhiteSpace;
-        };
-
-        /**
-         * The pseudo EXBNF for the query parsing language is:
-         *
-         * SEARCH STRING = TOKEN_LIST ( ' ' TOKEN_LIST )*
-         *
-         * TOKEN_LIST = SEARCH_TOKEN
-         *          |'-' SEARCH_TOKEN
-         *          | QUOTED_SEARCH_TOKEN
-         *          |'-' QUOTED_SEARCH_TOKEN
-         *
-         * QUOTED_SEARCH_TOKEN = '“' SEARCH_TOKEN+ '"'
-         *
-         * SEARCH_TOKEN = CHARACTER_EXCLUDING_SPECIAL_CHARS
-         *
-         * SPECIAL_CHARS = '-' | ' ' | '"'
-         */
-        class FTSQueryParser {
-            MONGO_DISALLOW_COPYING( FTSQueryParser );
-        public:
-
-            FTSQueryParser(StringData str);
-            bool more() const;
-            QueryToken next();
-
-        private:
-            QueryToken::Type getType( char c ) const;
-            bool skipWhitespace();
-
-            unsigned _pos;
-            bool _previousWhiteSpace;
-            const StringData _raw;
-        };
-
+    bool ok() const {
+        return type != INVALID;
     }
-}
 
+    Type type;
+    StringData data;
+    unsigned offset;
+    bool previousWhiteSpace;
+};
+
+/**
+ * The pseudo EXBNF for the query parsing language is:
+ *
+ * SEARCH STRING = TOKEN_LIST ( ' ' TOKEN_LIST )*
+ *
+ * TOKEN_LIST = SEARCH_TOKEN
+ *          |'-' SEARCH_TOKEN
+ *          | QUOTED_SEARCH_TOKEN
+ *          |'-' QUOTED_SEARCH_TOKEN
+ *
+ * QUOTED_SEARCH_TOKEN = '“' SEARCH_TOKEN+ '"'
+ *
+ * SEARCH_TOKEN = CHARACTER_EXCLUDING_SPECIAL_CHARS
+ *
+ * SPECIAL_CHARS = '-' | ' ' | '"'
+ */
+class FTSQueryParser {
+    MONGO_DISALLOW_COPYING(FTSQueryParser);
+
+public:
+    FTSQueryParser(StringData str);
+    bool more() const;
+    QueryToken next();
+
+private:
+    QueryToken::Type getType(char c) const;
+    bool skipWhitespace();
+
+    unsigned _pos;
+    bool _previousWhiteSpace;
+    const StringData _raw;
+};
+}
+}

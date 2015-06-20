@@ -34,21 +34,20 @@
 
 namespace mongo {
 
-    OperationContext::OperationContext(Client* client, unsigned int opId, Locker* locker) :
-        _client(client), _opId(opId), _locker(locker) {
-    }
+OperationContext::OperationContext(Client* client, unsigned int opId, Locker* locker)
+    : _client(client), _opId(opId), _locker(locker) {}
 
-    Client* OperationContext::getClient() const {
-        invariant(_client);
-        return _client;
-    }
+Client* OperationContext::getClient() const {
+    invariant(_client);
+    return _client;
+}
 
-    void OperationContext::markKilled() {
-        _killPending.store(1);
-    }
+void OperationContext::markKilled() {
+    _killPending.store(1);
+}
 
-    bool OperationContext::isKillPending() const {
-        return _killPending.loadRelaxed();
-    }
+bool OperationContext::isKillPending() const {
+    return _killPending.loadRelaxed();
+}
 
 }  // namespace mongo

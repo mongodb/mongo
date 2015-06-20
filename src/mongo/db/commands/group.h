@@ -32,60 +32,68 @@
 
 namespace mongo {
 
-    class ClientBasic;
-    class Database;
-    class OperationContext;
-    class PlanExecutor;
-    class Scope;
+class ClientBasic;
+class Database;
+class OperationContext;
+class PlanExecutor;
+class Scope;
 
-    struct GroupRequest;
+struct GroupRequest;
 
-    class GroupCommand : public Command {
-    public:
-        GroupCommand();
+class GroupCommand : public Command {
+public:
+    GroupCommand();
 
-    private:
-        virtual bool isWriteCommandForConfigServer() const { return false; }
+private:
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual bool maintenanceOk() const { return false; }
+    virtual bool maintenanceOk() const {
+        return false;
+    }
 
-        virtual bool slaveOk() const { return false; }
+    virtual bool slaveOk() const {
+        return false;
+    }
 
-        virtual bool slaveOverrideOk() const { return true; }
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
 
-        virtual void help(std::stringstream& help) const {
-            help << "http://dochub.mongodb.org/core/aggregation";
-        }
+    virtual void help(std::stringstream& help) const {
+        help << "http://dochub.mongodb.org/core/aggregation";
+    }
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj);
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj);
 
-        virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const;
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const;
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& jsobj,
-                         int,
-                         std::string& errmsg,
-                         BSONObjBuilder& result);
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& jsobj,
+                     int,
+                     std::string& errmsg,
+                     BSONObjBuilder& result);
 
-        virtual Status explain(OperationContext* txn,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               ExplainCommon::Verbosity verbosity,
-                               BSONObjBuilder* out) const;
+    virtual Status explain(OperationContext* txn,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           ExplainCommon::Verbosity verbosity,
+                           BSONObjBuilder* out) const;
 
-        /**
-         * Parse a group command object.
-         *
-         * If 'cmdObj' is well-formed, returns Status::OK() and fills in out-argument 'request'.
-         *
-         * If a parsing error is encountered, returns an error Status.
-         */
-        Status parseRequest(const std::string& dbname,
-                            const BSONObj& cmdObj,
-                            GroupRequest* request) const; 
-    };
+    /**
+     * Parse a group command object.
+     *
+     * If 'cmdObj' is well-formed, returns Status::OK() and fills in out-argument 'request'.
+     *
+     * If a parsing error is encountered, returns an error Status.
+     */
+    Status parseRequest(const std::string& dbname,
+                        const BSONObj& cmdObj,
+                        GroupRequest* request) const;
+};
 
 }  // namespace mongo

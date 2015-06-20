@@ -37,85 +37,85 @@
 
 namespace mongo {
 
-    /**
-     * This class represents the layout and content of a update document runCommand,
-     * in the request side.
-     */
-    class BatchedUpdateDocument : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(BatchedUpdateDocument);
-    public:
+/**
+ * This class represents the layout and content of a update document runCommand,
+ * in the request side.
+ */
+class BatchedUpdateDocument : public BSONSerializable {
+    MONGO_DISALLOW_COPYING(BatchedUpdateDocument);
 
-        //
-        // schema declarations
-        //
+public:
+    //
+    // schema declarations
+    //
 
-        static const BSONField<BSONObj> query;
-        static const BSONField<BSONObj> updateExpr;
-        static const BSONField<bool> multi;
-        static const BSONField<bool> upsert;
+    static const BSONField<BSONObj> query;
+    static const BSONField<BSONObj> updateExpr;
+    static const BSONField<bool> multi;
+    static const BSONField<bool> upsert;
 
-        //
-        // construction / destruction
-        //
+    //
+    // construction / destruction
+    //
 
-        BatchedUpdateDocument();
-        virtual ~BatchedUpdateDocument();
+    BatchedUpdateDocument();
+    virtual ~BatchedUpdateDocument();
 
-        /** Copies all the fields present in 'this' to 'other'. */
-        void cloneTo(BatchedUpdateDocument* other) const;
+    /** Copies all the fields present in 'this' to 'other'. */
+    void cloneTo(BatchedUpdateDocument* other) const;
 
-        //
-        // bson serializable interface implementation
-        //
+    //
+    // bson serializable interface implementation
+    //
 
-        virtual bool isValid(std::string* errMsg) const;
-        virtual BSONObj toBSON() const;
-        virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-        virtual void clear();
-        virtual std::string toString() const;
+    virtual bool isValid(std::string* errMsg) const;
+    virtual BSONObj toBSON() const;
+    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
+    virtual void clear();
+    virtual std::string toString() const;
 
-        //
-        // individual field accessors
-        //
+    //
+    // individual field accessors
+    //
 
-        void setQuery(const BSONObj& query);
-        void unsetQuery();
-        bool isQuerySet() const;
-        const BSONObj& getQuery() const;
+    void setQuery(const BSONObj& query);
+    void unsetQuery();
+    bool isQuerySet() const;
+    const BSONObj& getQuery() const;
 
-        void setUpdateExpr(const BSONObj& updateExpr);
-        void unsetUpdateExpr();
-        bool isUpdateExprSet() const;
-        const BSONObj& getUpdateExpr() const;
+    void setUpdateExpr(const BSONObj& updateExpr);
+    void unsetUpdateExpr();
+    bool isUpdateExprSet() const;
+    const BSONObj& getUpdateExpr() const;
 
-        void setMulti(bool multi);
-        void unsetMulti();
-        bool isMultiSet() const;
-        bool getMulti() const;
+    void setMulti(bool multi);
+    void unsetMulti();
+    bool isMultiSet() const;
+    bool getMulti() const;
 
-        void setUpsert(bool upsert);
-        void unsetUpsert();
-        bool isUpsertSet() const;
-        bool getUpsert() const;
+    void setUpsert(bool upsert);
+    void unsetUpsert();
+    bool isUpsertSet() const;
+    bool getUpsert() const;
 
-    private:
-        // Convention: (M)andatory, (O)ptional
+private:
+    // Convention: (M)andatory, (O)ptional
 
-        // (M)  query whose result the update will manipulate
-        BSONObj _query;
-        bool _isQuerySet;
+    // (M)  query whose result the update will manipulate
+    BSONObj _query;
+    bool _isQuerySet;
 
-        // (M)  the update expression itself
-        BSONObj _updateExpr;
-        bool _isUpdateExprSet;
+    // (M)  the update expression itself
+    BSONObj _updateExpr;
+    bool _isUpdateExprSet;
 
-        // (O)  whether multiple documents are to be updated
-        bool _multi;
-        bool _isMultiSet;
+    // (O)  whether multiple documents are to be updated
+    bool _multi;
+    bool _isMultiSet;
 
-        // (O)  whether upserts are allowed
-        bool _upsert;
-        bool _isUpsertSet;
-    };
+    // (O)  whether upserts are allowed
+    bool _upsert;
+    bool _isUpsertSet;
+};
 
-} // namespace mongo
+}  // namespace mongo

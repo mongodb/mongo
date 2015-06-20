@@ -35,90 +35,90 @@
 namespace mongo {
 namespace repl {
 
-    class ReplicationProgressManager {
-        public:
-            virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
-            virtual ~ReplicationProgressManager();
-    };
+class ReplicationProgressManager {
+public:
+    virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
+    virtual ~ReplicationProgressManager();
+};
 
-    class Reporter {
-        MONGO_DISALLOW_COPYING(Reporter);
+class Reporter {
+    MONGO_DISALLOW_COPYING(Reporter);
 
-    public:
-        Reporter(ReplicationExecutor* executor,
-                 ReplicationProgressManager* replicationProgressManager,
-                 const HostAndPort& target);
-        virtual ~Reporter();
+public:
+    Reporter(ReplicationExecutor* executor,
+             ReplicationProgressManager* replicationProgressManager,
+             const HostAndPort& target);
+    virtual ~Reporter();
 
-        /**
-         * Returns true if a remote command has been scheduled (but not completed)
-         * with the executor.
-         */
-        bool isActive() const;
+    /**
+     * Returns true if a remote command has been scheduled (but not completed)
+     * with the executor.
+     */
+    bool isActive() const;
 
-        /**
-         * Returns true if a remote command should be scheduled once the current one returns 
-         * from the executor.
-         */
-        bool willRunAgain() const;
+    /**
+     * Returns true if a remote command should be scheduled once the current one returns
+     * from the executor.
+     */
+    bool willRunAgain() const;
 
-        /**
-         * Cancels remote command request.
-         * Returns immediately if the Reporter is not active.
-         */
-        void cancel();
+    /**
+     * Cancels remote command request.
+     * Returns immediately if the Reporter is not active.
+     */
+    void cancel();
 
-        /**
-         * Waits for last/current executor handle to finish.
-         * Returns immediately if the handle is invalid.
-         */
-        void wait();
+    /**
+     * Waits for last/current executor handle to finish.
+     * Returns immediately if the handle is invalid.
+     */
+    void wait();
 
-        /**
-         * Signals to the Reporter that there is new information to be sent to the "_target" server.
-         * Returns the _status, indicating any error the Reporter has encountered.
-         */
-        Status trigger();
+    /**
+     * Signals to the Reporter that there is new information to be sent to the "_target" server.
+     * Returns the _status, indicating any error the Reporter has encountered.
+     */
+    Status trigger();
 
-        /**
-         * Returns the previous return status so that the owner can decide whether the Reporter
-         * needs a new target to whom it can report.
-         */
-        Status getStatus() const;
+    /**
+     * Returns the previous return status so that the owner can decide whether the Reporter
+     * needs a new target to whom it can report.
+     */
+    Status getStatus() const;
 
-    private:
-        /**
-         * Schedules remote command to be run by the executor
-         */
-        Status _schedule_inlock();
+private:
+    /**
+     * Schedules remote command to be run by the executor
+     */
+    Status _schedule_inlock();
 
-        /**
-         * Callback for remote command.
-         */
-        void _callback(const ReplicationExecutor::RemoteCommandCallbackArgs& rcbd);
+    /**
+     * Callback for remote command.
+     */
+    void _callback(const ReplicationExecutor::RemoteCommandCallbackArgs& rcbd);
 
-        // Not owned by us.
-        ReplicationExecutor* _executor;
-        ReplicationProgressManager* _updatePositionSource;
+    // Not owned by us.
+    ReplicationExecutor* _executor;
+    ReplicationProgressManager* _updatePositionSource;
 
-        // Host to whom the Reporter sends updates.
-        HostAndPort _target;
+    // Host to whom the Reporter sends updates.
+    HostAndPort _target;
 
-        // Protects member data of this Reporter.
-        mutable stdx::mutex _mutex;
+    // Protects member data of this Reporter.
+    mutable stdx::mutex _mutex;
 
-        // Stores the most recent Status returned from the ReplicationExecutor.
-        Status _status;
+    // Stores the most recent Status returned from the ReplicationExecutor.
+    Status _status;
 
-        // _willRunAgain is true when Reporter is scheduled to be run by the executor and subsequent
-        // updates have come in.
-        bool _willRunAgain;
-        // _active is true when Reporter is scheduled to be run by the executor.
-        bool _active;
+    // _willRunAgain is true when Reporter is scheduled to be run by the executor and subsequent
+    // updates have come in.
+    bool _willRunAgain;
+    // _active is true when Reporter is scheduled to be run by the executor.
+    bool _active;
 
-        // Callback handle to the scheduled remote command.
-        ReplicationExecutor::CallbackHandle _remoteCommandCallbackHandle;
-    };
+    // Callback handle to the scheduled remote command.
+    ReplicationExecutor::CallbackHandle _remoteCommandCallbackHandle;
+};
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

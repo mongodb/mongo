@@ -41,105 +41,102 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
 namespace {
 
-    class AddShardCmd : public Command {
-    public:
-        AddShardCmd() : Command("addShard", false, "addshard") { }
+class AddShardCmd : public Command {
+public:
+    AddShardCmd() : Command("addShard", false, "addshard") {}
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+    virtual bool slaveOk() const {
+        return true;
+    }
 
-        virtual bool adminOnly() const {
-            return true;
-        }
+    virtual bool adminOnly() const {
+        return true;
+    }
 
-        virtual bool isWriteCommandForConfigServer() const {
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(std::stringstream& help) const {
+        help << "add a new shard to the system";
+    }
+
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::addShard);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        // get replica set component hosts
+        ConnectionString servers =
+            ConnectionString::parse(cmdObj.firstElement().valuestrsafe(), errmsg);
+        if (!errmsg.empty()) {
+            log() << "addshard request " << cmdObj << " failed: " << errmsg;
             return false;
         }
 
-        virtual void help(std::stringstream& help) const {
-            help << "add a new shard to the system";
-        }
+        // using localhost in server names implies every other process must use localhost addresses too
+        std::vector<HostAndPort> serverAddrs = servers.getServers();
+        for (size_t i = 0; i < serverAddrs.size(); i++) {
+            if (serverAddrs[i].isLocalHost() != grid.allowLocalHost()) {
+                errmsg = str::stream()
+                    << "Can't use localhost as a shard since all shards need to"
+                    << " communicate. Either use all shards and configdbs in localhost"
+                    << " or all in actual IPs. host: " << serverAddrs[i].toString()
+                    << " isLocalHost:" << serverAddrs[i].isLocalHost();
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-
-            ActionSet actions;
-            actions.addAction(ActionType::addShard);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
-
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
-
-            // get replica set component hosts
-            ConnectionString servers = ConnectionString::parse(
-                                            cmdObj.firstElement().valuestrsafe(), errmsg);
-            if (!errmsg.empty()) {
-                log() << "addshard request " << cmdObj << " failed: " << errmsg;
+                log() << "addshard request " << cmdObj
+                      << " failed: attempt to mix localhosts and IPs";
                 return false;
             }
 
-            // using localhost in server names implies every other process must use localhost addresses too
-            std::vector<HostAndPort> serverAddrs = servers.getServers();
-            for (size_t i = 0; i < serverAddrs.size(); i++) {
-                if (serverAddrs[i].isLocalHost() != grid.allowLocalHost()) {
-                    errmsg = str::stream() <<
-                                "Can't use localhost as a shard since all shards need to" <<
-                                " communicate. Either use all shards and configdbs in localhost" <<
-                                " or all in actual IPs. host: " << serverAddrs[i].toString() <<
-                                " isLocalHost:" << serverAddrs[i].isLocalHost();
-
-                    log() << "addshard request " << cmdObj
-                          << " failed: attempt to mix localhosts and IPs";
-                    return false;
-                }
-
-                // it's fine if mongods of a set all use default port
-                if (!serverAddrs[i].hasPort()) {
-                    serverAddrs[i] = HostAndPort(serverAddrs[i].host(),
-                                                 ServerGlobalParams::ShardServerPort);
-                }
+            // it's fine if mongods of a set all use default port
+            if (!serverAddrs[i].hasPort()) {
+                serverAddrs[i] =
+                    HostAndPort(serverAddrs[i].host(), ServerGlobalParams::ShardServerPort);
             }
-
-            // name is optional; addShard will provide one if needed
-            string name = "";
-            if (cmdObj["name"].type() == String) {
-                name = cmdObj["name"].valuestrsafe();
-            }
-
-            // maxSize is the space usage cap in a shard in MBs
-            long long maxSize = 0;
-            if (cmdObj[ShardType::maxSizeMB()].isNumber()) {
-                maxSize = cmdObj[ShardType::maxSizeMB()].numberLong();
-            }
-
-            audit::logAddShard(ClientBasic::getCurrent(), name, servers.toString(), maxSize);
-
-            StatusWith<string> addShardResult =
-                grid.catalogManager()->addShard(name, servers, maxSize);
-            if (!addShardResult.isOK()) {
-                log() << "addShard request '" << cmdObj << "'"
-                      << " failed: " << addShardResult.getStatus().reason();
-                return appendCommandStatus(result, addShardResult.getStatus());
-            }
-
-            result << "shardAdded" << addShardResult.getValue();
-
-            return true;
         }
 
-    } addShard;
+        // name is optional; addShard will provide one if needed
+        string name = "";
+        if (cmdObj["name"].type() == String) {
+            name = cmdObj["name"].valuestrsafe();
+        }
+
+        // maxSize is the space usage cap in a shard in MBs
+        long long maxSize = 0;
+        if (cmdObj[ShardType::maxSizeMB()].isNumber()) {
+            maxSize = cmdObj[ShardType::maxSizeMB()].numberLong();
+        }
+
+        audit::logAddShard(ClientBasic::getCurrent(), name, servers.toString(), maxSize);
+
+        StatusWith<string> addShardResult = grid.catalogManager()->addShard(name, servers, maxSize);
+        if (!addShardResult.isOK()) {
+            log() << "addShard request '" << cmdObj << "'"
+                  << " failed: " << addShardResult.getStatus().reason();
+            return appendCommandStatus(result, addShardResult.getStatus());
+        }
+
+        result << "shardAdded" << addShardResult.getValue();
+
+        return true;
+    }
+
+} addShard;
 
 
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

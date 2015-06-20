@@ -41,48 +41,47 @@
 
 namespace mongo {
 
-    SharedLibrary::~SharedLibrary() {
-        if (_handle) {
-            if (dlclose(_handle) != 0) {
-                LOG(2) << "Load Library close failed " << dlerror();
-            }
+SharedLibrary::~SharedLibrary() {
+    if (_handle) {
+        if (dlclose(_handle) != 0) {
+            LOG(2) << "Load Library close failed " << dlerror();
         }
     }
+}
 
-    StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
-        const boost::filesystem::path& full_path) {
+StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
+    const boost::filesystem::path& full_path) {
+    LOG(1) << "Loading library: " << full_path.c_str();
 
-        LOG(1) << "Loading library: " << full_path.c_str();
-
-        void* handle = dlopen(full_path.c_str(), RTLD_NOW | RTLD_GLOBAL);
-        if (handle == nullptr) {
-            return Status(ErrorCodes::InternalError,
-                str::stream() << "Load library failed: " << dlerror());
-        }
-
-        return StatusWith<std::unique_ptr<SharedLibrary>>(
-                std::unique_ptr<SharedLibrary>(new SharedLibrary(handle)));
+    void* handle = dlopen(full_path.c_str(), RTLD_NOW | RTLD_GLOBAL);
+    if (handle == nullptr) {
+        return Status(ErrorCodes::InternalError,
+                      str::stream() << "Load library failed: " << dlerror());
     }
 
-    StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
-        // Clear dlerror() before calling dlsym,
-        // see man dlerror(3) or dlerror(3p) on any POSIX system for details
-        // Ignore return
-        dlerror();
+    return StatusWith<std::unique_ptr<SharedLibrary>>(
+        std::unique_ptr<SharedLibrary>(new SharedLibrary(handle)));
+}
 
-        // StringData is not assued to be null-terminated
-        std::string symbolName = name.toString();
+StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
+    // Clear dlerror() before calling dlsym,
+    // see man dlerror(3) or dlerror(3p) on any POSIX system for details
+    // Ignore return
+    dlerror();
 
-        void* symbol = dlsym(_handle, symbolName.c_str());
+    // StringData is not assued to be null-terminated
+    std::string symbolName = name.toString();
 
-        char* error_msg = dlerror();
-        if (error_msg != nullptr) {
-            return StatusWith<void*>(ErrorCodes::InternalError,
-                str::stream() << "dlsym failed for symbol "
-                    << name << " with error message: " << error_msg);
-        }
+    void* symbol = dlsym(_handle, symbolName.c_str());
 
-        return StatusWith<void*>(symbol);
+    char* error_msg = dlerror();
+    if (error_msg != nullptr) {
+        return StatusWith<void*>(ErrorCodes::InternalError,
+                                 str::stream() << "dlsym failed for symbol " << name
+                                               << " with error message: " << error_msg);
     }
 
-} // namespace mongo
+    return StatusWith<void*>(symbol);
+}
+
+}  // namespace mongo

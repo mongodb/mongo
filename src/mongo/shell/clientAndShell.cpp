@@ -39,44 +39,43 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
-    using std::vector;
+using std::endl;
+using std::string;
+using std::vector;
 
-    class Client;
-    class DBClientBase;
-    class OperationContext;
+class Client;
+class DBClientBase;
+class OperationContext;
 
 
-    bool dbexitCalled = false;
+bool dbexitCalled = false;
 
-    void dbexit( ExitCode returnCode, const char *whyMsg ) {
-        {
-            stdx::lock_guard<stdx::mutex> lk( shell_utils::mongoProgramOutputMutex );
-            dbexitCalled = true;
-        }
-
-        log() << "dbexit called" << endl;
-
-        if (whyMsg) {
-            log() << " b/c " << whyMsg << endl;
-        }
-
-        log() << "exiting" << endl;
-        quickExit( returnCode );
+void dbexit(ExitCode returnCode, const char* whyMsg) {
+    {
+        stdx::lock_guard<stdx::mutex> lk(shell_utils::mongoProgramOutputMutex);
+        dbexitCalled = true;
     }
 
-    bool inShutdown() {
-        return dbexitCalled;
+    log() << "dbexit called" << endl;
+
+    if (whyMsg) {
+        log() << " b/c " << whyMsg << endl;
     }
 
-    bool haveLocalShardingInfo( Client* client, const string& ns ) {
-        return false;
-    }
+    log() << "exiting" << endl;
+    quickExit(returnCode);
+}
 
-    DBClientBase* createDirectClient(OperationContext* txn) {
-        uassert( 10256 ,  "no createDirectClient in clientOnly" , 0 );
-        return 0;
-    }
+bool inShutdown() {
+    return dbexitCalled;
+}
 
+bool haveLocalShardingInfo(Client* client, const string& ns) {
+    return false;
+}
+
+DBClientBase* createDirectClient(OperationContext* txn) {
+    uassert(10256, "no createDirectClient in clientOnly", 0);
+    return 0;
+}
 }

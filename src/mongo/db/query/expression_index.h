@@ -32,29 +32,28 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/geo/shapes.h"
-#include "mongo/db/query/index_bounds_builder.h" // For OrderedIntervalList
+#include "mongo/db/query/index_bounds_builder.h"  // For OrderedIntervalList
 
 namespace mongo {
 
-    /**
-     * Functions that compute expression index mappings.
-     *
-     * TODO: I think we could structure this more generally with respect to planning.
-     */
-    class ExpressionMapping {
-    public:
+/**
+ * Functions that compute expression index mappings.
+ *
+ * TODO: I think we could structure this more generally with respect to planning.
+ */
+class ExpressionMapping {
+public:
+    static BSONObj hash(const BSONElement& value);
 
-        static BSONObj hash(const BSONElement& value);
+    static void cover2d(const R2Region& region,
+                        const BSONObj& indexInfoObj,
+                        int maxCoveringCells,
+                        OrderedIntervalList* oil);
 
-        static void cover2d(const R2Region& region,
-                            const BSONObj& indexInfoObj,
-                            int maxCoveringCells,
-                            OrderedIntervalList* oil);
-
-        // TODO: what should we really pass in for indexInfoObj?
-        static void cover2dsphere(const S2Region& region,
-                                  const BSONObj& indexInfoObj,
-                                  OrderedIntervalList* oilOut);
-    };
+    // TODO: what should we really pass in for indexInfoObj?
+    static void cover2dsphere(const S2Region& region,
+                              const BSONObj& indexInfoObj,
+                              OrderedIntervalList* oilOut);
+};
 
 }  // namespace mongo

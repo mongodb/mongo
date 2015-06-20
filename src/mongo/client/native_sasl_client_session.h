@@ -30,34 +30,36 @@
 
 namespace mongo {
 
-    class SaslClientConversation;
+class SaslClientConversation;
 
-    /**
-     * Implementation of the client side of a SASL authentication conversation using the
-     * native SASL implementation.
-     */
-    class NativeSaslClientSession : public SaslClientSession {
-        MONGO_DISALLOW_COPYING(NativeSaslClientSession);
-    public:
+/**
+ * Implementation of the client side of a SASL authentication conversation using the
+ * native SASL implementation.
+ */
+class NativeSaslClientSession : public SaslClientSession {
+    MONGO_DISALLOW_COPYING(NativeSaslClientSession);
 
-        NativeSaslClientSession();
-        ~NativeSaslClientSession();
+public:
+    NativeSaslClientSession();
+    ~NativeSaslClientSession();
 
-        virtual Status initialize();
+    virtual Status initialize();
 
-        virtual Status step(StringData inputData, std::string* outputData);
+    virtual Status step(StringData inputData, std::string* outputData);
 
-        virtual bool isDone() const { return _done; }
+    virtual bool isDone() const {
+        return _done;
+    }
 
-    private:
-        /// Number of successfully completed conversation steps.
-        int _step;
+private:
+    /// Number of successfully completed conversation steps.
+    int _step;
 
-        /// See isDone().
-        bool _done;
+    /// See isDone().
+    bool _done;
 
-        /// The client side of a SASL authentication conversation.
-        std::unique_ptr<SaslClientConversation> _saslConversation;
-    };
+    /// The client side of a SASL authentication conversation.
+    std::unique_ptr<SaslClientConversation> _saslConversation;
+};
 
 }  // namespace mongo

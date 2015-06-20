@@ -36,33 +36,33 @@
 namespace mongo {
 namespace repl {
 
-    OpTime::OpTime(Timestamp ts, long long term) : _timestamp(std::move(ts)), _term(term) {}
+OpTime::OpTime(Timestamp ts, long long term) : _timestamp(std::move(ts)), _term(term) {}
 
-    Timestamp OpTime::getTimestamp() const {
-        return _timestamp;
-    }
+Timestamp OpTime::getTimestamp() const {
+    return _timestamp;
+}
 
-    long long OpTime::getSecs() const {
-        return _timestamp.getSecs();
-    }
+long long OpTime::getSecs() const {
+    return _timestamp.getSecs();
+}
 
-    long long OpTime::getTerm() const {
-        return _term;
-    }
+long long OpTime::getTerm() const {
+    return _term;
+}
 
-    bool OpTime::isNull() const {
-        return _timestamp.isNull();
-    }
+bool OpTime::isNull() const {
+    return _timestamp.isNull();
+}
 
-    std::string OpTime::toString() const {
-        std::stringstream ss;
-        ss << "(term: " << _term << ", timestamp: " << _timestamp.toStringPretty() << ")";
-        return ss.str();
-    }
+std::string OpTime::toString() const {
+    std::stringstream ss;
+    ss << "(term: " << _term << ", timestamp: " << _timestamp.toStringPretty() << ")";
+    return ss.str();
+}
 
-    std::ostream& operator<<(std::ostream& out, const OpTime& opTime) {
-        return out << opTime.toString();
-    }
+std::ostream& operator<<(std::ostream& out, const OpTime& opTime) {
+    return out << opTime.toString();
+}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

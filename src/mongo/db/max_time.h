@@ -30,9 +30,6 @@
 
 namespace mongo {
 
-    enum {
-        kMaxTimeCursorTimeLimitExpired = -1,
-        kMaxTimeCursorNoTimeLimit = 0
-    };
+enum { kMaxTimeCursorTimeLimitExpired = -1, kMaxTimeCursorNoTimeLimit = 0 };
 
-} // namespace mongo
+}  // namespace mongo

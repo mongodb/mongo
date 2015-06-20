@@ -44,28 +44,27 @@
 
 namespace mongo {
 
-    using std::cout;
-    using std::endl;
+using std::cout;
+using std::endl;
 
-    bool is32bit() {
-        return ( sizeof(int*) == 4 );
-    }
+bool is32bit() {
+    return (sizeof(int*) == 4);
+}
 
-    void logProcessDetails() {
-        log() << mongodVersion() << endl;
-        printGitVersion();
-        printOpenSSLVersion();
-        printAllocator();
-        printCommandLineOpts();
-    }
+void logProcessDetails() {
+    log() << mongodVersion() << endl;
+    printGitVersion();
+    printOpenSSLVersion();
+    printAllocator();
+    printCommandLineOpts();
+}
 
-    void logProcessDetailsForLogRotate() {
-        log() << "pid=" <<  ProcessId::getCurrent()
-            << " port=" << serverGlobalParams.port
-            << ( is32bit() ? " 32" : " 64" ) << "-bit "
-            << "host=" << getHostNameCached();
+void logProcessDetailsForLogRotate() {
+    log() << "pid=" << ProcessId::getCurrent() << " port=" << serverGlobalParams.port
+          << (is32bit() ? " 32" : " 64") << "-bit "
+          << "host=" << getHostNameCached();
 
-        logProcessDetails();
-    }
+    logProcessDetails();
+}
 
-} //mongo
+}  // mongo

@@ -34,103 +34,110 @@
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 
 namespace mongo {
+/**
+ * A simple class for mocking mongo::DBClientConnection.
+ *
+ * Also check out sample usage in dbtests/mock_dbclient_conn_test.cpp
+ */
+class MockDBClientConnection : public mongo::DBClientConnection {
+public:
     /**
-     * A simple class for mocking mongo::DBClientConnection.
+     * Create a mock connection to a mock server.
      *
-     * Also check out sample usage in dbtests/mock_dbclient_conn_test.cpp
+     * @param remoteServer the remote server to connect to. The caller is
+     *     responsible for making sure that the life of remoteServer is
+     *     longer than this connection.
+     * @param autoReconnect will automatically re-establish connection the
+     *     next time an operation is requested when the last operation caused
+     *     this connection to fall into a failed state.
      */
-    class MockDBClientConnection : public mongo::DBClientConnection {
-    public:
-        /**
-         * Create a mock connection to a mock server.
-         *
-         * @param remoteServer the remote server to connect to. The caller is
-         *     responsible for making sure that the life of remoteServer is
-         *     longer than this connection.
-         * @param autoReconnect will automatically re-establish connection the
-         *     next time an operation is requested when the last operation caused
-         *     this connection to fall into a failed state.
-         */
-        MockDBClientConnection(MockRemoteDBServer* remoteServer, bool autoReconnect = false);
-        virtual ~MockDBClientConnection();
+    MockDBClientConnection(MockRemoteDBServer* remoteServer, bool autoReconnect = false);
+    virtual ~MockDBClientConnection();
 
-        //
-        // DBClientBase methods
-        //
+    //
+    // DBClientBase methods
+    //
 
-        bool connect(const char* hostName, std::string& errmsg);
+    bool connect(const char* hostName, std::string& errmsg);
 
-        inline bool connect(const HostAndPort& host, std::string& errmsg) {
-            return connect(host.toString().c_str(), errmsg);
-        }
+    inline bool connect(const HostAndPort& host, std::string& errmsg) {
+        return connect(host.toString().c_str(), errmsg);
+    }
 
-        bool runCommand(const std::string& dbname, const mongo::BSONObj& cmdObj,
-                mongo::BSONObj &info, int options = 0);
+    bool runCommand(const std::string& dbname,
+                    const mongo::BSONObj& cmdObj,
+                    mongo::BSONObj& info,
+                    int options = 0);
 
-        rpc::UniqueReply runCommandWithMetadata(StringData database,
-                                                StringData command,
-                                                const BSONObj& metadata,
-                                                const BSONObj& commandArgs) final;
+    rpc::UniqueReply runCommandWithMetadata(StringData database,
+                                            StringData command,
+                                            const BSONObj& metadata,
+                                            const BSONObj& commandArgs) final;
 
-        std::unique_ptr<mongo::DBClientCursor> query(const std::string &ns,
-                                                     mongo::Query query = mongo::Query(),
-                                                     int nToReturn = 0,
-                                                     int nToSkip = 0,
-                                                     const mongo::BSONObj* fieldsToReturn = 0,
-                                                     int queryOptions = 0,
-                                                     int batchSize = 0);
+    std::unique_ptr<mongo::DBClientCursor> query(const std::string& ns,
+                                                 mongo::Query query = mongo::Query(),
+                                                 int nToReturn = 0,
+                                                 int nToSkip = 0,
+                                                 const mongo::BSONObj* fieldsToReturn = 0,
+                                                 int queryOptions = 0,
+                                                 int batchSize = 0);
 
-        uint64_t getSockCreationMicroSec() const;
+    uint64_t getSockCreationMicroSec() const;
 
-        virtual void insert(const std::string& ns, BSONObj obj, int flags = 0);
+    virtual void insert(const std::string& ns, BSONObj obj, int flags = 0);
 
-        virtual void insert(const std::string& ns, const std::vector<BSONObj>& objList, int flags = 0);
+    virtual void insert(const std::string& ns, const std::vector<BSONObj>& objList, int flags = 0);
 
-        virtual void remove(const std::string& ns, Query query, bool justOne = false);
+    virtual void remove(const std::string& ns, Query query, bool justOne = false);
 
-        virtual void remove(const std::string& ns, Query query, int flags = 0);
+    virtual void remove(const std::string& ns, Query query, int flags = 0);
 
-        //
-        // Getters
-        //
+    //
+    // Getters
+    //
 
-        mongo::ConnectionString::ConnectionType type() const;
-        bool isFailed() const;
-        double getSoTimeout() const;
-        std::string getServerAddress() const;
-        std::string toString() const;
+    mongo::ConnectionString::ConnectionType type() const;
+    bool isFailed() const;
+    double getSoTimeout() const;
+    std::string getServerAddress() const;
+    std::string toString() const;
 
-        //
-        // Unsupported methods (defined to get rid of virtual function was hidden error)
-        //
-        unsigned long long query(stdx::function<void(const mongo::BSONObj&)> f,
-                const std::string& ns, mongo::Query query,
-                const mongo::BSONObj* fieldsToReturn = 0, int queryOptions = 0);
+    //
+    // Unsupported methods (defined to get rid of virtual function was hidden error)
+    //
+    unsigned long long query(stdx::function<void(const mongo::BSONObj&)> f,
+                             const std::string& ns,
+                             mongo::Query query,
+                             const mongo::BSONObj* fieldsToReturn = 0,
+                             int queryOptions = 0);
 
-        unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
-                const std::string& ns, mongo::Query query,
-                const mongo::BSONObj* fieldsToReturn = 0,
-                int queryOptions = 0);
+    unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
+                             const std::string& ns,
+                             mongo::Query query,
+                             const mongo::BSONObj* fieldsToReturn = 0,
+                             int queryOptions = 0);
 
-        //
-        // Unsupported methods (these are pure virtuals in the base class)
-        //
+    //
+    // Unsupported methods (these are pure virtuals in the base class)
+    //
 
-        void killCursor(long long cursorID);
-        bool callRead(mongo::Message& toSend , mongo::Message& response);
-        bool call(mongo::Message& toSend, mongo::Message& response, bool assertOk = true,
-                std::string* actualServer = 0);
-        void say(mongo::Message& toSend, bool isRetry = false, std::string* actualServer = 0);
-        void sayPiggyBack(mongo::Message& toSend);
-        bool lazySupported() const;
+    void killCursor(long long cursorID);
+    bool callRead(mongo::Message& toSend, mongo::Message& response);
+    bool call(mongo::Message& toSend,
+              mongo::Message& response,
+              bool assertOk = true,
+              std::string* actualServer = 0);
+    void say(mongo::Message& toSend, bool isRetry = false, std::string* actualServer = 0);
+    void sayPiggyBack(mongo::Message& toSend);
+    bool lazySupported() const;
 
-    private:
-        void checkConnection();
+private:
+    void checkConnection();
 
-        MockRemoteDBServer::InstanceID _remoteServerInstanceID;
-        MockRemoteDBServer* _remoteServer;
-        bool _isFailed;
-        uint64_t _sockCreationTime;
-        bool _autoReconnect;
-    };
+    MockRemoteDBServer::InstanceID _remoteServerInstanceID;
+    MockRemoteDBServer* _remoteServer;
+    bool _isFailed;
+    uint64_t _sockCreationTime;
+    bool _autoReconnect;
+};
 }

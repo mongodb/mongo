@@ -42,715 +42,715 @@
 
 namespace {
 
-    using mongo::BSONObj;
-    using mongo::fromjson;
-    using mongo::LogBuilder;
-    using mongo::ModifierInterface;
-    using mongo::NumberInt;
-    using mongo::ModifierSet;
-    using mongo::Status;
-    using mongo::StringData;
-    using mongo::mutablebson::ConstElement;
-    using mongo::mutablebson::countChildren;
-    using mongo::mutablebson::Document;
-    using mongo::mutablebson::Element;
+using mongo::BSONObj;
+using mongo::fromjson;
+using mongo::LogBuilder;
+using mongo::ModifierInterface;
+using mongo::NumberInt;
+using mongo::ModifierSet;
+using mongo::Status;
+using mongo::StringData;
+using mongo::mutablebson::ConstElement;
+using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Document;
+using mongo::mutablebson::Element;
 
-    /** Helper to build and manipulate a $set mod. */
-    class Mod {
-    public:
-        Mod() : _mod() {}
+/** Helper to build and manipulate a $set mod. */
+class Mod {
+public:
+    Mod() : _mod() {}
 
-        explicit Mod(BSONObj modObj, bool fromRepl = false) :
-                _mod(mongoutils::str::equals(modObj.firstElement().fieldName(), "$setOnInsert") ?
-                ModifierSet::SET_ON_INSERT : ModifierSet::SET_NORMAL) {
-
-            _modObj = modObj;
-            StringData modName = modObj.firstElement().fieldName();
-            ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(),
-                                !fromRepl ? ModifierInterface::Options::normal():
-                                            ModifierInterface::Options::fromRepl()));
-        }
-
-        Status prepare(Element root,
-                       StringData matchedField,
-                       ModifierInterface::ExecInfo* execInfo) {
-            return _mod.prepare(root, matchedField, execInfo);
-        }
-
-        Status apply() const {
-            return _mod.apply();
-        }
-
-        Status log(LogBuilder* logBuilder) const {
-            return _mod.log(logBuilder);
-        }
-
-        ModifierSet& mod() { return _mod; }
-
-    private:
-        ModifierSet _mod;
-        BSONObj _modObj;
-    };
-
-    //
-    // Init tests
-    //
-
-    TEST(Init, EmptyOperation) {
-        BSONObj modObj = fromjson("{$set: {}}");
-        ModifierSet mod;
-        ASSERT_NOT_OK(mod.init(modObj["$set"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal() ));
+    explicit Mod(BSONObj modObj, bool fromRepl = false)
+        : _mod(mongoutils::str::equals(modObj.firstElement().fieldName(), "$setOnInsert")
+                   ? ModifierSet::SET_ON_INSERT
+                   : ModifierSet::SET_NORMAL) {
+        _modObj = modObj;
+        StringData modName = modObj.firstElement().fieldName();
+        ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(),
+                            !fromRepl ? ModifierInterface::Options::normal()
+                                      : ModifierInterface::Options::fromRepl()));
     }
 
-    //
-    // Simple Mods
-    //
-
-    TEST(SimpleMod, PrepareNoOp) {
-        Document doc(fromjson("{a: 2}"));
-        Mod setMod(fromjson("{$set: {a: 2}}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
-
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_TRUE(execInfo.noOp);
+    Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
+        return _mod.prepare(root, matchedField, execInfo);
     }
 
-    TEST(SimpleMod, PrepareSetOnInsert) {
-        Document doc(fromjson("{a: 1}"));
-        Mod setMod(fromjson("{$setOnInsert: {a: 2}}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
-
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_EQUALS(execInfo.context, ModifierInterface::ExecInfo::INSERT_CONTEXT);
+    Status apply() const {
+        return _mod.apply();
     }
 
-    TEST(SimpleMod, PrepareApplyEmptyDocument) {
-        Document doc(fromjson("{}"));
-        Mod setMod(fromjson("{$set: {a: 2}}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
-
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+    Status log(LogBuilder* logBuilder) const {
+        return _mod.log(logBuilder);
     }
 
-    TEST(SimpleMod, PrepareApplyInPlace) {
-        Document doc(fromjson("{a: 1}"));
-        Mod setMod(fromjson("{$set: {a: 2}}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
-
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(setMod.apply());
-        ASSERT_TRUE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+    ModifierSet& mod() {
+        return _mod;
     }
 
-    TEST(SimpleMod, PrepareApplyOverridePath) {
-        Document doc(fromjson("{a: {b: 1}}"));
-        Mod setMod(fromjson("{$set: {a: 2}}"));
+private:
+    ModifierSet _mod;
+    BSONObj _modObj;
+};
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+//
+// Init tests
+//
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: 2}"), doc);
-    }
+TEST(Init, EmptyOperation) {
+    BSONObj modObj = fromjson("{$set: {}}");
+    ModifierSet mod;
+    ASSERT_NOT_OK(mod.init(modObj["$set"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
+}
 
-    TEST(SimpleMod, PrepareApplyChangeType) {
-        Document doc(fromjson("{a: 'str'}"));
-        Mod setMod(fromjson("{$set: {a: 2}}"));
+//
+// Simple Mods
+//
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+TEST(SimpleMod, PrepareNoOp) {
+    Document doc(fromjson("{a: 2}"));
+    Mod setMod(fromjson("{$set: {a: 2}}"));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: 2}"), doc);
-    }
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_TRUE(execInfo.noOp);
+}
+
+TEST(SimpleMod, PrepareSetOnInsert) {
+    Document doc(fromjson("{a: 1}"));
+    Mod setMod(fromjson("{$setOnInsert: {a: 2}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.context, ModifierInterface::ExecInfo::INSERT_CONTEXT);
+}
+
+TEST(SimpleMod, PrepareApplyEmptyDocument) {
+    Document doc(fromjson("{}"));
+    Mod setMod(fromjson("{$set: {a: 2}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
 
-    TEST(SimpleMod, PrepareApplyNewPath) {
-        Document doc(fromjson("{b: 1}"));
-        Mod setMod(fromjson("{$set: {a: 2}}"));
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+}
+
+TEST(SimpleMod, PrepareApplyInPlace) {
+    Document doc(fromjson("{a: 1}"));
+    Mod setMod(fromjson("{$set: {a: 2}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(setMod.apply());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+}
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.noOp);
+TEST(SimpleMod, PrepareApplyOverridePath) {
+    Document doc(fromjson("{a: {b: 1}}"));
+    Mod setMod(fromjson("{$set: {a: 2}}"));
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{b: 1, a: 2}"), doc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-    TEST(SimpleMod, LogNormal) {
-        BSONObj obj = fromjson("{a: 1}");
-        Mod setMod(fromjson("{$set: {a: 2}}"));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+}
 
-        Document doc(obj);
-        ModifierInterface::ExecInfo dummy;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &dummy));
+TEST(SimpleMod, PrepareApplyChangeType) {
+    Document doc(fromjson("{a: 'str'}"));
+    Mod setMod(fromjson("{$set: {a: 2}}"));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(setMod.log(&logBuilder));
-        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_EQUALS(fromjson("{$set: {a: 2}}"), logDoc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-    //
-    // Simple dotted mod
-    //
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+}
 
-    TEST(DottedMod, PrepareNoOp) {
-        Document doc(fromjson("{a: {b: 2}}"));
-        Mod setMod(fromjson("{$set: {'a.b': 2}}"));
+TEST(SimpleMod, PrepareApplyNewPath) {
+    Document doc(fromjson("{b: 1}"));
+    Mod setMod(fromjson("{$set: {a: 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_TRUE(execInfo.noOp);
-    }
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
 
-    TEST(DottedMod, PreparePathNotViable) {
-        Document doc(fromjson("{a:1}"));
-        Mod setMod(fromjson("{$set: {'a.b': 2}}"));
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{b: 1, a: 2}"), doc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_NOT_OK(setMod.prepare(doc.root(), "", &execInfo));
-    }
+TEST(SimpleMod, LogNormal) {
+    BSONObj obj = fromjson("{a: 1}");
+    Mod setMod(fromjson("{$set: {a: 2}}"));
 
-    TEST(DottedMod, PreparePathNotViableArrray) {
-        Document doc(fromjson("{a:[{b:1}]}"));
-        Mod setMod(fromjson("{$set: {'a.b': 2}}"));
+    Document doc(obj);
+    ModifierInterface::ExecInfo dummy;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &dummy));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_NOT_OK(setMod.prepare(doc.root(), "", &execInfo));
-    }
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(setMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {a: 2}}"), logDoc);
+}
 
-    TEST(DottedMod, PrepareApplyInPlace) {
-        Document doc(fromjson("{a: {b: 1}}"));
-        Mod setMod(fromjson("{$set: {'a.b': 2}}"));
+//
+// Simple dotted mod
+//
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+TEST(DottedMod, PrepareNoOp) {
+    Document doc(fromjson("{a: {b: 2}}"));
+    Mod setMod(fromjson("{$set: {'a.b': 2}}"));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_TRUE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
-    }
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-    TEST(DottedMod, PrepareApplyChangeType) {
-        Document doc(fromjson("{a: {b: 'str'}}"));
-        Mod setMod(fromjson("{$set: {'a.b': 2}}"));
+TEST(DottedMod, PreparePathNotViable) {
+    Document doc(fromjson("{a:1}"));
+    Mod setMod(fromjson("{$set: {'a.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_NOT_OK(setMod.prepare(doc.root(), "", &execInfo));
+}
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.noOp);
+TEST(DottedMod, PreparePathNotViableArrray) {
+    Document doc(fromjson("{a:[{b:1}]}"));
+    Mod setMod(fromjson("{$set: {'a.b': 2}}"));
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_NOT_OK(setMod.prepare(doc.root(), "", &execInfo));
+}
 
-    TEST(DottedMod, PrepareApplyChangePath) {
-        Document doc(fromjson("{a: {b: {c: 1}}}"));
-        Mod setMod(fromjson("{$set: {'a.b': 2}}"));
+TEST(DottedMod, PrepareApplyInPlace) {
+    Document doc(fromjson("{a: {b: 1}}"));
+    Mod setMod(fromjson("{$set: {'a.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
+}
 
-    TEST(DottedMod, PrepareApplyExtendPath) {
-        Document doc(fromjson("{a: {c: 1}}"));
-        Mod setMod(fromjson("{$set: {'a.b': 2}}"));
+TEST(DottedMod, PrepareApplyChangeType) {
+    Document doc(fromjson("{a: {b: 'str'}}"));
+    Mod setMod(fromjson("{$set: {'a.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {c: 1, b: 2}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
+}
 
-    TEST(DottedMod, PrepareApplyNewPath) {
-        Document doc(fromjson("{c: 1}"));
-        Mod setMod(fromjson("{$set: {'a.b': 2}}"));
+TEST(DottedMod, PrepareApplyChangePath) {
+    Document doc(fromjson("{a: {b: {c: 1}}}"));
+    Mod setMod(fromjson("{$set: {'a.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{c: 1, a: {b: 2}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
+}
 
-    TEST(DottedMod, PrepareApplyEmptyDoc) {
-        Document doc(fromjson("{}"));
-        Mod setMod(fromjson("{$set: {'a.b': 2}}"));
+TEST(DottedMod, PrepareApplyExtendPath) {
+    Document doc(fromjson("{a: {c: 1}}"));
+    Mod setMod(fromjson("{$set: {'a.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {c: 1, b: 2}}"), doc);
+}
 
-    TEST(DottedMod, PrepareApplyFieldWithDot) {
-        Document doc(fromjson("{'a.b':4}"));
-        Mod setMod(fromjson("{$set: {'a.b': 2}}"));
+TEST(DottedMod, PrepareApplyNewPath) {
+    Document doc(fromjson("{c: 1}"));
+    Mod setMod(fromjson("{$set: {'a.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{'a.b':4, a: {b: 2}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{c: 1, a: {b: 2}}"), doc);
+}
 
-    //
-    // Indexed mod
-    //
+TEST(DottedMod, PrepareApplyEmptyDoc) {
+    Document doc(fromjson("{}"));
+    Mod setMod(fromjson("{$set: {'a.b': 2}}"));
 
-    TEST(IndexedMod, PrepareNoOp) {
-        Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_TRUE(execInfo.noOp);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
+}
 
-    TEST(IndexedMod, PrepareNonViablePath) {
-        Document doc(fromjson("{a: 0}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+TEST(DottedMod, PrepareApplyFieldWithDot) {
+    Document doc(fromjson("{'a.b':4}"));
+    Mod setMod(fromjson("{$set: {'a.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_NOT_OK(setMod.prepare(doc.root(), "", &execInfo));
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-    TEST(IndexedMod, PrepareApplyInPlace) {
-        Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{'a.b':4, a: {b: 2}}"), doc);
+}
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.noOp);
+//
+// Indexed mod
+//
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_TRUE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"), doc);
-    }
+TEST(IndexedMod, PrepareNoOp) {
+    Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-    TEST(IndexedMod, PrepareApplyNormalArray) {
-        Document doc(fromjson("{a: [{b: 0},{b: 1}]}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.noOp);
+TEST(IndexedMod, PrepareNonViablePath) {
+    Document doc(fromjson("{a: 0}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"), doc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_NOT_OK(setMod.prepare(doc.root(), "", &execInfo));
+}
 
-    TEST(IndexedMod, PrepareApplyPaddingArray) {
-        Document doc(fromjson("{a: [{b: 0}]}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+TEST(IndexedMod, PrepareApplyInPlace) {
+    Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: [{b: 0},null,{b: 2}]}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"), doc);
+}
 
-    TEST(IndexedMod, PrepareApplyNumericObject) {
-        Document doc(fromjson("{a: {b: 0}}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+TEST(IndexedMod, PrepareApplyNormalArray) {
+    Document doc(fromjson("{a: [{b: 0},{b: 1}]}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {b: 0, '2': {b: 2}}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"), doc);
+}
 
-    TEST(IndexedMod, PrepareApplyNumericField) {
-        Document doc(fromjson("{a: {'2': {b: 1}}}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+TEST(IndexedMod, PrepareApplyPaddingArray) {
+    Document doc(fromjson("{a: [{b: 0}]}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_TRUE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [{b: 0},null,{b: 2}]}"), doc);
+}
 
-    TEST(IndexedMod, PrepareApplyExtendNumericField) {
-        Document doc(fromjson("{a: {'2': {c: 1}}}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+TEST(IndexedMod, PrepareApplyNumericObject) {
+    Document doc(fromjson("{a: {b: 0}}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {'2': {c: 1, b: 2}}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {b: 0, '2': {b: 2}}}"), doc);
+}
 
-    TEST(IndexedMod, PrepareApplyEmptyObject) {
-        Document doc(fromjson("{a: {}}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+TEST(IndexedMod, PrepareApplyNumericField) {
+    Document doc(fromjson("{a: {'2': {b: 1}}}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
+}
 
-    TEST(IndexedMod, PrepareApplyEmptyArray) {
-        Document doc(fromjson("{a: []}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+TEST(IndexedMod, PrepareApplyExtendNumericField) {
+    Document doc(fromjson("{a: {'2': {c: 1}}}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: [null, null, {b: 2}]}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {'2': {c: 1, b: 2}}}"), doc);
+}
 
-    TEST(IndexedMod, PrepareApplyInexistent) {
-        Document doc(fromjson("{}"));
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+TEST(IndexedMod, PrepareApplyEmptyObject) {
+    Document doc(fromjson("{a: {}}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
+}
 
-    TEST(IndexedMod, LogNormal) {
-        BSONObj obj = fromjson("{a: [{b:0}, {b:1}]}");
-        Document doc(obj);
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+TEST(IndexedMod, PrepareApplyEmptyArray) {
+    Document doc(fromjson("{a: []}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(setMod.log(&logBuilder));
-        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
-    }
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-    TEST(IndexedMod, LogEmptyArray) {
-        BSONObj obj = fromjson("{a: []}");
-        Document doc(obj);
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [null, null, {b: 2}]}"), doc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+TEST(IndexedMod, PrepareApplyInexistent) {
+    Document doc(fromjson("{}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(setMod.log(&logBuilder));
-        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-    TEST(IndexedMod, LogEmptyObject) {
-        BSONObj obj = fromjson("{a: []}");
-        Document doc(obj);
-        Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
+}
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(setMod.log(&logBuilder));
-        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
-    }
+TEST(IndexedMod, LogNormal) {
+    BSONObj obj = fromjson("{a: [{b:0}, {b:1}]}");
+    Document doc(obj);
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-    //
-    // Indexed complex mod
-    //
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-    TEST(IndexedComplexMod, PrepareNoOp) {
-        Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"));
-        Mod setMod(fromjson("{$set: {'a.1.b': {c: 1, d: 1}}}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(setMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+TEST(IndexedMod, LogEmptyArray) {
+    BSONObj obj = fromjson("{a: []}");
+    Document doc(obj);
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.b");
-        ASSERT_TRUE(execInfo.noOp);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-    TEST(IndexedComplexMod, PrepareSameStructure) {
-        Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, xxx: 1}}]}}"));
-        Mod setMod(fromjson("{$set: {'a.1.b': {c: 1, d: 1}}}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(setMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+TEST(IndexedMod, LogEmptyObject) {
+    BSONObj obj = fromjson("{a: []}");
+    Document doc(obj);
+    Mod setMod(fromjson("{$set: {'a.2.b': 2}}"));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.b");
-        ASSERT_FALSE(execInfo.noOp);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-    //
-    // Replication version where viable paths don't block modification
-    //
-    TEST(NonViablePathWithoutRepl, ControlRun) {
-        Document doc(fromjson("{a: 1}"));
-        Mod setMod(fromjson("{$set: {'a.1.b': 1}}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(setMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_NOT_OK(setMod.prepare(doc.root(), "", &execInfo));
-    }
+//
+// Indexed complex mod
+//
 
-    TEST(NonViablePathWithRepl, SingleField) {
-        Document doc(fromjson("{_id:1, a: 1}"));
-        Mod setMod(fromjson("{$set: {'a.1.b': 1}}"), true);
+TEST(IndexedComplexMod, PrepareNoOp) {
+    Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"));
+    Mod setMod(fromjson("{$set: {'a.1.b': {c: 1, d: 1}}}"));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.b");
+    ASSERT_TRUE(execInfo.noOp);
+}
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{_id:1, a: {'1': {b: 1}}}"), doc);
-    }
+TEST(IndexedComplexMod, PrepareSameStructure) {
+    Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, xxx: 1}}]}}"));
+    Mod setMod(fromjson("{$set: {'a.1.b': {c: 1, d: 1}}}"));
 
-    TEST(NonViablePathWithRepl, SingleFieldNoId) {
-        Document doc(fromjson("{a: 1}"));
-        Mod setMod(fromjson("{$set: {'a.1.b': 1}}"), true);
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.b");
+    ASSERT_FALSE(execInfo.noOp);
+}
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.b");
-        ASSERT_FALSE(execInfo.noOp);
+//
+// Replication version where viable paths don't block modification
+//
+TEST(NonViablePathWithoutRepl, ControlRun) {
+    Document doc(fromjson("{a: 1}"));
+    Mod setMod(fromjson("{$set: {'a.1.b': 1}}"));
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {'1': {b: 1}}}"), doc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_NOT_OK(setMod.prepare(doc.root(), "", &execInfo));
+}
 
-    TEST(NonViablePathWithRepl, NestedField) {
-        Document doc(fromjson("{_id:1, a: {a: 1}}"));
-        Mod setMod(fromjson("{$set: {'a.a.1.b': 1}}"), true);
+TEST(NonViablePathWithRepl, SingleField) {
+    Document doc(fromjson("{_id:1, a: 1}"));
+    Mod setMod(fromjson("{$set: {'a.1.b': 1}}"), true);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.a.1.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{_id:1, a: {a: {'1': {b: 1}}}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{_id:1, a: {'1': {b: 1}}}"), doc);
+}
 
-    TEST(NonViablePathWithRepl, DoubleNestedField) {
-        Document doc(fromjson("{_id:1, a: {b: {c: 1}}}"));
-        Mod setMod(fromjson("{$set: {'a.b.c.d': 2}}"), true);
+TEST(NonViablePathWithRepl, SingleFieldNoId) {
+    Document doc(fromjson("{a: 1}"));
+    Mod setMod(fromjson("{$set: {'a.1.b': 1}}"), true);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b.c.d");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{_id:1, a: {b: {c: {d: 2}}}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {'1': {b: 1}}}"), doc);
+}
 
-    TEST(NonViablePathWithRepl, NestedFieldNoId) {
-        Document doc(fromjson("{a: {a: 1}}"));
-        Mod setMod(fromjson("{$set: {'a.a.1.b': 1}}"), true);
+TEST(NonViablePathWithRepl, NestedField) {
+    Document doc(fromjson("{_id:1, a: {a: 1}}"));
+    Mod setMod(fromjson("{$set: {'a.a.1.b': 1}}"), true);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.a.1.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.a.1.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{a: {a: {'1': {b: 1}}}}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{_id:1, a: {a: {'1': {b: 1}}}}"), doc);
+}
 
-    TEST(NonViablePathWithRepl, ReplayArrayFieldNotAppendedItermediate) {
-        Document doc(fromjson("{_id: 0, a: [1, {b: [1]}]}"));
-        Mod setMod(fromjson("{$set: {'a.0.b': [0,2]}}}"), true);
+TEST(NonViablePathWithRepl, DoubleNestedField) {
+    Document doc(fromjson("{_id:1, a: {b: {c: 1}}}"));
+    Mod setMod(fromjson("{$set: {'a.b.c.d': 2}}"), true);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.0.b");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b.c.d");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{_id: 0, a: [{b: [0,2]}, {b: [1]}]}"), doc);
-    }
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{_id:1, a: {b: {c: {d: 2}}}}"), doc);
+}
 
-    // Cases from users/issues/jstests
-    TEST(JsTestIssues, Set6) {
-        Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
-        Mod setMod(fromjson("{$set: {'r.a': 2}}"));
+TEST(NonViablePathWithRepl, NestedFieldNoId) {
+    Document doc(fromjson("{a: {a: 1}}"));
+    Mod setMod(fromjson("{$set: {'a.a.1.b': 1}}"), true);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "r.a");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.a.1.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_TRUE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{_id: 1, r: {a:2, b:2}}"), doc);
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: {a: {'1': {b: 1}}}}"), doc);
+}
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(setMod.log(&logBuilder));
-        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_EQUALS(fromjson("{$set: {'r.a': 2}}"), logDoc);
-    }
+TEST(NonViablePathWithRepl, ReplayArrayFieldNotAppendedItermediate) {
+    Document doc(fromjson("{_id: 0, a: [1, {b: [1]}]}"));
+    Mod setMod(fromjson("{$set: {'a.0.b': [0,2]}}}"), true);
 
-    // Test which failed before and is here to verify correct execution.
-    TEST(JsTestIssues, Set6FromRepl) {
-        Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
-        Mod setMod(fromjson("{$set: { 'r.a': 2}}"), true);
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.0.b");
+    ASSERT_FALSE(execInfo.noOp);
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "r.a");
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{_id: 0, a: [{b: [0,2]}, {b: [1]}]}"), doc);
+}
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_TRUE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{_id: 1, r: {a:2, b:2} }"), doc);
+// Cases from users/issues/jstests
+TEST(JsTestIssues, Set6) {
+    Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
+    Mod setMod(fromjson("{$set: {'r.a': 2}}"));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(setMod.log(&logBuilder));
-        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_EQUALS(fromjson("{$set: {'r.a': 2}}"), logDoc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-    TEST(Ephemeral, ApplySetModToEphemeralDocument) {
-        // The following mod when applied to a document constructed node by node exposed a
-        // latent debug only defect in mutable BSON, so this is more a test of mutable than
-        // $set.
-        Document doc;
-        Element x = doc.makeElementObject("x");
-        doc.root().pushBack(x);
-        Element a  = doc.makeElementInt("a", 100);
-        x.pushBack(a);
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "r.a");
+    ASSERT_FALSE(execInfo.noOp);
 
-        Mod setMod(fromjson("{ $set: { x: { a: 100, b: 2 }}}"), true);
+    ASSERT_OK(setMod.apply());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{_id: 1, r: {a:2, b:2}}"), doc);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(setMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'r.a': 2}}"), logDoc);
+}
 
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "x");
-        ASSERT_FALSE(execInfo.noOp);
+// Test which failed before and is here to verify correct execution.
+TEST(JsTestIssues, Set6FromRepl) {
+    Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
+    Mod setMod(fromjson("{$set: { 'r.a': 2}}"), true);
 
-        ASSERT_OK(setMod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{ x : { a : 100, b : 2 } }"), doc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-} // unnamed namespace
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "r.a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(setMod.apply());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{_id: 1, r: {a:2, b:2} }"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(setMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'r.a': 2}}"), logDoc);
+}
+
+TEST(Ephemeral, ApplySetModToEphemeralDocument) {
+    // The following mod when applied to a document constructed node by node exposed a
+    // latent debug only defect in mutable BSON, so this is more a test of mutable than
+    // $set.
+    Document doc;
+    Element x = doc.makeElementObject("x");
+    doc.root().pushBack(x);
+    Element a = doc.makeElementInt("a", 100);
+    x.pushBack(a);
+
+    Mod setMod(fromjson("{ $set: { x: { a: 100, b: 2 }}}"), true);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "x");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ x : { a : 100, b : 2 } }"), doc);
+}
+
+}  // unnamed namespace

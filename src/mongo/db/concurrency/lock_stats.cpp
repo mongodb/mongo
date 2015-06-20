@@ -34,125 +34,121 @@
 
 namespace mongo {
 
-    template<typename CounterType>
-    LockStats<CounterType>::LockStats() {
-        reset();
+template <typename CounterType>
+LockStats<CounterType>::LockStats() {
+    reset();
+}
+
+template <typename CounterType>
+void LockStats<CounterType>::report(BSONObjBuilder* builder) const {
+    // All indexing below starts from offset 1, because we do not want to report/account
+    // position 0, which is a sentinel value for invalid resource/no lock.
+    for (int i = 1; i < ResourceTypesCount; i++) {
+        _report(builder, resourceTypeName(static_cast<ResourceType>(i)), _stats[i]);
     }
 
-    template<typename CounterType>
-    void LockStats<CounterType>::report(BSONObjBuilder* builder) const {
-        // All indexing below starts from offset 1, because we do not want to report/account
-        // position 0, which is a sentinel value for invalid resource/no lock.
-        for (int i = 1; i < ResourceTypesCount; i++) {
-            _report(builder, resourceTypeName(static_cast<ResourceType>(i)), _stats[i]);
-        }
+    _report(builder, "oplog", _oplogStats);
+}
 
-        _report(builder, "oplog", _oplogStats);
-    }
+template <typename CounterType>
+void LockStats<CounterType>::_report(BSONObjBuilder* builder,
+                                     const char* sectionName,
+                                     const PerModeLockStatCounters& stat) const {
+    std::unique_ptr<BSONObjBuilder> section;
 
-    template<typename CounterType>
-    void LockStats<CounterType>::_report(BSONObjBuilder* builder,
-                                         const char* sectionName,
-                                         const PerModeLockStatCounters& stat) const {
+    // All indexing below starts from offset 1, because we do not want to report/account
+    // position 0, which is a sentinel value for invalid resource/no lock.
 
-        std::unique_ptr<BSONObjBuilder> section;
-
-        // All indexing below starts from offset 1, because we do not want to report/account
-        // position 0, which is a sentinel value for invalid resource/no lock.
-
-        // Num acquires
-        {
-            std::unique_ptr<BSONObjBuilder> numAcquires;
-            for (int mode = 1; mode < LockModesCount; mode++) {
-                const long long value = CounterOps::get(stat.modeStats[mode].numAcquisitions);
-                if (value > 0) {
-                    if (!numAcquires) {
-                        if (!section) {
-                            section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
-                        }
-
-                        numAcquires.reset(
-                            new BSONObjBuilder(section->subobjStart("acquireCount")));
+    // Num acquires
+    {
+        std::unique_ptr<BSONObjBuilder> numAcquires;
+        for (int mode = 1; mode < LockModesCount; mode++) {
+            const long long value = CounterOps::get(stat.modeStats[mode].numAcquisitions);
+            if (value > 0) {
+                if (!numAcquires) {
+                    if (!section) {
+                        section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
                     }
-                    numAcquires->append(legacyModeName(static_cast<LockMode>(mode)), value);
+
+                    numAcquires.reset(new BSONObjBuilder(section->subobjStart("acquireCount")));
                 }
-            }
-        }
-
-        // Num waits
-        {
-            std::unique_ptr<BSONObjBuilder> numWaits;
-            for (int mode = 1; mode < LockModesCount; mode++) {
-                const long long value = CounterOps::get(stat.modeStats[mode].numWaits);
-                if (value > 0) {
-                    if (!numWaits) {
-                        if (!section) {
-                            section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
-                        }
-
-                        numWaits.reset(
-                            new BSONObjBuilder(section->subobjStart("acquireWaitCount")));
-                    }
-                    numWaits->append(legacyModeName(static_cast<LockMode>(mode)), value);
-                }
-            }
-        }
-
-        // Total time waiting
-        {
-            std::unique_ptr<BSONObjBuilder> timeAcquiring;
-            for (int mode = 1; mode < LockModesCount; mode++) {
-                const long long value = CounterOps::get(stat.modeStats[mode].combinedWaitTimeMicros);
-                if (value > 0) {
-                    if (!timeAcquiring) {
-                        if (!section) {
-                            section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
-                        }
-
-                        timeAcquiring.reset(
-                            new BSONObjBuilder(section->subobjStart("timeAcquiringMicros")));
-                    }
-                    timeAcquiring->append(legacyModeName(static_cast<LockMode>(mode)), value);
-                }
-            }
-        }
-
-        // Deadlocks
-        {
-            std::unique_ptr<BSONObjBuilder> deadlockCount;
-            for (int mode = 1; mode < LockModesCount; mode++) {
-                const long long value = CounterOps::get(stat.modeStats[mode].numDeadlocks);
-                if (value > 0) {
-                    if (!deadlockCount) {
-                        if (!section) {
-                            section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
-                        }
-
-                        deadlockCount.reset(
-                            new BSONObjBuilder(section->subobjStart("deadlockCount")));
-                    }
-                    deadlockCount->append(legacyModeName(static_cast<LockMode>(mode)), value);
-                }
+                numAcquires->append(legacyModeName(static_cast<LockMode>(mode)), value);
             }
         }
     }
 
-    template<typename CounterType>
-    void LockStats<CounterType>::reset() {
-        for (int i = 0; i < ResourceTypesCount; i++) {
-            for (int mode = 0; mode < LockModesCount; mode++) {
-                _stats[i].modeStats[mode].reset();
+    // Num waits
+    {
+        std::unique_ptr<BSONObjBuilder> numWaits;
+        for (int mode = 1; mode < LockModesCount; mode++) {
+            const long long value = CounterOps::get(stat.modeStats[mode].numWaits);
+            if (value > 0) {
+                if (!numWaits) {
+                    if (!section) {
+                        section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
+                    }
+
+                    numWaits.reset(new BSONObjBuilder(section->subobjStart("acquireWaitCount")));
+                }
+                numWaits->append(legacyModeName(static_cast<LockMode>(mode)), value);
             }
         }
+    }
 
+    // Total time waiting
+    {
+        std::unique_ptr<BSONObjBuilder> timeAcquiring;
+        for (int mode = 1; mode < LockModesCount; mode++) {
+            const long long value = CounterOps::get(stat.modeStats[mode].combinedWaitTimeMicros);
+            if (value > 0) {
+                if (!timeAcquiring) {
+                    if (!section) {
+                        section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
+                    }
+
+                    timeAcquiring.reset(
+                        new BSONObjBuilder(section->subobjStart("timeAcquiringMicros")));
+                }
+                timeAcquiring->append(legacyModeName(static_cast<LockMode>(mode)), value);
+            }
+        }
+    }
+
+    // Deadlocks
+    {
+        std::unique_ptr<BSONObjBuilder> deadlockCount;
+        for (int mode = 1; mode < LockModesCount; mode++) {
+            const long long value = CounterOps::get(stat.modeStats[mode].numDeadlocks);
+            if (value > 0) {
+                if (!deadlockCount) {
+                    if (!section) {
+                        section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
+                    }
+
+                    deadlockCount.reset(new BSONObjBuilder(section->subobjStart("deadlockCount")));
+                }
+                deadlockCount->append(legacyModeName(static_cast<LockMode>(mode)), value);
+            }
+        }
+    }
+}
+
+template <typename CounterType>
+void LockStats<CounterType>::reset() {
+    for (int i = 0; i < ResourceTypesCount; i++) {
         for (int mode = 0; mode < LockModesCount; mode++) {
-            _oplogStats.modeStats[mode].reset();
+            _stats[i].modeStats[mode].reset();
         }
     }
 
+    for (int mode = 0; mode < LockModesCount; mode++) {
+        _oplogStats.modeStats[mode].reset();
+    }
+}
 
-    // Ensures that there are instances compiled for LockStats for AtomicInt64 and int64_t
-    template class LockStats<int64_t>;
-    template class LockStats<AtomicInt64>;
 
-} // namespace mongo
+// Ensures that there are instances compiled for LockStats for AtomicInt64 and int64_t
+template class LockStats<int64_t>;
+template class LockStats<AtomicInt64>;
+
+}  // namespace mongo

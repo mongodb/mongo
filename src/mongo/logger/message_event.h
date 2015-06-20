@@ -36,50 +36,58 @@
 namespace mongo {
 namespace logger {
 
-    /**
-     * Free form text log message object that does not own the storage behind its message and
-     * contextName.
-     *
-     * Used and owned by one thread.  This is the message type used by MessageLogDomain.
-     */
-    class MessageEventEphemeral {
-    public:
-        MessageEventEphemeral(
-                Date_t date,
-                LogSeverity severity,
-                StringData contextName,
-                StringData message) :
-            _date(date),
-            _severity(severity),
-            _component(LogComponent::kDefault),
-            _contextName(contextName),
-            _message(message) {}
+/**
+ * Free form text log message object that does not own the storage behind its message and
+ * contextName.
+ *
+ * Used and owned by one thread.  This is the message type used by MessageLogDomain.
+ */
+class MessageEventEphemeral {
+public:
+    MessageEventEphemeral(Date_t date,
+                          LogSeverity severity,
+                          StringData contextName,
+                          StringData message)
+        : _date(date),
+          _severity(severity),
+          _component(LogComponent::kDefault),
+          _contextName(contextName),
+          _message(message) {}
 
-        MessageEventEphemeral(
-                Date_t date,
-                LogSeverity severity,
-                LogComponent component,
-                StringData contextName,
-                StringData message) :
-            _date(date),
-            _severity(severity),
-            _component(component),
-            _contextName(contextName),
-            _message(message) {}
+    MessageEventEphemeral(Date_t date,
+                          LogSeverity severity,
+                          LogComponent component,
+                          StringData contextName,
+                          StringData message)
+        : _date(date),
+          _severity(severity),
+          _component(component),
+          _contextName(contextName),
+          _message(message) {}
 
-        Date_t getDate() const { return _date; }
-        LogSeverity getSeverity() const { return _severity; }
-        LogComponent getComponent() const { return _component; }
-        StringData getContextName() const { return _contextName; }
-        StringData getMessage() const { return _message; }
+    Date_t getDate() const {
+        return _date;
+    }
+    LogSeverity getSeverity() const {
+        return _severity;
+    }
+    LogComponent getComponent() const {
+        return _component;
+    }
+    StringData getContextName() const {
+        return _contextName;
+    }
+    StringData getMessage() const {
+        return _message;
+    }
 
-    private:
-        Date_t _date;
-        LogSeverity _severity;
-        LogComponent _component;
-        StringData _contextName;
-        StringData _message;
-    };
+private:
+    Date_t _date;
+    LogSeverity _severity;
+    LogComponent _component;
+    StringData _contextName;
+    StringData _message;
+};
 
 }  // namespace logger
 }  // namespace mongo

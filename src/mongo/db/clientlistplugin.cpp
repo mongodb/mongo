@@ -46,205 +46,198 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::string;
+using std::unique_ptr;
+using std::string;
 
 namespace {
 
-    class ClientListPlugin : public WebStatusPlugin {
-    public:
-        ClientListPlugin() : WebStatusPlugin( "clients" , 20 ) {}
-        virtual void init() {}
+class ClientListPlugin : public WebStatusPlugin {
+public:
+    ClientListPlugin() : WebStatusPlugin("clients", 20) {}
+    virtual void init() {}
 
-        virtual void run(OperationContext* txn, std::stringstream& ss ) {
-            using namespace html;
+    virtual void run(OperationContext* txn, std::stringstream& ss) {
+        using namespace html;
 
-            ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
-            ss << "<tr align='left'>"
-               << th( a("", "Connections to the database, both internal and external.", "Client") )
-               << th( a("http://dochub.mongodb.org/core/viewingandterminatingcurrentoperation", "", "OpId") )
-               << "<th>Locking</th>"
-               << "<th>Waiting</th>"
-               << "<th>SecsRunning</th>"
-               << "<th>Op</th>"
-               << th( a("http://dochub.mongodb.org/core/whatisanamespace", "", "Namespace") )
-               << "<th>Query</th>"
-               << "<th>client</th>"
-               << "<th>msg</th>"
-               << "<th>progress</th>"
+        ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
+        ss << "<tr align='left'>"
+           << th(a("", "Connections to the database, both internal and external.", "Client"))
+           << th(a("http://dochub.mongodb.org/core/viewingandterminatingcurrentoperation",
+                   "",
+                   "OpId")) << "<th>Locking</th>"
+           << "<th>Waiting</th>"
+           << "<th>SecsRunning</th>"
+           << "<th>Op</th>"
+           << th(a("http://dochub.mongodb.org/core/whatisanamespace", "", "Namespace"))
+           << "<th>Query</th>"
+           << "<th>client</th>"
+           << "<th>msg</th>"
+           << "<th>progress</th>"
 
-               << "</tr>\n";
-            
-            _processAllClients(txn->getClient()->getServiceContext(), ss);
-            
-            ss << "</table>\n";
+           << "</tr>\n";
+
+        _processAllClients(txn->getClient()->getServiceContext(), ss);
+
+        ss << "</table>\n";
+    }
+
+private:
+    static void _processAllClients(ServiceContext* service, std::stringstream& ss) {
+        using namespace html;
+
+        for (ServiceContext::LockedClientsCursor cursor(service); Client* client = cursor.next();) {
+            invariant(client);
+
+            // Make the client stable
+            stdx::lock_guard<Client> lk(*client);
+            const OperationContext* txn = client->getOperationContext();
+            if (!txn)
+                continue;
+
+            CurOp* curOp = CurOp::get(txn);
+            if (!curOp)
+                continue;
+
+            ss << "<tr><td>" << client->desc() << "</td>";
+
+            tablecell(ss, txn->getOpID());
+            tablecell(ss, true);
+
+            // LockState
+            {
+                Locker::LockerInfo lockerInfo;
+                txn->lockState()->getLockerInfo(&lockerInfo);
+
+                BSONObjBuilder lockerInfoBuilder;
+                fillLockerInfo(lockerInfo, lockerInfoBuilder);
+
+                tablecell(ss, lockerInfoBuilder.obj());
+            }
+
+            tablecell(ss, curOp->elapsedSeconds());
+
+            tablecell(ss, curOp->getOp());
+            tablecell(ss, html::escape(curOp->getNS()));
+
+            if (curOp->haveQuery()) {
+                tablecell(ss, html::escape(curOp->query().toString()));
+            } else {
+                tablecell(ss, "");
+            }
+
+            tablecell(ss, client->clientAddress(true /*includePort*/));
+
+            tablecell(ss, curOp->getMessage());
+            tablecell(ss, curOp->getProgressMeter().toString());
+
+            ss << "</tr>\n";
+        }
+    }
+
+} clientListPlugin;
+
+
+class CurrentOpContexts : public Command {
+public:
+    CurrentOpContexts() : Command("currentOpCtx") {}
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        if (AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(), ActionType::inprog)) {
+            return Status::OK();
         }
 
-    private:
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    }
 
-        static void _processAllClients(ServiceContext* service, std::stringstream& ss) {
-            using namespace html;
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        unique_ptr<MatchExpression> filter;
+        if (cmdObj["filter"].isABSONObj()) {
+            StatusWithMatchExpression res = MatchExpressionParser::parse(cmdObj["filter"].Obj());
+            if (!res.isOK()) {
+                return appendCommandStatus(result, res.getStatus());
+            }
+            filter.reset(res.getValue());
+        }
 
-            for (ServiceContext::LockedClientsCursor cursor(service);
-                 Client* client = cursor.next();) {
+        result.appendArray("operations",
+                           _processAllClients(txn->getClient()->getServiceContext(), filter.get()));
 
-                invariant(client);
+        return true;
+    }
 
-                // Make the client stable
-                stdx::lock_guard<Client> lk(*client);
-                const OperationContext* txn = client->getOperationContext();
-                if (!txn) continue;
 
-                CurOp* curOp = CurOp::get(txn);
-                if (!curOp) continue;
+private:
+    static BSONArray _processAllClients(ServiceContext* service, MatchExpression* matcher) {
+        BSONArrayBuilder array;
 
-                ss << "<tr><td>" << client->desc() << "</td>";
+        for (ServiceContext::LockedClientsCursor cursor(service); Client* client = cursor.next();) {
+            invariant(client);
 
-                tablecell(ss, txn->getOpID());
-                tablecell(ss, true);
+            BSONObjBuilder b;
+
+            // Make the client stable
+            stdx::lock_guard<Client> lk(*client);
+
+            client->reportState(b);
+
+            const OperationContext* txn = client->getOperationContext();
+            b.appendBool("active", static_cast<bool>(txn));
+            if (txn) {
+                b.append("opid", txn->getOpID());
+                if (txn->isKillPending()) {
+                    b.append("killPending", true);
+                }
+
+                CurOp::get(txn)->reportState(&b);
 
                 // LockState
-                {
+                if (txn->lockState()) {
+                    StringBuilder ss;
+                    ss << txn->lockState();
+                    b.append("lockStatePointer", ss.str());
+
                     Locker::LockerInfo lockerInfo;
                     txn->lockState()->getLockerInfo(&lockerInfo);
 
                     BSONObjBuilder lockerInfoBuilder;
                     fillLockerInfo(lockerInfo, lockerInfoBuilder);
 
-                    tablecell(ss, lockerInfoBuilder.obj());
+                    b.append("lockState", lockerInfoBuilder.obj());
                 }
 
-                tablecell(ss, curOp->elapsedSeconds());
-
-                tablecell(ss, curOp->getOp());
-                tablecell(ss, html::escape(curOp->getNS()));
-
-                if (curOp->haveQuery()) {
-                    tablecell(ss, html::escape(curOp->query().toString()));
-                }
-                else {
-                    tablecell(ss, "");
-                }
-
-                tablecell(ss, client->clientAddress(true /*includePort*/));
-
-                tablecell(ss, curOp->getMessage());
-                tablecell(ss, curOp->getProgressMeter().toString());
-
-                ss << "</tr>\n";
-            }
-        }
-
-    } clientListPlugin;
-
-
-    class CurrentOpContexts : public Command {
-    public:
-        CurrentOpContexts()
-            : Command( "currentOpCtx" ) {
-        }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual bool slaveOk() const { return true; }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            if ( AuthorizationSession::get(client)
-                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                    ActionType::inprog) ) {
-                return Status::OK();
-            }
-
-            return Status(ErrorCodes::Unauthorized, "unauthorized");
-
-        }
-
-        bool run( OperationContext* txn,
-                  const string& dbname,
-                  BSONObj& cmdObj,
-                  int,
-                  string& errmsg,
-                  BSONObjBuilder& result) {
-
-            unique_ptr<MatchExpression> filter;
-            if ( cmdObj["filter"].isABSONObj() ) {
-                StatusWithMatchExpression res =
-                    MatchExpressionParser::parse( cmdObj["filter"].Obj() );
-                if ( !res.isOK() ) {
-                    return appendCommandStatus( result, res.getStatus() );
-                }
-                filter.reset( res.getValue() );
-            }
-
-            result.appendArray(
-                    "operations",
-                    _processAllClients(txn->getClient()->getServiceContext(), filter.get()));
-
-            return true;
-        }
-
-
-    private:
-
-        static BSONArray _processAllClients(ServiceContext* service, MatchExpression* matcher) {
-            BSONArrayBuilder array;
-
-            for (ServiceContext::LockedClientsCursor cursor(service);
-                 Client* client = cursor.next();) {
-
-                invariant(client);
-
-                BSONObjBuilder b;
-
-                // Make the client stable
-                stdx::lock_guard<Client> lk(*client);
-
-                client->reportState(b);
-
-                const OperationContext* txn = client->getOperationContext();
-                b.appendBool("active", static_cast<bool>(txn));
-                if (txn) {
-                    b.append("opid", txn->getOpID());
-                    if (txn->isKillPending()) {
-                        b.append("killPending", true);
-                    }
-
-                    CurOp::get(txn)->reportState(&b);
-
-                    // LockState
-                    if (txn->lockState()) {
-                        StringBuilder ss;
-                        ss << txn->lockState();
-                        b.append("lockStatePointer", ss.str());
-
-                        Locker::LockerInfo lockerInfo;
-                        txn->lockState()->getLockerInfo(&lockerInfo);
-
-                        BSONObjBuilder lockerInfoBuilder;
-                        fillLockerInfo(lockerInfo, lockerInfoBuilder);
-
-                        b.append("lockState", lockerInfoBuilder.obj());
-                    }
-
-                    // RecoveryUnit
-                    if (txn->recoveryUnit()) {
-                        txn->recoveryUnit()->reportState(&b);
-                    }
-                }
-
-                const BSONObj obj = b.obj();
-
-                if (!matcher || matcher->matchesBSON(obj)) {
-                    array.append(obj);
+                // RecoveryUnit
+                if (txn->recoveryUnit()) {
+                    txn->recoveryUnit()->reportState(&b);
                 }
             }
 
-            return array.arr();
+            const BSONObj obj = b.obj();
+
+            if (!matcher || matcher->matchesBSON(obj)) {
+                array.append(obj);
+            }
         }
 
-    } currentOpContexts;
+        return array.arr();
+    }
+
+} currentOpContexts;
 
 }  // namespace
 }  // namespace mongo

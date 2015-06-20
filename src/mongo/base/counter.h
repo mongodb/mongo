@@ -34,27 +34,35 @@
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
-    /**
-     * A 64bit (atomic) counter.
-     *
-     * The constructor allows setting the start value, and increment([int]) is used to change it.
-     *
-     * The value can be returned using get() or the (long long) function operator.
-     */
-    class Counter64 {
-    public:
+/**
+ * A 64bit (atomic) counter.
+ *
+ * The constructor allows setting the start value, and increment([int]) is used to change it.
+ *
+ * The value can be returned using get() or the (long long) function operator.
+ */
+class Counter64 {
+public:
+    /** Atomically increment. */
+    void increment(uint64_t n = 1) {
+        _counter.addAndFetch(n);
+    }
 
-        /** Atomically increment. */
-        void increment( uint64_t n = 1 ) { _counter.addAndFetch(n); }
+    /** Atomically decrement. */
+    void decrement(uint64_t n = 1) {
+        _counter.subtractAndFetch(n);
+    }
 
-        /** Atomically decrement. */
-        void decrement( uint64_t n = 1 ) { _counter.subtractAndFetch(n); }
+    /** Return the current value */
+    long long get() const {
+        return _counter.load();
+    }
 
-        /** Return the current value */
-        long long get() const { return _counter.load(); }
-        
-        operator long long() const { return get(); }
-    private:
-        AtomicInt64 _counter;
-    };
+    operator long long() const {
+        return get();
+    }
+
+private:
+    AtomicInt64 _counter;
+};
 }

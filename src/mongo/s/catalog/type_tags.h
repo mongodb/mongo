@@ -35,74 +35,83 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class Status;
-    template<typename T> class StatusWith;
+class BSONObj;
+class Status;
+template <typename T>
+class StatusWith;
+
+
+/**
+ * This class represents the layout and contents of documents contained in the config.tags
+ * collection. All manipulation of documents coming from that collection should be done with
+ * this class.
+ */
+class TagsType {
+public:
+    // Name of the tags collection in the config server.
+    static const std::string ConfigNS;
+
+    // Field names and types in the tags collection type.
+    static const BSONField<std::string> ns;
+    static const BSONField<std::string> tag;
+    static const BSONField<BSONObj> min;
+    static const BSONField<BSONObj> max;
 
 
     /**
-     * This class represents the layout and contents of documents contained in the config.tags
-     * collection. All manipulation of documents coming from that collection should be done with
-     * this class.
+     * Constructs a new DatabaseType object from BSON. Validates that all required fields are
+     * present.
      */
-    class TagsType {
-    public:
-        // Name of the tags collection in the config server.
-        static const std::string ConfigNS;
+    static StatusWith<TagsType> fromBSON(const BSONObj& source);
 
-        // Field names and types in the tags collection type.
-        static const BSONField<std::string> ns;
-        static const BSONField<std::string> tag;
-        static const BSONField<BSONObj> min;
-        static const BSONField<BSONObj> max;
+    /**
+     * Returns OK if all fields have been set. Otherwise returns NoSuchKey and information
+     * about what is the first field which is missing.
+     */
+    Status validate() const;
 
+    /**
+     * Returns the BSON representation of the entry.
+     */
+    BSONObj toBSON() const;
 
-        /**
-         * Constructs a new DatabaseType object from BSON. Validates that all required fields are
-         * present.
-         */
-        static StatusWith<TagsType> fromBSON(const BSONObj& source);
+    /**
+     * Returns a std::string representation of the current internal state.
+     */
+    std::string toString() const;
 
-        /**
-         * Returns OK if all fields have been set. Otherwise returns NoSuchKey and information
-         * about what is the first field which is missing.
-         */
-        Status validate() const;
+    const std::string& getNS() const {
+        return _ns.get();
+    }
+    void setNS(const std::string& ns);
 
-        /**
-         * Returns the BSON representation of the entry.
-         */
-        BSONObj toBSON() const;
+    const std::string& getTag() const {
+        return _tag.get();
+    }
+    void setTag(const std::string& tag);
 
-        /**
-         * Returns a std::string representation of the current internal state.
-         */
-        std::string toString() const;
+    const BSONObj& getMinKey() const {
+        return _minKey.get();
+    }
+    void setMinKey(const BSONObj& minKey);
 
-        const std::string& getNS() const { return _ns.get(); }
-        void setNS(const std::string& ns);
+    const BSONObj& getMaxKey() const {
+        return _maxKey.get();
+    }
+    void setMaxKey(const BSONObj& max);
 
-        const std::string& getTag() const { return _tag.get(); }
-        void setTag(const std::string& tag);
+private:
+    // Required namespace to which this tag belongs
+    boost::optional<std::string> _ns;
 
-        const BSONObj& getMinKey() const { return _minKey.get(); }
-        void setMinKey(const BSONObj& minKey);
+    // Required tag name
+    boost::optional<std::string> _tag;
 
-        const BSONObj& getMaxKey() const { return _maxKey.get(); }
-        void setMaxKey(const BSONObj& max);
+    // Required first key of the tag (inclusive)
+    boost::optional<BSONObj> _minKey;
 
-    private:
-        // Required namespace to which this tag belongs
-        boost::optional<std::string> _ns;
+    // Required last key of the tag (not-inclusive)
+    boost::optional<BSONObj> _maxKey;
+};
 
-        // Required tag name
-        boost::optional<std::string> _tag;
-
-        // Required first key of the tag (inclusive)
-        boost::optional<BSONObj> _minKey;
-
-        // Required last key of the tag (not-inclusive)
-        boost::optional<BSONObj> _maxKey;
-    };
-
-} // namespace mongo
+}  // namespace mongo

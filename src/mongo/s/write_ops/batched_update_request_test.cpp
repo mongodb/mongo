@@ -36,56 +36,49 @@
 
 namespace {
 
-    using std::string;
-    using mongo::BatchedUpdateDocument;
-    using mongo::BatchedUpdateRequest;
-    using mongo::BatchedRequestMetadata;
-    using mongo::BSONArray;
-    using mongo::BSONArrayBuilder;
-    using mongo::BSONObj;
-    using mongo::OID;
-    using mongo::Timestamp;
+using std::string;
+using mongo::BatchedUpdateDocument;
+using mongo::BatchedUpdateRequest;
+using mongo::BatchedRequestMetadata;
+using mongo::BSONArray;
+using mongo::BSONArrayBuilder;
+using mongo::BSONObj;
+using mongo::OID;
+using mongo::Timestamp;
 
-    TEST(RoundTrip, Normal) {
-        BSONArray updateArray =
-            BSON_ARRAY(
-                BSON(BatchedUpdateDocument::query(BSON("a" << 1)) <<
-                     BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("a" << 1))) <<
-                     BatchedUpdateDocument::multi(false) <<
-                     BatchedUpdateDocument::upsert(false)
-                    ) <<
-                BSON(BatchedUpdateDocument::query(BSON("b" << 1)) <<
-                     BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("b" << 2))) <<
-                     BatchedUpdateDocument::multi(false) <<
-                     BatchedUpdateDocument::upsert(false)
-                    )
-                );
+TEST(RoundTrip, Normal) {
+    BSONArray updateArray = BSON_ARRAY(
+        BSON(BatchedUpdateDocument::query(BSON("a" << 1))
+             << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("a" << 1)))
+             << BatchedUpdateDocument::multi(false) << BatchedUpdateDocument::upsert(false))
+        << BSON(BatchedUpdateDocument::query(BSON("b" << 1))
+                << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("b" << 2)))
+                << BatchedUpdateDocument::multi(false) << BatchedUpdateDocument::upsert(false)));
 
-        BSONObj writeConcernObj = BSON("w" << 1);
+    BSONObj writeConcernObj = BSON("w" << 1);
 
-        // The BSON_ARRAY macro doesn't support Timestamps.
-        BSONArrayBuilder arrBuilder;
-        arrBuilder.append(Timestamp(1,1));
-        arrBuilder.append(OID::gen());
-        BSONArray shardVersionArray = arrBuilder.arr();
+    // The BSON_ARRAY macro doesn't support Timestamps.
+    BSONArrayBuilder arrBuilder;
+    arrBuilder.append(Timestamp(1, 1));
+    arrBuilder.append(OID::gen());
+    BSONArray shardVersionArray = arrBuilder.arr();
 
-        BSONObj origUpdateRequestObj =
-            BSON(BatchedUpdateRequest::collName("test") <<
-                 BatchedUpdateRequest::updates() << updateArray <<
-                 BatchedUpdateRequest::writeConcern(writeConcernObj) <<
-                 BatchedUpdateRequest::ordered(true) <<
-                 BatchedUpdateRequest::metadata() << BSON(
-                      BatchedRequestMetadata::shardName("shard0000") <<
-                      BatchedRequestMetadata::shardVersion() << shardVersionArray <<
-                      BatchedRequestMetadata::session(0)));
+    BSONObj origUpdateRequestObj =
+        BSON(BatchedUpdateRequest::collName("test")
+             << BatchedUpdateRequest::updates() << updateArray
+             << BatchedUpdateRequest::writeConcern(writeConcernObj)
+             << BatchedUpdateRequest::ordered(true) << BatchedUpdateRequest::metadata()
+             << BSON(BatchedRequestMetadata::shardName("shard0000")
+                     << BatchedRequestMetadata::shardVersion() << shardVersionArray
+                     << BatchedRequestMetadata::session(0)));
 
-        string errMsg;
-        BatchedUpdateRequest request;
-        bool ok = request.parseBSON(origUpdateRequestObj, &errMsg);
-        ASSERT_TRUE(ok);
+    string errMsg;
+    BatchedUpdateRequest request;
+    bool ok = request.parseBSON(origUpdateRequestObj, &errMsg);
+    ASSERT_TRUE(ok);
 
-        BSONObj genUpdateRequestObj = request.toBSON();
-        ASSERT_EQUALS(0, genUpdateRequestObj.woCompare(origUpdateRequestObj));
-    }
+    BSONObj genUpdateRequestObj = request.toBSON();
+    ASSERT_EQUALS(0, genUpdateRequestObj.woCompare(origUpdateRequestObj));
+}
 
-} // unnamed namespace
+}  // unnamed namespace

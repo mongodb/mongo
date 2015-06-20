@@ -40,10 +40,9 @@
 namespace mongo {
 namespace auth {
 
-    Status checkAuthForWriteCommand( AuthorizationSession* authzSession,
-                                     BatchedCommandRequest::BatchType cmdType,
-                                     const NamespaceString& cmdNSS,
-                                     const BSONObj& cmdObj );
-
+Status checkAuthForWriteCommand(AuthorizationSession* authzSession,
+                                BatchedCommandRequest::BatchType cmdType,
+                                const NamespaceString& cmdNSS,
+                                const BSONObj& cmdObj);
 }
 }

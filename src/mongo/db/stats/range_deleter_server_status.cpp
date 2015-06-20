@@ -32,69 +32,70 @@
 
 namespace mongo {
 
-    /**
-     * Server status section for RangeDeleter.
-     *
-     * Sample format:
-     *
-     * rangeDeleter: {
-     *   lastDeleteStats: [
-     *     {
-     *       deleteDocs: NumberLong(5);
-     *       queueStart: ISODate("2014-06-11T22:45:30.221Z"),
-     *       queueEnd: ISODate("2014-06-11T22:45:30.221Z"),
-     *       deleteStart: ISODate("2014-06-11T22:45:30.221Z"),
-     *       deleteEnd: ISODate("2014-06-11T22:45:30.221Z"),
-     *       waitForReplStart: ISODate("2014-06-11T22:45:30.221Z"),
-     *       waitForReplEnd: ISODate("2014-06-11T22:45:30.221Z")
-     *     }
-     *   ]
-     * }
-     */
-    class RangeDeleterServerStatusSection : public ServerStatusSection {
-    public:
-        RangeDeleterServerStatusSection() : ServerStatusSection( "rangeDeleter" ){}
-        bool includeByDefault() const { return false; }
+/**
+ * Server status section for RangeDeleter.
+ *
+ * Sample format:
+ *
+ * rangeDeleter: {
+ *   lastDeleteStats: [
+ *     {
+ *       deleteDocs: NumberLong(5);
+ *       queueStart: ISODate("2014-06-11T22:45:30.221Z"),
+ *       queueEnd: ISODate("2014-06-11T22:45:30.221Z"),
+ *       deleteStart: ISODate("2014-06-11T22:45:30.221Z"),
+ *       deleteEnd: ISODate("2014-06-11T22:45:30.221Z"),
+ *       waitForReplStart: ISODate("2014-06-11T22:45:30.221Z"),
+ *       waitForReplEnd: ISODate("2014-06-11T22:45:30.221Z")
+ *     }
+ *   ]
+ * }
+ */
+class RangeDeleterServerStatusSection : public ServerStatusSection {
+public:
+    RangeDeleterServerStatusSection() : ServerStatusSection("rangeDeleter") {}
+    bool includeByDefault() const {
+        return false;
+    }
 
-        BSONObj generateSection(OperationContext* txn,
-                                const BSONElement& configElement) const {
-
-            RangeDeleter* deleter = getDeleter();
-            if (!deleter) {
-                return BSONObj();
-            }
-
-            BSONObjBuilder result;
-
-            OwnedPointerVector<DeleteJobStats> statsList;
-            deleter->getStatsHistory(&statsList.mutableVector());
-            BSONArrayBuilder oldStatsBuilder;
-            for (OwnedPointerVector<DeleteJobStats>::const_iterator it = statsList.begin();
-                 it != statsList.end(); ++it) {
-                BSONObjBuilder entryBuilder;
-                entryBuilder.append("deletedDocs", (*it)->deletedDocCount);
-
-                if ((*it)->queueEndTS > Date_t()) {
-                    entryBuilder.append("queueStart", (*it)->queueStartTS);
-                    entryBuilder.append("queueEnd", (*it)->queueEndTS);
-                }
-
-                if ((*it)->deleteEndTS > Date_t()) {
-                    entryBuilder.append("deleteStart", (*it)->deleteStartTS);
-                    entryBuilder.append("deleteEnd", (*it)->deleteEndTS);
-
-                    if ((*it)->waitForReplEndTS > Date_t()) {
-                        entryBuilder.append("waitForReplStart", (*it)->waitForReplStartTS);
-                        entryBuilder.append("waitForReplEnd", (*it)->waitForReplEndTS);
-                    }
-                }
-
-                oldStatsBuilder.append(entryBuilder.obj());
-            }
-            result.append("lastDeleteStats", oldStatsBuilder.arr());
-
-            return result.obj();
+    BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+        RangeDeleter* deleter = getDeleter();
+        if (!deleter) {
+            return BSONObj();
         }
 
-    } rangeDeleterServerStatusSection;
+        BSONObjBuilder result;
+
+        OwnedPointerVector<DeleteJobStats> statsList;
+        deleter->getStatsHistory(&statsList.mutableVector());
+        BSONArrayBuilder oldStatsBuilder;
+        for (OwnedPointerVector<DeleteJobStats>::const_iterator it = statsList.begin();
+             it != statsList.end();
+             ++it) {
+            BSONObjBuilder entryBuilder;
+            entryBuilder.append("deletedDocs", (*it)->deletedDocCount);
+
+            if ((*it)->queueEndTS > Date_t()) {
+                entryBuilder.append("queueStart", (*it)->queueStartTS);
+                entryBuilder.append("queueEnd", (*it)->queueEndTS);
+            }
+
+            if ((*it)->deleteEndTS > Date_t()) {
+                entryBuilder.append("deleteStart", (*it)->deleteStartTS);
+                entryBuilder.append("deleteEnd", (*it)->deleteEndTS);
+
+                if ((*it)->waitForReplEndTS > Date_t()) {
+                    entryBuilder.append("waitForReplStart", (*it)->waitForReplStartTS);
+                    entryBuilder.append("waitForReplEnd", (*it)->waitForReplEndTS);
+                }
+            }
+
+            oldStatsBuilder.append(entryBuilder.obj());
+        }
+        result.append("lastDeleteStats", oldStatsBuilder.arr());
+
+        return result.obj();
+    }
+
+} rangeDeleterServerStatusSection;
 }

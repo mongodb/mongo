@@ -39,164 +39,175 @@
 
 namespace mongo {
 
-    class Collection;
+class Collection;
+
+/**
+ * RAII-style class, which acquires a lock on the specified database in the requested mode and
+ * obtains a reference to the database. Used as a shortcut for calls to dbHolder().get().
+ *
+ * It is guaranteed that locks will be released when this object goes out of scope, therefore
+ * the database reference returned by this class should not be retained.
+ */
+class AutoGetDb {
+    MONGO_DISALLOW_COPYING(AutoGetDb);
+
+public:
+    AutoGetDb(OperationContext* txn, StringData ns, LockMode mode);
+
+    Database* getDb() const {
+        return _db;
+    }
+
+private:
+    const Lock::DBLock _dbLock;
+    Database* const _db;
+};
+
+/**
+ * RAII-style class, which acquires a lock on the specified database in the requested mode and
+ * obtains a reference to the database, creating it was non-existing. Used as a shortcut for
+ * calls to dbHolder().openDb(), taking care of locking details. The requested mode must be
+ * MODE_IX or MODE_X. If the database needs to be created, the lock will automatically be
+ * reacquired as MODE_X.
+ *
+ * It is guaranteed that locks will be released when this object goes out of scope, therefore
+ * the database reference returned by this class should not be retained.
+ */
+class AutoGetOrCreateDb {
+    MONGO_DISALLOW_COPYING(AutoGetOrCreateDb);
+
+public:
+    AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockMode mode);
+
+    Database* getDb() const {
+        return _db;
+    }
+
+    bool justCreated() const {
+        return _justCreated;
+    }
+
+    Lock::DBLock& lock() {
+        return _dbLock;
+    }
+
+private:
+    ScopedTransaction _transaction;
+    Lock::DBLock _dbLock;  // not const, as we may need to relock for implicit create
+    Database* _db;
+    bool _justCreated;
+};
+
+/**
+ * RAII-style class, which would acquire the appropritate hierarchy of locks for obtaining
+ * a particular collection and would retrieve a reference to the collection.
+ *
+ * It is guaranteed that locks will be released when this object goes out of scope, therefore
+ * database and collection references returned by this class should not be retained.
+ */
+class AutoGetCollectionForRead {
+    MONGO_DISALLOW_COPYING(AutoGetCollectionForRead);
+
+public:
+    AutoGetCollectionForRead(OperationContext* txn, const std::string& ns);
+    AutoGetCollectionForRead(OperationContext* txn, const NamespaceString& nss);
+    ~AutoGetCollectionForRead();
+
+    Database* getDb() const {
+        return _db.getDb();
+    }
+
+    Collection* getCollection() const {
+        return _coll;
+    }
+
+private:
+    void _init(const std::string& ns, StringData coll);
+
+    const Timer _timer;
+    OperationContext* const _txn;
+    const ScopedTransaction _transaction;
+    const AutoGetDb _db;
+    const Lock::CollectionLock _collLock;
+
+    Collection* _coll;
+};
+
+/**
+ * Opens the database that we want to use and sets the appropriate namespace on the
+ * current operation.
+ */
+class OldClientContext {
+    MONGO_DISALLOW_COPYING(OldClientContext);
+
+public:
+    /** this is probably what you want */
+    OldClientContext(OperationContext* txn, const std::string& ns, bool doVersion = true);
 
     /**
-     * RAII-style class, which acquires a lock on the specified database in the requested mode and
-     * obtains a reference to the database. Used as a shortcut for calls to dbHolder().get().
-     *
-     * It is guaranteed that locks will be released when this object goes out of scope, therefore
-     * the database reference returned by this class should not be retained.
+     * Below still calls _finishInit, but assumes database has already been acquired
+     * or just created.
      */
-    class AutoGetDb {
-        MONGO_DISALLOW_COPYING(AutoGetDb);
-    public:
-        AutoGetDb(OperationContext* txn, StringData ns, LockMode mode);
-
-        Database* getDb() const {
-            return _db;
-        }
-
-    private:
-        const Lock::DBLock _dbLock;
-        Database* const _db;
-    };
+    OldClientContext(OperationContext* txn, const std::string& ns, Database* db, bool justCreated);
 
     /**
-     * RAII-style class, which acquires a lock on the specified database in the requested mode and
-     * obtains a reference to the database, creating it was non-existing. Used as a shortcut for
-     * calls to dbHolder().openDb(), taking care of locking details. The requested mode must be
-     * MODE_IX or MODE_X. If the database needs to be created, the lock will automatically be
-     * reacquired as MODE_X.
-     *
-     * It is guaranteed that locks will be released when this object goes out of scope, therefore
-     * the database reference returned by this class should not be retained.
+     * note: this does not call _finishInit -- i.e., does not call
+     * ensureShardVersionOKOrThrow for example.
+     * see also: reset().
      */
-    class AutoGetOrCreateDb {
-        MONGO_DISALLOW_COPYING(AutoGetOrCreateDb);
-    public:
-        AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockMode mode);
+    OldClientContext(OperationContext* txn, const std::string& ns, Database* db);
 
-        Database* getDb() const {
-            return _db;
-        }
+    ~OldClientContext();
 
-        bool justCreated() const {
-            return _justCreated;
-        }
+    Database* db() const {
+        return _db;
+    }
+    const char* ns() const {
+        return _ns.c_str();
+    }
 
-        Lock::DBLock& lock() { return _dbLock; }
+    /** @return if the db was created by this OldClientContext */
+    bool justCreated() const {
+        return _justCreated;
+    }
 
-    private:
-        ScopedTransaction _transaction;
-        Lock::DBLock _dbLock; // not const, as we may need to relock for implicit create
-        Database* _db;
-        bool _justCreated;
-    };
+private:
+    friend class CurOp;
+    void _finishInit();
+    void _checkNotStale() const;
 
-    /**
-     * RAII-style class, which would acquire the appropritate hierarchy of locks for obtaining
-     * a particular collection and would retrieve a reference to the collection.
-     *
-     * It is guaranteed that locks will be released when this object goes out of scope, therefore
-     * database and collection references returned by this class should not be retained.
-     */
-    class AutoGetCollectionForRead {
-        MONGO_DISALLOW_COPYING(AutoGetCollectionForRead);
-    public:
-        AutoGetCollectionForRead(OperationContext* txn, const std::string& ns);
-        AutoGetCollectionForRead(OperationContext* txn, const NamespaceString& nss);
-        ~AutoGetCollectionForRead();
+    bool _justCreated;
+    bool _doVersion;
+    const std::string _ns;
+    Database* _db;
+    OperationContext* _txn;
 
-        Database* getDb() const {
-            return _db.getDb();
-        }
-
-        Collection* getCollection() const {
-            return _coll;
-        }
-
-    private:
-        void _init(const std::string& ns,
-                   StringData coll);
-
-        const Timer _timer;
-        OperationContext* const _txn;
-        const ScopedTransaction _transaction;
-        const AutoGetDb _db;
-        const Lock::CollectionLock _collLock;
-
-        Collection* _coll;
-    };
-
-    /**
-     * Opens the database that we want to use and sets the appropriate namespace on the
-     * current operation.
-     */
-    class OldClientContext {
-        MONGO_DISALLOW_COPYING(OldClientContext);
-    public:
-        /** this is probably what you want */
-        OldClientContext(OperationContext* txn, const std::string& ns, bool doVersion = true);
-
-        /**
-         * Below still calls _finishInit, but assumes database has already been acquired
-         * or just created.
-         */
-        OldClientContext(OperationContext* txn,
-                         const std::string& ns,
-                         Database* db,
-                         bool justCreated);
-
-        /**
-         * note: this does not call _finishInit -- i.e., does not call
-         * ensureShardVersionOKOrThrow for example.
-         * see also: reset().
-         */
-        OldClientContext(OperationContext* txn, const std::string& ns, Database * db);
-
-        ~OldClientContext();
-
-        Database* db() const { return _db; }
-        const char* ns() const { return _ns.c_str(); }
-
-        /** @return if the db was created by this OldClientContext */
-        bool justCreated() const { return _justCreated; }
-
-    private:
-        friend class CurOp;
-        void _finishInit();
-        void _checkNotStale() const;
-
-        bool _justCreated;
-        bool _doVersion;
-        const std::string _ns;
-        Database * _db;
-        OperationContext* _txn;
-
-        Timer _timer;
-    };
+    Timer _timer;
+};
 
 
-    class OldClientWriteContext {
-        MONGO_DISALLOW_COPYING(OldClientWriteContext);
-    public:
-        OldClientWriteContext(OperationContext* opCtx, const std::string& ns);
+class OldClientWriteContext {
+    MONGO_DISALLOW_COPYING(OldClientWriteContext);
 
-        Database* db() const { return _c.db(); }
+public:
+    OldClientWriteContext(OperationContext* opCtx, const std::string& ns);
 
-        Collection* getCollection() const {
-            return _c.db()->getCollection(_nss.ns());
-        }
+    Database* db() const {
+        return _c.db();
+    }
 
-    private:
-        OperationContext* const _txn;
-        const NamespaceString _nss;
+    Collection* getCollection() const {
+        return _c.db()->getCollection(_nss.ns());
+    }
 
-        AutoGetOrCreateDb _autodb;
-        Lock::CollectionLock _collk;
-        OldClientContext _c;
-        Collection* _collection;
-    };
+private:
+    OperationContext* const _txn;
+    const NamespaceString _nss;
+
+    AutoGetOrCreateDb _autodb;
+    Lock::CollectionLock _collk;
+    OldClientContext _c;
+    Collection* _collection;
+};
 
 }  // namespace mongo

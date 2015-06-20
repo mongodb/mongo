@@ -38,22 +38,20 @@ namespace mongo {
 
 namespace {
 
-    const int64_t kMicrosPerSecond = 1000 * 1000;
+const int64_t kMicrosPerSecond = 1000 * 1000;
 
-} // unnamed namespace
+}  // unnamed namespace
 
-    Timer::Timer(): Timer(SystemTickSource::get()) {
-    }
+Timer::Timer() : Timer(SystemTickSource::get()) {}
 
-    Timer::Timer(TickSource* tickSource):
-            _tickSource(tickSource),
-            _microsPerCount(static_cast<double>(kMicrosPerSecond) /
-                            _tickSource->getTicksPerSecond()) {
-        reset();
-    }
+Timer::Timer(TickSource* tickSource)
+    : _tickSource(tickSource),
+      _microsPerCount(static_cast<double>(kMicrosPerSecond) / _tickSource->getTicksPerSecond()) {
+    reset();
+}
 
-    long long Timer::now() const {
-        return _tickSource->getTicks();
-    }
+long long Timer::now() const {
+    return _tickSource->getTicks();
+}
 
 }  // namespace mongo

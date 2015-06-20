@@ -37,175 +37,166 @@
 namespace mongo {
 
 namespace {
-    const char kCmdName[] = "findAndModify";
-    const char kQueryField[] = "query";
-    const char kSortField[] = "sort";
-    const char kRemoveField[] = "remove";
-    const char kUpdateField[] = "update";
-    const char kNewField[] = "new";
-    const char kFieldProjectionField[] = "fields";
-    const char kUpsertField[] = "upsert";
-    const char kWriteConcernField[] = "writeConcern";
+const char kCmdName[] = "findAndModify";
+const char kQueryField[] = "query";
+const char kSortField[] = "sort";
+const char kRemoveField[] = "remove";
+const char kUpdateField[] = "update";
+const char kNewField[] = "new";
+const char kFieldProjectionField[] = "fields";
+const char kUpsertField[] = "upsert";
+const char kWriteConcernField[] = "writeConcern";
 
-} // unnamed namespace
+}  // unnamed namespace
 
-    FindAndModifyRequest::FindAndModifyRequest(NamespaceString fullNs,
-                                               BSONObj query,
-                                               BSONObj updateObj):
-        _ns(std::move(fullNs)),
-        _query(query.getOwned()),
-        _updateObj(updateObj.getOwned()),
-        _isRemove(false) {
+FindAndModifyRequest::FindAndModifyRequest(NamespaceString fullNs, BSONObj query, BSONObj updateObj)
+    : _ns(std::move(fullNs)),
+      _query(query.getOwned()),
+      _updateObj(updateObj.getOwned()),
+      _isRemove(false) {}
+
+FindAndModifyRequest FindAndModifyRequest::makeUpdate(NamespaceString fullNs,
+                                                      BSONObj query,
+                                                      BSONObj updateObj) {
+    return FindAndModifyRequest(fullNs, query, updateObj);
+}
+
+FindAndModifyRequest FindAndModifyRequest::makeRemove(NamespaceString fullNs, BSONObj query) {
+    FindAndModifyRequest request(fullNs, query, BSONObj());
+    request._isRemove = true;
+    return request;
+}
+
+BSONObj FindAndModifyRequest::toBSON() const {
+    BSONObjBuilder builder;
+
+    builder.append(kCmdName, _ns.coll());
+    builder.append(kQueryField, _query);
+
+    if (_isRemove) {
+        builder.append(kRemoveField, true);
+    } else {
+        builder.append(kUpdateField, _updateObj);
+
+        if (_isUpsert) {
+            builder.append(kUpsertField, _isUpsert.get());
+        }
     }
 
-    FindAndModifyRequest FindAndModifyRequest::makeUpdate(NamespaceString fullNs,
-                                                          BSONObj query,
-                                                          BSONObj updateObj) {
-        return FindAndModifyRequest(fullNs, query, updateObj);
+    if (_fieldProjection) {
+        builder.append(kFieldProjectionField, _fieldProjection.get());
     }
 
-    FindAndModifyRequest FindAndModifyRequest::makeRemove(NamespaceString fullNs,
-                                                          BSONObj query) {
-        FindAndModifyRequest request(fullNs, query, BSONObj());
-        request._isRemove = true;
-        return request;
+    if (_sort) {
+        builder.append(kSortField, _sort.get());
     }
 
-    BSONObj FindAndModifyRequest::toBSON() const {
-        BSONObjBuilder builder;
-
-        builder.append(kCmdName, _ns.coll());
-        builder.append(kQueryField, _query);
-
-        if (_isRemove) {
-            builder.append(kRemoveField, true);
-        }
-        else {
-            builder.append(kUpdateField, _updateObj);
-
-            if (_isUpsert) {
-                builder.append(kUpsertField, _isUpsert.get());
-            }
-        }
-
-        if (_fieldProjection) {
-            builder.append(kFieldProjectionField, _fieldProjection.get());
-        }
-
-        if (_sort) {
-            builder.append(kSortField, _sort.get());
-        }
-
-        if (_shouldReturnNew) {
-            builder.append(kNewField, _shouldReturnNew.get());
-        }
-
-        if (_writeConcern) {
-            builder.append(kWriteConcernField, _writeConcern->toBSON());
-        }
-
-        return builder.obj();
+    if (_shouldReturnNew) {
+        builder.append(kNewField, _shouldReturnNew.get());
     }
 
-    StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceString fullNs,
-                                                                         const BSONObj& cmdObj) {
-        BSONObj query = cmdObj.getObjectField(kQueryField);
-        BSONObj fields = cmdObj.getObjectField(kFieldProjectionField);
-        BSONObj updateObj = cmdObj.getObjectField(kUpdateField);
-        BSONObj sort = cmdObj.getObjectField(kSortField);
-        bool shouldReturnNew = cmdObj[kNewField].trueValue();
-        bool isUpsert = cmdObj[kUpsertField].trueValue();
-        bool isRemove = cmdObj[kRemoveField].trueValue();
-        bool isUpdate = cmdObj.hasField(kUpdateField);
+    if (_writeConcern) {
+        builder.append(kWriteConcernField, _writeConcern->toBSON());
+    }
 
-        if (!isRemove && !isUpdate) {
+    return builder.obj();
+}
+
+StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceString fullNs,
+                                                                     const BSONObj& cmdObj) {
+    BSONObj query = cmdObj.getObjectField(kQueryField);
+    BSONObj fields = cmdObj.getObjectField(kFieldProjectionField);
+    BSONObj updateObj = cmdObj.getObjectField(kUpdateField);
+    BSONObj sort = cmdObj.getObjectField(kSortField);
+    bool shouldReturnNew = cmdObj[kNewField].trueValue();
+    bool isUpsert = cmdObj[kUpsertField].trueValue();
+    bool isRemove = cmdObj[kRemoveField].trueValue();
+    bool isUpdate = cmdObj.hasField(kUpdateField);
+
+    if (!isRemove && !isUpdate) {
+        return {ErrorCodes::FailedToParse, "Either an update or remove=true must be specified"};
+    }
+
+    if (isRemove) {
+        if (isUpdate) {
+            return {ErrorCodes::FailedToParse, "Cannot specify both an update and remove=true"};
+        }
+
+        if (isUpsert) {
+            return {ErrorCodes::FailedToParse, "Cannot specify both upsert=true and remove=true"};
+        }
+
+        if (shouldReturnNew) {
             return {ErrorCodes::FailedToParse,
-                "Either an update or remove=true must be specified"};
-        }
-
-        if (isRemove) {
-            if (isUpdate) {
-                return {ErrorCodes::FailedToParse,
-                    "Cannot specify both an update and remove=true"};
-            }
-
-            if (isUpsert) {
-                return {ErrorCodes::FailedToParse,
-                    "Cannot specify both upsert=true and remove=true"};
-            }
-
-            if (shouldReturnNew) {
-                return {ErrorCodes::FailedToParse,
                     "Cannot specify both new=true and remove=true;"
                     " 'remove' always returns the deleted document"};
-            }
         }
-
-        FindAndModifyRequest request(std::move(fullNs), query, updateObj);
-        request._isRemove = isRemove;
-        request.setFieldProjection(fields);
-        request.setSort(sort);
-
-        if (!isRemove) {
-            request.setShouldReturnNew(shouldReturnNew);
-            request.setUpsert(isUpsert);
-        }
-
-        return request;
     }
 
-    void FindAndModifyRequest::setFieldProjection(BSONObj fields) {
-        _fieldProjection = fields.getOwned();
+    FindAndModifyRequest request(std::move(fullNs), query, updateObj);
+    request._isRemove = isRemove;
+    request.setFieldProjection(fields);
+    request.setSort(sort);
+
+    if (!isRemove) {
+        request.setShouldReturnNew(shouldReturnNew);
+        request.setUpsert(isUpsert);
     }
 
-    void FindAndModifyRequest::setSort(BSONObj sort) {
-        _sort = sort.getOwned();
-    }
+    return request;
+}
 
-    void FindAndModifyRequest::setShouldReturnNew(bool shouldReturnNew) {
-        dassert(!_isRemove);
-        _shouldReturnNew = shouldReturnNew;
-    }
+void FindAndModifyRequest::setFieldProjection(BSONObj fields) {
+    _fieldProjection = fields.getOwned();
+}
 
-    void FindAndModifyRequest::setUpsert(bool upsert) {
-        dassert(!_isRemove);
-        _isUpsert = upsert;
-    }
+void FindAndModifyRequest::setSort(BSONObj sort) {
+    _sort = sort.getOwned();
+}
 
-    void FindAndModifyRequest::setWriteConcern(WriteConcernOptions writeConcern) {
-        _writeConcern = std::move(writeConcern);
-    }
+void FindAndModifyRequest::setShouldReturnNew(bool shouldReturnNew) {
+    dassert(!_isRemove);
+    _shouldReturnNew = shouldReturnNew;
+}
 
-    const NamespaceString& FindAndModifyRequest::getNamespaceString() const {
-        return _ns;
-    }
+void FindAndModifyRequest::setUpsert(bool upsert) {
+    dassert(!_isRemove);
+    _isUpsert = upsert;
+}
 
-    BSONObj FindAndModifyRequest::getQuery() const {
-        return _query;
-    }
+void FindAndModifyRequest::setWriteConcern(WriteConcernOptions writeConcern) {
+    _writeConcern = std::move(writeConcern);
+}
 
-    BSONObj FindAndModifyRequest::getFields() const {
-        return _fieldProjection.value_or(BSONObj());
-    }
+const NamespaceString& FindAndModifyRequest::getNamespaceString() const {
+    return _ns;
+}
 
-    BSONObj FindAndModifyRequest::getUpdateObj() const {
-        return _updateObj;
-    }
+BSONObj FindAndModifyRequest::getQuery() const {
+    return _query;
+}
 
-    BSONObj FindAndModifyRequest::getSort() const {
-        return _sort.value_or(BSONObj());
-    }
+BSONObj FindAndModifyRequest::getFields() const {
+    return _fieldProjection.value_or(BSONObj());
+}
 
-    bool FindAndModifyRequest::shouldReturnNew() const {
-        return _shouldReturnNew.value_or(false);
-    }
+BSONObj FindAndModifyRequest::getUpdateObj() const {
+    return _updateObj;
+}
 
-    bool FindAndModifyRequest::isUpsert() const {
-        return _isUpsert.value_or(false);
-    }
+BSONObj FindAndModifyRequest::getSort() const {
+    return _sort.value_or(BSONObj());
+}
 
-    bool FindAndModifyRequest::isRemove() const {
-        return _isRemove;
-    }
+bool FindAndModifyRequest::shouldReturnNew() const {
+    return _shouldReturnNew.value_or(false);
+}
 
+bool FindAndModifyRequest::isUpsert() const {
+    return _isUpsert.value_or(false);
+}
+
+bool FindAndModifyRequest::isRemove() const {
+    return _isRemove;
+}
 }

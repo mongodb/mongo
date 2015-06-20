@@ -33,25 +33,24 @@
 
 namespace mongo {
 
-    /**
-     * if doc is ok, then return is BSONObj()
-     * otherwise, BSONObj is what should be inserted instead
-     */
-    StatusWith<BSONObj> fixDocumentForInsert( const BSONObj& doc );
+/**
+ * if doc is ok, then return is BSONObj()
+ * otherwise, BSONObj is what should be inserted instead
+ */
+StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc);
 
 
-    /**
-     * Returns Status::OK() if this namespace is valid for user write operations.  If not, returns
-     * an error Status.
-     */
-    Status userAllowedWriteNS( StringData db, StringData coll );
-    Status userAllowedWriteNS( StringData ns );
-    Status userAllowedWriteNS( const NamespaceString& ns );
+/**
+ * Returns Status::OK() if this namespace is valid for user write operations.  If not, returns
+ * an error Status.
+ */
+Status userAllowedWriteNS(StringData db, StringData coll);
+Status userAllowedWriteNS(StringData ns);
+Status userAllowedWriteNS(const NamespaceString& ns);
 
-    /**
-     * Returns Status::OK() if the namespace described by (db, coll) is valid for user create
-     * operations.  If not, returns an error Status.
-     */
-    Status userAllowedCreateNS( StringData db, StringData coll );
-
+/**
+ * Returns Status::OK() if the namespace described by (db, coll) is valid for user create
+ * operations.  If not, returns an error Status.
+ */
+Status userAllowedCreateNS(StringData db, StringData coll);
 }

@@ -39,30 +39,30 @@
 namespace mongo {
 namespace repl {
 namespace {
-    static const int kLeaderValue = 0;
-    static const int kFollowerValue = 1;
-    static const int kCandidateValue = 2;
+static const int kLeaderValue = 0;
+static const int kFollowerValue = 1;
+static const int kCandidateValue = 2;
 }  // namespace
 
-    const TopologyCoordinator::Role TopologyCoordinator::Role::leader(kLeaderValue);
-    const TopologyCoordinator::Role TopologyCoordinator::Role::follower(kFollowerValue);
-    const TopologyCoordinator::Role TopologyCoordinator::Role::candidate(kCandidateValue);
+const TopologyCoordinator::Role TopologyCoordinator::Role::leader(kLeaderValue);
+const TopologyCoordinator::Role TopologyCoordinator::Role::follower(kFollowerValue);
+const TopologyCoordinator::Role TopologyCoordinator::Role::candidate(kCandidateValue);
 
-    TopologyCoordinator::Role::Role(int value) : _value(value) {}
+TopologyCoordinator::Role::Role(int value) : _value(value) {}
 
-    std::string TopologyCoordinator::Role::toString() const {
-        switch(_value) {
+std::string TopologyCoordinator::Role::toString() const {
+    switch (_value) {
         case kLeaderValue:
             return "leader";
         case kFollowerValue:
             return "follower";
         case kCandidateValue:
             return "candidate";
-        }
-        invariant(false);
     }
+    invariant(false);
+}
 
-    TopologyCoordinator::~TopologyCoordinator() {}
+TopologyCoordinator::~TopologyCoordinator() {}
 
 }  // namespace repl
 }  // namespace mongo

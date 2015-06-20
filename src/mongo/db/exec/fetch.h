@@ -37,75 +37,75 @@
 
 namespace mongo {
 
-    class RecordCursor;
+class RecordCursor;
 
+/**
+ * This stage turns a RecordId into a BSONObj.
+ *
+ * In WorkingSetMember terms, it transitions from LOC_AND_IDX to LOC_AND_UNOWNED_OBJ by reading
+ * the record at the provided loc.  Returns verbatim any data that already has an object.
+ *
+ * Preconditions: Valid RecordId.
+ */
+class FetchStage : public PlanStage {
+public:
+    FetchStage(OperationContext* txn,
+               WorkingSet* ws,
+               PlanStage* child,
+               const MatchExpression* filter,
+               const Collection* collection);
+
+    virtual ~FetchStage();
+
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
+
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_FETCH;
+    }
+
+    PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats() const;
+
+    virtual const SpecificStats* getSpecificStats() const;
+
+    static const char* kStageType;
+
+private:
     /**
-     * This stage turns a RecordId into a BSONObj.
-     *
-     * In WorkingSetMember terms, it transitions from LOC_AND_IDX to LOC_AND_UNOWNED_OBJ by reading
-     * the record at the provided loc.  Returns verbatim any data that already has an object.
-     *
-     * Preconditions: Valid RecordId.
+     * If the member (with id memberID) passes our filter, set *out to memberID and return that
+     * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
      */
-    class FetchStage : public PlanStage {
-    public:
-        FetchStage(OperationContext* txn,
-                   WorkingSet* ws,
-                   PlanStage* child,
-                   const MatchExpression* filter,
-                   const Collection* collection);
+    StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
 
-        virtual ~FetchStage();
+    OperationContext* _txn;
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+    // Collection which is used by this stage. Used to resolve record ids retrieved by child
+    // stages. The lifetime of the collection must supersede that of the stage.
+    const Collection* _collection;
+    // Used to fetch Records from _collection.
+    std::unique_ptr<RecordCursor> _cursor;
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    // _ws is not owned by us.
+    WorkingSet* _ws;
+    std::unique_ptr<PlanStage> _child;
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    // The filter is not owned by us.
+    const MatchExpression* _filter;
 
-        virtual StageType stageType() const { return STAGE_FETCH; }
+    // If not Null, we use this rather than asking our child what to do next.
+    WorkingSetID _idRetrying;
 
-        PlanStageStats* getStats();
-
-        virtual const CommonStats* getCommonStats() const;
-
-        virtual const SpecificStats* getSpecificStats() const;
-
-        static const char* kStageType;
-
-    private:
-
-        /**
-         * If the member (with id memberID) passes our filter, set *out to memberID and return that
-         * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
-         */
-        StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID,
-                                   WorkingSetID* out);
-
-        OperationContext* _txn;
-
-        // Collection which is used by this stage. Used to resolve record ids retrieved by child
-        // stages. The lifetime of the collection must supersede that of the stage.
-        const Collection* _collection;
-        // Used to fetch Records from _collection.
-        std::unique_ptr<RecordCursor> _cursor;
-
-        // _ws is not owned by us.
-        WorkingSet* _ws;
-        std::unique_ptr<PlanStage> _child;
-
-        // The filter is not owned by us.
-        const MatchExpression* _filter;
-
-        // If not Null, we use this rather than asking our child what to do next.
-        WorkingSetID _idRetrying;
-
-        // Stats
-        CommonStats _commonStats;
-        FetchStats _specificStats;
-    };
+    // Stats
+    CommonStats _commonStats;
+    FetchStats _specificStats;
+};
 
 }  // namespace mongo

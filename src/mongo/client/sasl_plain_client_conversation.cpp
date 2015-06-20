@@ -37,27 +37,22 @@
 
 namespace mongo {
 
-    SaslPLAINClientConversation::SaslPLAINClientConversation(
-                                                    SaslClientSession* saslClientSession) :
-        SaslClientConversation(saslClientSession) {
-    }
+SaslPLAINClientConversation::SaslPLAINClientConversation(SaslClientSession* saslClientSession)
+    : SaslClientConversation(saslClientSession) {}
 
-    SaslPLAINClientConversation::~SaslPLAINClientConversation() {};
+SaslPLAINClientConversation::~SaslPLAINClientConversation(){};
 
-    StatusWith<bool> SaslPLAINClientConversation::step(StringData inputData,
-                                                       std::string* outputData) {
-        // Create PLAIN message on the form: user\0user\0pwd
+StatusWith<bool> SaslPLAINClientConversation::step(StringData inputData, std::string* outputData) {
+    // Create PLAIN message on the form: user\0user\0pwd
 
-        StringBuilder sb;
-        sb << _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() <<
-              '\0' <<
-              _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() <<
-              '\0' <<
-              _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString();
+    StringBuilder sb;
+    sb << _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() << '\0'
+       << _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() << '\0'
+       << _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString();
 
-        *outputData = sb.str();
+    *outputData = sb.str();
 
-        return StatusWith<bool>(true);
-    }
+    return StatusWith<bool>(true);
+}
 
 }  // namespace mongo

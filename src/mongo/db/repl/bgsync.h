@@ -37,158 +37,156 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
 namespace repl {
 
-    class Member;
-    class ReplicationCoordinator;
+class Member;
+class ReplicationCoordinator;
 
-    // This interface exists to facilitate easier testing;
-    // the test infrastructure implements these functions with stubs.
-    class BackgroundSyncInterface {
-    public:
-        virtual ~BackgroundSyncInterface();
+// This interface exists to facilitate easier testing;
+// the test infrastructure implements these functions with stubs.
+class BackgroundSyncInterface {
+public:
+    virtual ~BackgroundSyncInterface();
 
-        // Gets the head of the buffer, but does not remove it.
-        // Returns true if an element was present at the head;
-        // false if the queue was empty.
-        virtual bool peek(BSONObj* op) = 0;
+    // Gets the head of the buffer, but does not remove it.
+    // Returns true if an element was present at the head;
+    // false if the queue was empty.
+    virtual bool peek(BSONObj* op) = 0;
 
-        // Deletes objects in the queue;
-        // called by sync thread after it has applied an op
-        virtual void consume() = 0;
+    // Deletes objects in the queue;
+    // called by sync thread after it has applied an op
+    virtual void consume() = 0;
 
-        // wait up to 1 second for more ops to appear
-        virtual void waitForMore() = 0;
-    };
-
-
-    /**
-     * Lock order:
-     * 1. rslock
-     * 2. rwlock
-     * 3. BackgroundSync::_mutex
-     */
-    class BackgroundSync : public BackgroundSyncInterface {
-    public:
-        // Allow index prefetching to be turned on/off
-        enum IndexPrefetchConfig {
-            PREFETCH_NONE=0, PREFETCH_ID_ONLY=1, PREFETCH_ALL=2
-        };
-
-        static BackgroundSync* get();
-
-        // stop syncing (when this node becomes a primary, e.g.)
-        void stop();
+    // wait up to 1 second for more ops to appear
+    virtual void waitForMore() = 0;
+};
 
 
-        void shutdown();
-        void notify(OperationContext* txn);
+/**
+ * Lock order:
+ * 1. rslock
+ * 2. rwlock
+ * 3. BackgroundSync::_mutex
+ */
+class BackgroundSync : public BackgroundSyncInterface {
+public:
+    // Allow index prefetching to be turned on/off
+    enum IndexPrefetchConfig { PREFETCH_NONE = 0, PREFETCH_ID_ONLY = 1, PREFETCH_ALL = 2 };
 
-        // Blocks until _pause becomes true from a call to stop() or shutdown()
-        void waitUntilPaused();
+    static BackgroundSync* get();
 
-        virtual ~BackgroundSync() {}
-
-        // starts the producer thread
-        void producerThread();
-        // starts the sync target notifying thread
-        void notifierThread();
-
-        HostAndPort getSyncTarget();
-
-        // Interface implementation
-
-        virtual bool peek(BSONObj* op);
-        virtual void consume();
-        virtual void clearSyncTarget();
-        virtual void waitForMore();
-
-        // For monitoring
-        BSONObj getCounters();
-
-        long long getLastAppliedHash() const;
-        void setLastAppliedHash(long long oldH);
-        void loadLastAppliedHash(OperationContext* txn);
-
-        // Clears any fetched and buffered oplog entries.
-        void clearBuffer();
-
-        bool getInitialSyncRequestedFlag();
-        void setInitialSyncRequestedFlag(bool value);
-
-        void setIndexPrefetchConfig(const IndexPrefetchConfig cfg) {
-            _indexPrefetchConfig = cfg;
-        }
-
-        IndexPrefetchConfig getIndexPrefetchConfig() {
-            return _indexPrefetchConfig;
-        }
+    // stop syncing (when this node becomes a primary, e.g.)
+    void stop();
 
 
-        // Testing related stuff
-        void pushTestOpToBuffer(const BSONObj& op);
-    private:
-        static BackgroundSync *s_instance;
-        // protects creation of s_instance
-        static stdx::mutex s_mutex;
+    void shutdown();
+    void notify(OperationContext* txn);
 
-        // Production thread
-        BlockingQueue<BSONObj> _buffer;
-        OplogReader _syncSourceReader;
+    // Blocks until _pause becomes true from a call to stop() or shutdown()
+    void waitUntilPaused();
 
-        // _mutex protects all of the class variables except _syncSourceReader and _buffer
-        mutable stdx::mutex _mutex;
+    virtual ~BackgroundSync() {}
 
-        OpTime _lastOpTimeFetched;
+    // starts the producer thread
+    void producerThread();
+    // starts the sync target notifying thread
+    void notifierThread();
 
-        // lastAppliedHash is used to generate a new hash for the following op, when primary.
-        long long _lastAppliedHash;
-        // lastFetchedHash is used to match ops to determine if we need to rollback, when
-        // a secondary.
-        long long _lastFetchedHash;
+    HostAndPort getSyncTarget();
 
-        // if produce thread should be running
-        bool _pause;
-        stdx::condition_variable _pausedCondition;
-        bool _appliedBuffer;
-        stdx::condition_variable _appliedBufferCondition;
+    // Interface implementation
 
-        HostAndPort _syncSourceHost;
+    virtual bool peek(BSONObj* op);
+    virtual void consume();
+    virtual void clearSyncTarget();
+    virtual void waitForMore();
 
-        BackgroundSync();
-        BackgroundSync(const BackgroundSync& s);
-        BackgroundSync operator=(const BackgroundSync& s);
+    // For monitoring
+    BSONObj getCounters();
 
-        // Production thread
-        void _producerThread();
-        // Adds elements to the list, up to maxSize.
-        void produce(OperationContext* txn);
-        // Checks the criteria for rolling back and executes a rollback if warranted.
-        bool _rollbackIfNeeded(OperationContext* txn, OplogReader& r);
+    long long getLastAppliedHash() const;
+    void setLastAppliedHash(long long oldH);
+    void loadLastAppliedHash(OperationContext* txn);
 
-        // Evaluate if the current sync target is still good
-        bool shouldChangeSyncSource();
+    // Clears any fetched and buffered oplog entries.
+    void clearBuffer();
 
-        // restart syncing
-        void start(OperationContext* txn);
+    bool getInitialSyncRequestedFlag();
+    void setInitialSyncRequestedFlag(bool value);
 
-        long long _readLastAppliedHash(OperationContext* txn);
+    void setIndexPrefetchConfig(const IndexPrefetchConfig cfg) {
+        _indexPrefetchConfig = cfg;
+    }
 
-        // A pointer to the replication coordinator running the show.
-        ReplicationCoordinator* _replCoord;
-
-        // bool for indicating resync need on this node and the mutex that protects it
-        // The resync command sets this flag; the Applier thread observes and clears it.
-        bool _initialSyncRequestedFlag;
-        stdx::mutex _initialSyncMutex;
-
-        // This setting affects the Applier prefetcher behavior.
-        IndexPrefetchConfig _indexPrefetchConfig;
-
-    };
+    IndexPrefetchConfig getIndexPrefetchConfig() {
+        return _indexPrefetchConfig;
+    }
 
 
-} // namespace repl
-} // namespace mongo
+    // Testing related stuff
+    void pushTestOpToBuffer(const BSONObj& op);
+
+private:
+    static BackgroundSync* s_instance;
+    // protects creation of s_instance
+    static stdx::mutex s_mutex;
+
+    // Production thread
+    BlockingQueue<BSONObj> _buffer;
+    OplogReader _syncSourceReader;
+
+    // _mutex protects all of the class variables except _syncSourceReader and _buffer
+    mutable stdx::mutex _mutex;
+
+    OpTime _lastOpTimeFetched;
+
+    // lastAppliedHash is used to generate a new hash for the following op, when primary.
+    long long _lastAppliedHash;
+    // lastFetchedHash is used to match ops to determine if we need to rollback, when
+    // a secondary.
+    long long _lastFetchedHash;
+
+    // if produce thread should be running
+    bool _pause;
+    stdx::condition_variable _pausedCondition;
+    bool _appliedBuffer;
+    stdx::condition_variable _appliedBufferCondition;
+
+    HostAndPort _syncSourceHost;
+
+    BackgroundSync();
+    BackgroundSync(const BackgroundSync& s);
+    BackgroundSync operator=(const BackgroundSync& s);
+
+    // Production thread
+    void _producerThread();
+    // Adds elements to the list, up to maxSize.
+    void produce(OperationContext* txn);
+    // Checks the criteria for rolling back and executes a rollback if warranted.
+    bool _rollbackIfNeeded(OperationContext* txn, OplogReader& r);
+
+    // Evaluate if the current sync target is still good
+    bool shouldChangeSyncSource();
+
+    // restart syncing
+    void start(OperationContext* txn);
+
+    long long _readLastAppliedHash(OperationContext* txn);
+
+    // A pointer to the replication coordinator running the show.
+    ReplicationCoordinator* _replCoord;
+
+    // bool for indicating resync need on this node and the mutex that protects it
+    // The resync command sets this flag; the Applier thread observes and clears it.
+    bool _initialSyncRequestedFlag;
+    stdx::mutex _initialSyncMutex;
+
+    // This setting affects the Applier prefetcher behavior.
+    IndexPrefetchConfig _indexPrefetchConfig;
+};
+
+
+}  // namespace repl
+}  // namespace mongo

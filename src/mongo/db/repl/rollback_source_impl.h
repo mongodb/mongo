@@ -35,40 +35,36 @@
 
 namespace mongo {
 
-    class DBClientConnection;
+class DBClientConnection;
 
 namespace repl {
 
-    /**
-     * Rollback source implementation using a connection.
-     */
+/**
+ * Rollback source implementation using a connection.
+ */
 
-    class RollbackSourceImpl : public RollbackSource {
-    public:
+class RollbackSourceImpl : public RollbackSource {
+public:
+    explicit RollbackSourceImpl(DBClientConnection* conn, const std::string& collectionName);
 
-        explicit RollbackSourceImpl(DBClientConnection* conn, const std::string& collectionName);
+    const OplogInterface& getOplog() const override;
 
-        const OplogInterface& getOplog() const override;
+    int getRollbackId() const override;
 
-        int getRollbackId() const override;
+    BSONObj getLastOperation() const override;
 
-        BSONObj getLastOperation() const override;
+    BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
 
-        BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
+    void copyCollectionFromRemote(OperationContext* txn, const NamespaceString& nss) const override;
 
-        void copyCollectionFromRemote(OperationContext* txn,
-                                      const NamespaceString& nss) const override;
+    StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
 
-        StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
-
-    private:
-
-        DBClientConnection* _conn;
-        std::string _collectionName;
-        OplogInterfaceRemote _oplog;
-
-    };
+private:
+    DBClientConnection* _conn;
+    std::string _collectionName;
+    OplogInterfaceRemote _oplog;
+};
 
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

@@ -37,38 +37,41 @@
 
 namespace {
 
-    using mongo::BSONObj;
-    using mongo::ChunkType;
-    using mongo::ConfigDiffTracker;
-    using std::string;
-    using std::pair;
-    using std::make_pair;
+using mongo::BSONObj;
+using mongo::ChunkType;
+using mongo::ConfigDiffTracker;
+using std::string;
+using std::pair;
+using std::make_pair;
 
-    // XXX
-    // We'd move ChunkDiffUnitTest here
-    // We can check the queries it generates.
-    // We can check if is populating the attaching structures properly
-    //
+// XXX
+// We'd move ChunkDiffUnitTest here
+// We can check the queries it generates.
+// We can check if is populating the attaching structures properly
+//
 
-    // The default pass-through adapter for using config diffs.
-    class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj,string> {
-    public:
+// The default pass-through adapter for using config diffs.
+class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj, string> {
+public:
+    DefaultDiffAdapter() {}
+    virtual ~DefaultDiffAdapter() {}
 
-        DefaultDiffAdapter() {}
-        virtual ~DefaultDiffAdapter() {}
-
-        virtual bool isTracked(const ChunkType& chunk) const { return true; }
-
-        virtual pair<BSONObj,BSONObj> rangeFor(const ChunkType& chunk) const {
-            return make_pair(chunk.getMin(), chunk.getMax());
-        }
-
-        virtual string shardFor(const string& name) const { return name; }
-    };
-
-    TEST(Basics, Simple) {
-        DefaultDiffAdapter differ;
-        ASSERT_TRUE(true);
+    virtual bool isTracked(const ChunkType& chunk) const {
+        return true;
     }
 
-} // unnamed namespace
+    virtual pair<BSONObj, BSONObj> rangeFor(const ChunkType& chunk) const {
+        return make_pair(chunk.getMin(), chunk.getMax());
+    }
+
+    virtual string shardFor(const string& name) const {
+        return name;
+    }
+};
+
+TEST(Basics, Simple) {
+    DefaultDiffAdapter differ;
+    ASSERT_TRUE(true);
+}
+
+}  // unnamed namespace

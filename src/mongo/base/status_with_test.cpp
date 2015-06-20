@@ -36,60 +36,59 @@
 
 namespace {
 
-    using mongo::makeStatusWith;
-    using mongo::StatusWith;
+using mongo::makeStatusWith;
+using mongo::StatusWith;
 
-    TEST(StatusWith, makeStatusWith) {
+TEST(StatusWith, makeStatusWith) {
+    using mongo::StringData;
 
-        using mongo::StringData;
+    auto s1 = makeStatusWith<int>(3);
+    ASSERT_TRUE(s1.isOK());
+    ASSERT_EQUALS(uassertStatusOK(s1), 3);
 
-        auto s1 = makeStatusWith<int>(3);
-        ASSERT_TRUE(s1.isOK());
-        ASSERT_EQUALS(uassertStatusOK(s1), 3);
+    auto s2 = makeStatusWith<std::vector<int>>();
+    ASSERT_TRUE(s2.isOK());
+    ASSERT_EQUALS(uassertStatusOK(s2).size(), 0u);
 
-        auto s2 = makeStatusWith<std::vector<int>>();
-        ASSERT_TRUE(s2.isOK());
-        ASSERT_EQUALS(uassertStatusOK(s2).size(), 0u);
+    std::vector<int> i = {1, 2, 3};
+    auto s3 = makeStatusWith<std::vector<int>>(i.begin(), i.end());
+    ASSERT_TRUE(s3.isOK());
+    ASSERT_EQUALS(uassertStatusOK(s3).size(), 3u);
 
-        std::vector<int> i = {1, 2, 3};
-        auto s3 = makeStatusWith<std::vector<int>>(i.begin(), i.end());
-        ASSERT_TRUE(s3.isOK());
-        ASSERT_EQUALS(uassertStatusOK(s3).size(), 3u);
+    auto s4 = makeStatusWith<std::string>("foo");
 
-        auto s4 = makeStatusWith<std::string>("foo");
+    ASSERT_TRUE(s4.isOK());
+    ASSERT_EQUALS(uassertStatusOK(s4), std::string{"foo"});
+    const char* foo = "barbaz";
+    auto s5 = makeStatusWith<StringData>(foo, std::size_t{6});
+    ASSERT_TRUE(s5.isOK());
 
-        ASSERT_TRUE(s4.isOK());
-        ASSERT_EQUALS(uassertStatusOK(s4), std::string{"foo"});
-        const char* foo = "barbaz";
-        auto s5 = makeStatusWith<StringData>(foo, std::size_t{6});
-        ASSERT_TRUE(s5.isOK());
+    // make sure CV qualifiers trigger correct overload
+    const StatusWith<StringData>& s6 = s5;
+    ASSERT_EQUALS(uassertStatusOK(s6), foo);
+    StatusWith<StringData>& s7 = s5;
+    ASSERT_EQUALS(uassertStatusOK(s7), foo);
+    ASSERT_EQUALS(uassertStatusOK(std::move(s5)), foo);
 
-        // make sure CV qualifiers trigger correct overload
-        const StatusWith<StringData>& s6 = s5;
-        ASSERT_EQUALS(uassertStatusOK(s6), foo);
-        StatusWith<StringData>& s7 = s5;
-        ASSERT_EQUALS(uassertStatusOK(s7), foo);
-        ASSERT_EQUALS(uassertStatusOK(std::move(s5)), foo);
+    // Check that we use T(...) and not T{...}
+    // ASSERT_EQUALS requires an ostream overload for vector<int>
+    ASSERT_TRUE(makeStatusWith<std::vector<int>>(1, 2) == std::vector<int>{2});
+}
 
-        // Check that we use T(...) and not T{...}
-        // ASSERT_EQUALS requires an ostream overload for vector<int>
-        ASSERT_TRUE(makeStatusWith<std::vector<int>>(1, 2) == std::vector<int>{2});
-    }
+TEST(StatusWith, nonDefaultConstructible) {
+    class NoDefault {
+        NoDefault() = delete;
 
-    TEST(StatusWith, nonDefaultConstructible) {
+    public:
+        NoDefault(int x) : _x{x} {};
+        int _x{0};
+    };
 
-        class NoDefault {
-            NoDefault() = delete;
-        public:
-            NoDefault(int x) : _x{x} {};
-            int _x{0};
-        };
+    auto swND = makeStatusWith<NoDefault>(1);
+    ASSERT_TRUE(swND.getValue()._x = 1);
 
-        auto swND = makeStatusWith<NoDefault>(1);
-        ASSERT_TRUE(swND.getValue()._x = 1);
-
-        auto swNDerror = StatusWith<NoDefault>(mongo::ErrorCodes::BadValue, "foo");
-        ASSERT_FALSE(swNDerror.isOK());
-    }
+    auto swNDerror = StatusWith<NoDefault>(mongo::ErrorCodes::BadValue, "foo");
+    ASSERT_FALSE(swNDerror.isOK());
+}
 
 }  // namespace

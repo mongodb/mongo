@@ -34,38 +34,37 @@
 
 namespace mongo {
 
-    /* Details about a particular index. There is one of these effectively for each object in
-       system.namespaces (although this also includes the head pointer, which is not in that
-       collection).
+/* Details about a particular index. There is one of these effectively for each object in
+   system.namespaces (although this also includes the head pointer, which is not in that
+   collection).
 
-       This is an internal part of the catalog.  Nothing outside of the catalog should use this.
+   This is an internal part of the catalog.  Nothing outside of the catalog should use this.
 
-       ** MemoryMapped in NamespaceDetails ** (i.e., this is on disk data)
-     */
+   ** MemoryMapped in NamespaceDetails ** (i.e., this is on disk data)
+ */
 #pragma pack(1)
-    struct IndexDetails {
-        /**
-         * btree head disk location
-         */
-        DiskLoc head;
+struct IndexDetails {
+    /**
+     * btree head disk location
+     */
+    DiskLoc head;
 
-        /* Location of index info object. Format:
+    /* Location of index info object. Format:
 
-             { name:"nameofindex", ns:"parentnsname", key: {keypattobject}
-               [, unique: <bool>, background: <bool>, v:<version>]
-             }
+         { name:"nameofindex", ns:"parentnsname", key: {keypattobject}
+           [, unique: <bool>, background: <bool>, v:<version>]
+         }
 
-           This object is in the system.indexes collection.  Note that since we
-           have a pointer to the object here, the object in system.indexes MUST NEVER MOVE.
-        */
-        DiskLoc info;
+       This object is in the system.indexes collection.  Note that since we
+       have a pointer to the object here, the object in system.indexes MUST NEVER MOVE.
+    */
+    DiskLoc info;
 
-        /**
-         * makes head and info invalid
-        */
-        void _reset();
-
-    };
+    /**
+     * makes head and info invalid
+    */
+    void _reset();
+};
 #pragma pack()
 
-} // namespace mongo
+}  // namespace mongo

@@ -29,30 +29,27 @@
 #include "mongo/base/status.h"
 
 namespace mongo {
-    class Database;
-    class NamespaceString;
-    class OperationContext;
+class Database;
+class NamespaceString;
+class OperationContext;
 
-    /**
-     * Drops all documents contained in the capped collection, "collectionName".
-     */
-    Status emptyCapped(OperationContext* txn,
-                       const NamespaceString& collectionName);
+/**
+ * Drops all documents contained in the capped collection, "collectionName".
+ */
+Status emptyCapped(OperationContext* txn, const NamespaceString& collectionName);
 
-    /**
-     * Clones the collection "shortFrom" to the capped collection "shortTo" with a size of "size".
-     */
-    Status cloneCollectionAsCapped(OperationContext* txn,
-                                   Database* db,
-                                   const std::string& shortFrom,
-                                   const std::string& shortTo,
-                                   double size,
-                                   bool temp);
+/**
+ * Clones the collection "shortFrom" to the capped collection "shortTo" with a size of "size".
+ */
+Status cloneCollectionAsCapped(OperationContext* txn,
+                               Database* db,
+                               const std::string& shortFrom,
+                               const std::string& shortTo,
+                               double size,
+                               bool temp);
 
-    /**
-     * Converts the collection "collectionName" to a capped collection with a size of "size".
-     */
-    Status convertToCapped(OperationContext* txn,
-                           const NamespaceString& collectionName,
-                           double size);
-} // namespace mongo
+/**
+ * Converts the collection "collectionName" to a capped collection with a size of "size".
+ */
+Status convertToCapped(OperationContext* txn, const NamespaceString& collectionName, double size);
+}  // namespace mongo

@@ -34,80 +34,84 @@
 #include "mongo/db/storage/mmap_v1/logfile.h"
 
 namespace mongo {
-    namespace dur {
+namespace dur {
 
-        /** the writeahead journal for durability */
-        class Journal {
-        public:
-            std::string dir; // set by journalMakeDir() during initialization
+/** the writeahead journal for durability */
+class Journal {
+public:
+    std::string dir;  // set by journalMakeDir() during initialization
 
-            Journal();
+    Journal();
 
-            /** call during startup by journalMakeDir() */
-            void init();
+    /** call during startup by journalMakeDir() */
+    void init();
 
-            /** check if time to rotate files.  assure a file is open.
-                done separately from the journal() call as we can do this part
-                outside of lock.
-                thread: durThread()
-             */
-            void rotate();
+    /** check if time to rotate files.  assure a file is open.
+        done separately from the journal() call as we can do this part
+        outside of lock.
+        thread: durThread()
+     */
+    void rotate();
 
-            /** append to the journal file
-            */
-            void journal(const JSectHeader& h, const AlignedBuilder& b);
+    /** append to the journal file
+    */
+    void journal(const JSectHeader& h, const AlignedBuilder& b);
 
-            boost::filesystem::path getFilePathFor(int filenumber) const;
+    boost::filesystem::path getFilePathFor(int filenumber) const;
 
-            unsigned long long lastFlushTime() const { return _lastFlushTime; }
-            void cleanup(bool log); // closes and removes journal files
-
-            unsigned long long curFileId() const { return _curFileId; }
-
-            void assureLogFileOpen() {
-                stdx::lock_guard<SimpleMutex> lk(_curLogFileMutex);
-                if( _curLogFile == 0 )
-                    _open();
-            }
-
-            /** open a journal file to journal operations to. */
-            void open();
-
-        private:
-            /** check if time to rotate files.  assure a file is open.
-             *  internally called with every commit
-             */
-            void _rotate();
-
-            void _open();
-            void closeCurrentJournalFile();
-            void removeUnneededJournalFiles();
-
-            unsigned long long _written; // bytes written so far to the current journal (log) file
-            unsigned _nextFileNumber;
-
-            SimpleMutex _curLogFileMutex;
-
-            LogFile *_curLogFile; // use _curLogFileMutex
-            unsigned long long _curFileId; // current file id see JHeader::fileId
-
-            struct JFile {
-                std::string filename;
-                unsigned long long lastEventTimeMs;
-            };
-
-            // files which have been closed but not unlinked (rotated out) yet
-            // ordered oldest to newest
-            std::list<JFile> _oldJournalFiles; // use _curLogFileMutex
-
-            // lsn related
-            static void preFlush();
-            static void postFlush();
-            unsigned long long _preFlushTime;
-            unsigned long long _lastFlushTime; // data < this time is fsynced in the datafiles (unless hard drive controller is caching)
-            bool _writeToLSNNeeded;
-            void updateLSNFile();
-        };
-
+    unsigned long long lastFlushTime() const {
+        return _lastFlushTime;
     }
+    void cleanup(bool log);  // closes and removes journal files
+
+    unsigned long long curFileId() const {
+        return _curFileId;
+    }
+
+    void assureLogFileOpen() {
+        stdx::lock_guard<SimpleMutex> lk(_curLogFileMutex);
+        if (_curLogFile == 0)
+            _open();
+    }
+
+    /** open a journal file to journal operations to. */
+    void open();
+
+private:
+    /** check if time to rotate files.  assure a file is open.
+     *  internally called with every commit
+     */
+    void _rotate();
+
+    void _open();
+    void closeCurrentJournalFile();
+    void removeUnneededJournalFiles();
+
+    unsigned long long _written;  // bytes written so far to the current journal (log) file
+    unsigned _nextFileNumber;
+
+    SimpleMutex _curLogFileMutex;
+
+    LogFile* _curLogFile;           // use _curLogFileMutex
+    unsigned long long _curFileId;  // current file id see JHeader::fileId
+
+    struct JFile {
+        std::string filename;
+        unsigned long long lastEventTimeMs;
+    };
+
+    // files which have been closed but not unlinked (rotated out) yet
+    // ordered oldest to newest
+    std::list<JFile> _oldJournalFiles;  // use _curLogFileMutex
+
+    // lsn related
+    static void preFlush();
+    static void postFlush();
+    unsigned long long _preFlushTime;
+    unsigned long long
+        _lastFlushTime;  // data < this time is fsynced in the datafiles (unless hard drive controller is caching)
+    bool _writeToLSNNeeded;
+    void updateLSNFile();
+};
+}
 }

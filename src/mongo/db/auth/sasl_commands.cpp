@@ -56,327 +56,320 @@
 namespace mongo {
 namespace {
 
-    using std::stringstream;
+using std::stringstream;
 
-    const bool autoAuthorizeDefault = true;
+const bool autoAuthorizeDefault = true;
 
-    class CmdSaslStart : public Command {
-    public:
-        CmdSaslStart();
-        virtual ~CmdSaslStart();
+class CmdSaslStart : public Command {
+public:
+    CmdSaslStart();
+    virtual ~CmdSaslStart();
 
-        virtual void addRequiredPrivileges(
-                const std::string&, const BSONObj&, std::vector<Privilege>*) {}
+    virtual void addRequiredPrivileges(const std::string&,
+                                       const BSONObj&,
+                                       std::vector<Privilege>*) {}
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& db,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& ignored,
-                         BSONObjBuilder& result);
+    virtual bool run(OperationContext* txn,
+                     const std::string& db,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& ignored,
+                     BSONObjBuilder& result);
 
-        virtual void help(stringstream& help) const;
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual bool slaveOk() const { return true; }
-        virtual bool requiresAuth() { return false; }
+    virtual void help(stringstream& help) const;
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual bool requiresAuth() {
+        return false;
+    }
+};
 
-    };
+class CmdSaslContinue : public Command {
+public:
+    CmdSaslContinue();
+    virtual ~CmdSaslContinue();
 
-    class CmdSaslContinue : public Command {
-    public:
-        CmdSaslContinue();
-        virtual ~CmdSaslContinue();
+    virtual void addRequiredPrivileges(const std::string&,
+                                       const BSONObj&,
+                                       std::vector<Privilege>*) {}
 
-        virtual void addRequiredPrivileges(
-                const std::string&, const BSONObj&, std::vector<Privilege>*) {}
+    virtual bool run(OperationContext* txn,
+                     const std::string& db,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& ignored,
+                     BSONObjBuilder& result);
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& db,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& ignored,
-                         BSONObjBuilder& result);
+    virtual void help(stringstream& help) const;
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual bool requiresAuth() {
+        return false;
+    }
+};
 
-        virtual void help(stringstream& help) const;
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual bool slaveOk() const { return true; }
-        virtual bool requiresAuth() { return false; }
-    };
+CmdSaslStart cmdSaslStart;
+CmdSaslContinue cmdSaslContinue;
+Status buildResponse(const SaslAuthenticationSession* session,
+                     const std::string& responsePayload,
+                     BSONType responsePayloadType,
+                     BSONObjBuilder* result) {
+    result->appendIntOrLL(saslCommandConversationIdFieldName, session->getConversationId());
+    result->appendBool(saslCommandDoneFieldName, session->isDone());
 
-    CmdSaslStart cmdSaslStart;
-    CmdSaslContinue cmdSaslContinue;
-    Status buildResponse(const SaslAuthenticationSession* session,
-                         const std::string& responsePayload,
-                         BSONType responsePayloadType,
-                         BSONObjBuilder* result) {
-        result->appendIntOrLL(saslCommandConversationIdFieldName, session->getConversationId());
-        result->appendBool(saslCommandDoneFieldName, session->isDone());
-
-        if (responsePayload.size() > size_t(std::numeric_limits<int>::max())) {
-            return Status(ErrorCodes::InvalidLength, "Response payload too long");
-        }
-        if (responsePayloadType == BinData) {
-            result->appendBinData(saslCommandPayloadFieldName,
-                                  int(responsePayload.size()),
-                                  BinDataGeneral,
-                                  responsePayload.data());
-        }
-        else if (responsePayloadType == String) {
-            result->append(saslCommandPayloadFieldName, base64::encode(responsePayload));
-        }
-        else {
-            fassertFailed(4003);
-        }
-
-        return Status::OK();
+    if (responsePayload.size() > size_t(std::numeric_limits<int>::max())) {
+        return Status(ErrorCodes::InvalidLength, "Response payload too long");
+    }
+    if (responsePayloadType == BinData) {
+        result->appendBinData(saslCommandPayloadFieldName,
+                              int(responsePayload.size()),
+                              BinDataGeneral,
+                              responsePayload.data());
+    } else if (responsePayloadType == String) {
+        result->append(saslCommandPayloadFieldName, base64::encode(responsePayload));
+    } else {
+        fassertFailed(4003);
     }
 
-    Status extractConversationId(const BSONObj& cmdObj, int64_t* conversationId) {
-        BSONElement element;
-        Status status = bsonExtractField(cmdObj, saslCommandConversationIdFieldName, &element);
-        if (!status.isOK())
+    return Status::OK();
+}
+
+Status extractConversationId(const BSONObj& cmdObj, int64_t* conversationId) {
+    BSONElement element;
+    Status status = bsonExtractField(cmdObj, saslCommandConversationIdFieldName, &element);
+    if (!status.isOK())
+        return status;
+
+    if (!element.isNumber()) {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "Wrong type for field; expected number for " << element);
+    }
+    *conversationId = element.numberLong();
+    return Status::OK();
+}
+
+Status extractMechanism(const BSONObj& cmdObj, std::string* mechanism) {
+    return bsonExtractStringField(cmdObj, saslCommandMechanismFieldName, mechanism);
+}
+
+void addStatus(const Status& status, BSONObjBuilder* builder) {
+    builder->append("ok", status.isOK() ? 1.0 : 0.0);
+    if (!status.isOK())
+        builder->append(saslCommandCodeFieldName, status.code());
+    if (!status.reason().empty())
+        builder->append(saslCommandErrmsgFieldName, status.reason());
+}
+
+Status doSaslStep(const ClientBasic* client,
+                  SaslAuthenticationSession* session,
+                  const BSONObj& cmdObj,
+                  BSONObjBuilder* result) {
+    std::string payload;
+    BSONType type = EOO;
+    Status status = saslExtractPayload(cmdObj, &payload, &type);
+    if (!status.isOK())
+        return status;
+
+    std::string responsePayload;
+    // Passing in a payload and extracting a responsePayload
+    status = session->step(payload, &responsePayload);
+
+    if (!status.isOK()) {
+        const SockAddr clientAddr = client->port()->localAddr();
+        log() << session->getMechanism() << " authentication failed for "
+              << session->getPrincipalId() << " on " << session->getAuthenticationDatabase()
+              << " from client " << clientAddr.getAddr() << " ; " << status.toString() << std::endl;
+        // All the client needs to know is that authentication has failed.
+        return Status(ErrorCodes::AuthenticationFailed, "Authentication failed.");
+    }
+
+    status = buildResponse(session, responsePayload, type, result);
+    if (!status.isOK())
+        return status;
+
+    if (session->isDone()) {
+        UserName userName(session->getPrincipalId(), session->getAuthenticationDatabase());
+        status =
+            session->getAuthorizationSession()->addAndAuthorizeUser(session->getOpCtxt(), userName);
+        if (!status.isOK()) {
             return status;
-
-        if (!element.isNumber()) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "Wrong type for field; expected number for " << element);
         }
-        *conversationId = element.numberLong();
-        return Status::OK();
+
+        if (!serverGlobalParams.quiet) {
+            log() << "Successfully authenticated as principal " << session->getPrincipalId()
+                  << " on " << session->getAuthenticationDatabase();
+        }
+    }
+    return Status::OK();
+}
+
+Status doSaslStart(const ClientBasic* client,
+                   SaslAuthenticationSession* session,
+                   const std::string& db,
+                   const BSONObj& cmdObj,
+                   BSONObjBuilder* result) {
+    bool autoAuthorize = false;
+    Status status = bsonExtractBooleanFieldWithDefault(
+        cmdObj, saslCommandAutoAuthorizeFieldName, autoAuthorizeDefault, &autoAuthorize);
+    if (!status.isOK())
+        return status;
+
+    std::string mechanism;
+    status = extractMechanism(cmdObj, &mechanism);
+    if (!status.isOK())
+        return status;
+
+    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, mechanism) &&
+        mechanism != "SCRAM-SHA-1") {
+        // Always allow SCRAM-SHA-1 to pass to the first sasl step since we need to
+        // handle internal user authentication, SERVER-16534
+        result->append(saslCommandMechanismListFieldName,
+                       saslGlobalParams.authenticationMechanisms);
+        return Status(ErrorCodes::BadValue,
+                      mongoutils::str::stream() << "Unsupported mechanism " << mechanism);
     }
 
-    Status extractMechanism(const BSONObj& cmdObj, std::string* mechanism) {
-        return bsonExtractStringField(cmdObj, saslCommandMechanismFieldName, mechanism);
-    }
+    status = session->start(
+        db, mechanism, saslGlobalParams.serviceName, saslGlobalParams.hostName, 1, autoAuthorize);
+    if (!status.isOK())
+        return status;
 
-    void addStatus(const Status& status, BSONObjBuilder* builder) {
-        builder->append("ok", status.isOK() ? 1.0: 0.0);
-        if (!status.isOK())
-            builder->append(saslCommandCodeFieldName, status.code());
-        if (!status.reason().empty())
-            builder->append(saslCommandErrmsgFieldName, status.reason());
-    }
+    return doSaslStep(client, session, cmdObj, result);
+}
 
-    Status doSaslStep(const ClientBasic* client,
+Status doSaslContinue(const ClientBasic* client,
                       SaslAuthenticationSession* session,
                       const BSONObj& cmdObj,
                       BSONObjBuilder* result) {
+    int64_t conversationId = 0;
+    Status status = extractConversationId(cmdObj, &conversationId);
+    if (!status.isOK())
+        return status;
+    if (conversationId != session->getConversationId())
+        return Status(ErrorCodes::ProtocolError, "sasl: Mismatched conversation id");
 
-        std::string payload;
-        BSONType type = EOO;
-        Status status = saslExtractPayload(cmdObj, &payload, &type);
-        if (!status.isOK())
-            return status;
+    return doSaslStep(client, session, cmdObj, result);
+}
 
-        std::string responsePayload;
-        // Passing in a payload and extracting a responsePayload
-        status = session->step(payload, &responsePayload);
+CmdSaslStart::CmdSaslStart() : Command(saslStartCommandName) {}
+CmdSaslStart::~CmdSaslStart() {}
 
-        if (!status.isOK()) {
-            const SockAddr clientAddr = client->port()->localAddr();
-            log() << session->getMechanism() << " authentication failed for " <<
-                session->getPrincipalId() << " on " <<
-                session->getAuthenticationDatabase() << " from client "  << clientAddr.getAddr() <<
-                " ; " << status.toString() << std::endl;
-            // All the client needs to know is that authentication has failed.
-            return Status(ErrorCodes::AuthenticationFailed, "Authentication failed.");
-        }
+void CmdSaslStart::help(std::stringstream& os) const {
+    os << "First step in a SASL authentication conversation.";
+}
 
-        status = buildResponse(session, responsePayload, type, result);
-        if (!status.isOK())
-            return status;
+bool CmdSaslStart::run(OperationContext* txn,
+                       const std::string& db,
+                       BSONObj& cmdObj,
+                       int options,
+                       std::string& ignored,
+                       BSONObjBuilder& result) {
+    ClientBasic* client = ClientBasic::getCurrent();
+    AuthenticationSession::set(client, std::unique_ptr<AuthenticationSession>());
 
-        if (session->isDone()) {
-            UserName userName(session->getPrincipalId(), session->getAuthenticationDatabase());
-            status = session->getAuthorizationSession()->addAndAuthorizeUser(
-                                                            session->getOpCtxt(), userName);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            if (!serverGlobalParams.quiet) {
-                log() << "Successfully authenticated as principal " << session->getPrincipalId()
-                      << " on " << session->getAuthenticationDatabase();
-            }
-        }
-        return Status::OK();
+    std::string mechanism;
+    if (!extractMechanism(cmdObj, &mechanism).isOK()) {
+        return false;
     }
 
-    Status doSaslStart(const ClientBasic* client,
-                       SaslAuthenticationSession* session,
-                       const std::string& db, 
-                       const BSONObj& cmdObj,
-                       BSONObjBuilder* result) {
+    SaslAuthenticationSession* session =
+        SaslAuthenticationSession::create(AuthorizationSession::get(client), mechanism);
 
-        bool autoAuthorize = false;
-        Status status = bsonExtractBooleanFieldWithDefault(cmdObj,
-                                                           saslCommandAutoAuthorizeFieldName,
-                                                           autoAuthorizeDefault,
-                                                           &autoAuthorize);
-        if (!status.isOK())
-            return status;
+    std::unique_ptr<AuthenticationSession> sessionGuard(session);
 
-        std::string mechanism;
-        status = extractMechanism(cmdObj, &mechanism);
-        if (!status.isOK())
-            return status;
+    session->setOpCtxt(txn);
 
-        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, mechanism) &&
-            mechanism != "SCRAM-SHA-1") {
-            // Always allow SCRAM-SHA-1 to pass to the first sasl step since we need to
-            // handle internal user authentication, SERVER-16534
-            result->append(saslCommandMechanismListFieldName,
-                           saslGlobalParams.authenticationMechanisms);
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Unsupported mechanism " << mechanism);
-        }
+    Status status = doSaslStart(client, session, db, cmdObj, &result);
+    addStatus(status, &result);
 
-        status = session->start(db,
-                                mechanism,
-                                saslGlobalParams.serviceName,
-                                saslGlobalParams.hostName,
-                                1,
-                                autoAuthorize);
-        if (!status.isOK())
-            return status;
-
-        return doSaslStep(client, session, cmdObj, result);
-    }
-
-    Status doSaslContinue(const ClientBasic* client,
-                          SaslAuthenticationSession* session,
-                          const BSONObj& cmdObj,
-                          BSONObjBuilder* result) {
-
-        int64_t conversationId = 0;
-        Status status = extractConversationId(cmdObj, &conversationId);
-        if (!status.isOK())
-            return status;
-        if (conversationId != session->getConversationId())
-            return Status(ErrorCodes::ProtocolError, "sasl: Mismatched conversation id");
-
-        return doSaslStep(client, session, cmdObj, result);
-    }
-
-    CmdSaslStart::CmdSaslStart() : Command(saslStartCommandName) {}
-    CmdSaslStart::~CmdSaslStart() {}
-
-    void CmdSaslStart::help(std::stringstream& os) const {
-        os << "First step in a SASL authentication conversation.";
-    }
-
-    bool CmdSaslStart::run(OperationContext* txn,
-                           const std::string& db,
-                           BSONObj& cmdObj,
-                           int options,
-                           std::string& ignored,
-                           BSONObjBuilder& result) {
-
-        ClientBasic* client = ClientBasic::getCurrent();
-        AuthenticationSession::set(client, std::unique_ptr<AuthenticationSession>());
-
-        std::string mechanism;
-        if (!extractMechanism(cmdObj, &mechanism).isOK()) {
-            return false;
-        }
-
-        SaslAuthenticationSession* session =
-            SaslAuthenticationSession::create(AuthorizationSession::get(client), mechanism);
-
-        std::unique_ptr<AuthenticationSession> sessionGuard(session);
-
-        session->setOpCtxt(txn);
-
-        Status status = doSaslStart(client, session, db, cmdObj, &result);
-        addStatus(status, &result);
-
-        if (session->isDone()) {
-            audit::logAuthentication(
-                    client,
-                    session->getMechanism(),
-                    UserName(session->getPrincipalId(), db),
-                    status.code());
-        }
-        else {
-            AuthenticationSession::swap(client, sessionGuard);
-        }
-        return status.isOK();
-    }
-
-    CmdSaslContinue::CmdSaslContinue() : Command(saslContinueCommandName) {}
-    CmdSaslContinue::~CmdSaslContinue() {}
-
-    void CmdSaslContinue::help(std::stringstream& os) const {
-        os << "Subsequent steps in a SASL authentication conversation.";
-    }
-
-    bool CmdSaslContinue::run(OperationContext* txn,
-                              const std::string& db,
-                              BSONObj& cmdObj,
-                              int options,
-                              std::string& ignored,
-                              BSONObjBuilder& result) {
-
-        ClientBasic* client = ClientBasic::getCurrent();
-        std::unique_ptr<AuthenticationSession> sessionGuard;
+    if (session->isDone()) {
+        audit::logAuthentication(client,
+                                 session->getMechanism(),
+                                 UserName(session->getPrincipalId(), db),
+                                 status.code());
+    } else {
         AuthenticationSession::swap(client, sessionGuard);
+    }
+    return status.isOK();
+}
 
-        if (!sessionGuard || sessionGuard->getType() != AuthenticationSession::SESSION_TYPE_SASL) {
-            addStatus(Status(ErrorCodes::ProtocolError, "No SASL session state found"), &result);
-            return false;
-        }
+CmdSaslContinue::CmdSaslContinue() : Command(saslContinueCommandName) {}
+CmdSaslContinue::~CmdSaslContinue() {}
 
-        SaslAuthenticationSession* session =
-            static_cast<SaslAuthenticationSession*>(sessionGuard.get());
+void CmdSaslContinue::help(std::stringstream& os) const {
+    os << "Subsequent steps in a SASL authentication conversation.";
+}
 
-        // Authenticating the __system@local user to the admin database on mongos is required
-        // by the auth passthrough test suite.
-        if (session->getAuthenticationDatabase() != db && !Command::testCommandsEnabled) {
-            addStatus(Status(ErrorCodes::ProtocolError,
-                             "Attempt to switch database target during SASL authentication."),
-                      &result);
-            return false;
-        }
+bool CmdSaslContinue::run(OperationContext* txn,
+                          const std::string& db,
+                          BSONObj& cmdObj,
+                          int options,
+                          std::string& ignored,
+                          BSONObjBuilder& result) {
+    ClientBasic* client = ClientBasic::getCurrent();
+    std::unique_ptr<AuthenticationSession> sessionGuard;
+    AuthenticationSession::swap(client, sessionGuard);
 
-        session->setOpCtxt(txn);
-
-        Status status = doSaslContinue(client, session, cmdObj, &result);
-        addStatus(status, &result);
-
-        if (session->isDone()) {
-            audit::logAuthentication(
-                    client,
-                    session->getMechanism(),
-                    UserName(session->getPrincipalId(), db),
-                    status.code());
-        }
-        else {
-            AuthenticationSession::swap(client, sessionGuard);
-        }
-
-        return status.isOK();
+    if (!sessionGuard || sessionGuard->getType() != AuthenticationSession::SESSION_TYPE_SASL) {
+        addStatus(Status(ErrorCodes::ProtocolError, "No SASL session state found"), &result);
+        return false;
     }
 
-    // The CyrusSaslCommands Enterprise initializer is dependent on PreSaslCommands
-    MONGO_INITIALIZER_WITH_PREREQUISITES(PreSaslCommands,
-                                         ("NativeSaslServerCore"))
-        (InitializerContext*) {
+    SaslAuthenticationSession* session =
+        static_cast<SaslAuthenticationSession*>(sessionGuard.get());
 
-        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-CR"))
-            CmdAuthenticate::disableAuthMechanism("MONGODB-CR");
-
-        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))
-            CmdAuthenticate::disableAuthMechanism("MONGODB-X509");
-
-        // For backwards compatibility, in 3.0 we are letting MONGODB-CR imply general
-        // challenge-response auth and hence SCRAM-SHA-1 is enabled by either specifying
-        // SCRAM-SHA-1 or MONGODB-CR in the authenticationMechanism server parameter.
-        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
-            sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-CR"))
-            saslGlobalParams.authenticationMechanisms.push_back("SCRAM-SHA-1");
-
-        return Status::OK();
+    // Authenticating the __system@local user to the admin database on mongos is required
+    // by the auth passthrough test suite.
+    if (session->getAuthenticationDatabase() != db && !Command::testCommandsEnabled) {
+        addStatus(Status(ErrorCodes::ProtocolError,
+                         "Attempt to switch database target during SASL authentication."),
+                  &result);
+        return false;
     }
+
+    session->setOpCtxt(txn);
+
+    Status status = doSaslContinue(client, session, cmdObj, &result);
+    addStatus(status, &result);
+
+    if (session->isDone()) {
+        audit::logAuthentication(client,
+                                 session->getMechanism(),
+                                 UserName(session->getPrincipalId(), db),
+                                 status.code());
+    } else {
+        AuthenticationSession::swap(client, sessionGuard);
+    }
+
+    return status.isOK();
+}
+
+// The CyrusSaslCommands Enterprise initializer is dependent on PreSaslCommands
+MONGO_INITIALIZER_WITH_PREREQUISITES(PreSaslCommands, ("NativeSaslServerCore"))
+(InitializerContext*) {
+    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-CR"))
+        CmdAuthenticate::disableAuthMechanism("MONGODB-CR");
+
+    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))
+        CmdAuthenticate::disableAuthMechanism("MONGODB-X509");
+
+    // For backwards compatibility, in 3.0 we are letting MONGODB-CR imply general
+    // challenge-response auth and hence SCRAM-SHA-1 is enabled by either specifying
+    // SCRAM-SHA-1 or MONGODB-CR in the authenticationMechanism server parameter.
+    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
+        sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-CR"))
+        saslGlobalParams.authenticationMechanisms.push_back("SCRAM-SHA-1");
+
+    return Status::OK();
+}
 
 }  // namespace
 }  // namespace mongo

@@ -32,61 +32,58 @@
 
 namespace mongo {
 
-    QueryFetcher::QueryFetcher(executor::TaskExecutor* exec,
-                               const HostAndPort& src,
-                               const NamespaceString& nss,
-                               const BSONObj& cmdBSON,
-                               const CallbackFn& work)
-        : _exec(exec),
-          _fetcher(exec,
-                   src,
-                   nss.db().toString(),
-                   cmdBSON,
-                   stdx::bind(&QueryFetcher::_onFetchCallback,
-                              this,
-                              stdx::placeholders::_1,
-                              stdx::placeholders::_2,
-                              stdx::placeholders::_3)),
-        _responses(0),
-        _work(work) {
+QueryFetcher::QueryFetcher(executor::TaskExecutor* exec,
+                           const HostAndPort& src,
+                           const NamespaceString& nss,
+                           const BSONObj& cmdBSON,
+                           const CallbackFn& work)
+    : _exec(exec),
+      _fetcher(exec,
+               src,
+               nss.db().toString(),
+               cmdBSON,
+               stdx::bind(&QueryFetcher::_onFetchCallback,
+                          this,
+                          stdx::placeholders::_1,
+                          stdx::placeholders::_2,
+                          stdx::placeholders::_3)),
+      _responses(0),
+      _work(work) {}
 
+int QueryFetcher::_getResponses() const {
+    return _responses;
+}
+
+void QueryFetcher::_onFetchCallback(const Fetcher::QueryResponseStatus& fetchResult,
+                                    Fetcher::NextAction* nextAction,
+                                    BSONObjBuilder* getMoreBob) {
+    _delegateCallback(fetchResult, nextAction);
+
+    ++_responses;
+
+    // The fetcher will continue to call with kGetMore until an error or the last batch.
+    if (fetchResult.isOK() && *nextAction == Fetcher::NextAction::kGetMore) {
+        const auto batchData(fetchResult.getValue());
+        invariant(getMoreBob);
+        getMoreBob->append("getMore", batchData.cursorId);
+        getMoreBob->append("collection", batchData.nss.coll());
     }
+}
 
-    int QueryFetcher::_getResponses() const {
-        return _responses;
-    }
+void QueryFetcher::_onQueryResponse(const Fetcher::QueryResponseStatus& fetchResult,
+                                    Fetcher::NextAction* nextAction) {
+    _work(fetchResult, nextAction);
+}
 
-    void QueryFetcher::_onFetchCallback(const Fetcher::QueryResponseStatus& fetchResult,
-                                        Fetcher::NextAction* nextAction,
-                                        BSONObjBuilder* getMoreBob) {
+void QueryFetcher::_delegateCallback(const Fetcher::QueryResponseStatus& fetchResult,
+                                     Fetcher::NextAction* nextAction) {
+    _onQueryResponse(fetchResult, nextAction);
+};
 
-        _delegateCallback(fetchResult, nextAction);
+std::string QueryFetcher::getDiagnosticString() const {
+    return str::stream() << "QueryFetcher -"
+                         << " responses: " << _responses
+                         << " fetcher: " << _fetcher.getDiagnosticString();
+}
 
-        ++_responses;
-
-        // The fetcher will continue to call with kGetMore until an error or the last batch.
-        if (fetchResult.isOK() && *nextAction == Fetcher::NextAction::kGetMore) {
-            const auto batchData(fetchResult.getValue());
-            invariant(getMoreBob);
-            getMoreBob->append("getMore", batchData.cursorId);
-            getMoreBob->append("collection", batchData.nss.coll());
-        }
-    }
-
-    void QueryFetcher::_onQueryResponse(const Fetcher::QueryResponseStatus& fetchResult,
-                                        Fetcher::NextAction* nextAction) {
-        _work(fetchResult, nextAction);
-    }
-
-    void QueryFetcher::_delegateCallback(const Fetcher::QueryResponseStatus& fetchResult,
-                                         Fetcher::NextAction* nextAction) {
-        _onQueryResponse(fetchResult, nextAction);
-    };
-
-    std::string QueryFetcher::getDiagnosticString() const {
-        return str::stream() << "QueryFetcher -"
-                             << " responses: " << _responses
-                             << " fetcher: " << _fetcher.getDiagnosticString();
-    }
-
-} // namespace mongo
+}  // namespace mongo

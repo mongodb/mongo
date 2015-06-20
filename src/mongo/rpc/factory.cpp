@@ -43,21 +43,20 @@
 namespace mongo {
 namespace rpc {
 
-    std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(ProtocolSet clientProtos,
-                                                                ProtocolSet serverProtos) {
-        switch (uassertStatusOK(negotiate(clientProtos, serverProtos))) {
+std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(ProtocolSet clientProtos,
+                                                            ProtocolSet serverProtos) {
+    switch (uassertStatusOK(negotiate(clientProtos, serverProtos))) {
         case Protocol::kOpQuery:
             return stdx::make_unique<LegacyRequestBuilder>();
         case Protocol::kOpCommandV1:
             return stdx::make_unique<CommandRequestBuilder>();
         default:
             MONGO_UNREACHABLE;
-        }
     }
+}
 
-    std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
-
-        switch (unownedMessage->operation()) {
+std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
+    switch (unownedMessage->operation()) {
         case mongo::opReply:
             return stdx::make_unique<LegacyReply>(unownedMessage);
         case mongo::dbCommandReply:
@@ -66,8 +65,8 @@ namespace rpc {
             uasserted(ErrorCodes::UnsupportedFormat,
                       str::stream() << "Received a reply message with unexpected opcode: "
                                     << unownedMessage->operation());
-        }
     }
+}
 
 }  // namespace rpc
 }  // namespace mongo

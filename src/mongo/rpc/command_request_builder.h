@@ -40,54 +40,53 @@
 namespace mongo {
 namespace rpc {
 
+/**
+ * Constructs an OP_COMMAND message.
+ */
+class CommandRequestBuilder : public RequestBuilderInterface {
+public:
     /**
-     * Constructs an OP_COMMAND message.
+     * Constructs an OP_COMMAND in a new buffer.
      */
-    class CommandRequestBuilder : public RequestBuilderInterface {
-    public:
+    CommandRequestBuilder();
 
-        /**
-         * Constructs an OP_COMMAND in a new buffer.
-         */
-        CommandRequestBuilder();
+    ~CommandRequestBuilder() final;
 
-        ~CommandRequestBuilder() final;
+    /**
+     * Construct an OP_COMMAND in an existing buffer. Ownership of the buffer will be
+     * transfered to the CommandRequestBuilder.
+     */
+    CommandRequestBuilder(std::unique_ptr<Message> message);
 
-        /**
-         * Construct an OP_COMMAND in an existing buffer. Ownership of the buffer will be
-         * transfered to the CommandRequestBuilder.
-         */
-        CommandRequestBuilder(std::unique_ptr<Message> message);
+    CommandRequestBuilder& setDatabase(StringData database) final;
 
-        CommandRequestBuilder& setDatabase(StringData database) final;
+    CommandRequestBuilder& setCommandName(StringData commandName) final;
 
-        CommandRequestBuilder& setCommandName(StringData commandName) final;
+    CommandRequestBuilder& setMetadata(BSONObj metadata) final;
 
-        CommandRequestBuilder& setMetadata(BSONObj metadata) final;
+    CommandRequestBuilder& setCommandArgs(BSONObj commandArgs) final;
 
-        CommandRequestBuilder& setCommandArgs(BSONObj commandArgs) final;
+    CommandRequestBuilder& addInputDocs(DocumentRange inputDocs) final;
 
-        CommandRequestBuilder& addInputDocs(DocumentRange inputDocs) final;
+    CommandRequestBuilder& addInputDoc(BSONObj inputDoc) final;
 
-        CommandRequestBuilder& addInputDoc(BSONObj inputDoc) final;
+    State getState() const final;
 
-        State getState() const final;
+    Protocol getProtocol() const final;
 
-        Protocol getProtocol() const final;
+    /**
+     * Writes data then transfers ownership of the message to the caller.
+     * The behavior of calling any methods on the object is subsequently
+     * undefined.
+     */
+    std::unique_ptr<Message> done() final;
 
-        /**
-         * Writes data then transfers ownership of the message to the caller.
-         * The behavior of calling any methods on the object is subsequently
-         * undefined.
-         */
-        std::unique_ptr<Message> done() final;
+private:
+    BufBuilder _builder{};
+    std::unique_ptr<Message> _message;
 
-    private:
-        BufBuilder _builder{};
-        std::unique_ptr<Message> _message;
-
-        State _state{State::kDatabase};
-    };
+    State _state{State::kDatabase};
+};
 
 }  // rpc
 }  // mongo

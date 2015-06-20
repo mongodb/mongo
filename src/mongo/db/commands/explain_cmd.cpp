@@ -43,84 +43,82 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    static CmdExplain cmdExplain;
+static CmdExplain cmdExplain;
 
-    Status CmdExplain::checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-        if (Object != cmdObj.firstElement().type()) {
-            return Status(ErrorCodes::BadValue, "explain command requires a nested object");
-        }
-
-        BSONObj explainObj = cmdObj.firstElement().Obj();
-
-        Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
-        if (NULL == commToExplain) {
-            mongoutils::str::stream ss;
-            ss << "unknown command: " << explainObj.firstElementFieldName();
-            return Status(ErrorCodes::CommandNotFound, ss);
-        }
-
-        return commToExplain->checkAuthForCommand(client, dbname, explainObj);
+Status CmdExplain::checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+    if (Object != cmdObj.firstElement().type()) {
+        return Status(ErrorCodes::BadValue, "explain command requires a nested object");
     }
 
-    bool CmdExplain::run(OperationContext* txn,
-                         const string& dbname,
-                         BSONObj& cmdObj, int options,
-                         string& errmsg,
-                         BSONObjBuilder& result) {
+    BSONObj explainObj = cmdObj.firstElement().Obj();
 
-        ExplainCommon::Verbosity verbosity;
-        Status parseStatus = ExplainCommon::parseCmdBSON(cmdObj, &verbosity);
-        if (!parseStatus.isOK()) {
-            return appendCommandStatus(result, parseStatus);
-        }
-
-        // This is the nested command which we are explaining.
-        BSONObj explainObj = cmdObj.firstElement().Obj();
-
-        Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
-        if (NULL == commToExplain) {
-            mongoutils::str::stream ss;
-            ss << "Explain failed due to unknown command: " << explainObj.firstElementFieldName();
-            Status explainStatus(ErrorCodes::CommandNotFound, ss);
-            return appendCommandStatus(result, explainStatus);
-        }
-
-        // Check whether the child command is allowed to run here. TODO: this logic is
-        // copied from Command::execCommand and should be abstracted. Until then, make
-        // sure to keep it up to date.
-        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-        bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
-        bool commandCanRunOnSecondary = commToExplain->slaveOk();
-
-        bool commandIsOverriddenToRunOnSecondary = commToExplain->slaveOverrideOk() &&
-            (rpc::ServerSelectionMetadata::get(txn).isSecondaryOk() ||
-             rpc::ServerSelectionMetadata::get(txn).getReadPreference() != boost::none);
-        bool iAmStandalone = !txn->writesAreReplicated();
-
-        const bool canRunHere = iAmPrimary ||
-                                commandCanRunOnSecondary ||
-                                commandIsOverriddenToRunOnSecondary ||
-                                iAmStandalone;
-
-        if (!canRunHere) {
-            mongoutils::str::stream ss;
-            ss << "Explain's child command cannot run on this node. "
-               << "Are you explaining a write command on a secondary?";
-            appendCommandStatus(result, false, ss);
-            return false;
-        }
-
-        // Actually call the nested command's explain(...) method.
-        Status explainStatus = commToExplain->explain(txn, dbname, explainObj, verbosity, &result);
-        if (!explainStatus.isOK()) {
-            return appendCommandStatus(result, explainStatus);
-        }
-
-        return true;
+    Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
+    if (NULL == commToExplain) {
+        mongoutils::str::stream ss;
+        ss << "unknown command: " << explainObj.firstElementFieldName();
+        return Status(ErrorCodes::CommandNotFound, ss);
     }
 
-} // namespace mongo
+    return commToExplain->checkAuthForCommand(client, dbname, explainObj);
+}
+
+bool CmdExplain::run(OperationContext* txn,
+                     const string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
+    ExplainCommon::Verbosity verbosity;
+    Status parseStatus = ExplainCommon::parseCmdBSON(cmdObj, &verbosity);
+    if (!parseStatus.isOK()) {
+        return appendCommandStatus(result, parseStatus);
+    }
+
+    // This is the nested command which we are explaining.
+    BSONObj explainObj = cmdObj.firstElement().Obj();
+
+    Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
+    if (NULL == commToExplain) {
+        mongoutils::str::stream ss;
+        ss << "Explain failed due to unknown command: " << explainObj.firstElementFieldName();
+        Status explainStatus(ErrorCodes::CommandNotFound, ss);
+        return appendCommandStatus(result, explainStatus);
+    }
+
+    // Check whether the child command is allowed to run here. TODO: this logic is
+    // copied from Command::execCommand and should be abstracted. Until then, make
+    // sure to keep it up to date.
+    repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+    bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
+    bool commandCanRunOnSecondary = commToExplain->slaveOk();
+
+    bool commandIsOverriddenToRunOnSecondary = commToExplain->slaveOverrideOk() &&
+        (rpc::ServerSelectionMetadata::get(txn).isSecondaryOk() ||
+         rpc::ServerSelectionMetadata::get(txn).getReadPreference() != boost::none);
+    bool iAmStandalone = !txn->writesAreReplicated();
+
+    const bool canRunHere = iAmPrimary || commandCanRunOnSecondary ||
+        commandIsOverriddenToRunOnSecondary || iAmStandalone;
+
+    if (!canRunHere) {
+        mongoutils::str::stream ss;
+        ss << "Explain's child command cannot run on this node. "
+           << "Are you explaining a write command on a secondary?";
+        appendCommandStatus(result, false, ss);
+        return false;
+    }
+
+    // Actually call the nested command's explain(...) method.
+    Status explainStatus = commToExplain->explain(txn, dbname, explainObj, verbosity, &result);
+    if (!explainStatus.isOK()) {
+        return appendCommandStatus(result, explainStatus);
+    }
+
+    return true;
+}
+
+}  // namespace mongo

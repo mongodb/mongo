@@ -43,190 +43,185 @@
 namespace mongo {
 namespace auth {
 
-    struct CreateOrUpdateUserArgs {
-        UserName userName;
-        bool hasHashedPassword;
-        std::string hashedPassword;
-        bool hasCustomData;
-        BSONObj customData;
-        bool hasRoles;
-        std::vector<RoleName> roles;
-        BSONObj writeConcern;
-        
-        CreateOrUpdateUserArgs() :
-            hasHashedPassword(false), hasCustomData(false), hasRoles(false) {}
-    };
+struct CreateOrUpdateUserArgs {
+    UserName userName;
+    bool hasHashedPassword;
+    std::string hashedPassword;
+    bool hasCustomData;
+    BSONObj customData;
+    bool hasRoles;
+    std::vector<RoleName> roles;
+    BSONObj writeConcern;
 
-    /**
-     * Takes a command object describing an invocation of the "createUser" or "updateUser" commands
-     * (which command it is is specified in "cmdName") on the database "dbname", and parses out all
-     * the arguments into the "parsedArgs" output param.
-     */
-    Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
-                                           StringData cmdName,
-                                           const std::string& dbname,
-                                           CreateOrUpdateUserArgs* parsedArgs);
+    CreateOrUpdateUserArgs() : hasHashedPassword(false), hasCustomData(false), hasRoles(false) {}
+};
 
-    /**
-     * Takes a command object describing an invocation of one of "grantRolesToUser",
-     * "revokeRolesFromUser", "grantDelegateRolesToUser", "revokeDelegateRolesFromUser",
-     * "grantRolesToRole", and "revokeRolesFromRoles" (which command it is is specified in the
-     * "cmdName" argument), and parses out (into the parsedName out param) the user/role name of
-     * the user/roles being modified, the roles being granted or revoked, and the write concern to
-     * use.
-     */
-    Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
-                                                   StringData cmdName,
-                                                   const std::string& dbname,
-                                                   std::string* parsedName,
-                                                   std::vector<RoleName>* parsedRoleNames,
-                                                   BSONObj* parsedWriteConcern);
+/**
+ * Takes a command object describing an invocation of the "createUser" or "updateUser" commands
+ * (which command it is is specified in "cmdName") on the database "dbname", and parses out all
+ * the arguments into the "parsedArgs" output param.
+ */
+Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
+                                       StringData cmdName,
+                                       const std::string& dbname,
+                                       CreateOrUpdateUserArgs* parsedArgs);
 
-    /**
-     * Takes a command object describing an invocation of the "dropUser" command and parses out
-     * the UserName of the user to be removed and the writeConcern.
-     * Also validates the input and returns a non-ok Status if there is anything wrong.
-     */
-    Status parseAndValidateDropUserCommand(const BSONObj& cmdObj,
-                                           const std::string& dbname,
-                                           UserName* parsedUserName,
-                                           BSONObj* parsedWriteConcern);
+/**
+ * Takes a command object describing an invocation of one of "grantRolesToUser",
+ * "revokeRolesFromUser", "grantDelegateRolesToUser", "revokeDelegateRolesFromUser",
+ * "grantRolesToRole", and "revokeRolesFromRoles" (which command it is is specified in the
+ * "cmdName" argument), and parses out (into the parsedName out param) the user/role name of
+ * the user/roles being modified, the roles being granted or revoked, and the write concern to
+ * use.
+ */
+Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
+                                               StringData cmdName,
+                                               const std::string& dbname,
+                                               std::string* parsedName,
+                                               std::vector<RoleName>* parsedRoleNames,
+                                               BSONObj* parsedWriteConcern);
 
-    /**
-     * Takes a command object describing an invocation of the "dropAllUsersFromDatabase" command and
-     * parses out the write concern.
-     * Also validates the input and returns a non-ok Status if there is anything wrong.
-     */
-    Status parseAndValidateDropAllUsersFromDatabaseCommand(const BSONObj& cmdObj,
-                                                        const std::string& dbname,
-                                                        BSONObj* parsedWriteConcern);
+/**
+ * Takes a command object describing an invocation of the "dropUser" command and parses out
+ * the UserName of the user to be removed and the writeConcern.
+ * Also validates the input and returns a non-ok Status if there is anything wrong.
+ */
+Status parseAndValidateDropUserCommand(const BSONObj& cmdObj,
+                                       const std::string& dbname,
+                                       UserName* parsedUserName,
+                                       BSONObj* parsedWriteConcern);
 
-    struct UsersInfoArgs {
-        std::vector<UserName> userNames;
-        bool allForDB;
-        bool showPrivileges;
-        bool showCredentials;
-        UsersInfoArgs() : allForDB(false), showPrivileges(false), showCredentials(false) {}
-    };
+/**
+ * Takes a command object describing an invocation of the "dropAllUsersFromDatabase" command and
+ * parses out the write concern.
+ * Also validates the input and returns a non-ok Status if there is anything wrong.
+ */
+Status parseAndValidateDropAllUsersFromDatabaseCommand(const BSONObj& cmdObj,
+                                                       const std::string& dbname,
+                                                       BSONObj* parsedWriteConcern);
 
-    /**
-     * Takes a command object describing an invocation of the "usersInfo" command  and parses out
-     * all the arguments into the "parsedArgs" output param.
-     */
-    Status parseUsersInfoCommand(const BSONObj& cmdObj,
-                                 StringData dbname,
-                                 UsersInfoArgs* parsedArgs);
+struct UsersInfoArgs {
+    std::vector<UserName> userNames;
+    bool allForDB;
+    bool showPrivileges;
+    bool showCredentials;
+    UsersInfoArgs() : allForDB(false), showPrivileges(false), showCredentials(false) {}
+};
 
-    struct RolesInfoArgs {
-        std::vector<RoleName> roleNames;
-        bool allForDB;
-        bool showPrivileges;
-        bool showBuiltinRoles;
-        RolesInfoArgs() : allForDB(false), showPrivileges(false), showBuiltinRoles(false) {}
-    };
+/**
+ * Takes a command object describing an invocation of the "usersInfo" command  and parses out
+ * all the arguments into the "parsedArgs" output param.
+ */
+Status parseUsersInfoCommand(const BSONObj& cmdObj, StringData dbname, UsersInfoArgs* parsedArgs);
 
-    /**
-     * Takes a command object describing an invocation of the "rolesInfo" command  and parses out
-     * the arguments into the "parsedArgs" output param.
-     */
-    Status parseRolesInfoCommand(const BSONObj& cmdObj,
-                                 StringData dbname,
-                                 RolesInfoArgs* parsedArgs);
+struct RolesInfoArgs {
+    std::vector<RoleName> roleNames;
+    bool allForDB;
+    bool showPrivileges;
+    bool showBuiltinRoles;
+    RolesInfoArgs() : allForDB(false), showPrivileges(false), showBuiltinRoles(false) {}
+};
 
-    struct CreateOrUpdateRoleArgs {
-        RoleName roleName;
-        bool hasRoles;
-        std::vector<RoleName> roles;
-        bool hasPrivileges;
-        PrivilegeVector privileges;
-        BSONObj writeConcern;
-        CreateOrUpdateRoleArgs() : hasRoles(false), hasPrivileges(false) {}
-    };
+/**
+ * Takes a command object describing an invocation of the "rolesInfo" command  and parses out
+ * the arguments into the "parsedArgs" output param.
+ */
+Status parseRolesInfoCommand(const BSONObj& cmdObj, StringData dbname, RolesInfoArgs* parsedArgs);
 
-    /**
-     * Takes a command object describing an invocation of the "createRole" or "updateRole" commands
-     * (which command it is is specified in "cmdName") on the database "dbname", and parses out all
-     * the arguments into the "parsedArgs" output param.
-     */
-    Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
-                                           StringData cmdName,
-                                           const std::string& dbname,
-                                           CreateOrUpdateRoleArgs* parsedArgs);
+struct CreateOrUpdateRoleArgs {
+    RoleName roleName;
+    bool hasRoles;
+    std::vector<RoleName> roles;
+    bool hasPrivileges;
+    PrivilegeVector privileges;
+    BSONObj writeConcern;
+    CreateOrUpdateRoleArgs() : hasRoles(false), hasPrivileges(false) {}
+};
 
-    /**
-     * Takes a command object describing an invocation of the "grantPrivilegesToRole" or
-     * "revokePrivilegesFromRole" commands, and parses out the role name of the
-     * role being modified, the privileges being granted or revoked, and the write concern to use.
-     */
-    Status parseAndValidateRolePrivilegeManipulationCommands(const BSONObj& cmdObj,
-                                                             StringData cmdName,
-                                                             const std::string& dbname,
-                                                             RoleName* parsedRoleName,
-                                                             PrivilegeVector* parsedPrivileges,
-                                                             BSONObj* parsedWriteConcern);
+/**
+ * Takes a command object describing an invocation of the "createRole" or "updateRole" commands
+ * (which command it is is specified in "cmdName") on the database "dbname", and parses out all
+ * the arguments into the "parsedArgs" output param.
+ */
+Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
+                                       StringData cmdName,
+                                       const std::string& dbname,
+                                       CreateOrUpdateRoleArgs* parsedArgs);
 
-    /**
-     * Takes a command object describing an invocation of the "dropRole" command and parses out
-     * the RoleName of the role to be removed and the writeConcern.
-     */
-    Status parseDropRoleCommand(const BSONObj& cmdObj,
-                                const std::string& dbname,
-                                RoleName* parsedRoleName,
-                                BSONObj* parsedWriteConcern);
+/**
+ * Takes a command object describing an invocation of the "grantPrivilegesToRole" or
+ * "revokePrivilegesFromRole" commands, and parses out the role name of the
+ * role being modified, the privileges being granted or revoked, and the write concern to use.
+ */
+Status parseAndValidateRolePrivilegeManipulationCommands(const BSONObj& cmdObj,
+                                                         StringData cmdName,
+                                                         const std::string& dbname,
+                                                         RoleName* parsedRoleName,
+                                                         PrivilegeVector* parsedPrivileges,
+                                                         BSONObj* parsedWriteConcern);
 
-    /**
-     * Takes a command object describing an invocation of the "dropAllRolesFromDatabase" command and
-     * parses out the write concern.
-     */
-    Status parseDropAllRolesFromDatabaseCommand(const BSONObj& cmdObj,
-                                                const std::string& dbname,
-                                                BSONObj* parsedWriteConcern);
+/**
+ * Takes a command object describing an invocation of the "dropRole" command and parses out
+ * the RoleName of the role to be removed and the writeConcern.
+ */
+Status parseDropRoleCommand(const BSONObj& cmdObj,
+                            const std::string& dbname,
+                            RoleName* parsedRoleName,
+                            BSONObj* parsedWriteConcern);
 
-    /**
-     * Parses the privileges described in "privileges" into a vector of Privilege objects.
-     * Returns Status::OK() upon successfully parsing all the elements of "privileges".
-     */
-    Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
-                                          PrivilegeVector* parsedPrivileges);
+/**
+ * Takes a command object describing an invocation of the "dropAllRolesFromDatabase" command and
+ * parses out the write concern.
+ */
+Status parseDropAllRolesFromDatabaseCommand(const BSONObj& cmdObj,
+                                            const std::string& dbname,
+                                            BSONObj* parsedWriteConcern);
 
-    /**
-     * Takes a BSONArray of name,db pair documents, parses that array and returns (via the
-     * output param parsedRoleNames) a list of the role names in the input array.
-     * Performs syntactic validation of "rolesArray", only.
-     */
-    Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
-                                       StringData dbname,
-                                       std::vector<RoleName>* parsedRoleNames);
+/**
+ * Parses the privileges described in "privileges" into a vector of Privilege objects.
+ * Returns Status::OK() upon successfully parsing all the elements of "privileges".
+ */
+Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
+                                      PrivilegeVector* parsedPrivileges);
 
-    /**
-     * Takes a BSONArray of name,db pair documents, parses that array and returns (via the
-     * output param parsedUserNames) a list of the usernames in the input array.
-     * Performs syntactic validation of "usersArray", only.
-     */
-    Status parseUserNamesFromBSONArray(const BSONArray& usersArray,
-                                       StringData dbname,
-                                       std::vector<UserName>* parsedUserNames);
+/**
+ * Takes a BSONArray of name,db pair documents, parses that array and returns (via the
+ * output param parsedRoleNames) a list of the role names in the input array.
+ * Performs syntactic validation of "rolesArray", only.
+ */
+Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
+                                   StringData dbname,
+                                   std::vector<RoleName>* parsedRoleNames);
 
-    struct MergeAuthzCollectionsArgs {
-        std::string usersCollName;
-        std::string rolesCollName;
-        std::string db;
-        bool drop;
-        BSONObj writeConcern;
-        MergeAuthzCollectionsArgs() : drop(false) {}
-    };
+/**
+ * Takes a BSONArray of name,db pair documents, parses that array and returns (via the
+ * output param parsedUserNames) a list of the usernames in the input array.
+ * Performs syntactic validation of "usersArray", only.
+ */
+Status parseUserNamesFromBSONArray(const BSONArray& usersArray,
+                                   StringData dbname,
+                                   std::vector<UserName>* parsedUserNames);
 
-    /**
-     * Takes a command object describing an invocation of the "_mergeAuthzCollections" command and
-     * parses out the name of the temporary collections to use for user and role data, whether or
-     * not to drop the existing users/roles, the database if this is a for a db-specific restore,
-     * and the writeConcern.
-     * Returns ErrorCodes::OutdatedClient if the "db" field is missing, as that likely indicates
-     * the command was sent by an outdated (pre 2.6.4) version of mongorestore.
-     * Returns other codes indicating missing or incorrectly typed fields.
-     */
-    Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
-                                             MergeAuthzCollectionsArgs* parsedArgs);
+struct MergeAuthzCollectionsArgs {
+    std::string usersCollName;
+    std::string rolesCollName;
+    std::string db;
+    bool drop;
+    BSONObj writeConcern;
+    MergeAuthzCollectionsArgs() : drop(false) {}
+};
 
-} // namespace auth
-} // namespace mongo
+/**
+ * Takes a command object describing an invocation of the "_mergeAuthzCollections" command and
+ * parses out the name of the temporary collections to use for user and role data, whether or
+ * not to drop the existing users/roles, the database if this is a for a db-specific restore,
+ * and the writeConcern.
+ * Returns ErrorCodes::OutdatedClient if the "db" field is missing, as that likely indicates
+ * the command was sent by an outdated (pre 2.6.4) version of mongorestore.
+ * Returns other codes indicating missing or incorrectly typed fields.
+ */
+Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
+                                         MergeAuthzCollectionsArgs* parsedArgs);
+
+}  // namespace auth
+}  // namespace mongo

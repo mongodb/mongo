@@ -45,46 +45,49 @@
 
 namespace mongo {
 
-    class KillOpCommand : public Command {
-    public:
+class KillOpCommand : public Command {
+public:
+    KillOpCommand() : Command("killOp") {}
 
-        KillOpCommand() : Command("killOp") {}
+    bool isWriteCommandForConfigServer() const final {
+        return false;
+    }
 
-        bool isWriteCommandForConfigServer() const final { return false; }
+    bool slaveOk() const final {
+        return true;
+    }
 
-        bool slaveOk() const final { return true; }
+    bool adminOnly() const final {
+        return true;
+    }
 
-        bool adminOnly() const final { return true; }
+    Status checkAuthForCommand(ClientBasic* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(), ActionType::killop);
+        return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
 
-        Status checkAuthForCommand(ClientBasic* client,
-                                   const std::string& dbname,
-                                   const BSONObj& cmdObj) final {
+    bool run(OperationContext* txn,
+             const std::string& db,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& result) final {
+        long long op;
+        uassertStatusOK(bsonExtractIntegerField(cmdObj, "op", &op));
 
-            bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                                    ResourcePattern::forClusterResource(),
-                                    ActionType::killop);
-            return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
+        log() << "going to kill op: " << op;
+        result.append("info", "attempting to kill op");
 
-        bool run(OperationContext* txn,
-                 const std::string& db,
-                 BSONObj& cmdObj,
-                 int options,
-                 std::string& errmsg,
-                 BSONObjBuilder& result) final {
+        uassert(26823,
+                str::stream() << "invalid op : " << op,
+                (op >= 0) && (op <= std::numeric_limits<unsigned int>::max()));
 
-            long long op;
-            uassertStatusOK(bsonExtractIntegerField(cmdObj, "op", &op));
-
-            log() << "going to kill op: " << op;
-            result.append("info", "attempting to kill op");
-
-            uassert(26823, str::stream() << "invalid op : " << op,
-                    (op >= 0) && (op <= std::numeric_limits<unsigned int>::max()));
-
-            getGlobalServiceContext()->killOperation(static_cast<unsigned int>(op));
-            return true;
-        }
-    } killOpCmd;
+        getGlobalServiceContext()->killOperation(static_cast<unsigned int>(op));
+        return true;
+    }
+} killOpCmd;
 
 }  // namespace mongo

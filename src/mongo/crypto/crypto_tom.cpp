@@ -38,59 +38,51 @@
 
 namespace mongo {
 namespace crypto {
-    /*
-     * Computes a SHA-1 hash of 'input'.
-     */
-    bool sha1(const unsigned char* input,
+/*
+ * Computes a SHA-1 hash of 'input'.
+ */
+bool sha1(const unsigned char* input, const size_t inputLen, unsigned char* output) {
+    hash_state hashState;
+    if (sha1_init(&hashState) != CRYPT_OK) {
+        return false;
+    }
+    if (sha1_process(&hashState, input, inputLen) != CRYPT_OK) {
+        return false;
+    }
+    if (sha1_done(&hashState, output) != CRYPT_OK) {
+        return false;
+    }
+
+    return true;
+}
+
+/*
+ * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'
+ */
+bool hmacSha1(const unsigned char* key,
+              const size_t keyLen,
+              const unsigned char* input,
               const size_t inputLen,
-              unsigned char* output) {
-        hash_state hashState;
-        if (sha1_init(&hashState) != CRYPT_OK) {
-            return false;
-        }
-        if (sha1_process(&hashState, input, inputLen) != CRYPT_OK) {
-            return false;
-        }
-        if (sha1_done(&hashState, output) != CRYPT_OK) {
-            return false;
-        }
-
-        return true;
+              unsigned char* output,
+              unsigned int* outputLen) {
+    if (!key || !input || !output) {
+        return false;
     }
 
-    /*
-     * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'
-     */
-    bool hmacSha1(const unsigned char* key,
-                  const size_t keyLen,
-                  const unsigned char* input,
-                  const size_t inputLen,
-                  unsigned char* output,
-                  unsigned int* outputLen) {
-        if (!key || !input || !output) {
-            return false;
-        }
-
-        static int hashId = -1;
-        if (hashId == -1) {
-            register_hash (&sha1_desc);
-            hashId = find_hash("sha1");
-        }
-
-        unsigned long sha1HashLen = 20;
-        if (hmac_memory(hashId,
-                        key,
-                        keyLen,
-                        input,
-                        inputLen,
-                        output,
-                        &sha1HashLen) != CRYPT_OK) {
-            return false;
-        }
-
-        *outputLen = sha1HashLen;
-        return true;
+    static int hashId = -1;
+    if (hashId == -1) {
+        register_hash(&sha1_desc);
+        hashId = find_hash("sha1");
     }
 
-} // namespace crypto
-} // namespace mongo
+    unsigned long sha1HashLen = 20;
+    if (hmac_memory(hashId, key, keyLen, input, inputLen, output, &sha1HashLen) != CRYPT_OK) {
+        return false;
+    }
+
+    *outputLen = sha1HashLen;
+    return true;
+}
+
+}  // namespace crypto
+}  // namespace mongo

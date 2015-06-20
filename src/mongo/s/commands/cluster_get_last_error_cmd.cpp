@@ -41,174 +41,163 @@
 namespace mongo {
 namespace {
 
-    class GetLastErrorCmd : public Command {
-    public:
-        GetLastErrorCmd() : Command("getLastError", false, "getlasterror") { }
+class GetLastErrorCmd : public Command {
+public:
+    GetLastErrorCmd() : Command("getLastError", false, "getlasterror") {}
 
-        virtual bool isWriteCommandForConfigServer() const {
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual void help(std::stringstream& help) const {
+        help << "check for an error on the last command executed";
+    }
+
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        // No auth required for getlasterror
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        // Mongos GLE - finicky.
+        //
+        // To emulate mongod, we first append any write errors we had, then try to append
+        // write concern error if there was no write error.  We need to contact the previous
+        // shards regardless to maintain 2.4 behavior.
+        //
+        // If there are any unexpected or connectivity errors when calling GLE, fail the
+        // command.
+        //
+        // Finally, report the write concern errors IF we don't already have an error.
+        // If we only get one write concern error back, report that, otherwise report an
+        // aggregated error.
+        //
+        // TODO: Do we need to contact the prev shards regardless - do we care that much
+        // about 2.4 behavior?
+        //
+
+        LastError* le = &LastError::get(cc());
+        le->disable();
+
+
+        // Write commands always have the error stored in the mongos last error
+        bool errorOccurred = false;
+        if (le->getNPrev() == 1) {
+            errorOccurred = le->appendSelf(result, false);
+        }
+
+        // For compatibility with 2.4 sharded GLE, we always enforce the write concern
+        // across all shards.
+        const HostOpTimeMap hostOpTimes(ClusterLastErrorInfo::get(cc()).getPrevHostOpTimes());
+        HostOpTimeMap resolvedHostOpTimes;
+
+        Status status(Status::OK());
+        for (HostOpTimeMap::const_iterator it = hostOpTimes.begin(); it != hostOpTimes.end();
+             ++it) {
+            const ConnectionString& shardEndpoint = it->first;
+            const HostOpTime& hot = it->second;
+
+            ConnectionString resolvedHost;
+            status = DBClientShardResolver::findMaster(shardEndpoint, &resolvedHost);
+            if (!status.isOK()) {
+                break;
+            }
+
+            resolvedHostOpTimes[resolvedHost] = hot;
+        }
+
+        DBClientMultiCommand dispatcher;
+        std::vector<LegacyWCResponse> wcResponses;
+        if (status.isOK()) {
+            status = enforceLegacyWriteConcern(
+                &dispatcher, dbname, cmdObj, resolvedHostOpTimes, &wcResponses);
+        }
+
+        // Don't forget about our last hosts, reset the client info
+        ClusterLastErrorInfo::get(cc()).disableForCommand();
+
+        // We're now done contacting all remote servers, just report results
+
+        if (!status.isOK()) {
+            // Return immediately if we failed to contact a shard, unexpected GLE issue
+            // Can't return code, since it may have been set above (2.4 compatibility)
+            result.append("errmsg", status.reason());
             return false;
         }
 
-        virtual bool slaveOk() const {
+        // Go through all the write concern responses and find errors
+        BSONArrayBuilder shards;
+        BSONObjBuilder shardRawGLE;
+        BSONArrayBuilder errors;
+        BSONArrayBuilder errorRawGLE;
+
+        int numWCErrors = 0;
+        const LegacyWCResponse* lastErrResponse = NULL;
+
+        for (std::vector<LegacyWCResponse>::const_iterator it = wcResponses.begin();
+             it != wcResponses.end();
+             ++it) {
+            const LegacyWCResponse& wcResponse = *it;
+
+            shards.append(wcResponse.shardHost);
+            shardRawGLE.append(wcResponse.shardHost, wcResponse.gleResponse);
+
+            if (!wcResponse.errToReport.empty()) {
+                numWCErrors++;
+                lastErrResponse = &wcResponse;
+                errors.append(wcResponse.errToReport);
+                errorRawGLE.append(wcResponse.gleResponse);
+            }
+        }
+
+        // Always report what we found to match 2.4 behavior and for debugging
+        if (wcResponses.size() == 1u) {
+            result.append("singleShard", wcResponses.front().shardHost);
+        } else {
+            result.append("shards", shards.arr());
+            result.append("shardRawGLE", shardRawGLE.obj());
+        }
+
+        // Suppress write concern errors if a write error occurred, to match mongod behavior
+        if (errorOccurred || numWCErrors == 0) {
+            // Still need to return err
+            if (!errorOccurred) {
+                result.appendNull("err");
+            }
+
             return true;
         }
 
-        virtual void help(std::stringstream& help) const {
-            help << "check for an error on the last command executed";
+        if (numWCErrors == 1) {
+            // Return the single write concern error we found, err should be set or not
+            // from gle response
+            result.appendElements(lastErrResponse->gleResponse);
+            return lastErrResponse->gleResponse["ok"].trueValue();
+        } else {
+            // Return a generic combined WC error message
+            result.append("errs", errors.arr());
+            result.append("errObjects", errorRawGLE.arr());
+
+            // Need to always return err
+            result.appendNull("err");
+
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::WriteConcernFailed, "multiple write concern errors occurred"));
         }
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+} cmdGetLastError;
 
-            // No auth required for getlasterror
-        }
-
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
-
-            // Mongos GLE - finicky.
-            //
-            // To emulate mongod, we first append any write errors we had, then try to append
-            // write concern error if there was no write error.  We need to contact the previous
-            // shards regardless to maintain 2.4 behavior.
-            //
-            // If there are any unexpected or connectivity errors when calling GLE, fail the
-            // command.
-            //
-            // Finally, report the write concern errors IF we don't already have an error.
-            // If we only get one write concern error back, report that, otherwise report an
-            // aggregated error.
-            //
-            // TODO: Do we need to contact the prev shards regardless - do we care that much
-            // about 2.4 behavior?
-            //
-
-            LastError *le = &LastError::get(cc());
-            le->disable();
-
-
-            // Write commands always have the error stored in the mongos last error
-            bool errorOccurred = false;
-            if (le->getNPrev() == 1) {
-                errorOccurred = le->appendSelf(result, false);
-            }
-
-            // For compatibility with 2.4 sharded GLE, we always enforce the write concern
-            // across all shards.
-            const HostOpTimeMap hostOpTimes(ClusterLastErrorInfo::get(cc()).getPrevHostOpTimes());
-            HostOpTimeMap resolvedHostOpTimes;
-
-            Status status(Status::OK());
-            for (HostOpTimeMap::const_iterator it = hostOpTimes.begin();
-                it != hostOpTimes.end();
-                ++it) {
-
-                const ConnectionString& shardEndpoint = it->first;
-                const HostOpTime& hot = it->second;
-
-                ConnectionString resolvedHost;
-                status = DBClientShardResolver::findMaster(shardEndpoint, &resolvedHost);
-                if (!status.isOK()) {
-                    break;
-                }
-
-                resolvedHostOpTimes[resolvedHost] = hot;
-            }
-
-            DBClientMultiCommand dispatcher;
-            std::vector<LegacyWCResponse> wcResponses;
-            if (status.isOK()) {
-                status = enforceLegacyWriteConcern(&dispatcher,
-                    dbname,
-                    cmdObj,
-                    resolvedHostOpTimes,
-                    &wcResponses);
-            }
-
-            // Don't forget about our last hosts, reset the client info
-            ClusterLastErrorInfo::get(cc()).disableForCommand();
-
-            // We're now done contacting all remote servers, just report results
-
-            if (!status.isOK()) {
-                // Return immediately if we failed to contact a shard, unexpected GLE issue
-                // Can't return code, since it may have been set above (2.4 compatibility)
-                result.append("errmsg", status.reason());
-                return false;
-            }
-
-            // Go through all the write concern responses and find errors
-            BSONArrayBuilder shards;
-            BSONObjBuilder shardRawGLE;
-            BSONArrayBuilder errors;
-            BSONArrayBuilder errorRawGLE;
-
-            int numWCErrors = 0;
-            const LegacyWCResponse* lastErrResponse = NULL;
-
-            for (std::vector<LegacyWCResponse>::const_iterator it = wcResponses.begin();
-                 it != wcResponses.end();
-                 ++it) {
-
-                const LegacyWCResponse& wcResponse = *it;
-
-                shards.append(wcResponse.shardHost);
-                shardRawGLE.append(wcResponse.shardHost, wcResponse.gleResponse);
-
-                if (!wcResponse.errToReport.empty()) {
-                    numWCErrors++;
-                    lastErrResponse = &wcResponse;
-                    errors.append(wcResponse.errToReport);
-                    errorRawGLE.append(wcResponse.gleResponse);
-                }
-            }
-
-            // Always report what we found to match 2.4 behavior and for debugging
-            if (wcResponses.size() == 1u) {
-                result.append("singleShard", wcResponses.front().shardHost);
-            }
-            else {
-                result.append("shards", shards.arr());
-                result.append("shardRawGLE", shardRawGLE.obj());
-            }
-
-            // Suppress write concern errors if a write error occurred, to match mongod behavior
-            if (errorOccurred || numWCErrors == 0) {
-                // Still need to return err
-                if (!errorOccurred) {
-                    result.appendNull("err");
-                }
-
-                return true;
-            }
-
-            if (numWCErrors == 1) {
-                // Return the single write concern error we found, err should be set or not
-                // from gle response
-                result.appendElements(lastErrResponse->gleResponse);
-                return lastErrResponse->gleResponse["ok"].trueValue();
-            }
-            else {
-
-                // Return a generic combined WC error message
-                result.append("errs", errors.arr());
-                result.append("errObjects", errorRawGLE.arr());
-
-                // Need to always return err
-                result.appendNull("err");
-
-                return appendCommandStatus(result,
-                                           Status(ErrorCodes::WriteConcernFailed,
-                                           "multiple write concern errors occurred"));
-            }
-        }
-
-    } cmdGetLastError;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

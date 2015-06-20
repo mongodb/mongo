@@ -33,14 +33,14 @@
 
 namespace mongo {
 
-    /**
-     * Global connection pool (used by all references to the internal DB client).
-     */
-    extern DBConnectionPool globalConnPool;
+/**
+ * Global connection pool (used by all references to the internal DB client).
+ */
+extern DBConnectionPool globalConnPool;
 
-    /**
-     * Maintains the replica set monitors associated with the global connection pool.
-     */
-    extern ReplicaSetMonitorManager globalRSMonitorManager;
+/**
+ * Maintains the replica set monitors associated with the global connection pool.
+ */
+extern ReplicaSetMonitorManager globalRSMonitorManager;
 
-} // namespace mongo
+}  // namespace mongo

@@ -36,52 +36,49 @@
 
 namespace mongo {
 
-    void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
-        StageType type = node->getType();
+void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
+    StageType type = node->getType();
 
-        if (STAGE_IXSCAN == type) {
-            IndexScanNode* isn = static_cast<IndexScanNode*>(node);
-            isn->direction *= -1;
+    if (STAGE_IXSCAN == type) {
+        IndexScanNode* isn = static_cast<IndexScanNode*>(node);
+        isn->direction *= -1;
 
-            if (isn->bounds.isSimpleRange) {
-                std::swap(isn->bounds.startKey, isn->bounds.endKey);
-                // XXX: Not having a startKeyInclusive means that if we reverse a max/min query
-                // we have different results with and without the reverse...
-                isn->bounds.endKeyInclusive = true;
-            }
-            else {
-                for (size_t i = 0; i < isn->bounds.fields.size(); ++i) {
-                    std::vector<Interval>& iv = isn->bounds.fields[i].intervals;
-                    // Step 1: reverse the list.
-                    std::reverse(iv.begin(), iv.end());
-                    // Step 2: reverse each interval.
-                    for (size_t j = 0; j < iv.size(); ++j) {
-                        iv[j].reverse();
-                    }
+        if (isn->bounds.isSimpleRange) {
+            std::swap(isn->bounds.startKey, isn->bounds.endKey);
+            // XXX: Not having a startKeyInclusive means that if we reverse a max/min query
+            // we have different results with and without the reverse...
+            isn->bounds.endKeyInclusive = true;
+        } else {
+            for (size_t i = 0; i < isn->bounds.fields.size(); ++i) {
+                std::vector<Interval>& iv = isn->bounds.fields[i].intervals;
+                // Step 1: reverse the list.
+                std::reverse(iv.begin(), iv.end());
+                // Step 2: reverse each interval.
+                for (size_t j = 0; j < iv.size(); ++j) {
+                    iv[j].reverse();
                 }
             }
-
-            if (!isn->bounds.isValidFor(isn->indexKeyPattern, isn->direction)) {
-                LOG(5) << "Invalid bounds: " << isn->bounds.toString() << std::endl;
-                invariant(0);
-            }
-
-            // TODO: we can just negate every value in the already computed properties.
-            isn->computeProperties();
-        }
-        else if (STAGE_SORT_MERGE == type) {
-            // reverse direction of comparison for merge
-            MergeSortNode* msn = static_cast<MergeSortNode*>(node);
-            msn->sort = reverseSortObj(msn->sort);
-        }
-        else {
-            invariant(STAGE_SORT != type);
-            // This shouldn't be here...
         }
 
-        for (size_t i = 0; i < node->children.size(); ++i) {
-            reverseScans(node->children[i]);
+        if (!isn->bounds.isValidFor(isn->indexKeyPattern, isn->direction)) {
+            LOG(5) << "Invalid bounds: " << isn->bounds.toString() << std::endl;
+            invariant(0);
         }
+
+        // TODO: we can just negate every value in the already computed properties.
+        isn->computeProperties();
+    } else if (STAGE_SORT_MERGE == type) {
+        // reverse direction of comparison for merge
+        MergeSortNode* msn = static_cast<MergeSortNode*>(node);
+        msn->sort = reverseSortObj(msn->sort);
+    } else {
+        invariant(STAGE_SORT != type);
+        // This shouldn't be here...
     }
+
+    for (size_t i = 0; i < node->children.size(); ++i) {
+        reverseScans(node->children[i]);
+    }
+}
 
 }  // namespace mongo

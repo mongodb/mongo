@@ -37,37 +37,39 @@
 
 namespace mongo {
 
-    class SortedDataInterface;
+class SortedDataInterface;
 
-    class InMemoryRecoveryUnit : public RecoveryUnit {
-    public:
-        void beginUnitOfWork(OperationContext* opCtx) final { };
-        void commitUnitOfWork() final;
-        void abortUnitOfWork() final;
+class InMemoryRecoveryUnit : public RecoveryUnit {
+public:
+    void beginUnitOfWork(OperationContext* opCtx) final{};
+    void commitUnitOfWork() final;
+    void abortUnitOfWork() final;
 
-        virtual bool waitUntilDurable() {
-            return true;
-        }
+    virtual bool waitUntilDurable() {
+        return true;
+    }
 
-        virtual void abandonSnapshot() {}
+    virtual void abandonSnapshot() {}
 
-        virtual void registerChange(Change* change) {
-            _changes.push_back(ChangePtr(change));
-        }
+    virtual void registerChange(Change* change) {
+        _changes.push_back(ChangePtr(change));
+    }
 
-        virtual void* writingPtr(void* data, size_t len) {
-            invariant(!"don't call writingPtr");
-        }
+    virtual void* writingPtr(void* data, size_t len) {
+        invariant(!"don't call writingPtr");
+    }
 
-        virtual void setRollbackWritesDisabled() {}
+    virtual void setRollbackWritesDisabled() {}
 
-        virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
+    virtual SnapshotId getSnapshotId() const {
+        return SnapshotId();
+    }
 
-    private:
-        typedef std::shared_ptr<Change> ChangePtr;
-        typedef std::vector<ChangePtr> Changes;
+private:
+    typedef std::shared_ptr<Change> ChangePtr;
+    typedef std::vector<ChangePtr> Changes;
 
-        Changes _changes;
-    };
+    Changes _changes;
+};
 
-} // namespace mongo
+}  // namespace mongo

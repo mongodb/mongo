@@ -34,87 +34,85 @@
 
 namespace mongo {
 
-    using std::ostream;
-    using std::string;
-    using std::stringstream;
-    using std::vector;
+using std::ostream;
+using std::string;
+using std::stringstream;
+using std::vector;
 
-    using namespace mongoutils;
+using namespace mongoutils;
 
-    const char FieldPath::prefix[] = "$";
+const char FieldPath::prefix[] = "$";
 
-    FieldPath::FieldPath(const vector<string>& fieldPath) {
-        massert(16409, "FieldPath cannot be constructed from an empty vector.", !fieldPath.empty());
-        vFieldName.reserve(fieldPath.size());
-        for(vector<string>::const_iterator i = fieldPath.begin(); i != fieldPath.end(); ++i) {
-            pushFieldName(*i);
+FieldPath::FieldPath(const vector<string>& fieldPath) {
+    massert(16409, "FieldPath cannot be constructed from an empty vector.", !fieldPath.empty());
+    vFieldName.reserve(fieldPath.size());
+    for (vector<string>::const_iterator i = fieldPath.begin(); i != fieldPath.end(); ++i) {
+        pushFieldName(*i);
+    }
+    verify(getPathLength() > 0);
+}
+
+FieldPath::FieldPath(const string& fieldPath) {
+    /*
+      The field path could be using dot notation.
+      Break the field path up by peeling off successive pieces.
+    */
+    size_t startpos = 0;
+    while (true) {
+        /* find the next dot */
+        const size_t dotpos = fieldPath.find('.', startpos);
+
+        /* if there are no more dots, use the remainder of the string */
+        if (dotpos == fieldPath.npos) {
+            string lastFieldName = fieldPath.substr(startpos, dotpos);
+            pushFieldName(lastFieldName);
+            break;
         }
-        verify(getPathLength() > 0);
+
+        /* use the string up to the dot */
+        const size_t length = dotpos - startpos;
+        string nextFieldName = fieldPath.substr(startpos, length);
+        pushFieldName(nextFieldName);
+
+        /* next time, search starting one spot after that */
+        startpos = dotpos + 1;
     }
+    verify(getPathLength() > 0);
+}
 
-    FieldPath::FieldPath(const string& fieldPath) {
-        /*
-          The field path could be using dot notation.
-          Break the field path up by peeling off successive pieces.
-        */
-        size_t startpos = 0;
-        while(true) {
-            /* find the next dot */
-            const size_t dotpos = fieldPath.find('.', startpos);
+string FieldPath::getPath(bool fieldPrefix) const {
+    stringstream ss;
+    writePath(ss, fieldPrefix);
+    return ss.str();
+}
 
-            /* if there are no more dots, use the remainder of the string */
-            if (dotpos == fieldPath.npos) {
-                string lastFieldName = fieldPath.substr(startpos, dotpos);
-                pushFieldName(lastFieldName);
-                break;
-            }
+void FieldPath::writePath(ostream& outStream, bool fieldPrefix) const {
+    if (fieldPrefix)
+        outStream << prefix;
 
-            /* use the string up to the dot */
-            const size_t length = dotpos - startpos;
-            string nextFieldName = fieldPath.substr(startpos, length);
-            pushFieldName(nextFieldName);
+    const size_t n = vFieldName.size();
 
-            /* next time, search starting one spot after that */
-            startpos = dotpos + 1;
-        }
-        verify(getPathLength() > 0);
-    }
+    verify(n > 0);
+    outStream << vFieldName[0];
+    for (size_t i = 1; i < n; ++i)
+        outStream << '.' << vFieldName[i];
+}
 
-    string FieldPath::getPath(bool fieldPrefix) const {
-        stringstream ss;
-        writePath(ss, fieldPrefix);
-        return ss.str();
-    }
+FieldPath FieldPath::tail() const {
+    vector<string> allButFirst(vFieldName.begin() + 1, vFieldName.end());
+    return FieldPath(allButFirst);
+}
 
-    void FieldPath::writePath(ostream &outStream, bool fieldPrefix) const {
-        if (fieldPrefix)
-            outStream << prefix;
+void FieldPath::uassertValidFieldName(const string& fieldName) {
+    uassert(15998, "FieldPath field names may not be empty strings.", fieldName.length() > 0);
+    uassert(16410, "FieldPath field names may not start with '$'.", fieldName[0] != '$');
+    uassert(
+        16411, "FieldPath field names may not contain '\0'.", fieldName.find('\0') == string::npos);
+    uassert(16412, "FieldPath field names may not contain '.'.", !str::contains(fieldName, '.'));
+}
 
-        const size_t n = vFieldName.size();
-
-        verify(n > 0);
-        outStream << vFieldName[0];
-        for(size_t i = 1; i < n; ++i)
-            outStream << '.' << vFieldName[i];
-    }
-
-    FieldPath FieldPath::tail() const {
-        vector<string> allButFirst(vFieldName.begin()+1, vFieldName.end());
-        return FieldPath(allButFirst);
-    }
-
-    void FieldPath::uassertValidFieldName(const string& fieldName) {
-        uassert(15998, "FieldPath field names may not be empty strings.", fieldName.length() > 0);
-        uassert(16410, "FieldPath field names may not start with '$'.", fieldName[0] != '$');
-        uassert(16411, "FieldPath field names may not contain '\0'.",
-                fieldName.find('\0') == string::npos);
-        uassert(16412, "FieldPath field names may not contain '.'.",
-                !str::contains(fieldName, '.'));
-    }
-
-    void FieldPath::pushFieldName(const string& fieldName) {
-        uassertValidFieldName(fieldName);
-        vFieldName.push_back(fieldName);
-    }
-
+void FieldPath::pushFieldName(const string& fieldName) {
+    uassertValidFieldName(fieldName);
+    vFieldName.push_back(fieldName);
+}
 }

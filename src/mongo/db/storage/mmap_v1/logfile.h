@@ -35,43 +35,42 @@
 
 namespace mongo {
 
-    class LogFile {
-    public:
-        /** create the file and open.  must not already exist.
-            throws UserAssertion on i/o error
-        */
-        LogFile(const std::string& name, bool readwrite = false);
+class LogFile {
+public:
+    /** create the file and open.  must not already exist.
+        throws UserAssertion on i/o error
+    */
+    LogFile(const std::string& name, bool readwrite = false);
 
-        /** closes */
-        ~LogFile();
+    /** closes */
+    ~LogFile();
 
-        /** append to file.  does not return until sync'd.  uses direct i/o when possible.
-            throws UserAssertion on an i/o error
-            note direct i/o may have alignment requirements
-        */
-        void synchronousAppend(const void *buf, size_t len);
+    /** append to file.  does not return until sync'd.  uses direct i/o when possible.
+        throws UserAssertion on an i/o error
+        note direct i/o may have alignment requirements
+    */
+    void synchronousAppend(const void* buf, size_t len);
 
-        /** write at specified offset. must be aligned.  noreturn until physically written. thread safe */
-        void writeAt(unsigned long long offset, const void *_bug, size_t _len);
+    /** write at specified offset. must be aligned.  noreturn until physically written. thread safe */
+    void writeAt(unsigned long long offset, const void* _bug, size_t _len);
 
-        void readAt(unsigned long long offset, void *_buf, size_t _len);
+    void readAt(unsigned long long offset, void* _buf, size_t _len);
 
-        const std::string _name;
+    const std::string _name;
 
-        void truncate(); // Removes extra data after current position
+    void truncate();  // Removes extra data after current position
 
-    private:
+private:
 #if defined(_WIN32)
-        typedef HANDLE fd_type;
+    typedef HANDLE fd_type;
 #else
-        typedef int fd_type;
+    typedef int fd_type;
 #endif
-        fd_type _fd;
-        bool _direct; // are we using direct I/O
+    fd_type _fd;
+    bool _direct;  // are we using direct I/O
 
-        // Block size, in case of direct I/O we need to test alignment against the page size,
-        // which can be different than 4kB.
-        size_t _blkSize;
-    };
-
+    // Block size, in case of direct I/O we need to test alignment against the page size,
+    // which can be different than 4kB.
+    size_t _blkSize;
+};
 }

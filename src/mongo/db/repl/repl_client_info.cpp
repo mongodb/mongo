@@ -39,15 +39,15 @@
 namespace mongo {
 namespace repl {
 
-    const Client::Decoration<ReplClientInfo> ReplClientInfo::forClient =
-        Client::declareDecoration<ReplClientInfo>();
+const Client::Decoration<ReplClientInfo> ReplClientInfo::forClient =
+    Client::declareDecoration<ReplClientInfo>();
 
-    long long ReplClientInfo::getTerm() {
-        if (_cachedTerm == kUninitializedTerm) {
-            _cachedTerm = getGlobalReplicationCoordinator()->getTerm();
-        }
-        return _cachedTerm;
+long long ReplClientInfo::getTerm() {
+    if (_cachedTerm == kUninitializedTerm) {
+        _cachedTerm = getGlobalReplicationCoordinator()->getTerm();
     }
+    return _cachedTerm;
+}
 
 }  // namespace repl
 }  // namespace mongo

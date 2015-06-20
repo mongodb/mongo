@@ -30,5 +30,5 @@
 #include "mongo/db/commands.h"
 
 namespace mongo {
-    int Command::testCommandsEnabled = 0;
+int Command::testCommandsEnabled = 0;
 }

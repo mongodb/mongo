@@ -38,74 +38,70 @@
 namespace mongo {
 namespace rpc {
 
-    CommandRequestBuilder::CommandRequestBuilder()
-        : _message{stdx::make_unique<Message>()}
-    {}
+CommandRequestBuilder::CommandRequestBuilder() : _message{stdx::make_unique<Message>()} {}
 
-    CommandRequestBuilder::~CommandRequestBuilder()
-    {}
+CommandRequestBuilder::~CommandRequestBuilder() {}
 
-    CommandRequestBuilder::CommandRequestBuilder(std::unique_ptr<Message> message)
-        : _message{std::move(message)}
-    {}
+CommandRequestBuilder::CommandRequestBuilder(std::unique_ptr<Message> message)
+    : _message{std::move(message)} {}
 
-    CommandRequestBuilder& CommandRequestBuilder::setDatabase(StringData database) {
-        invariant(_state == State::kDatabase);
-        _builder.appendStr(database);
-        _state = State::kCommandName;
-        return *this;
-    }
+CommandRequestBuilder& CommandRequestBuilder::setDatabase(StringData database) {
+    invariant(_state == State::kDatabase);
+    _builder.appendStr(database);
+    _state = State::kCommandName;
+    return *this;
+}
 
-    CommandRequestBuilder& CommandRequestBuilder::setCommandName(StringData commandName) {
-        invariant(_state == State::kCommandName);
-        _builder.appendStr(commandName);
-        _state = State::kMetadata;
-        return *this;
-    }
+CommandRequestBuilder& CommandRequestBuilder::setCommandName(StringData commandName) {
+    invariant(_state == State::kCommandName);
+    _builder.appendStr(commandName);
+    _state = State::kMetadata;
+    return *this;
+}
 
-    CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
-        invariant(_state == State::kMetadata);
-        metadata.appendSelfToBufBuilder(_builder);
-        _state = State::kCommandArgs;
-        return *this;
-    }
+CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
+    invariant(_state == State::kMetadata);
+    metadata.appendSelfToBufBuilder(_builder);
+    _state = State::kCommandArgs;
+    return *this;
+}
 
-    CommandRequestBuilder& CommandRequestBuilder::setCommandArgs(BSONObj commandArgs) {
-        invariant(_state == State::kCommandArgs);
-        commandArgs.appendSelfToBufBuilder(_builder);
-        _state = State::kInputDocs;
-        return *this;
-    }
+CommandRequestBuilder& CommandRequestBuilder::setCommandArgs(BSONObj commandArgs) {
+    invariant(_state == State::kCommandArgs);
+    commandArgs.appendSelfToBufBuilder(_builder);
+    _state = State::kInputDocs;
+    return *this;
+}
 
-    CommandRequestBuilder& CommandRequestBuilder::addInputDocs(DocumentRange inputDocs) {
-        invariant(_state == State::kInputDocs);
-        auto rangeData = inputDocs.data();
-        _builder.appendBuf(rangeData.data(), rangeData.length());
-        return *this;
-    }
+CommandRequestBuilder& CommandRequestBuilder::addInputDocs(DocumentRange inputDocs) {
+    invariant(_state == State::kInputDocs);
+    auto rangeData = inputDocs.data();
+    _builder.appendBuf(rangeData.data(), rangeData.length());
+    return *this;
+}
 
-    CommandRequestBuilder& CommandRequestBuilder::addInputDoc(BSONObj inputDoc) {
-        invariant(_state == State::kInputDocs);
-        inputDoc.appendSelfToBufBuilder(_builder);
-        return *this;
-    }
+CommandRequestBuilder& CommandRequestBuilder::addInputDoc(BSONObj inputDoc) {
+    invariant(_state == State::kInputDocs);
+    inputDoc.appendSelfToBufBuilder(_builder);
+    return *this;
+}
 
-    RequestBuilderInterface::State CommandRequestBuilder::getState() const {
-        return _state;
-    }
+RequestBuilderInterface::State CommandRequestBuilder::getState() const {
+    return _state;
+}
 
-    Protocol CommandRequestBuilder::getProtocol() const {
-        return rpc::Protocol::kOpCommandV1;
-    }
+Protocol CommandRequestBuilder::getProtocol() const {
+    return rpc::Protocol::kOpCommandV1;
+}
 
-    std::unique_ptr<Message> CommandRequestBuilder::done() {
-        invariant(_state == State::kInputDocs);
-        // TODO: we can elide a large copy here by transferring the internal buffer of
-        // the BufBuilder to the Message.
-        _message->setData(dbCommand, _builder.buf(), _builder.len());
-        _state = State::kDone;
-        return std::move(_message);
-    }
+std::unique_ptr<Message> CommandRequestBuilder::done() {
+    invariant(_state == State::kInputDocs);
+    // TODO: we can elide a large copy here by transferring the internal buffer of
+    // the BufBuilder to the Message.
+    _message->setData(dbCommand, _builder.buf(), _builder.len());
+    _state = State::kDone;
+    return std::move(_message);
+}
 
 }  // namespace rpc
 }  // namespace mongo

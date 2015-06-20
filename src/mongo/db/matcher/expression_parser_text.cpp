@@ -37,64 +37,62 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::string;
+using std::unique_ptr;
+using std::string;
 
-    StatusWithMatchExpression expressionParserTextCallbackReal( const BSONObj& queryObj ) {
-        // Validate queryObj, but defer construction of FTSQuery (which requires access to the
-        // target namespace) until stage building time.
+StatusWithMatchExpression expressionParserTextCallbackReal(const BSONObj& queryObj) {
+    // Validate queryObj, but defer construction of FTSQuery (which requires access to the
+    // target namespace) until stage building time.
 
-        int expectedFieldCount = 1;
+    int expectedFieldCount = 1;
 
-        if ( mongo::String != queryObj["$search"].type() ) {
-            return StatusWithMatchExpression( ErrorCodes::TypeMismatch,
-                                              "$search requires a string value" );
-        }
-
-        string language = "";
-        BSONElement languageElt = queryObj["$language"];
-        if ( !languageElt.eoo() ) {
-            expectedFieldCount++;
-            if ( mongo::String != languageElt.type() ) {
-                return StatusWithMatchExpression( ErrorCodes::TypeMismatch,
-                                                  "$language requires a string value" );
-            }
-            language = languageElt.String();
-            Status status =
-                fts::FTSLanguage::make( language, fts::TEXT_INDEX_VERSION_2 ).getStatus();
-            if ( !status.isOK() ) {
-                return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                                  "$language specifies unsupported language" );
-            }
-        }
-        string query = queryObj["$search"].String();
-
-        BSONElement caseSensitiveElt = queryObj["$caseSensitive"];
-        bool caseSensitive = fts::FTSQuery::caseSensitiveDefault;
-        if ( !caseSensitiveElt.eoo() ) {
-            expectedFieldCount++;
-            if ( mongo::Bool != caseSensitiveElt.type() ) {
-                return StatusWithMatchExpression( ErrorCodes::TypeMismatch,
-                                                  "$caseSensitive requires a boolean value" );
-            }
-            caseSensitive = caseSensitiveElt.trueValue();
-        }
-
-        if ( queryObj.nFields() != expectedFieldCount ) {
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "extra fields in $text" );
-        }
-
-        unique_ptr<TextMatchExpression> e( new TextMatchExpression() );
-        Status s = e->init( query, language, caseSensitive );
-        if ( !s.isOK() ) {
-            return StatusWithMatchExpression( s );
-        }
-        return StatusWithMatchExpression( e.release() );
+    if (mongo::String != queryObj["$search"].type()) {
+        return StatusWithMatchExpression(ErrorCodes::TypeMismatch,
+                                         "$search requires a string value");
     }
 
-    MONGO_INITIALIZER( MatchExpressionParserText )( ::mongo::InitializerContext* context ) {
-        expressionParserTextCallback = expressionParserTextCallbackReal;
-        return Status::OK();
+    string language = "";
+    BSONElement languageElt = queryObj["$language"];
+    if (!languageElt.eoo()) {
+        expectedFieldCount++;
+        if (mongo::String != languageElt.type()) {
+            return StatusWithMatchExpression(ErrorCodes::TypeMismatch,
+                                             "$language requires a string value");
+        }
+        language = languageElt.String();
+        Status status = fts::FTSLanguage::make(language, fts::TEXT_INDEX_VERSION_2).getStatus();
+        if (!status.isOK()) {
+            return StatusWithMatchExpression(ErrorCodes::BadValue,
+                                             "$language specifies unsupported language");
+        }
+    }
+    string query = queryObj["$search"].String();
+
+    BSONElement caseSensitiveElt = queryObj["$caseSensitive"];
+    bool caseSensitive = fts::FTSQuery::caseSensitiveDefault;
+    if (!caseSensitiveElt.eoo()) {
+        expectedFieldCount++;
+        if (mongo::Bool != caseSensitiveElt.type()) {
+            return StatusWithMatchExpression(ErrorCodes::TypeMismatch,
+                                             "$caseSensitive requires a boolean value");
+        }
+        caseSensitive = caseSensitiveElt.trueValue();
     }
 
+    if (queryObj.nFields() != expectedFieldCount) {
+        return StatusWithMatchExpression(ErrorCodes::BadValue, "extra fields in $text");
+    }
+
+    unique_ptr<TextMatchExpression> e(new TextMatchExpression());
+    Status s = e->init(query, language, caseSensitive);
+    if (!s.isOK()) {
+        return StatusWithMatchExpression(s);
+    }
+    return StatusWithMatchExpression(e.release());
+}
+
+MONGO_INITIALIZER(MatchExpressionParserText)(::mongo::InitializerContext* context) {
+    expressionParserTextCallback = expressionParserTextCallbackReal;
+    return Status::OK();
+}
 }

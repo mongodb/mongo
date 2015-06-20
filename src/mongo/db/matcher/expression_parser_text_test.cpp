@@ -39,55 +39,55 @@
 
 namespace mongo {
 
-    TEST( MatchExpressionParserText, Basic ) {
-        BSONObj query = fromjson( "{$text: {$search:\"awesome\", $language:\"english\"}}" );
+TEST(MatchExpressionParserText, Basic) {
+    BSONObj query = fromjson("{$text: {$search:\"awesome\", $language:\"english\"}}");
 
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
 
-        ASSERT_EQUALS( MatchExpression::TEXT, result.getValue()->matchType() );
-        std::unique_ptr<TextMatchExpression> textExp(
-                static_cast<TextMatchExpression*>( result.getValue() ) );
-        ASSERT_EQUALS( textExp->getQuery(), "awesome" );
-        ASSERT_EQUALS( textExp->getLanguage(), "english" );
-        ASSERT_EQUALS( textExp->getCaseSensitive(), fts::FTSQuery::caseSensitiveDefault );
-    }
+    ASSERT_EQUALS(MatchExpression::TEXT, result.getValue()->matchType());
+    std::unique_ptr<TextMatchExpression> textExp(
+        static_cast<TextMatchExpression*>(result.getValue()));
+    ASSERT_EQUALS(textExp->getQuery(), "awesome");
+    ASSERT_EQUALS(textExp->getLanguage(), "english");
+    ASSERT_EQUALS(textExp->getCaseSensitive(), fts::FTSQuery::caseSensitiveDefault);
+}
 
-    TEST( MatchExpressionParserText, LanguageError ) {
-        BSONObj query = fromjson( "{$text: {$search:\"awesome\", $language:\"spanglish\"}}" );
+TEST(MatchExpressionParserText, LanguageError) {
+    BSONObj query = fromjson("{$text: {$search:\"awesome\", $language:\"spanglish\"}}");
 
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
 
-    TEST( MatchExpressionParserText, CaseSensitiveTrue ) {
-        BSONObj query = fromjson( "{$text: {$search:\"awesome\", $caseSensitive: true}}" );
+TEST(MatchExpressionParserText, CaseSensitiveTrue) {
+    BSONObj query = fromjson("{$text: {$search:\"awesome\", $caseSensitive: true}}");
 
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
 
-        ASSERT_EQUALS( MatchExpression::TEXT, result.getValue()->matchType() );
-        std::unique_ptr<TextMatchExpression> textExp(
-                static_cast<TextMatchExpression*>( result.getValue() ) );
-        ASSERT_EQUALS( textExp->getCaseSensitive(), true );
-    }
+    ASSERT_EQUALS(MatchExpression::TEXT, result.getValue()->matchType());
+    std::unique_ptr<TextMatchExpression> textExp(
+        static_cast<TextMatchExpression*>(result.getValue()));
+    ASSERT_EQUALS(textExp->getCaseSensitive(), true);
+}
 
-    TEST( MatchExpressionParserText, CaseSensitiveFalse ) {
-        BSONObj query = fromjson( "{$text: {$search:\"awesome\", $caseSensitive: false}}" );
+TEST(MatchExpressionParserText, CaseSensitiveFalse) {
+    BSONObj query = fromjson("{$text: {$search:\"awesome\", $caseSensitive: false}}");
 
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
 
-        ASSERT_EQUALS( MatchExpression::TEXT, result.getValue()->matchType() );
-        std::unique_ptr<TextMatchExpression> textExp(
-                static_cast<TextMatchExpression*>( result.getValue() ) );
-        ASSERT_EQUALS( textExp->getCaseSensitive(), false );
-    }
+    ASSERT_EQUALS(MatchExpression::TEXT, result.getValue()->matchType());
+    std::unique_ptr<TextMatchExpression> textExp(
+        static_cast<TextMatchExpression*>(result.getValue()));
+    ASSERT_EQUALS(textExp->getCaseSensitive(), false);
+}
 
-    TEST( MatchExpressionParserText, CaseSensitiveError ) {
-        BSONObj query = fromjson( "{$text:{$search:\"awesome\", $caseSensitive: 0}}" );
+TEST(MatchExpressionParserText, CaseSensitiveError) {
+    BSONObj query = fromjson("{$text:{$search:\"awesome\", $caseSensitive: 0}}");
 
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
 }

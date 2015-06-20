@@ -40,43 +40,41 @@ using std::stringstream;
 
 namespace mongo {
 
-    // Verify that a nonempty collection maybe takes up some space on disk.
-    TEST( RecordStoreTestHarness, StorageSizeNonEmpty ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Verify that a nonempty collection maybe takes up some space on disk.
+TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
+            stringstream ss;
+            ss << "record " << i;
+            string data = ss.str();
 
-        int nToInsert = 10;
-        for ( int i = 0; i < nToInsert; i++ ) {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                stringstream ss;
-                ss << "record " << i;
-                string data = ss.str();
-
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( rs->storageSize( opCtx.get(), NULL ) >= 0 );
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            uow.commit();
         }
     }
 
-} // namespace mongo
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(rs->storageSize(opCtx.get(), NULL) >= 0);
+    }
+}
+
+}  // namespace mongo

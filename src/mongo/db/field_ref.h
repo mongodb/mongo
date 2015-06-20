@@ -37,165 +37,172 @@
 
 namespace mongo {
 
+/**
+ * A FieldPath represents a path in a document, starting from the root. The path
+ * is made of "field parts" separated by dots. The class provides an efficient means to
+ * "split" the dotted fields in its parts, but no validation is done.
+ *
+ * Any field part may be replaced, after the "original" field reference was parsed. Any
+ * part can be accessed through a StringData object.
+ *
+ * The class is not thread safe.
+ */
+class FieldRef {
+    MONGO_DISALLOW_COPYING(FieldRef);
+
+public:
+    FieldRef();
+
+    explicit FieldRef(StringData path);
+
     /**
-     * A FieldPath represents a path in a document, starting from the root. The path
-     * is made of "field parts" separated by dots. The class provides an efficient means to
-     * "split" the dotted fields in its parts, but no validation is done.
-     *
-     * Any field part may be replaced, after the "original" field reference was parsed. Any
-     * part can be accessed through a StringData object.
-     *
-     * The class is not thread safe.
+     * Field parts accessed through getPart() calls no longer would be valid, after the
+     * destructor ran.
      */
-    class FieldRef {
-        MONGO_DISALLOW_COPYING(FieldRef);
-    public:
-        FieldRef();
+    ~FieldRef() {}
 
-        explicit FieldRef(StringData path);
+    /**
+     * Builds a field path out of each field part in 'dottedField'.
+     */
+    void parse(StringData dottedField);
 
-        /**
-         * Field parts accessed through getPart() calls no longer would be valid, after the
-         * destructor ran.
-         */
-        ~FieldRef() {}
+    /**
+     * Sets the 'i-th' field part to point to 'part'. Assumes i < size(). Behavior is
+     * undefined otherwise.
+     */
+    void setPart(size_t i, StringData part);
 
-        /**
-         * Builds a field path out of each field part in 'dottedField'.
-         */
-        void parse(StringData dottedField);
+    /**
+     * Returns the 'i-th' field part. Assumes i < size(). Behavior is undefined otherwise.
+     */
+    StringData getPart(size_t i) const;
 
-        /**
-         * Sets the 'i-th' field part to point to 'part'. Assumes i < size(). Behavior is
-         * undefined otherwise.
-         */
-        void setPart(size_t i, StringData part);
+    /**
+     * Returns true when 'this' FieldRef is a prefix of 'other'. Equality is not considered
+     * a prefix.
+     */
+    bool isPrefixOf(const FieldRef& other) const;
 
-        /**
-         * Returns the 'i-th' field part. Assumes i < size(). Behavior is undefined otherwise.
-         */
-        StringData getPart(size_t i) const;
+    /**
+     * Returns the number of field parts in the prefix that 'this' and 'other' share.
+     */
+    size_t commonPrefixSize(const FieldRef& other) const;
 
-        /**
-         * Returns true when 'this' FieldRef is a prefix of 'other'. Equality is not considered
-         * a prefix.
-         */
-        bool isPrefixOf( const FieldRef& other ) const;
+    /**
+     * Returns a StringData of the full dotted field in its current state (i.e., some parts may
+     * have been replaced since the parse() call).
+     */
+    StringData dottedField(size_t offsetFromStart = 0) const;
 
-        /**
-         * Returns the number of field parts in the prefix that 'this' and 'other' share.
-         */
-        size_t commonPrefixSize( const FieldRef& other ) const;
+    /**
+     * Returns a StringData of parts of the dotted field from startPart to endPart in its
+     * current state (i.e., some parts may have been replaced since the parse() call).
+     */
+    StringData dottedSubstring(size_t startPart, size_t endPart) const;
 
-        /**
-         * Returns a StringData of the full dotted field in its current state (i.e., some parts may
-         * have been replaced since the parse() call).
-         */
-        StringData dottedField( size_t offsetFromStart = 0 ) const;
+    /**
+     * Compares the full dotted path represented by this FieldRef to other
+     */
+    bool equalsDottedField(StringData other) const;
 
-        /**
-         * Returns a StringData of parts of the dotted field from startPart to endPart in its
-         * current state (i.e., some parts may have been replaced since the parse() call).
-         */
-        StringData dottedSubstring(size_t startPart, size_t endPart) const;
+    /**
+     * Return 0 if 'this' is equal to 'other' lexicographically, -1 if is it less than or
+     * +1 if it is greater than.
+     */
+    int compare(const FieldRef& other) const;
 
-        /**
-         * Compares the full dotted path represented by this FieldRef to other
-         */
-        bool equalsDottedField( StringData other ) const;
+    /**
+     * Resets the internal state. See note in parse() call.
+     */
+    void clear();
 
-        /**
-         * Return 0 if 'this' is equal to 'other' lexicographically, -1 if is it less than or
-         * +1 if it is greater than.
-         */
-        int compare( const FieldRef& other ) const;
+    //
+    // accessors
+    //
 
-        /**
-         * Resets the internal state. See note in parse() call.
-         */
-        void clear();
-
-        //
-        // accessors
-        //
-
-        /**
-         * Returns the number of parts in this FieldRef.
-         */
-        size_t numParts() const { return _size; }
-
-        bool empty() const { return numParts() == 0; }
-
-    private:
-        // Dotted fields are most often not longer than four parts. We use a mixed structure
-        // here that will not require any extra memory allocation when that is the case. And
-        // handle larger dotted fields if it is. The idea is not to penalize the common case
-        // with allocations.
-        static const size_t kReserveAhead = 4;
-
-        /**
-         * Parses 'path' into parts.
-         */
-        void _parse(StringData path);
-
-        /** Converts the field part index to the variable part equivalent */
-        size_t getIndex(size_t i) const { return i-kReserveAhead; }
-
-        /**
-         * Returns the new number of parts after appending 'part' to this field path. It
-         * assumes that 'part' is pointing to an internally allocated area.
-         */
-        size_t appendPart(StringData part);
-
-        /**
-         * Re-assemble _dotted from components, including any replacements in _replacements,
-         * and update the StringData components in _fixed and _variable to refer to the parts
-         * of the new _dotted. This is used to make the storage for the current value of this
-         * FieldRef contiguous so it can be returned as a StringData from the dottedField
-         * method above.
-         */
-        void reserialize() const;
-
-        // number of field parts stored
-        size_t _size;
-
-        // first kResevedAhead field components
-        mutable StringData _fixed[kReserveAhead];
-
-         // remaining field components
-        mutable std::vector<StringData> _variable;
-
-        // cached dotted name
-        mutable std::string _dotted;
-
-        // back memory added with the setPart call pointed to by _fized and _variable
-        mutable std::vector<std::string> _replacements;
-    };
-
-    inline bool operator==(const FieldRef& lhs, const FieldRef& rhs) {
-        return lhs.compare(rhs) == 0;
+    /**
+     * Returns the number of parts in this FieldRef.
+     */
+    size_t numParts() const {
+        return _size;
     }
 
-    inline bool operator!=(const FieldRef& lhs, const FieldRef& rhs) {
-        return lhs.compare(rhs) != 0;
+    bool empty() const {
+        return numParts() == 0;
     }
 
-    inline bool operator<(const FieldRef& lhs, const FieldRef& rhs) {
-        return lhs.compare(rhs) < 0;
+private:
+    // Dotted fields are most often not longer than four parts. We use a mixed structure
+    // here that will not require any extra memory allocation when that is the case. And
+    // handle larger dotted fields if it is. The idea is not to penalize the common case
+    // with allocations.
+    static const size_t kReserveAhead = 4;
+
+    /**
+     * Parses 'path' into parts.
+     */
+    void _parse(StringData path);
+
+    /** Converts the field part index to the variable part equivalent */
+    size_t getIndex(size_t i) const {
+        return i - kReserveAhead;
     }
 
-    inline bool operator<=(const FieldRef& lhs, const FieldRef& rhs) {
-        return lhs.compare(rhs) <= 0;
-    }
+    /**
+     * Returns the new number of parts after appending 'part' to this field path. It
+     * assumes that 'part' is pointing to an internally allocated area.
+     */
+    size_t appendPart(StringData part);
 
-    inline bool operator>(const FieldRef& lhs, const FieldRef& rhs) {
-        return lhs.compare(rhs) > 0;
-    }
+    /**
+     * Re-assemble _dotted from components, including any replacements in _replacements,
+     * and update the StringData components in _fixed and _variable to refer to the parts
+     * of the new _dotted. This is used to make the storage for the current value of this
+     * FieldRef contiguous so it can be returned as a StringData from the dottedField
+     * method above.
+     */
+    void reserialize() const;
 
-    inline bool operator>=(const FieldRef& lhs, const FieldRef& rhs) {
-        return lhs.compare(rhs) >= 0;
-    }
+    // number of field parts stored
+    size_t _size;
 
-    std::ostream& operator<<(std::ostream& stream, const FieldRef& value);
+    // first kResevedAhead field components
+    mutable StringData _fixed[kReserveAhead];
 
-} // namespace mongo
+    // remaining field components
+    mutable std::vector<StringData> _variable;
+
+    // cached dotted name
+    mutable std::string _dotted;
+
+    // back memory added with the setPart call pointed to by _fized and _variable
+    mutable std::vector<std::string> _replacements;
+};
+
+inline bool operator==(const FieldRef& lhs, const FieldRef& rhs) {
+    return lhs.compare(rhs) == 0;
+}
+
+inline bool operator!=(const FieldRef& lhs, const FieldRef& rhs) {
+    return lhs.compare(rhs) != 0;
+}
+
+inline bool operator<(const FieldRef& lhs, const FieldRef& rhs) {
+    return lhs.compare(rhs) < 0;
+}
+
+inline bool operator<=(const FieldRef& lhs, const FieldRef& rhs) {
+    return lhs.compare(rhs) <= 0;
+}
+
+inline bool operator>(const FieldRef& lhs, const FieldRef& rhs) {
+    return lhs.compare(rhs) > 0;
+}
+
+inline bool operator>=(const FieldRef& lhs, const FieldRef& rhs) {
+    return lhs.compare(rhs) >= 0;
+}
+
+std::ostream& operator<<(std::ostream& stream, const FieldRef& value);
+
+}  // namespace mongo

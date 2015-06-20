@@ -36,122 +36,122 @@
 
 namespace mongo {
 
+/**
+ * Status represents an error state or the absence thereof.
+ *
+ * A Status uses the standardized error codes -- from file 'error_codes.h' -- to
+ * determine an error's cause. It further clarifies the error with a textual
+ * description. Optionally, a Status may also have an error location number, which
+ * should be a unique, grep-able point in the code base (including assert numbers).
+ *
+ * Example usage:
+ *
+ *    Status sumAB(int a, int b, int* c) {
+ *       if (overflowIfSum(a,b)) {
+ *           return Status(ErrorCodes::ERROR_OVERFLOW, "overflow in sumAB", 16494);
+ *       }
+ *
+ *       *c = a+b;
+ *       return Status::OK();
+ *   }
+ *
+ * TODO: expand base/error_codes.h to capture common errors in current code
+ * TODO: generate base/error_codes.h out of a description file
+ * TODO: check 'location' duplicates against assert numbers
+ */
+class Status {
+public:
+    // Short-hand for returning an OK status.
+    static inline Status OK();
+
     /**
-     * Status represents an error state or the absence thereof.
-     *
-     * A Status uses the standardized error codes -- from file 'error_codes.h' -- to
-     * determine an error's cause. It further clarifies the error with a textual
-     * description. Optionally, a Status may also have an error location number, which
-     * should be a unique, grep-able point in the code base (including assert numbers).
-     *
-     * Example usage:
-     *
-     *    Status sumAB(int a, int b, int* c) {
-     *       if (overflowIfSum(a,b)) {
-     *           return Status(ErrorCodes::ERROR_OVERFLOW, "overflow in sumAB", 16494);
-     *       }
-     *
-     *       *c = a+b;
-     *       return Status::OK();
-     *   }
-     *
-     * TODO: expand base/error_codes.h to capture common errors in current code
-     * TODO: generate base/error_codes.h out of a description file
-     * TODO: check 'location' duplicates against assert numbers
+     * Builds an error status given the error code, a textual description of what
+     * caused the error, and a unique position in the where the error occurred
+     * (similar to an assert number)
      */
-    class Status {
-    public:
-        // Short-hand for returning an OK status.
-        static inline Status OK();
+    Status(ErrorCodes::Error code, std::string reason, int location = 0);
 
-        /**
-         * Builds an error status given the error code, a textual description of what
-         * caused the error, and a unique position in the where the error occurred
-         * (similar to an assert number)
-         */
-        Status(ErrorCodes::Error code, std::string reason, int location = 0);
+    inline Status(const Status& other);
+    inline Status& operator=(const Status& other);
 
-        inline Status(const Status& other);
-        inline Status& operator=(const Status& other);
+    inline Status(Status&& other) BOOST_NOEXCEPT;
+    inline Status& operator=(Status&& other) BOOST_NOEXCEPT;
 
-        inline Status(Status&& other) BOOST_NOEXCEPT;
-        inline Status& operator=(Status&& other) BOOST_NOEXCEPT;
+    inline ~Status();
 
-        inline ~Status();
+    /**
+     * Returns true if 'other's error code and location are equal/different to this
+     * instance's. Otherwise returns false.
+     */
+    bool compare(const Status& other) const;
+    bool operator==(const Status& other) const;
+    bool operator!=(const Status& other) const;
 
-        /**
-         * Returns true if 'other's error code and location are equal/different to this
-         * instance's. Otherwise returns false.
-         */
-        bool compare(const Status& other) const;
-        bool operator==(const Status& other) const;
-        bool operator!=(const Status& other) const;
+    /**
+     * Returns true if 'other's error code is equal/different to this instance's.
+     * Otherwise returns false.
+     */
+    bool compareCode(const ErrorCodes::Error other) const;
+    bool operator==(const ErrorCodes::Error other) const;
+    bool operator!=(const ErrorCodes::Error other) const;
 
-        /**
-         * Returns true if 'other's error code is equal/different to this instance's.
-         * Otherwise returns false.
-         */
-        bool compareCode(const ErrorCodes::Error other) const;
-        bool operator==(const ErrorCodes::Error other) const;
-        bool operator!=(const ErrorCodes::Error other) const;
+    //
+    // accessors
+    //
 
-        //
-        // accessors
-        //
+    inline bool isOK() const;
 
-        inline bool isOK() const;
+    inline ErrorCodes::Error code() const;
 
-        inline ErrorCodes::Error code() const;
+    inline std::string codeString() const;
 
-        inline std::string codeString() const;
+    inline std::string reason() const;
 
-        inline std::string reason() const;
+    inline int location() const;
 
-        inline int location() const;
+    std::string toString() const;
 
-        std::string toString() const;
+    //
+    // Below interface used for testing code only.
+    //
 
-        //
-        // Below interface used for testing code only.
-        //
+    inline AtomicUInt32::WordType refCount() const;
 
-        inline AtomicUInt32::WordType refCount() const;
+private:
+    inline Status();
 
-    private:
-        inline Status();
+    struct ErrorInfo {
+        AtomicUInt32 refs;             // reference counter
+        const ErrorCodes::Error code;  // error code
+        const std::string reason;      // description of error cause
+        const int location;            // unique location of the triggering line in the code
 
-        struct ErrorInfo {
-            AtomicUInt32 refs;             // reference counter
-            const ErrorCodes::Error code;  // error code
-            const std::string reason;      // description of error cause
-            const int location;            // unique location of the triggering line in the code
+        static ErrorInfo* create(ErrorCodes::Error code, std::string reason, int location);
 
-            static ErrorInfo* create(ErrorCodes::Error code, std::string reason, int location);
-
-            ErrorInfo(ErrorCodes::Error code, std::string reason, int location);
-        };
-
-        ErrorInfo* _error;
-
-        /**
-         * Increment/Decrement the reference counter inside an ErrorInfo
-         *
-         * @param error  ErrorInfo to be incremented
-         */
-        static inline void ref(ErrorInfo* error);
-        static inline void unref(ErrorInfo* error);
+        ErrorInfo(ErrorCodes::Error code, std::string reason, int location);
     };
 
-    inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs);
+    ErrorInfo* _error;
 
-    inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs);
+    /**
+     * Increment/Decrement the reference counter inside an ErrorInfo
+     *
+     * @param error  ErrorInfo to be incremented
+     */
+    static inline void ref(ErrorInfo* error);
+    static inline void unref(ErrorInfo* error);
+};
 
-    //
-    // Convenience method for unittest code. Please use accessors otherwise.
-    //
+inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs);
 
-    std::ostream& operator<<(std::ostream& os, const Status& status);
-    std::ostream& operator<<(std::ostream& os, ErrorCodes::Error);
+inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs);
+
+//
+// Convenience method for unittest code. Please use accessors otherwise.
+//
+
+std::ostream& operator<<(std::ostream& os, const Status& status);
+std::ostream& operator<<(std::ostream& os, ErrorCodes::Error);
 
 }  // namespace mongo
 

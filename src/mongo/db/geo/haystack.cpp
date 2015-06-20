@@ -54,71 +54,82 @@
  */
 namespace mongo {
 
-    using std::string;
-    using std::vector;
+using std::string;
+using std::vector;
 
-    class GeoHaystackSearchCommand : public Command {
-    public:
-        GeoHaystackSearchCommand() : Command("geoSearch") {}
+class GeoHaystackSearchCommand : public Command {
+public:
+    GeoHaystackSearchCommand() : Command("geoSearch") {}
 
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        bool slaveOk() const { return true; }
-        bool slaveOverrideOk() const { return true; }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    bool slaveOk() const {
+        return true;
+    }
+    bool slaveOverrideOk() const {
+        return true;
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::find);
+        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
+
+        AutoGetCollectionForRead ctx(txn, ns);
+
+        Collection* collection = ctx.getCollection();
+        if (!collection) {
+            errmsg = "can't find ns";
+            return false;
         }
 
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
-
-            AutoGetCollectionForRead ctx(txn, ns);
-
-            Collection* collection = ctx.getCollection();
-            if ( !collection ) {
-                errmsg = "can't find ns";
-                return false;
-            }
-
-            vector<IndexDescriptor*> idxs;
-            collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_HAYSTACK, idxs);
-            if (idxs.size() == 0) {
-                errmsg = "no geoSearch index";
-                return false;
-            }
-            if (idxs.size() > 1) {
-                errmsg = "more than 1 geosearch index";
-                return false;
-            }
-
-            BSONElement nearElt = cmdObj["near"];
-            BSONElement maxDistance = cmdObj["maxDistance"];
-            BSONElement search = cmdObj["search"];
-
-            uassert(13318, "near needs to be an array", nearElt.isABSONObj());
-            uassert(13319, "maxDistance needs a number", maxDistance.isNumber());
-            uassert(13320, "search needs to be an object", search.type() == Object);
-
-            unsigned limit = 50;
-            if (cmdObj["limit"].isNumber())
-                limit = static_cast<unsigned>(cmdObj["limit"].numberInt());
-
-            IndexDescriptor* desc = idxs[0];
-            HaystackAccessMethod* ham =
-                static_cast<HaystackAccessMethod*>( collection->getIndexCatalog()->getIndex(desc) );
-            ham->searchCommand(txn, collection, nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
-                               &result, limit);
-            return 1;
+        vector<IndexDescriptor*> idxs;
+        collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_HAYSTACK, idxs);
+        if (idxs.size() == 0) {
+            errmsg = "no geoSearch index";
+            return false;
         }
-    } nameSearchCommand;
+        if (idxs.size() > 1) {
+            errmsg = "more than 1 geosearch index";
+            return false;
+        }
+
+        BSONElement nearElt = cmdObj["near"];
+        BSONElement maxDistance = cmdObj["maxDistance"];
+        BSONElement search = cmdObj["search"];
+
+        uassert(13318, "near needs to be an array", nearElt.isABSONObj());
+        uassert(13319, "maxDistance needs a number", maxDistance.isNumber());
+        uassert(13320, "search needs to be an object", search.type() == Object);
+
+        unsigned limit = 50;
+        if (cmdObj["limit"].isNumber())
+            limit = static_cast<unsigned>(cmdObj["limit"].numberInt());
+
+        IndexDescriptor* desc = idxs[0];
+        HaystackAccessMethod* ham =
+            static_cast<HaystackAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
+        ham->searchCommand(txn,
+                           collection,
+                           nearElt.Obj(),
+                           maxDistance.numberDouble(),
+                           search.Obj(),
+                           &result,
+                           limit);
+        return 1;
+    }
+} nameSearchCommand;
 
 }  // namespace mongo

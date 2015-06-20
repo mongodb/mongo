@@ -35,20 +35,19 @@
 
 namespace mongo {
 
-    UserName::UserName(StringData user, StringData dbname) {
-        _fullName.resize(user.size() + dbname.size() + 1);
-        std::string::iterator iter = std::copy(user.rawData(),
-                                               user.rawData() + user.size(),
-                                               _fullName.begin());
-        *iter = '@';
-        ++iter;
-        iter = std::copy(dbname.rawData(), dbname.rawData() + dbname.size(), iter);
-        dassert(iter == _fullName.end());
-        _splitPoint = user.size();
-    }
+UserName::UserName(StringData user, StringData dbname) {
+    _fullName.resize(user.size() + dbname.size() + 1);
+    std::string::iterator iter =
+        std::copy(user.rawData(), user.rawData() + user.size(), _fullName.begin());
+    *iter = '@';
+    ++iter;
+    iter = std::copy(dbname.rawData(), dbname.rawData() + dbname.size(), iter);
+    dassert(iter == _fullName.end());
+    _splitPoint = user.size();
+}
 
-    std::ostream& operator<<(std::ostream& os, const UserName& name) {
-        return os << name.getFullName();
-    }
+std::ostream& operator<<(std::ostream& os, const UserName& name) {
+    return os << name.getFullName();
+}
 
 }  // namespace mongo

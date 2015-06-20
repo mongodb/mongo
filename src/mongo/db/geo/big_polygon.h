@@ -40,82 +40,78 @@
 
 namespace mongo {
 
-    // Simple GeoJSON polygon with a custom CRS identifier as having a strict winding order.
-    // The winding order will determine unambiguously the inside/outside of the polygon even
-    // if larger than one hemisphere.
+// Simple GeoJSON polygon with a custom CRS identifier as having a strict winding order.
+// The winding order will determine unambiguously the inside/outside of the polygon even
+// if larger than one hemisphere.
+//
+// BigSimplePolygon uses S2Loop internally, which follows a left-foot rule (inside to the
+// left when walking the edge of the polygon, counter-clockwise)
+class BigSimplePolygon : public S2Region {
+public:
+    BigSimplePolygon();
+
+    BigSimplePolygon(S2Loop* loop);
+
+    virtual ~BigSimplePolygon();
+
+    void Init(S2Loop* loop);
+
+    double GetArea() const;
+
+    bool Contains(const S2Polygon& polygon) const;
+
+    bool Contains(const S2Polyline& line) const;
+
+    // Needs to be this way for S2 compatibility
+    bool Contains(S2Point const& point) const;
+
+    bool Intersects(const S2Polygon& polygon) const;
+
+    bool Intersects(const S2Polyline& line) const;
+
+    bool Intersects(S2Point const& point) const;
+
+    // Only used in tests
+    void Invert();
+
+    const S2Polygon& GetPolygonBorder() const;
+
+    const S2Polyline& GetLineBorder() const;
+
     //
-    // BigSimplePolygon uses S2Loop internally, which follows a left-foot rule (inside to the
-    // left when walking the edge of the polygon, counter-clockwise)
-    class BigSimplePolygon : public S2Region {
-    public:
+    // S2Region interface
+    //
 
-        BigSimplePolygon();
+    BigSimplePolygon* Clone() const;
 
-        BigSimplePolygon(S2Loop* loop);
+    S2Cap GetCapBound() const;
 
-        virtual ~BigSimplePolygon();
+    S2LatLngRect GetRectBound() const;
 
-        void Init(S2Loop* loop);
+    bool Contains(S2Cell const& cell) const;
 
-        double GetArea() const;
+    bool MayIntersect(S2Cell const& cell) const;
 
-        bool Contains(const S2Polygon& polygon) const;
+    bool VirtualContainsPoint(S2Point const& p) const;
 
-        bool Contains(const S2Polyline& line) const;
+    void Encode(Encoder* const encoder) const;
 
-        // Needs to be this way for S2 compatibility
-        bool Contains(S2Point const& point) const;
+    bool Decode(Decoder* const decoder);
 
-        bool Intersects(const S2Polygon& polygon) const;
+    bool DecodeWithinScope(Decoder* const decoder);
 
-        bool Intersects(const S2Polyline& line) const;
+private:
+    std::unique_ptr<S2Loop> _loop;
 
-        bool Intersects(S2Point const& point) const;
+    // Cache whether the loop area is at most 2*Pi (the area of hemisphere).
+    //
+    // S2 guarantees that any loop in a valid (normalized) polygon, no matter a hole
+    // or a shell, has to be less than 2*Pi. So if the loop is normalized, it's the same
+    // with the border polygon, otherwise, the border polygon is its complement.
+    bool _isNormalized;
 
-        // Only used in tests
-        void Invert();
-
-        const S2Polygon& GetPolygonBorder() const;
-
-        const S2Polyline& GetLineBorder() const;
-
-        //
-        // S2Region interface
-        //
-
-        BigSimplePolygon* Clone() const;
-
-        S2Cap GetCapBound() const;
-
-        S2LatLngRect GetRectBound() const;
-
-        bool Contains(S2Cell const& cell) const;
-
-        bool MayIntersect(S2Cell const& cell) const;
-
-        bool VirtualContainsPoint(S2Point const& p) const;
-
-        void Encode(Encoder* const encoder) const;
-
-        bool Decode(Decoder* const decoder);
-
-        bool DecodeWithinScope(Decoder* const decoder);
-
-    private:
-
-        std::unique_ptr<S2Loop> _loop;
-
-        // Cache whether the loop area is at most 2*Pi (the area of hemisphere).
-        //
-        // S2 guarantees that any loop in a valid (normalized) polygon, no matter a hole
-        // or a shell, has to be less than 2*Pi. So if the loop is normalized, it's the same
-        // with the border polygon, otherwise, the border polygon is its complement.
-        bool _isNormalized;
-
-        // Cached to do Intersects() and Contains() with S2Polylines.
-        mutable std::unique_ptr<S2Polyline> _borderLine;
-        mutable std::unique_ptr<S2Polygon> _borderPoly;
-    };
-
+    // Cached to do Intersects() and Contains() with S2Polylines.
+    mutable std::unique_ptr<S2Polyline> _borderLine;
+    mutable std::unique_ptr<S2Polygon> _borderPoly;
+};
 }
-

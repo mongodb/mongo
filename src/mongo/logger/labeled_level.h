@@ -34,43 +34,69 @@
 namespace mongo {
 namespace logger {
 
-    /**
-     * Deprecated utility for associating a std::string and log level together.
-     */
-    class LabeledLevel {
-    public:
-        LabeledLevel( int level ) : _level( level ) {}
-        LabeledLevel( const char* label, int level ) : _label( label ), _level( level ) {}
-        LabeledLevel( const std::string& label, int level ) : _label( label ), _level( level ) {}
+/**
+ * Deprecated utility for associating a std::string and log level together.
+ */
+class LabeledLevel {
+public:
+    LabeledLevel(int level) : _level(level) {}
+    LabeledLevel(const char* label, int level) : _label(label), _level(level) {}
+    LabeledLevel(const std::string& label, int level) : _label(label), _level(level) {}
 
-        LabeledLevel operator+( int i ) const {
-            return LabeledLevel( _label, _level + i );
-        }
+    LabeledLevel operator+(int i) const {
+        return LabeledLevel(_label, _level + i);
+    }
 
-        LabeledLevel operator-( int i ) const {
-            return LabeledLevel( _label, _level - i );
-        }
+    LabeledLevel operator-(int i) const {
+        return LabeledLevel(_label, _level - i);
+    }
 
-        const std::string& getLabel() const { return _label; }
-        int getLevel() const { return _level; }
+    const std::string& getLabel() const {
+        return _label;
+    }
+    int getLevel() const {
+        return _level;
+    }
 
-        operator LogSeverity () const { return logger::LogSeverity::cast(_level); }
+    operator LogSeverity() const {
+        return logger::LogSeverity::cast(_level);
+    }
 
-    private:
-        std::string _label;
-        int _level;
-    };
+private:
+    std::string _label;
+    int _level;
+};
 
-    inline bool operator<( const LabeledLevel& ll, const int i ) { return ll.getLevel() < i; }
-    inline bool operator<( const int i, const LabeledLevel& ll ) { return i < ll.getLevel(); }
-    inline bool operator>( const LabeledLevel& ll, const int i ) { return ll.getLevel() > i; }
-    inline bool operator>( const int i, const LabeledLevel& ll ) { return i > ll.getLevel(); }
-    inline bool operator<=( const LabeledLevel& ll, const int i ) { return ll.getLevel() <= i; }
-    inline bool operator<=( const int i, const LabeledLevel& ll ) { return i <= ll.getLevel(); }
-    inline bool operator>=( const LabeledLevel& ll, const int i ) { return ll.getLevel() >= i; }
-    inline bool operator>=( const int i, const LabeledLevel& ll ) { return i >= ll.getLevel(); }
-    inline bool operator==( const LabeledLevel& ll, const int i ) { return ll.getLevel() == i; }
-    inline bool operator==( const int i, const LabeledLevel& ll ) { return i == ll.getLevel(); }
+inline bool operator<(const LabeledLevel& ll, const int i) {
+    return ll.getLevel() < i;
+}
+inline bool operator<(const int i, const LabeledLevel& ll) {
+    return i < ll.getLevel();
+}
+inline bool operator>(const LabeledLevel& ll, const int i) {
+    return ll.getLevel() > i;
+}
+inline bool operator>(const int i, const LabeledLevel& ll) {
+    return i > ll.getLevel();
+}
+inline bool operator<=(const LabeledLevel& ll, const int i) {
+    return ll.getLevel() <= i;
+}
+inline bool operator<=(const int i, const LabeledLevel& ll) {
+    return i <= ll.getLevel();
+}
+inline bool operator>=(const LabeledLevel& ll, const int i) {
+    return ll.getLevel() >= i;
+}
+inline bool operator>=(const int i, const LabeledLevel& ll) {
+    return i >= ll.getLevel();
+}
+inline bool operator==(const LabeledLevel& ll, const int i) {
+    return ll.getLevel() == i;
+}
+inline bool operator==(const int i, const LabeledLevel& ll) {
+    return i == ll.getLevel();
+}
 
 }  // namespace logger
 }  // namespace mongo

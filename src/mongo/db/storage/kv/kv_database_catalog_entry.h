@@ -37,69 +37,66 @@
 
 namespace mongo {
 
-    class KVCollectionCatalogEntry;
-    class KVStorageEngine;
+class KVCollectionCatalogEntry;
+class KVStorageEngine;
 
-    class KVDatabaseCatalogEntry : public DatabaseCatalogEntry {
-    public:
-        KVDatabaseCatalogEntry( StringData db, KVStorageEngine* engine );
-        virtual ~KVDatabaseCatalogEntry();
+class KVDatabaseCatalogEntry : public DatabaseCatalogEntry {
+public:
+    KVDatabaseCatalogEntry(StringData db, KVStorageEngine* engine);
+    virtual ~KVDatabaseCatalogEntry();
 
-        virtual bool exists() const;
-        virtual bool isEmpty() const;
-        virtual bool hasUserData() const;
+    virtual bool exists() const;
+    virtual bool isEmpty() const;
+    virtual bool hasUserData() const;
 
-        virtual int64_t sizeOnDisk( OperationContext* opCtx ) const;
+    virtual int64_t sizeOnDisk(OperationContext* opCtx) const;
 
-        virtual void appendExtraStats( OperationContext* opCtx,
-                                       BSONObjBuilder* out,
-                                       double scale ) const;
+    virtual void appendExtraStats(OperationContext* opCtx, BSONObjBuilder* out, double scale) const;
 
-        virtual bool isOlderThan24( OperationContext* opCtx ) const { return false; }
-        virtual void markIndexSafe24AndUp( OperationContext* opCtx ) {}
+    virtual bool isOlderThan24(OperationContext* opCtx) const {
+        return false;
+    }
+    virtual void markIndexSafe24AndUp(OperationContext* opCtx) {}
 
-        virtual bool currentFilesCompatible( OperationContext* opCtx ) const;
+    virtual bool currentFilesCompatible(OperationContext* opCtx) const;
 
-        virtual void getCollectionNamespaces( std::list<std::string>* out ) const;
+    virtual void getCollectionNamespaces(std::list<std::string>* out) const;
 
-        virtual CollectionCatalogEntry* getCollectionCatalogEntry( StringData ns ) const;
+    virtual CollectionCatalogEntry* getCollectionCatalogEntry(StringData ns) const;
 
-        virtual RecordStore* getRecordStore( StringData ns ) const;
+    virtual RecordStore* getRecordStore(StringData ns) const;
 
-        virtual IndexAccessMethod* getIndex( OperationContext* txn,
-                                             const CollectionCatalogEntry* collection,
-                                             IndexCatalogEntry* index );
+    virtual IndexAccessMethod* getIndex(OperationContext* txn,
+                                        const CollectionCatalogEntry* collection,
+                                        IndexCatalogEntry* index);
 
-        virtual Status createCollection( OperationContext* txn,
-                                         StringData ns,
-                                         const CollectionOptions& options,
-                                         bool allocateDefaultSpace );
+    virtual Status createCollection(OperationContext* txn,
+                                    StringData ns,
+                                    const CollectionOptions& options,
+                                    bool allocateDefaultSpace);
 
-        virtual Status renameCollection( OperationContext* txn,
-                                         StringData fromNS,
-                                         StringData toNS,
-                                         bool stayTemp );
+    virtual Status renameCollection(OperationContext* txn,
+                                    StringData fromNS,
+                                    StringData toNS,
+                                    bool stayTemp);
 
-        virtual Status dropCollection( OperationContext* opCtx,
-                                       StringData ns );
+    virtual Status dropCollection(OperationContext* opCtx, StringData ns);
 
-        // --------------
+    // --------------
 
-        void initCollection( OperationContext* opCtx,
-                             const std::string& ns,
-                             bool forRepair );
+    void initCollection(OperationContext* opCtx, const std::string& ns, bool forRepair);
 
-        void initCollectionBeforeRepair(OperationContext* opCtx, const std::string& ns);
-        void reinitCollectionAfterRepair(OperationContext* opCtx, const std::string& ns);
+    void initCollectionBeforeRepair(OperationContext* opCtx, const std::string& ns);
+    void reinitCollectionAfterRepair(OperationContext* opCtx, const std::string& ns);
 
-    private:
-        class AddCollectionChange;
-        class RemoveCollectionChange;
+private:
+    class AddCollectionChange;
+    class RemoveCollectionChange;
 
-        typedef std::map<std::string, KVCollectionCatalogEntry*> CollectionMap;
+    typedef std::map<std::string, KVCollectionCatalogEntry*> CollectionMap;
 
 
-        KVStorageEngine* const _engine; // not owned here
-        CollectionMap _collections;
-    };
+    KVStorageEngine* const _engine;  // not owned here
+    CollectionMap _collections;
+};
 }

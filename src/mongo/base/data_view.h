@@ -36,60 +36,54 @@
 
 namespace mongo {
 
-    class ConstDataView {
+class ConstDataView {
+public:
+    typedef const char* bytes_type;
 
-    public:
-        typedef const char* bytes_type;
+    ConstDataView(bytes_type bytes) : _bytes(bytes) {}
 
-        ConstDataView(bytes_type bytes)
-            : _bytes(bytes) {
-        }
+    bytes_type view(std::size_t offset = 0) const {
+        return _bytes + offset;
+    }
 
-        bytes_type view(std::size_t offset = 0) const {
-            return _bytes + offset;
-        }
+    template <typename T>
+    const ConstDataView& read(T* t, size_t offset = 0) const {
+        DataType::unsafeLoad(t, view(offset), nullptr);
 
-        template<typename T>
-        const ConstDataView& read(T* t, size_t offset = 0) const {
-            DataType::unsafeLoad(t, view(offset), nullptr);
+        return *this;
+    }
 
-            return *this;
-        }
+    template <typename T>
+    T read(std::size_t offset = 0) const {
+        T t(DataType::defaultConstruct<T>());
 
-        template<typename T>
-        T read(std::size_t offset = 0) const {
-            T t(DataType::defaultConstruct<T>());
+        read(&t, offset);
 
-            read(&t, offset);
+        return t;
+    }
 
-            return t;
-        }
+private:
+    bytes_type _bytes;
+};
 
-    private:
-        bytes_type _bytes;
-    };
+class DataView : public ConstDataView {
+public:
+    typedef char* bytes_type;
 
-    class DataView : public ConstDataView {
+    DataView(bytes_type bytes) : ConstDataView(bytes) {}
 
-    public:
-        typedef char* bytes_type;
+    bytes_type view(std::size_t offset = 0) const {
+        // It is safe to cast away const here since the pointer stored in our base class was
+        // originally non-const by way of our constructor.
+        return const_cast<bytes_type>(ConstDataView::view(offset));
+    }
 
-        DataView(bytes_type bytes)
-            : ConstDataView(bytes) {
-        }
+    template <typename T>
+    DataView& write(const T& value, std::size_t offset = 0) {
+        DataType::unsafeStore(value, view(offset), nullptr);
 
-        bytes_type view(std::size_t offset = 0) const {
-            // It is safe to cast away const here since the pointer stored in our base class was
-            // originally non-const by way of our constructor.
-            return const_cast<bytes_type>(ConstDataView::view(offset));
-        }
+        return *this;
+    }
+};
 
-        template<typename T>
-        DataView& write(const T& value, std::size_t offset = 0) {
-            DataType::unsafeStore(value, view(offset), nullptr);
-
-            return *this;
-        }
-    };
-
-} // namespace mongo
+}  // namespace mongo

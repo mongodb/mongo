@@ -34,57 +34,56 @@
 
 namespace mongo {
 
-    class NamespaceString;
-    class OperationContext;
+class NamespaceString;
+class OperationContext;
 
 namespace repl {
 
-    class OplogInterface;
+class OplogInterface;
+
+/**
+ * Interface for rollback-related operations on the sync source.
+ */
+class RollbackSource {
+    MONGO_DISALLOW_COPYING(RollbackSource);
+
+public:
+    RollbackSource() = default;
+
+    virtual ~RollbackSource() = default;
 
     /**
-     * Interface for rollback-related operations on the sync source.
+     * Returns remote oplog interface.
+     * Read oplog entries with OplogInterface::makeIterator().
      */
-    class RollbackSource {
-        MONGO_DISALLOW_COPYING(RollbackSource);
-    public:
+    virtual const OplogInterface& getOplog() const = 0;
 
-        RollbackSource() = default;
+    /**
+     * Returns rollback ID.
+     */
+    virtual int getRollbackId() const = 0;
 
-        virtual ~RollbackSource() = default;
+    /**
+     * Returns last operation in oplog.
+     */
+    virtual BSONObj getLastOperation() const = 0;
 
-        /**
-         * Returns remote oplog interface.
-         * Read oplog entries with OplogInterface::makeIterator().
-         */
-        virtual const OplogInterface& getOplog() const = 0;
+    /**
+     * Fetch a single document from the sync source.
+     */
+    virtual BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const = 0;
 
-        /**
-         * Returns rollback ID.
-         */
-        virtual int getRollbackId() const = 0;
+    /**
+     * Clones a single collection from the sync source.
+     */
+    virtual void copyCollectionFromRemote(OperationContext* txn,
+                                          const NamespaceString& nss) const = 0;
 
-        /**
-         * Returns last operation in oplog.
-         */
-        virtual BSONObj getLastOperation() const = 0;
+    /**
+     * Returns collection info.
+     */
+    virtual StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const = 0;
+};
 
-        /**
-         * Fetch a single document from the sync source.
-         */
-        virtual BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const = 0;
-
-        /**
-         * Clones a single collection from the sync source.
-         */
-        virtual void copyCollectionFromRemote(OperationContext* txn,
-                                              const NamespaceString& nss) const = 0;
-
-        /**
-         * Returns collection info.
-         */
-        virtual StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const = 0;
-
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

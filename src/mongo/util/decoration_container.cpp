@@ -34,15 +34,14 @@
 
 namespace mongo {
 
-    DecorationContainer::DecorationContainer(const DecorationRegistry* registry) :
-        _registry(registry),
-        _decorationData(new unsigned char[registry->getDecorationBufferSizeBytes()]) {
+DecorationContainer::DecorationContainer(const DecorationRegistry* registry)
+    : _registry(registry),
+      _decorationData(new unsigned char[registry->getDecorationBufferSizeBytes()]) {
+    _registry->construct(this);
+}
 
-        _registry->construct(this);
-    }
-
-    DecorationContainer::~DecorationContainer() {
-        _registry->destruct(this);
-    }
+DecorationContainer::~DecorationContainer() {
+    _registry->destruct(this);
+}
 
 }  // namespace mongo

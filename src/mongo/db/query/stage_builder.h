@@ -34,26 +34,26 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
+/**
+ * The StageBuilder converts a QuerySolution to an executable tree of PlanStage(s).
+ */
+class StageBuilder {
+public:
     /**
-     * The StageBuilder converts a QuerySolution to an executable tree of PlanStage(s).
+     * Turns 'solution' into an executable tree of PlanStage(s).
+     *
+     * Returns true if the PlanStage tree was built successfully.  The root of the tree is in
+     * *rootOut and the WorkingSet that the tree uses is in wsIn.
+     *
+     * Returns false otherwise.  *rootOut and *wsOut are invalid.
      */
-    class StageBuilder {
-    public:
-        /**
-         * Turns 'solution' into an executable tree of PlanStage(s).
-         *
-         * Returns true if the PlanStage tree was built successfully.  The root of the tree is in
-         * *rootOut and the WorkingSet that the tree uses is in wsIn.
-         *
-         * Returns false otherwise.  *rootOut and *wsOut are invalid.
-         */
-        static bool build(OperationContext* txn,
-                          Collection* collection,
-                          const QuerySolution& solution,
-                          WorkingSet* wsIn,
-                          PlanStage** rootOut);
-    };
+    static bool build(OperationContext* txn,
+                      Collection* collection,
+                      const QuerySolution& solution,
+                      WorkingSet* wsIn,
+                      PlanStage** rootOut);
+};
 
 }  // namespace mongo

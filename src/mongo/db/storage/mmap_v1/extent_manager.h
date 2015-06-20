@@ -40,141 +40,141 @@
 
 namespace mongo {
 
-    class DataFile;
-    class MmapV1RecordHeader;
-    class RecordFetcher;
-    class OperationContext;
+class DataFile;
+class MmapV1RecordHeader;
+class RecordFetcher;
+class OperationContext;
 
-    struct Extent;
+struct Extent;
+
+/**
+ * ExtentManager basics
+ *  - one per database
+ *  - responsible for managing <db>.# files
+ *  - NOT responsible for .ns file
+ *  - gives out extents
+ *  - responsible for figuring out how to get a new extent
+ *  - can use any method it wants to do so
+ *  - this structure is NOT stored on disk
+ *  - files will not be removed from the EM
+ *  - extent size and loc are immutable
+ *  - this class is thread safe, once constructed and init()-ialized
+ */
+class ExtentManager {
+    MONGO_DISALLOW_COPYING(ExtentManager);
+
+public:
+    ExtentManager() {}
+
+    virtual ~ExtentManager() {}
 
     /**
-     * ExtentManager basics
-     *  - one per database
-     *  - responsible for managing <db>.# files
-     *  - NOT responsible for .ns file
-     *  - gives out extents
-     *  - responsible for figuring out how to get a new extent
-     *  - can use any method it wants to do so
-     *  - this structure is NOT stored on disk
-     *  - files will not be removed from the EM
-     *  - extent size and loc are immutable
-     *  - this class is thread safe, once constructed and init()-ialized
+     * opens all current files
      */
-    class ExtentManager {
-        MONGO_DISALLOW_COPYING( ExtentManager );
+    virtual Status init(OperationContext* txn) = 0;
 
+    virtual int numFiles() const = 0;
+    virtual long long fileSize() const = 0;
+
+    // must call Extent::reuse on the returned extent
+    virtual DiskLoc allocateExtent(OperationContext* txn,
+                                   bool capped,
+                                   int size,
+                                   bool enforceQuota) = 0;
+
+    /**
+     * firstExt has to be == lastExt or a chain
+     */
+    virtual void freeExtents(OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt) = 0;
+
+    /**
+     * frees a single extent
+     * ignores all fields in the Extent except: magic, myLoc, length
+     */
+    virtual void freeExtent(OperationContext* txn, DiskLoc extent) = 0;
+
+    /**
+     * Retrieve statistics on the the free list managed by this ExtentManger.
+     * @param numExtents - non-null pointer to an int that will receive the number of extents
+     * @param totalFreeSizeBytes - non-null pointer to an int64_t receiving the total free
+     *                             space in the free list.
+     */
+    virtual void freeListStats(OperationContext* txn,
+                               int* numExtents,
+                               int64_t* totalFreeSizeBytes) const = 0;
+
+    /**
+     * @param loc - has to be for a specific MmapV1RecordHeader
+     * Note(erh): this sadly cannot be removed.
+     * A MmapV1RecordHeader DiskLoc has an offset from a file, while a RecordStore really wants an offset
+     * from an extent.  This intrinsically links an original record store to the original extent
+     * manager.
+     */
+    virtual MmapV1RecordHeader* recordForV1(const DiskLoc& loc) const = 0;
+
+    /**
+     * The extent manager tracks accesses to DiskLocs. This returns non-NULL if the DiskLoc has
+     * been recently accessed, and therefore has likely been paged into physical memory.
+     * Returns nullptr if the DiskLoc is Null.
+     *
+     */
+    virtual std::unique_ptr<RecordFetcher> recordNeedsFetch(const DiskLoc& loc) const = 0;
+
+    /**
+     * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)
+     * Note(erh) see comment on recordFor
+     */
+    virtual Extent* extentForV1(const DiskLoc& loc) const = 0;
+
+    /**
+     * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)
+     * Note(erh) see comment on recordFor
+     */
+    virtual DiskLoc extentLocForV1(const DiskLoc& loc) const = 0;
+
+    /**
+     * @param loc - has to be for a specific Extent
+     */
+    virtual Extent* getExtent(const DiskLoc& loc, bool doSanityCheck = true) const = 0;
+
+    /**
+     * @return maximum size of an Extent
+     */
+    virtual int maxSize() const = 0;
+
+    /**
+     * @return minimum size of an Extent
+     */
+    virtual int minSize() const {
+        return 0x1000;
+    }
+
+    /**
+     * @param recordLen length of record we need
+     * @param lastExt size of last extent which is a factor in next extent size
+     */
+    virtual int followupSize(int recordLen, int lastExtentLen) const;
+
+    /** get a suggested size for the first extent in a namespace
+     *  @param recordLen length of record we need to insert
+     */
+    virtual int initialSize(int recordLen) const;
+
+    /**
+     * quantizes extent size to >= min + page boundary
+     */
+    virtual int quantizeExtentSize(int size) const;
+
+    // see cacheHint methods
+    enum HintType { Sequential, Random };
+    class CacheHint {
     public:
-        ExtentManager(){}
-
-        virtual ~ExtentManager(){}
-
-        /**
-         * opens all current files
-         */
-        virtual Status init(OperationContext* txn) = 0;
-
-        virtual int numFiles() const = 0;
-        virtual long long fileSize() const = 0;
-
-        // must call Extent::reuse on the returned extent
-        virtual DiskLoc allocateExtent( OperationContext* txn,
-                                        bool capped,
-                                        int size,
-                                        bool enforceQuota ) = 0;
-
-        /**
-         * firstExt has to be == lastExt or a chain
-         */
-        virtual void freeExtents( OperationContext* txn,
-                                  DiskLoc firstExt, DiskLoc lastExt ) = 0;
-
-        /**
-         * frees a single extent
-         * ignores all fields in the Extent except: magic, myLoc, length
-         */
-        virtual void freeExtent( OperationContext* txn, DiskLoc extent ) = 0;
-
-        /**
-         * Retrieve statistics on the the free list managed by this ExtentManger.
-         * @param numExtents - non-null pointer to an int that will receive the number of extents
-         * @param totalFreeSizeBytes - non-null pointer to an int64_t receiving the total free
-         *                             space in the free list.
-         */
-        virtual void freeListStats(OperationContext* txn,
-                                   int* numExtents,
-                                   int64_t* totalFreeSizeBytes) const = 0;
-
-        /**
-         * @param loc - has to be for a specific MmapV1RecordHeader
-         * Note(erh): this sadly cannot be removed.
-         * A MmapV1RecordHeader DiskLoc has an offset from a file, while a RecordStore really wants an offset
-         * from an extent.  This intrinsically links an original record store to the original extent
-         * manager.
-         */
-        virtual MmapV1RecordHeader* recordForV1( const DiskLoc& loc ) const = 0;
-
-        /**
-         * The extent manager tracks accesses to DiskLocs. This returns non-NULL if the DiskLoc has
-         * been recently accessed, and therefore has likely been paged into physical memory.
-         * Returns nullptr if the DiskLoc is Null.
-         *
-         */
-        virtual std::unique_ptr<RecordFetcher> recordNeedsFetch( const DiskLoc& loc ) const = 0;
-
-        /**
-         * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)
-         * Note(erh) see comment on recordFor
-         */
-        virtual Extent* extentForV1( const DiskLoc& loc ) const = 0;
-
-        /**
-         * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)
-         * Note(erh) see comment on recordFor
-         */
-        virtual DiskLoc extentLocForV1( const DiskLoc& loc ) const = 0;
-
-        /**
-         * @param loc - has to be for a specific Extent
-         */
-        virtual Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const = 0;
-
-        /**
-         * @return maximum size of an Extent
-         */
-        virtual int maxSize() const = 0;
-
-        /**
-         * @return minimum size of an Extent
-         */
-        virtual int minSize() const { return 0x1000; }
-
-        /**
-         * @param recordLen length of record we need
-         * @param lastExt size of last extent which is a factor in next extent size
-         */
-        virtual int followupSize( int recordLen, int lastExtentLen ) const;
-
-        /** get a suggested size for the first extent in a namespace
-         *  @param recordLen length of record we need to insert
-         */
-        virtual int initialSize( int recordLen ) const;
-
-        /**
-         * quantizes extent size to >= min + page boundary
-         */
-        virtual int quantizeExtentSize( int size ) const;
-
-        // see cacheHint methods
-        enum HintType { Sequential, Random };
-        class CacheHint {
-        public:
-            virtual ~CacheHint(){}
-        };
-        /**
-         * Tell the system that for this extent, it will have this kind of disk access.
-         * Caller takes owernship of CacheHint
-         */
-        virtual CacheHint* cacheHint( const DiskLoc& extentLoc, const HintType& hint ) = 0;
+        virtual ~CacheHint() {}
     };
-
+    /**
+     * Tell the system that for this extent, it will have this kind of disk access.
+     * Caller takes owernship of CacheHint
+     */
+    virtual CacheHint* cacheHint(const DiskLoc& extentLoc, const HintType& hint) = 0;
+};
 }

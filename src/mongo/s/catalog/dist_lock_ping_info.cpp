@@ -32,18 +32,13 @@
 
 namespace mongo {
 
-    DistLockPingInfo::DistLockPingInfo() = default;
+DistLockPingInfo::DistLockPingInfo() = default;
 
-    DistLockPingInfo::DistLockPingInfo(StringData idArg,
-                                       Date_t lastPingArg,
-                                       Date_t remoteArg,
-                                       OID tsArg,
-                                       OID electionIdArg) :
-            processId(idArg.toString()),
-            lastPing(lastPingArg),
-            configLocalTime(remoteArg),
-            lockSessionId(std::move(tsArg)),
-            electionId(std::move(electionIdArg)) {
-    }
-
+DistLockPingInfo::DistLockPingInfo(
+    StringData idArg, Date_t lastPingArg, Date_t remoteArg, OID tsArg, OID electionIdArg)
+    : processId(idArg.toString()),
+      lastPing(lastPingArg),
+      configLocalTime(remoteArg),
+      lockSessionId(std::move(tsArg)),
+      electionId(std::move(electionIdArg)) {}
 }

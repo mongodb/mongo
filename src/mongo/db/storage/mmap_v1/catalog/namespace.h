@@ -38,55 +38,77 @@
 namespace mongo {
 
 #pragma pack(1)
-    /**
-     * This is used for storing a namespace on disk in a fixed witdh form
-     * it should only be used for that, not for passing internally
-     * for that, please use NamespaceString
-     */
-    class Namespace {
-    public:
-        Namespace(StringData ns) { *this = ns; }
-        Namespace& operator=(StringData ns);
+/**
+ * This is used for storing a namespace on disk in a fixed witdh form
+ * it should only be used for that, not for passing internally
+ * for that, please use NamespaceString
+ */
+class Namespace {
+public:
+    Namespace(StringData ns) {
+        *this = ns;
+    }
+    Namespace& operator=(StringData ns);
 
-        void kill() { buf[0] = 0x7f; }
+    void kill() {
+        buf[0] = 0x7f;
+    }
 
-        bool operator==(const char *r) const { return strcmp(buf, r) == 0; }
-        bool operator==(const Namespace& r) const { return strcmp(buf, r.buf) == 0; }
-        bool operator!=(const char *r) const { return strcmp(buf, r) != 0; }
-        bool operator!=(const Namespace& r) const { return strcmp(buf, r.buf) != 0; }
+    bool operator==(const char* r) const {
+        return strcmp(buf, r) == 0;
+    }
+    bool operator==(const Namespace& r) const {
+        return strcmp(buf, r.buf) == 0;
+    }
+    bool operator!=(const char* r) const {
+        return strcmp(buf, r) != 0;
+    }
+    bool operator!=(const Namespace& r) const {
+        return strcmp(buf, r.buf) != 0;
+    }
 
-        bool hasDollarSign() const { return strchr( buf , '$' ) != NULL;  }
+    bool hasDollarSign() const {
+        return strchr(buf, '$') != NULL;
+    }
 
-        int hash() const; // value returned is always > 0
+    int hash() const;  // value returned is always > 0
 
-        size_t size() const { return strlen( buf ); }
+    size_t size() const {
+        return strlen(buf);
+    }
 
-        std::string toString() const { return buf; }
-        operator std::string() const { return buf; }
+    std::string toString() const {
+        return buf;
+    }
+    operator std::string() const {
+        return buf;
+    }
 
-        /* NamespaceDetails::Extra was added after fact to allow chaining of data blocks to support more than 10 indexes
-           (more than 10 IndexDetails).  It's a bit hacky because of this late addition with backward
-           file support. */
-        std::string extraName(int i) const;
-        bool isExtra() const; /* ends with $extr... -- when true an extra block not a normal NamespaceDetails block */
+    /* NamespaceDetails::Extra was added after fact to allow chaining of data blocks to support more than 10 indexes
+       (more than 10 IndexDetails).  It's a bit hacky because of this late addition with backward
+       file support. */
+    std::string extraName(int i) const;
+    bool isExtra()
+        const; /* ends with $extr... -- when true an extra block not a normal NamespaceDetails block */
 
-        enum MaxNsLenValue {
-            // Maximum possible length of name any namespace, including special ones like $extra.
-            // This includes rum for the NUL byte so it can be used when sizing buffers.
-            MaxNsLenWithNUL = 128,
+    enum MaxNsLenValue {
+        // Maximum possible length of name any namespace, including special ones like $extra.
+        // This includes rum for the NUL byte so it can be used when sizing buffers.
+        MaxNsLenWithNUL = 128,
 
-            // MaxNsLenWithNUL excluding the NUL byte. Use this when comparing std::string lengths.
-            MaxNsLen = MaxNsLenWithNUL - 1,
+        // MaxNsLenWithNUL excluding the NUL byte. Use this when comparing std::string lengths.
+        MaxNsLen = MaxNsLenWithNUL - 1,
 
-            // Maximum allowed length of fully qualified namespace name of any real collection.
-            // Does not include NUL so it can be directly compared to std::string lengths.
-            MaxNsColletionLen = MaxNsLen - 7/*strlen(".$extra")*/,
-        };
-    private:
-        char buf[MaxNsLenWithNUL];
+        // Maximum allowed length of fully qualified namespace name of any real collection.
+        // Does not include NUL so it can be directly compared to std::string lengths.
+        MaxNsColletionLen = MaxNsLen - 7 /*strlen(".$extra")*/,
     };
+
+private:
+    char buf[MaxNsLenWithNUL];
+};
 #pragma pack()
 
-} // namespace mongo
+}  // namespace mongo
 
 #include "mongo/db/storage/mmap_v1/catalog/namespace-inl.h"

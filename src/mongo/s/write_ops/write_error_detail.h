@@ -37,85 +37,85 @@
 
 namespace mongo {
 
-    /**
-     * This class represents the layout and content of a insert/update/delete runCommand,
-     * the response side.
-     */
-    class WriteErrorDetail : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(WriteErrorDetail);
-    public:
+/**
+ * This class represents the layout and content of a insert/update/delete runCommand,
+ * the response side.
+ */
+class WriteErrorDetail : public BSONSerializable {
+    MONGO_DISALLOW_COPYING(WriteErrorDetail);
 
-        //
-        // schema declarations
-        //
+public:
+    //
+    // schema declarations
+    //
 
-        static const BSONField<int> index;
-        static const BSONField<int> errCode;
-        static const BSONField<BSONObj> errInfo;
-        static const BSONField<std::string> errMessage;
+    static const BSONField<int> index;
+    static const BSONField<int> errCode;
+    static const BSONField<BSONObj> errInfo;
+    static const BSONField<std::string> errMessage;
 
-        //
-        // construction / destruction
-        //
+    //
+    // construction / destruction
+    //
 
-        WriteErrorDetail();
-        virtual ~WriteErrorDetail();
+    WriteErrorDetail();
+    virtual ~WriteErrorDetail();
 
-        /** Copies all the fields present in 'this' to 'other'. */
-        void cloneTo(WriteErrorDetail* other) const;
+    /** Copies all the fields present in 'this' to 'other'. */
+    void cloneTo(WriteErrorDetail* other) const;
 
-        //
-        // bson serializable interface implementation
-        //
+    //
+    // bson serializable interface implementation
+    //
 
-        virtual bool isValid(std::string* errMsg) const;
-        virtual BSONObj toBSON() const;
-        virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-        virtual void clear();
-        virtual std::string toString() const;
+    virtual bool isValid(std::string* errMsg) const;
+    virtual BSONObj toBSON() const;
+    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
+    virtual void clear();
+    virtual std::string toString() const;
 
-        //
-        // individual field accessors
-        //
+    //
+    // individual field accessors
+    //
 
-        void setIndex(int index);
-        void unsetIndex();
-        bool isIndexSet() const;
-        int getIndex() const;
+    void setIndex(int index);
+    void unsetIndex();
+    bool isIndexSet() const;
+    int getIndex() const;
 
-        void setErrCode(int errCode);
-        void unsetErrCode();
-        bool isErrCodeSet() const;
-        int getErrCode() const;
+    void setErrCode(int errCode);
+    void unsetErrCode();
+    bool isErrCodeSet() const;
+    int getErrCode() const;
 
-        void setErrInfo(const BSONObj& errInfo);
-        void unsetErrInfo();
-        bool isErrInfoSet() const;
-        const BSONObj& getErrInfo() const;
+    void setErrInfo(const BSONObj& errInfo);
+    void unsetErrInfo();
+    bool isErrInfoSet() const;
+    const BSONObj& getErrInfo() const;
 
-        void setErrMessage(StringData errMessage);
-        void unsetErrMessage();
-        bool isErrMessageSet() const;
-        const std::string& getErrMessage() const;
+    void setErrMessage(StringData errMessage);
+    void unsetErrMessage();
+    bool isErrMessageSet() const;
+    const std::string& getErrMessage() const;
 
-    private:
-        // Convention: (M)andatory, (O)ptional
+private:
+    // Convention: (M)andatory, (O)ptional
 
-        // (M)  number of the batch item the error refers to
-        int _index;
-        bool _isIndexSet;
+    // (M)  number of the batch item the error refers to
+    int _index;
+    bool _isIndexSet;
 
-        // (M)  whether all items in the batch applied correctly
-        int _errCode;
-        bool _isErrCodeSet;
+    // (M)  whether all items in the batch applied correctly
+    int _errCode;
+    bool _isErrCodeSet;
 
-        // (O)  further details about the batch item error
-        BSONObj _errInfo;
-        bool _isErrInfoSet;
+    // (O)  further details about the batch item error
+    BSONObj _errInfo;
+    bool _isErrInfoSet;
 
-        // (O)  user readable explanation about the batch item error
-        std::string _errMessage;
-        bool _isErrMessageSet;
-    };
+    // (O)  user readable explanation about the batch item error
+    std::string _errMessage;
+    bool _isErrMessageSet;
+};
 
-} // namespace mongo
+}  // namespace mongo

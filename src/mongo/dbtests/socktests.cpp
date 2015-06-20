@@ -37,28 +37,27 @@
 
 namespace SockTests {
 
-    class HostByName {
-    public:
-        void run() {
-            ASSERT_EQUALS( "127.0.0.1", hostbyname( "localhost" ) );
-            ASSERT_EQUALS( "127.0.0.1", hostbyname( "127.0.0.1" ) );
-            // ASSERT_EQUALS( "::1", hostbyname( "::1" ) ); // IPv6 disabled at runtime by default.
+class HostByName {
+public:
+    void run() {
+        ASSERT_EQUALS("127.0.0.1", hostbyname("localhost"));
+        ASSERT_EQUALS("127.0.0.1", hostbyname("127.0.0.1"));
+        // ASSERT_EQUALS( "::1", hostbyname( "::1" ) ); // IPv6 disabled at runtime by default.
 
-            HostAndPort h("asdfasdfasdf_no_such_host");
-            // this fails uncomment when fixed.
-            ASSERT(!mongo::repl::isSelf(h));
-        }
-    };
+        HostAndPort h("asdfasdfasdf_no_such_host");
+        // this fails uncomment when fixed.
+        ASSERT(!mongo::repl::isSelf(h));
+    }
+};
 
-    class All : public Suite {
-    public:
-        All() : Suite( "sock" ) {}
-        void setupTests() {
-            add< HostByName >();
-        }
-    };
+class All : public Suite {
+public:
+    All() : Suite("sock") {}
+    void setupTests() {
+        add<HostByName>();
+    }
+};
 
-    SuiteInstance<All> myall;
+SuiteInstance<All> myall;
 
-} // namespace SockTests
-
+}  // namespace SockTests

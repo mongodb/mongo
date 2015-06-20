@@ -38,127 +38,132 @@
 
 namespace mongo {
 
-    class BSONObjBuilder;
-    class CatalogManager;
-    struct HostAndPort;
-    class NamespaceString;
-    class RemoteCommandRunner;
-    class RemoteCommandTargeterFactory;
-    class Shard;
-    class ShardType;
+class BSONObjBuilder;
+class CatalogManager;
+struct HostAndPort;
+class NamespaceString;
+class RemoteCommandRunner;
+class RemoteCommandTargeterFactory;
+class Shard;
+class ShardType;
 
-    template<typename T> class StatusWith;
+template <typename T>
+class StatusWith;
 
 namespace executor {
 
-    class TaskExecutor;
+class TaskExecutor;
 
-} // namespace executor
+}  // namespace executor
+
+/**
+ * Maintains the set of all shards known to the instance and their connections. Manages polling
+ * the respective replica sets for membership changes.
+ */
+class ShardRegistry {
+public:
+    /**
+     * Instantiates a new shard registry.
+     *
+     * @param targeterFactory Produces targeters for each shard's individual connection string
+     * @param commandRunner Command runner for executing commands against hosts
+     * @param executor Asynchronous task executor to use for making calls to shards.
+     * @param catalogManager Used to retrieve the list of registered shard. TODO: remove.
+     */
+    ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
+                  std::unique_ptr<RemoteCommandRunner> commandRunner,
+                  std::unique_ptr<executor::TaskExecutor> executor,
+                  CatalogManager* catalogManager);
+
+    ~ShardRegistry();
+
+    RemoteCommandRunner* getCommandRunner() const {
+        return _commandRunner.get();
+    }
+
+    executor::TaskExecutor* getExecutor() const {
+        return _executor.get();
+    }
+
+    void reload();
 
     /**
-     * Maintains the set of all shards known to the instance and their connections. Manages polling
-     * the respective replica sets for membership changes.
+     * Returns shared pointer to shard object with given shard id.
      */
-    class ShardRegistry {
-    public:
-        /**
-         * Instantiates a new shard registry.
-         *
-         * @param targeterFactory Produces targeters for each shard's individual connection string
-         * @param commandRunner Command runner for executing commands against hosts
-         * @param executor Asynchronous task executor to use for making calls to shards.
-         * @param catalogManager Used to retrieve the list of registered shard. TODO: remove.
-         */
-        ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
-                      std::unique_ptr<RemoteCommandRunner> commandRunner,
-                      std::unique_ptr<executor::TaskExecutor> executor,
-                      CatalogManager* catalogManager);
+    std::shared_ptr<Shard> getShard(const ShardId& shardId);
 
-        ~ShardRegistry();
+    /**
+     * Lookup shard by replica set name. Returns nullptr if the name can't be found.
+     * Note: this doesn't refresh the table if the name isn't found, so it's possible that a
+     * newly added shard/Replica Set may not be found.
+     */
+    std::shared_ptr<Shard> lookupRSName(const std::string& name) const;
 
-        RemoteCommandRunner* getCommandRunner() const { return _commandRunner.get(); }
+    void remove(const ShardId& id);
 
-        executor::TaskExecutor* getExecutor() const { return _executor.get(); }
+    void getAllShardIds(std::vector<ShardId>* all) const;
 
-        void reload();
+    void toBSON(BSONObjBuilder* result);
 
-        /**
-         * Returns shared pointer to shard object with given shard id.
-         */
-        std::shared_ptr<Shard> getShard(const ShardId& shardId);
+    /**
+     * Executes 'find' command against the specified host and fetches *all* the results that
+     * the host will return until there are no more or until an error is returned.
+     *
+     * Returns either the complete set of results or an error, never partial results.
+     *
+     * Note: should never be used outside of CatalogManagerReplicaSet or DistLockCatalogImpl.
+     */
+    StatusWith<std::vector<BSONObj>> exhaustiveFind(const HostAndPort& host,
+                                                    const NamespaceString& nss,
+                                                    const BSONObj& query,
+                                                    boost::optional<int> limit);
 
-        /**
-         * Lookup shard by replica set name. Returns nullptr if the name can't be found.
-         * Note: this doesn't refresh the table if the name isn't found, so it's possible that a
-         * newly added shard/Replica Set may not be found.
-         */
-        std::shared_ptr<Shard> lookupRSName(const std::string& name) const;
+    /**
+     * Runs a command against the specified host and returns the result.
+     */
+    StatusWith<BSONObj> runCommand(const HostAndPort& host,
+                                   const std::string& dbName,
+                                   const BSONObj& cmdObj);
 
-        void remove(const ShardId& id);
+private:
+    typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;
 
-        void getAllShardIds(std::vector<ShardId>* all) const;
+    /**
+     * Creates a shard based on the specified information and puts it into the lookup maps.
+     */
+    void _addShard_inlock(const ShardType& shardType);
 
-        void toBSON(BSONObjBuilder* result);
+    /**
+     * Adds the "config" shard (representing the config server) to the shard registry.
+     */
+    void _addConfigShard_inlock();
 
-        /**
-         * Executes 'find' command against the specified host and fetches *all* the results that
-         * the host will return until there are no more or until an error is returned.
-         *
-         * Returns either the complete set of results or an error, never partial results.
-         *
-         * Note: should never be used outside of CatalogManagerReplicaSet or DistLockCatalogImpl.
-         */
-        StatusWith<std::vector<BSONObj>> exhaustiveFind(const HostAndPort& host,
-                                                        const NamespaceString& nss,
-                                                        const BSONObj& query,
-                                                        boost::optional<int> limit);
+    std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
 
-        /**
-         * Runs a command against the specified host and returns the result.
-         */
-        StatusWith<BSONObj> runCommand(const HostAndPort& host,
-                                       const std::string& dbName,
-                                       const BSONObj& cmdObj);
+    // Factory to obtain remote command targeters for shards
+    const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
 
-    private:
-        typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;
+    // API to run remote commands to shards in a synchronous manner
+    const std::unique_ptr<RemoteCommandRunner> _commandRunner;
 
-        /**
-         * Creates a shard based on the specified information and puts it into the lookup maps.
-         */
-        void _addShard_inlock(const ShardType& shardType);
+    // Executor for scheduling work and remote commands to shards that run in an asynchronous
+    // manner.
+    const std::unique_ptr<executor::TaskExecutor> _executor;
 
-        /**
-         * Adds the "config" shard (representing the config server) to the shard registry.
-         */
-        void _addConfigShard_inlock();
+    // Catalog manager from which to load the shard information. Not owned and must outlive
+    // the shard registry object.
+    CatalogManager* const _catalogManager;
 
-        std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
+    // Protects the maps below
+    mutable std::mutex _mutex;
 
-        // Factory to obtain remote command targeters for shards
-        const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
+    // Map of both shardName -> Shard and hostName -> Shard
+    ShardMap _lookup;
 
-        // API to run remote commands to shards in a synchronous manner
-        const std::unique_ptr<RemoteCommandRunner> _commandRunner;
+    // TODO: These should eventually disappear and become parts of Shard
 
-        // Executor for scheduling work and remote commands to shards that run in an asynchronous
-        // manner.
-        const std::unique_ptr<executor::TaskExecutor> _executor;
+    // Map from all hosts within a replica set to the shard representing this replica set
+    ShardMap _rsLookup;
+};
 
-        // Catalog manager from which to load the shard information. Not owned and must outlive
-        // the shard registry object.
-        CatalogManager* const _catalogManager;
-
-        // Protects the maps below
-        mutable std::mutex _mutex;
-
-        // Map of both shardName -> Shard and hostName -> Shard
-        ShardMap _lookup;
-
-        // TODO: These should eventually disappear and become parts of Shard
-
-        // Map from all hosts within a replica set to the shard representing this replica set
-        ShardMap _rsLookup;
-    };
-
-} // namespace mongo
+}  // namespace mongo

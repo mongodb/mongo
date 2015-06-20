@@ -39,13 +39,13 @@
 
 namespace mongo {
 
-    // static
-    bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
-        return false;
-    }
+// static
+bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
+    return false;
+}
 
-    MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-        setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-        return Status::OK();
-    }
+MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
+    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
+    return Status::OK();
+}
 }  // namespace mongo

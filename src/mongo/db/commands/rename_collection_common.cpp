@@ -42,63 +42,61 @@
 namespace mongo {
 namespace rename_collection {
 
-    Status checkAuthForRenameCollectionCommand(ClientBasic* client,
-                                               const std::string& dbname,
-                                               const BSONObj& cmdObj) {
-        NamespaceString sourceNS = NamespaceString(cmdObj.getStringField("renameCollection"));
-        NamespaceString targetNS = NamespaceString(cmdObj.getStringField("to"));
-        bool dropTarget = cmdObj["dropTarget"].trueValue();
+Status checkAuthForRenameCollectionCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+    NamespaceString sourceNS = NamespaceString(cmdObj.getStringField("renameCollection"));
+    NamespaceString targetNS = NamespaceString(cmdObj.getStringField("to"));
+    bool dropTarget = cmdObj["dropTarget"].trueValue();
 
-        if (sourceNS.db() == targetNS.db() && !sourceNS.isSystem() && !targetNS.isSystem()) {
-            // If renaming within the same database, then if you have renameCollectionSameDB and
-            // either can read both of source and dest collections or *can't* read either of source
-            // or dest collection, then you get can do the rename, even without insert on the
-            // destination collection.
-            bool canRename = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(sourceNS.db()),
-                    ActionType::renameCollectionSameDB);
+    if (sourceNS.db() == targetNS.db() && !sourceNS.isSystem() && !targetNS.isSystem()) {
+        // If renaming within the same database, then if you have renameCollectionSameDB and
+        // either can read both of source and dest collections or *can't* read either of source
+        // or dest collection, then you get can do the rename, even without insert on the
+        // destination collection.
+        bool canRename = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forDatabaseName(sourceNS.db()), ActionType::renameCollectionSameDB);
 
-            bool canDropTargetIfNeeded = true;
-            if (dropTarget) {
-                canDropTargetIfNeeded =
-                        AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                            ResourcePattern::forExactNamespace(targetNS),
-                            ActionType::dropCollection);
-            }
-
-            bool canReadSrc = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(sourceNS), ActionType::find);
-            bool canReadDest = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(targetNS), ActionType::find);
-
-            if (canRename && canDropTargetIfNeeded && (canReadSrc || !canReadDest)) {
-                return Status::OK();
-            }
-        }
-
-        // Check privileges on source collection
-        ActionSet actions;
-        actions.addAction(ActionType::find);
-        actions.addAction(ActionType::dropCollection);
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(sourceNS), actions)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        // Check privileges on dest collection
-        actions.removeAllActions();
-        actions.addAction(ActionType::insert);
-        actions.addAction(ActionType::createIndex);
+        bool canDropTargetIfNeeded = true;
         if (dropTarget) {
-            actions.addAction(ActionType::dropCollection);
-        }
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(targetNS), actions)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            canDropTargetIfNeeded =
+                AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(targetNS), ActionType::dropCollection);
         }
 
-        return Status::OK();
+        bool canReadSrc = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forExactNamespace(sourceNS), ActionType::find);
+        bool canReadDest = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forExactNamespace(targetNS), ActionType::find);
+
+        if (canRename && canDropTargetIfNeeded && (canReadSrc || !canReadDest)) {
+            return Status::OK();
+        }
     }
 
-} // namespace rename_collection
-} // namespace mongo
+    // Check privileges on source collection
+    ActionSet actions;
+    actions.addAction(ActionType::find);
+    actions.addAction(ActionType::dropCollection);
+    if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forExactNamespace(sourceNS), actions)) {
+        return Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
+
+    // Check privileges on dest collection
+    actions.removeAllActions();
+    actions.addAction(ActionType::insert);
+    actions.addAction(ActionType::createIndex);
+    if (dropTarget) {
+        actions.addAction(ActionType::dropCollection);
+    }
+    if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forExactNamespace(targetNS), actions)) {
+        return Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
+
+    return Status::OK();
+}
+
+}  // namespace rename_collection
+}  // namespace mongo

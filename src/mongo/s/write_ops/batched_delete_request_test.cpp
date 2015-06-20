@@ -36,53 +36,46 @@
 
 namespace {
 
-    using mongo::BSONArray;
-    using mongo::BSONObj;
-    using mongo::BatchedDeleteRequest;
-    using mongo::BatchedDeleteDocument;
-    using mongo::BatchedRequestMetadata;
-    using mongo::BSONArrayBuilder;
-    using mongo::OID;
-    using mongo::Timestamp;
-    using std::string;
+using mongo::BSONArray;
+using mongo::BSONObj;
+using mongo::BatchedDeleteRequest;
+using mongo::BatchedDeleteDocument;
+using mongo::BatchedRequestMetadata;
+using mongo::BSONArrayBuilder;
+using mongo::OID;
+using mongo::Timestamp;
+using std::string;
 
 
-    TEST(RoundTrip, Normal) {
-        BSONArray deleteArray =
-            BSON_ARRAY(
-                BSON(BatchedDeleteDocument::query(BSON("a" << 1)) <<
-                     BatchedDeleteDocument::limit(1)
-                    ) <<
-                BSON(BatchedDeleteDocument::query(BSON("b" << 1)) <<
-                     BatchedDeleteDocument::limit(1)
-                    )
-                );
+TEST(RoundTrip, Normal) {
+    BSONArray deleteArray = BSON_ARRAY(
+        BSON(BatchedDeleteDocument::query(BSON("a" << 1)) << BatchedDeleteDocument::limit(1))
+        << BSON(BatchedDeleteDocument::query(BSON("b" << 1)) << BatchedDeleteDocument::limit(1)));
 
-        BSONObj writeConcernObj = BSON("w" << 1);
+    BSONObj writeConcernObj = BSON("w" << 1);
 
-        // The BSON_ARRAY macro doesn't support Timestamps.
-        BSONArrayBuilder arrBuilder;
-        arrBuilder.append(Timestamp(1,1));
-        arrBuilder.append(OID::gen());
-        BSONArray shardVersionArray = arrBuilder.arr();
+    // The BSON_ARRAY macro doesn't support Timestamps.
+    BSONArrayBuilder arrBuilder;
+    arrBuilder.append(Timestamp(1, 1));
+    arrBuilder.append(OID::gen());
+    BSONArray shardVersionArray = arrBuilder.arr();
 
-        BSONObj origDeleteRequestObj =
-            BSON(BatchedDeleteRequest::collName("test") <<
-                 BatchedDeleteRequest::deletes() << deleteArray <<
-                 BatchedDeleteRequest::writeConcern(writeConcernObj) <<
-                 BatchedDeleteRequest::ordered(true) <<
-                 BatchedDeleteRequest::metadata() <<
-                     BSON(BatchedRequestMetadata::shardName("shard000") <<
-                          BatchedRequestMetadata::shardVersion() << shardVersionArray <<
-                          BatchedRequestMetadata::session(0)));
+    BSONObj origDeleteRequestObj =
+        BSON(BatchedDeleteRequest::collName("test")
+             << BatchedDeleteRequest::deletes() << deleteArray
+             << BatchedDeleteRequest::writeConcern(writeConcernObj)
+             << BatchedDeleteRequest::ordered(true) << BatchedDeleteRequest::metadata()
+             << BSON(BatchedRequestMetadata::shardName("shard000")
+                     << BatchedRequestMetadata::shardVersion() << shardVersionArray
+                     << BatchedRequestMetadata::session(0)));
 
-        string errMsg;
-        BatchedDeleteRequest request;
-        bool ok = request.parseBSON(origDeleteRequestObj, &errMsg);
-        ASSERT_TRUE(ok);
+    string errMsg;
+    BatchedDeleteRequest request;
+    bool ok = request.parseBSON(origDeleteRequestObj, &errMsg);
+    ASSERT_TRUE(ok);
 
-        BSONObj genDeleteRequestObj = request.toBSON();
-        ASSERT_EQUALS(0, genDeleteRequestObj.woCompare(origDeleteRequestObj));
-    }
+    BSONObj genDeleteRequestObj = request.toBSON();
+    ASSERT_EQUALS(0, genDeleteRequestObj.woCompare(origDeleteRequestObj));
+}
 
-} // unnamed namespace
+}  // unnamed namespace

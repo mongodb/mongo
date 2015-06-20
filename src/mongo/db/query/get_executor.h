@@ -39,171 +39,171 @@
 
 namespace mongo {
 
-    class Collection;
-    class CountRequest;
+class Collection;
+class CountRequest;
 
-    struct GroupRequest;
+struct GroupRequest;
 
-    /**
-     * Filter indexes retrieved from index catalog by
-     * allowed indices in query settings.
-     * Used by getExecutor().
-     * This function is public to facilitate testing.
-     */
-    void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
-                                   std::vector<IndexEntry>* indexEntries);
+/**
+ * Filter indexes retrieved from index catalog by
+ * allowed indices in query settings.
+ * Used by getExecutor().
+ * This function is public to facilitate testing.
+ */
+void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
+                               std::vector<IndexEntry>* indexEntries);
 
-    /**
-     * Fill out the provided 'plannerParams' for the 'canonicalQuery' operating on the collection
-     * 'collection'.  Exposed for testing.
-     */
-    void fillOutPlannerParams(OperationContext* txn,
-                              Collection* collection,
-                              CanonicalQuery* canonicalQuery,
-                              QueryPlannerParams* plannerParams);
+/**
+ * Fill out the provided 'plannerParams' for the 'canonicalQuery' operating on the collection
+ * 'collection'.  Exposed for testing.
+ */
+void fillOutPlannerParams(OperationContext* txn,
+                          Collection* collection,
+                          CanonicalQuery* canonicalQuery,
+                          QueryPlannerParams* plannerParams);
 
-    /**
-     * Get a plan executor for a query. Takes ownership of 'rawCanonicalQuery'.
-     *
-     * If the query is valid and an executor could be created, returns Status::OK()
-     * and populates *out with the PlanExecutor.
-     *
-     * If the query cannot be executed, returns a Status indicating why.
-     */
-    Status getExecutor(OperationContext* txn,
+/**
+ * Get a plan executor for a query. Takes ownership of 'rawCanonicalQuery'.
+ *
+ * If the query is valid and an executor could be created, returns Status::OK()
+ * and populates *out with the PlanExecutor.
+ *
+ * If the query cannot be executed, returns a Status indicating why.
+ */
+Status getExecutor(OperationContext* txn,
+                   Collection* collection,
+                   CanonicalQuery* rawCanonicalQuery,
+                   PlanExecutor::YieldPolicy yieldPolicy,
+                   PlanExecutor** out,
+                   size_t plannerOptions = 0);
+
+/**
+ * Get a plan executor for query. This differs from the getExecutor(...) function
+ * above in that the above requires a non-NULL canonical query, whereas this
+ * function can retrieve a plan executor from the raw query object.
+ *
+ * Used to support idhack updates that do not create a canonical query.
+ *
+ * If the query is valid and an executor could be created, returns Status::OK()
+ * and populates *out with the PlanExecutor.
+ *
+ * If the query cannot be executed, returns a Status indicating why.
+ */
+Status getExecutor(OperationContext* txn,
+                   Collection* collection,
+                   const std::string& ns,
+                   const BSONObj& unparsedQuery,
+                   PlanExecutor::YieldPolicy yieldPolicy,
+                   PlanExecutor** out,
+                   size_t plannerOptions = 0);
+
+/**
+ * Get a plan executor for a .find() operation. Takes ownership of 'rawCanonicalQuery'.
+ *
+ * If the query is valid and an executor could be created, returns Status::OK()
+ * and populates *out with the PlanExecutor.
+ *
+ * If the query cannot be executed, returns a Status indicating why.
+ */
+Status getExecutorFind(OperationContext* txn,
                        Collection* collection,
+                       const NamespaceString& nss,
                        CanonicalQuery* rawCanonicalQuery,
                        PlanExecutor::YieldPolicy yieldPolicy,
-                       PlanExecutor** out,
-                       size_t plannerOptions = 0);
+                       PlanExecutor** out);
 
-    /**
-     * Get a plan executor for query. This differs from the getExecutor(...) function
-     * above in that the above requires a non-NULL canonical query, whereas this
-     * function can retrieve a plan executor from the raw query object.
-     *
-     * Used to support idhack updates that do not create a canonical query.
-     *
-     * If the query is valid and an executor could be created, returns Status::OK()
-     * and populates *out with the PlanExecutor.
-     *
-     * If the query cannot be executed, returns a Status indicating why.
-     */
-    Status getExecutor(OperationContext* txn,
-                       Collection* collection,
-                       const std::string& ns,
-                       const BSONObj& unparsedQuery,
-                       PlanExecutor::YieldPolicy yieldPolicy,
-                       PlanExecutor** out,
-                       size_t plannerOptions = 0);
+/**
+ * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
+ * to provide results for the distinct command.
+ *
+ * If the provided solution could be mutated successfully, returns true, otherwise returns
+ * false.
+ */
+bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const std::string& field);
 
-    /**
-     * Get a plan executor for a .find() operation. Takes ownership of 'rawCanonicalQuery'.
-     *
-     * If the query is valid and an executor could be created, returns Status::OK()
-     * and populates *out with the PlanExecutor.
-     *
-     * If the query cannot be executed, returns a Status indicating why.
-     */
-    Status getExecutorFind(OperationContext* txn,
+/*
+ * Get an executor for a query executing as part of a distinct command.
+ *
+ * Distinct is unique in that it doesn't care about getting all the results; it just wants all
+ * possible values of a certain field.  As such, we can skip lots of data in certain cases (see
+ * body of method for detail).
+ */
+Status getExecutorDistinct(OperationContext* txn,
                            Collection* collection,
-                           const NamespaceString& nss,
-                           CanonicalQuery* rawCanonicalQuery,
+                           const BSONObj& query,
+                           const std::string& field,
                            PlanExecutor::YieldPolicy yieldPolicy,
                            PlanExecutor** out);
 
-    /**
-     * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
-     * to provide results for the distinct command.
-     *
-     * If the provided solution could be mutated successfully, returns true, otherwise returns
-     * false.
-     */
-    bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const std::string& field);
+/*
+ * Get a PlanExecutor for a query executing as part of a count command.
+ *
+ * Count doesn't care about actually examining its results; it just wants to walk through them.
+ * As such, with certain covered queries, we can skip the overhead of fetching etc. when
+ * executing a count.
+ */
+Status getExecutorCount(OperationContext* txn,
+                        Collection* collection,
+                        const CountRequest& request,
+                        bool explain,
+                        PlanExecutor::YieldPolicy yieldPolicy,
+                        PlanExecutor** execOut);
 
-    /*
-     * Get an executor for a query executing as part of a distinct command.
-     *
-     * Distinct is unique in that it doesn't care about getting all the results; it just wants all
-     * possible values of a certain field.  As such, we can skip lots of data in certain cases (see
-     * body of method for detail).
-     */
-    Status getExecutorDistinct(OperationContext* txn,
-                               Collection* collection,
-                               const BSONObj& query,
-                               const std::string& field,
-                               PlanExecutor::YieldPolicy yieldPolicy,
-                               PlanExecutor** out);
+/**
+ * Get a PlanExecutor for a delete operation. 'parsedDelete' describes the query predicate
+ * and delete flags like 'isMulti'. The caller must hold the appropriate MODE_X or MODE_IX
+ * locks, and must not release these locks until after the returned PlanExecutor is deleted.
+ *
+ * The returned PlanExecutor will yield if and only if parsedDelete->canYield().
+ *
+ * Does not take ownership of its arguments.
+ *
+ * If the query is valid and an executor could be created, returns Status::OK() and populates
+ * *execOut with the PlanExecutor. The caller takes ownership of *execOut.
+ *
+ * If the query cannot be executed, returns a Status indicating why.
+ */
+Status getExecutorDelete(OperationContext* txn,
+                         Collection* collection,
+                         ParsedDelete* parsedDelete,
+                         PlanExecutor** execOut);
 
-    /*
-     * Get a PlanExecutor for a query executing as part of a count command.
-     *
-     * Count doesn't care about actually examining its results; it just wants to walk through them.
-     * As such, with certain covered queries, we can skip the overhead of fetching etc. when
-     * executing a count.
-     */
-    Status getExecutorCount(OperationContext* txn,
-                            Collection* collection,
-                            const CountRequest& request,
-                            bool explain,
-                            PlanExecutor::YieldPolicy yieldPolicy,
-                            PlanExecutor** execOut);
+/**
+ * Get a PlanExecutor for an update operation. 'parsedUpdate' describes the query predicate
+ * and update modifiers. The caller must hold the appropriate MODE_X or MODE_IX locks prior
+ * to calling this function, and must not release these locks until after the returned
+ * PlanExecutor is deleted.
+ *
+ * The returned PlanExecutor will yield if and only if parsedUpdate->canYield().
+ *
+ * Does not take ownership of its arguments.
+ *
+ * If the query is valid and an executor could be created, returns Status::OK() and populates
+ * *out with the PlanExecutor. The caller takes ownership of *execOut.
+ *
+ * If the query cannot be executed, returns a Status indicating why.
+ */
+Status getExecutorUpdate(OperationContext* txn,
+                         Collection* collection,
+                         ParsedUpdate* parsedUpdate,
+                         OpDebug* opDebug,
+                         PlanExecutor** execOut);
 
-    /**
-     * Get a PlanExecutor for a delete operation. 'parsedDelete' describes the query predicate
-     * and delete flags like 'isMulti'. The caller must hold the appropriate MODE_X or MODE_IX
-     * locks, and must not release these locks until after the returned PlanExecutor is deleted.
-     *
-     * The returned PlanExecutor will yield if and only if parsedDelete->canYield().
-     *
-     * Does not take ownership of its arguments.
-     *
-     * If the query is valid and an executor could be created, returns Status::OK() and populates
-     * *execOut with the PlanExecutor. The caller takes ownership of *execOut.
-     *
-     * If the query cannot be executed, returns a Status indicating why.
-     */
-    Status getExecutorDelete(OperationContext* txn,
-                             Collection* collection,
-                             ParsedDelete* parsedDelete,
-                             PlanExecutor** execOut);
-
-    /**
-     * Get a PlanExecutor for an update operation. 'parsedUpdate' describes the query predicate
-     * and update modifiers. The caller must hold the appropriate MODE_X or MODE_IX locks prior
-     * to calling this function, and must not release these locks until after the returned
-     * PlanExecutor is deleted.
-     *
-     * The returned PlanExecutor will yield if and only if parsedUpdate->canYield().
-     *
-     * Does not take ownership of its arguments.
-     *
-     * If the query is valid and an executor could be created, returns Status::OK() and populates
-     * *out with the PlanExecutor. The caller takes ownership of *execOut.
-     *
-     * If the query cannot be executed, returns a Status indicating why.
-     */
-    Status getExecutorUpdate(OperationContext* txn,
-                             Collection* collection,
-                             ParsedUpdate* parsedUpdate,
-                             OpDebug* opDebug,
-                             PlanExecutor** execOut);
-
-    /**
-     * Get a PlanExecutor for a group operation.  'rawCanonicalQuery' describes the predicate for
-     * the documents to be grouped.
-     *
-     * Takes ownership of 'rawCanonicalQuery'. Does not take ownership of other args.
-     *
-     * If the query is valid and an executor could be created, returns Status::OK() and populates
-     * *out with the PlanExecutor.
-     *
-     * If an executor could not be created, returns a Status indicating why.
-     */
-    Status getExecutorGroup(OperationContext* txn,
-                            Collection* collection,
-                            const GroupRequest& request,
-                            PlanExecutor::YieldPolicy yieldPolicy,
-                            PlanExecutor** execOut);
+/**
+ * Get a PlanExecutor for a group operation.  'rawCanonicalQuery' describes the predicate for
+ * the documents to be grouped.
+ *
+ * Takes ownership of 'rawCanonicalQuery'. Does not take ownership of other args.
+ *
+ * If the query is valid and an executor could be created, returns Status::OK() and populates
+ * *out with the PlanExecutor.
+ *
+ * If an executor could not be created, returns a Status indicating why.
+ */
+Status getExecutorGroup(OperationContext* txn,
+                        Collection* collection,
+                        const GroupRequest& request,
+                        PlanExecutor::YieldPolicy yieldPolicy,
+                        PlanExecutor** execOut);
 
 }  // namespace mongo

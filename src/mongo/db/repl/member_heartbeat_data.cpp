@@ -39,71 +39,67 @@
 namespace mongo {
 namespace repl {
 
-    MemberHeartbeatData::MemberHeartbeatData() :
-        _health(-1),
-        _authIssue(false) {
+MemberHeartbeatData::MemberHeartbeatData() : _health(-1), _authIssue(false) {
+    _lastResponse.setState(MemberState::RS_UNKNOWN);
+    _lastResponse.setElectionTime(Timestamp());
+    _lastResponse.setOpTime(OpTime());
+}
 
-        _lastResponse.setState(MemberState::RS_UNKNOWN);
-        _lastResponse.setElectionTime(Timestamp());
-        _lastResponse.setOpTime(OpTime());
+void MemberHeartbeatData::setUpValues(Date_t now,
+                                      const HostAndPort& host,
+                                      ReplSetHeartbeatResponse hbResponse) {
+    _health = 1;
+    if (_upSince == Date_t()) {
+        _upSince = now;
+    }
+    _authIssue = false;
+    _lastHeartbeat = now;
+    if (!hbResponse.hasState()) {
+        hbResponse.setState(MemberState::RS_UNKNOWN);
+    }
+    if (!hbResponse.hasElectionTime()) {
+        hbResponse.setElectionTime(_lastResponse.getElectionTime());
+    }
+    if (!hbResponse.hasOpTime()) {
+        hbResponse.setOpTime(_lastResponse.getOpTime());
     }
 
-    void MemberHeartbeatData::setUpValues(Date_t now,
-                                          const HostAndPort& host,
-                                          ReplSetHeartbeatResponse hbResponse) {
-        _health = 1;
-        if (_upSince == Date_t()) {
-            _upSince = now;
-        }
-        _authIssue = false;
-        _lastHeartbeat = now;
-        if (!hbResponse.hasState()) {
-            hbResponse.setState(MemberState::RS_UNKNOWN);
-        }
-        if (!hbResponse.hasElectionTime()) {
-            hbResponse.setElectionTime(_lastResponse.getElectionTime());
-        }
-        if (!hbResponse.hasOpTime()) {
-            hbResponse.setOpTime(_lastResponse.getOpTime());
-        }
-
-        // Log if the state changes
-        if (_lastResponse.getState() != hbResponse.getState()){
-            log() << "Member " << host.toString() << " is now in state "
-                  << hbResponse.getState().toString() << rsLog;
-        }
-
-        _lastResponse = hbResponse;
+    // Log if the state changes
+    if (_lastResponse.getState() != hbResponse.getState()) {
+        log() << "Member " << host.toString() << " is now in state "
+              << hbResponse.getState().toString() << rsLog;
     }
 
-    void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeatMessage) {
+    _lastResponse = hbResponse;
+}
 
-        _health = 0;
-        _upSince = Date_t();
-        _lastHeartbeat = now;
-        _authIssue = false;
+void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeatMessage) {
+    _health = 0;
+    _upSince = Date_t();
+    _lastHeartbeat = now;
+    _authIssue = false;
 
-        _lastResponse = ReplSetHeartbeatResponse();
-        _lastResponse.setState(MemberState::RS_DOWN);
-        _lastResponse.setElectionTime(Timestamp());
-        _lastResponse.setOpTime(OpTime());
-        _lastResponse.setHbMsg(heartbeatMessage);
-        _lastResponse.setSyncingTo(HostAndPort());
-    }
+    _lastResponse = ReplSetHeartbeatResponse();
+    _lastResponse.setState(MemberState::RS_DOWN);
+    _lastResponse.setElectionTime(Timestamp());
+    _lastResponse.setOpTime(OpTime());
+    _lastResponse.setHbMsg(heartbeatMessage);
+    _lastResponse.setSyncingTo(HostAndPort());
+}
 
-    void MemberHeartbeatData::setAuthIssue(Date_t now) {
-        _health = 0;  // set health to 0 so that this doesn't count towards majority.
-        _upSince = Date_t();
-        _lastHeartbeat = now;
-        _authIssue = true;
+void MemberHeartbeatData::setAuthIssue(Date_t now) {
+    _health = 0;  // set health to 0 so that this doesn't count towards majority.
+    _upSince = Date_t();
+    _lastHeartbeat = now;
+    _authIssue = true;
 
-        _lastResponse = ReplSetHeartbeatResponse();
-        _lastResponse.setState(MemberState::RS_UNKNOWN);
-        _lastResponse.setElectionTime(Timestamp());
-        _lastResponse.setOpTime(OpTime());
-        _lastResponse.setHbMsg("");
-        _lastResponse.setSyncingTo(HostAndPort());
-    }
+    _lastResponse = ReplSetHeartbeatResponse();
+    _lastResponse.setState(MemberState::RS_UNKNOWN);
+    _lastResponse.setElectionTime(Timestamp());
+    _lastResponse.setOpTime(OpTime());
+    _lastResponse.setHbMsg("");
+    _lastResponse.setSyncingTo(HostAndPort());
+}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

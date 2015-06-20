@@ -33,8 +33,7 @@
 namespace mongo {
 namespace stdx {
 
-    namespace chrono = boost::chrono;
+namespace chrono = boost::chrono;
 
 }  // namespace stdx
 }  // namespace mongo
-

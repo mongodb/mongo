@@ -32,10 +32,10 @@
 
 namespace mongo {
 
-    class Client;
+class Client;
 
-    struct CopyDbAuthConnection {
-        static std::unique_ptr<DBClientBase>& forClient(Client* client);
-    };
+struct CopyDbAuthConnection {
+    static std::unique_ptr<DBClientBase>& forClient(Client* client);
+};
 
-} // namespace mongo
+}  // namespace mongo

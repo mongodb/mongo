@@ -36,90 +36,87 @@
 
 namespace mongo {
 
-    class MatchExpression;
+class MatchExpression;
+
+/**
+ * This name sucks, but every name involving 'index' is used somewhere.
+ */
+struct IndexEntry {
+    /**
+     * Use this constructor if you're making an IndexEntry from the catalog.
+     */
+    IndexEntry(const BSONObj& kp,
+               const std::string& accessMethod,
+               bool mk,
+               bool sp,
+               bool unq,
+               const std::string& n,
+               const MatchExpression* fe,
+               const BSONObj& io)
+        : keyPattern(kp),
+          multikey(mk),
+          sparse(sp),
+          unique(unq),
+          name(n),
+          filterExpr(fe),
+          infoObj(io) {
+        type = IndexNames::nameToType(accessMethod);
+    }
 
     /**
-     * This name sucks, but every name involving 'index' is used somewhere.
+     * For testing purposes only.
      */
-    struct IndexEntry {
-        /**
-         * Use this constructor if you're making an IndexEntry from the catalog.
-         */
-        IndexEntry(const BSONObj& kp,
-                   const std::string& accessMethod,
-                   bool mk,
-                   bool sp,
-                   bool unq,
-                   const std::string& n,
-                   const MatchExpression* fe,
-                   const BSONObj& io)
-            : keyPattern(kp),
-              multikey(mk),
-              sparse(sp),
-              unique(unq),
-              name(n),
-              filterExpr(fe),
-              infoObj(io) {
+    IndexEntry(const BSONObj& kp,
+               bool mk,
+               bool sp,
+               bool unq,
+               const std::string& n,
+               const MatchExpression* fe,
+               const BSONObj& io)
+        : keyPattern(kp),
+          multikey(mk),
+          sparse(sp),
+          unique(unq),
+          name(n),
+          filterExpr(fe),
+          infoObj(io) {
+        type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
+    }
 
-            type = IndexNames::nameToType(accessMethod);
-        }
+    /**
+     * For testing purposes only.
+     */
+    IndexEntry(const BSONObj& kp)
+        : keyPattern(kp),
+          multikey(false),
+          sparse(false),
+          unique(false),
+          name("test_foo"),
+          filterExpr(nullptr),
+          infoObj(BSONObj()) {
+        type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
+    }
 
-        /**
-         * For testing purposes only.
-         */
-        IndexEntry(const BSONObj& kp,
-                   bool mk,
-                   bool sp,
-                   bool unq,
-                   const std::string& n,
-                   const MatchExpression* fe,
-                   const BSONObj& io)
-            : keyPattern(kp),
-              multikey(mk),
-              sparse(sp),
-              unique(unq),
-              name(n),
-              filterExpr(fe),
-              infoObj(io) {
+    BSONObj keyPattern;
 
-            type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
-        }
+    bool multikey;
 
-        /**
-         * For testing purposes only.
-         */
-        IndexEntry(const BSONObj& kp)
-            : keyPattern(kp),
-              multikey(false),
-              sparse(false),
-              unique(false),
-              name("test_foo"),
-              filterExpr(nullptr),
-              infoObj(BSONObj()) {
+    bool sparse;
 
-            type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
-        }
+    bool unique;
 
-        BSONObj keyPattern;
+    std::string name;
 
-        bool multikey;
+    const MatchExpression* filterExpr;
 
-        bool sparse;
+    // Geo indices have extra parameters.  We need those available to plan correctly.
+    BSONObj infoObj;
 
-        bool unique;
+    // What type of index is this?  (What access method can we use on the index described
+    // by the keyPattern?)
+    IndexType type;
 
-        std::string name;
-
-        const MatchExpression* filterExpr;
-
-        // Geo indices have extra parameters.  We need those available to plan correctly.
-        BSONObj infoObj;
-
-        // What type of index is this?  (What access method can we use on the index described
-        // by the keyPattern?)
-        IndexType type;
-
-        std::string toString() const;
-    };
+    std::string toString() const;
+};
 
 }  // namespace mongo

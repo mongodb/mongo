@@ -37,213 +37,204 @@
 
 namespace mongo {
 
-    class NamespaceString;
+class NamespaceString;
+
+/**
+ * This class wraps the different kinds of command requests into a generically usable write
+ * command request.
+ *
+ * Designed to be a very thin wrapper that mimics the underlying requests exactly.  Owns the
+ * wrapped request object once constructed.
+ */
+class BatchedCommandRequest : public BSONSerializable {
+    MONGO_DISALLOW_COPYING(BatchedCommandRequest);
+
+public:
+    // Maximum number of write ops supported per batch
+    static const size_t kMaxWriteBatchSize;
+
+    enum BatchType { BatchType_Insert, BatchType_Update, BatchType_Delete, BatchType_Unknown };
+
+    //
+    // construction / destruction
+    //
+
+    BatchedCommandRequest(BatchType batchType);
 
     /**
-     * This class wraps the different kinds of command requests into a generically usable write
-     * command request.
-     *
-     * Designed to be a very thin wrapper that mimics the underlying requests exactly.  Owns the
-     * wrapped request object once constructed.
+     * insertReq ownership is transferred to here.
      */
-    class BatchedCommandRequest : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(BatchedCommandRequest);
-    public:
-
-        // Maximum number of write ops supported per batch
-        static const size_t kMaxWriteBatchSize;
-
-        enum BatchType {
-            BatchType_Insert, BatchType_Update, BatchType_Delete, BatchType_Unknown
-        };
-
-        //
-        // construction / destruction
-        //
-
-        BatchedCommandRequest( BatchType batchType );
-
-        /**
-         * insertReq ownership is transferred to here.
-         */
-        BatchedCommandRequest( BatchedInsertRequest* insertReq ) :
-                _batchType( BatchType_Insert ), _insertReq( insertReq ) {
-        }
-
-        /**
-         * updateReq ownership is transferred to here.
-         */
-        BatchedCommandRequest( BatchedUpdateRequest* updateReq ) :
-                _batchType( BatchType_Update ), _updateReq( updateReq ) {
-        }
-
-        /**
-         * deleteReq ownership is transferred to here.
-         */
-        BatchedCommandRequest( BatchedDeleteRequest* deleteReq ) :
-                _batchType( BatchType_Delete ), _deleteReq( deleteReq ) {
-        }
-
-        virtual ~BatchedCommandRequest() {};
-
-        /** Copies all the fields present in 'this' to 'other'. */
-        void cloneTo( BatchedCommandRequest* other ) const;
-
-        //
-        // bson serializable interface implementation
-        //
-
-        virtual bool isValid( std::string* errMsg ) const;
-        virtual BSONObj toBSON() const;
-        virtual bool parseBSON( const BSONObj& source, std::string* errMsg );
-        virtual void clear();
-        virtual std::string toString() const;
-
-        //
-        // Batch type accessors
-        //
-
-        BatchType getBatchType() const;
-        BatchedInsertRequest* getInsertRequest() const;
-        BatchedUpdateRequest* getUpdateRequest() const;
-        BatchedDeleteRequest* getDeleteRequest() const;
-        // Index creation is also an insert, but a weird one.
-        bool isInsertIndexRequest() const;
-        bool isUniqueIndexRequest() const;
-        bool isValidIndexRequest( std::string* errMsg ) const;
-        std::string getTargetingNS() const;
-        const NamespaceString& getTargetingNSS() const;
-        BSONObj getIndexKeyPattern() const;
-
-        //
-        // individual field accessors
-        //
-
-        bool isVerboseWC() const;
-
-        void setNSS( const NamespaceString& nss );
-        void setNS( StringData collName );
-        const std::string& getNS() const;
-        const NamespaceString& getNSS() const;
-
-        std::size_t sizeWriteOps() const;
-
-        void setWriteConcern( const BSONObj& writeConcern );
-        void unsetWriteConcern();
-        bool isWriteConcernSet() const;
-        const BSONObj& getWriteConcern() const;
-
-        void setOrdered( bool ordered );
-        void unsetOrdered();
-        bool isOrderedSet() const;
-        bool getOrdered() const;
-
-        void setMetadata(BatchedRequestMetadata* metadata);
-        void unsetMetadata();
-        bool isMetadataSet() const;
-        BatchedRequestMetadata* getMetadata() const;
-
-        void setShouldBypassValidation(bool newVal);
-        bool shouldBypassValidation() const;
-
-        //
-        // Helpers for batch pre-processing
-        //
-
-        /**
-         * Generates a new request, the same as the old, but with insert _ids if required.
-         * Returns NULL if this is not an insert request or all inserts already have _ids.
-         */
-        static BatchedCommandRequest* cloneWithIds(const BatchedCommandRequest& origCmdRequest);
-
-        /**
-         * Whether or not this batch contains an upsert without an _id - these can't be sent
-         * to multiple hosts.
-         */
-        static bool containsNoIDUpsert(const BatchedCommandRequest& request);
-
-        //
-        // Helpers for auth pre-parsing
-        //
-
-        /**
-         * Helper to determine whether or not there are any upserts in the batch
-         */
-        static bool containsUpserts( const BSONObj& writeCmdObj );
-
-        /**
-         * Helper to extract the namespace being indexed from a raw BSON write command.
-         *
-         * Returns false with errMsg if the index write command seems invalid.
-         * TODO: Remove when we have parsing hooked before authorization
-         */
-        static bool getIndexedNS( const BSONObj& writeCmdObj,
-                                  std::string* nsToIndex,
-                                  std::string* errMsg );
-
-    private:
-
-        BatchType _batchType;
-        std::unique_ptr<BatchedInsertRequest> _insertReq;
-        std::unique_ptr<BatchedUpdateRequest> _updateReq;
-        std::unique_ptr<BatchedDeleteRequest> _deleteReq;
-    };
+    BatchedCommandRequest(BatchedInsertRequest* insertReq)
+        : _batchType(BatchType_Insert), _insertReq(insertReq) {}
 
     /**
-     * Similar to above, this class wraps the write items of a command request into a generically
-     * usable type.  Very thin wrapper, does not own the write item itself.
-     *
-     * TODO: Use in BatchedCommandRequest above
+     * updateReq ownership is transferred to here.
      */
-    class BatchItemRef {
-    public:
+    BatchedCommandRequest(BatchedUpdateRequest* updateReq)
+        : _batchType(BatchType_Update), _updateReq(updateReq) {}
 
-        BatchItemRef( const BatchedCommandRequest* request, int itemIndex ) :
-            _request( request ), _itemIndex( itemIndex ) {
-        }
+    /**
+     * deleteReq ownership is transferred to here.
+     */
+    BatchedCommandRequest(BatchedDeleteRequest* deleteReq)
+        : _batchType(BatchType_Delete), _deleteReq(deleteReq) {}
 
-        const BatchedCommandRequest* getRequest() const {
-            return _request;
-        }
+    virtual ~BatchedCommandRequest(){};
 
-        int getItemIndex() const {
-            return _itemIndex;
-        }
+    /** Copies all the fields present in 'this' to 'other'. */
+    void cloneTo(BatchedCommandRequest* other) const;
 
-        BatchedCommandRequest::BatchType getOpType() const {
-            return _request->getBatchType();
-        }
+    //
+    // bson serializable interface implementation
+    //
 
-        const BSONObj& getDocument() const {
-            dassert( _itemIndex < static_cast<int>( _request->sizeWriteOps() ) );
-            return _request->getInsertRequest()->getDocumentsAt( _itemIndex );
-        }
+    virtual bool isValid(std::string* errMsg) const;
+    virtual BSONObj toBSON() const;
+    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
+    virtual void clear();
+    virtual std::string toString() const;
 
-        const BatchedUpdateDocument* getUpdate() const {
-            dassert( _itemIndex < static_cast<int>( _request->sizeWriteOps() ) );
-            return _request->getUpdateRequest()->getUpdatesAt( _itemIndex );
-        }
+    //
+    // Batch type accessors
+    //
 
-        const BatchedDeleteDocument* getDelete() const {
-            dassert( _itemIndex < static_cast<int>( _request->sizeWriteOps() ) );
-            return _request->getDeleteRequest()->getDeletesAt( _itemIndex );
-        }
+    BatchType getBatchType() const;
+    BatchedInsertRequest* getInsertRequest() const;
+    BatchedUpdateRequest* getUpdateRequest() const;
+    BatchedDeleteRequest* getDeleteRequest() const;
+    // Index creation is also an insert, but a weird one.
+    bool isInsertIndexRequest() const;
+    bool isUniqueIndexRequest() const;
+    bool isValidIndexRequest(std::string* errMsg) const;
+    std::string getTargetingNS() const;
+    const NamespaceString& getTargetingNSS() const;
+    BSONObj getIndexKeyPattern() const;
 
-        BSONObj toBSON() const {
-            switch ( getOpType() ) {
+    //
+    // individual field accessors
+    //
+
+    bool isVerboseWC() const;
+
+    void setNSS(const NamespaceString& nss);
+    void setNS(StringData collName);
+    const std::string& getNS() const;
+    const NamespaceString& getNSS() const;
+
+    std::size_t sizeWriteOps() const;
+
+    void setWriteConcern(const BSONObj& writeConcern);
+    void unsetWriteConcern();
+    bool isWriteConcernSet() const;
+    const BSONObj& getWriteConcern() const;
+
+    void setOrdered(bool ordered);
+    void unsetOrdered();
+    bool isOrderedSet() const;
+    bool getOrdered() const;
+
+    void setMetadata(BatchedRequestMetadata* metadata);
+    void unsetMetadata();
+    bool isMetadataSet() const;
+    BatchedRequestMetadata* getMetadata() const;
+
+    void setShouldBypassValidation(bool newVal);
+    bool shouldBypassValidation() const;
+
+    //
+    // Helpers for batch pre-processing
+    //
+
+    /**
+     * Generates a new request, the same as the old, but with insert _ids if required.
+     * Returns NULL if this is not an insert request or all inserts already have _ids.
+     */
+    static BatchedCommandRequest* cloneWithIds(const BatchedCommandRequest& origCmdRequest);
+
+    /**
+     * Whether or not this batch contains an upsert without an _id - these can't be sent
+     * to multiple hosts.
+     */
+    static bool containsNoIDUpsert(const BatchedCommandRequest& request);
+
+    //
+    // Helpers for auth pre-parsing
+    //
+
+    /**
+     * Helper to determine whether or not there are any upserts in the batch
+     */
+    static bool containsUpserts(const BSONObj& writeCmdObj);
+
+    /**
+     * Helper to extract the namespace being indexed from a raw BSON write command.
+     *
+     * Returns false with errMsg if the index write command seems invalid.
+     * TODO: Remove when we have parsing hooked before authorization
+     */
+    static bool getIndexedNS(const BSONObj& writeCmdObj,
+                             std::string* nsToIndex,
+                             std::string* errMsg);
+
+private:
+    BatchType _batchType;
+    std::unique_ptr<BatchedInsertRequest> _insertReq;
+    std::unique_ptr<BatchedUpdateRequest> _updateReq;
+    std::unique_ptr<BatchedDeleteRequest> _deleteReq;
+};
+
+/**
+ * Similar to above, this class wraps the write items of a command request into a generically
+ * usable type.  Very thin wrapper, does not own the write item itself.
+ *
+ * TODO: Use in BatchedCommandRequest above
+ */
+class BatchItemRef {
+public:
+    BatchItemRef(const BatchedCommandRequest* request, int itemIndex)
+        : _request(request), _itemIndex(itemIndex) {}
+
+    const BatchedCommandRequest* getRequest() const {
+        return _request;
+    }
+
+    int getItemIndex() const {
+        return _itemIndex;
+    }
+
+    BatchedCommandRequest::BatchType getOpType() const {
+        return _request->getBatchType();
+    }
+
+    const BSONObj& getDocument() const {
+        dassert(_itemIndex < static_cast<int>(_request->sizeWriteOps()));
+        return _request->getInsertRequest()->getDocumentsAt(_itemIndex);
+    }
+
+    const BatchedUpdateDocument* getUpdate() const {
+        dassert(_itemIndex < static_cast<int>(_request->sizeWriteOps()));
+        return _request->getUpdateRequest()->getUpdatesAt(_itemIndex);
+    }
+
+    const BatchedDeleteDocument* getDelete() const {
+        dassert(_itemIndex < static_cast<int>(_request->sizeWriteOps()));
+        return _request->getDeleteRequest()->getDeletesAt(_itemIndex);
+    }
+
+    BSONObj toBSON() const {
+        switch (getOpType()) {
             case BatchedCommandRequest::BatchType_Insert:
                 return getDocument();
             case BatchedCommandRequest::BatchType_Update:
                 return getUpdate()->toBSON();
             default:
                 return getDelete()->toBSON();
-            }
         }
+    }
 
-    private:
+private:
+    const BatchedCommandRequest* _request;
+    const int _itemIndex;
+};
 
-        const BatchedCommandRequest* _request;
-        const int _itemIndex;
-    };
-
-} // namespace mongo
+}  // namespace mongo

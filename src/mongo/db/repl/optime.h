@@ -35,65 +35,65 @@
 namespace mongo {
 namespace repl {
 
-    /**
-     * OpTime encompasses a Timestamp (which itself is composed of two 32-bit integers, which can
-     * represent a time_t and a counter), and a 64-bit Term number.  OpTime can be used to
-     * label every op in an oplog with a unique identifier.
-     */
+/**
+ * OpTime encompasses a Timestamp (which itself is composed of two 32-bit integers, which can
+ * represent a time_t and a counter), and a 64-bit Term number.  OpTime can be used to
+ * label every op in an oplog with a unique identifier.
+ */
 
-    class OpTime {
-    public:
-        // The default term after the first time upgrading from protocol version 0.
-        //
-        // This is also the first term for nodes that were recently started up but have not
-        // yet joined the cluster, all in protocol version 1.
-        static const long long kDefaultTerm = 0;
+class OpTime {
+public:
+    // The default term after the first time upgrading from protocol version 0.
+    //
+    // This is also the first term for nodes that were recently started up but have not
+    // yet joined the cluster, all in protocol version 1.
+    static const long long kDefaultTerm = 0;
 
-        OpTime() = default;
-        OpTime(Timestamp ts, long long term);
+    OpTime() = default;
+    OpTime(Timestamp ts, long long term);
 
-        Timestamp getTimestamp() const;
+    Timestamp getTimestamp() const;
 
-        long long getSecs() const;
+    long long getSecs() const;
 
-        long long getTerm() const;
+    long long getTerm() const;
 
-        std::string toString() const;
+    std::string toString() const;
 
-        // Returns true when this OpTime is not yet initialized.
-        bool isNull() const;
+    // Returns true when this OpTime is not yet initialized.
+    bool isNull() const;
 
-        inline bool operator==(const OpTime& rhs) const {
-            return std::tie(_term, _timestamp) == std::tie(rhs._term, rhs._timestamp);
-        }
+    inline bool operator==(const OpTime& rhs) const {
+        return std::tie(_term, _timestamp) == std::tie(rhs._term, rhs._timestamp);
+    }
 
-        inline bool operator<(const OpTime& rhs) const {
-            // Compare term first, then the opTimes.
-            return std::tie(_term, _timestamp) < std::tie(rhs._term, rhs._timestamp);
-        }
+    inline bool operator<(const OpTime& rhs) const {
+        // Compare term first, then the opTimes.
+        return std::tie(_term, _timestamp) < std::tie(rhs._term, rhs._timestamp);
+    }
 
-        inline bool operator!=(const OpTime& rhs) const {
-            return !(*this == rhs);
-        }
+    inline bool operator!=(const OpTime& rhs) const {
+        return !(*this == rhs);
+    }
 
-        inline bool operator<=(const OpTime& rhs) const {
-            return *this < rhs || *this == rhs;
-        }
+    inline bool operator<=(const OpTime& rhs) const {
+        return *this < rhs || *this == rhs;
+    }
 
-        inline bool operator>(const OpTime& rhs) const {
-            return !(*this <= rhs);
-        }
+    inline bool operator>(const OpTime& rhs) const {
+        return !(*this <= rhs);
+    }
 
-        inline bool operator>=(const OpTime& rhs) const {
-            return !(*this < rhs);
-        }
+    inline bool operator>=(const OpTime& rhs) const {
+        return !(*this < rhs);
+    }
 
-        friend std::ostream& operator<<(std::ostream& out, const OpTime& opTime);
+    friend std::ostream& operator<<(std::ostream& out, const OpTime& opTime);
 
-    private:
-        Timestamp _timestamp;
-        long long _term = kDefaultTerm;
-    };
+private:
+    Timestamp _timestamp;
+    long long _term = kDefaultTerm;
+};
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

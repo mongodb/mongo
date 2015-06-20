@@ -35,84 +35,88 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-    class BSONObjBuilder;
+class BSONObjBuilder;
 
-    static const char kUpsertedFieldName[] = "upserted";
+static const char kUpsertedFieldName[] = "upserted";
 
-    class LastError {
+class LastError {
+public:
+    static const Client::Decoration<LastError> get;
+
+    /**
+     * Resets the object to a newly constructed state.  If "valid" is true, marks the last-error
+     * object as "valid".
+     */
+    void reset(bool valid = false);
+
+    /**
+     * when db receives a message/request, call this
+     */
+    void startRequest();
+
+    /**
+     * Disables error recording for the current operation.
+     */
+    void disable();
+
+    /**
+     * Sets the error information for the current operation, if error recording was not
+     * explicitly disabled via a call to disable() since the call to startRequest.
+     */
+    void setLastError(int code, std::string msg);
+
+    void recordInsert(long long nObjects);
+
+    void recordUpdate(bool updateObjects, long long nObjects, BSONObj upsertedId);
+
+    void recordDelete(long long nDeleted);
+
+    /**
+     * Writes the last-error state described by this object to "b".
+     *
+     * If "blankErr" is true, the "err" field will be explicitly set to null in the result
+     * instead of being omitted when the error string is empty.
+     *
+     * Returns true if there is a non-empty error message.
+     */
+    bool appendSelf(BSONObjBuilder& b, bool blankErr) const;
+
+    bool isValid() const {
+        return _valid;
+    }
+    int const getNPrev() const {
+        return _nPrev;
+    }
+
+    class Disabled {
     public:
-        static const Client::Decoration<LastError> get;
+        explicit Disabled(LastError* le) : _le(le), _prev(le->_disabled) {
+            _le->_disabled = true;
+        }
 
-        /**
-         * Resets the object to a newly constructed state.  If "valid" is true, marks the last-error
-         * object as "valid".
-         */
-        void reset(bool valid = false);
-
-        /**
-         * when db receives a message/request, call this
-         */
-        void startRequest();
-
-        /**
-         * Disables error recording for the current operation.
-         */
-        void disable();
-
-        /**
-         * Sets the error information for the current operation, if error recording was not
-         * explicitly disabled via a call to disable() since the call to startRequest.
-         */
-        void setLastError(int code, std::string msg);
-
-        void recordInsert(long long nObjects);
-
-        void recordUpdate(bool updateObjects, long long nObjects, BSONObj upsertedId);
-
-        void recordDelete(long long nDeleted);
-
-        /**
-         * Writes the last-error state described by this object to "b".
-         *
-         * If "blankErr" is true, the "err" field will be explicitly set to null in the result
-         * instead of being omitted when the error string is empty.
-         *
-         * Returns true if there is a non-empty error message.
-         */
-        bool appendSelf(BSONObjBuilder &b, bool blankErr) const;
-
-        bool isValid() const { return _valid; }
-        int const getNPrev() const { return _nPrev; }
-
-        class Disabled {
-        public:
-            explicit Disabled(LastError* le) : _le(le), _prev(le->_disabled) {
-                _le->_disabled = true;
-            }
-
-            ~Disabled() {
-                _le->_disabled = _prev;
-            }
-
-        private:
-            LastError * const _le;
-            const bool _prev;
-        };
-
-        static LastError noError;
+        ~Disabled() {
+            _le->_disabled = _prev;
+        }
 
     private:
-        enum UpdatedExistingType { NotUpdate, True, False };
-
-        int _code = 0;
-        std::string _msg = {};
-        UpdatedExistingType _updatedExisting = NotUpdate;
-        // _id field value from inserted doc, returned as kUpsertedFieldName (above)
-        BSONObj _upsertedId = {};
-        long long _nObjects = 0;
-        int _nPrev = 1;
-        bool _valid = false;
-        bool _disabled = false;
+        LastError* const _le;
+        const bool _prev;
     };
 
-} // namespace mongo
+    static LastError noError;
+
+private:
+    enum UpdatedExistingType { NotUpdate, True, False };
+
+    int _code = 0;
+    std::string _msg = {};
+    UpdatedExistingType _updatedExisting = NotUpdate;
+    // _id field value from inserted doc, returned as kUpsertedFieldName (above)
+    BSONObj _upsertedId = {};
+    long long _nObjects = 0;
+    int _nPrev = 1;
+    bool _valid = false;
+    bool _disabled = false;
+};
+
+}  // namespace mongo

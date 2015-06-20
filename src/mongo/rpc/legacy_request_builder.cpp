@@ -41,85 +41,79 @@
 namespace mongo {
 namespace rpc {
 
-    LegacyRequestBuilder::LegacyRequestBuilder()
-        : _message{stdx::make_unique<Message>()}
-    {}
+LegacyRequestBuilder::LegacyRequestBuilder() : _message{stdx::make_unique<Message>()} {}
 
-    LegacyRequestBuilder::~LegacyRequestBuilder()
-    {}
+LegacyRequestBuilder::~LegacyRequestBuilder() {}
 
-    LegacyRequestBuilder::LegacyRequestBuilder(std::unique_ptr<Message> message)
-        : _message{std::move(message)}
-    {}
+LegacyRequestBuilder::LegacyRequestBuilder(std::unique_ptr<Message> message)
+    : _message{std::move(message)} {}
 
-    LegacyRequestBuilder& LegacyRequestBuilder::setDatabase(StringData database) {
-        invariant(_state == State::kDatabase);
-        _ns = NamespaceString(database, "$cmd").toString();
-        _state = State::kCommandName;
-        return *this;
-    }
+LegacyRequestBuilder& LegacyRequestBuilder::setDatabase(StringData database) {
+    invariant(_state == State::kDatabase);
+    _ns = NamespaceString(database, "$cmd").toString();
+    _state = State::kCommandName;
+    return *this;
+}
 
-    LegacyRequestBuilder& LegacyRequestBuilder::setCommandName(StringData commandName) {
-        invariant(_state == State::kCommandName);
-        // no op, as commandName is the first element of commandArgs
-        _state = State::kMetadata;
-        return *this;
-    }
+LegacyRequestBuilder& LegacyRequestBuilder::setCommandName(StringData commandName) {
+    invariant(_state == State::kCommandName);
+    // no op, as commandName is the first element of commandArgs
+    _state = State::kMetadata;
+    return *this;
+}
 
-    LegacyRequestBuilder& LegacyRequestBuilder::setMetadata(BSONObj metadata) {
-        invariant(_state == State::kMetadata);
-        _metadata = std::move(metadata);
-        _state = State::kCommandArgs;
-        return *this;
-    }
+LegacyRequestBuilder& LegacyRequestBuilder::setMetadata(BSONObj metadata) {
+    invariant(_state == State::kMetadata);
+    _metadata = std::move(metadata);
+    _state = State::kCommandArgs;
+    return *this;
+}
 
-    LegacyRequestBuilder& LegacyRequestBuilder::setCommandArgs(BSONObj commandArgs) {
-        invariant(_state == State::kCommandArgs);
+LegacyRequestBuilder& LegacyRequestBuilder::setCommandArgs(BSONObj commandArgs) {
+    invariant(_state == State::kCommandArgs);
 
-        BSONObj legacyCommandArgs;
-        int queryOptions;
+    BSONObj legacyCommandArgs;
+    int queryOptions;
 
-        std::tie(legacyCommandArgs, queryOptions) = uassertStatusOK(
-            rpc::downconvertRequestMetadata(std::move(commandArgs),
-                                            std::move(_metadata))
-        );
+    std::tie(legacyCommandArgs, queryOptions) = uassertStatusOK(
+        rpc::downconvertRequestMetadata(std::move(commandArgs), std::move(_metadata)));
 
-        _builder.appendNum(queryOptions); // queryOptions
-        _builder.appendStr(_ns);
-        _builder.appendNum(0); // nToSkip
-        _builder.appendNum(1); // nToReturn
+    _builder.appendNum(queryOptions);  // queryOptions
+    _builder.appendStr(_ns);
+    _builder.appendNum(0);  // nToSkip
+    _builder.appendNum(1);  // nToReturn
 
-        legacyCommandArgs.appendSelfToBufBuilder(_builder);
-        _state = State::kInputDocs;
-        return *this;
-    }
+    legacyCommandArgs.appendSelfToBufBuilder(_builder);
+    _state = State::kInputDocs;
+    return *this;
+}
 
-    LegacyRequestBuilder& LegacyRequestBuilder::addInputDocs(DocumentRange inputDocs) {
-        invariant(_state == State::kInputDocs);
-        // no op
-        return *this;
-    }
+LegacyRequestBuilder& LegacyRequestBuilder::addInputDocs(DocumentRange inputDocs) {
+    invariant(_state == State::kInputDocs);
+    // no op
+    return *this;
+}
 
-    LegacyRequestBuilder& LegacyRequestBuilder::addInputDoc(BSONObj inputDoc) {
-        invariant(_state == State::kInputDocs);
-        // no op
-        return *this;
-    }
+LegacyRequestBuilder& LegacyRequestBuilder::addInputDoc(BSONObj inputDoc) {
+    invariant(_state == State::kInputDocs);
+    // no op
+    return *this;
+}
 
-    RequestBuilderInterface::State LegacyRequestBuilder::getState() const {
-        return _state;
-    }
+RequestBuilderInterface::State LegacyRequestBuilder::getState() const {
+    return _state;
+}
 
-    Protocol LegacyRequestBuilder::getProtocol() const {
-        return rpc::Protocol::kOpQuery;
-    }
+Protocol LegacyRequestBuilder::getProtocol() const {
+    return rpc::Protocol::kOpQuery;
+}
 
-    std::unique_ptr<Message> LegacyRequestBuilder::done() {
-        invariant(_state == State::kInputDocs);
-        _message->setData(dbQuery, _builder.buf(), _builder.len());
-        _state = State::kDone;
-        return std::move(_message);
-    }
+std::unique_ptr<Message> LegacyRequestBuilder::done() {
+    invariant(_state == State::kInputDocs);
+    _message->setData(dbQuery, _builder.buf(), _builder.len());
+    _state = State::kDone;
+    return std::move(_message);
+}
 
 }  // namespace rpc
 }  // namespace mongo

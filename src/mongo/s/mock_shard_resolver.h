@@ -37,19 +37,16 @@
 
 namespace mongo {
 
-    class MockShardResolver : public ShardResolver {
-    public:
+class MockShardResolver : public ShardResolver {
+public:
+    virtual ~MockShardResolver() {}
 
-        virtual ~MockShardResolver() {
-        }
+    Status chooseWriteHost(const std::string& shardName, ConnectionString* shardHost) const {
+        std::string errMsg;
+        *shardHost = ConnectionString::parse(std::string("$") + shardName + ":12345", errMsg);
+        ASSERT_EQUALS(errMsg, "");
+        return Status::OK();
+    }
+};
 
-        Status chooseWriteHost( const std::string& shardName, ConnectionString* shardHost ) const {
-            std::string errMsg;
-            *shardHost = ConnectionString::parse( std::string( "$" ) + shardName + ":12345", errMsg );
-            ASSERT_EQUALS( errMsg, "" );
-            return Status::OK();
-        }
-
-    };
-
-} // namespace mongo
+}  // namespace mongo

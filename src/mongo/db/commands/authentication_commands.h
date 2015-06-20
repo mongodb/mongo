@@ -36,52 +36,53 @@
 
 namespace mongo {
 
-    class CmdAuthenticate : public Command {
-    public:
-        static void disableAuthMechanism(std::string authMechanism);
+class CmdAuthenticate : public Command {
+public:
+    static void disableAuthMechanism(std::string authMechanism);
 
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void help(std::stringstream& ss) const { ss << "internal"; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
-        virtual void redactForLogging(mutablebson::Document* cmdObj);
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual void help(std::stringstream& ss) const {
+        ss << "internal";
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {}  // No auth required
+    virtual void redactForLogging(mutablebson::Document* cmdObj);
 
-        CmdAuthenticate() : Command("authenticate") {}
-        bool run(OperationContext* txn, const std::string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 std::string& errmsg,
-                 BSONObjBuilder& result);
+    CmdAuthenticate() : Command("authenticate") {}
+    bool run(OperationContext* txn,
+             const std::string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& result);
 
-    private:
-        /**
-         * Completes the authentication of "user" using "mechanism" and parameters from "cmdObj".
-         *
-         * Returns Status::OK() on success.  All other statuses indicate failed authentication.  The
-         * entire status returned here may always be used for logging.  However, if the code is
-         * AuthenticationFailed, the "reason" field of the return status may contain information
-         * that should not be revealed to the connected client.
-         *
-         * Other than AuthenticationFailed, common returns are BadValue, indicating unsupported
-         * mechanism, and ProtocolError, indicating an error in the use of the authentication
-         * protocol.
-         */
-        Status _authenticate(OperationContext* txn,
-                             const std::string& mechanism,
-                             const UserName& user,
-                             const BSONObj& cmdObj);
-        Status _authenticateCR(
-                    OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
-        Status _authenticateX509(
-                    OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
-        bool _clusterIdMatch(const std::string& subjectName, const std::string& srvSubjectName);
-    };
+private:
+    /**
+     * Completes the authentication of "user" using "mechanism" and parameters from "cmdObj".
+     *
+     * Returns Status::OK() on success.  All other statuses indicate failed authentication.  The
+     * entire status returned here may always be used for logging.  However, if the code is
+     * AuthenticationFailed, the "reason" field of the return status may contain information
+     * that should not be revealed to the connected client.
+     *
+     * Other than AuthenticationFailed, common returns are BadValue, indicating unsupported
+     * mechanism, and ProtocolError, indicating an error in the use of the authentication
+     * protocol.
+     */
+    Status _authenticate(OperationContext* txn,
+                         const std::string& mechanism,
+                         const UserName& user,
+                         const BSONObj& cmdObj);
+    Status _authenticateCR(OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
+    Status _authenticateX509(OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
+    bool _clusterIdMatch(const std::string& subjectName, const std::string& srvSubjectName);
+};
 
-    extern CmdAuthenticate cmdAuthenticate;
+extern CmdAuthenticate cmdAuthenticate;
 }
-
-

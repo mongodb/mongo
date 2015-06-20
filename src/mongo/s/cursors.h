@@ -38,119 +38,120 @@
 
 namespace mongo {
 
-    class QueryMessage;
+class QueryMessage;
 
 
-    class ShardedClientCursor {
-        MONGO_DISALLOW_COPYING(ShardedClientCursor);
-    public:
-        ShardedClientCursor( QueryMessage& q , ParallelSortClusteredCursor * cursor );
-        ~ShardedClientCursor();
+class ShardedClientCursor {
+    MONGO_DISALLOW_COPYING(ShardedClientCursor);
 
-        long long getId();
+public:
+    ShardedClientCursor(QueryMessage& q, ParallelSortClusteredCursor* cursor);
+    ~ShardedClientCursor();
 
-        /**
-         * @return the cumulative number of documents seen by this cursor.
-         */
-        int getTotalSent() const;
+    long long getId();
 
-        /**
-         * Sends queries to the shards and gather the result for this batch.
-         *
-         * @param r The request object from the client
-         * @param ntoreturn Number of documents to return
-         * @param buffer The buffer to use to store the results.
-         * @param docCount This will contain the number of documents gathered for this batch after
-         *        a successful call.
-         *
-         * @return true if this is not the final batch.
-         */
-        bool sendNextBatch(int ntoreturn, BufBuilder& buffer, int& docCount);
+    /**
+     * @return the cumulative number of documents seen by this cursor.
+     */
+    int getTotalSent() const;
 
-        void accessed();
-        /** @return idle time in ms */
-        long long idleTime( long long now );
+    /**
+     * Sends queries to the shards and gather the result for this batch.
+     *
+     * @param r The request object from the client
+     * @param ntoreturn Number of documents to return
+     * @param buffer The buffer to use to store the results.
+     * @param docCount This will contain the number of documents gathered for this batch after
+     *        a successful call.
+     *
+     * @return true if this is not the final batch.
+     */
+    bool sendNextBatch(int ntoreturn, BufBuilder& buffer, int& docCount);
 
-        std::string getNS() { return _cursor->getNS(); }
+    void accessed();
+    /** @return idle time in ms */
+    long long idleTime(long long now);
 
-        // The default initial buffer size for sending responses.
-        static const int INIT_REPLY_BUFFER_SIZE;
+    std::string getNS() {
+        return _cursor->getNS();
+    }
 
-    protected:
+    // The default initial buffer size for sending responses.
+    static const int INIT_REPLY_BUFFER_SIZE;
 
-        ParallelSortClusteredCursor * _cursor;
+protected:
+    ParallelSortClusteredCursor* _cursor;
 
-        int _skip;
-        int _ntoreturn;
+    int _skip;
+    int _ntoreturn;
 
-        int _totalSent;
-        bool _done;
+    int _totalSent;
+    bool _done;
 
-        long long _id;
-        long long _lastAccessMillis; // 0 means no timeout
+    long long _id;
+    long long _lastAccessMillis;  // 0 means no timeout
+};
 
-    };
+typedef std::shared_ptr<ShardedClientCursor> ShardedClientCursorPtr;
 
-    typedef std::shared_ptr<ShardedClientCursor> ShardedClientCursorPtr;
+class CursorCache {
+public:
+    static long long TIMEOUT;
 
-    class CursorCache {
-    public:
+    typedef std::map<long long, ShardedClientCursorPtr> MapSharded;
+    typedef std::map<long long, int> MapShardedInt;
+    typedef std::map<long long, std::string> MapNormal;
 
-        static long long TIMEOUT;
+    CursorCache();
+    ~CursorCache();
 
-        typedef std::map<long long,ShardedClientCursorPtr> MapSharded;
-        typedef std::map<long long,int> MapShardedInt;
-        typedef std::map<long long,std::string> MapNormal;
+    ShardedClientCursorPtr get(long long id) const;
+    int getMaxTimeMS(long long id) const;
+    void store(ShardedClientCursorPtr cursor, int maxTimeMS);
+    void updateMaxTimeMS(long long id, int maxTimeMS);
+    void remove(long long id);
 
-        CursorCache();
-        ~CursorCache();
+    void storeRef(const std::string& server, long long id, const std::string& ns);
+    void removeRef(long long id);
 
-        ShardedClientCursorPtr get( long long id ) const;
-        int getMaxTimeMS( long long id ) const;
-        void store( ShardedClientCursorPtr cursor, int maxTimeMS );
-        void updateMaxTimeMS( long long id, int maxTimeMS );
-        void remove( long long id );
+    /** @return the server for id or "" */
+    std::string getRef(long long id) const;
+    /** @return the ns for id or "" */
+    std::string getRefNS(long long id) const;
 
-        void storeRef(const std::string& server, long long id, const std::string& ns);
-        void removeRef( long long id );
+    void gotKillCursors(Message& m);
 
-        /** @return the server for id or "" */
-        std::string getRef( long long id ) const ;
-        /** @return the ns for id or "" */
-        std::string getRefNS(long long id) const ;
-        
-        void gotKillCursors(Message& m );
+    void appendInfo(BSONObjBuilder& result) const;
 
-        void appendInfo( BSONObjBuilder& result ) const ;
+    long long genId();
 
-        long long genId();
+    void doTimeouts();
+    void startTimeoutThread();
 
-        void doTimeouts();
-        void startTimeoutThread();
-    private:
-        mutable stdx::mutex _mutex;
+private:
+    mutable stdx::mutex _mutex;
 
-        PseudoRandom _random;
+    PseudoRandom _random;
 
-        // Maps sharded cursor ID to ShardedClientCursorPtr.
-        MapSharded _cursors;
+    // Maps sharded cursor ID to ShardedClientCursorPtr.
+    MapSharded _cursors;
 
-        // Maps sharded cursor ID to remaining max time.  Value can be any of:
-        // - the constant "kMaxTimeCursorNoTimeLimit", or
-        // - the constant "kMaxTimeCursorTimeLimitExpired", or
-        // - a positive integer representing milliseconds of remaining time
-        MapShardedInt _cursorsMaxTimeMS;
+    // Maps sharded cursor ID to remaining max time.  Value can be any of:
+    // - the constant "kMaxTimeCursorNoTimeLimit", or
+    // - the constant "kMaxTimeCursorTimeLimitExpired", or
+    // - a positive integer representing milliseconds of remaining time
+    MapShardedInt _cursorsMaxTimeMS;
 
-        // Maps passthrough cursor ID to shard name.
-        MapNormal _refs;
+    // Maps passthrough cursor ID to shard name.
+    MapNormal _refs;
 
-        // Maps passthrough cursor ID to namespace.
-        MapNormal _refsNS;
-        
-        long long _shardedTotal;
+    // Maps passthrough cursor ID to namespace.
+    MapNormal _refsNS;
 
-        static const int _myLogLevel;
-    };
+    long long _shardedTotal;
 
-    extern CursorCache cursorCache;
+    static const int _myLogLevel;
+};
+
+extern CursorCache cursorCache;
 }

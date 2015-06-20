@@ -38,143 +38,168 @@
 
 namespace mongo {
 
-    class BSONObj;
+class BSONObj;
 
 namespace repl {
 
+/**
+ * Representation of the configuration information about a particular member of a replica set.
+ */
+class MemberConfig {
+public:
+    typedef std::vector<ReplicaSetTag>::const_iterator TagIterator;
+
+    static const std::string kIdFieldName;
+    static const std::string kVotesFieldName;
+    static const std::string kPriorityFieldName;
+    static const std::string kHostFieldName;
+    static const std::string kHiddenFieldName;
+    static const std::string kSlaveDelayFieldName;
+    static const std::string kArbiterOnlyFieldName;
+    static const std::string kBuildIndexesFieldName;
+    static const std::string kTagsFieldName;
+    static const std::string kInternalVoterTagName;
+    static const std::string kInternalElectableTagName;
+    static const std::string kInternalAllTagName;
+
     /**
-     * Representation of the configuration information about a particular member of a replica set.
+     * Default constructor, produces a MemberConfig in an undefined state.
+     * Must successfully call initialze() before calling validate() or the
+     * accessors.
      */
-    class MemberConfig {
-    public:
-        typedef std::vector<ReplicaSetTag>::const_iterator TagIterator;
+    MemberConfig() : _slaveDelay(0) {}
 
-        static const std::string kIdFieldName;
-        static const std::string kVotesFieldName;
-        static const std::string kPriorityFieldName;
-        static const std::string kHostFieldName;
-        static const std::string kHiddenFieldName;
-        static const std::string kSlaveDelayFieldName;
-        static const std::string kArbiterOnlyFieldName;
-        static const std::string kBuildIndexesFieldName;
-        static const std::string kTagsFieldName;
-        static const std::string kInternalVoterTagName;
-        static const std::string kInternalElectableTagName;
-        static const std::string kInternalAllTagName;
+    /**
+     * Initializes this MemberConfig from the contents of "mcfg".
+     *
+     * If "mcfg" describes any tags, builds ReplicaSetTags for this
+     * configuration using "tagConfig" as the tag's namespace. This may
+     * have the effect of altering "tagConfig" when "mcfg" describes a
+     * tag not previously added to "tagConfig".
+     */
+    Status initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagConfig);
 
-        /**
-         * Default constructor, produces a MemberConfig in an undefined state.
-         * Must successfully call initialze() before calling validate() or the
-         * accessors.
-         */
-        MemberConfig() : _slaveDelay(0) {}
+    /**
+     * Performs basic consistency checks on the member configuration.
+     */
+    Status validate() const;
 
-        /**
-         * Initializes this MemberConfig from the contents of "mcfg".
-         *
-         * If "mcfg" describes any tags, builds ReplicaSetTags for this
-         * configuration using "tagConfig" as the tag's namespace. This may
-         * have the effect of altering "tagConfig" when "mcfg" describes a
-         * tag not previously added to "tagConfig".
-         */
-        Status initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagConfig);
+    /**
+     * Gets the identifier for this member, unique within a ReplicaSetConfig.
+     */
+    int getId() const {
+        return _id;
+    }
 
-        /**
-         * Performs basic consistency checks on the member configuration.
-         */
-        Status validate() const;
+    /**
+     * Gets the canonical name of this member, by which other members and clients
+     * will contact it.
+     */
+    const HostAndPort& getHostAndPort() const {
+        return _host;
+    }
 
-        /**
-         * Gets the identifier for this member, unique within a ReplicaSetConfig.
-         */
-        int getId() const { return _id; }
+    /**
+     * Gets this member's priority.  Higher means more likely to be elected
+     * primary.
+     */
+    double getPriority() const {
+        return _priority;
+    }
 
-        /**
-         * Gets the canonical name of this member, by which other members and clients
-         * will contact it.
-         */
-        const HostAndPort& getHostAndPort() const { return _host; }
+    /**
+     * Gets the amount of time behind the primary that this member will atempt to
+     * remain.  Zero seconds means stay as caught up as possible.
+     */
+    Seconds getSlaveDelay() const {
+        return _slaveDelay;
+    }
 
-        /**
-         * Gets this member's priority.  Higher means more likely to be elected
-         * primary.
-         */
-        double getPriority() const { return _priority; }
+    /**
+     * Returns true if this member may vote in elections.
+     */
+    bool isVoter() const {
+        return _votes != 0;
+    }
 
-        /**
-         * Gets the amount of time behind the primary that this member will atempt to
-         * remain.  Zero seconds means stay as caught up as possible.
-         */
-        Seconds getSlaveDelay() const { return _slaveDelay; }
+    /**
+     * Returns the number of votes that this member gets.
+     */
+    int getNumVotes() const {
+        return isVoter() ? 1 : 0;
+    }
 
-        /**
-         * Returns true if this member may vote in elections.
-         */
-        bool isVoter() const { return _votes != 0; }
+    /**
+     * Returns true if this member is an arbiter (is not data-bearing).
+     */
+    bool isArbiter() const {
+        return _arbiterOnly;
+    }
 
-        /**
-         * Returns the number of votes that this member gets.
-         */
-        int getNumVotes() const { return isVoter() ? 1 : 0; }
+    /**
+     * Returns true if this member is hidden (not reported by isMaster, not electable).
+     */
+    bool isHidden() const {
+        return _hidden;
+    }
 
-        /**
-         * Returns true if this member is an arbiter (is not data-bearing).
-         */
-        bool isArbiter() const { return _arbiterOnly; }
+    /**
+     * Returns true if this member should build secondary indexes.
+     */
+    bool shouldBuildIndexes() const {
+        return _buildIndexes;
+    }
 
-        /**
-         * Returns true if this member is hidden (not reported by isMaster, not electable).
-         */
-        bool isHidden() const { return _hidden; }
+    /**
+     * Gets the number of replica set tags, including internal '$' tags, for this member.
+     */
+    size_t getNumTags() const {
+        return _tags.size();
+    }
 
-        /**
-         * Returns true if this member should build secondary indexes.
-         */
-        bool shouldBuildIndexes() const { return _buildIndexes; }
+    /**
+     * Returns true if this MemberConfig has any non-internal tags, using "tagConfig" to
+     * determine the internal property of the tags.
+     */
+    bool hasTags(const ReplicaSetTagConfig& tagConfig) const;
 
-        /**
-         * Gets the number of replica set tags, including internal '$' tags, for this member.
-         */
-        size_t getNumTags() const { return _tags.size(); }
+    /**
+     * Gets a begin iterator over the tags for this member.
+     */
+    TagIterator tagsBegin() const {
+        return _tags.begin();
+    }
 
-        /**
-         * Returns true if this MemberConfig has any non-internal tags, using "tagConfig" to
-         * determine the internal property of the tags.
-         */
-        bool hasTags(const ReplicaSetTagConfig& tagConfig) const;
+    /**
+     * Gets an end iterator over the tags for this member.
+     */
+    TagIterator tagsEnd() const {
+        return _tags.end();
+    }
 
-        /**
-         * Gets a begin iterator over the tags for this member.
-         */
-        TagIterator tagsBegin() const { return _tags.begin(); }
+    /**
+     * Returns true if this represents the configuration of an electable member.
+     */
+    bool isElectable() const {
+        return !isArbiter() && getPriority() > 0;
+    }
 
-        /**
-         * Gets an end iterator over the tags for this member.
-         */
-        TagIterator tagsEnd() const { return _tags.end(); }
+    /**
+     * Returns the member config as a BSONObj, using "tagConfig" to generate the tag subdoc.
+     */
+    BSONObj toBSON(const ReplicaSetTagConfig& tagConfig) const;
 
-        /**
-         * Returns true if this represents the configuration of an electable member.
-         */
-        bool isElectable() const { return !isArbiter() && getPriority() > 0; }
-
-        /**
-         * Returns the member config as a BSONObj, using "tagConfig" to generate the tag subdoc.
-         */
-        BSONObj toBSON(const ReplicaSetTagConfig& tagConfig) const;
-
-    private:
-
-        int _id;
-        HostAndPort _host;
-        double _priority;      // 0 means can never be primary
-        int _votes;            // Can this member vote? Only 0 and 1 are valid.  Default 1.
-        bool _arbiterOnly;
-        Seconds _slaveDelay;
-        bool _hidden;          // if set, don't advertise to drivers in isMaster.
-        bool _buildIndexes;    // if false, do not create any non-_id indexes
-        std::vector<ReplicaSetTag> _tags;  // tagging for data center, rack, etc.
-    };
+private:
+    int _id;
+    HostAndPort _host;
+    double _priority;  // 0 means can never be primary
+    int _votes;        // Can this member vote? Only 0 and 1 are valid.  Default 1.
+    bool _arbiterOnly;
+    Seconds _slaveDelay;
+    bool _hidden;                      // if set, don't advertise to drivers in isMaster.
+    bool _buildIndexes;                // if false, do not create any non-_id indexes
+    std::vector<ReplicaSetTag> _tags;  // tagging for data center, rack, etc.
+};
 
 }  // namespace repl
 }  // namespace mongo

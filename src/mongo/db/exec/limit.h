@@ -35,47 +35,49 @@
 
 namespace mongo {
 
-    /**
-     * This stage implements limit functionality.  It only returns 'limit' results before EOF.
-     *
-     * Sort has a baked-in limit, as it can optimize the sort if it has a limit.
-     *
-     * Preconditions: None.
-     */
-    class LimitStage : public PlanStage {
-    public:
-        LimitStage(int limit, WorkingSet* ws, PlanStage* child);
-        virtual ~LimitStage();
+/**
+ * This stage implements limit functionality.  It only returns 'limit' results before EOF.
+ *
+ * Sort has a baked-in limit, as it can optimize the sort if it has a limit.
+ *
+ * Preconditions: None.
+ */
+class LimitStage : public PlanStage {
+public:
+    LimitStage(int limit, WorkingSet* ws, PlanStage* child);
+    virtual ~LimitStage();
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual StageType stageType() const { return STAGE_LIMIT; }
+    virtual StageType stageType() const {
+        return STAGE_LIMIT;
+    }
 
-        virtual PlanStageStats* getStats();
+    virtual PlanStageStats* getStats();
 
-        virtual const CommonStats* getCommonStats() const;
+    virtual const CommonStats* getCommonStats() const;
 
-        virtual const SpecificStats* getSpecificStats() const;
+    virtual const SpecificStats* getSpecificStats() const;
 
-        static const char* kStageType;
+    static const char* kStageType;
 
-    private:
-        WorkingSet* _ws;
-        std::unique_ptr<PlanStage> _child;
+private:
+    WorkingSet* _ws;
+    std::unique_ptr<PlanStage> _child;
 
-        // We only return this many results.
-        int _numToReturn;
+    // We only return this many results.
+    int _numToReturn;
 
-        // Stats
-        CommonStats _commonStats;
-        LimitStats _specificStats;
-    };
+    // Stats
+    CommonStats _commonStats;
+    LimitStats _specificStats;
+};
 
 }  // namespace mongo

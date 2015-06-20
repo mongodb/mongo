@@ -32,10 +32,10 @@
 
 namespace mongo {
 
-    /**
-     * Constructs a human-readable BSON from the specified LockerInfo structure.
-     * The lockerInfo must be sorted.
-     */
-    void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder);
+/**
+ * Constructs a human-readable BSON from the specified LockerInfo structure.
+ * The lockerInfo must be sorted.
+ */
+void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder);
 
 }  // namespace mongo

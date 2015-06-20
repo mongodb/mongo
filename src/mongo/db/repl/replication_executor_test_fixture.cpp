@@ -39,47 +39,46 @@ namespace repl {
 
 namespace {
 
-    const int64_t prngSeed = 1;
+const int64_t prngSeed = 1;
 
-} // namespace
+}  // namespace
 
-    // static
-    Status ReplicationExecutorTest::getDetectableErrorStatus() {
-        return Status(ErrorCodes::InternalError, "Not mutated");
+// static
+Status ReplicationExecutorTest::getDetectableErrorStatus() {
+    return Status(ErrorCodes::InternalError, "Not mutated");
+}
+
+void ReplicationExecutorTest::launchExecutorThread() {
+    ASSERT(!_executorThread);
+    _executorThread.reset(new stdx::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
+    postExecutorThreadLaunch();
+}
+
+void ReplicationExecutorTest::postExecutorThreadLaunch() {
+    _net->enterNetwork();
+}
+
+void ReplicationExecutorTest::joinExecutorThread() {
+    ASSERT(_executorThread);
+    getNet()->exitNetwork();
+    _executorThread->join();
+    _executorThread.reset();
+}
+
+void ReplicationExecutorTest::setUp() {
+    _net = new executor::NetworkInterfaceMock;
+    _storage = new StorageInterfaceMock;
+    _executor.reset(new ReplicationExecutor(_net, _storage, prngSeed));
+}
+
+void ReplicationExecutorTest::tearDown() {
+    if (_executorThread) {
+        _executor->shutdown();
+        joinExecutorThread();
     }
-
-    void ReplicationExecutorTest::launchExecutorThread() {
-        ASSERT(!_executorThread);
-        _executorThread.reset(
-                new stdx::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
-        postExecutorThreadLaunch();
-    }
-
-    void ReplicationExecutorTest::postExecutorThreadLaunch() {
-        _net->enterNetwork();
-    }
-
-    void ReplicationExecutorTest::joinExecutorThread() {
-        ASSERT(_executorThread);
-        getNet()->exitNetwork();
-        _executorThread->join();
-        _executorThread.reset();
-    }
-
-    void ReplicationExecutorTest::setUp() {
-        _net = new executor::NetworkInterfaceMock;
-        _storage = new StorageInterfaceMock;
-        _executor.reset(new ReplicationExecutor(_net, _storage, prngSeed));
-    }
-
-    void ReplicationExecutorTest::tearDown() {
-        if (_executorThread) {
-            _executor->shutdown();
-            joinExecutorThread();
-        }
-        _executor.reset();
-        _net = nullptr;
-    }
+    _executor.reset();
+    _net = nullptr;
+}
 
 }  // namespace repl
 }  // namespace mongo

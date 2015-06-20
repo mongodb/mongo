@@ -36,27 +36,26 @@
 
 namespace mongo {
 
-    class MultiCommandDispatch;
+class MultiCommandDispatch;
 
-    class ConfigCoordinator {
-    public:
-        ConfigCoordinator(MultiCommandDispatch* dispatcher,
-                          const ConnectionString& configServerConnectionString);
+class ConfigCoordinator {
+public:
+    ConfigCoordinator(MultiCommandDispatch* dispatcher,
+                      const ConnectionString& configServerConnectionString);
 
-        void executeBatch(const BatchedCommandRequest& request, BatchedCommandResponse* response);
+    void executeBatch(const BatchedCommandRequest& request, BatchedCommandResponse* response);
 
-    private:
-        /**
-         * Initialize configDB string in config server or if already initialized,
-         * check that it matches. Returns false if an error occured.
-         */
-        bool _checkConfigString(BatchedCommandResponse* clientResponse);
+private:
+    /**
+     * Initialize configDB string in config server or if already initialized,
+     * check that it matches. Returns false if an error occured.
+     */
+    bool _checkConfigString(BatchedCommandResponse* clientResponse);
 
 
-        // Not owned here
-        MultiCommandDispatch* const _dispatcher;
+    // Not owned here
+    MultiCommandDispatch* const _dispatcher;
 
-        const ConnectionString _configServerConnectionString;
-    };
-
+    const ConnectionString _configServerConnectionString;
+};
 }

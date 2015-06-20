@@ -34,54 +34,54 @@
 
 namespace mongo {
 
-    using std::vector;
+using std::vector;
 
-    // static
-    const char* EOFStage::kStageType = "EOF";
+// static
+const char* EOFStage::kStageType = "EOF";
 
-    EOFStage::EOFStage() : _commonStats(kStageType) { }
+EOFStage::EOFStage() : _commonStats(kStageType) {}
 
-    EOFStage::~EOFStage() { }
+EOFStage::~EOFStage() {}
 
-    bool EOFStage::isEOF() {
-        return true;
-    }
+bool EOFStage::isEOF() {
+    return true;
+}
 
-    PlanStage::StageState EOFStage::work(WorkingSetID* out) {
-        ++_commonStats.works;
-        // Adds the amount of time taken by work() to executionTimeMillis.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
-        return PlanStage::IS_EOF;
-    }
+PlanStage::StageState EOFStage::work(WorkingSetID* out) {
+    ++_commonStats.works;
+    // Adds the amount of time taken by work() to executionTimeMillis.
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
+    return PlanStage::IS_EOF;
+}
 
-    void EOFStage::saveState() {
-        ++_commonStats.yields;
-    }
+void EOFStage::saveState() {
+    ++_commonStats.yields;
+}
 
-    void EOFStage::restoreState(OperationContext* opCtx) {
-        ++_commonStats.unyields;
-    }
+void EOFStage::restoreState(OperationContext* opCtx) {
+    ++_commonStats.unyields;
+}
 
-    void EOFStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-        ++_commonStats.invalidates;
-    }
+void EOFStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    ++_commonStats.invalidates;
+}
 
-    vector<PlanStage*> EOFStage::getChildren() const {
-        vector<PlanStage*> empty;
-        return empty;
-    }
+vector<PlanStage*> EOFStage::getChildren() const {
+    vector<PlanStage*> empty;
+    return empty;
+}
 
-    PlanStageStats* EOFStage::getStats() {
-        _commonStats.isEOF = isEOF();
-        return new PlanStageStats(_commonStats, STAGE_EOF);
-    }
+PlanStageStats* EOFStage::getStats() {
+    _commonStats.isEOF = isEOF();
+    return new PlanStageStats(_commonStats, STAGE_EOF);
+}
 
-    const CommonStats* EOFStage::getCommonStats() const {
-        return &_commonStats;
-    }
+const CommonStats* EOFStage::getCommonStats() const {
+    return &_commonStats;
+}
 
-    const SpecificStats* EOFStage::getSpecificStats() const {
-        return nullptr;
-    }
+const SpecificStats* EOFStage::getSpecificStats() const {
+    return nullptr;
+}
 
 }  // namespace mongo

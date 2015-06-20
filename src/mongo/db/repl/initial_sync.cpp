@@ -39,24 +39,23 @@
 namespace mongo {
 namespace repl {
 
-    unsigned replSetForceInitialSyncFailure = 0;
+unsigned replSetForceInitialSyncFailure = 0;
 
-    InitialSync::InitialSync(BackgroundSyncInterface *q) : 
-        SyncTail(q, multiInitialSyncApply) {}
+InitialSync::InitialSync(BackgroundSyncInterface* q) : SyncTail(q, multiInitialSyncApply) {}
 
-    InitialSync::~InitialSync() {}
+InitialSync::~InitialSync() {}
 
-    /* initial oplog application, during initial sync, after cloning.
-    */
-    void InitialSync::oplogApplication(OperationContext* txn, const OpTime& endOpTime) {
-        if (replSetForceInitialSyncFailure > 0) {
-            log() << "test code invoked, forced InitialSync failure: "
-                  << replSetForceInitialSyncFailure;
-            replSetForceInitialSyncFailure--;
-            throw DBException("forced error",0);
-        }
-        _applyOplogUntil(txn, endOpTime);
+/* initial oplog application, during initial sync, after cloning.
+*/
+void InitialSync::oplogApplication(OperationContext* txn, const OpTime& endOpTime) {
+    if (replSetForceInitialSyncFailure > 0) {
+        log() << "test code invoked, forced InitialSync failure: "
+              << replSetForceInitialSyncFailure;
+        replSetForceInitialSyncFailure--;
+        throw DBException("forced error", 0);
     }
+    _applyOplogUntil(txn, endOpTime);
+}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

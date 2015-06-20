@@ -32,27 +32,27 @@
 
 namespace mongo {
 
-    class CertificateExpirationMonitor : public PeriodicTask {
-    public:
-        explicit CertificateExpirationMonitor(Date_t date);
+class CertificateExpirationMonitor : public PeriodicTask {
+public:
+    explicit CertificateExpirationMonitor(Date_t date);
 
-        /**
-         * Gets the PeriodicTask's name.
-         * @return CertificateExpirationMonitor's name.
-         */
-        virtual std::string taskName() const;
+    /**
+     * Gets the PeriodicTask's name.
+     * @return CertificateExpirationMonitor's name.
+     */
+    virtual std::string taskName() const;
 
-        /**
-         * Wakes up every minute as it is a PeriodicTask.
-         * Checks once a day if the server certificate has expired
-         * or will expire in the next 30 days and sends a warning 
-         * to the log accordingly.
-         */
-        virtual void taskDoWork();
+    /**
+     * Wakes up every minute as it is a PeriodicTask.
+     * Checks once a day if the server certificate has expired
+     * or will expire in the next 30 days and sends a warning
+     * to the log accordingly.
+     */
+    virtual void taskDoWork();
 
-    private:
-        const Date_t _certExpiration;
-        Date_t _lastCheckTime;
-    };
+private:
+    const Date_t _certExpiration;
+    Date_t _lastCheckTime;
+};
 
 }  // namespace mongo

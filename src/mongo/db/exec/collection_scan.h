@@ -37,75 +37,75 @@
 
 namespace mongo {
 
-    class RecordCursor;
-    class WorkingSet;
-    class OperationContext;
+class RecordCursor;
+class WorkingSet;
+class OperationContext;
 
+/**
+ * Scans over a collection, starting at the RecordId provided in params and continuing until
+ * there are no more records in the collection.
+ *
+ * Preconditions: Valid RecordId.
+ */
+class CollectionScan : public PlanStage {
+public:
+    CollectionScan(OperationContext* txn,
+                   const CollectionScanParams& params,
+                   WorkingSet* workingSet,
+                   const MatchExpression* filter);
+
+    virtual StageState work(WorkingSetID* out);
+    virtual bool isEOF();
+
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_COLLSCAN;
+    }
+
+    virtual PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats() const;
+
+    virtual const SpecificStats* getSpecificStats() const;
+
+    static const char* kStageType;
+
+private:
     /**
-     * Scans over a collection, starting at the RecordId provided in params and continuing until
-     * there are no more records in the collection.
-     *
-     * Preconditions: Valid RecordId.
+     * If the member (with id memberID) passes our filter, set *out to memberID and return that
+     * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
      */
-    class CollectionScan : public PlanStage {
-    public:
-        CollectionScan(OperationContext* txn,
-                       const CollectionScanParams& params,
-                       WorkingSet* workingSet,
-                       const MatchExpression* filter);
+    StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
 
-        virtual StageState work(WorkingSetID* out);
-        virtual bool isEOF();
+    // transactional context for read locks. Not owned by us
+    OperationContext* _txn;
 
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
+    // WorkingSet is not owned by us.
+    WorkingSet* _workingSet;
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    // The filter is not owned by us.
+    const MatchExpression* _filter;
 
-        virtual StageType stageType() const { return STAGE_COLLSCAN; }
+    std::unique_ptr<RecordCursor> _cursor;
 
-        virtual PlanStageStats* getStats();
+    CollectionScanParams _params;
 
-        virtual const CommonStats* getCommonStats() const;
+    bool _isDead;
 
-        virtual const SpecificStats* getSpecificStats() const;
+    RecordId _lastSeenId;  // Null if nothing has been returned from _cursor yet.
 
-        static const char* kStageType;
+    // We allocate a working set member with this id on construction of the stage. It gets
+    // used for all fetch requests, changing the RecordId as appropriate.
+    const WorkingSetID _wsidForFetch;
 
-    private:
-        /**
-         * If the member (with id memberID) passes our filter, set *out to memberID and return that
-         * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
-         */
-        StageState returnIfMatches(WorkingSetMember* member,
-                                   WorkingSetID memberID,
-                                   WorkingSetID* out);
-
-        // transactional context for read locks. Not owned by us
-        OperationContext* _txn;
-
-        // WorkingSet is not owned by us.
-        WorkingSet* _workingSet;
-
-        // The filter is not owned by us.
-        const MatchExpression* _filter;
-
-        std::unique_ptr<RecordCursor> _cursor;
-
-        CollectionScanParams _params;
-
-        bool _isDead;
-
-        RecordId _lastSeenId; // Null if nothing has been returned from _cursor yet.
-
-        // We allocate a working set member with this id on construction of the stage. It gets
-        // used for all fetch requests, changing the RecordId as appropriate.
-        const WorkingSetID _wsidForFetch;
-
-        // Stats
-        CommonStats _commonStats;
-        CollectionScanStats _specificStats;
-    };
+    // Stats
+    CommonStats _commonStats;
+    CollectionScanStats _specificStats;
+};
 
 }  // namespace mongo

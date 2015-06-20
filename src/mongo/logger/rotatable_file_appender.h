@@ -37,38 +37,36 @@
 namespace mongo {
 namespace logger {
 
+/**
+ * Appender for writing to instances of RotatableFileWriter.
+ */
+template <typename Event>
+class RotatableFileAppender : public Appender<Event> {
+    MONGO_DISALLOW_COPYING(RotatableFileAppender);
+
+public:
+    typedef Encoder<Event> EventEncoder;
+
     /**
-     * Appender for writing to instances of RotatableFileWriter.
+     * Constructs an appender, that owns "encoder", but not "writer."  Caller must
+     * keep "writer" in scope at least as long as the constructed appender.
      */
-    template <typename Event>
-    class RotatableFileAppender : public Appender<Event> {
-        MONGO_DISALLOW_COPYING(RotatableFileAppender);
+    RotatableFileAppender(EventEncoder* encoder, RotatableFileWriter* writer)
+        : _encoder(encoder), _writer(writer) {}
 
-    public:
-        typedef Encoder<Event> EventEncoder;
+    virtual Status append(const Event& event) {
+        RotatableFileWriter::Use useWriter(_writer);
+        Status status = useWriter.status();
+        if (!status.isOK())
+            return status;
+        _encoder->encode(event, useWriter.stream()).flush();
+        return useWriter.status();
+    }
 
-        /**
-         * Constructs an appender, that owns "encoder", but not "writer."  Caller must
-         * keep "writer" in scope at least as long as the constructed appender.
-         */
-        RotatableFileAppender(EventEncoder* encoder, RotatableFileWriter* writer) :
-            _encoder(encoder),
-            _writer(writer) {
-        }
-
-        virtual Status append(const Event& event) {
-            RotatableFileWriter::Use useWriter(_writer);
-            Status status = useWriter.status();
-            if (!status.isOK())
-                return status;
-            _encoder->encode(event, useWriter.stream()).flush();
-            return useWriter.status();
-        }
-
-    private:
-        std::unique_ptr<EventEncoder> _encoder;
-        RotatableFileWriter* _writer;
-    };
+private:
+    std::unique_ptr<EventEncoder> _encoder;
+    RotatableFileWriter* _writer;
+};
 
 }  // namespace logger
 }  // namespace mongo

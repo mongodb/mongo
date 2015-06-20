@@ -37,76 +37,76 @@
 
 namespace mongo {
 
-    class Collection;
+class Collection;
+
+/**
+ * this is for storing things that you want to cache about a single collection
+ * life cycle is managed for you from inside Collection
+ */
+class CollectionInfoCache {
+public:
+    CollectionInfoCache(Collection* collection);
+
+    /*
+     * Resets entire cache state. Must be called under exclusive DB lock.
+     */
+    void reset(OperationContext* txn);
+
+    //
+    // New Query Execution
+    //
 
     /**
-     * this is for storing things that you want to cache about a single collection
-     * life cycle is managed for you from inside Collection
+     * Get the PlanCache for this collection.
      */
-    class CollectionInfoCache {
-    public:
+    PlanCache* getPlanCache() const;
 
-        CollectionInfoCache( Collection* collection );
+    /**
+     * Get the QuerySettings for this collection.
+     */
+    QuerySettings* getQuerySettings() const;
 
-        /*
-         * Resets entire cache state. Must be called under exclusive DB lock.
-         */
-        void reset( OperationContext* txn );
+    // -------------------
 
-        //
-        // New Query Execution
-        //
+    /* get set of index keys for this namespace.  handy to quickly check if a given
+       field is indexed (Note it might be a secondary component of a compound index.)
+    */
+    const UpdateIndexData& indexKeys(OperationContext* txn) const;
 
-        /**
-         * Get the PlanCache for this collection.
-         */
-        PlanCache* getPlanCache() const;
+    // ---------------------
 
-        /**
-         * Get the QuerySettings for this collection.
-         */
-        QuerySettings* getQuerySettings() const;
+    /**
+     * Called when an index is added to this collection.
+     */
+    void addedIndex(OperationContext* txn) {
+        reset(txn);
+    }
 
-        // -------------------
+    void clearQueryCache();
 
-        /* get set of index keys for this namespace.  handy to quickly check if a given
-           field is indexed (Note it might be a secondary component of a compound index.)
-        */
-        const UpdateIndexData& indexKeys( OperationContext* txn ) const;
+    /* you must notify the cache if you are doing writes, as query plan utility will change */
+    void notifyOfWriteOp();
 
-        // ---------------------
+private:
+    Collection* _collection;  // not owned
 
-        /**
-         * Called when an index is added to this collection.
-         */
-        void addedIndex( OperationContext* txn ) { reset( txn ); }
+    // ---  index keys cache
+    bool _keysComputed;
+    UpdateIndexData _indexedPaths;
 
-        void clearQueryCache();
+    // A cache for query plans.
+    std::unique_ptr<PlanCache> _planCache;
 
-        /* you must notify the cache if you are doing writes, as query plan utility will change */
-        void notifyOfWriteOp();
+    // Query settings.
+    // Includes index filters.
+    std::unique_ptr<QuerySettings> _querySettings;
 
-    private:
+    /**
+     * Must be called under exclusive DB lock.
+     */
+    void computeIndexKeys(OperationContext* txn);
 
-        Collection* _collection; // not owned
-
-        // ---  index keys cache
-        bool _keysComputed;
-        UpdateIndexData _indexedPaths;
-
-        // A cache for query plans.
-        std::unique_ptr<PlanCache> _planCache;
-
-        // Query settings.
-        // Includes index filters.
-        std::unique_ptr<QuerySettings> _querySettings;
-
-        /**
-         * Must be called under exclusive DB lock.
-         */
-        void computeIndexKeys( OperationContext* txn );
-
-        void updatePlanCacheIndexEntries( OperationContext* txn );
-    };
+    void updatePlanCacheIndexEntries(OperationContext* txn);
+};
 
 }  // namespace mongo

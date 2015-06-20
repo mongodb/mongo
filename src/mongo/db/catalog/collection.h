@@ -53,343 +53,360 @@
 
 namespace mongo {
 
-    class CollectionCatalogEntry;
-    class DatabaseCatalogEntry;
-    class ExtentManager;
-    class IndexCatalog;
-    class MatchExpression;
-    class MultiIndexBlock;
-    class OpDebug;
-    class OperationContext;
-    class RecordCursor;
-    class RecordFetcher;
-    class UpdateDriver;
-    class UpdateRequest;
+class CollectionCatalogEntry;
+class DatabaseCatalogEntry;
+class ExtentManager;
+class IndexCatalog;
+class MatchExpression;
+class MultiIndexBlock;
+class OpDebug;
+class OperationContext;
+class RecordCursor;
+class RecordFetcher;
+class UpdateDriver;
+class UpdateRequest;
 
-    struct CompactOptions {
+struct CompactOptions {
+    CompactOptions() {
+        paddingMode = NONE;
+        validateDocuments = true;
+        paddingFactor = 1;
+        paddingBytes = 0;
+    }
 
-        CompactOptions() {
-            paddingMode = NONE;
-            validateDocuments = true;
-            paddingFactor = 1;
-            paddingBytes = 0;
-        }
+    // padding
+    enum PaddingMode { PRESERVE, NONE, MANUAL } paddingMode;
 
-        // padding
-        enum PaddingMode {
-            PRESERVE, NONE, MANUAL
-        } paddingMode;
+    // only used if _paddingMode == MANUAL
+    double paddingFactor;  // what to multiple document size by
+    int paddingBytes;      // what to add to ducment size after multiplication
+    unsigned computeRecordSize(unsigned recordSize) const {
+        recordSize = static_cast<unsigned>(paddingFactor * recordSize);
+        recordSize += paddingBytes;
+        return recordSize;
+    }
 
-        // only used if _paddingMode == MANUAL
-        double paddingFactor; // what to multiple document size by
-        int paddingBytes; // what to add to ducment size after multiplication
-        unsigned computeRecordSize( unsigned recordSize ) const {
-            recordSize = static_cast<unsigned>( paddingFactor * recordSize );
-            recordSize += paddingBytes;
-            return recordSize;
-        }
+    // other
+    bool validateDocuments;
 
-        // other
-        bool validateDocuments;
+    std::string toString() const;
+};
 
-        std::string toString() const;
-    };
+struct CompactStats {
+    CompactStats() {
+        corruptDocuments = 0;
+    }
 
-    struct CompactStats {
-        CompactStats() {
-            corruptDocuments = 0;
-        }
+    long long corruptDocuments;
+};
 
-        long long corruptDocuments;
-    };
-
-    /**
-     * Queries with the awaitData option use this notifier object to wait for more data to be
-     * inserted into the capped collection.
-     */
-    class CappedInsertNotifier {
-    public:
-        CappedInsertNotifier();
-
-        /**
-         * Wakes up threads waiting on this object for the arrival of new data.
-         */
-        void notifyOfInsert();
-
-        /**
-         * Get a counter value which is incremented on every insert into a capped collection.
-         * The return value should be used as a reference value to pass into waitForCappedInsert().
-         */
-        uint64_t getCount() const;
-
-        /**
-         * Waits for 'timeout' microseconds, or until notifyAll() is called to indicate that new
-         * data is available in the capped collection.
-         */
-        void waitForInsert(uint64_t referenceCount, Microseconds timeout) const;
-
-    private:
-        // Signalled when a successful insert is made into a capped collection.
-        mutable stdx::condition_variable _cappedNewDataNotifier;
-
-        // Mutex used with '_cappedNewDataNotifier'. Protects access to '_cappedInsertCount'.
-        mutable stdx::mutex _cappedNewDataMutex;
-
-        // A counter, incremented on insertion of new data into the capped collection.
-        //
-        // The condition which '_cappedNewDataNotifier' is being notified of is an increment of this
-        // counter. Access to this counter is synchronized with '_cappedNewDataMutex'.
-        uint64_t _cappedInsertCount;
-    };
+/**
+ * Queries with the awaitData option use this notifier object to wait for more data to be
+ * inserted into the capped collection.
+ */
+class CappedInsertNotifier {
+public:
+    CappedInsertNotifier();
 
     /**
-     * this is NOT safe through a yield right now
-     * not sure if it will be, or what yet
+     * Wakes up threads waiting on this object for the arrival of new data.
      */
-    class Collection : CappedDocumentDeleteCallback, UpdateNotifier {
-    public:
-        Collection( OperationContext* txn,
-                    StringData fullNS,
-                    CollectionCatalogEntry* details, // does not own
-                    RecordStore* recordStore, // does not own
-                    DatabaseCatalogEntry* dbce ); // does not own
+    void notifyOfInsert();
 
-        ~Collection();
+    /**
+     * Get a counter value which is incremented on every insert into a capped collection.
+     * The return value should be used as a reference value to pass into waitForCappedInsert().
+     */
+    uint64_t getCount() const;
 
-        bool ok() const { return _magic == 1357924; }
+    /**
+     * Waits for 'timeout' microseconds, or until notifyAll() is called to indicate that new
+     * data is available in the capped collection.
+     */
+    void waitForInsert(uint64_t referenceCount, Microseconds timeout) const;
 
-        CollectionCatalogEntry* getCatalogEntry() { return _details; }
-        const CollectionCatalogEntry* getCatalogEntry() const { return _details; }
+private:
+    // Signalled when a successful insert is made into a capped collection.
+    mutable stdx::condition_variable _cappedNewDataNotifier;
 
-        CollectionInfoCache* infoCache() { return &_infoCache; }
-        const CollectionInfoCache* infoCache() const { return &_infoCache; }
+    // Mutex used with '_cappedNewDataNotifier'. Protects access to '_cappedInsertCount'.
+    mutable stdx::mutex _cappedNewDataMutex;
 
-        const NamespaceString& ns() const { return _ns; }
+    // A counter, incremented on insertion of new data into the capped collection.
+    //
+    // The condition which '_cappedNewDataNotifier' is being notified of is an increment of this
+    // counter. Access to this counter is synchronized with '_cappedNewDataMutex'.
+    uint64_t _cappedInsertCount;
+};
 
-        const IndexCatalog* getIndexCatalog() const { return &_indexCatalog; }
-        IndexCatalog* getIndexCatalog() { return &_indexCatalog; }
+/**
+ * this is NOT safe through a yield right now
+ * not sure if it will be, or what yet
+ */
+class Collection : CappedDocumentDeleteCallback, UpdateNotifier {
+public:
+    Collection(OperationContext* txn,
+               StringData fullNS,
+               CollectionCatalogEntry* details,  // does not own
+               RecordStore* recordStore,         // does not own
+               DatabaseCatalogEntry* dbce);      // does not own
 
-        const RecordStore* getRecordStore() const { return _recordStore; }
-        RecordStore* getRecordStore() { return _recordStore; }
+    ~Collection();
 
-        CursorManager* getCursorManager() const { return &_cursorManager; }
+    bool ok() const {
+        return _magic == 1357924;
+    }
 
-        bool requiresIdIndex() const;
+    CollectionCatalogEntry* getCatalogEntry() {
+        return _details;
+    }
+    const CollectionCatalogEntry* getCatalogEntry() const {
+        return _details;
+    }
 
-        Snapshotted<BSONObj> docFor(OperationContext* txn, const RecordId& loc) const;
+    CollectionInfoCache* infoCache() {
+        return &_infoCache;
+    }
+    const CollectionInfoCache* infoCache() const {
+        return &_infoCache;
+    }
 
-        /**
-         * @param out - contents set to the right docs if exists, or nothing.
-         * @return true iff loc exists
-         */
-        bool findDoc(OperationContext* txn, const RecordId& loc, Snapshotted<BSONObj>* out) const;
+    const NamespaceString& ns() const {
+        return _ns;
+    }
 
-        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward = true) const;
+    const IndexCatalog* getIndexCatalog() const {
+        return &_indexCatalog;
+    }
+    IndexCatalog* getIndexCatalog() {
+        return &_indexCatalog;
+    }
 
-        /**
-         * Returns many cursors that partition the Collection into many disjoint sets. Iterating
-         * all returned cursors is equivalent to iterating the full collection.
-         */
-        std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const;
+    const RecordStore* getRecordStore() const {
+        return _recordStore;
+    }
+    RecordStore* getRecordStore() {
+        return _recordStore;
+    }
 
-        void deleteDocument( OperationContext* txn,
-                             const RecordId& loc,
-                             bool cappedOK = false,
-                             bool noWarn = false,
-                             BSONObj* deletedId = 0 );
+    CursorManager* getCursorManager() const {
+        return &_cursorManager;
+    }
 
-        /**
-         * this does NOT modify the doc before inserting
-         * i.e. will not add an _id field for documents that are missing it
-         *
-         * If enforceQuota is false, quotas will be ignored.
-         */
-        StatusWith<RecordId> insertDocument( OperationContext* txn,
-                                            const BSONObj& doc,
-                                            bool enforceQuota,
-                                            bool fromMigrate = false);
+    bool requiresIdIndex() const;
 
-        /**
-         * Callers must ensure no document validation is performed for this collection when calling
-         * this method.
-         */
-        StatusWith<RecordId> insertDocument( OperationContext* txn,
-                                            const DocWriter* doc,
-                                            bool enforceQuota );
+    Snapshotted<BSONObj> docFor(OperationContext* txn, const RecordId& loc) const;
 
-        StatusWith<RecordId> insertDocument( OperationContext* txn,
-                                            const BSONObj& doc,
-                                            MultiIndexBlock* indexBlock,
-                                            bool enforceQuota );
+    /**
+     * @param out - contents set to the right docs if exists, or nothing.
+     * @return true iff loc exists
+     */
+    bool findDoc(OperationContext* txn, const RecordId& loc, Snapshotted<BSONObj>* out) const;
 
-        /**
-         * updates the document @ oldLocation with newDoc
-         * if the document fits in the old space, it is put there
-         * if not, it is moved
-         * @return the post update location of the doc (may or may not be the same as oldLocation)
-         */
-        StatusWith<RecordId> updateDocument(OperationContext* txn,
-                                            const RecordId& oldLocation,
-                                            const Snapshotted<BSONObj>& oldDoc,
-                                            const BSONObj& newDoc,
-                                            bool enforceQuota,
-                                            bool indexesAffected,
-                                            OpDebug* debug,
-                                            oplogUpdateEntryArgs& args);
+    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward = true) const;
 
-        bool updateWithDamagesSupported() const;
+    /**
+     * Returns many cursors that partition the Collection into many disjoint sets. Iterating
+     * all returned cursors is equivalent to iterating the full collection.
+     */
+    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const;
 
-        /**
-         * Not allowed to modify indexes.
-         * Illegal to call if updateWithDamagesSupported() returns false.
-         */
-        Status updateDocumentWithDamages(OperationContext* txn,
-                                         const RecordId& loc,
-                                         const Snapshotted<RecordData>& oldRec,
-                                         const char* damageSource,
-                                         const mutablebson::DamageVector& damages,
-                                         oplogUpdateEntryArgs& args);
+    void deleteDocument(OperationContext* txn,
+                        const RecordId& loc,
+                        bool cappedOK = false,
+                        bool noWarn = false,
+                        BSONObj* deletedId = 0);
 
-        // -----------
+    /**
+     * this does NOT modify the doc before inserting
+     * i.e. will not add an _id field for documents that are missing it
+     *
+     * If enforceQuota is false, quotas will be ignored.
+     */
+    StatusWith<RecordId> insertDocument(OperationContext* txn,
+                                        const BSONObj& doc,
+                                        bool enforceQuota,
+                                        bool fromMigrate = false);
 
-        StatusWith<CompactStats> compact(OperationContext* txn, const CompactOptions* options);
+    /**
+     * Callers must ensure no document validation is performed for this collection when calling
+     * this method.
+     */
+    StatusWith<RecordId> insertDocument(OperationContext* txn,
+                                        const DocWriter* doc,
+                                        bool enforceQuota);
 
-        /**
-         * removes all documents as fast as possible
-         * indexes before and after will be the same
-         * as will other characteristics
-         */
-        Status truncate(OperationContext* txn);
+    StatusWith<RecordId> insertDocument(OperationContext* txn,
+                                        const BSONObj& doc,
+                                        MultiIndexBlock* indexBlock,
+                                        bool enforceQuota);
 
-        /**
-         * @param full - does more checks
-         * @param scanData - scans each document
-         * @return OK if the validate run successfully
-         *         OK will be returned even if corruption is found
-         *         deatils will be in result
-         */
-        Status validate( OperationContext* txn,
-                         bool full, bool scanData,
-                         ValidateResults* results, BSONObjBuilder* output );
+    /**
+     * updates the document @ oldLocation with newDoc
+     * if the document fits in the old space, it is put there
+     * if not, it is moved
+     * @return the post update location of the doc (may or may not be the same as oldLocation)
+     */
+    StatusWith<RecordId> updateDocument(OperationContext* txn,
+                                        const RecordId& oldLocation,
+                                        const Snapshotted<BSONObj>& oldDoc,
+                                        const BSONObj& newDoc,
+                                        bool enforceQuota,
+                                        bool indexesAffected,
+                                        OpDebug* debug,
+                                        oplogUpdateEntryArgs& args);
 
-        /**
-         * forces data into cache
-         */
-        Status touch( OperationContext* txn,
-                      bool touchData, bool touchIndexes,
-                      BSONObjBuilder* output ) const;
+    bool updateWithDamagesSupported() const;
 
-        /**
-         * Truncate documents newer than the document at 'end' from the capped
-         * collection.  The collection cannot be completely emptied using this
-         * function.  An assertion will be thrown if that is attempted.
-         * @param inclusive - Truncate 'end' as well iff true
-         * XXX: this will go away soon, just needed to move for now
-         */
-        void temp_cappedTruncateAfter( OperationContext* txn, RecordId end, bool inclusive );
+    /**
+     * Not allowed to modify indexes.
+     * Illegal to call if updateWithDamagesSupported() returns false.
+     */
+    Status updateDocumentWithDamages(OperationContext* txn,
+                                     const RecordId& loc,
+                                     const Snapshotted<RecordData>& oldRec,
+                                     const char* damageSource,
+                                     const mutablebson::DamageVector& damages,
+                                     oplogUpdateEntryArgs& args);
 
-        /**
-         * Sets the validator for this collection.
-         *
-         * An empty validator removes all validation.
-         * Requires an exclusive lock on the collection.
-         */
-        Status setValidator(OperationContext* txn, BSONObj validator);
+    // -----------
 
-        // -----------
+    StatusWith<CompactStats> compact(OperationContext* txn, const CompactOptions* options);
 
-        //
-        // Stats
-        //
+    /**
+     * removes all documents as fast as possible
+     * indexes before and after will be the same
+     * as will other characteristics
+     */
+    Status truncate(OperationContext* txn);
 
-        bool isCapped() const;
+    /**
+     * @param full - does more checks
+     * @param scanData - scans each document
+     * @return OK if the validate run successfully
+     *         OK will be returned even if corruption is found
+     *         deatils will be in result
+     */
+    Status validate(OperationContext* txn,
+                    bool full,
+                    bool scanData,
+                    ValidateResults* results,
+                    BSONObjBuilder* output);
 
-        /**
-         * Get a pointer to a capped insert notifier object. The caller can wait on this object
-         * until it is notified of a new insert into the capped collection.
-         *
-         * It is invalid to call this method unless the collection is capped.
-         */
-        std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const;
+    /**
+     * forces data into cache
+     */
+    Status touch(OperationContext* txn,
+                 bool touchData,
+                 bool touchIndexes,
+                 BSONObjBuilder* output) const;
 
-        uint64_t numRecords( OperationContext* txn ) const;
+    /**
+     * Truncate documents newer than the document at 'end' from the capped
+     * collection.  The collection cannot be completely emptied using this
+     * function.  An assertion will be thrown if that is attempted.
+     * @param inclusive - Truncate 'end' as well iff true
+     * XXX: this will go away soon, just needed to move for now
+     */
+    void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
 
-        uint64_t dataSize( OperationContext* txn ) const;
+    /**
+     * Sets the validator for this collection.
+     *
+     * An empty validator removes all validation.
+     * Requires an exclusive lock on the collection.
+     */
+    Status setValidator(OperationContext* txn, BSONObj validator);
 
-        int averageObjectSize( OperationContext* txn ) const {
-            uint64_t n = numRecords( txn );
-            if ( n == 0 )
-                return 5;
-            return static_cast<int>( dataSize( txn ) / n );
-        }
+    // -----------
 
-        uint64_t getIndexSize(OperationContext* opCtx,
-                              BSONObjBuilder* details = NULL,
-                              int scale = 1);
+    //
+    // Stats
+    //
 
-        // --- end suspect things
+    bool isCapped() const;
 
-    private:
+    /**
+     * Get a pointer to a capped insert notifier object. The caller can wait on this object
+     * until it is notified of a new insert into the capped collection.
+     *
+     * It is invalid to call this method unless the collection is capped.
+     */
+    std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const;
 
-        /**
-         * Returns a non-ok Status if document does not pass this collection's validator.
-         */
-        Status checkValidation(OperationContext* txn, const BSONObj& document) const;
+    uint64_t numRecords(OperationContext* txn) const;
 
-        /**
-         * Returns a non-ok Status if validator is not legal for this collection.
-         */
-        StatusWith<std::unique_ptr<MatchExpression>> parseValidator(const BSONObj& validator) const;
+    uint64_t dataSize(OperationContext* txn) const;
 
-        Status recordStoreGoingToMove( OperationContext* txn,
-                                       const RecordId& oldLocation,
-                                       const char* oldBuffer,
-                                       size_t oldSize );
+    int averageObjectSize(OperationContext* txn) const {
+        uint64_t n = numRecords(txn);
+        if (n == 0)
+            return 5;
+        return static_cast<int>(dataSize(txn) / n);
+    }
 
-        Status recordStoreGoingToUpdateInPlace( OperationContext* txn,
-                                                const RecordId& loc );
+    uint64_t getIndexSize(OperationContext* opCtx, BSONObjBuilder* details = NULL, int scale = 1);
 
-        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc, RecordData data );
+    // --- end suspect things
 
-        /**
-         * same semantics as insertDocument, but doesn't do:
-         *  - some user error checks
-         *  - adjust padding
-         */
-        StatusWith<RecordId> _insertDocument( OperationContext* txn,
-                                             const BSONObj& doc,
-                                             bool enforceQuota );
+private:
+    /**
+     * Returns a non-ok Status if document does not pass this collection's validator.
+     */
+    Status checkValidation(OperationContext* txn, const BSONObj& document) const;
 
-        bool _enforceQuota( bool userEnforeQuota ) const;
+    /**
+     * Returns a non-ok Status if validator is not legal for this collection.
+     */
+    StatusWith<std::unique_ptr<MatchExpression>> parseValidator(const BSONObj& validator) const;
 
-        int _magic;
+    Status recordStoreGoingToMove(OperationContext* txn,
+                                  const RecordId& oldLocation,
+                                  const char* oldBuffer,
+                                  size_t oldSize);
 
-        NamespaceString _ns;
-        CollectionCatalogEntry* _details;
-        RecordStore* _recordStore;
-        DatabaseCatalogEntry* _dbce;
-        CollectionInfoCache _infoCache;
-        IndexCatalog _indexCatalog;
+    Status recordStoreGoingToUpdateInPlace(OperationContext* txn, const RecordId& loc);
 
-        // Empty means no filter.
-        BSONObj _validatorDoc;
-        // Points into _validatorDoc. Null means no filter.
-        std::unique_ptr<MatchExpression> _validator;
+    Status aboutToDeleteCapped(OperationContext* txn, const RecordId& loc, RecordData data);
 
-        // this is mutable because read only users of the Collection class
-        // use it keep state.  This seems valid as const correctness of Collection
-        // should be about the data.
-        mutable CursorManager _cursorManager;
+    /**
+     * same semantics as insertDocument, but doesn't do:
+     *  - some user error checks
+     *  - adjust padding
+     */
+    StatusWith<RecordId> _insertDocument(OperationContext* txn,
+                                         const BSONObj& doc,
+                                         bool enforceQuota);
 
-        // Notifier object for awaitData. Threads polling a capped collection for new data can wait
-        // on this object until notified of the arrival of new data.
-        //
-        // This is non-null if and only if the collection is a capped collection.
-        std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
+    bool _enforceQuota(bool userEnforeQuota) const;
 
-        friend class Database;
-        friend class IndexCatalog;
-        friend class NamespaceDetails;
-    };
+    int _magic;
 
+    NamespaceString _ns;
+    CollectionCatalogEntry* _details;
+    RecordStore* _recordStore;
+    DatabaseCatalogEntry* _dbce;
+    CollectionInfoCache _infoCache;
+    IndexCatalog _indexCatalog;
+
+    // Empty means no filter.
+    BSONObj _validatorDoc;
+    // Points into _validatorDoc. Null means no filter.
+    std::unique_ptr<MatchExpression> _validator;
+
+    // this is mutable because read only users of the Collection class
+    // use it keep state.  This seems valid as const correctness of Collection
+    // should be about the data.
+    mutable CursorManager _cursorManager;
+
+    // Notifier object for awaitData. Threads polling a capped collection for new data can wait
+    // on this object until notified of the arrival of new data.
+    //
+    // This is non-null if and only if the collection is a capped collection.
+    std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
+
+    friend class Database;
+    friend class IndexCatalog;
+    friend class NamespaceDetails;
+};
 }

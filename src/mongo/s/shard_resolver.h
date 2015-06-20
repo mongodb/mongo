@@ -36,26 +36,23 @@
 
 namespace mongo {
 
+/**
+ * Given a shard name, the ShardResolver resolves a particular host on that shard to contact.
+ *
+ * TODO: Internally, this is backed by a cache - do we need explicit refresh mechanisms built
+ * into this interface?
+ */
+class ShardResolver {
+public:
+    virtual ~ShardResolver() {}
+
     /**
-     * Given a shard name, the ShardResolver resolves a particular host on that shard to contact.
+     * Returns a host we can use for write ops to this shard.
      *
-     * TODO: Internally, this is backed by a cache - do we need explicit refresh mechanisms built
-     * into this interface?
+     * Returns !OK with message if the shard host could not be found for other reasons.
      */
-    class ShardResolver {
-    public:
+    virtual Status chooseWriteHost(const std::string& shardName,
+                                   ConnectionString* shardHost) const = 0;
+};
 
-        virtual ~ShardResolver() {
-        }
-
-        /**
-         * Returns a host we can use for write ops to this shard.
-         *
-         * Returns !OK with message if the shard host could not be found for other reasons.
-         */
-        virtual Status chooseWriteHost( const std::string& shardName,
-                                        ConnectionString* shardHost ) const = 0;
-
-    };
-
-} // namespace mongo
+}  // namespace mongo

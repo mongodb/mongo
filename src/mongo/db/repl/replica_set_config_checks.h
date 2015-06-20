@@ -33,61 +33,57 @@
 namespace mongo {
 namespace repl {
 
-    class ReplicationCoordinatorExternalState;
-    class ReplicaSetConfig;
+class ReplicationCoordinatorExternalState;
+class ReplicaSetConfig;
 
-    /**
-     * Validates that "newConfig" is a legal configuration that the current
-     * node can accept from its local storage during startup.
-     *
-     * Returns the index of the current node's member configuration in "newConfig",
-     * on success, and an indicative error on failure.
-     *
-     * If "oldConfig" is valid, this method only succeds if "newConfig" is a legal
-     * successor configuration.
-     */
-    StatusWith<int> validateConfigForStartUp(
-            ReplicationCoordinatorExternalState* externalState,
-            const ReplicaSetConfig& oldConfig,
-            const ReplicaSetConfig& newConfig);
+/**
+ * Validates that "newConfig" is a legal configuration that the current
+ * node can accept from its local storage during startup.
+ *
+ * Returns the index of the current node's member configuration in "newConfig",
+ * on success, and an indicative error on failure.
+ *
+ * If "oldConfig" is valid, this method only succeds if "newConfig" is a legal
+ * successor configuration.
+ */
+StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* externalState,
+                                         const ReplicaSetConfig& oldConfig,
+                                         const ReplicaSetConfig& newConfig);
 
-    /**
-     * Validates that "newConfig" is a legal initial configuration that can be
-     * initiated by the current node (identified via "externalState").
-     *
-     * Returns the index of the current node's member configuration in "newConfig",
-     * on success, and an indicative error on failure.
-     */
-    StatusWith<int> validateConfigForInitiate(
-            ReplicationCoordinatorExternalState* externalState,
-            const ReplicaSetConfig& newConfig);
+/**
+ * Validates that "newConfig" is a legal initial configuration that can be
+ * initiated by the current node (identified via "externalState").
+ *
+ * Returns the index of the current node's member configuration in "newConfig",
+ * on success, and an indicative error on failure.
+ */
+StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* externalState,
+                                          const ReplicaSetConfig& newConfig);
 
-    /**
-     * Validates that "newConfig" is a legal successor configuration to "oldConfig" that can be
-     * initiated by the current node (identified via "externalState").
-     *
-     * If "force" is set to true, then compatibility with the old configuration and electability of
-     * the current node in "newConfig" are not considered when determining if the reconfig is valid.
-     *
-     * Returns the index of the current node's member configuration in "newConfig",
-     * on success, and an indicative error on failure.
-     */
-    StatusWith<int> validateConfigForReconfig(
-            ReplicationCoordinatorExternalState* externalState,
-            const ReplicaSetConfig& oldConfig,
-            const ReplicaSetConfig& newConfig,
-            bool force);
+/**
+ * Validates that "newConfig" is a legal successor configuration to "oldConfig" that can be
+ * initiated by the current node (identified via "externalState").
+ *
+ * If "force" is set to true, then compatibility with the old configuration and electability of
+ * the current node in "newConfig" are not considered when determining if the reconfig is valid.
+ *
+ * Returns the index of the current node's member configuration in "newConfig",
+ * on success, and an indicative error on failure.
+ */
+StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* externalState,
+                                          const ReplicaSetConfig& oldConfig,
+                                          const ReplicaSetConfig& newConfig,
+                                          bool force);
 
-    /**
-     * Validates that "newConfig" is an acceptable configuration when received in a heartbeat
-     * reasponse.
-     *
-     * If the new configuration omits the current node, but is otherwise valid, returns
-     * ErrorCodes::NodeNotFound.  If the configuration is wholly valid, returns Status::OK().
-     * Otherwise, returns some other error status.
-     */
-    StatusWith<int> validateConfigForHeartbeatReconfig(
-            ReplicationCoordinatorExternalState* externalState,
-            const ReplicaSetConfig& newConfig);
+/**
+ * Validates that "newConfig" is an acceptable configuration when received in a heartbeat
+ * reasponse.
+ *
+ * If the new configuration omits the current node, but is otherwise valid, returns
+ * ErrorCodes::NodeNotFound.  If the configuration is wholly valid, returns Status::OK().
+ * Otherwise, returns some other error status.
+ */
+StatusWith<int> validateConfigForHeartbeatReconfig(
+    ReplicationCoordinatorExternalState* externalState, const ReplicaSetConfig& newConfig);
 }  // namespace repl
 }  // namespace mongo

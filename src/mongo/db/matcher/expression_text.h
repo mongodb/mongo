@@ -36,30 +36,37 @@
 
 namespace mongo {
 
-    class TextMatchExpression : public LeafMatchExpression {
-    public:
-        TextMatchExpression() : LeafMatchExpression( TEXT ) {}
-        virtual ~TextMatchExpression() {}
+class TextMatchExpression : public LeafMatchExpression {
+public:
+    TextMatchExpression() : LeafMatchExpression(TEXT) {}
+    virtual ~TextMatchExpression() {}
 
-        Status init( const std::string& query, const std::string& language, bool caseSensitive );
+    Status init(const std::string& query, const std::string& language, bool caseSensitive);
 
-        virtual bool matchesSingleElement( const BSONElement& e ) const;
+    virtual bool matchesSingleElement(const BSONElement& e) const;
 
-        virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+    virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-        virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void toBSON(BSONObjBuilder* out) const;
 
-        virtual bool equivalent( const MatchExpression* other ) const;
+    virtual bool equivalent(const MatchExpression* other) const;
 
-        virtual LeafMatchExpression* shallowClone() const;
+    virtual LeafMatchExpression* shallowClone() const;
 
-        const std::string& getQuery() const { return _query; }
-        const std::string& getLanguage() const { return _language; }
-        bool getCaseSensitive() const { return _caseSensitive; }
-    private:
-        std::string _query;
-        std::string _language;
-        bool _caseSensitive;
-    };
+    const std::string& getQuery() const {
+        return _query;
+    }
+    const std::string& getLanguage() const {
+        return _language;
+    }
+    bool getCaseSensitive() const {
+        return _caseSensitive;
+    }
 
-} // namespace mongo
+private:
+    std::string _query;
+    std::string _language;
+    bool _caseSensitive;
+};
+
+}  // namespace mongo

@@ -34,102 +34,103 @@
 
 namespace mongo {
 
-    class CanonicalQuery;
-    class OperationContext;
-    class UpdateRequest;
+class CanonicalQuery;
+class OperationContext;
+class UpdateRequest;
+
+/**
+ * This class takes a pointer to an UpdateRequest, and converts that request into a parsed form
+ * via the parseRequest() method. A ParsedUpdate can then be used to retrieve a PlanExecutor
+ * capable of executing the update.
+ *
+ * It is invalid to request that the UpdateStage return the prior or newly-updated version of a
+ * document during a multi-update. It is also invalid to request that a ProjectionStage be
+ * applied to the UpdateStage if the UpdateStage would not return any document.
+ *
+ * No locks need to be held during parsing.
+ *
+ * The query part of the update is parsed to a CanonicalQuery, and the update part is parsed
+ * using the UpdateDriver.
+ */
+class ParsedUpdate {
+    MONGO_DISALLOW_COPYING(ParsedUpdate);
+
+public:
+    /**
+     * Constructs a parsed update.
+     *
+     * The object pointed to by "request" must stay in scope for the life of the constructed
+     * ParsedUpdate.
+     */
+    ParsedUpdate(OperationContext* txn, const UpdateRequest* request);
 
     /**
-     * This class takes a pointer to an UpdateRequest, and converts that request into a parsed form
-     * via the parseRequest() method. A ParsedUpdate can then be used to retrieve a PlanExecutor
-     * capable of executing the update.
-     *
-     * It is invalid to request that the UpdateStage return the prior or newly-updated version of a
-     * document during a multi-update. It is also invalid to request that a ProjectionStage be
-     * applied to the UpdateStage if the UpdateStage would not return any document.
-     *
-     * No locks need to be held during parsing.
-     *
-     * The query part of the update is parsed to a CanonicalQuery, and the update part is parsed
-     * using the UpdateDriver.
+     * Parses the update request to a canonical query and an update driver. On success, the
+     * parsed update can be used to create a PlanExecutor for this update.
      */
-    class ParsedUpdate {
-        MONGO_DISALLOW_COPYING(ParsedUpdate);
-    public:
-        /**
-         * Constructs a parsed update.
-         *
-         * The object pointed to by "request" must stay in scope for the life of the constructed
-         * ParsedUpdate.
-         */
-        ParsedUpdate(OperationContext* txn, const UpdateRequest* request);
+    Status parseRequest();
 
-        /**
-         * Parses the update request to a canonical query and an update driver. On success, the
-         * parsed update can be used to create a PlanExecutor for this update.
-         */
-        Status parseRequest();
+    /**
+     * As an optimization, we do not create a canonical query if the predicate is a simple
+     * _id equality. This method can be used to force full parsing to a canonical query,
+     * as a fallback if the idhack path is not available (e.g. no _id index).
+     */
+    Status parseQueryToCQ();
 
-        /**
-         * As an optimization, we do not create a canonical query if the predicate is a simple
-         * _id equality. This method can be used to force full parsing to a canonical query,
-         * as a fallback if the idhack path is not available (e.g. no _id index).
-         */
-        Status parseQueryToCQ();
+    /**
+     * Get the raw request.
+     */
+    const UpdateRequest* getRequest() const;
 
-        /**
-         * Get the raw request.
-         */
-        const UpdateRequest* getRequest() const;
+    /**
+     * Get a pointer to the update driver, the abstraction which both parses the update and
+     * is capable of applying mods / computing damages.
+     */
+    UpdateDriver* getDriver();
 
-        /**
-         * Get a pointer to the update driver, the abstraction which both parses the update and
-         * is capable of applying mods / computing damages.
-         */
-        UpdateDriver* getDriver();
+    /**
+     * Is this update allowed to yield?
+     */
+    bool canYield() const;
 
-        /**
-         * Is this update allowed to yield?
-         */
-        bool canYield() const;
+    /**
+     * Is this update supposed to be isolated?
+     */
+    bool isIsolated() const;
 
-        /**
-         * Is this update supposed to be isolated?
-         */
-        bool isIsolated() const;
+    /**
+     * As an optimization, we don't create a canonical query for updates with simple _id
+     * queries. Use this method to determine whether or not we actually parsed the query.
+     */
+    bool hasParsedQuery() const;
 
-        /**
-         * As an optimization, we don't create a canonical query for updates with simple _id
-         * queries. Use this method to determine whether or not we actually parsed the query.
-         */
-        bool hasParsedQuery() const;
+    /**
+     * Releases ownership of the canonical query to the caller.
+     */
+    CanonicalQuery* releaseParsedQuery();
 
-        /**
-         * Releases ownership of the canonical query to the caller.
-         */
-        CanonicalQuery* releaseParsedQuery();
+private:
+    /**
+     * Parses the query portion of the update request.
+     */
+    Status parseQuery();
 
-    private:
-        /**
-         * Parses the query portion of the update request.
-         */
-        Status parseQuery();
+    /**
+     * Parses the update-descriptor portion of the update request.
+     */
+    Status parseUpdate();
 
-        /**
-         * Parses the update-descriptor portion of the update request.
-         */
-        Status parseUpdate();
+    // Unowned pointer to the transactional context.
+    OperationContext* _txn;
 
-        // Unowned pointer to the transactional context.
-        OperationContext* _txn;
+    // Unowned pointer to the request object to process.
+    const UpdateRequest* const _request;
 
-        // Unowned pointer to the request object to process.
-        const UpdateRequest* const _request;
+    // Driver for processing updates on matched documents.
+    UpdateDriver _driver;
 
-        // Driver for processing updates on matched documents.
-        UpdateDriver _driver;
-
-        // Parsed query object, or NULL if the query proves to be an id hack query.
-        std::unique_ptr<CanonicalQuery> _canonicalQuery;
-    };
+    // Parsed query object, or NULL if the query proves to be an id hack query.
+    std::unique_ptr<CanonicalQuery> _canonicalQuery;
+};
 
 }  // namespace mongo

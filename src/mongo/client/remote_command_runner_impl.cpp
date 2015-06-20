@@ -41,236 +41,225 @@
 namespace mongo {
 namespace {
 
-    /**
-     * Calculates the timeout for a network operation expiring at "expDate", given
-     * that it is now "nowDate".
-     *
-     * Returns 0ms to indicate no expiration date, a number of milliseconds until "expDate", or
-     * ErrorCodes::ExceededTimeLimit if "expDate" is not later than "nowDate".
-     */
-    StatusWith<Milliseconds> getTimeoutMillis(const Date_t expDate, const Date_t nowDate) {
-        if (expDate == RemoteCommandRequest::kNoExpirationDate) {
-            return Milliseconds(0);
-        }
-        if (expDate <= nowDate) {
-            return {ErrorCodes::ExceededTimeLimit,
-                    str::stream() << "Went to run command, but it was too late. "
-                    "Expiration was set to " << dateToISOStringUTC(expDate)};
-        }
-        return expDate - nowDate;
+/**
+ * Calculates the timeout for a network operation expiring at "expDate", given
+ * that it is now "nowDate".
+ *
+ * Returns 0ms to indicate no expiration date, a number of milliseconds until "expDate", or
+ * ErrorCodes::ExceededTimeLimit if "expDate" is not later than "nowDate".
+ */
+StatusWith<Milliseconds> getTimeoutMillis(const Date_t expDate, const Date_t nowDate) {
+    if (expDate == RemoteCommandRequest::kNoExpirationDate) {
+        return Milliseconds(0);
     }
-
-    /**
-     * Updates command output document with status.
-     */
-    BSONObj getCommandResultFromStatus(const Status& status) {
-        BSONObjBuilder result;
-        Command::appendCommandStatus(result, status);
-        return result.obj();
+    if (expDate <= nowDate) {
+        return {ErrorCodes::ExceededTimeLimit,
+                str::stream() << "Went to run command, but it was too late. "
+                                 "Expiration was set to " << dateToISOStringUTC(expDate)};
     }
+    return expDate - nowDate;
+}
 
-    /**
-     * Peeks at error in cursor. If an error has occurred, converts the {$err: "...", code: N}
-     * cursor error to a Status.
-     */
-    Status getStatusFromCursorResult(DBClientCursor& cursor) {
-        BSONObj error;
-        if (!cursor.peekError(&error)) {
-            return Status::OK();
-        }
+/**
+ * Updates command output document with status.
+ */
+BSONObj getCommandResultFromStatus(const Status& status) {
+    BSONObjBuilder result;
+    Command::appendCommandStatus(result, status);
+    return result.obj();
+}
 
-        BSONElement e = error.getField("code");
-        return Status(e.isNumber() ? ErrorCodes::fromInt(e.numberInt()) :
-                                     ErrorCodes::UnknownError,
-                      getErrField(error).valuestrsafe());
-    }
-
-    /**
-     * Downconverts the specified find command to a find protocol operation and sends it to the
-     * server on the specified connection.
-     */
-    Status runDownconvertedFindCommand(DBClientConnection* conn,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       BSONObj* output) {
-
-        const NamespaceString nss(dbname, cmdObj.firstElement().String());
-        if (!nss.isValid()) {
-            return {ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid collection name: " << nss.ns()};
-        }
-        const std::string& ns = nss.ns();
-
-        // It is a little heavy handed to use LiteParsedQuery to convert the command object to
-        // query() arguments but we get validation and consistent behavior with the find
-        // command implementation on the remote server.
-        auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, false);
-        if (!lpqStatus.isOK()) {
-            *output = getCommandResultFromStatus(lpqStatus.getStatus());
-            return lpqStatus.getStatus();
-        }
-
-        auto& lpq = lpqStatus.getValue();
-
-        Query query(lpq->getFilter());
-        if (!lpq->getSort().isEmpty()) { query.sort(lpq->getSort()); }
-        if (!lpq->getHint().isEmpty()) { query.hint(lpq->getHint()); }
-        if (!lpq->getMin().isEmpty()) { query.minKey(lpq->getMin()); }
-        if (!lpq->getMax().isEmpty()) { query.minKey(lpq->getMax()); }
-        if (lpq->isExplain()) { query.explain(); }
-        if (lpq->isSnapshot()) { query.snapshot(); }
-        int nToReturn = lpq->getLimit().value_or(0) * -1;
-        int nToSkip = lpq->getSkip();
-        const BSONObj* fieldsToReturn = &lpq->getProj();
-        int queryOptions = lpq->getOptions();
-        int batchSize = lpq->getBatchSize().value_or(0);
-
-        std::unique_ptr<DBClientCursor> cursor =
-            conn->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
-        cursor->decouple();
-
-        Status status = getStatusFromCursorResult(*cursor);
-        if (!status.isOK()) {
-            *output = getCommandResultFromStatus(status);
-            return status;
-        }
-
-        BSONArrayBuilder batch;
-        while (cursor->moreInCurrentBatch()) {
-            batch.append(cursor->next());
-        }
-
-        BSONObjBuilder result;
-        appendCursorResponseObject(cursor->getCursorId(), ns, batch.arr(), &result);
-        Command::appendCommandStatus(result, Status::OK());
-        *output = result.obj();
+/**
+ * Peeks at error in cursor. If an error has occurred, converts the {$err: "...", code: N}
+ * cursor error to a Status.
+ */
+Status getStatusFromCursorResult(DBClientCursor& cursor) {
+    BSONObj error;
+    if (!cursor.peekError(&error)) {
         return Status::OK();
     }
 
-    /**
-     * Downconverts the specified getMore command to legacy getMore operation and sends it to the
-     * server on the specified connection.
-     */
-    Status runDownconvertedGetMoreCommand(DBClientConnection* conn,
-                                          const std::string& dbname,
-                                          const BSONObj& cmdObj,
-                                          BSONObj* output) {
+    BSONElement e = error.getField("code");
+    return Status(e.isNumber() ? ErrorCodes::fromInt(e.numberInt()) : ErrorCodes::UnknownError,
+                  getErrField(error).valuestrsafe());
+}
 
-        StatusWith<GetMoreRequest> parseResult = GetMoreRequest::parseFromBSON(dbname, cmdObj);
-        if (!parseResult.isOK()) {
-            const Status& status = parseResult.getStatus();
-            *output = getCommandResultFromStatus(status);
-            return status;
-        }
+/**
+ * Downconverts the specified find command to a find protocol operation and sends it to the
+ * server on the specified connection.
+ */
+Status runDownconvertedFindCommand(DBClientConnection* conn,
+                                   const std::string& dbname,
+                                   const BSONObj& cmdObj,
+                                   BSONObj* output) {
+    const NamespaceString nss(dbname, cmdObj.firstElement().String());
+    if (!nss.isValid()) {
+        return {ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid collection name: " << nss.ns()};
+    }
+    const std::string& ns = nss.ns();
 
-        const GetMoreRequest& req = parseResult.getValue();
-        const std::string& ns = req.nss.ns();
-
-        std::unique_ptr<DBClientCursor> cursor = conn->getMore(ns, req.cursorid,
-                                                               req.batchSize.value_or(0));
-        cursor->decouple();
-
-        Status status = getStatusFromCursorResult(*cursor);
-        if (!status.isOK()) {
-            *output = getCommandResultFromStatus(status);
-            return status;
-        }
-
-        BSONArrayBuilder batch;
-        while (cursor->moreInCurrentBatch()) {
-            batch.append(cursor->next());
-        }
-
-        BSONObjBuilder result;
-        appendGetMoreResponseObject(cursor->getCursorId(), ns, batch.arr(), &result);
-        Command::appendCommandStatus(result, Status::OK());
-        *output = result.obj();
-        return Status::OK();
+    // It is a little heavy handed to use LiteParsedQuery to convert the command object to
+    // query() arguments but we get validation and consistent behavior with the find
+    // command implementation on the remote server.
+    auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, false);
+    if (!lpqStatus.isOK()) {
+        *output = getCommandResultFromStatus(lpqStatus.getStatus());
+        return lpqStatus.getStatus();
     }
 
-} //namespace
+    auto& lpq = lpqStatus.getValue();
 
-    RemoteCommandRunnerImpl::RemoteCommandRunnerImpl(int messagingPortTags)
-        : _connPool(messagingPortTags),
-          _shutDown(false) {
+    Query query(lpq->getFilter());
+    if (!lpq->getSort().isEmpty()) {
+        query.sort(lpq->getSort());
+    }
+    if (!lpq->getHint().isEmpty()) {
+        query.hint(lpq->getHint());
+    }
+    if (!lpq->getMin().isEmpty()) {
+        query.minKey(lpq->getMin());
+    }
+    if (!lpq->getMax().isEmpty()) {
+        query.minKey(lpq->getMax());
+    }
+    if (lpq->isExplain()) {
+        query.explain();
+    }
+    if (lpq->isSnapshot()) {
+        query.snapshot();
+    }
+    int nToReturn = lpq->getLimit().value_or(0) * -1;
+    int nToSkip = lpq->getSkip();
+    const BSONObj* fieldsToReturn = &lpq->getProj();
+    int queryOptions = lpq->getOptions();
+    int batchSize = lpq->getBatchSize().value_or(0);
 
+    std::unique_ptr<DBClientCursor> cursor =
+        conn->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
+    cursor->decouple();
+
+    Status status = getStatusFromCursorResult(*cursor);
+    if (!status.isOK()) {
+        *output = getCommandResultFromStatus(status);
+        return status;
     }
 
-    RemoteCommandRunnerImpl::~RemoteCommandRunnerImpl() {
-        invariant(_shutDown);
+    BSONArrayBuilder batch;
+    while (cursor->moreInCurrentBatch()) {
+        batch.append(cursor->next());
     }
 
-    void RemoteCommandRunnerImpl::shutdown() {
-        if (_shutDown) {
-            return;
+    BSONObjBuilder result;
+    appendCursorResponseObject(cursor->getCursorId(), ns, batch.arr(), &result);
+    Command::appendCommandStatus(result, Status::OK());
+    *output = result.obj();
+    return Status::OK();
+}
+
+/**
+ * Downconverts the specified getMore command to legacy getMore operation and sends it to the
+ * server on the specified connection.
+ */
+Status runDownconvertedGetMoreCommand(DBClientConnection* conn,
+                                      const std::string& dbname,
+                                      const BSONObj& cmdObj,
+                                      BSONObj* output) {
+    StatusWith<GetMoreRequest> parseResult = GetMoreRequest::parseFromBSON(dbname, cmdObj);
+    if (!parseResult.isOK()) {
+        const Status& status = parseResult.getStatus();
+        *output = getCommandResultFromStatus(status);
+        return status;
+    }
+
+    const GetMoreRequest& req = parseResult.getValue();
+    const std::string& ns = req.nss.ns();
+
+    std::unique_ptr<DBClientCursor> cursor =
+        conn->getMore(ns, req.cursorid, req.batchSize.value_or(0));
+    cursor->decouple();
+
+    Status status = getStatusFromCursorResult(*cursor);
+    if (!status.isOK()) {
+        *output = getCommandResultFromStatus(status);
+        return status;
+    }
+
+    BSONArrayBuilder batch;
+    while (cursor->moreInCurrentBatch()) {
+        batch.append(cursor->next());
+    }
+
+    BSONObjBuilder result;
+    appendGetMoreResponseObject(cursor->getCursorId(), ns, batch.arr(), &result);
+    Command::appendCommandStatus(result, Status::OK());
+    *output = result.obj();
+    return Status::OK();
+}
+
+}  // namespace
+
+RemoteCommandRunnerImpl::RemoteCommandRunnerImpl(int messagingPortTags)
+    : _connPool(messagingPortTags), _shutDown(false) {}
+
+RemoteCommandRunnerImpl::~RemoteCommandRunnerImpl() {
+    invariant(_shutDown);
+}
+
+void RemoteCommandRunnerImpl::shutdown() {
+    if (_shutDown) {
+        return;
+    }
+
+    _shutDown = true;
+    _connPool.closeAllInUseConnections();
+}
+
+StatusWith<RemoteCommandResponse> RemoteCommandRunnerImpl::runCommand(
+    const RemoteCommandRequest& request) {
+    try {
+        BSONObj output;
+
+        const Date_t requestStartDate = Date_t::now();
+        const auto timeoutMillis = getTimeoutMillis(request.expirationDate, requestStartDate);
+        if (!timeoutMillis.isOK()) {
+            return StatusWith<RemoteCommandResponse>(timeoutMillis.getStatus());
         }
 
-        _shutDown = true;
-        _connPool.closeAllInUseConnections();
-    }
+        ConnectionPool::ConnectionPtr conn(
+            &_connPool, request.target, requestStartDate, timeoutMillis.getValue());
 
-    StatusWith<RemoteCommandResponse> RemoteCommandRunnerImpl::runCommand(
-                                                        const RemoteCommandRequest& request) {
-        try {
-            BSONObj output;
+        bool ok = conn.get()->runCommand(request.dbname, request.cmdObj, output);
 
-            const Date_t requestStartDate = Date_t::now();
-            const auto timeoutMillis = getTimeoutMillis(request.expirationDate, requestStartDate);
-            if (!timeoutMillis.isOK()) {
-                return StatusWith<RemoteCommandResponse>(timeoutMillis.getStatus());
+        // If remote server does not support either find or getMore commands, down convert
+        // to using DBClientInterface::query()/getMore().
+        // TODO: Perform down conversion based on wire protocol version.
+        //       Refer to the down conversion implementation in the shell.
+        if (!ok && getStatusFromCommandResult(output).code() == ErrorCodes::CommandNotFound) {
+            // 'commandName' will be an empty string if the command object is an empty BSON
+            // document.
+            StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
+            if (commandName == "find") {
+                runDownconvertedFindCommand(conn.get(), request.dbname, request.cmdObj, &output);
+            } else if (commandName == "getMore") {
+                runDownconvertedGetMoreCommand(conn.get(), request.dbname, request.cmdObj, &output);
             }
-
-            ConnectionPool::ConnectionPtr conn(&_connPool,
-                                               request.target,
-                                               requestStartDate,
-                                               timeoutMillis.getValue());
-
-            bool ok = conn.get()->runCommand(request.dbname, request.cmdObj, output);
-
-            // If remote server does not support either find or getMore commands, down convert
-            // to using DBClientInterface::query()/getMore().
-            // TODO: Perform down conversion based on wire protocol version.
-            //       Refer to the down conversion implementation in the shell.
-            if (!ok &&
-                getStatusFromCommandResult(output).code() == ErrorCodes::CommandNotFound) {
-
-                // 'commandName' will be an empty string if the command object is an empty BSON
-                // document.
-                StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
-                if (commandName == "find") {
-                    runDownconvertedFindCommand(
-                        conn.get(),
-                        request.dbname,
-                        request.cmdObj,
-                        &output);
-                }
-                else if (commandName == "getMore") {
-                    runDownconvertedGetMoreCommand(
-                        conn.get(),
-                        request.dbname,
-                        request.cmdObj,
-                        &output);
-                }
-            }
-
-            const Date_t requestFinishDate = Date_t::now();
-            conn.done(requestFinishDate);
-
-            return StatusWith<RemoteCommandResponse>(
-                    RemoteCommandResponse(output,
-                                          Milliseconds(requestFinishDate - requestStartDate)));
         }
-        catch (const DBException& ex) {
-            return StatusWith<RemoteCommandResponse>(ex.toStatus());
-        }
-        catch (const std::exception& ex) {
-            return StatusWith<RemoteCommandResponse>(
-                        ErrorCodes::UnknownError,
-                        str::stream() << "Sending command " << request.cmdObj << " on database "
-                                      << request.dbname << " over network to "
-                                      << request.target.toString() << " received exception "
-                                      << ex.what());
-        }
+
+        const Date_t requestFinishDate = Date_t::now();
+        conn.done(requestFinishDate);
+
+        return StatusWith<RemoteCommandResponse>(
+            RemoteCommandResponse(output, Milliseconds(requestFinishDate - requestStartDate)));
+    } catch (const DBException& ex) {
+        return StatusWith<RemoteCommandResponse>(ex.toStatus());
+    } catch (const std::exception& ex) {
+        return StatusWith<RemoteCommandResponse>(
+            ErrorCodes::UnknownError,
+            str::stream() << "Sending command " << request.cmdObj << " on database "
+                          << request.dbname << " over network to " << request.target.toString()
+                          << " received exception " << ex.what());
     }
+}
 
-} // namespace mongo
+}  // namespace mongo

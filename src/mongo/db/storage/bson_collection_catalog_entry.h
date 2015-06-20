@@ -37,76 +37,71 @@
 
 namespace mongo {
 
-    /**
-     * This is a helper class for any storage engine that wants to store catalog information
-     * as BSON. It is totally optional to use this.
-     */
-    class BSONCollectionCatalogEntry : public CollectionCatalogEntry {
-    public:
-        BSONCollectionCatalogEntry( StringData ns );
+/**
+ * This is a helper class for any storage engine that wants to store catalog information
+ * as BSON. It is totally optional to use this.
+ */
+class BSONCollectionCatalogEntry : public CollectionCatalogEntry {
+public:
+    BSONCollectionCatalogEntry(StringData ns);
 
-        virtual ~BSONCollectionCatalogEntry(){}
+    virtual ~BSONCollectionCatalogEntry() {}
 
-        virtual CollectionOptions getCollectionOptions( OperationContext* txn ) const;
+    virtual CollectionOptions getCollectionOptions(OperationContext* txn) const;
 
-        virtual int getTotalIndexCount( OperationContext* txn ) const;
+    virtual int getTotalIndexCount(OperationContext* txn) const;
 
-        virtual int getCompletedIndexCount( OperationContext* txn ) const;
+    virtual int getCompletedIndexCount(OperationContext* txn) const;
 
-        virtual BSONObj getIndexSpec( OperationContext* txn,
-                                      StringData idxName ) const;
+    virtual BSONObj getIndexSpec(OperationContext* txn, StringData idxName) const;
 
-        virtual void getAllIndexes( OperationContext* txn,
-                                    std::vector<std::string>* names ) const;
+    virtual void getAllIndexes(OperationContext* txn, std::vector<std::string>* names) const;
 
-        virtual bool isIndexMultikey( OperationContext* txn,
-                                      StringData indexName) const;
+    virtual bool isIndexMultikey(OperationContext* txn, StringData indexName) const;
 
-        virtual RecordId getIndexHead( OperationContext* txn,
-                                      StringData indexName ) const;
+    virtual RecordId getIndexHead(OperationContext* txn, StringData indexName) const;
 
-        virtual bool isIndexReady( OperationContext* txn,
-                                   StringData indexName ) const;
+    virtual bool isIndexReady(OperationContext* txn, StringData indexName) const;
 
-        // ------ for implementors
+    // ------ for implementors
 
-        struct IndexMetaData {
-            IndexMetaData() {}
-            IndexMetaData( BSONObj s, bool r, RecordId h, bool m )
-                : spec( s ), ready( r ), head( h ), multikey( m ) {}
+    struct IndexMetaData {
+        IndexMetaData() {}
+        IndexMetaData(BSONObj s, bool r, RecordId h, bool m)
+            : spec(s), ready(r), head(h), multikey(m) {}
 
-            void updateTTLSetting( long long newExpireSeconds );
+        void updateTTLSetting(long long newExpireSeconds);
 
-            std::string name() const { return spec["name"].String(); }
+        std::string name() const {
+            return spec["name"].String();
+        }
 
-            BSONObj spec;
-            bool ready;
-            RecordId head;
-            bool multikey;
-        };
-
-        struct MetaData {
-            void parse( const BSONObj& obj );
-            BSONObj toBSON() const;
-
-            int findIndexOffset( StringData name ) const;
-
-            /**
-             * Removes information about an index from the MetaData. Returns true if an index
-             * called name existed and was deleted, and false otherwise.
-             */
-            bool eraseIndex( StringData name );
-
-            void rename( StringData toNS );
-
-            std::string ns;
-            CollectionOptions options;
-            std::vector<IndexMetaData> indexes;
-        };
-
-    protected:
-        virtual MetaData _getMetaData( OperationContext* txn ) const = 0;
-
+        BSONObj spec;
+        bool ready;
+        RecordId head;
+        bool multikey;
     };
 
+    struct MetaData {
+        void parse(const BSONObj& obj);
+        BSONObj toBSON() const;
+
+        int findIndexOffset(StringData name) const;
+
+        /**
+         * Removes information about an index from the MetaData. Returns true if an index
+         * called name existed and was deleted, and false otherwise.
+         */
+        bool eraseIndex(StringData name);
+
+        void rename(StringData toNS);
+
+        std::string ns;
+        CollectionOptions options;
+        std::vector<IndexMetaData> indexes;
+    };
+
+protected:
+    virtual MetaData _getMetaData(OperationContext* txn) const = 0;
+};
 }

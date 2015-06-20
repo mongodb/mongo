@@ -36,48 +36,47 @@
 namespace mongo {
 namespace {
 
-    class FlushRouterConfigCmd : public Command {
-    public:
-        FlushRouterConfigCmd() : Command("flushRouterConfig", false, "flushrouterconfig") { }
+class FlushRouterConfigCmd : public Command {
+public:
+    FlushRouterConfigCmd() : Command("flushRouterConfig", false, "flushrouterconfig") {}
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+    virtual bool slaveOk() const {
+        return true;
+    }
 
-        virtual bool adminOnly() const {
-            return true;
-        }
+    virtual bool adminOnly() const {
+        return true;
+    }
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
-        }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual void help(std::stringstream& help) const {
-            help << "flush all router config";
-        }
+    virtual void help(std::stringstream& help) const {
+        help << "flush all router config";
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::flushRouterConfig);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::flushRouterConfig);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        grid.catalogCache()->invalidateAll();
 
-            grid.catalogCache()->invalidateAll();
+        result.appendBool("flushed", true);
+        return true;
+    }
 
-            result.appendBool("flushed", true);
-            return true;
-        }
+} flushRouterConfigCmd;
 
-    } flushRouterConfigCmd;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

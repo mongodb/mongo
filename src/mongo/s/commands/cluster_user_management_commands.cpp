@@ -46,746 +46,761 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
-    using std::vector;
+using std::string;
+using std::stringstream;
+using std::vector;
 
-    class CmdCreateUser : public Command {
-    public:
+class CmdCreateUser : public Command {
+public:
+    CmdCreateUser() : Command("createUser") {}
 
-        CmdCreateUser() : Command("createUser") {}
+    virtual bool slaveOk() const {
+        return false;
+    }
 
-        virtual bool slaveOk() const { return false; }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual bool isWriteCommandForConfigServer() const { return false; }
+    virtual void help(stringstream& ss) const {
+        ss << "Adds a user to the system";
+    }
 
-        virtual void help(stringstream& ss) const {
-            ss << "Adds a user to the system";
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForCreateUserCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        return grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+    }
+
+    virtual void redactForLogging(mutablebson::Document* cmdObj) {
+        auth::redactPasswordData(cmdObj->root());
+    }
+
+} cmdCreateUser;
+
+class CmdUpdateUser : public Command {
+public:
+    CmdUpdateUser() : Command("updateUser") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Used to update a user, for example to change its password";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForUpdateUserCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        auth::CreateOrUpdateUserArgs args;
+        Status status = auth::parseCreateOrUpdateUserCommands(cmdObj, this->name, dbname, &args);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
         }
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForCreateUserCommand(client, dbname, cmdObj);
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserByName(args.userName);
+
+        return ok;
+    }
+
+    virtual void redactForLogging(mutablebson::Document* cmdObj) {
+        auth::redactPasswordData(cmdObj->root());
+    }
+
+} cmdUpdateUser;
+
+class CmdDropUser : public Command {
+public:
+    CmdDropUser() : Command("dropUser") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Drops a single user.";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForDropUserCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        UserName userName;
+        BSONObj unusedWriteConcern;
+        Status status =
+            auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName, &unusedWriteConcern);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
         }
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
 
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            return grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                        dbname,
-                                                                        cmdObj,
-                                                                        &result);
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserByName(userName);
+
+        return ok;
+    }
+
+} cmdDropUser;
+
+class CmdDropAllUsersFromDatabase : public Command {
+public:
+    CmdDropAllUsersFromDatabase() : Command("dropAllUsersFromDatabase") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Drops all users for a single database.";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForDropAllUsersFromDatabaseCommand(client, dbname);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUsersFromDB(dbname);
+
+        return ok;
+    }
+
+} cmdDropAllUsersFromDatabase;
+
+class CmdGrantRolesToUser : public Command {
+public:
+    CmdGrantRolesToUser() : Command("grantRolesToUser") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Grants roles to a user.";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForGrantRolesToUserCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        string userNameString;
+        vector<RoleName> roles;
+        BSONObj unusedWriteConcern;
+        Status status = auth::parseRolePossessionManipulationCommands(
+            cmdObj, this->name, dbname, &userNameString, &roles, &unusedWriteConcern);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
         }
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
 
-        virtual void redactForLogging(mutablebson::Document* cmdObj) {
-            auth::redactPasswordData(cmdObj->root());
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserByName(UserName(userNameString, dbname));
+
+        return ok;
+    }
+
+} cmdGrantRolesToUser;
+
+class CmdRevokeRolesFromUser : public Command {
+public:
+    CmdRevokeRolesFromUser() : Command("revokeRolesFromUser") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Revokes roles from a user.";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForRevokeRolesFromUserCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        string userNameString;
+        vector<RoleName> unusedRoles;
+        BSONObj unusedWriteConcern;
+        Status status = auth::parseRolePossessionManipulationCommands(
+            cmdObj, this->name, dbname, &userNameString, &unusedRoles, &unusedWriteConcern);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
         }
-
-    } cmdCreateUser;
-
-    class CmdUpdateUser : public Command {
-    public:
-
-        CmdUpdateUser() : Command("updateUser") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Used to update a user, for example to change its password";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForUpdateUserCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            auth::CreateOrUpdateUserArgs args;
-            Status status = auth::parseCreateOrUpdateUserCommands(cmdObj,
-                                                                  this->name,
-                                                                  dbname,
-                                                                  &args);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserByName(args.userName);
-
-            return ok;
-        }
-
-        virtual void redactForLogging(mutablebson::Document* cmdObj) {
-            auth::redactPasswordData(cmdObj->root());
-        }
-
-    } cmdUpdateUser;
-
-    class CmdDropUser : public Command {
-    public:
-
-        CmdDropUser() : Command("dropUser") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Drops a single user.";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForDropUserCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            UserName userName;
-            BSONObj unusedWriteConcern;
-            Status status = auth::parseAndValidateDropUserCommand(cmdObj,
-                                                                  dbname,
-                                                                  &userName,
-                                                                  &unusedWriteConcern);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserByName(userName);
-
-            return ok;
-        }
-
-    } cmdDropUser;
-
-    class CmdDropAllUsersFromDatabase : public Command {
-    public:
-
-        CmdDropAllUsersFromDatabase() : Command("dropAllUsersFromDatabase") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Drops all users for a single database.";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForDropAllUsersFromDatabaseCommand(client, dbname);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUsersFromDB(dbname);
-
-            return ok;
-        }
-
-    } cmdDropAllUsersFromDatabase;
-
-    class CmdGrantRolesToUser: public Command {
-    public:
-
-        CmdGrantRolesToUser() : Command("grantRolesToUser") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Grants roles to a user.";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForGrantRolesToUserCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            string userNameString;
-            vector<RoleName> roles;
-            BSONObj unusedWriteConcern;
-            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
-                                                                          this->name,
-                                                                          dbname,
-                                                                          &userNameString,
-                                                                          &roles,
-                                                                          &unusedWriteConcern);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserByName(UserName(userNameString, dbname));
-
-            return ok;
-        }
-
-    } cmdGrantRolesToUser;
-
-    class CmdRevokeRolesFromUser: public Command {
-    public:
-
-        CmdRevokeRolesFromUser() : Command("revokeRolesFromUser") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Revokes roles from a user.";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForRevokeRolesFromUserCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            string userNameString;
-            vector<RoleName> unusedRoles;
-            BSONObj unusedWriteConcern;
-            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
-                                                                          this->name,
-                                                                          dbname,
-                                                                          &userNameString,
-                                                                          &unusedRoles,
-                                                                          &unusedWriteConcern);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserByName(UserName(userNameString, dbname));
-
-            return ok;
-        }
-
-    } cmdRevokeRolesFromUser;
-
-    class CmdUsersInfo: public Command {
-    public:
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool slaveOverrideOk() const { return true; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        CmdUsersInfo() : Command("usersInfo") {}
-
-        virtual void help(stringstream& ss) const {
-            ss << "Returns information about users.";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForUsersInfoCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            return grid.catalogManager()->runUserManagementReadCommand(dbname,
-                                                                       cmdObj,
-                                                                       &result);
-        }
-
-    } cmdUsersInfo;
-
-    class CmdCreateRole: public Command {
-    public:
-
-        CmdCreateRole() : Command("createRole") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Adds a role to the system";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForCreateRoleCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            return grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                        dbname,
-                                                                        cmdObj,
-                                                                        &result);
-        }
-
-    } cmdCreateRole;
-
-    class CmdUpdateRole: public Command {
-    public:
-
-        CmdUpdateRole() : Command("updateRole") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Used to update a role";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForUpdateRoleCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserCache();
-
-            return ok;
-        }
-
-    } cmdUpdateRole;
-
-    class CmdGrantPrivilegesToRole: public Command {
-    public:
-
-        CmdGrantPrivilegesToRole() : Command("grantPrivilegesToRole") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Grants privileges to a role";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForGrantPrivilegesToRoleCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserCache();
-
-            return ok;
-        }
-
-    } cmdGrantPrivilegesToRole;
-
-    class CmdRevokePrivilegesFromRole: public Command {
-    public:
-
-        CmdRevokePrivilegesFromRole() : Command("revokePrivilegesFromRole") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Revokes privileges from a role";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForRevokePrivilegesFromRoleCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserCache();
-
-            return ok;
-        }
-
-    } cmdRevokePrivilegesFromRole;
-
-    class CmdGrantRolesToRole: public Command {
-    public:
-
-        CmdGrantRolesToRole() : Command("grantRolesToRole") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Grants roles to another role.";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForGrantRolesToRoleCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserCache();
-
-            return ok;
-        }
-
-    } cmdGrantRolesToRole;
-
-    class CmdRevokeRolesFromRole: public Command {
-    public:
-
-        CmdRevokeRolesFromRole() : Command("revokeRolesFromRole") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Revokes roles from another role.";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForRevokeRolesFromRoleCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserCache();
-
-            return ok;
-        }
-
-    } cmdRevokeRolesFromRole;
-
-    class CmdDropRole: public Command {
-    public:
-
-        CmdDropRole() : Command("dropRole") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Drops a single role.  Before deleting the role completely it must remove it "
-                  "from any users or roles that reference it.  If any errors occur in the middle "
-                  "of that process it's possible to be left in a state where the role has been "
-                  "removed from some user/roles but otherwise still exists.";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForDropRoleCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserCache();
-
-            return ok;
-        }
-
-    } cmdDropRole;
-
-    class CmdDropAllRolesFromDatabase: public Command {
-    public:
-
-        CmdDropAllRolesFromDatabase() : Command("dropAllRolesFromDatabase") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Drops all roles from the given database.  Before deleting the roles completely "
-                  "it must remove them from any users or other roles that reference them.  If any "
-                  "errors occur in the middle of that process it's possible to be left in a state "
-                  "where the roles have been removed from some user/roles but otherwise still "
-                  "exist.";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForDropAllRolesFromDatabaseCommand(client, dbname);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            const bool ok = grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                                 dbname,
-                                                                                 cmdObj,
-                                                                                 &result);
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserCache();
-
-            return ok;
-        }
-
-    } cmdDropAllRolesFromDatabase;
-
-    class CmdRolesInfo: public Command {
-    public:
-
-        CmdRolesInfo() : Command("rolesInfo") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool slaveOverrideOk() const { return true; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Returns information about roles.";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForRolesInfoCommand(client, dbname, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            return grid.catalogManager()->runUserManagementReadCommand(dbname,
-                                                                       cmdObj,
-                                                                       &result);
-        }
-
-    } cmdRolesInfo;
-
-    class CmdInvalidateUserCache: public Command {
-    public:
-
-        CmdInvalidateUserCache() : Command("invalidateUserCache") {}
-
-        virtual bool slaveOk() const { return true; }
-
-        virtual bool adminOnly() const { return true; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Invalidates the in-memory cache of user information";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForInvalidateUserCacheCommand(client);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            invariant(authzManager);
-            authzManager->invalidateUserCache();
-            return true;
-        }
-
-    } cmdInvalidateUserCache;
-
-    /**
-     * This command is used only by mongorestore to handle restoring users/roles.  We do this so
-     * that mongorestore doesn't do direct inserts into the admin.system.users and
-     * admin.system.roles, which would bypass the authzUpdateLock and allow multiple concurrent
-     * modifications to users/roles.  What mongorestore now does instead is it inserts all user/role
-     * definitions it wants to restore into temporary collections, then this command moves those
-     * user/role definitions into their proper place in admin.system.users and admin.system.roles.
-     * It either adds the users/roles to the existing ones or replaces the existing ones, depending
-     * on whether the "drop" argument is true or false.
-     */
-    class CmdMergeAuthzCollections : public Command {
-    public:
-
-        CmdMergeAuthzCollections() : Command("_mergeAuthzCollections") {}
-
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        virtual bool adminOnly() const { return true; }
-
-        virtual void help(stringstream& ss) const {
-            ss << "Internal command used by mongorestore for updating user/role data";
-        }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            return auth::checkAuthForMergeAuthzCollectionsCommand(client, cmdObj);
-        }
-
-        bool run(OperationContext* txn,
-                 const string& dbname,
-                 BSONObj& cmdObj,
-                 int options,
-                 string& errmsg,
-                 BSONObjBuilder& result) {
-            return grid.catalogManager()->runUserManagementWriteCommand(this->name,
-                                                                        dbname,
-                                                                        cmdObj,
-                                                                        &result);
-        }
-
-    } cmdMergeAuthzCollections;
-
-} // namespace mongo
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserByName(UserName(userNameString, dbname));
+
+        return ok;
+    }
+
+} cmdRevokeRolesFromUser;
+
+class CmdUsersInfo : public Command {
+public:
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    CmdUsersInfo() : Command("usersInfo") {}
+
+    virtual void help(stringstream& ss) const {
+        ss << "Returns information about users.";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForUsersInfoCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        return grid.catalogManager()->runUserManagementReadCommand(dbname, cmdObj, &result);
+    }
+
+} cmdUsersInfo;
+
+class CmdCreateRole : public Command {
+public:
+    CmdCreateRole() : Command("createRole") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Adds a role to the system";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForCreateRoleCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        return grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+    }
+
+} cmdCreateRole;
+
+class CmdUpdateRole : public Command {
+public:
+    CmdUpdateRole() : Command("updateRole") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Used to update a role";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForUpdateRoleCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserCache();
+
+        return ok;
+    }
+
+} cmdUpdateRole;
+
+class CmdGrantPrivilegesToRole : public Command {
+public:
+    CmdGrantPrivilegesToRole() : Command("grantPrivilegesToRole") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Grants privileges to a role";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForGrantPrivilegesToRoleCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserCache();
+
+        return ok;
+    }
+
+} cmdGrantPrivilegesToRole;
+
+class CmdRevokePrivilegesFromRole : public Command {
+public:
+    CmdRevokePrivilegesFromRole() : Command("revokePrivilegesFromRole") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Revokes privileges from a role";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForRevokePrivilegesFromRoleCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserCache();
+
+        return ok;
+    }
+
+} cmdRevokePrivilegesFromRole;
+
+class CmdGrantRolesToRole : public Command {
+public:
+    CmdGrantRolesToRole() : Command("grantRolesToRole") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Grants roles to another role.";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForGrantRolesToRoleCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserCache();
+
+        return ok;
+    }
+
+} cmdGrantRolesToRole;
+
+class CmdRevokeRolesFromRole : public Command {
+public:
+    CmdRevokeRolesFromRole() : Command("revokeRolesFromRole") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Revokes roles from another role.";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForRevokeRolesFromRoleCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserCache();
+
+        return ok;
+    }
+
+} cmdRevokeRolesFromRole;
+
+class CmdDropRole : public Command {
+public:
+    CmdDropRole() : Command("dropRole") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Drops a single role.  Before deleting the role completely it must remove it "
+              "from any users or roles that reference it.  If any errors occur in the middle "
+              "of that process it's possible to be left in a state where the role has been "
+              "removed from some user/roles but otherwise still exists.";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForDropRoleCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserCache();
+
+        return ok;
+    }
+
+} cmdDropRole;
+
+class CmdDropAllRolesFromDatabase : public Command {
+public:
+    CmdDropAllRolesFromDatabase() : Command("dropAllRolesFromDatabase") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Drops all roles from the given database.  Before deleting the roles completely "
+              "it must remove them from any users or other roles that reference them.  If any "
+              "errors occur in the middle of that process it's possible to be left in a state "
+              "where the roles have been removed from some user/roles but otherwise still "
+              "exist.";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForDropAllRolesFromDatabaseCommand(client, dbname);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        const bool ok = grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserCache();
+
+        return ok;
+    }
+
+} cmdDropAllRolesFromDatabase;
+
+class CmdRolesInfo : public Command {
+public:
+    CmdRolesInfo() : Command("rolesInfo") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Returns information about roles.";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForRolesInfoCommand(client, dbname, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        return grid.catalogManager()->runUserManagementReadCommand(dbname, cmdObj, &result);
+    }
+
+} cmdRolesInfo;
+
+class CmdInvalidateUserCache : public Command {
+public:
+    CmdInvalidateUserCache() : Command("invalidateUserCache") {}
+
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Invalidates the in-memory cache of user information";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForInvalidateUserCacheCommand(client);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        invariant(authzManager);
+        authzManager->invalidateUserCache();
+        return true;
+    }
+
+} cmdInvalidateUserCache;
+
+/**
+ * This command is used only by mongorestore to handle restoring users/roles.  We do this so
+ * that mongorestore doesn't do direct inserts into the admin.system.users and
+ * admin.system.roles, which would bypass the authzUpdateLock and allow multiple concurrent
+ * modifications to users/roles.  What mongorestore now does instead is it inserts all user/role
+ * definitions it wants to restore into temporary collections, then this command moves those
+ * user/role definitions into their proper place in admin.system.users and admin.system.roles.
+ * It either adds the users/roles to the existing ones or replaces the existing ones, depending
+ * on whether the "drop" argument is true or false.
+ */
+class CmdMergeAuthzCollections : public Command {
+public:
+    CmdMergeAuthzCollections() : Command("_mergeAuthzCollections") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Internal command used by mongorestore for updating user/role data";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForMergeAuthzCollectionsCommand(client, cmdObj);
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        return grid.catalogManager()->runUserManagementWriteCommand(
+            this->name, dbname, cmdObj, &result);
+    }
+
+} cmdMergeAuthzCollections;
+
+}  // namespace mongo

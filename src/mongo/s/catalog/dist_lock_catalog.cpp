@@ -32,8 +32,7 @@
 
 namespace mongo {
 
-    DistLockCatalog::ServerInfo::ServerInfo(Date_t time, OID _electionId):
-            serverTime(std::move(time)), electionId(std::move(_electionId)) {
-    }
+DistLockCatalog::ServerInfo::ServerInfo(Date_t time, OID _electionId)
+    : serverTime(std::move(time)), electionId(std::move(_electionId)) {}
 
-} // namespace mongo
+}  // namespace mongo

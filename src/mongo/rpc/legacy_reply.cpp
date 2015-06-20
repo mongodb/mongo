@@ -40,52 +40,50 @@
 namespace mongo {
 namespace rpc {
 
-    LegacyReply::LegacyReply(const Message* message)
-        : _message(std::move(message)) {
-        invariant(message->operation() == opReply);
+LegacyReply::LegacyReply(const Message* message) : _message(std::move(message)) {
+    invariant(message->operation() == opReply);
 
-        QueryResult::View qr = _message->singleData().view2ptr();
+    QueryResult::View qr = _message->singleData().view2ptr();
 
-        // should be checked by caller.
-        invariant(qr.msgdata().getOperation() == opReply);
+    // should be checked by caller.
+    invariant(qr.msgdata().getOperation() == opReply);
 
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "Got legacy command reply with a bad cursorId field,"
-                              << " expected a value of 0 but got " << qr.getCursorId(),
-                qr.getCursorId() == 0);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Got legacy command reply with a bad cursorId field,"
+                          << " expected a value of 0 but got " << qr.getCursorId(),
+            qr.getCursorId() == 0);
 
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "Got legacy command reply with a bad nReturned field,"
-                              << " expected a value of 1 but got " << qr.getNReturned(),
-                qr.getNReturned() == 1);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Got legacy command reply with a bad nReturned field,"
+                          << " expected a value of 1 but got " << qr.getNReturned(),
+            qr.getNReturned() == 1);
 
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "Got legacy command reply with a bad startingFrom field,"
-                              << " expected a value of 0 but got " << qr.getStartingFrom(),
-                qr.getStartingFrom() == 0);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Got legacy command reply with a bad startingFrom field,"
+                          << " expected a value of 0 but got " << qr.getStartingFrom(),
+            qr.getStartingFrom() == 0);
 
-        // TODO bson validation
-        std::tie(_commandReply, _metadata) = uassertStatusOK(
-            rpc::upconvertReplyMetadata(BSONObj(qr.data()))
-        );
-    }
+    // TODO bson validation
+    std::tie(_commandReply, _metadata) =
+        uassertStatusOK(rpc::upconvertReplyMetadata(BSONObj(qr.data())));
+}
 
-    const BSONObj& LegacyReply::getMetadata() const {
-        return _metadata;
-    }
+const BSONObj& LegacyReply::getMetadata() const {
+    return _metadata;
+}
 
-    const BSONObj& LegacyReply::getCommandReply() const {
-        return _commandReply;
-    }
+const BSONObj& LegacyReply::getCommandReply() const {
+    return _commandReply;
+}
 
-    DocumentRange LegacyReply::getOutputDocs() const {
-        // return empty range
-        return DocumentRange{};
-    }
+DocumentRange LegacyReply::getOutputDocs() const {
+    // return empty range
+    return DocumentRange{};
+}
 
-    Protocol LegacyReply::getProtocol() const {
-        return rpc::Protocol::kOpQuery;
-    }
+Protocol LegacyReply::getProtocol() const {
+    return rpc::Protocol::kOpQuery;
+}
 
 }  // namespace rpc
 }  // namespace mongo

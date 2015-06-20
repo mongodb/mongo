@@ -31,15 +31,15 @@
 #include "mongo/bson/timestamp.h"
 
 namespace mongo {
-    void setGlobalTimestamp(const Timestamp& newTime);
+void setGlobalTimestamp(const Timestamp& newTime);
 
-    /**
-     * Returns the value of the global Timestamp generated last time or set.
-     */
-    Timestamp getLastSetTimestamp();
+/**
+ * Returns the value of the global Timestamp generated last time or set.
+ */
+Timestamp getLastSetTimestamp();
 
-    /**
-     * Generates a new and unique Timestamp.
-     */
-    Timestamp getNextGlobalTimestamp();
+/**
+ * Generates a new and unique Timestamp.
+ */
+Timestamp getNextGlobalTimestamp();
 }

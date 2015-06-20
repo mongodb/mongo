@@ -34,53 +34,51 @@
 
 namespace mongo {
 
-    /**
-     * Confirms that "o" only contains fields whose names are in "begin".."end",
-     * and that no field name occurs multiple times.
-     *
-     * On failure, returns BadValue and a message naming the unexpected field or DuplicateKey and a
-     * message naming the repeated field.  "objectName" is included in the message, for reporting
-     * purposes.
-     */
-    template <typename Iter>
-    Status bsonCheckOnlyHasFields(StringData objectName,
-                                  const BSONObj& o,
-                                  const Iter& begin,
-                                  const Iter& end) {
-        std::vector<int> occurrences(std::distance(begin, end), 0);
-        for (BSONObj::iterator iter(o); iter.more();) {
-            const BSONElement e = iter.next();
-            const Iter found = std::find(begin, end, e.fieldNameStringData());
-            if (found != end) {
-                ++occurrences[std::distance(begin, found)];
-            }
-            else {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() <<
-                              "Unexpected field " << e.fieldName() << " in " << objectName);
-            }
+/**
+ * Confirms that "o" only contains fields whose names are in "begin".."end",
+ * and that no field name occurs multiple times.
+ *
+ * On failure, returns BadValue and a message naming the unexpected field or DuplicateKey and a
+ * message naming the repeated field.  "objectName" is included in the message, for reporting
+ * purposes.
+ */
+template <typename Iter>
+Status bsonCheckOnlyHasFields(StringData objectName,
+                              const BSONObj& o,
+                              const Iter& begin,
+                              const Iter& end) {
+    std::vector<int> occurrences(std::distance(begin, end), 0);
+    for (BSONObj::iterator iter(o); iter.more();) {
+        const BSONElement e = iter.next();
+        const Iter found = std::find(begin, end, e.fieldNameStringData());
+        if (found != end) {
+            ++occurrences[std::distance(begin, found)];
+        } else {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Unexpected field " << e.fieldName() << " in "
+                                        << objectName);
         }
-        int i = 0;
-        for(Iter curr = begin; curr != end; ++curr, ++i) {
-            if (occurrences[i] > 1) {
-                return Status(ErrorCodes::DuplicateKey,
-                              str::stream() <<
-                              "Field " << *curr << " appears " << occurrences[i] <<
-                              " times in " << objectName);
-            }
-        }
-        return Status::OK();
     }
+    int i = 0;
+    for (Iter curr = begin; curr != end; ++curr, ++i) {
+        if (occurrences[i] > 1) {
+            return Status(ErrorCodes::DuplicateKey,
+                          str::stream() << "Field " << *curr << " appears " << occurrences[i]
+                                        << " times in " << objectName);
+        }
+    }
+    return Status::OK();
+}
 
-    /**
-     * Same as above, but operates over an array of string-ish items, "legals", instead
-     * of "begin".."end".
-     */
-    template <typename StringType, int N>
-    Status bsonCheckOnlyHasFields(StringData objectName,
-                                  const BSONObj& o,
-                                  const StringType (&legals)[N]) {
-        return bsonCheckOnlyHasFields(objectName, o, &legals[0], legals + N);
-    }
+/**
+ * Same as above, but operates over an array of string-ish items, "legals", instead
+ * of "begin".."end".
+ */
+template <typename StringType, int N>
+Status bsonCheckOnlyHasFields(StringData objectName,
+                              const BSONObj& o,
+                              const StringType(&legals)[N]) {
+    return bsonCheckOnlyHasFields(objectName, o, &legals[0], legals + N);
+}
 
 }  // namespace mongo

@@ -35,171 +35,182 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
-    const std::string ChangelogType::ConfigNS = "config.changelog";
+const std::string ChangelogType::ConfigNS = "config.changelog";
 
-    const BSONField<std::string> ChangelogType::changeID("_id");
-    const BSONField<std::string> ChangelogType::server("server");
-    const BSONField<std::string> ChangelogType::clientAddr("clientAddr");
-    const BSONField<Date_t> ChangelogType::time("time");
-    const BSONField<std::string> ChangelogType::what("what");
-    const BSONField<std::string> ChangelogType::ns("ns");
-    const BSONField<BSONObj> ChangelogType::details("details");
+const BSONField<std::string> ChangelogType::changeID("_id");
+const BSONField<std::string> ChangelogType::server("server");
+const BSONField<std::string> ChangelogType::clientAddr("clientAddr");
+const BSONField<Date_t> ChangelogType::time("time");
+const BSONField<std::string> ChangelogType::what("what");
+const BSONField<std::string> ChangelogType::ns("ns");
+const BSONField<BSONObj> ChangelogType::details("details");
 
-    ChangelogType::ChangelogType() {
-        clear();
+ChangelogType::ChangelogType() {
+    clear();
+}
+
+ChangelogType::~ChangelogType() {}
+
+bool ChangelogType::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    ChangelogType::~ChangelogType() {
+    // All the mandatory fields must be present.
+    if (!_isChangeIDSet) {
+        *errMsg = stream() << "missing " << changeID.name() << " field";
+        return false;
+    }
+    if (!_isServerSet) {
+        *errMsg = stream() << "missing " << server.name() << " field";
+        return false;
+    }
+    if (!_isClientAddrSet) {
+        *errMsg = stream() << "missing " << clientAddr.name() << " field";
+        return false;
+    }
+    if (!_isTimeSet) {
+        *errMsg = stream() << "missing " << time.name() << " field";
+        return false;
+    }
+    if (!_isWhatSet) {
+        *errMsg = stream() << "missing " << what.name() << " field";
+        return false;
+    }
+    if (!_isNsSet) {
+        *errMsg = stream() << "missing " << ns.name() << " field";
+        return false;
+    }
+    if (!_isDetailsSet) {
+        *errMsg = stream() << "missing " << details.name() << " field";
+        return false;
     }
 
-    bool ChangelogType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
+    return true;
+}
 
-        // All the mandatory fields must be present.
-        if (!_isChangeIDSet) {
-            *errMsg = stream() << "missing " << changeID.name() << " field";
-            return false;
-        }
-        if (!_isServerSet) {
-            *errMsg = stream() << "missing " << server.name() << " field";
-            return false;
-        }
-        if (!_isClientAddrSet) {
-            *errMsg = stream() << "missing " << clientAddr.name() << " field";
-            return false;
-        }
-        if (!_isTimeSet) {
-            *errMsg = stream() << "missing " << time.name() << " field";
-            return false;
-        }
-        if (!_isWhatSet) {
-            *errMsg = stream() << "missing " << what.name() << " field";
-            return false;
-        }
-        if (!_isNsSet) {
-            *errMsg = stream() << "missing " << ns.name() << " field";
-            return false;
-        }
-        if (!_isDetailsSet) {
-            *errMsg = stream() << "missing " << details.name() << " field";
-            return false;
-        }
+BSONObj ChangelogType::toBSON() const {
+    BSONObjBuilder builder;
 
-        return true;
-    }
+    if (_isChangeIDSet)
+        builder.append(changeID(), _changeID);
+    if (_isServerSet)
+        builder.append(server(), _server);
+    if (_isClientAddrSet)
+        builder.append(clientAddr(), _clientAddr);
+    if (_isTimeSet)
+        builder.append(time(), _time);
+    if (_isWhatSet)
+        builder.append(what(), _what);
+    if (_isNsSet)
+        builder.append(ns(), _ns);
+    if (_isDetailsSet)
+        builder.append(details(), _details);
 
-    BSONObj ChangelogType::toBSON() const {
-        BSONObjBuilder builder;
+    return builder.obj();
+}
 
-        if (_isChangeIDSet) builder.append(changeID(), _changeID);
-        if (_isServerSet) builder.append(server(), _server);
-        if (_isClientAddrSet) builder.append(clientAddr(), _clientAddr);
-        if (_isTimeSet) builder.append(time(), _time);
-        if (_isWhatSet) builder.append(what(), _what);
-        if (_isNsSet) builder.append(ns(), _ns);
-        if (_isDetailsSet) builder.append(details(), _details);
+bool ChangelogType::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-        return builder.obj();
-    }
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-    bool ChangelogType::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+    FieldParser::FieldState fieldState;
+    fieldState = FieldParser::extract(source, changeID, &_changeID, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isChangeIDSet = fieldState == FieldParser::FIELD_SET;
 
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
+    fieldState = FieldParser::extract(source, server, &_server, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isServerSet = fieldState == FieldParser::FIELD_SET;
 
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, changeID, &_changeID, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isChangeIDSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, clientAddr, &_clientAddr, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isClientAddrSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, server, &_server, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isServerSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, time, &_time, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isTimeSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, clientAddr, &_clientAddr, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isClientAddrSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, what, &_what, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isWhatSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, time, &_time, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isTimeSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, ns, &_ns, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isNsSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, what, &_what, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWhatSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, details, &_details, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isDetailsSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, ns, &_ns, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNsSet = fieldState == FieldParser::FIELD_SET;
+    return true;
+}
 
-        fieldState = FieldParser::extract(source, details, &_details, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isDetailsSet = fieldState == FieldParser::FIELD_SET;
+void ChangelogType::clear() {
+    _changeID.clear();
+    _isChangeIDSet = false;
 
-        return true;
-    }
+    _server.clear();
+    _isServerSet = false;
 
-    void ChangelogType::clear() {
+    _clientAddr.clear();
+    _isClientAddrSet = false;
 
-        _changeID.clear();
-        _isChangeIDSet = false;
+    _time = Date_t();
+    _isTimeSet = false;
 
-        _server.clear();
-        _isServerSet = false;
+    _what.clear();
+    _isWhatSet = false;
 
-        _clientAddr.clear();
-        _isClientAddrSet = false;
+    _ns.clear();
+    _isNsSet = false;
 
-        _time = Date_t();
-        _isTimeSet = false;
+    _details = BSONObj();
+    _isDetailsSet = false;
+}
 
-        _what.clear();
-        _isWhatSet = false;
+void ChangelogType::cloneTo(ChangelogType* other) const {
+    other->clear();
 
-        _ns.clear();
-        _isNsSet = false;
+    other->_changeID = _changeID;
+    other->_isChangeIDSet = _isChangeIDSet;
 
-        _details = BSONObj();
-        _isDetailsSet = false;
+    other->_server = _server;
+    other->_isServerSet = _isServerSet;
 
-    }
+    other->_clientAddr = _clientAddr;
+    other->_isClientAddrSet = _isClientAddrSet;
 
-    void ChangelogType::cloneTo(ChangelogType* other) const {
-        other->clear();
+    other->_time = _time;
+    other->_isTimeSet = _isTimeSet;
 
-        other->_changeID = _changeID;
-        other->_isChangeIDSet = _isChangeIDSet;
+    other->_what = _what;
+    other->_isWhatSet = _isWhatSet;
 
-        other->_server = _server;
-        other->_isServerSet = _isServerSet;
+    other->_ns = _ns;
+    other->_isNsSet = _isNsSet;
 
-        other->_clientAddr = _clientAddr;
-        other->_isClientAddrSet = _isClientAddrSet;
+    other->_details = _details;
+    other->_isDetailsSet = _isDetailsSet;
+}
 
-        other->_time = _time;
-        other->_isTimeSet = _isTimeSet;
+std::string ChangelogType::toString() const {
+    return toBSON().toString();
+}
 
-        other->_what = _what;
-        other->_isWhatSet = _isWhatSet;
-
-        other->_ns = _ns;
-        other->_isNsSet = _isNsSet;
-
-        other->_details = _details;
-        other->_isDetailsSet = _isDetailsSet;
-
-    }
-
-    std::string ChangelogType::toString() const {
-        return toBSON().toString();
-    }
-
-} // namespace mongo
+}  // namespace mongo

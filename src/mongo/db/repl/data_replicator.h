@@ -72,7 +72,7 @@ struct InitialSyncState;
 
 /** State for decision tree */
 enum class DataReplicatorState {
-    Steady, // Default
+    Steady,  // Default
     InitialSync,
     Rollback,
     Uninitialized,
@@ -81,11 +81,7 @@ enum class DataReplicatorState {
 std::string toString(DataReplicatorState s);
 
 // TBD -- ignore for now
-enum class DataReplicatorScope {
-    ReplicateAll,
-    ReplicateDB,
-    ReplicateCollection
-};
+enum class DataReplicatorScope { ReplicateAll, ReplicateDB, ReplicateCollection };
 
 struct DataReplicatorOptions {
     // Error and retry values
@@ -103,12 +99,11 @@ struct DataReplicatorOptions {
     DataReplicatorScope scope = DataReplicatorScope::ReplicateAll;
     std::string scopeNS;
     BSONObj filterCriteria;
-    HostAndPort syncSource; // for use without replCoord -- maybe some kind of rsMonitor/interface
+    HostAndPort syncSource;  // for use without replCoord -- maybe some kind of rsMonitor/interface
 
     // TODO: replace with real applier function
-    Applier::ApplyOperationFn applierFn = [] (OperationContext*, const BSONObj&) -> Status {
-        return Status::OK();
-    };
+    Applier::ApplyOperationFn applierFn =
+        [](OperationContext*, const BSONObj&) -> Status { return Status::OK(); };
 
     std::string toString() const {
         return str::stream() << "DataReplicatorOptions -- "
@@ -129,7 +124,7 @@ struct DataReplicatorOptions {
 class DataReplicator {
 public:
     /** Function to call when a batch is applied. */
-    using OnBatchCompleteFn = stdx::function<void (const Timestamp&)>;
+    using OnBatchCompleteFn = stdx::function<void(const Timestamp&)>;
 
     DataReplicator(DataReplicatorOptions opts,
                    ReplicationExecutor* exec,
@@ -137,8 +132,7 @@ public:
     /**
      * Used by non-replication coordinator processes, like sharding.
      */
-    DataReplicator(DataReplicatorOptions opts,
-                   ReplicationExecutor* exec);
+    DataReplicator(DataReplicatorOptions opts, ReplicationExecutor* exec);
 
     /**
      * Used for testing.
@@ -165,7 +159,7 @@ public:
     void waitForShutdown();
 
     // Resumes apply replication events from the oplog
-    Status resume(bool wait=false);
+    Status resume(bool wait = false);
 
     // Pauses replication and application
     Status pause();
@@ -189,11 +183,12 @@ public:
     // For testing only
 
     void _resetState_inlock(Timestamp lastAppliedOptime);
-    void __setSourceForTesting(HostAndPort src) { _syncSource = src; }
+    void __setSourceForTesting(HostAndPort src) {
+        _syncSource = src;
+    }
     void _setInitialSyncStorageInterface(CollectionCloner::StorageInterface* si);
 
 private:
-
     // Returns OK when there is a good syncSource at _syncSource.
     Status _ensureGoodSyncSource_inlock();
 
@@ -263,39 +258,39 @@ private:
     // (I)  Independently synchronized, see member variable comment.
 
     // Protects member data of this ReplicationCoordinator.
-    mutable stdx::mutex _mutex;                                                         // (S)
-    DataReplicatorState _state;                                                        // (MX)
+    mutable stdx::mutex _mutex;  // (S)
+    DataReplicatorState _state;  // (MX)
 
     // initial sync state
-    std::unique_ptr<InitialSyncState> _initialSyncState;                                // (M)
-    CollectionCloner::StorageInterface* _storage;                                       // (M)
+    std::unique_ptr<InitialSyncState> _initialSyncState;  // (M)
+    CollectionCloner::StorageInterface* _storage;         // (M)
 
     // set during scheduling and onFinish
-    bool _fetcherPaused;                                                                // (X)
-    std::unique_ptr<OplogFetcher> _fetcher;                                             // (S)
-    std::unique_ptr<QueryFetcher> _tmpFetcher;                                          // (S)
+    bool _fetcherPaused;                        // (X)
+    std::unique_ptr<OplogFetcher> _fetcher;     // (S)
+    std::unique_ptr<QueryFetcher> _tmpFetcher;  // (S)
 
-    bool _reporterPaused;                                                               // (M)
-    Handle  _reporterHandle;                                                            // (M)
-    std::unique_ptr<Reporter> _reporter;                                                // (M)
+    bool _reporterPaused;                 // (M)
+    Handle _reporterHandle;               // (M)
+    std::unique_ptr<Reporter> _reporter;  // (M)
 
-    bool _applierActive;                                                                // (M)
-    bool _applierPaused;                                                                // (X)
-    std::unique_ptr<Applier> _applier;                                                  // (M)
-    OnBatchCompleteFn _batchCompletedFn;                                                // (M)
+    bool _applierActive;                  // (M)
+    bool _applierPaused;                  // (X)
+    std::unique_ptr<Applier> _applier;    // (M)
+    OnBatchCompleteFn _batchCompletedFn;  // (M)
 
 
-    HostAndPort _syncSource;                                                            // (M)
-    Timestamp _lastTimestampFetched;                                                    // (MX)
-    Timestamp _lastTimestampApplied;                                                    // (MX)
-    BlockingQueue<BSONObj> _oplogBuffer;                                                // (M)
+    HostAndPort _syncSource;              // (M)
+    Timestamp _lastTimestampFetched;      // (MX)
+    Timestamp _lastTimestampApplied;      // (MX)
+    BlockingQueue<BSONObj> _oplogBuffer;  // (M)
 
     // Shutdown
-    Event _onShutdown;                                                                  // (M)
+    Event _onShutdown;  // (M)
 
     // Rollback stuff
-    Timestamp _rollbackCommonOptime;                                                    // (MX)
+    Timestamp _rollbackCommonOptime;  // (MX)
 };
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

@@ -36,82 +36,70 @@
 
 namespace mongo {
 
-    using std::iostream;
-    using std::string;
-    using std::vector;
+using std::iostream;
+using std::string;
+using std::vector;
 
-    BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
+BOOST_STATIC_ASSERT(sizeof(Extent) - 4 == 48 + 128);
 
-    BSONObj Extent::dump() const {
-        return BSON( "loc" << myLoc.toString()
-                     << "xnext" << xnext.toString()
-                     << "xprev" << xprev.toString()
-                     << "nsdiag" << nsDiagnostic.toString()
-                     << "size" << length
-                     << "firstRecord"
-                     << firstRecord.toString()
-                     << "lastRecord" << lastRecord.toString() );
+BSONObj Extent::dump() const {
+    return BSON("loc" << myLoc.toString() << "xnext" << xnext.toString() << "xprev"
+                      << xprev.toString() << "nsdiag" << nsDiagnostic.toString() << "size" << length
+                      << "firstRecord" << firstRecord.toString() << "lastRecord"
+                      << lastRecord.toString());
+}
+
+void Extent::dump(iostream& s) const {
+    s << "    loc:" << myLoc.toString() << " xnext:" << xnext.toString()
+      << " xprev:" << xprev.toString() << '\n';
+    s << "    nsdiag:" << nsDiagnostic.toString() << '\n';
+    s << "    size:" << length << " firstRecord:" << firstRecord.toString()
+      << " lastRecord:" << lastRecord.toString() << '\n';
+}
+
+bool Extent::validates(const DiskLoc diskLoc, vector<string>* errors) const {
+    bool extentOk = true;
+    if (magic != extentSignature) {
+        if (errors) {
+            StringBuilder sb;
+            sb << "bad extent signature " << integerToHex(magic) << " in extent "
+               << diskLoc.toString();
+            errors->push_back(sb.str());
+        }
+        extentOk = false;
     }
-
-    void Extent::dump(iostream& s) const {
-        s << "    loc:" << myLoc.toString()
-          << " xnext:" << xnext.toString()
-          << " xprev:" << xprev.toString() << '\n';
-        s << "    nsdiag:" << nsDiagnostic.toString() << '\n';
-        s << "    size:" << length
-          << " firstRecord:" << firstRecord.toString()
-          << " lastRecord:" << lastRecord.toString() << '\n';
+    if (myLoc != diskLoc) {
+        if (errors) {
+            StringBuilder sb;
+            sb << "extent " << diskLoc.toString() << " self-pointer is " << myLoc.toString();
+            errors->push_back(sb.str());
+        }
+        extentOk = false;
     }
-
-    bool Extent::validates(const DiskLoc diskLoc, vector<string>* errors) const {
-        bool extentOk = true;
-        if (magic != extentSignature) {
-            if (errors) {
-                StringBuilder sb;
-                sb << "bad extent signature " << integerToHex(magic)
-                    << " in extent " << diskLoc.toString();
-                errors->push_back( sb.str() );
+    if (firstRecord.isNull() != lastRecord.isNull()) {
+        if (errors) {
+            StringBuilder sb;
+            if (firstRecord.isNull()) {
+                sb << "in extent " << diskLoc.toString()
+                   << ", firstRecord is null but lastRecord is " << lastRecord.toString();
+            } else {
+                sb << "in extent " << diskLoc.toString() << ", firstRecord is "
+                   << firstRecord.toString() << " but lastRecord is null";
             }
-            extentOk = false;
+            errors->push_back(sb.str());
         }
-        if (myLoc != diskLoc) {
-            if (errors) {
-                StringBuilder sb;
-                sb << "extent " << diskLoc.toString()
-                    << " self-pointer is " << myLoc.toString();
-                errors->push_back( sb.str() );
-            }
-            extentOk = false;
-        }
-        if (firstRecord.isNull() != lastRecord.isNull()) {
-            if (errors) {
-                StringBuilder sb;
-                if (firstRecord.isNull()) {
-                    sb << "in extent " << diskLoc.toString()
-                        << ", firstRecord is null but lastRecord is "
-                        << lastRecord.toString();
-                }
-                else {
-                    sb << "in extent " << diskLoc.toString()
-                        << ", firstRecord is " << firstRecord.toString()
-                        << " but lastRecord is null";
-                }
-                errors->push_back( sb.str() );
-            }
-            extentOk = false;
-        }
-        static const int minSize = 0x1000;
-        if (length < minSize) {
-            if (errors) {
-                StringBuilder sb;
-                sb << "length of extent " << diskLoc.toString()
-                    << " is " << length
-                    << ", which is less than minimum length of " << minSize;
-                errors->push_back( sb.str() );
-            }
-            extentOk = false;
-        }
-        return extentOk;
+        extentOk = false;
     }
-
+    static const int minSize = 0x1000;
+    if (length < minSize) {
+        if (errors) {
+            StringBuilder sb;
+            sb << "length of extent " << diskLoc.toString() << " is " << length
+               << ", which is less than minimum length of " << minSize;
+            errors->push_back(sb.str());
+        }
+        extentOk = false;
+    }
+    return extentOk;
+}
 }

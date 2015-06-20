@@ -32,8 +32,8 @@
 
 namespace mongo {
 
-    DBConnectionPool globalConnPool;
+DBConnectionPool globalConnPool;
 
-    ReplicaSetMonitorManager globalRSMonitorManager;
+ReplicaSetMonitorManager globalRSMonitorManager;
 
 }  // namespace mongo

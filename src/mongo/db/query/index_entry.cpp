@@ -34,33 +34,33 @@
 
 namespace mongo {
 
-    std::string IndexEntry::toString() const {
-        StringBuilder sb;
-        sb << "kp: "  << keyPattern;
+std::string IndexEntry::toString() const {
+    StringBuilder sb;
+    sb << "kp: " << keyPattern;
 
-        if (multikey) {
-            sb << " multikey";
-        }
-
-        if (sparse) {
-            sb << " sparse";
-        }
-
-        if (unique) {
-            sb << " unique";
-        }
-
-        sb << " name: '" << name << "'";
-
-        if (filterExpr) {
-            sb << " filterExpr: " << filterExpr->toString();
-        }
-
-        if (!infoObj.isEmpty()) {
-            sb << " io: " << infoObj;
-        }
-
-        return sb.str();
+    if (multikey) {
+        sb << " multikey";
     }
+
+    if (sparse) {
+        sb << " sparse";
+    }
+
+    if (unique) {
+        sb << " unique";
+    }
+
+    sb << " name: '" << name << "'";
+
+    if (filterExpr) {
+        sb << " filterExpr: " << filterExpr->toString();
+    }
+
+    if (!infoObj.isEmpty()) {
+        sb << " io: " << infoObj;
+    }
+
+    return sb.str();
+}
 
 }  // namespace mongo

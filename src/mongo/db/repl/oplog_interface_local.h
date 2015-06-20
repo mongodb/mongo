@@ -32,27 +32,24 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
 namespace repl {
 
-    /**
-     * Scans local oplog collection in reverse natural order.
-     */
+/**
+ * Scans local oplog collection in reverse natural order.
+ */
 
-    class OplogInterfaceLocal : public OplogInterface {
-    public:
+class OplogInterfaceLocal : public OplogInterface {
+public:
+    OplogInterfaceLocal(OperationContext* txn, const std::string& collectionName);
+    std::string toString() const override;
+    std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
 
-        OplogInterfaceLocal(OperationContext* txn, const std::string& collectionName);
-        std::string toString() const override;
-        std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
+private:
+    OperationContext* _txn;
+    std::string _collectionName;
+};
 
-    private:
-
-        OperationContext* _txn;
-        std::string _collectionName;
-
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

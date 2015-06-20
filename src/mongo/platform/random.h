@@ -33,61 +33,64 @@
 
 namespace mongo {
 
-    /**
-     * Uses http://en.wikipedia.org/wiki/Xorshift
-     */
-    class PseudoRandom {
-    public:
-        PseudoRandom( int32_t seed );
+/**
+ * Uses http://en.wikipedia.org/wiki/Xorshift
+ */
+class PseudoRandom {
+public:
+    PseudoRandom(int32_t seed);
 
-        PseudoRandom( uint32_t seed );
+    PseudoRandom(uint32_t seed);
 
-        PseudoRandom( int64_t seed );
+    PseudoRandom(int64_t seed);
 
-        int32_t nextInt32();
+    int32_t nextInt32();
 
-        int64_t nextInt64();
-
-        /**
-         * @return a number between 0 and max
-         */
-        int32_t nextInt32( int32_t max ) { return nextInt32() % max; }
-
-        /**
-         * @return a number between 0 and max
-         */
-        int64_t nextInt64( int64_t max ) { return nextInt64() % max; }
-
-        /**
-         * @return a number between 0 and max
-         *
-         * This makes PsuedoRandom instances passable as the third argument to std::random_shuffle
-         */
-        intptr_t operator()(intptr_t max) {
-            if (sizeof(intptr_t) == 4)
-                return static_cast<intptr_t>(nextInt32(static_cast<int32_t>(max)));
-            return static_cast<intptr_t>(nextInt64(static_cast<int64_t>(max)));
-        }
-
-    private:
-        int32_t _x;
-        int32_t _y;
-        int32_t _z;
-        int32_t _w;
-    };
+    int64_t nextInt64();
 
     /**
-     * More secure random numbers
-     * Suitable for nonce/crypto
-     * Slower than PseudoRandom, so only use when really need
+     * @return a number between 0 and max
      */
-    class SecureRandom {
-    public:
-        virtual ~SecureRandom();
+    int32_t nextInt32(int32_t max) {
+        return nextInt32() % max;
+    }
 
-        virtual int64_t nextInt64() = 0;
+    /**
+     * @return a number between 0 and max
+     */
+    int64_t nextInt64(int64_t max) {
+        return nextInt64() % max;
+    }
 
-        static SecureRandom* create();
-    };
+    /**
+     * @return a number between 0 and max
+     *
+     * This makes PsuedoRandom instances passable as the third argument to std::random_shuffle
+     */
+    intptr_t operator()(intptr_t max) {
+        if (sizeof(intptr_t) == 4)
+            return static_cast<intptr_t>(nextInt32(static_cast<int32_t>(max)));
+        return static_cast<intptr_t>(nextInt64(static_cast<int64_t>(max)));
+    }
 
+private:
+    int32_t _x;
+    int32_t _y;
+    int32_t _z;
+    int32_t _w;
+};
+
+/**
+ * More secure random numbers
+ * Suitable for nonce/crypto
+ * Slower than PseudoRandom, so only use when really need
+ */
+class SecureRandom {
+public:
+    virtual ~SecureRandom();
+
+    virtual int64_t nextInt64() = 0;
+
+    static SecureRandom* create();
+};
 }

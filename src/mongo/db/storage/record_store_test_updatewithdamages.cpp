@@ -41,251 +41,239 @@ using std::string;
 
 namespace mongo {
 
-    // Insert a record and try to perform an in-place update on it.
-    TEST( RecordStoreTestHarness, UpdateWithDamages ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Insert a record and try to perform an in-place update on it.
+TEST(RecordStoreTestHarness, UpdateWithDamages) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-        if (!rs->updateWithDamagesSupported())
-            return;
+    if (!rs->updateWithDamagesSupported())
+        return;
 
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    string data = "00010111";
+    RecordId loc;
+    const RecordData rec(data.c_str(), data.size() + 1);
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        string data = "00010111";
-        RecordId loc;
-        const RecordData rec(data.c_str(), data.size() + 1);
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            rec.data(),
-                                                            rec.size(),
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                mutablebson::DamageVector dv( 3 );
-                dv[0].sourceOffset = 5;
-                dv[0].targetOffset = 0;
-                dv[0].size = 2;
-                dv[1].sourceOffset = 3;
-                dv[1].targetOffset = 2;
-                dv[1].size = 3;
-                dv[2].sourceOffset = 0;
-                dv[2].targetOffset = 5;
-                dv[2].size = 3;
-
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, rec, data.c_str(), dv ) );
-                uow.commit();
-            }
-        }
-
-        data = "11101000";
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                RecordData record = rs->dataFor( opCtx.get(), loc );
-                ASSERT_EQUALS( data, record.data() );
-            }
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), rec.data(), rec.size(), false);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
         }
     }
 
-    // Insert a record and try to perform an in-place update on it with a DamageVector
-    // containing overlapping DamageEvents.
-    TEST( RecordStoreTestHarness, UpdateWithOverlappingDamageEvents ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+    }
 
-        if (!rs->updateWithDamagesSupported())
-            return;
-
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
+            mutablebson::DamageVector dv(3);
+            dv[0].sourceOffset = 5;
+            dv[0].targetOffset = 0;
+            dv[0].size = 2;
+            dv[1].sourceOffset = 3;
+            dv[1].targetOffset = 2;
+            dv[1].size = 3;
+            dv[2].sourceOffset = 0;
+            dv[2].targetOffset = 5;
+            dv[2].size = 3;
 
-        string data = "00010111";
-        RecordId loc;
-        const RecordData rec(data.c_str(), data.size() + 1);
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            rec.data(),
-                                                            rec.size(),
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                mutablebson::DamageVector dv( 2 );
-                dv[0].sourceOffset = 3;
-                dv[0].targetOffset = 0;
-                dv[0].size = 5;
-                dv[1].sourceOffset = 0;
-                dv[1].targetOffset = 3;
-                dv[1].size = 5;
-
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, rec, data.c_str(), dv ) );
-                uow.commit();
-            }
-        }
-
-        data = "10100010";
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                RecordData record = rs->dataFor( opCtx.get(), loc );
-                ASSERT_EQUALS( data, record.data() );
-            }
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv));
+            uow.commit();
         }
     }
 
-    // Insert a record and try to perform an in-place update on it with a DamageVector
-    // containing overlapping DamageEvents. The changes should be applied in the order
-    // specified by the DamageVector, and not -- for instance -- by the targetOffset.
-    TEST( RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-
-        if (!rs->updateWithDamagesSupported())
-            return;
-
+    data = "11101000";
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+            RecordData record = rs->dataFor(opCtx.get(), loc);
+            ASSERT_EQUALS(data, record.data());
         }
+    }
+}
 
-        string data = "00010111";
-        RecordId loc;
-        const RecordData rec(data.c_str(), data.size() + 1);
+// Insert a record and try to perform an in-place update on it with a DamageVector
+// containing overlapping DamageEvents.
+TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    if (!rs->updateWithDamagesSupported())
+        return;
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    string data = "00010111";
+    RecordId loc;
+    const RecordData rec(data.c_str(), data.size() + 1);
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            rec.data(),
-                                                            rec.size(),
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                mutablebson::DamageVector dv( 2 );
-                dv[0].sourceOffset = 0;
-                dv[0].targetOffset = 3;
-                dv[0].size = 5;
-                dv[1].sourceOffset = 3;
-                dv[1].targetOffset = 0;
-                dv[1].size = 5;
-
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, rec, data.c_str(), dv ) );
-                uow.commit();
-            }
-        }
-
-        data = "10111010";
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                RecordData record = rs->dataFor( opCtx.get(), loc );
-                ASSERT_EQUALS( data, record.data() );
-            }
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), rec.data(), rec.size(), false);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
         }
     }
 
-    // Insert a record and try to call updateWithDamages() with an empty DamageVector.
-    TEST( RecordStoreTestHarness, UpdateWithNoDamages ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+    }
 
-        if (!rs->updateWithDamagesSupported())
-            return;
-
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
+            mutablebson::DamageVector dv(2);
+            dv[0].sourceOffset = 3;
+            dv[0].targetOffset = 0;
+            dv[0].size = 5;
+            dv[1].sourceOffset = 0;
+            dv[1].targetOffset = 3;
+            dv[1].size = 5;
 
-        string data = "my record";
-        RecordId loc;
-        const RecordData rec(data.c_str(), data.size() + 1);
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            rec.data(),
-                                                            rec.size(),
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                mutablebson::DamageVector dv;
-
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, rec, "", dv ) );
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                RecordData record = rs->dataFor( opCtx.get(), loc );
-                ASSERT_EQUALS( data, record.data() );
-            }
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv));
+            uow.commit();
         }
     }
 
-} // namespace mongo
+    data = "10100010";
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            RecordData record = rs->dataFor(opCtx.get(), loc);
+            ASSERT_EQUALS(data, record.data());
+        }
+    }
+}
+
+// Insert a record and try to perform an in-place update on it with a DamageVector
+// containing overlapping DamageEvents. The changes should be applied in the order
+// specified by the DamageVector, and not -- for instance -- by the targetOffset.
+TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    if (!rs->updateWithDamagesSupported())
+        return;
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    string data = "00010111";
+    RecordId loc;
+    const RecordData rec(data.c_str(), data.size() + 1);
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), rec.data(), rec.size(), false);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
+        }
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            mutablebson::DamageVector dv(2);
+            dv[0].sourceOffset = 0;
+            dv[0].targetOffset = 3;
+            dv[0].size = 5;
+            dv[1].sourceOffset = 3;
+            dv[1].targetOffset = 0;
+            dv[1].size = 5;
+
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv));
+            uow.commit();
+        }
+    }
+
+    data = "10111010";
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            RecordData record = rs->dataFor(opCtx.get(), loc);
+            ASSERT_EQUALS(data, record.data());
+        }
+    }
+}
+
+// Insert a record and try to call updateWithDamages() with an empty DamageVector.
+TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    if (!rs->updateWithDamagesSupported())
+        return;
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    string data = "my record";
+    RecordId loc;
+    const RecordData rec(data.c_str(), data.size() + 1);
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), rec.data(), rec.size(), false);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
+        }
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            mutablebson::DamageVector dv;
+
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(rs->updateWithDamages(opCtx.get(), loc, rec, "", dv));
+            uow.commit();
+        }
+    }
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            RecordData record = rs->dataFor(opCtx.get(), loc);
+            ASSERT_EQUALS(data, record.data());
+        }
+    }
+}
+
+}  // namespace mongo

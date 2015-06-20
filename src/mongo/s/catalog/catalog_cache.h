@@ -36,53 +36,55 @@
 
 namespace mongo {
 
-    class CatalogManager;
-    class DBConfig;
-    template<typename T> class StatusWith;
+class CatalogManager;
+class DBConfig;
+template <typename T>
+class StatusWith;
 
+
+/**
+ * This is the root of the "read-only" hierarchy of cached catalog metadata. It is read only
+ * in the sense that it only reads from the persistent store, but never writes to it. Instead
+ * writes happen thorugh the CatalogManager and the cache hierarchy needs to be invalidated.
+ */
+class CatalogCache {
+    MONGO_DISALLOW_COPYING(CatalogCache);
+
+public:
+    explicit CatalogCache(CatalogManager* catalogManager);
 
     /**
-     * This is the root of the "read-only" hierarchy of cached catalog metadata. It is read only
-     * in the sense that it only reads from the persistent store, but never writes to it. Instead
-     * writes happen thorugh the CatalogManager and the cache hierarchy needs to be invalidated.
+     * Retrieves the cached metadata for the specified database. The returned value is still
+     * owned by the cache and it should not be cached elsewhere, but instead only used as a
+     * local variable. The reason for this is so that if the cache gets invalidated, the caller
+     * does not miss getting the most up-to-date value.
+     *
+     * @param dbname The name of the database (must not contain dots, etc).
+     * @return The database if it exists, NULL otherwise.
      */
-    class CatalogCache {
-        MONGO_DISALLOW_COPYING(CatalogCache);
-    public:
-        explicit CatalogCache(CatalogManager* catalogManager);
+    StatusWith<std::shared_ptr<DBConfig>> getDatabase(const std::string& dbName);
 
-        /**
-         * Retrieves the cached metadata for the specified database. The returned value is still
-         * owned by the cache and it should not be cached elsewhere, but instead only used as a
-         * local variable. The reason for this is so that if the cache gets invalidated, the caller
-         * does not miss getting the most up-to-date value.
-         *
-         * @param dbname The name of the database (must not contain dots, etc).
-         * @return The database if it exists, NULL otherwise.
-         */
-        StatusWith<std::shared_ptr<DBConfig>> getDatabase(const std::string& dbName);
+    /**
+     * Removes the database information for the specified name from the cache, so that the
+     * next time getDatabase is called, it will be reloaded.
+     */
+    void invalidate(const std::string& dbName);
 
-        /**
-         * Removes the database information for the specified name from the cache, so that the
-         * next time getDatabase is called, it will be reloaded.
-         */
-        void invalidate(const std::string& dbName);
+    /**
+     * Purges all cached database information, which will cause the data to be reloaded again.
+     */
+    void invalidateAll();
 
-        /**
-         * Purges all cached database information, which will cause the data to be reloaded again.
-         */
-        void invalidateAll();
-
-    private:
-        typedef std::map<std::string, std::shared_ptr<DBConfig>> ShardedDatabasesMap;
+private:
+    typedef std::map<std::string, std::shared_ptr<DBConfig>> ShardedDatabasesMap;
 
 
-        // Reference to the catalog manager. Not owned.
-        CatalogManager* const _catalogManager;
+    // Reference to the catalog manager. Not owned.
+    CatalogManager* const _catalogManager;
 
-        // Databases catalog map and mutex to protect it
-        stdx::mutex _mutex;
-        ShardedDatabasesMap _databases;
-    };
+    // Databases catalog map and mutex to protect it
+    stdx::mutex _mutex;
+    ShardedDatabasesMap _databases;
+};
 
-} // namespace mongo
+}  // namespace mongo

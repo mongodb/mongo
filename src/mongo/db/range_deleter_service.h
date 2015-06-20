@@ -32,8 +32,8 @@
 
 namespace mongo {
 
-    /**
-     * Gets the global instance of the deleter and starts it.
-     */
-    RangeDeleter* getDeleter();
+/**
+ * Gets the global instance of the deleter and starts it.
+ */
+RangeDeleter* getDeleter();
 }

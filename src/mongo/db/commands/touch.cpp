@@ -52,66 +52,71 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
+using std::string;
+using std::stringstream;
 
-    class TouchCmd : public Command {
-    public:
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual bool adminOnly() const { return false; }
-        virtual bool slaveOk() const { return true; }
-        virtual bool maintenanceMode() const { return true; }
-        virtual void help( stringstream& help ) const {
-            help << "touch collection\n"
+class TouchCmd : public Command {
+public:
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual bool adminOnly() const {
+        return false;
+    }
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual bool maintenanceMode() const {
+        return true;
+    }
+    virtual void help(stringstream& help) const {
+        help << "touch collection\n"
                 "Page in all pages of memory containing every extent for the given collection\n"
                 "{ touch : <collection_name>, [data : true] , [index : true] }\n"
                 " at least one of data or index must be true; default is both are false\n";
-        }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::touch);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
-        TouchCmd() : Command("touch") { }
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::touch);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
+    TouchCmd() : Command("touch") {}
 
-        virtual bool run(OperationContext* txn,
-                         const string& dbname,
-                         BSONObj& cmdObj,
-                         int,
-                         string& errmsg,
-                         BSONObjBuilder& result) {
-            const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
+    virtual bool run(OperationContext* txn,
+                     const string& dbname,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
+        const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
 
-            const NamespaceString nss(ns);
-            if ( ! nss.isNormal() ) {
-                errmsg = "bad namespace name";
-                return false;
-            }
-
-            bool touch_indexes( cmdObj["index"].trueValue() );
-            bool touch_data( cmdObj["data"].trueValue() );
-
-            if ( ! (touch_indexes || touch_data) ) {
-                errmsg = "must specify at least one of (data:true, index:true)";
-                return false;
-            }
-
-            AutoGetCollectionForRead context(txn, nss);
-
-            Collection* collection = context.getCollection();
-            if ( !collection ) {
-                errmsg = "collection not found";
-                return false;
-            }
-
-            return appendCommandStatus( result,
-                                        collection->touch( txn,
-                                                           touch_data, touch_indexes,
-                                                           &result ) );
+        const NamespaceString nss(ns);
+        if (!nss.isNormal()) {
+            errmsg = "bad namespace name";
+            return false;
         }
 
-    };
-    static TouchCmd touchCmd;
+        bool touch_indexes(cmdObj["index"].trueValue());
+        bool touch_data(cmdObj["data"].trueValue());
+
+        if (!(touch_indexes || touch_data)) {
+            errmsg = "must specify at least one of (data:true, index:true)";
+            return false;
+        }
+
+        AutoGetCollectionForRead context(txn, nss);
+
+        Collection* collection = context.getCollection();
+        if (!collection) {
+            errmsg = "collection not found";
+            return false;
+        }
+
+        return appendCommandStatus(result,
+                                   collection->touch(txn, touch_data, touch_indexes, &result));
+    }
+};
+static TouchCmd touchCmd;
 }

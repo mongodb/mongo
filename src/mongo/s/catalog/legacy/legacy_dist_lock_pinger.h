@@ -43,98 +43,97 @@
 
 namespace mongo {
 
-    class DistributedLock;
+class DistributedLock;
 
-    class LegacyDistLockPinger {
-    public:
-        LegacyDistLockPinger() = default;
+class LegacyDistLockPinger {
+public:
+    LegacyDistLockPinger() = default;
 
-        /**
-         * Starts pinging the process id for the given lock.
-         */
-        Status startPing(const DistributedLock& lock, Milliseconds sleepTime);
+    /**
+     * Starts pinging the process id for the given lock.
+     */
+    Status startPing(const DistributedLock& lock, Milliseconds sleepTime);
 
-        /**
-         * Adds a distributed lock that has the given id to the unlock list. The unlock list
-         * contains the list of locks that this pinger will repeatedly attempt to unlock until
-         * it succeeds.
-         */
-        void addUnlockOID(const DistLockHandle& lockID);
+    /**
+     * Adds a distributed lock that has the given id to the unlock list. The unlock list
+     * contains the list of locks that this pinger will repeatedly attempt to unlock until
+     * it succeeds.
+     */
+    void addUnlockOID(const DistLockHandle& lockID);
 
-        /**
-         * Returns true if the given lock id is currently in the unlock queue.
-         */
-        bool willUnlockOID(const DistLockHandle& lockID);
+    /**
+     * Returns true if the given lock id is currently in the unlock queue.
+     */
+    bool willUnlockOID(const DistLockHandle& lockID);
 
-        /**
-         * For testing only: non-blocking call to stop pinging the given process id.
-         */
-        void stopPing(const ConnectionString& conn, const std::string& processId);
+    /**
+     * For testing only: non-blocking call to stop pinging the given process id.
+     */
+    void stopPing(const ConnectionString& conn, const std::string& processId);
 
-        /**
-         * Kills all ping threads and wait for them to cleanup.
-         */
-        void shutdown();
+    /**
+     * Kills all ping threads and wait for them to cleanup.
+     */
+    void shutdown();
 
-    private:
-        /**
-         * Helper method for calling _distLockPingThread.
-         */
-        void distLockPingThread(ConnectionString addr,
-                                long long clockSkew,
-                                const std::string& processId,
-                                Milliseconds sleepTime);
+private:
+    /**
+     * Helper method for calling _distLockPingThread.
+     */
+    void distLockPingThread(ConnectionString addr,
+                            long long clockSkew,
+                            const std::string& processId,
+                            Milliseconds sleepTime);
 
-        /**
-         * Function for repeatedly pinging the process id. Also attempts to unlock all the
-         * locks in the unlock list.
-         */
-        void _distLockPingThread(ConnectionString addr,
-                                 const std::string& process,
-                                 Milliseconds sleepTime);
+    /**
+     * Function for repeatedly pinging the process id. Also attempts to unlock all the
+     * locks in the unlock list.
+     */
+    void _distLockPingThread(ConnectionString addr,
+                             const std::string& process,
+                             Milliseconds sleepTime);
 
-        /**
-         * Returns true if a request has been made to stop pinging the give process id.
-         */
-        bool shouldStopPinging(const ConnectionString& conn, const std::string& processId);
+    /**
+     * Returns true if a request has been made to stop pinging the give process id.
+     */
+    bool shouldStopPinging(const ConnectionString& conn, const std::string& processId);
 
-        /**
-         * Acknowledge the stop ping request and performs the necessary cleanup.
-         */
-        void acknowledgeStopPing(const ConnectionString& conn, const std::string& processId);
+    /**
+     * Acknowledge the stop ping request and performs the necessary cleanup.
+     */
+    void acknowledgeStopPing(const ConnectionString& conn, const std::string& processId);
 
-        /**
-         * Blocks until duration has elapsed or if the ping thread is interrupted.
-         */
-        void waitTillNextPingTime(Milliseconds duration);
+    /**
+     * Blocks until duration has elapsed or if the ping thread is interrupted.
+     */
+    void waitTillNextPingTime(Milliseconds duration);
 
-        //
-        // All member variables are labeled with one of the following codes indicating the
-        // synchronization rules for accessing them.
-        //
-        // (M)  Must hold _mutex for access.
+    //
+    // All member variables are labeled with one of the following codes indicating the
+    // synchronization rules for accessing them.
+    //
+    // (M)  Must hold _mutex for access.
 
-        stdx::mutex _mutex;
+    stdx::mutex _mutex;
 
-        // Triggered everytime a pinger thread is stopped.
-        stdx::condition_variable _pingStoppedCV;                                        // (M)
+    // Triggered everytime a pinger thread is stopped.
+    stdx::condition_variable _pingStoppedCV;  // (M)
 
-        // pingID -> thread
-        // This can contain multiple elements in tests, but in tne normal case, this will
-        // contain only a single element.
-        // Note: can be safely read when _inShutdown is true.
-        std::map<std::string, stdx::thread> _pingThreads;                               // (M*)
+    // pingID -> thread
+    // This can contain multiple elements in tests, but in tne normal case, this will
+    // contain only a single element.
+    // Note: can be safely read when _inShutdown is true.
+    std::map<std::string, stdx::thread> _pingThreads;  // (M*)
 
-        // Contains the list of process id to stopPing.
-        std::set<std::string> _kill;                                                     // (M)
+    // Contains the list of process id to stopPing.
+    std::set<std::string> _kill;  // (M)
 
-        // Contains all of the process id to ping.
-        std::set<std::string> _seen;                                                     // (M)
+    // Contains all of the process id to ping.
+    std::set<std::string> _seen;  // (M)
 
-        // Contains all lock ids to keeping on retrying to unlock until success.
-        std::list<DistLockHandle> _unlockList;                                           // (M)
+    // Contains all lock ids to keeping on retrying to unlock until success.
+    std::list<DistLockHandle> _unlockList;  // (M)
 
-        bool _inShutdown = false;                                                        // (M)
-    };
-
+    bool _inShutdown = false;  // (M)
+};
 }

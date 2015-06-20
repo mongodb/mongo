@@ -37,13 +37,13 @@
 namespace mongo {
 namespace repl {
 
-    StorageInterfaceMock::StorageInterfaceMock() {}
+StorageInterfaceMock::StorageInterfaceMock() {}
 
-    StorageInterfaceMock::~StorageInterfaceMock() { }
+StorageInterfaceMock::~StorageInterfaceMock() {}
 
-    OperationContext* StorageInterfaceMock::createOperationContext() {
-        return new OperationContextReplMock();
-    }
+OperationContext* StorageInterfaceMock::createOperationContext() {
+    return new OperationContextReplMock();
+}
 
 }  // namespace repl
-} // namespace mongo
+}  // namespace mongo

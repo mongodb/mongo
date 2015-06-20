@@ -40,113 +40,104 @@
 
 namespace mongo {
 
-    GetMoreRequest::GetMoreRequest()
-        : cursorid(0),
-          batchSize(0) { }
+GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 
-    GetMoreRequest::GetMoreRequest(const std::string& fullns,
-                                   CursorId id,
-                                   boost::optional<int> sizeOfBatch)
-        : nss(fullns),
-          cursorid(id),
-          batchSize(sizeOfBatch) { }
+GetMoreRequest::GetMoreRequest(const std::string& fullns,
+                               CursorId id,
+                               boost::optional<int> sizeOfBatch)
+    : nss(fullns), cursorid(id), batchSize(sizeOfBatch) {}
 
-    Status GetMoreRequest::isValid() const {
-        if (!nss.isValid()) {
-            return Status(ErrorCodes::BadValue, str::stream()
-                << "Invalid namespace for getMore: " << nss.ns());
-        }
-
-        if (cursorid == 0) {
-            return Status(ErrorCodes::BadValue, "Cursor id for getMore must be non-zero");
-        }
-
-        if (batchSize && *batchSize <= 0) {
-            return Status(ErrorCodes::BadValue, str::stream()
-                << "Batch size for getMore must be positive, "
-                << "but received: " << *batchSize);
-        }
-
-        return Status::OK();
+Status GetMoreRequest::isValid() const {
+    if (!nss.isValid()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid namespace for getMore: " << nss.ns());
     }
 
-    // static
-    std::string GetMoreRequest::parseNs(const std::string& dbname, const BSONObj& cmdObj) {
-        BSONElement collElt = cmdObj["collection"];
-        const std::string coll = (collElt.type() == BSONType::String) ? collElt.String()
-                                                                      : "";
-
-        return str::stream() << dbname << "." << coll;
+    if (cursorid == 0) {
+        return Status(ErrorCodes::BadValue, "Cursor id for getMore must be non-zero");
     }
 
-    // static
-    StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbname,
-                                                             const BSONObj& cmdObj) {
-        invariant(!dbname.empty());
+    if (batchSize && *batchSize <= 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Batch size for getMore must be positive, "
+                                    << "but received: " << *batchSize);
+    }
 
-        // Required fields.
-        boost::optional<CursorId> cursorid;
-        boost::optional<std::string> fullns;
+    return Status::OK();
+}
 
-        // Optional field.
-        boost::optional<int> batchSize;
+// static
+std::string GetMoreRequest::parseNs(const std::string& dbname, const BSONObj& cmdObj) {
+    BSONElement collElt = cmdObj["collection"];
+    const std::string coll = (collElt.type() == BSONType::String) ? collElt.String() : "";
 
-        for (BSONElement el : cmdObj) {
-            const char* fieldName = el.fieldName();
-            if (str::equals(fieldName, "getMore")) {
-                if (el.type() != BSONType::NumberLong) {
-                    return {ErrorCodes::TypeMismatch,
-                            str::stream() << "Field 'getMore' must be of type long in: " << cmdObj};
-                }
+    return str::stream() << dbname << "." << coll;
+}
 
-                cursorid = el.Long();
+// static
+StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbname,
+                                                         const BSONObj& cmdObj) {
+    invariant(!dbname.empty());
+
+    // Required fields.
+    boost::optional<CursorId> cursorid;
+    boost::optional<std::string> fullns;
+
+    // Optional field.
+    boost::optional<int> batchSize;
+
+    for (BSONElement el : cmdObj) {
+        const char* fieldName = el.fieldName();
+        if (str::equals(fieldName, "getMore")) {
+            if (el.type() != BSONType::NumberLong) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "Field 'getMore' must be of type long in: " << cmdObj};
             }
-            else if (str::equals(fieldName, "collection")) {
-                if (el.type() != BSONType::String) {
-                    return {ErrorCodes::TypeMismatch,
-                            str::stream() << "Field 'collection' must be of type string in: "
-                                          << cmdObj};
-                }
 
-                fullns = parseNs(dbname, cmdObj);
+            cursorid = el.Long();
+        } else if (str::equals(fieldName, "collection")) {
+            if (el.type() != BSONType::String) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << "Field 'collection' must be of type string in: " << cmdObj};
             }
-            else if (str::equals(fieldName, "batchSize")) {
-                if (!el.isNumber()) {
-                    return {ErrorCodes::TypeMismatch,
-                            str::stream() << "Field 'batchSize' must be a number in: " << cmdObj};
-                }
 
-                batchSize = el.numberInt();
+            fullns = parseNs(dbname, cmdObj);
+        } else if (str::equals(fieldName, "batchSize")) {
+            if (!el.isNumber()) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "Field 'batchSize' must be a number in: " << cmdObj};
             }
-            else if (str::equals(fieldName, "maxTimeMS")) {
-                // maxTimeMS is parsed by the command handling code, so we don't repeat the parsing
-                // here.
-                continue;
-            }
-            else if (!str::startsWith(fieldName, "$")) {
-                return {ErrorCodes::FailedToParse,
-                        str::stream() << "Failed to parse: " << cmdObj << ". "
-                                      << "Unrecognized field '" << fieldName << "'."};
-            }
-        }
 
-        if (!cursorid) {
+            batchSize = el.numberInt();
+        } else if (str::equals(fieldName, "maxTimeMS")) {
+            // maxTimeMS is parsed by the command handling code, so we don't repeat the parsing
+            // here.
+            continue;
+        } else if (!str::startsWith(fieldName, "$")) {
             return {ErrorCodes::FailedToParse,
-                    str::stream() << "Field 'getMore' missing in: " << cmdObj};
+                    str::stream() << "Failed to parse: " << cmdObj << ". "
+                                  << "Unrecognized field '" << fieldName << "'."};
         }
-
-        if (!fullns) {
-            return {ErrorCodes::FailedToParse,
-                    str::stream() << "Field 'collection' missing in: " << cmdObj};
-        }
-
-        GetMoreRequest request(*fullns, *cursorid, batchSize);
-        Status validStatus = request.isValid();
-        if (!validStatus.isOK()) {
-            return validStatus;
-        }
-
-        return request;
     }
 
-} // namespace mongo
+    if (!cursorid) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Field 'getMore' missing in: " << cmdObj};
+    }
+
+    if (!fullns) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Field 'collection' missing in: " << cmdObj};
+    }
+
+    GetMoreRequest request(*fullns, *cursorid, batchSize);
+    Status validStatus = request.isValid();
+    if (!validStatus.isOK()) {
+        return validStatus;
+    }
+
+    return request;
+}
+
+}  // namespace mongo

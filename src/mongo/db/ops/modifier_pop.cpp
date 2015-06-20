@@ -38,176 +38,161 @@
 
 namespace mongo {
 
-    namespace mb = mutablebson;
-    namespace str = mongoutils::str;
+namespace mb = mutablebson;
+namespace str = mongoutils::str;
 
-    struct ModifierPop::PreparedState {
+struct ModifierPop::PreparedState {
+    PreparedState(mutablebson::Document* targetDoc)
+        : doc(*targetDoc),
+          elementToRemove(doc.end()),
+          pathFoundIndex(0),
+          pathFoundElement(doc.end()) {}
 
-        PreparedState(mutablebson::Document* targetDoc)
-            : doc(*targetDoc)
-            , elementToRemove(doc.end())
-            , pathFoundIndex(0)
-            , pathFoundElement(doc.end()) {
-        }
+    // Document that is going to be changed.
+    mutablebson::Document& doc;
 
-        // Document that is going to be changed.
-        mutablebson::Document& doc;
+    // Element to be removed
+    mutablebson::Element elementToRemove;
 
-        // Element to be removed
-        mutablebson::Element elementToRemove;
+    // Index in _fieldRef for which an Element exist in the document.
+    size_t pathFoundIndex;
 
-        // Index in _fieldRef for which an Element exist in the document.
-        size_t pathFoundIndex;
+    // Element corresponding to _fieldRef[0.._idxFound].
+    mutablebson::Element pathFoundElement;
+};
 
-        // Element corresponding to _fieldRef[0.._idxFound].
-        mutablebson::Element pathFoundElement;
-    };
+ModifierPop::ModifierPop() : _fieldRef(), _positionalPathIndex(0), _fromTop(false) {}
 
-    ModifierPop::ModifierPop()
-        : _fieldRef()
-        , _positionalPathIndex(0)
-        , _fromTop(false) {
-    }
+ModifierPop::~ModifierPop() {}
 
-    ModifierPop::~ModifierPop() {
-    }
+Status ModifierPop::init(const BSONElement& modExpr, const Options& opts, bool* positional) {
+    //
+    // field name analysis
+    //
 
-    Status ModifierPop::init(const BSONElement& modExpr, const Options& opts,
-                             bool* positional) {
-        //
-        // field name analysis
-        //
-
-        // Break down the field name into its 'dotted' components (aka parts) and check that
-        // there are no empty parts.
-        _fieldRef.parse(modExpr.fieldName());
-        Status status = fieldchecker::isUpdatable(_fieldRef);
-        if (! status.isOK()) {
-            return status;
-        }
-
-        // If a $-positional operator was used, get the index in which it occurred
-        // and ensure only one occurrence.
-        size_t foundCount;
-        bool foundDollar = fieldchecker::isPositional(_fieldRef,
-                                                      &_positionalPathIndex,
-                                                      &foundCount);
-
-        if (positional)
-            *positional = foundDollar;
-
-        if (foundDollar && foundCount > 1) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                        << _fieldRef.dottedField() << "'");
-        }
-
-        //
-        // value analysis
-        //
-
-        // TODO: tighten validation to numbers and just 1/-1 explicitly
-        //if (!modExpr.isNumber()) {
-        //    return Status(ErrorCodes::BadValue, "Must be a number");
-        //}
-
-        _fromTop = (modExpr.isNumber() && modExpr.number() < 0) ? true : false;
-
-        return Status::OK();
-    }
-
-    Status ModifierPop::prepare(mutablebson::Element root,
-                                  StringData matchedField,
-                                  ExecInfo* execInfo) {
-
-        _preparedState.reset(new PreparedState(&root.getDocument()));
-
-        // If we have a $-positional field, it is time to bind it to an actual field part.
-        if (_positionalPathIndex) {
-            if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "The positional operator did not find the match "
-                                               "needed from the query. Unexpanded update: "
-                                            << _fieldRef.dottedField());
-            }
-            _fieldRef.setPart(_positionalPathIndex, matchedField);
-        }
-
-        // Locate the field name in 'root'. Note that if we don't have the full path in the
-        // doc, there isn't anything to unset, really.
-        Status status = pathsupport::findLongestPrefix(_fieldRef,
-                                                       root,
-                                                       &_preparedState->pathFoundIndex,
-                                                       &_preparedState->pathFoundElement);
-        // Check if we didn't find the full path
-        if (status.isOK()) {
-            const bool destExists = (_preparedState->pathFoundIndex == (_fieldRef.numParts()-1));
-            if (!destExists) {
-                execInfo->noOp = true;
-            } else {
-                // If the path exists, we require the target field to be already an
-                // array.
-                if (_preparedState->pathFoundElement.getType() != Array) {
-                    mb::Element idElem = mb::findFirstChildNamed(root, "_id");
-                    return Status(
-                        ErrorCodes::BadValue,
-                        str::stream() << "Can only $pop from arrays. {"
-                                      << idElem.toString()
-                                      << "} has the field '"
-                                      << _preparedState->pathFoundElement.getFieldName()
-                                      << "' of non-array type "
-                                      << typeName(_preparedState->pathFoundElement.getType()));
-                }
-
-                // No children, nothing to do -- not an error state
-                if (!_preparedState->pathFoundElement.hasChildren()) {
-                    execInfo->noOp = true;
-                } else {
-                    _preparedState->elementToRemove = _fromTop ?
-                                    _preparedState->pathFoundElement.leftChild() :
-                                    _preparedState->pathFoundElement.rightChild();
-                }
-            }
-        } else {
-            // Let the caller know we can't do anything given the mod, _fieldRef, and doc.
-            execInfo->noOp = true;
-            _preparedState->pathFoundElement = root.getDocument().end();
-
-            //okay if path not found
-            if (status.code() == ErrorCodes::NonExistentPath)
-                status = Status::OK();
-        }
-
-        // Let the caller know what field we care about
-        execInfo->fieldRef[0] = &_fieldRef;
-
+    // Break down the field name into its 'dotted' components (aka parts) and check that
+    // there are no empty parts.
+    _fieldRef.parse(modExpr.fieldName());
+    Status status = fieldchecker::isUpdatable(_fieldRef);
+    if (!status.isOK()) {
         return status;
     }
 
-    Status ModifierPop::apply() const {
-        return _preparedState->elementToRemove.remove();
+    // If a $-positional operator was used, get the index in which it occurred
+    // and ensure only one occurrence.
+    size_t foundCount;
+    bool foundDollar = fieldchecker::isPositional(_fieldRef, &_positionalPathIndex, &foundCount);
+
+    if (positional)
+        *positional = foundDollar;
+
+    if (foundDollar && foundCount > 1) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                    << _fieldRef.dottedField() << "'");
     }
 
-    Status ModifierPop::log(LogBuilder* logBuilder) const {
-        // log document
-        mutablebson::Document& doc = logBuilder->getDocument();
-        const bool pathExists = _preparedState->pathFoundElement.ok() &&
-            (_preparedState->pathFoundIndex == (_fieldRef.numParts() - 1));
+    //
+    // value analysis
+    //
 
-        if (!pathExists)
-            return logBuilder->addToUnsets(_fieldRef.dottedField());
+    // TODO: tighten validation to numbers and just 1/-1 explicitly
+    // if (!modExpr.isNumber()) {
+    //    return Status(ErrorCodes::BadValue, "Must be a number");
+    //}
 
-        // value for the logElement ("field.path.name": <value>)
-        mutablebson::Element logElement = doc.makeElementWithNewFieldName(
-                                                            _fieldRef.dottedField(),
-                                                            _preparedState->pathFoundElement);
+    _fromTop = (modExpr.isNumber() && modExpr.number() < 0) ? true : false;
 
-        if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError,
-                          str::stream() << "Could not append entry to $pop oplog entry: "
-                                        << "set '" << _fieldRef.dottedField() << "' -> "
-                                        << _preparedState->pathFoundElement.toString() );
+    return Status::OK();
+}
+
+Status ModifierPop::prepare(mutablebson::Element root,
+                            StringData matchedField,
+                            ExecInfo* execInfo) {
+    _preparedState.reset(new PreparedState(&root.getDocument()));
+
+    // If we have a $-positional field, it is time to bind it to an actual field part.
+    if (_positionalPathIndex) {
+        if (matchedField.empty()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "The positional operator did not find the match "
+                                           "needed from the query. Unexpanded update: "
+                                        << _fieldRef.dottedField());
         }
-        return logBuilder->addToSets(logElement);
+        _fieldRef.setPart(_positionalPathIndex, matchedField);
     }
-} // namespace mongo
+
+    // Locate the field name in 'root'. Note that if we don't have the full path in the
+    // doc, there isn't anything to unset, really.
+    Status status = pathsupport::findLongestPrefix(
+        _fieldRef, root, &_preparedState->pathFoundIndex, &_preparedState->pathFoundElement);
+    // Check if we didn't find the full path
+    if (status.isOK()) {
+        const bool destExists = (_preparedState->pathFoundIndex == (_fieldRef.numParts() - 1));
+        if (!destExists) {
+            execInfo->noOp = true;
+        } else {
+            // If the path exists, we require the target field to be already an
+            // array.
+            if (_preparedState->pathFoundElement.getType() != Array) {
+                mb::Element idElem = mb::findFirstChildNamed(root, "_id");
+                return Status(ErrorCodes::BadValue,
+                              str::stream()
+                                  << "Can only $pop from arrays. {" << idElem.toString()
+                                  << "} has the field '"
+                                  << _preparedState->pathFoundElement.getFieldName()
+                                  << "' of non-array type "
+                                  << typeName(_preparedState->pathFoundElement.getType()));
+            }
+
+            // No children, nothing to do -- not an error state
+            if (!_preparedState->pathFoundElement.hasChildren()) {
+                execInfo->noOp = true;
+            } else {
+                _preparedState->elementToRemove = _fromTop
+                    ? _preparedState->pathFoundElement.leftChild()
+                    : _preparedState->pathFoundElement.rightChild();
+            }
+        }
+    } else {
+        // Let the caller know we can't do anything given the mod, _fieldRef, and doc.
+        execInfo->noOp = true;
+        _preparedState->pathFoundElement = root.getDocument().end();
+
+        // okay if path not found
+        if (status.code() == ErrorCodes::NonExistentPath)
+            status = Status::OK();
+    }
+
+    // Let the caller know what field we care about
+    execInfo->fieldRef[0] = &_fieldRef;
+
+    return status;
+}
+
+Status ModifierPop::apply() const {
+    return _preparedState->elementToRemove.remove();
+}
+
+Status ModifierPop::log(LogBuilder* logBuilder) const {
+    // log document
+    mutablebson::Document& doc = logBuilder->getDocument();
+    const bool pathExists = _preparedState->pathFoundElement.ok() &&
+        (_preparedState->pathFoundIndex == (_fieldRef.numParts() - 1));
+
+    if (!pathExists)
+        return logBuilder->addToUnsets(_fieldRef.dottedField());
+
+    // value for the logElement ("field.path.name": <value>)
+    mutablebson::Element logElement =
+        doc.makeElementWithNewFieldName(_fieldRef.dottedField(), _preparedState->pathFoundElement);
+
+    if (!logElement.ok()) {
+        return Status(ErrorCodes::InternalError,
+                      str::stream() << "Could not append entry to $pop oplog entry: "
+                                    << "set '" << _fieldRef.dottedField() << "' -> "
+                                    << _preparedState->pathFoundElement.toString());
+    }
+    return logBuilder->addToSets(logElement);
+}
+}  // namespace mongo

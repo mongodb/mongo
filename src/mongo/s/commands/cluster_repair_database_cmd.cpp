@@ -33,19 +33,19 @@
 namespace mongo {
 namespace {
 
-    class ClusterRepairDatabaseCmd : public RunOnAllShardsCommand {
-    public:
-        ClusterRepairDatabaseCmd() : RunOnAllShardsCommand("repairDatabase") {}
+class ClusterRepairDatabaseCmd : public RunOnAllShardsCommand {
+public:
+    ClusterRepairDatabaseCmd() : RunOnAllShardsCommand("repairDatabase") {}
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::repairDatabase);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-        }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::repairDatabase);
+        out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+    }
 
-    } clusterRepairDatabaseCmd;
+} clusterRepairDatabaseCmd;
 
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

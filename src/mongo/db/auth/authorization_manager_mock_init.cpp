@@ -41,18 +41,18 @@
 
 namespace mongo {
 namespace {
-    std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMock() {
-        return stdx::make_unique<AuthzManagerExternalStateMock>();
-    }
+std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMock() {
+    return stdx::make_unique<AuthzManagerExternalStateMock>();
+}
 
-    MONGO_INITIALIZER(CreateAuthorizationExternalStateFactory) (InitializerContext* context) {
-        AuthzManagerExternalState::create = &createAuthzManagerExternalStateMock;
-        return Status::OK();
-    }
+MONGO_INITIALIZER(CreateAuthorizationExternalStateFactory)(InitializerContext* context) {
+    AuthzManagerExternalState::create = &createAuthzManagerExternalStateMock;
+    return Status::OK();
+}
 
-    MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-        setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-        return Status::OK();
-    }
+MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
+    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
+    return Status::OK();
+}
 }
 }

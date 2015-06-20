@@ -36,84 +36,78 @@
 
 namespace mongo {
 
-    class OperationContextNoop : public OperationContext {
-    public:
+class OperationContextNoop : public OperationContext {
+public:
+    OperationContextNoop() : OperationContextNoop(new RecoveryUnitNoop()) {}
 
-        OperationContextNoop() : OperationContextNoop(new RecoveryUnitNoop()) {}
+    OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0, ru) {}
 
-        OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0, ru) {}
+    OperationContextNoop(Client* client, unsigned int opId)
+        : OperationContextNoop(client, opId, new RecoveryUnitNoop()) {}
 
-        OperationContextNoop(Client* client, unsigned int opId)
-            : OperationContextNoop(client, opId, new RecoveryUnitNoop()) {
-        }
+    OperationContextNoop(Client* client, unsigned int opId, RecoveryUnit* ru)
+        : OperationContextNoop(client, opId, new LockerNoop(), ru) {}
 
-        OperationContextNoop(Client* client, unsigned int opId, RecoveryUnit* ru)
-            : OperationContextNoop(client, opId, new LockerNoop(), ru) {
-        }
+    OperationContextNoop(Client* client, unsigned int opId, Locker* locker)
+        : OperationContextNoop(client, opId, locker, new RecoveryUnitNoop()) {}
 
-        OperationContextNoop(Client* client, unsigned int opId, Locker* locker)
-            : OperationContextNoop(client, opId, locker, new RecoveryUnitNoop()) {
-        }
+    OperationContextNoop(Client* client, unsigned int opId, Locker* locker, RecoveryUnit* ru)
+        : OperationContext(client, opId, locker), _recoveryUnit(ru) {
+        _locker.reset(lockState());
+    }
 
-        OperationContextNoop(Client* client, unsigned int opId, Locker* locker, RecoveryUnit* ru)
-            : OperationContext(client, opId, locker),
-              _recoveryUnit(ru) {
+    virtual ~OperationContextNoop() = default;
 
-            _locker.reset(lockState());
-        }
+    virtual RecoveryUnit* recoveryUnit() const override {
+        return _recoveryUnit.get();
+    }
 
-        virtual ~OperationContextNoop() = default;
+    virtual RecoveryUnit* releaseRecoveryUnit() override {
+        return _recoveryUnit.release();
+    }
 
-        virtual RecoveryUnit* recoveryUnit() const override {
-            return _recoveryUnit.get();
-        }
+    virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
+                                              RecoveryUnitState state) override {
+        RecoveryUnitState oldState = _ruState;
+        _recoveryUnit.reset(unit);
+        _ruState = state;
+        return oldState;
+    }
 
-        virtual RecoveryUnit* releaseRecoveryUnit() override {
-            return _recoveryUnit.release();
-        }
+    virtual ProgressMeter* setMessage_inlock(const char* msg,
+                                             const std::string& name,
+                                             unsigned long long progressMeterTotal,
+                                             int secondsBetween) override {
+        return &_pm;
+    }
 
-        virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
-                                                  RecoveryUnitState state) override {
-            RecoveryUnitState oldState = _ruState;
-            _recoveryUnit.reset(unit);
-            _ruState = state;
-            return oldState;
-        }
+    virtual void checkForInterrupt() override {}
+    virtual Status checkForInterruptNoAssert() override {
+        return Status::OK();
+    }
 
-        virtual ProgressMeter* setMessage_inlock(const char * msg,
-                                                 const std::string &name,
-                                                 unsigned long long progressMeterTotal,
-                                                 int secondsBetween) override {
-            return &_pm;
-        }
+    virtual bool isPrimaryFor(StringData ns) override {
+        return true;
+    }
 
-        virtual void checkForInterrupt() override { }
-        virtual Status checkForInterruptNoAssert() override {
-            return Status::OK();
-        }
-
-        virtual bool isPrimaryFor( StringData ns ) override {
-            return true;
-        }
-
-        virtual std::string getNS() const override {
-            return std::string();
-        };
-
-        void setReplicatedWrites(bool writesAreReplicated = true) override {}
-
-        bool writesAreReplicated() const override {
-            return false;
-        }
-
-        virtual uint64_t getRemainingMaxTimeMicros() const override {
-            return 0;
-        }
-
-    private:
-        std::unique_ptr<RecoveryUnit> _recoveryUnit;
-        std::unique_ptr<Locker> _locker;
-        ProgressMeter _pm;
+    virtual std::string getNS() const override {
+        return std::string();
     };
+
+    void setReplicatedWrites(bool writesAreReplicated = true) override {}
+
+    bool writesAreReplicated() const override {
+        return false;
+    }
+
+    virtual uint64_t getRemainingMaxTimeMicros() const override {
+        return 0;
+    }
+
+private:
+    std::unique_ptr<RecoveryUnit> _recoveryUnit;
+    std::unique_ptr<Locker> _locker;
+    ProgressMeter _pm;
+};
 
 }  // namespace mongo

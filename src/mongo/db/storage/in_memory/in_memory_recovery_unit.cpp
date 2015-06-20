@@ -37,30 +37,28 @@
 
 namespace mongo {
 
-    void InMemoryRecoveryUnit::commitUnitOfWork() {
-        try {
-            for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
-                (*it)->commit();
-            }
-            _changes.clear();
+void InMemoryRecoveryUnit::commitUnitOfWork() {
+    try {
+        for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
+            (*it)->commit();
         }
-        catch (...) {
-            std::terminate();
-        }
+        _changes.clear();
+    } catch (...) {
+        std::terminate();
     }
+}
 
-    void InMemoryRecoveryUnit::abortUnitOfWork() {
-         try {
-             for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend();
-                     it != end; ++it) {
-                 ChangePtr change = *it;
-                 LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*change));
-                 change->rollback();
-             }
-             _changes.clear();
+void InMemoryRecoveryUnit::abortUnitOfWork() {
+    try {
+        for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend(); it != end;
+             ++it) {
+            ChangePtr change = *it;
+            LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*change));
+            change->rollback();
         }
-        catch (...) {
-            std::terminate();
-        }
+        _changes.clear();
+    } catch (...) {
+        std::terminate();
     }
+}
 }

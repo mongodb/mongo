@@ -39,81 +39,81 @@
 namespace mongo {
 namespace {
 
-    class ValidateAdaptorSpy : public ValidateAdaptor {
-    public:
-        ValidateAdaptorSpy() { }
+class ValidateAdaptorSpy : public ValidateAdaptor {
+public:
+    ValidateAdaptorSpy() {}
 
-        ValidateAdaptorSpy( const std::set<std::string> &remain )
-            : _remain( remain ) {
+    ValidateAdaptorSpy(const std::set<std::string>& remain) : _remain(remain) {}
+
+    ~ValidateAdaptorSpy() {}
+
+    Status validate(const RecordData& recordData, size_t* dataSize) {
+        std::string s(recordData.data());
+        ASSERT(1 == _remain.erase(s));
+
+        *dataSize = recordData.size();
+        return Status::OK();
+    }
+
+    bool allValidated() {
+        return _remain.empty();
+    }
+
+private:
+    std::set<std::string> _remain;  // initially contains all inserted records
+};
+
+class ValidateTest : public mongo::unittest::Test {
+public:
+    ValidateTest()
+        : _harnessHelper(newHarnessHelper()), _rs(_harnessHelper->newNonCappedRecordStore()) {}
+
+    OperationContext* newOperationContext() {
+        return _harnessHelper->newOperationContext();
+    }
+
+    RecordStore& getRecordStore() {
+        return *_rs;
+    }
+
+    const std::set<std::string>& getInsertedRecords() {
+        return _remain;
+    }
+
+    void setUp() {
+        {
+            std::unique_ptr<OperationContext> opCtx(newOperationContext());
+            ASSERT_EQUALS(0, _rs->numRecords(opCtx.get()));
         }
 
-        ~ValidateAdaptorSpy() { }
-
-        Status validate( const RecordData &recordData, size_t *dataSize ) {
-            std::string s( recordData.data() );
-            ASSERT( 1 == _remain.erase( s ) );
-
-            *dataSize = recordData.size();
-            return Status::OK();
-        }
-
-        bool allValidated() { return _remain.empty(); }
-
-    private:
-        std::set<std::string> _remain; // initially contains all inserted records
-    };
-
-    class ValidateTest : public mongo::unittest::Test {
-    public:
-        ValidateTest()
-            : _harnessHelper( newHarnessHelper() ),
-              _rs( _harnessHelper->newNonCappedRecordStore() ) {
-        }
-
-        OperationContext* newOperationContext() {
-            return _harnessHelper->newOperationContext();
-        }
-
-        RecordStore& getRecordStore() { return *_rs; }
-
-        const std::set<std::string>& getInsertedRecords() { return _remain; }
-
-        void setUp() {
+        int nToInsert = 10;
+        for (int i = 0; i < nToInsert; i++) {
+            std::unique_ptr<OperationContext> opCtx(newOperationContext());
             {
-                std::unique_ptr<OperationContext> opCtx( newOperationContext() );
-                ASSERT_EQUALS( 0, _rs->numRecords( opCtx.get() ) );
-            }
+                std::stringstream ss;
+                ss << "record " << i;
+                std::string data = ss.str();
+                ASSERT(_remain.insert(data).second);
 
-            int nToInsert = 10;
-            for ( int i = 0; i < nToInsert; i++ ) {
-                std::unique_ptr<OperationContext> opCtx( newOperationContext() );
-                {
-                    std::stringstream ss;
-                    ss << "record " << i;
-                    std::string data = ss.str();
-                    ASSERT( _remain.insert( data ).second );
-
-                    WriteUnitOfWork uow( opCtx.get() );
-                    StatusWith<RecordId> res = _rs->insertRecord( opCtx.get(),
-                                                                 data.c_str(),
-                                                                 data.size() + 1,
-                                                                 false );
-                    ASSERT_OK( res.getStatus() );
-                    uow.commit();
-                }
-            }
-
-            {
-                std::unique_ptr<OperationContext> opCtx( newOperationContext() );
-                ASSERT_EQUALS( nToInsert, _rs->numRecords( opCtx.get() ) );
+                WriteUnitOfWork uow(opCtx.get());
+                StatusWith<RecordId> res =
+                    _rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                ASSERT_OK(res.getStatus());
+                uow.commit();
             }
         }
 
-    private:
-        std::unique_ptr<HarnessHelper> _harnessHelper;
-        std::unique_ptr<RecordStore> _rs;
-        std::set<std::string> _remain;
-    };
+        {
+            std::unique_ptr<OperationContext> opCtx(newOperationContext());
+            ASSERT_EQUALS(nToInsert, _rs->numRecords(opCtx.get()));
+        }
+    }
 
-} // namespace
-} // namespace mongo
+private:
+    std::unique_ptr<HarnessHelper> _harnessHelper;
+    std::unique_ptr<RecordStore> _rs;
+    std::set<std::string> _remain;
+};
+
+}  // namespace
+}  // namespace mongo

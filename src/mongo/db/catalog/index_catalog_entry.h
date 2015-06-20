@@ -38,130 +38,155 @@
 
 namespace mongo {
 
-    class CollectionCatalogEntry;
-    class CollectionInfoCache;
-    class HeadManager;
-    class IndexAccessMethod;
-    class IndexDescriptor;
-    class MatchExpression;
-    class OperationContext;
+class CollectionCatalogEntry;
+class CollectionInfoCache;
+class HeadManager;
+class IndexAccessMethod;
+class IndexDescriptor;
+class MatchExpression;
+class OperationContext;
 
-    class IndexCatalogEntry {
-        MONGO_DISALLOW_COPYING( IndexCatalogEntry );
-    public:
-        IndexCatalogEntry( StringData ns,
-                           CollectionCatalogEntry* collection, // not owned
-                           IndexDescriptor* descriptor, // ownership passes to me
-                           CollectionInfoCache* infoCache ); // not owned, optional
+class IndexCatalogEntry {
+    MONGO_DISALLOW_COPYING(IndexCatalogEntry);
 
-        ~IndexCatalogEntry();
+public:
+    IndexCatalogEntry(StringData ns,
+                      CollectionCatalogEntry* collection,  // not owned
+                      IndexDescriptor* descriptor,         // ownership passes to me
+                      CollectionInfoCache* infoCache);     // not owned, optional
 
-        const std::string& ns() const { return _ns; }
+    ~IndexCatalogEntry();
 
-        void init( OperationContext* txn,
-                   IndexAccessMethod* accessMethod );
+    const std::string& ns() const {
+        return _ns;
+    }
 
-        IndexDescriptor* descriptor() { return _descriptor; }
-        const IndexDescriptor* descriptor() const { return _descriptor; }
+    void init(OperationContext* txn, IndexAccessMethod* accessMethod);
 
-        IndexAccessMethod* accessMethod() { return _accessMethod; }
-        const IndexAccessMethod* accessMethod() const { return _accessMethod; }
+    IndexDescriptor* descriptor() {
+        return _descriptor;
+    }
+    const IndexDescriptor* descriptor() const {
+        return _descriptor;
+    }
 
-        const Ordering& ordering() const { return _ordering; }
+    IndexAccessMethod* accessMethod() {
+        return _accessMethod;
+    }
+    const IndexAccessMethod* accessMethod() const {
+        return _accessMethod;
+    }
 
-        const MatchExpression* getFilterExpression() const { return _filterExpression.get(); }
+    const Ordering& ordering() const {
+        return _ordering;
+    }
 
-        /// ---------------------
+    const MatchExpression* getFilterExpression() const {
+        return _filterExpression.get();
+    }
 
-        const RecordId& head( OperationContext* txn ) const;
+    /// ---------------------
 
-        void setHead( OperationContext* txn, RecordId newHead );
+    const RecordId& head(OperationContext* txn) const;
 
-        void setIsReady( bool newIsReady );
+    void setHead(OperationContext* txn, RecordId newHead);
 
-        HeadManager* headManager() const { return _headManager; }
+    void setIsReady(bool newIsReady);
 
-        // --
+    HeadManager* headManager() const {
+        return _headManager;
+    }
 
-        bool isMultikey() const;
+    // --
 
-        void setMultikey( OperationContext* txn );
+    bool isMultikey() const;
 
-        // if this ready is ready for queries
-        bool isReady( OperationContext* txn ) const;
+    void setMultikey(OperationContext* txn);
 
-    private:
+    // if this ready is ready for queries
+    bool isReady(OperationContext* txn) const;
 
-        class SetMultikeyChange;
-        class SetHeadChange;
+private:
+    class SetMultikeyChange;
+    class SetHeadChange;
 
-        bool _catalogIsReady( OperationContext* txn ) const;
-        RecordId _catalogHead( OperationContext* txn ) const;
-        bool _catalogIsMultikey( OperationContext* txn ) const;
+    bool _catalogIsReady(OperationContext* txn) const;
+    RecordId _catalogHead(OperationContext* txn) const;
+    bool _catalogIsMultikey(OperationContext* txn) const;
 
-        // -----
+    // -----
 
-        std::string _ns;
+    std::string _ns;
 
-        CollectionCatalogEntry* _collection; // not owned here
+    CollectionCatalogEntry* _collection;  // not owned here
 
-        IndexDescriptor* _descriptor; // owned here
+    IndexDescriptor* _descriptor;  // owned here
 
-        CollectionInfoCache* _infoCache; // not owned here
+    CollectionInfoCache* _infoCache;  // not owned here
 
-        IndexAccessMethod* _accessMethod; // owned here
+    IndexAccessMethod* _accessMethod;  // owned here
 
-        // Owned here.
-        HeadManager* _headManager;
-        std::unique_ptr<MatchExpression> _filterExpression;
+    // Owned here.
+    HeadManager* _headManager;
+    std::unique_ptr<MatchExpression> _filterExpression;
 
-        // cached stuff
+    // cached stuff
 
-        Ordering _ordering; // TODO: this might be b-tree specific
-        bool _isReady; // cache of NamespaceDetails info
-        RecordId _head; // cache of IndexDetails
-        bool _isMultikey; // cache of NamespaceDetails info
-    };
+    Ordering _ordering;  // TODO: this might be b-tree specific
+    bool _isReady;       // cache of NamespaceDetails info
+    RecordId _head;      // cache of IndexDetails
+    bool _isMultikey;    // cache of NamespaceDetails info
+};
 
-    class IndexCatalogEntryContainer {
-    public:
+class IndexCatalogEntryContainer {
+public:
+    typedef std::vector<IndexCatalogEntry*>::const_iterator const_iterator;
+    typedef std::vector<IndexCatalogEntry*>::const_iterator iterator;
 
-        typedef std::vector<IndexCatalogEntry*>::const_iterator const_iterator;
-        typedef std::vector<IndexCatalogEntry*>::const_iterator iterator;
+    const_iterator begin() const {
+        return _entries.vector().begin();
+    }
+    const_iterator end() const {
+        return _entries.vector().end();
+    }
 
-        const_iterator begin() const { return _entries.vector().begin(); }
-        const_iterator end() const { return _entries.vector().end(); }
+    iterator begin() {
+        return _entries.vector().begin();
+    }
+    iterator end() {
+        return _entries.vector().end();
+    }
 
-        iterator begin() { return _entries.vector().begin(); }
-        iterator end() { return _entries.vector().end(); }
+    // TODO: these have to be SUPER SUPER FAST
+    // maybe even some pointer trickery is in order
+    const IndexCatalogEntry* find(const IndexDescriptor* desc) const;
+    IndexCatalogEntry* find(const IndexDescriptor* desc);
 
-        // TODO: these have to be SUPER SUPER FAST
-        // maybe even some pointer trickery is in order
-        const IndexCatalogEntry* find( const IndexDescriptor* desc ) const;
-        IndexCatalogEntry* find( const IndexDescriptor* desc );
-
-        IndexCatalogEntry* find( const std::string& name );
+    IndexCatalogEntry* find(const std::string& name);
 
 
-        unsigned size() const { return _entries.size(); }
-        // -----------------
+    unsigned size() const {
+        return _entries.size();
+    }
+    // -----------------
 
-        /**
-         * Removes from _entries and returns the matching entry or NULL if none matches.
-         */
-        IndexCatalogEntry* release( const IndexDescriptor* desc );
+    /**
+     * Removes from _entries and returns the matching entry or NULL if none matches.
+     */
+    IndexCatalogEntry* release(const IndexDescriptor* desc);
 
-        bool remove( const IndexDescriptor* desc ) {
-            IndexCatalogEntry* entry = release(desc);
-            delete entry;
-            return entry;
-        }
+    bool remove(const IndexDescriptor* desc) {
+        IndexCatalogEntry* entry = release(desc);
+        delete entry;
+        return entry;
+    }
 
-        // pass ownership to EntryContainer
-        void add( IndexCatalogEntry* entry ) { _entries.mutableVector().push_back( entry ); }
+    // pass ownership to EntryContainer
+    void add(IndexCatalogEntry* entry) {
+        _entries.mutableVector().push_back(entry);
+    }
 
-    private:
-        OwnedPointerVector<IndexCatalogEntry> _entries;
-    };
-
+private:
+    OwnedPointerVector<IndexCatalogEntry> _entries;
+};
 }

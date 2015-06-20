@@ -41,211 +41,211 @@ using std::string;
 namespace mongo {
 namespace {
 
-    // Verify that calling validate() on an empty collection returns an OK status.
-    // When either of `full` or `scanData` are false, the ValidateAdaptor
-    // should not be used.
-    TEST( RecordStoreTestHarness, ValidateEmpty ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Verify that calling validate() on an empty collection returns an OK status.
+// When either of `full` or `scanData` are false, the ValidateAdaptor
+// should not be used.
+TEST(RecordStoreTestHarness, ValidateEmpty) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                ValidateAdaptorSpy adaptor;
-                ValidateResults results;
-                BSONObjBuilder stats;
-                ASSERT_OK( rs->validate( opCtx.get(),
-                                         false,  // full validate
-                                         false,  // scan data
-                                         &adaptor,
-                                         &results,
-                                         &stats ) );
-                ASSERT( results.valid );
-                ASSERT( results.errors.empty() );
-            }
-        }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    // Verify that calling validate() on an empty collection returns an OK status.
-    // When either of `full` or `scanData` are false, the ValidateAdaptor
-    // should not be used.
-    TEST( RecordStoreTestHarness, ValidateEmptyAndScanData ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                ValidateAdaptorSpy adaptor;
-                ValidateResults results;
-                BSONObjBuilder stats;
-                ASSERT_OK( rs->validate( opCtx.get(),
-                                         false,  // full validate
-                                         true,  // scan data
-                                         &adaptor,
-                                         &results,
-                                         &stats ) );
-                ASSERT( results.valid );
-                ASSERT( results.errors.empty() );
-            }
+            ValidateAdaptorSpy adaptor;
+            ValidateResults results;
+            BSONObjBuilder stats;
+            ASSERT_OK(rs->validate(opCtx.get(),
+                                   false,  // full validate
+                                   false,  // scan data
+                                   &adaptor,
+                                   &results,
+                                   &stats));
+            ASSERT(results.valid);
+            ASSERT(results.errors.empty());
         }
     }
+}
 
-    // Verify that calling validate() on an empty collection returns an OK status.
-    // When either of `full` or `scanData` are false, the ValidateAdaptor
-    // should not be used.
-    TEST( RecordStoreTestHarness, FullValidateEmpty ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Verify that calling validate() on an empty collection returns an OK status.
+// When either of `full` or `scanData` are false, the ValidateAdaptor
+// should not be used.
+TEST(RecordStoreTestHarness, ValidateEmptyAndScanData) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                ValidateAdaptorSpy adaptor;
-                ValidateResults results;
-                BSONObjBuilder stats;
-                ASSERT_OK( rs->validate( opCtx.get(),
-                                         true,  // full validate
-                                         false,  // scan data
-                                         &adaptor,
-                                         &results,
-                                         &stats ) );
-                ASSERT( results.valid );
-                ASSERT( results.errors.empty() );
-            }
-        }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    // Verify that calling validate() on an empty collection returns an OK status.
-    TEST( RecordStoreTestHarness, FullValidateEmptyAndScanData ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                ValidateAdaptorSpy adaptor;
-                ValidateResults results;
-                BSONObjBuilder stats;
-                ASSERT_OK( rs->validate( opCtx.get(),
-                                         true,  // full validate
-                                         true,  // scan data
-                                         &adaptor,
-                                         &results,
-                                         &stats ) );
-                ASSERT( results.valid );
-                ASSERT( results.errors.empty() );
-            }
+            ValidateAdaptorSpy adaptor;
+            ValidateResults results;
+            BSONObjBuilder stats;
+            ASSERT_OK(rs->validate(opCtx.get(),
+                                   false,  // full validate
+                                   true,   // scan data
+                                   &adaptor,
+                                   &results,
+                                   &stats));
+            ASSERT(results.valid);
+            ASSERT(results.errors.empty());
         }
     }
+}
 
-    // Insert multiple records, and verify that calling validate() on a nonempty collection
-    // returns an OK status. When either of `full` or `scanData` are false, the ValidateAdaptor
-    // should not be used.
-    TEST_F( ValidateTest, ValidateNonEmpty ) {
-        {
-            unique_ptr<OperationContext> opCtx( newOperationContext() );
-            {
-                ValidateAdaptorSpy adaptor;
-                ValidateResults results;
-                BSONObjBuilder stats;
-                ASSERT_OK( getRecordStore().validate( opCtx.get(),
-                                                      false,  // full validate
-                                                      false,  // scan data
-                                                      &adaptor,
-                                                      &results,
-                                                      &stats ) );
-                ASSERT( results.valid );
-                ASSERT( results.errors.empty() );
-            }
-        }
+// Verify that calling validate() on an empty collection returns an OK status.
+// When either of `full` or `scanData` are false, the ValidateAdaptor
+// should not be used.
+TEST(RecordStoreTestHarness, FullValidateEmpty) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    // Insert multiple records, and verify that calling validate() on a nonempty collection
-    // returns an OK status. When either of `full` or `scanData` are false, the ValidateAdaptor
-    // should not be used.
-    TEST_F( ValidateTest, ValidateAndScanDataNonEmpty ) {
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( newOperationContext() );
-            {
-                ValidateAdaptorSpy adaptor;
-                ValidateResults results;
-                BSONObjBuilder stats;
-                ASSERT_OK( getRecordStore().validate( opCtx.get(),
-                                                      false,  // full validate
-                                                      true,  // scan data
-                                                      &adaptor,
-                                                      &results,
-                                                      &stats ) );
-                ASSERT( results.valid );
-                ASSERT( results.errors.empty() );
-            }
+            ValidateAdaptorSpy adaptor;
+            ValidateResults results;
+            BSONObjBuilder stats;
+            ASSERT_OK(rs->validate(opCtx.get(),
+                                   true,   // full validate
+                                   false,  // scan data
+                                   &adaptor,
+                                   &results,
+                                   &stats));
+            ASSERT(results.valid);
+            ASSERT(results.errors.empty());
         }
     }
+}
 
-    // Insert multiple records, and verify that calling validate() on a nonempty collection
-    // returns an OK status. When either of `full` or `scanData` are false, the ValidateAdaptor
-    // should not be used.
-    TEST_F( ValidateTest, FullValidateNonEmpty ) {
-        {
-            unique_ptr<OperationContext> opCtx( newOperationContext() );
-            {
-                ValidateAdaptorSpy adaptor;
-                ValidateResults results;
-                BSONObjBuilder stats;
-                ASSERT_OK( getRecordStore().validate( opCtx.get(),
-                                                      true,  // full validate
-                                                      false,  // scan data
-                                                      &adaptor,
-                                                      &results,
-                                                      &stats ) );
-                ASSERT( results.valid );
-                ASSERT( results.errors.empty() );
-            }
-        }
+// Verify that calling validate() on an empty collection returns an OK status.
+TEST(RecordStoreTestHarness, FullValidateEmptyAndScanData) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    // Insert multiple records, and verify that calling validate() on a nonempty collection
-    // returns an OK status.
-    TEST_F( ValidateTest, FullValidateNonEmptyAndScanData ) {
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( newOperationContext() );
-            {
-                ValidateAdaptorSpy adaptor( getInsertedRecords() );
-                ValidateResults results;
-                BSONObjBuilder stats;
-                ASSERT_OK( getRecordStore().validate( opCtx.get(),
-                                                      true,  // full validate
-                                                      true,  // scan data
-                                                      &adaptor,
-                                                      &results,
-                                                      &stats ) );
-                ASSERT( adaptor.allValidated() );
-                ASSERT( results.valid );
-                ASSERT( results.errors.empty() );
-            }
+            ValidateAdaptorSpy adaptor;
+            ValidateResults results;
+            BSONObjBuilder stats;
+            ASSERT_OK(rs->validate(opCtx.get(),
+                                   true,  // full validate
+                                   true,  // scan data
+                                   &adaptor,
+                                   &results,
+                                   &stats));
+            ASSERT(results.valid);
+            ASSERT(results.errors.empty());
         }
     }
+}
 
-} // namespace
-} // namespace mongo
+// Insert multiple records, and verify that calling validate() on a nonempty collection
+// returns an OK status. When either of `full` or `scanData` are false, the ValidateAdaptor
+// should not be used.
+TEST_F(ValidateTest, ValidateNonEmpty) {
+    {
+        unique_ptr<OperationContext> opCtx(newOperationContext());
+        {
+            ValidateAdaptorSpy adaptor;
+            ValidateResults results;
+            BSONObjBuilder stats;
+            ASSERT_OK(getRecordStore().validate(opCtx.get(),
+                                                false,  // full validate
+                                                false,  // scan data
+                                                &adaptor,
+                                                &results,
+                                                &stats));
+            ASSERT(results.valid);
+            ASSERT(results.errors.empty());
+        }
+    }
+}
+
+// Insert multiple records, and verify that calling validate() on a nonempty collection
+// returns an OK status. When either of `full` or `scanData` are false, the ValidateAdaptor
+// should not be used.
+TEST_F(ValidateTest, ValidateAndScanDataNonEmpty) {
+    {
+        unique_ptr<OperationContext> opCtx(newOperationContext());
+        {
+            ValidateAdaptorSpy adaptor;
+            ValidateResults results;
+            BSONObjBuilder stats;
+            ASSERT_OK(getRecordStore().validate(opCtx.get(),
+                                                false,  // full validate
+                                                true,   // scan data
+                                                &adaptor,
+                                                &results,
+                                                &stats));
+            ASSERT(results.valid);
+            ASSERT(results.errors.empty());
+        }
+    }
+}
+
+// Insert multiple records, and verify that calling validate() on a nonempty collection
+// returns an OK status. When either of `full` or `scanData` are false, the ValidateAdaptor
+// should not be used.
+TEST_F(ValidateTest, FullValidateNonEmpty) {
+    {
+        unique_ptr<OperationContext> opCtx(newOperationContext());
+        {
+            ValidateAdaptorSpy adaptor;
+            ValidateResults results;
+            BSONObjBuilder stats;
+            ASSERT_OK(getRecordStore().validate(opCtx.get(),
+                                                true,   // full validate
+                                                false,  // scan data
+                                                &adaptor,
+                                                &results,
+                                                &stats));
+            ASSERT(results.valid);
+            ASSERT(results.errors.empty());
+        }
+    }
+}
+
+// Insert multiple records, and verify that calling validate() on a nonempty collection
+// returns an OK status.
+TEST_F(ValidateTest, FullValidateNonEmptyAndScanData) {
+    {
+        unique_ptr<OperationContext> opCtx(newOperationContext());
+        {
+            ValidateAdaptorSpy adaptor(getInsertedRecords());
+            ValidateResults results;
+            BSONObjBuilder stats;
+            ASSERT_OK(getRecordStore().validate(opCtx.get(),
+                                                true,  // full validate
+                                                true,  // scan data
+                                                &adaptor,
+                                                &results,
+                                                &stats));
+            ASSERT(adaptor.allValidated());
+            ASSERT(results.valid);
+            ASSERT(results.errors.empty());
+        }
+    }
+}
+
+}  // namespace
+}  // namespace mongo

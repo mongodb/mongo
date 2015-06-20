@@ -37,136 +37,127 @@
 
 namespace mongo {
 
-    /**
-     * A ConnectionString endpoint registered with some kind of error, to simulate returning when
-     * the endpoint is used.
-     */
-    struct MockWriteResult {
+/**
+ * A ConnectionString endpoint registered with some kind of error, to simulate returning when
+ * the endpoint is used.
+ */
+struct MockWriteResult {
+    MockWriteResult(const ConnectionString& endpoint, const WriteErrorDetail& error)
+        : endpoint(endpoint) {
+        WriteErrorDetail* errorCopy = new WriteErrorDetail;
+        error.cloneTo(errorCopy);
+        errorCopy->setIndex(0);
+        response.setOk(true);
+        response.setN(0);
+        response.addToErrDetails(errorCopy);
+    }
 
-        MockWriteResult( const ConnectionString& endpoint, const WriteErrorDetail& error ) :
-                endpoint( endpoint ) {
+    MockWriteResult(const ConnectionString& endpoint, const WriteErrorDetail& error, int copies)
+        : endpoint(endpoint) {
+        response.setOk(true);
+        response.setN(0);
+
+        for (int i = 0; i < copies; ++i) {
             WriteErrorDetail* errorCopy = new WriteErrorDetail;
-            error.cloneTo( errorCopy );
-            errorCopy->setIndex( 0 );
-            response.setOk(true);
-            response.setN(0);
-            response.addToErrDetails( errorCopy );
+            error.cloneTo(errorCopy);
+            errorCopy->setIndex(i);
+            response.addToErrDetails(errorCopy);
         }
-
-        MockWriteResult( const ConnectionString& endpoint,
-                         const WriteErrorDetail& error,
-                         int copies ) :
-            endpoint( endpoint ) {
-
-            response.setOk( true );
-            response.setN( 0 );
-
-            for ( int i = 0; i < copies; ++i ) {
-                WriteErrorDetail* errorCopy = new WriteErrorDetail;
-                error.cloneTo( errorCopy );
-                errorCopy->setIndex( i );
-                response.addToErrDetails( errorCopy );
-            }
-        }
+    }
 
 
-        MockWriteResult( const ConnectionString& endpoint, const BatchedCommandResponse& response ) :
-                endpoint( endpoint ) {
-            response.cloneTo( &this->response );
-        }
+    MockWriteResult(const ConnectionString& endpoint, const BatchedCommandResponse& response)
+        : endpoint(endpoint) {
+        response.cloneTo(&this->response);
+    }
 
-        const ConnectionString endpoint;
-        BatchedCommandResponse response;
-    };
+    const ConnectionString endpoint;
+    BatchedCommandResponse response;
+};
+
+/**
+ * Implementation of the MultiCommandDispatch interface which allows registering a number of
+ * endpoints on which errors are returned.  Note that *only* BatchedCommandResponses are
+ * supported here.
+ *
+ * The first matching MockEndpoint for a request in the MockEndpoint* vector is used for one
+ * request, then removed.  This allows simulating retryable errors where a second request
+ * succeeds or has a different error reported.
+ *
+ * If an endpoint isn't registered with a MockEndpoint, just returns BatchedCommandResponses
+ * with ok : true.
+ */
+class MockMultiWriteCommand : public MultiCommandDispatch {
+public:
+    void init(const std::vector<MockWriteResult*> mockEndpoints) {
+        ASSERT(!mockEndpoints.empty());
+        _mockEndpoints.mutableVector().insert(
+            _mockEndpoints.mutableVector().end(), mockEndpoints.begin(), mockEndpoints.end());
+    }
+
+    void addCommand(const ConnectionString& endpoint,
+                    StringData dbName,
+                    const BSONSerializable& request) {
+        _pending.push_back(endpoint);
+    }
+
+    void sendAll() {
+        // No-op
+    }
+
+    int numPending() const {
+        return static_cast<int>(_pending.size());
+    }
 
     /**
-     * Implementation of the MultiCommandDispatch interface which allows registering a number of
-     * endpoints on which errors are returned.  Note that *only* BatchedCommandResponses are
-     * supported here.
-     *
-     * The first matching MockEndpoint for a request in the MockEndpoint* vector is used for one
-     * request, then removed.  This allows simulating retryable errors where a second request
-     * succeeds or has a different error reported.
-     *
-     * If an endpoint isn't registered with a MockEndpoint, just returns BatchedCommandResponses
-     * with ok : true.
+     * Returns an error response if the next pending endpoint returned has a corresponding
+     * MockEndpoint.
      */
-    class MockMultiWriteCommand : public MultiCommandDispatch {
-    public:
+    Status recvAny(ConnectionString* endpoint, BSONSerializable* response) {
+        BatchedCommandResponse* batchResponse =  //
+            static_cast<BatchedCommandResponse*>(response);
 
-        void init( const std::vector<MockWriteResult*> mockEndpoints ) {
-            ASSERT( !mockEndpoints.empty() );
-            _mockEndpoints.mutableVector().insert( _mockEndpoints.mutableVector().end(),
-                                                   mockEndpoints.begin(),
-                                                   mockEndpoints.end() );
+        *endpoint = _pending.front();
+        MockWriteResult* mockResponse = releaseByHost(_pending.front());
+        _pending.pop_front();
+
+        if (NULL == mockResponse) {
+            batchResponse->setOk(true);
+            batchResponse->setN(0);  // TODO: Make this accurate
+        } else {
+            mockResponse->response.cloneTo(batchResponse);
+            delete mockResponse;
         }
 
-        void addCommand( const ConnectionString& endpoint,
-                         StringData dbName,
-                         const BSONSerializable& request ) {
-            _pending.push_back( endpoint );
-        }
+        ASSERT(batchResponse->isValid(NULL));
+        return Status::OK();
+    }
 
-        void sendAll() {
-            // No-op
-        }
+    const std::vector<MockWriteResult*>& getEndpoints() const {
+        return _mockEndpoints.vector();
+    }
 
-        int numPending() const {
-            return static_cast<int>( _pending.size() );
-        }
+private:
+    // Find a MockEndpoint* by host, and release it so we don't see it again
+    MockWriteResult* releaseByHost(const ConnectionString& endpoint) {
+        std::vector<MockWriteResult*>& endpoints = _mockEndpoints.mutableVector();
 
-        /**
-         * Returns an error response if the next pending endpoint returned has a corresponding
-         * MockEndpoint.
-         */
-        Status recvAny( ConnectionString* endpoint, BSONSerializable* response ) {
-
-            BatchedCommandResponse* batchResponse = //
-                static_cast<BatchedCommandResponse*>( response );
-
-            *endpoint = _pending.front();
-            MockWriteResult* mockResponse = releaseByHost( _pending.front() );
-            _pending.pop_front();
-
-            if ( NULL == mockResponse ) {
-                batchResponse->setOk( true );
-                batchResponse->setN( 0 ); // TODO: Make this accurate
+        for (std::vector<MockWriteResult*>::iterator it = endpoints.begin(); it != endpoints.end();
+             ++it) {
+            MockWriteResult* storedEndpoint = *it;
+            if (storedEndpoint->endpoint.toString().compare(endpoint.toString()) == 0) {
+                endpoints.erase(it);
+                return storedEndpoint;
             }
-            else {
-                mockResponse->response.cloneTo( batchResponse );
-                delete mockResponse;
-            }
-
-            ASSERT( batchResponse->isValid( NULL ) );
-            return Status::OK();
         }
 
-        const std::vector<MockWriteResult*>& getEndpoints() const {
-            return _mockEndpoints.vector();
-        }
+        return NULL;
+    }
 
-    private:
+    // Manually-stored ranges
+    OwnedPointerVector<MockWriteResult> _mockEndpoints;
 
-        // Find a MockEndpoint* by host, and release it so we don't see it again
-        MockWriteResult* releaseByHost( const ConnectionString& endpoint ) {
-            std::vector<MockWriteResult*>& endpoints = _mockEndpoints.mutableVector();
+    std::deque<ConnectionString> _pending;
+};
 
-            for ( std::vector<MockWriteResult*>::iterator it = endpoints.begin();
-                it != endpoints.end(); ++it ) {
-                MockWriteResult* storedEndpoint = *it;
-                if ( storedEndpoint->endpoint.toString().compare( endpoint.toString() ) == 0 ) {
-                    endpoints.erase( it );
-                    return storedEndpoint;
-                }
-            }
-
-            return NULL;
-        }
-
-        // Manually-stored ranges
-        OwnedPointerVector<MockWriteResult> _mockEndpoints;
-
-        std::deque<ConnectionString> _pending;
-    };
-
-} // namespace mongo
+}  // namespace mongo

@@ -40,40 +40,40 @@
 namespace mongo {
 namespace repl {
 
-    class OplogInterface {
-        MONGO_DISALLOW_COPYING(OplogInterface);
-    public:
+class OplogInterface {
+    MONGO_DISALLOW_COPYING(OplogInterface);
 
-        class Iterator;
+public:
+    class Iterator;
 
-        OplogInterface() = default;
-        virtual ~OplogInterface() = default;
+    OplogInterface() = default;
+    virtual ~OplogInterface() = default;
 
-        /**
-         * Diagnostic information.
-         */
-        virtual std::string toString() const = 0;
+    /**
+     * Diagnostic information.
+     */
+    virtual std::string toString() const = 0;
 
-        /**
-         * Produces an iterator over oplog collection in reverse natural order.
-         */
-        virtual std::unique_ptr<Iterator> makeIterator() const = 0;
-    };
+    /**
+     * Produces an iterator over oplog collection in reverse natural order.
+     */
+    virtual std::unique_ptr<Iterator> makeIterator() const = 0;
+};
 
-    class OplogInterface::Iterator {
-        MONGO_DISALLOW_COPYING(Iterator);
-    public:
+class OplogInterface::Iterator {
+    MONGO_DISALLOW_COPYING(Iterator);
 
-        using Value = std::pair<BSONObj, RecordId>;
+public:
+    using Value = std::pair<BSONObj, RecordId>;
 
-        Iterator() = default;
-        virtual ~Iterator() = default;
+    Iterator() = default;
+    virtual ~Iterator() = default;
 
-        /**
-         * Returns next operation and record id (if applicable) in the oplog.
-         */
-        virtual StatusWith<Value> next() = 0;
-    };
+    /**
+     * Returns next operation and record id (if applicable) in the oplog.
+     */
+    virtual StatusWith<Value> next() = 0;
+};
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

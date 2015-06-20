@@ -34,39 +34,47 @@
 
 namespace mongo {
 
-    class BSONObjBuilder;
-    class Client;
+class BSONObjBuilder;
+class Client;
 
 namespace repl {
 
-    class ReplClientInfo {
-    public:
-        static const Client::Decoration<ReplClientInfo> forClient;
+class ReplClientInfo {
+public:
+    static const Client::Decoration<ReplClientInfo> forClient;
 
-        void setLastOp(const OpTime& op) { _lastOp = op; }
-        OpTime getLastOp() const { return _lastOp; }
+    void setLastOp(const OpTime& op) {
+        _lastOp = op;
+    }
+    OpTime getLastOp() const {
+        return _lastOp;
+    }
 
-        // Only used for master/slave
-        void setRemoteID(OID rid) { _remoteId = rid; }
-        OID getRemoteID() const { return _remoteId; }
+    // Only used for master/slave
+    void setRemoteID(OID rid) {
+        _remoteId = rid;
+    }
+    OID getRemoteID() const {
+        return _remoteId;
+    }
 
-        // If we haven't cached a term from replication coordinator, get the current term
-        // and cache it during the life cycle of this client.
-        //
-        // Used by logOp() to attach the current term to each log entries. Assume we don't change
-        // the term since caching it. This is true for write commands, since we acquire the
-        // global lock (IX) for write commands and stepping down also needs that lock (S).
-        // Stepping down will kill all user operations, so there is no write after stepping down
-        // in the case of yielding.
-        long long getTerm();
+    // If we haven't cached a term from replication coordinator, get the current term
+    // and cache it during the life cycle of this client.
+    //
+    // Used by logOp() to attach the current term to each log entries. Assume we don't change
+    // the term since caching it. This is true for write commands, since we acquire the
+    // global lock (IX) for write commands and stepping down also needs that lock (S).
+    // Stepping down will kill all user operations, so there is no write after stepping down
+    // in the case of yielding.
+    long long getTerm();
 
-    private:
-        static const long long kUninitializedTerm = -1;
+private:
+    static const long long kUninitializedTerm = -1;
 
-        OpTime _lastOp = OpTime();
-        OID _remoteId = OID();
-        long long _cachedTerm = kUninitializedTerm;
-    };
+    OpTime _lastOp = OpTime();
+    OID _remoteId = OID();
+    long long _cachedTerm = kUninitializedTerm;
+};
 
 }  // namespace repl
 }  // namespace mongo

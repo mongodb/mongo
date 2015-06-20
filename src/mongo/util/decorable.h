@@ -65,57 +65,57 @@
 
 namespace mongo {
 
-    template <typename D>
-    class Decorable {
-        MONGO_DISALLOW_COPYING(Decorable);
+template <typename D>
+class Decorable {
+    MONGO_DISALLOW_COPYING(Decorable);
+
+public:
+    template <typename T>
+    class Decoration {
     public:
-        template <typename T>
-        class Decoration {
-        public:
-            Decoration() = delete;
+        Decoration() = delete;
 
-            T& operator()(D& d) const {
-                return static_cast<Decorable&>(d)._decorations.getDecoration(_raw);
-            }
-
-            T& operator()(D* d) const {
-                return (*this)(*d);
-            }
-
-            const T& operator()(const D& d) const {
-                return static_cast<const Decorable&>(d)._decorations.getDecoration(_raw);
-            }
-
-            const T& operator()(const D* d) const {
-                return (*this)(*d);
-            }
-
-        private:
-            friend class Decorable;
-
-            explicit Decoration(DecorationContainer::DecorationDescriptorWithType<T> raw) :
-                _raw(std::move(raw)) {
-            }
-
-            DecorationContainer::DecorationDescriptorWithType<T> _raw;
-        };
-
-        template <typename T>
-        static Decoration<T> declareDecoration() {
-            return Decoration<T>(getRegistry()->declareDecoration<T>());
+        T& operator()(D& d) const {
+            return static_cast<Decorable&>(d)._decorations.getDecoration(_raw);
         }
 
-    protected:
-        Decorable() : _decorations(getRegistry()) {}
-        ~Decorable() = default;
+        T& operator()(D* d) const {
+            return (*this)(*d);
+        }
+
+        const T& operator()(const D& d) const {
+            return static_cast<const Decorable&>(d)._decorations.getDecoration(_raw);
+        }
+
+        const T& operator()(const D* d) const {
+            return (*this)(*d);
+        }
 
     private:
-        static DecorationRegistry* getRegistry() {
-            static DecorationRegistry* theRegistry = new DecorationRegistry();
-            return theRegistry;
-        }
+        friend class Decorable;
 
-        DecorationContainer _decorations;
+        explicit Decoration(DecorationContainer::DecorationDescriptorWithType<T> raw)
+            : _raw(std::move(raw)) {}
+
+        DecorationContainer::DecorationDescriptorWithType<T> _raw;
     };
+
+    template <typename T>
+    static Decoration<T> declareDecoration() {
+        return Decoration<T>(getRegistry()->declareDecoration<T>());
+    }
+
+protected:
+    Decorable() : _decorations(getRegistry()) {}
+    ~Decorable() = default;
+
+private:
+    static DecorationRegistry* getRegistry() {
+        static DecorationRegistry* theRegistry = new DecorationRegistry();
+        return theRegistry;
+    }
+
+    DecorationContainer _decorations;
+};
 
 }  // namespace mongo

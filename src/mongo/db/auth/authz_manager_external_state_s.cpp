@@ -49,153 +49,139 @@
 
 namespace mongo {
 
-    AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() = default;
+AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() = default;
 
-    AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() = default;
+AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() = default;
 
-    Status AuthzManagerExternalStateMongos::initialize(OperationContext* txn) {
-        return Status::OK();
+Status AuthzManagerExternalStateMongos::initialize(OperationContext* txn) {
+    return Status::OK();
+}
+
+std::unique_ptr<AuthzSessionExternalState>
+AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
+    return stdx::make_unique<AuthzSessionExternalStateMongos>(authzManager);
+}
+
+Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationContext* txn,
+                                                                      int* outVersion) {
+    // Note: we are treating
+    // { 'getParameter' : 1, <authSchemaVersionServerParameter> : 1 }
+    // as a user management command since this is the *only* part of mongos
+    // that runs this command
+    BSONObj getParameterCmd = BSON("getParameter" << 1 << authSchemaVersionServerParameter << 1);
+    BSONObjBuilder builder;
+    const bool ok =
+        grid.catalogManager()->runUserManagementReadCommand("admin", getParameterCmd, &builder);
+    BSONObj cmdResult = builder.obj();
+    if (!ok) {
+        return Command::getStatusFromCommandResult(cmdResult);
     }
 
-    std::unique_ptr<AuthzSessionExternalState>
-    AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(
-            AuthorizationManager* authzManager) {
+    BSONElement versionElement = cmdResult[authSchemaVersionServerParameter];
+    if (versionElement.eoo()) {
+        return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
+    }
+    *outVersion = versionElement.numberInt();
 
-        return stdx::make_unique<AuthzSessionExternalStateMongos>(authzManager);
+    return Status::OK();
+}
+
+Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn,
+                                                           const UserName& userName,
+                                                           BSONObj* result) {
+    BSONObj usersInfoCmd =
+        BSON("usersInfo" << BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME
+                                            << userName.getUser()
+                                            << AuthorizationManager::USER_DB_FIELD_NAME
+                                            << userName.getDB())) << "showPrivileges" << true
+                         << "showCredentials" << true);
+    BSONObjBuilder builder;
+    const bool ok =
+        grid.catalogManager()->runUserManagementReadCommand("admin", usersInfoCmd, &builder);
+    BSONObj cmdResult = builder.obj();
+    if (!ok) {
+        return Command::getStatusFromCommandResult(cmdResult);
     }
 
-    Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(
-                                                OperationContext* txn, int* outVersion) {
-        // Note: we are treating
-        // { 'getParameter' : 1, <authSchemaVersionServerParameter> : 1 }
-        // as a user management command since this is the *only* part of mongos
-        // that runs this command
-        BSONObj getParameterCmd = BSON("getParameter" << 1 <<
-                                       authSchemaVersionServerParameter << 1);
-        BSONObjBuilder builder;
-        const bool ok = grid.catalogManager()->runUserManagementReadCommand("admin",
-                                                                            getParameterCmd,
-                                                                            &builder);
-        BSONObj cmdResult = builder.obj();
-        if (!ok) {
-            return Command::getStatusFromCommandResult(cmdResult);
-        }
-
-        BSONElement versionElement = cmdResult[authSchemaVersionServerParameter];
-        if (versionElement.eoo()) {
-            return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
-        }
-        *outVersion = versionElement.numberInt();
-
-        return Status::OK();
+    std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
+    if (foundUsers.size() == 0) {
+        return Status(ErrorCodes::UserNotFound, "User \"" + userName.toString() + "\" not found");
     }
 
-    Status AuthzManagerExternalStateMongos::getUserDescription(
-                    OperationContext* txn, const UserName& userName, BSONObj* result) {
-        BSONObj usersInfoCmd = BSON("usersInfo" <<
-                                    BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
-                                                    userName.getUser() <<
-                                                    AuthorizationManager::USER_DB_FIELD_NAME <<
-                                                    userName.getDB())) <<
-                                    "showPrivileges" << true <<
-                                    "showCredentials" << true);
-        BSONObjBuilder builder;
-        const bool ok = grid.catalogManager()->runUserManagementReadCommand("admin",
-                                                                            usersInfoCmd,
-                                                                            &builder);
-        BSONObj cmdResult = builder.obj();
-        if (!ok) {
-            return Command::getStatusFromCommandResult(cmdResult);
-        }
+    if (foundUsers.size() > 1) {
+        return Status(ErrorCodes::UserDataInconsistent,
+                      str::stream() << "Found multiple users on the \"" << userName.getDB()
+                                    << "\" database with name \"" << userName.getUser() << "\"");
+    }
+    *result = foundUsers[0].Obj().getOwned();
+    return Status::OK();
+}
 
-        std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
-        if (foundUsers.size() == 0) {
-            return Status(ErrorCodes::UserNotFound,
-                          "User \"" + userName.toString() + "\" not found");
-        }
-
-        if (foundUsers.size() > 1) {
-            return Status(ErrorCodes::UserDataInconsistent,
-                          str::stream() << "Found multiple users on the \""
-                                        << userName.getDB() << "\" database with name \""
-                                        << userName.getUser() << "\"");
-        }
-        *result = foundUsers[0].Obj().getOwned();
-        return Status::OK();
+Status AuthzManagerExternalStateMongos::getRoleDescription(const RoleName& roleName,
+                                                           bool showPrivileges,
+                                                           BSONObj* result) {
+    BSONObj rolesInfoCmd =
+        BSON("rolesInfo" << BSON_ARRAY(BSON(
+                                AuthorizationManager::ROLE_NAME_FIELD_NAME
+                                << roleName.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                << roleName.getDB())) << "showPrivileges" << showPrivileges);
+    BSONObjBuilder builder;
+    const bool ok =
+        grid.catalogManager()->runUserManagementReadCommand("admin", rolesInfoCmd, &builder);
+    BSONObj cmdResult = builder.obj();
+    if (!ok) {
+        return Command::getStatusFromCommandResult(cmdResult);
     }
 
-    Status AuthzManagerExternalStateMongos::getRoleDescription(const RoleName& roleName,
-                                                               bool showPrivileges,
-                                                               BSONObj* result) {
-        BSONObj rolesInfoCmd = BSON("rolesInfo" <<
-                                    BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
-                                                    roleName.getRole() <<
-                                                    AuthorizationManager::ROLE_DB_FIELD_NAME <<
-                                                    roleName.getDB())) <<
-                                    "showPrivileges" << showPrivileges);
-        BSONObjBuilder builder;
-        const bool ok = grid.catalogManager()->runUserManagementReadCommand("admin",
-                                                                           rolesInfoCmd,
-                                                                           &builder);
-        BSONObj cmdResult = builder.obj();
-        if (!ok) {
-            return Command::getStatusFromCommandResult(cmdResult);
-        }
-
-        std::vector<BSONElement> foundRoles = cmdResult["roles"].Array();
-        if (foundRoles.size() == 0) {
-            return Status(ErrorCodes::RoleNotFound,
-                          "Role \"" + roleName.toString() + "\" not found");
-        }
-
-        if (foundRoles.size() > 1) {
-            return Status(ErrorCodes::RoleDataInconsistent,
-                          str::stream() << "Found multiple roles on the \""
-                                        << roleName.getDB() << "\" database with name \""
-                                        << roleName.getRole() << "\"");
-        }
-        *result = foundRoles[0].Obj().getOwned();
-        return Status::OK();
+    std::vector<BSONElement> foundRoles = cmdResult["roles"].Array();
+    if (foundRoles.size() == 0) {
+        return Status(ErrorCodes::RoleNotFound, "Role \"" + roleName.toString() + "\" not found");
     }
 
-    Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(const std::string dbname,
-                                                                     bool showPrivileges,
-                                                                     bool showBuiltinRoles,
-                                                                     std::vector<BSONObj>* result) {
-        BSONObj rolesInfoCmd = BSON("rolesInfo" << 1 <<
-                                    "showPrivileges" << showPrivileges <<
-                                    "showBuiltinRoles" << showBuiltinRoles);
-        BSONObjBuilder builder;
-        const bool ok = grid.catalogManager()->runUserManagementReadCommand(dbname,
-                                                                            rolesInfoCmd,
-                                                                            &builder);
-        BSONObj cmdResult = builder.obj();
-        if (!ok) {
-            return Command::getStatusFromCommandResult(cmdResult);
-        }
-        for (BSONObjIterator it(cmdResult["roles"].Obj()); it.more(); it.next()) {
-            result->push_back((*it).Obj().getOwned());
-        }
-        return Status::OK();
+    if (foundRoles.size() > 1) {
+        return Status(ErrorCodes::RoleDataInconsistent,
+                      str::stream() << "Found multiple roles on the \"" << roleName.getDB()
+                                    << "\" database with name \"" << roleName.getRole() << "\"");
+    }
+    *result = foundRoles[0].Obj().getOwned();
+    return Status::OK();
+}
+
+Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(const std::string dbname,
+                                                                 bool showPrivileges,
+                                                                 bool showBuiltinRoles,
+                                                                 std::vector<BSONObj>* result) {
+    BSONObj rolesInfoCmd = BSON("rolesInfo" << 1 << "showPrivileges" << showPrivileges
+                                            << "showBuiltinRoles" << showBuiltinRoles);
+    BSONObjBuilder builder;
+    const bool ok =
+        grid.catalogManager()->runUserManagementReadCommand(dbname, rolesInfoCmd, &builder);
+    BSONObj cmdResult = builder.obj();
+    if (!ok) {
+        return Command::getStatusFromCommandResult(cmdResult);
+    }
+    for (BSONObjIterator it(cmdResult["roles"].Obj()); it.more(); it.next()) {
+        result->push_back((*it).Obj().getOwned());
+    }
+    return Status::OK();
+}
+
+bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* txn) {
+    BSONObj usersInfoCmd = BSON("usersInfo" << 1);
+    BSONObjBuilder builder;
+    const bool ok =
+        grid.catalogManager()->runUserManagementReadCommand("admin", usersInfoCmd, &builder);
+    if (!ok) {
+        // If we were unable to complete the query,
+        // it's best to assume that there _are_ privilege documents.  This might happen
+        // if the node contaning the users collection becomes transiently unavailable.
+        // See SERVER-12616, for example.
+        return true;
     }
 
-    bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* txn) {
-        BSONObj usersInfoCmd = BSON("usersInfo" << 1);
-        BSONObjBuilder builder;
-        const bool ok = grid.catalogManager()->runUserManagementReadCommand("admin",
-                                                                            usersInfoCmd,
-                                                                            &builder);
-        if (!ok) {
-            // If we were unable to complete the query,
-            // it's best to assume that there _are_ privilege documents.  This might happen
-            // if the node contaning the users collection becomes transiently unavailable.
-            // See SERVER-12616, for example.
-            return true;
-        }
+    BSONObj cmdResult = builder.obj();
+    std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
+    return foundUsers.size() > 0;
+}
 
-        BSONObj cmdResult = builder.obj();
-        std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
-        return foundUsers.size() > 0;
-    }
-
-} // namespace mongo
+}  // namespace mongo

@@ -32,27 +32,24 @@
 
 namespace mongo {
 
-    class DBClientConnection;
+class DBClientConnection;
 
 namespace repl {
 
-    /**
-     * Reads oplog on remote server.
-     */
+/**
+ * Reads oplog on remote server.
+ */
 
-    class OplogInterfaceRemote : public OplogInterface {
-    public:
+class OplogInterfaceRemote : public OplogInterface {
+public:
+    explicit OplogInterfaceRemote(DBClientConnection* conn, const std::string& collectionName);
+    std::string toString() const override;
+    std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
 
-        explicit OplogInterfaceRemote(DBClientConnection* conn, const std::string& collectionName);
-        std::string toString() const override;
-        std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
+private:
+    DBClientConnection* _conn;
+    std::string _collectionName;
+};
 
-    private:
-
-        DBClientConnection* _conn;
-        std::string _collectionName;
-
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

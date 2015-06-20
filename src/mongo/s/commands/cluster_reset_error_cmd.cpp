@@ -40,56 +40,50 @@
 namespace mongo {
 namespace {
 
-    class CmdShardingResetError : public Command {
-    public:
-        CmdShardingResetError() : Command("resetError", false, "reseterror") { }
+class CmdShardingResetError : public Command {
+public:
+    CmdShardingResetError() : Command("resetError", false, "reseterror") {}
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        // No auth required
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        LastError::get(cc()).reset();
+
+        const std::set<std::string>* shards = ClusterLastErrorInfo::get(cc()).getPrevShardHosts();
+
+        for (std::set<std::string>::const_iterator i = shards->begin(); i != shards->end(); i++) {
+            const std::string shardName = *i;
+
+            ShardConnection conn(ConnectionString(shardName, ConnectionString::SET), "");
+
+            BSONObj res;
+
+            // Don't care about result from shards.
+            conn->runCommand(dbname, cmdObj, res);
+            conn.done();
         }
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+        return true;
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+} cmdShardingResetError;
 
-            // No auth required
-        }
-
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
-
-            LastError::get(cc()).reset();
-
-            const std::set<std::string>* shards =
-                ClusterLastErrorInfo::get(cc()).getPrevShardHosts();
-
-            for (std::set<std::string>::const_iterator i = shards->begin();
-                 i != shards->end();
-                 i++) {
-
-                const std::string shardName = *i;
-
-                ShardConnection conn(ConnectionString(shardName, ConnectionString::SET), "");
-
-                BSONObj res;
-
-                // Don't care about result from shards.
-                conn->runCommand(dbname, cmdObj, res);
-                conn.done();
-            }
-
-            return true;
-        }
-
-    } cmdShardingResetError;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

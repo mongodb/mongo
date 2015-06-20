@@ -39,64 +39,63 @@ namespace mongo {
 
 namespace repl {
 
-    /**
-     * Class containing all the information needed to build the replSet page on http interface,
-     * and the logic to generate that page.
-     */
-    class ReplSetHtmlSummary {
-    public:
-        ReplSetHtmlSummary();
+/**
+ * Class containing all the information needed to build the replSet page on http interface,
+ * and the logic to generate that page.
+ */
+class ReplSetHtmlSummary {
+public:
+    ReplSetHtmlSummary();
 
-        const std::string toHtmlString() const;
+    const std::string toHtmlString() const;
 
-        void setConfig(const ReplicaSetConfig& config) {
-            _config = config;
-        }
+    void setConfig(const ReplicaSetConfig& config) {
+        _config = config;
+    }
 
-        void setHBData(const std::vector<MemberHeartbeatData>& hbData) {
-            _hbData = hbData;
-        }
+    void setHBData(const std::vector<MemberHeartbeatData>& hbData) {
+        _hbData = hbData;
+    }
 
-        void setSelfIndex(int index) {
-            _selfIndex = index;
-        }
+    void setSelfIndex(int index) {
+        _selfIndex = index;
+    }
 
-        void setPrimaryIndex(int index) {
-            _primaryIndex = index;
-        }
+    void setPrimaryIndex(int index) {
+        _primaryIndex = index;
+    }
 
-        void setSelfOptime(const OpTime& ts) {
-            _selfOptime = ts;
-        }
+    void setSelfOptime(const OpTime& ts) {
+        _selfOptime = ts;
+    }
 
-        void setSelfUptime(unsigned int time) {
-            _selfUptime = time;
-        }
+    void setSelfUptime(unsigned int time) {
+        _selfUptime = time;
+    }
 
-        void setNow(Date_t now) {
-            _now = now;
-        }
+    void setNow(Date_t now) {
+        _now = now;
+    }
 
-        void setSelfState(const MemberState& state) {
-            _selfState = state;
-        }
+    void setSelfState(const MemberState& state) {
+        _selfState = state;
+    }
 
-        void setSelfHeartbeatMessage(StringData msg) {
-            _selfHeartbeatMessage = msg.toString();
-        }
+    void setSelfHeartbeatMessage(StringData msg) {
+        _selfHeartbeatMessage = msg.toString();
+    }
 
-    private:
+private:
+    ReplicaSetConfig _config;
+    std::vector<MemberHeartbeatData> _hbData;
+    Date_t _now;
+    int _selfIndex;
+    int _primaryIndex;
+    OpTime _selfOptime;
+    unsigned int _selfUptime;
+    MemberState _selfState;
+    std::string _selfHeartbeatMessage;
+};
 
-        ReplicaSetConfig _config;
-        std::vector<MemberHeartbeatData> _hbData;
-        Date_t _now;
-        int _selfIndex;
-        int _primaryIndex;
-        OpTime _selfOptime;
-        unsigned int _selfUptime;
-        MemberState _selfState;
-        std::string _selfHeartbeatMessage;
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

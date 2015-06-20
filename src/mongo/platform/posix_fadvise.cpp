@@ -37,32 +37,32 @@
 namespace mongo {
 namespace pal {
 
-    int posix_fadvise_emulation(int fd, off_t offset, off_t len, int advice) {
-        return 0;
+int posix_fadvise_emulation(int fd, off_t offset, off_t len, int advice) {
+    return 0;
+}
+
+typedef int (*PosixFadviseFunc)(int fd, off_t offset, off_t len, int advice);
+static PosixFadviseFunc posix_fadvise_switcher = mongo::pal::posix_fadvise_emulation;
+
+int posix_fadvise(int fd, off_t offset, off_t len, int advice) {
+    return posix_fadvise_switcher(fd, offset, len, advice);
+}
+
+}  // namespace pal
+
+// 'posix_fadvise()' on Solaris will call the emulation if the symbol is not found
+//
+MONGO_INITIALIZER_GENERAL(SolarisPosixFadvise,
+                          MONGO_NO_PREREQUISITES,
+                          ("default"))(InitializerContext* context) {
+    void* functionAddress = dlsym(RTLD_DEFAULT, "posix_fadvise");
+    if (functionAddress != NULL) {
+        mongo::pal::posix_fadvise_switcher =
+            reinterpret_cast<mongo::pal::PosixFadviseFunc>(functionAddress);
     }
+    return Status::OK();
+}
 
-    typedef int (*PosixFadviseFunc)(int fd, off_t offset, off_t len, int advice);
-    static PosixFadviseFunc posix_fadvise_switcher = mongo::pal::posix_fadvise_emulation;
+}  // namespace mongo
 
-    int posix_fadvise(int fd, off_t offset, off_t len, int advice) {
-        return posix_fadvise_switcher(fd, offset, len, advice);
-    }
-
-} // namespace pal
-
-    // 'posix_fadvise()' on Solaris will call the emulation if the symbol is not found
-    //
-    MONGO_INITIALIZER_GENERAL(SolarisPosixFadvise,
-                              MONGO_NO_PREREQUISITES,
-                              ("default"))(InitializerContext* context) {
-        void* functionAddress = dlsym(RTLD_DEFAULT, "posix_fadvise");
-        if (functionAddress != NULL) {
-            mongo::pal::posix_fadvise_switcher =
-                    reinterpret_cast<mongo::pal::PosixFadviseFunc>(functionAddress);
-        }
-        return Status::OK();
-    }
-
-} // namespace mongo
-
-#endif // #if defined(__sun)
+#endif  // #if defined(__sun)

@@ -32,36 +32,39 @@
 
 namespace mongo {
 namespace unittest {
+/**
+ * An RAII temporary directory that deletes itself and all contents files on scope exit.
+ */
+class TempDir {
+    MONGO_DISALLOW_COPYING(TempDir);
+
+public:
     /**
-     * An RAII temporary directory that deletes itself and all contents files on scope exit.
+     * Creates a new unique temporary directory.
+     *
+     * Throws if this fails for any reason, such as bad permissions.
+     *
+     * The leaf of the directory path will start with namePrefix and have
+     * unspecified characters added to ensure uniqueness.
+     *
+     * namePrefix must not contain either / or \
      */
-    class TempDir {
-        MONGO_DISALLOW_COPYING(TempDir);
-    public:
-        /**
-         * Creates a new unique temporary directory.
-         *
-         * Throws if this fails for any reason, such as bad permissions.
-         *
-         * The leaf of the directory path will start with namePrefix and have
-         * unspecified characters added to ensure uniqueness.
-         *
-         * namePrefix must not contain either / or \
-         */
-        explicit TempDir(const std::string& namePrefix);
+    explicit TempDir(const std::string& namePrefix);
 
-        /**
-         * Delete the directory and all contents.
-         *
-         * This only does best-effort. In particular no new files should be created in the directory
-         * once the TempDir goes out of scope. Any errors are logged and ignored.
-         */
-        ~TempDir();
-        
-        const std::string& path() { return _path; }
+    /**
+     * Delete the directory and all contents.
+     *
+     * This only does best-effort. In particular no new files should be created in the directory
+     * once the TempDir goes out of scope. Any errors are logged and ignored.
+     */
+    ~TempDir();
 
-    private:
-        std::string _path;
-    };
-} // namespace unittest
-} // namespace mongo
+    const std::string& path() {
+        return _path;
+    }
+
+private:
+    std::string _path;
+};
+}  // namespace unittest
+}  // namespace mongo

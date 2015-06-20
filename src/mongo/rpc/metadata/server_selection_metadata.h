@@ -35,82 +35,85 @@
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
-    class BSONObj;
-    class BSONObjBuilder;
-    class Status;
-    template <typename T> class StatusWith;
+class BSONObj;
+class BSONObjBuilder;
+class Status;
+template <typename T>
+class StatusWith;
 
 namespace rpc {
 
-    /**
-     * This class comprises the request metadata fields that concern server selection, that is,
-     * the conditions on which servers can execute this operation.
-     */
-    class ServerSelectionMetadata {
-        MONGO_DISALLOW_COPYING(ServerSelectionMetadata);
-    public:
-        static const OperationContext::Decoration<ServerSelectionMetadata> get;
+/**
+ * This class comprises the request metadata fields that concern server selection, that is,
+ * the conditions on which servers can execute this operation.
+ */
+class ServerSelectionMetadata {
+    MONGO_DISALLOW_COPYING(ServerSelectionMetadata);
 
-        // TODO: Remove when StatusWith supports default-constructible types (SERVER-18007).
-        ServerSelectionMetadata() = default;
+public:
+    static const OperationContext::Decoration<ServerSelectionMetadata> get;
+
+    // TODO: Remove when StatusWith supports default-constructible types (SERVER-18007).
+    ServerSelectionMetadata() = default;
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
-        ServerSelectionMetadata(ServerSelectionMetadata&&);
+    ServerSelectionMetadata(ServerSelectionMetadata&&);
 
-        ServerSelectionMetadata& operator=(ServerSelectionMetadata&&);
+    ServerSelectionMetadata& operator=(ServerSelectionMetadata&&);
 #else
-        ServerSelectionMetadata(ServerSelectionMetadata&&) = default;
+    ServerSelectionMetadata(ServerSelectionMetadata&&) = default;
 
-        ServerSelectionMetadata& operator=(ServerSelectionMetadata&&) = default;
+    ServerSelectionMetadata& operator=(ServerSelectionMetadata&&) = default;
 #endif
 
-        /**
-         * Loads ServerSelectionMetadata from a metadata object.
-         */
-        static StatusWith<ServerSelectionMetadata> readFromMetadata(const BSONObj& metadataObj);
+    /**
+     * Loads ServerSelectionMetadata from a metadata object.
+     */
+    static StatusWith<ServerSelectionMetadata> readFromMetadata(const BSONObj& metadataObj);
 
-        /**
-         * Writes this operation's ServerSelectionMetadata to a metadata object.
-         */
-        Status writeToMetadata(BSONObjBuilder* metadataBob) const;
+    /**
+     * Writes this operation's ServerSelectionMetadata to a metadata object.
+     */
+    Status writeToMetadata(BSONObjBuilder* metadataBob) const;
 
-        /**
-         * Rewrites the ServerSelectionMetadata from the metadata object format to the legacy OP_QUERY
-         * format. In particular, if secondaryOk is set, this will set QueryOption_SlaveOk
-         * on the legacyQueryFlags. If a readPreference is set, the legacy command will be wrapped
-         * in a 'query' element and a top-level $readPreference field will be set on the command.
-         */
-        static Status downconvert(const BSONObj& command,
-                                  const BSONObj& metadata,
-                                  BSONObjBuilder* legacyCommand,
-                                  int* legacyQueryFlags);
+    /**
+     * Rewrites the ServerSelectionMetadata from the metadata object format to the legacy OP_QUERY
+     * format. In particular, if secondaryOk is set, this will set QueryOption_SlaveOk
+     * on the legacyQueryFlags. If a readPreference is set, the legacy command will be wrapped
+     * in a 'query' element and a top-level $readPreference field will be set on the command.
+     */
+    static Status downconvert(const BSONObj& command,
+                              const BSONObj& metadata,
+                              BSONObjBuilder* legacyCommand,
+                              int* legacyQueryFlags);
 
-        /**
-         * Rewrites the ServerSelectionMetadata from the legacy OP_QUERY format to the metadata
-         * object format.
-         */
-        static Status upconvert(const BSONObj& legacyCommand,
-                                const int legacyQueryFlags,
-                                BSONObjBuilder* commandBob,
-                                BSONObjBuilder* metadataBob);
-        /**
-         * Returns true if this operation has been explicitly overridden to run on a secondary.
-         * This replaces previous usage of QueryOption_SlaveOk.
-         */
-        bool isSecondaryOk() const;
+    /**
+     * Rewrites the ServerSelectionMetadata from the legacy OP_QUERY format to the metadata
+     * object format.
+     */
+    static Status upconvert(const BSONObj& legacyCommand,
+                            const int legacyQueryFlags,
+                            BSONObjBuilder* commandBob,
+                            BSONObjBuilder* metadataBob);
+    /**
+     * Returns true if this operation has been explicitly overridden to run on a secondary.
+     * This replaces previous usage of QueryOption_SlaveOk.
+     */
+    bool isSecondaryOk() const;
 
-        /**
-         * Returns the ReadPreference associated with this operation. See
-         * mongo/client/read_preference.h for further details.
-         */
-        const boost::optional<ReadPreferenceSetting>& getReadPreference() const;
+    /**
+     * Returns the ReadPreference associated with this operation. See
+     * mongo/client/read_preference.h for further details.
+     */
+    const boost::optional<ReadPreferenceSetting>& getReadPreference() const;
 
-        ServerSelectionMetadata(bool secondaryOk,
-                                boost::optional<ReadPreferenceSetting> readPreference);
-    private:
-        bool _secondaryOk{false};
-        boost::optional<ReadPreferenceSetting> _readPreference{};
-    };
+    ServerSelectionMetadata(bool secondaryOk,
+                            boost::optional<ReadPreferenceSetting> readPreference);
+
+private:
+    bool _secondaryOk{false};
+    boost::optional<ReadPreferenceSetting> _readPreference{};
+};
 
 }  // namespace rpc
 }  // namespace mongo

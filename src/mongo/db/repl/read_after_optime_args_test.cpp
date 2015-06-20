@@ -34,86 +34,87 @@ namespace mongo {
 namespace repl {
 namespace {
 
-    TEST(ReadAfterParse, BasicFullSpecification) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName
-                << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                        << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName << Timestamp(20, 30)
-                                << ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
+TEST(ReadAfterParse, BasicFullSpecification) {
+    ReadAfterOpTimeArgs readAfterOpTime;
+    ASSERT_OK(readAfterOpTime.initialize(BSON(
+        "find"
+        << "test" << ReadAfterOpTimeArgs::kRootFieldName
+        << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
+                << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName
+                        << Timestamp(20, 30) << ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
 
-        ASSERT_EQ(Timestamp(20, 30), readAfterOpTime.getOpTime().getTimestamp());
-        ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
-    }
+    ASSERT_EQ(Timestamp(20, 30), readAfterOpTime.getOpTime().getTimestamp());
+    ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
+}
 
-    TEST(ReadAfterParse, Empty) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_OK(readAfterOpTime.initialize(BSON("find" << "test")));
+TEST(ReadAfterParse, Empty) {
+    ReadAfterOpTimeArgs readAfterOpTime;
+    ASSERT_OK(readAfterOpTime.initialize(BSON("find"
+                                              << "test")));
 
-        ASSERT(readAfterOpTime.getOpTime().getTimestamp().isNull());
-    }
+    ASSERT(readAfterOpTime.getOpTime().getTimestamp().isNull());
+}
 
-    TEST(ReadAfterParse, BadRootType) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName << "x")));
-    }
+TEST(ReadAfterParse, BadRootType) {
+    ReadAfterOpTimeArgs readAfterOpTime;
+    ASSERT_NOT_OK(
+        readAfterOpTime.initialize(BSON("find"
+                                        << "test" << ReadAfterOpTimeArgs::kRootFieldName << "x")));
+}
 
-    TEST(ReadAfterParse, BadOpTimeType) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName
-                    << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName << 2))));
-    }
+TEST(ReadAfterParse, BadOpTimeType) {
+    ReadAfterOpTimeArgs readAfterOpTime;
+    ASSERT_NOT_OK(
+        readAfterOpTime.initialize(BSON("find"
+                                        << "test" << ReadAfterOpTimeArgs::kRootFieldName
+                                        << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName << 2))));
+}
 
-    TEST(ReadAfterParse, OpTimeRequiredIfRootPresent) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName << BSONObj())));
-    }
+TEST(ReadAfterParse, OpTimeRequiredIfRootPresent) {
+    ReadAfterOpTimeArgs readAfterOpTime;
+    ASSERT_NOT_OK(readAfterOpTime.initialize(BSON("find"
+                                                  << "test" << ReadAfterOpTimeArgs::kRootFieldName
+                                                  << BSONObj())));
+}
 
-    TEST(ReadAfterParse, NoOpTimeTS) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
-                    "find" << "test"
-                    << ReadAfterOpTimeArgs::kRootFieldName
-                    << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                            << BSON(ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
-    }
+TEST(ReadAfterParse, NoOpTimeTS) {
+    ReadAfterOpTimeArgs readAfterOpTime;
+    ASSERT_NOT_OK(
+        readAfterOpTime.initialize(BSON("find"
+                                        << "test" << ReadAfterOpTimeArgs::kRootFieldName
+                                        << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName << BSON(
+                                                    ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
+}
 
-    TEST(ReadAfterParse, NoOpTimeTerm) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName
-                << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                        << BSON(ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
-    }
+TEST(ReadAfterParse, NoOpTimeTerm) {
+    ReadAfterOpTimeArgs readAfterOpTime;
+    ASSERT_NOT_OK(
+        readAfterOpTime.initialize(BSON("find"
+                                        << "test" << ReadAfterOpTimeArgs::kRootFieldName
+                                        << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName << BSON(
+                                                    ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
+}
 
-    TEST(ReadAfterParse, BadOpTimeTSType) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName
-                << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                        << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName << BSON("x" << 1)
-                                << ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
-    }
+TEST(ReadAfterParse, BadOpTimeTSType) {
+    ReadAfterOpTimeArgs readAfterOpTime;
+    ASSERT_NOT_OK(readAfterOpTime.initialize(
+        BSON("find"
+             << "test" << ReadAfterOpTimeArgs::kRootFieldName
+             << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
+                     << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName
+                             << BSON("x" << 1) << ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
+}
 
-    TEST(ReadAfterParse, BadOpTimeTermType) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName
-                << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                        << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName << Timestamp(1, 0)
-                                << ReadAfterOpTimeArgs::kOpTermFieldName << "y")))));
-    }
+TEST(ReadAfterParse, BadOpTimeTermType) {
+    ReadAfterOpTimeArgs readAfterOpTime;
+    ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
+        "find"
+        << "test" << ReadAfterOpTimeArgs::kRootFieldName
+        << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
+                << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName
+                        << Timestamp(1, 0) << ReadAfterOpTimeArgs::kOpTermFieldName << "y")))));
+}
 
-} // unnamed namespace
-} // namespace repl
-} // namespace mongo
+}  // unnamed namespace
+}  // namespace repl
+}  // namespace mongo

@@ -50,81 +50,84 @@
 namespace mongo {
 namespace {
 
-    class ClusterKillOpCommand : public Command {
-    public:
-        ClusterKillOpCommand() : Command("killOp") {}
+class ClusterKillOpCommand : public Command {
+public:
+    ClusterKillOpCommand() : Command("killOp") {}
 
-        bool isWriteCommandForConfigServer() const final { return false; }
+    bool isWriteCommandForConfigServer() const final {
+        return false;
+    }
 
-        bool slaveOk() const final { return true; }
+    bool slaveOk() const final {
+        return true;
+    }
 
-        bool adminOnly() const final { return true; }
+    bool adminOnly() const final {
+        return true;
+    }
 
-        Status checkAuthForCommand(ClientBasic* client,
-                                   const std::string& dbname,
-                                   const BSONObj& cmdObj) final {
+    Status checkAuthForCommand(ClientBasic* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(), ActionType::killop);
+        return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
 
-            bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                                    ResourcePattern::forClusterResource(),
-                                    ActionType::killop);
-            return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
+    bool run(OperationContext* txn,
+             const std::string& db,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& result) final {
+        // The format of op is shardid:opid
+        // This is different than the format passed to the mongod killOp command.
+        std::string opToKill;
+        uassertStatusOK(bsonExtractStringField(cmdObj, "op", &opToKill));
+
+        const auto opSepPos = opToKill.find(':');
+
+        uassert(28625,
+                str::stream() << "The op argument to killOp must be of the format shardid:opid"
+                              << " but found \"" << opToKill << '"',
+                (opToKill.size() >= 3) &&                  // must have at least N:N
+                    (opSepPos != std::string::npos) &&     // must have ':' as separator
+                    (opSepPos != 0) &&                     // can't be :NN
+                    (opSepPos != (opToKill.size() - 1)));  // can't be NN:
+
+        auto shardIdent = opToKill.substr(0, opSepPos);
+        log() << "want to kill op: " << opToKill;
+
+        // Will throw if shard id is not found
+        auto shard = grid.shardRegistry()->getShard(shardIdent);
+        if (!shard) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::ShardNotFound,
+                       str::stream() << "shard " << shardIdent << " does not exist"));
         }
 
-        bool run(OperationContext* txn,
-                 const std::string& db,
-                 BSONObj& cmdObj,
-                 int options,
-                 std::string& errmsg,
-                 BSONObjBuilder& result) final {
+        auto opId = std::stoi(opToKill.substr(opSepPos + 1));
 
-            // The format of op is shardid:opid
-            // This is different than the format passed to the mongod killOp command.
-            std::string opToKill;
-            uassertStatusOK(bsonExtractStringField(cmdObj, "op", &opToKill));
+        // shardid is actually the opid - keeping for backwards compatibility.
+        result.append("shard", shardIdent);
+        result.append("shardid", opId);
 
-            const auto opSepPos = opToKill.find(':');
+        ScopedDbConnection conn(shard->getConnString());
+        BSONObj cmdRes;
+        BSONObjBuilder argsBob;
+        argsBob.append("op", opId);
+        auto args = argsBob.done();
+        // intentionally ignore return value - that is how legacy killOp worked.
+        conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop", args, cmdRes);
+        conn.done();
 
-            uassert(28625,
-                    str::stream() << "The op argument to killOp must be of the format shardid:opid"
-                                  << " but found \"" << opToKill << '"',
-                    (opToKill.size() >= 3) && // must have at least N:N
-                    (opSepPos != std::string::npos) && // must have ':' as separator
-                    (opSepPos != 0) && // can't be :NN
-                    (opSepPos != (opToKill.size() - 1))); // can't be NN:
+        // The original behavior of killOp on mongos is to always return success, regardless of
+        // whether the shard reported success or not.
+        return true;
+    }
 
-            auto shardIdent = opToKill.substr(0, opSepPos);
-            log() << "want to kill op: " << opToKill;
-
-            // Will throw if shard id is not found
-            auto shard = grid.shardRegistry()->getShard(shardIdent);
-            if (!shard) {
-                return appendCommandStatus(result,
-                                           Status(ErrorCodes::ShardNotFound,
-                                                  str::stream() << "shard " << shardIdent
-                                                                << " does not exist"));
-            }
-
-            auto opId = std::stoi(opToKill.substr(opSepPos + 1));
-
-            // shardid is actually the opid - keeping for backwards compatibility.
-            result.append("shard", shardIdent);
-            result.append("shardid", opId);
-
-            ScopedDbConnection conn(shard->getConnString());
-            BSONObj cmdRes;
-            BSONObjBuilder argsBob;
-            argsBob.append("op", opId);
-            auto args = argsBob.done();
-            // intentionally ignore return value - that is how legacy killOp worked.
-            conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop", args, cmdRes);
-            conn.done();
-
-            // The original behavior of killOp on mongos is to always return success, regardless of
-            // whether the shard reported success or not.
-            return true;
-        }
-
-    } clusterKillOpCommand;
+} clusterKillOpCommand;
 
 }  // namespace
 }  // namespace mongo

@@ -30,34 +30,34 @@
 
 namespace mongo {
 
-     class MatchExpression;
+class MatchExpression;
 
 namespace expression {
 
-    /**
-     * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
-     * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
-     *
-     * With respect to partial indexes, 'lhs' corresponds to the query specification and 'rhs'
-     * corresponds to the filter specification.
-     *
-     * e.g.
-     *
-     *  Suppose that
-     *
-     *      lhs = { x : 4 }
-     *      rhs = { x : { $lte : 5 } }
-     *
-     *      ==> true
-     *
-     *  Suppose that
-     *
-     *      lhs = { x : { $gte: 6 } }
-     *      rhs = { x : 7 }
-     *
-     *      ==> false
-     */
-    bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs);
+/**
+ * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
+ * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
+ *
+ * With respect to partial indexes, 'lhs' corresponds to the query specification and 'rhs'
+ * corresponds to the filter specification.
+ *
+ * e.g.
+ *
+ *  Suppose that
+ *
+ *      lhs = { x : 4 }
+ *      rhs = { x : { $lte : 5 } }
+ *
+ *      ==> true
+ *
+ *  Suppose that
+ *
+ *      lhs = { x : { $gte: 6 } }
+ *      rhs = { x : 7 }
+ *
+ *      ==> false
+ */
+bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs);
 
 }  // namespace expression
 }  // namespace mongo

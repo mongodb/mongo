@@ -35,98 +35,109 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class RemoteCommandTargeter;
+class BSONObj;
+class RemoteCommandTargeter;
 
-    using ShardId = std::string;
+using ShardId = std::string;
+
+/**
+ * Contains runtime information obtained from the shard.
+ */
+class ShardStatus {
+public:
+    ShardStatus(long long dataSizeBytes, const std::string& version);
+
+    long long dataSizeBytes() const {
+        return _dataSizeBytes;
+    }
+    const std::string& mongoVersion() const {
+        return _mongoVersion;
+    }
+
+    std::string toString() const;
+
+    bool operator<(const ShardStatus& other) const;
+
+private:
+    long long _dataSizeBytes;
+    std::string _mongoVersion;
+};
+
+class Shard;
+using ShardPtr = std::shared_ptr<Shard>;
+
+/*
+ * Maintains the targeting and command execution logic for a single shard. Performs polling of
+ * the shard (if replica set).
+ */
+class Shard {
+    MONGO_DISALLOW_COPYING(Shard);
+
+public:
+    /**
+     * Instantiates a new shard connection management object for the specified shard.
+     */
+    Shard(const ShardId& id,
+          const ConnectionString& connStr,
+          std::unique_ptr<RemoteCommandTargeter> targeter);
+
+    ~Shard();
+
+    const ShardId& getId() const {
+        return _id;
+    }
+
+    const ConnectionString& getConnString() const {
+        return _cs;
+    }
+
+    RemoteCommandTargeter* getTargeter() const {
+        return _targeter.get();
+    }
+
+    BSONObj runCommand(const std::string& db, const std::string& simple) const;
+    BSONObj runCommand(const std::string& db, const BSONObj& cmd) const;
+
+    bool runCommand(const std::string& db, const std::string& simple, BSONObj& res) const;
+    bool runCommand(const std::string& db, const BSONObj& cmd, BSONObj& res) const;
 
     /**
-     * Contains runtime information obtained from the shard.
+     * Returns metadata and stats for this shard.
      */
-    class ShardStatus {
-    public:
-        ShardStatus(long long dataSizeBytes, const std::string& version);
+    ShardStatus getStatus() const;
 
-        long long dataSizeBytes() const { return _dataSizeBytes; }
-        const std::string& mongoVersion() const { return _mongoVersion; }
-
-        std::string toString() const;
-
-        bool operator< (const ShardStatus& other) const;
-
-    private:
-        long long _dataSizeBytes;
-        std::string _mongoVersion;
-    };
-
-    class Shard;
-    using ShardPtr = std::shared_ptr<Shard>;
-
-    /*
-     * Maintains the targeting and command execution logic for a single shard. Performs polling of
-     * the shard (if replica set).
+    /**
+     * Returns a string description of this shard entry.
      */
-    class Shard {
-        MONGO_DISALLOW_COPYING(Shard);
-    public:
-        /**
-         * Instantiates a new shard connection management object for the specified shard.
-         */
-        Shard(const ShardId& id,
-              const ConnectionString& connStr,
-              std::unique_ptr<RemoteCommandTargeter> targeter);
+    std::string toString() const;
 
-        ~Shard();
+    static ShardPtr lookupRSName(const std::string& name);
 
-        const ShardId& getId() const { return _id; }
+    /**
+     * @parm current - shard where the chunk/database currently lives in
+     * @return the currently emptiest shard, if best then current, or nullptr
+     */
+    static ShardPtr pick();
 
-        const ConnectionString& getConnString() const { return _cs; }
+    static void reloadShardInfo();
 
-        RemoteCommandTargeter* getTargeter() const { return _targeter.get(); }
+    static void removeShard(const ShardId& id);
 
-        BSONObj runCommand(const std::string& db, const std::string& simple) const;
-        BSONObj runCommand(const std::string& db, const BSONObj& cmd) const;
+private:
+    /**
+     * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
+     */
+    const ShardId _id;
 
-        bool runCommand(const std::string& db, const std::string& simple, BSONObj& res) const;
-        bool runCommand(const std::string& db, const BSONObj& cmd, BSONObj& res) const;
+    /**
+     * Connection string for the shard.
+     */
+    const ConnectionString _cs;
 
-        /**
-         * Returns metadata and stats for this shard.
-         */
-        ShardStatus getStatus() const;
+    /**
+     * Targeter for obtaining hosts from which to read or to which to write.
+     */
+    const std::unique_ptr<RemoteCommandTargeter> _targeter;
+};
 
-        /**
-         * Returns a string description of this shard entry.
-         */
-        std::string toString() const;
-
-        static ShardPtr lookupRSName(const std::string& name);
-        
-        /**
-         * @parm current - shard where the chunk/database currently lives in
-         * @return the currently emptiest shard, if best then current, or nullptr
-         */
-        static ShardPtr pick();
-
-        static void reloadShardInfo();
-
-        static void removeShard(const ShardId& id);
-
-    private:
-        /**
-         * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
-         */
-        const ShardId _id;
-
-        /**
-         * Connection string for the shard.
-         */
-        const ConnectionString _cs;
-
-        /**
-         * Targeter for obtaining hosts from which to read or to which to write.
-         */
-        const std::unique_ptr<RemoteCommandTargeter> _targeter;
-    };
-
-} // namespace mongo
+}  // namespace mongo

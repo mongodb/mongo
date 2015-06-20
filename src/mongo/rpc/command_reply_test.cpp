@@ -43,133 +43,126 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    using std::begin;
-    using std::end;
+using std::begin;
+using std::end;
 
-    class ReplyTest : public mongo::unittest::Test {
-    protected:
-        std::vector<char> _cmdData{};
-        // using unique ptr so we can destroy and replace easily
-        // since message does not have operator= or swap defined...
-        std::unique_ptr<Message> _message{};
+class ReplyTest : public mongo::unittest::Test {
+protected:
+    std::vector<char> _cmdData{};
+    // using unique ptr so we can destroy and replace easily
+    // since message does not have operator= or swap defined...
+    std::unique_ptr<Message> _message{};
 
-        virtual void setUp() override {
-            _message = stdx::make_unique<Message>();
-        }
-
-        virtual void tearDown() override {
-            _cmdData.clear();
-        }
-
-        void writeObj(const BSONObj& obj) {
-            _cmdData.insert(end(_cmdData), obj.objdata(),
-                           obj.objdata() + obj.objsize());
-        }
-
-        void writeObj(const BSONObj& obj, std::size_t length) {
-            _cmdData.insert(end(_cmdData), obj.objdata(),
-                            obj.objdata() + length);
-        }
-
-        const Message* buildMessage() {
-            _cmdData.shrink_to_fit();
-            _message->setData(dbCommandReply,
-                              _cmdData.data(),
-                              _cmdData.size());
-            return _message.get();
-        }
-
-    };
-
-    TEST_F(ReplyTest, ParseAllFields) {
-
-        BSONObjBuilder metadataBob{};
-        metadataBob.append("foo", "bar");
-        auto metadata = metadataBob.done();
-        writeObj(metadata);
-
-        BSONObjBuilder commandReplyBob{};
-        commandReplyBob.append("baz", "garply");
-        auto commandReply = commandReplyBob.done();
-        writeObj(commandReply);
-
-        BSONObjBuilder outputDoc1Bob{};
-        outputDoc1Bob.append("meep", "boop").append("meow", "chirp");
-        auto outputDoc1 = outputDoc1Bob.done();
-        writeObj(outputDoc1);
-
-        BSONObjBuilder outputDoc2Bob{};
-        outputDoc1Bob.append("bleep", "bop").append("woof", "squeak");
-        auto outputDoc2 = outputDoc2Bob.done();
-        writeObj(outputDoc2);
-
-        rpc::CommandReply opCmdReply{buildMessage()};
-
-        ASSERT_EQUALS(opCmdReply.getMetadata(), metadata);
-        ASSERT_EQUALS(opCmdReply.getCommandReply(), commandReply);
-
-        auto outputDocRange = opCmdReply.getOutputDocs();
-        auto outputDocRangeIter = outputDocRange.begin();
-
-        ASSERT_EQUALS(*outputDocRangeIter, outputDoc1);
-        // can't use assert equals since we don't have an op to print the iter.
-        ASSERT_FALSE(outputDocRangeIter == outputDocRange.end());
-        ++outputDocRangeIter;
-        ASSERT_EQUALS(*outputDocRangeIter, outputDoc2);
-        ASSERT_FALSE(outputDocRangeIter == outputDocRange.end());
-        ++outputDocRangeIter;
-
-        ASSERT_TRUE(outputDocRangeIter == outputDocRange.end());
+    virtual void setUp() override {
+        _message = stdx::make_unique<Message>();
     }
 
-    TEST_F(ReplyTest, EmptyMessageThrows) {
-        ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    virtual void tearDown() override {
+        _cmdData.clear();
     }
 
-    TEST_F(ReplyTest, MetadataOnlyThrows) {
-        BSONObjBuilder metadataBob{};
-        metadataBob.append("foo", "bar");
-        auto metadata = metadataBob.done();
-        writeObj(metadata);
-
-        ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    void writeObj(const BSONObj& obj) {
+        _cmdData.insert(end(_cmdData), obj.objdata(), obj.objdata() + obj.objsize());
     }
 
-    TEST_F(ReplyTest, MetadataInvalidLengthThrows) {
-        BSONObjBuilder metadataBob{};
-        metadataBob.append("foo", "bar");
-        auto metadata = metadataBob.done();
-        auto trueSize = metadata.objsize();
-        // write a super long length field
-        DataView(const_cast<char*>(metadata.objdata())).write<LittleEndian<int32_t>>(100000);
-        writeObj(metadata, trueSize);
-        // write a valid commandReply
-        BSONObjBuilder commandReplyBob{};
-        commandReplyBob.append("baz", "garply");
-        auto commandReply = commandReplyBob.done();
-        writeObj(commandReply);
-
-        ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    void writeObj(const BSONObj& obj, std::size_t length) {
+        _cmdData.insert(end(_cmdData), obj.objdata(), obj.objdata() + length);
     }
 
-    TEST_F(ReplyTest, InvalidLengthThrows) {
-        BSONObjBuilder metadataBob{};
-        metadataBob.append("foo", "bar");
-        auto metadata = metadataBob.done();
-        // write a valid metadata object
-        writeObj(metadata);
-
-        BSONObjBuilder commandReplyBob{};
-        commandReplyBob.append("baz", "garply");
-        auto commandReply = commandReplyBob.done();
-        auto trueSize = commandReply.objsize();
-        // write a super long length field
-        DataView(const_cast<char*>(commandReply.objdata())).write<LittleEndian<int32_t>>(100000);
-        writeObj(commandReply, trueSize);
-
-        ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    const Message* buildMessage() {
+        _cmdData.shrink_to_fit();
+        _message->setData(dbCommandReply, _cmdData.data(), _cmdData.size());
+        return _message.get();
     }
+};
 
+TEST_F(ReplyTest, ParseAllFields) {
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
+    writeObj(metadata);
+
+    BSONObjBuilder commandReplyBob{};
+    commandReplyBob.append("baz", "garply");
+    auto commandReply = commandReplyBob.done();
+    writeObj(commandReply);
+
+    BSONObjBuilder outputDoc1Bob{};
+    outputDoc1Bob.append("meep", "boop").append("meow", "chirp");
+    auto outputDoc1 = outputDoc1Bob.done();
+    writeObj(outputDoc1);
+
+    BSONObjBuilder outputDoc2Bob{};
+    outputDoc1Bob.append("bleep", "bop").append("woof", "squeak");
+    auto outputDoc2 = outputDoc2Bob.done();
+    writeObj(outputDoc2);
+
+    rpc::CommandReply opCmdReply{buildMessage()};
+
+    ASSERT_EQUALS(opCmdReply.getMetadata(), metadata);
+    ASSERT_EQUALS(opCmdReply.getCommandReply(), commandReply);
+
+    auto outputDocRange = opCmdReply.getOutputDocs();
+    auto outputDocRangeIter = outputDocRange.begin();
+
+    ASSERT_EQUALS(*outputDocRangeIter, outputDoc1);
+    // can't use assert equals since we don't have an op to print the iter.
+    ASSERT_FALSE(outputDocRangeIter == outputDocRange.end());
+    ++outputDocRangeIter;
+    ASSERT_EQUALS(*outputDocRangeIter, outputDoc2);
+    ASSERT_FALSE(outputDocRangeIter == outputDocRange.end());
+    ++outputDocRangeIter;
+
+    ASSERT_TRUE(outputDocRangeIter == outputDocRange.end());
+}
+
+TEST_F(ReplyTest, EmptyMessageThrows) {
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+}
+
+TEST_F(ReplyTest, MetadataOnlyThrows) {
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
+    writeObj(metadata);
+
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+}
+
+TEST_F(ReplyTest, MetadataInvalidLengthThrows) {
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
+    auto trueSize = metadata.objsize();
+    // write a super long length field
+    DataView(const_cast<char*>(metadata.objdata())).write<LittleEndian<int32_t>>(100000);
+    writeObj(metadata, trueSize);
+    // write a valid commandReply
+    BSONObjBuilder commandReplyBob{};
+    commandReplyBob.append("baz", "garply");
+    auto commandReply = commandReplyBob.done();
+    writeObj(commandReply);
+
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+}
+
+TEST_F(ReplyTest, InvalidLengthThrows) {
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
+    // write a valid metadata object
+    writeObj(metadata);
+
+    BSONObjBuilder commandReplyBob{};
+    commandReplyBob.append("baz", "garply");
+    auto commandReply = commandReplyBob.done();
+    auto trueSize = commandReply.objsize();
+    // write a super long length field
+    DataView(const_cast<char*>(commandReply.objdata())).write<LittleEndian<int32_t>>(100000);
+    writeObj(commandReply, trueSize);
+
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+}
 }

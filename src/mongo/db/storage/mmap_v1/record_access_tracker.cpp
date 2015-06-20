@@ -42,312 +42,305 @@
 
 namespace mongo {
 
-    namespace {
+namespace {
 
-        static bool blockSupported = false;
+static bool blockSupported = false;
 
-        MONGO_INITIALIZER_WITH_PREREQUISITES(RecordBlockSupported,
-                                             ("SystemInfo"))(InitializerContext* cx) {
-            blockSupported = ProcessInfo::blockCheckSupported();
-            return Status::OK();
-        }
+MONGO_INITIALIZER_WITH_PREREQUISITES(RecordBlockSupported, ("SystemInfo"))(InitializerContext* cx) {
+    blockSupported = ProcessInfo::blockCheckSupported();
+    return Status::OK();
+}
 
-        int hash(size_t region) {
-            return
-                abs( ( ( 7 + (int)(region & 0xFFFF) )
-                       * ( 11 + (int)( ( region >> 16 ) & 0xFFFF ) )
+int hash(size_t region) {
+    return abs(((7 + (int)(region & 0xFFFF)) * (11 + (int)((region >> 16) & 0xFFFF))
 #if defined(_WIN64) || defined(__amd64__)
-                       * ( 13 + (int)( ( region >> 32 ) & 0xFFFF ) )
-                       * ( 17 + (int)( ( region >> 48 ) & 0xFFFF ) )
+                *
+                (13 + (int)((region >> 32) & 0xFFFF)) * (17 + (int)((region >> 48) & 0xFFFF))
 #endif
-                       ) % RecordAccessTracker::SliceSize );
-        }
+                    ) %
+               RecordAccessTracker::SliceSize);
+}
 
-        int bigHash(size_t region) {
-            return hash(region) % RecordAccessTracker::BigHashSize;
-        }
+int bigHash(size_t region) {
+    return hash(region) % RecordAccessTracker::BigHashSize;
+}
 
-        namespace PointerTable {
+namespace PointerTable {
 
-            /* A "superpage" is a group of 16 contiguous pages that differ
-             * only in the low-order 16 bits. This means that there is
-             * enough room in the low-order bits to store a bitmap for each
-             * page in the superpage.
-             */
-            static const size_t superpageMask = ~0xffffLL;
-            static const size_t superpageShift = 16;
-            static const size_t pageSelectorMask = 0xf000LL; // selects a page in a superpage
-            static const int pageSelectorShift = 12;
+/* A "superpage" is a group of 16 contiguous pages that differ
+ * only in the low-order 16 bits. This means that there is
+ * enough room in the low-order bits to store a bitmap for each
+ * page in the superpage.
+ */
+static const size_t superpageMask = ~0xffffLL;
+static const size_t superpageShift = 16;
+static const size_t pageSelectorMask = 0xf000LL;  // selects a page in a superpage
+static const int pageSelectorShift = 12;
 
-            // Tunables
-            static const int capacity = 128; // in superpages
-            static const int bucketSize = 4; // half cache line
-            static const int buckets = capacity/bucketSize;
+// Tunables
+static const int capacity = 128;  // in superpages
+static const int bucketSize = 4;  // half cache line
+static const int buckets = capacity / bucketSize;
 
-            struct Data {
-                /** organized similar to a CPU cache
-                 *  bucketSize-way set associative
-                 *  least-recently-inserted replacement policy
-                 */
-                size_t _table[buckets][bucketSize];
-                long long _lastReset; // time in millis
-            };
+struct Data {
+    /** organized similar to a CPU cache
+     *  bucketSize-way set associative
+     *  least-recently-inserted replacement policy
+     */
+    size_t _table[buckets][bucketSize];
+    long long _lastReset;  // time in millis
+};
 
-            void reset(Data* data) {
-                memset(data->_table, 0, sizeof(data->_table));
-                data->_lastReset = Listener::getElapsedTimeMillis();
-            }
+void reset(Data* data) {
+    memset(data->_table, 0, sizeof(data->_table));
+    data->_lastReset = Listener::getElapsedTimeMillis();
+}
 
-            inline void resetIfNeeded( Data* data ) {
-                const long long now = Listener::getElapsedTimeMillis();
-                if (MONGO_unlikely((now - data->_lastReset) >
-                                   RecordAccessTracker::RotateTimeSecs*1000)) {
-                    reset(data);
-                }
-            }
-
-            inline size_t pageBitOf(size_t ptr) {
-                return 1LL << ((ptr & pageSelectorMask) >> pageSelectorShift);
-            }
-
-            inline size_t superpageOf(size_t ptr) {
-                return ptr & superpageMask;
-            }
-
-            inline size_t bucketFor(size_t ptr) {
-                return (ptr >> superpageShift) % buckets;
-            }
-
-            inline bool haveSeenPage(size_t superpage, size_t ptr) {
-                return superpage & pageBitOf(ptr);
-            }
-
-            inline void markPageSeen(size_t& superpage, size_t ptr) {
-                superpage |= pageBitOf(ptr);
-            }
-
-            /** call this to check a page has been seen yet. */
-            inline bool seen(Data* data, size_t ptr) {
-                resetIfNeeded(data);
-
-                // A bucket contains 4 superpages each containing 16 contiguous pages
-                // See above for a more detailed explanation of superpages
-                size_t* bucket = data->_table[bucketFor(ptr)];
-
-                for (int i = 0; i < bucketSize; i++) {
-                    if (superpageOf(ptr) == superpageOf(bucket[i])) {
-                        if (haveSeenPage(bucket[i], ptr))
-                            return true;
-
-                        markPageSeen(bucket[i], ptr);
-                        return false;
-                    }
-                }
-
-                // superpage isn't in thread-local cache
-                // slide bucket forward and add new superpage at front
-                for (int i = bucketSize-1; i > 0; i--)
-                    bucket[i] = bucket[i-1];
-
-                bucket[0] = superpageOf(ptr);
-                markPageSeen(bucket[0], ptr);
-
-                return false;
-            }
-
-            Data* getData();
-
-        }; // namespace PointerTable
-
-    } // namespace
-
-    //
-    // Slice
-    //
-
-    RecordAccessTracker::Slice::Slice() {
-        reset();
+inline void resetIfNeeded(Data* data) {
+    const long long now = Listener::getElapsedTimeMillis();
+    if (MONGO_unlikely((now - data->_lastReset) > RecordAccessTracker::RotateTimeSecs * 1000)) {
+        reset(data);
     }
+}
 
-    void RecordAccessTracker::Slice::reset() {
-        memset(_data, 0, sizeof(_data));
-        _lastReset = time(0);
-    }
+inline size_t pageBitOf(size_t ptr) {
+    return 1LL << ((ptr & pageSelectorMask) >> pageSelectorShift);
+}
 
-    RecordAccessTracker::State RecordAccessTracker::Slice::get(int regionHash,
-                                                               size_t region,
-                                                               short offset) {
-        DEV verify(hash(region) == regionHash);
+inline size_t superpageOf(size_t ptr) {
+    return ptr & superpageMask;
+}
 
-        Entry* e = _get(regionHash, region, false);
-        if (!e)
-            return Unk;
+inline size_t bucketFor(size_t ptr) {
+    return (ptr >> superpageShift) % buckets;
+}
 
-        return (e->value & ( 1ULL << offset ) ) ? In : Out;
-    }
+inline bool haveSeenPage(size_t superpage, size_t ptr) {
+    return superpage & pageBitOf(ptr);
+}
 
-    bool RecordAccessTracker::Slice::put(int regionHash, size_t region, short offset) {
-        DEV verify(hash(region) == regionHash);
+inline void markPageSeen(size_t& superpage, size_t ptr) {
+    superpage |= pageBitOf(ptr);
+}
 
-        Entry* e = _get(regionHash, region, true);
-        if (!e)
+/** call this to check a page has been seen yet. */
+inline bool seen(Data* data, size_t ptr) {
+    resetIfNeeded(data);
+
+    // A bucket contains 4 superpages each containing 16 contiguous pages
+    // See above for a more detailed explanation of superpages
+    size_t* bucket = data->_table[bucketFor(ptr)];
+
+    for (int i = 0; i < bucketSize; i++) {
+        if (superpageOf(ptr) == superpageOf(bucket[i])) {
+            if (haveSeenPage(bucket[i], ptr))
+                return true;
+
+            markPageSeen(bucket[i], ptr);
             return false;
+        }
+    }
 
-        e->value |= 1ULL << offset;
+    // superpage isn't in thread-local cache
+    // slide bucket forward and add new superpage at front
+    for (int i = bucketSize - 1; i > 0; i--)
+        bucket[i] = bucket[i - 1];
+
+    bucket[0] = superpageOf(ptr);
+    markPageSeen(bucket[0], ptr);
+
+    return false;
+}
+
+Data* getData();
+
+};  // namespace PointerTable
+
+}  // namespace
+
+//
+// Slice
+//
+
+RecordAccessTracker::Slice::Slice() {
+    reset();
+}
+
+void RecordAccessTracker::Slice::reset() {
+    memset(_data, 0, sizeof(_data));
+    _lastReset = time(0);
+}
+
+RecordAccessTracker::State RecordAccessTracker::Slice::get(int regionHash,
+                                                           size_t region,
+                                                           short offset) {
+    DEV verify(hash(region) == regionHash);
+
+    Entry* e = _get(regionHash, region, false);
+    if (!e)
+        return Unk;
+
+    return (e->value & (1ULL << offset)) ? In : Out;
+}
+
+bool RecordAccessTracker::Slice::put(int regionHash, size_t region, short offset) {
+    DEV verify(hash(region) == regionHash);
+
+    Entry* e = _get(regionHash, region, true);
+    if (!e)
+        return false;
+
+    e->value |= 1ULL << offset;
+    return true;
+}
+
+time_t RecordAccessTracker::Slice::lastReset() const {
+    return _lastReset;
+}
+
+RecordAccessTracker::Entry* RecordAccessTracker::Slice::_get(int start, size_t region, bool add) {
+    for (int i = 0; i < MaxChain; i++) {
+        int bucket = (start + i) % SliceSize;
+
+        if (_data[bucket].region == 0) {
+            if (!add)
+                return NULL;
+
+            _data[bucket].region = region;
+            return &_data[bucket];
+        }
+
+        if (_data[bucket].region == region) {
+            return &_data[bucket];
+        }
+    }
+
+    return NULL;
+}
+
+//
+// Rolling
+//
+
+RecordAccessTracker::Rolling::Rolling() {
+    _curSlice = 0;
+    _lastRotate = Listener::getElapsedTimeMillis();
+}
+
+bool RecordAccessTracker::Rolling::access(size_t region, short offset, bool doHalf) {
+    int regionHash = hash(region);
+
+    stdx::lock_guard<SimpleMutex> lk(_lock);
+
+    static int rarelyCount = 0;
+    if (rarelyCount++ % (2048 / BigHashSize) == 0) {
+        long long now = Listener::getElapsedTimeMillis();
+
+        if (now - _lastRotate > (1000 * RotateTimeSecs)) {
+            _rotate();
+        }
+    }
+
+    for (int i = 0; i < NumSlices / (doHalf ? 2 : 1); i++) {
+        int pos = (_curSlice + i) % NumSlices;
+        State s = _slices[pos].get(regionHash, region, offset);
+
+        if (s == In)
+            return true;
+
+        if (s == Out) {
+            _slices[pos].put(regionHash, region, offset);
+            return false;
+        }
+    }
+
+    // we weren't in any slice
+    // so add to cur
+    if (!_slices[_curSlice].put(regionHash, region, offset)) {
+        _rotate();
+        _slices[_curSlice].put(regionHash, region, offset);
+    }
+    return false;
+}
+
+void RecordAccessTracker::Rolling::_rotate() {
+    _curSlice = (_curSlice + 1) % NumSlices;
+    _slices[_curSlice].reset();
+    _lastRotate = Listener::getElapsedTimeMillis();
+}
+
+// These need to be outside the ps namespace due to the way they are defined
+#if defined(MONGO_CONFIG_HAVE___THREAD)
+__thread PointerTable::Data _pointerTableData;
+PointerTable::Data* PointerTable::getData() {
+    return &_pointerTableData;
+}
+#elif defined(MONGO_CONFIG_HAVE___DECLSPEC_THREAD)
+__declspec(thread) PointerTable::Data _pointerTableData;
+PointerTable::Data* PointerTable::getData() {
+    return &_pointerTableData;
+}
+#else
+TSP_DEFINE(PointerTable::Data, _pointerTableData);
+PointerTable::Data* PointerTable::getData() {
+    return _pointerTableData.getMake();
+}
+#endif
+
+//
+// RecordAccessTracker
+//
+
+RecordAccessTracker::RecordAccessTracker() : _blockSupported(blockSupported) {
+    reset();
+}
+
+void RecordAccessTracker::reset() {
+    PointerTable::reset(PointerTable::getData());
+    _rollingTable.reset(new Rolling[BigHashSize]);
+}
+
+void RecordAccessTracker::markAccessed(const void* record) {
+    const size_t page = reinterpret_cast<size_t>(record) >> 12;
+    const size_t region = page >> 6;
+    const size_t offset = page & 0x3f;
+
+    const bool seen = PointerTable::seen(PointerTable::getData(), reinterpret_cast<size_t>(record));
+    if (!seen) {
+        _rollingTable[bigHash(region)].access(region, offset, true);
+    }
+}
+
+
+bool RecordAccessTracker::checkAccessedAndMark(const void* record) {
+    const size_t page = reinterpret_cast<size_t>(record) >> 12;
+    const size_t region = page >> 6;
+    const size_t offset = page & 0x3f;
+
+    // This is like the "L1 cache". If we're a miss then we fall through and check the
+    // "L2 cache". If we're still a miss, then we defer to a system-specific system
+    // call (or give up and return false if deferring to the system call is not enabled).
+    if (PointerTable::seen(PointerTable::getData(), reinterpret_cast<size_t>(record))) {
         return true;
     }
 
-    time_t RecordAccessTracker::Slice::lastReset() const {
-        return _lastReset;
+    // We were a miss in the PointerTable. See if we can find 'record' in the Rolling table.
+    if (_rollingTable[bigHash(region)].access(region, offset, false)) {
+        return true;
     }
 
-    RecordAccessTracker::Entry* RecordAccessTracker::Slice::_get(int start,
-                                                                 size_t region,
-                                                                 bool add) {
-        for (int i = 0; i < MaxChain; i++) {
-            int bucket = (start + i) % SliceSize;
-
-            if (_data[bucket].region == 0) {
-                if (!add)
-                    return NULL;
-
-                _data[bucket].region = region;
-                return &_data[bucket];
-            }
-
-            if (_data[bucket].region == region) {
-                return &_data[bucket];
-            }
-        }
-
-        return NULL;
-    }
-
-    //
-    // Rolling
-    //
-
-    RecordAccessTracker::Rolling::Rolling() {
-        _curSlice = 0;
-        _lastRotate = Listener::getElapsedTimeMillis();
-    }
-
-    bool RecordAccessTracker::Rolling::access(size_t region, short offset, bool doHalf) {
-        int regionHash = hash(region);
-
-        stdx::lock_guard<SimpleMutex> lk(_lock);
-
-        static int rarelyCount = 0;
-        if (rarelyCount++ % (2048 / BigHashSize) == 0) {
-            long long now = Listener::getElapsedTimeMillis();
-
-            if (now - _lastRotate > (1000 * RotateTimeSecs)) {
-                _rotate();
-            }
-        }
-
-        for (int i = 0; i < NumSlices / (doHalf ? 2 : 1); i++) {
-            int pos = (_curSlice + i) % NumSlices;
-            State s = _slices[pos].get(regionHash, region, offset);
-
-            if (s == In)
-                return true;
-
-            if (s == Out) {
-                _slices[pos].put(regionHash, region, offset);
-                return false;
-            }
-        }
-
-        // we weren't in any slice
-        // so add to cur
-        if (!_slices[_curSlice].put(regionHash, region, offset)) {
-            _rotate();
-            _slices[_curSlice].put(regionHash, region, offset);
-        }
+    if (!_blockSupported) {
+        // This means we don't fall back to a system call. Instead we assume things aren't
+        // in memory. This could mean that we yield too much, but this is much better
+        // than the alternative of not yielding through a page fault.
         return false;
     }
 
-    void RecordAccessTracker::Rolling::_rotate() {
-        _curSlice = (_curSlice + 1) % NumSlices;
-        _slices[_curSlice].reset();
-        _lastRotate = Listener::getElapsedTimeMillis();
-    }
+    return ProcessInfo::blockInMemory(const_cast<void*>(record));
+}
 
-    // These need to be outside the ps namespace due to the way they are defined
-#if defined(MONGO_CONFIG_HAVE___THREAD)
-    __thread PointerTable::Data _pointerTableData;
-    PointerTable::Data* PointerTable::getData() {
-        return &_pointerTableData;
-    }
-#elif defined(MONGO_CONFIG_HAVE___DECLSPEC_THREAD)
-    __declspec( thread ) PointerTable::Data _pointerTableData;
-    PointerTable::Data* PointerTable::getData() {
-        return &_pointerTableData;
-    }
-#else
-    TSP_DEFINE(PointerTable::Data, _pointerTableData);
-    PointerTable::Data* PointerTable::getData() {
-        return _pointerTableData.getMake();
-    }
-#endif
+void RecordAccessTracker::disableSystemBlockInMemCheck() {
+    _blockSupported = false;
+}
 
-    //
-    // RecordAccessTracker
-    //
-
-    RecordAccessTracker::RecordAccessTracker()
-        : _blockSupported(blockSupported) {
-        reset();
-    }
-
-    void RecordAccessTracker::reset() {
-        PointerTable::reset(PointerTable::getData());
-        _rollingTable.reset(new Rolling[BigHashSize]);
-    }
-
-    void RecordAccessTracker::markAccessed(const void* record) {
-        const size_t page = reinterpret_cast<size_t>(record) >> 12;
-        const size_t region = page >> 6;
-        const size_t offset = page & 0x3f;
-
-        const bool seen = PointerTable::seen(PointerTable::getData(),
-                                             reinterpret_cast<size_t>(record));
-        if (!seen) {
-            _rollingTable[bigHash(region)].access(region, offset , true);
-        }
-    }
-
-
-    bool RecordAccessTracker::checkAccessedAndMark(const void* record) {
-        const size_t page = reinterpret_cast<size_t>(record) >> 12;
-        const size_t region = page >> 6;
-        const size_t offset = page & 0x3f;
-
-        // This is like the "L1 cache". If we're a miss then we fall through and check the
-        // "L2 cache". If we're still a miss, then we defer to a system-specific system
-        // call (or give up and return false if deferring to the system call is not enabled).
-        if (PointerTable::seen(PointerTable::getData(), reinterpret_cast<size_t>(record))) {
-            return true;
-        }
-
-        // We were a miss in the PointerTable. See if we can find 'record' in the Rolling table.
-        if (_rollingTable[bigHash(region)].access(region, offset, false)) {
-            return true;
-        }
-
-        if (!_blockSupported) {
-            // This means we don't fall back to a system call. Instead we assume things aren't
-            // in memory. This could mean that we yield too much, but this is much better
-            // than the alternative of not yielding through a page fault.
-            return false;
-        }
-
-        return ProcessInfo::blockInMemory(const_cast<void*>(record));
-    }
-
-    void RecordAccessTracker::disableSystemBlockInMemCheck() {
-        _blockSupported = false;
-    }
-
-} // namespace mongo
+}  // namespace mongo

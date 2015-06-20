@@ -37,131 +37,127 @@
 
 namespace {
 
-    using std::string;
-    using mongo::VersionType;
-    using mongo::BSONObj;
-    using mongo::BSONArray;
-    using mongo::BSONObjBuilder;
-    using mongo::BSONArrayBuilder;
-    using mongo::OID;
+using std::string;
+using mongo::VersionType;
+using mongo::BSONObj;
+using mongo::BSONArray;
+using mongo::BSONObjBuilder;
+using mongo::BSONArrayBuilder;
+using mongo::OID;
 
-    TEST(Validity, Empty) {
+TEST(Validity, Empty) {
+    //
+    // Tests parsing of empty document
+    //
 
-        //
-        // Tests parsing of empty document
-        //
+    VersionType versionInfo;
+    BSONObj emptyObj = BSONObj();
 
-        VersionType versionInfo;
-        BSONObj emptyObj = BSONObj();
+    // parses ok
+    string errMsg;
+    bool result = versionInfo.parseBSON(emptyObj, &errMsg);
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT(result);
 
-        // parses ok
-        string errMsg;
-        bool result = versionInfo.parseBSON(emptyObj, &errMsg);
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT(result);
+    // not valid
+    result = versionInfo.isValid(&errMsg);
+    ASSERT_NOT_EQUALS(errMsg, "");
+    ASSERT(!result);
+}
 
-        // not valid
-        result = versionInfo.isValid(&errMsg);
-        ASSERT_NOT_EQUALS(errMsg, "");
-        ASSERT(!result);
-    }
+TEST(Validity, NewVersion) {
+    //
+    // Tests parsing a new-style config version
+    //
 
-    TEST(Validity, NewVersion) {
+    VersionType versionInfo;
 
-        //
-        // Tests parsing a new-style config version
-        //
+    OID clusterId = OID::gen();
 
-        VersionType versionInfo;
+    BSONObjBuilder bob;
+    bob << VersionType::minCompatibleVersion(3);
+    bob << VersionType::currentVersion(4);
+    bob << VersionType::clusterId(clusterId);
 
-        OID clusterId = OID::gen();
+    BSONObj versionDoc = bob.obj();
 
-        BSONObjBuilder bob;
-        bob << VersionType::minCompatibleVersion(3);
-        bob << VersionType::currentVersion(4);
-        bob << VersionType::clusterId(clusterId);
+    string errMsg;
+    bool result = versionInfo.parseBSON(versionDoc, &errMsg);
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT(result);
+    ASSERT_EQUALS(versionInfo.getMinCompatibleVersion(), 3);
+    ASSERT_EQUALS(versionInfo.getCurrentVersion(), 4);
+    ASSERT_EQUALS(versionInfo.getClusterId(), clusterId);
 
-        BSONObj versionDoc = bob.obj();
+    // Valid
+    result = versionInfo.isValid(&errMsg);
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT(result);
+}
 
-        string errMsg;
-        bool result = versionInfo.parseBSON(versionDoc, &errMsg);
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT(result);
-        ASSERT_EQUALS(versionInfo.getMinCompatibleVersion(), 3);
-        ASSERT_EQUALS(versionInfo.getCurrentVersion(), 4);
-        ASSERT_EQUALS(versionInfo.getClusterId(), clusterId);
+TEST(Validity, NewVersionRoundTrip) {
+    //
+    // Round-trip
+    //
 
-        // Valid
-        result = versionInfo.isValid(&errMsg);
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT(result);
-    }
+    VersionType versionInfo;
 
-    TEST(Validity, NewVersionRoundTrip) {
+    OID clusterId = OID::gen();
+    OID upgradeId = OID::gen();
+    BSONObj upgradeState = BSON("a" << 1);
 
-        //
-        // Round-trip
-        //
+    BSONObjBuilder bob;
+    bob << VersionType::minCompatibleVersion(3);
+    bob << VersionType::currentVersion(4);
+    bob << VersionType::clusterId(clusterId);
+    bob << VersionType::upgradeId(upgradeId);
+    bob << VersionType::upgradeState(upgradeState);
 
-        VersionType versionInfo;
+    BSONObj versionDoc = bob.obj();
 
-        OID clusterId = OID::gen();
-        OID upgradeId = OID::gen();
-        BSONObj upgradeState = BSON("a" << 1);
+    string errMsg;
+    bool result = versionInfo.parseBSON(versionDoc, &errMsg);
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT(result);
 
-        BSONObjBuilder bob;
-        bob << VersionType::minCompatibleVersion(3);
-        bob << VersionType::currentVersion(4);
-        bob << VersionType::clusterId(clusterId);
-        bob << VersionType::upgradeId(upgradeId);
-        bob << VersionType::upgradeState(upgradeState);
+    result = versionInfo.parseBSON(versionInfo.toBSON(), &errMsg);
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT(result);
+    ASSERT_EQUALS(versionInfo.getMinCompatibleVersion(), 3);
+    ASSERT_EQUALS(versionInfo.getCurrentVersion(), 4);
+    ASSERT_EQUALS(versionInfo.getClusterId(), clusterId);
+    ASSERT_EQUALS(versionInfo.getUpgradeId(), upgradeId);
+    ASSERT_EQUALS(versionInfo.getUpgradeState(), upgradeState);
 
-        BSONObj versionDoc = bob.obj();
+    // Valid
+    result = versionInfo.isValid(&errMsg);
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT(result);
+}
 
-        string errMsg;
-        bool result = versionInfo.parseBSON(versionDoc, &errMsg);
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT(result);
+TEST(Validity, NewVersionNoClusterId) {
+    //
+    // Tests error on parsing new format with no clusterId
+    //
 
-        result = versionInfo.parseBSON(versionInfo.toBSON(), &errMsg);
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT(result);
-        ASSERT_EQUALS(versionInfo.getMinCompatibleVersion(), 3);
-        ASSERT_EQUALS(versionInfo.getCurrentVersion(), 4);
-        ASSERT_EQUALS(versionInfo.getClusterId(), clusterId);
-        ASSERT_EQUALS(versionInfo.getUpgradeId(), upgradeId);
-        ASSERT_EQUALS(versionInfo.getUpgradeState(), upgradeState);
+    VersionType versionInfo;
 
-        // Valid
-        result = versionInfo.isValid(&errMsg);
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT(result);
-    }
+    BSONObjBuilder bob;
+    bob << VersionType::minCompatibleVersion(3);
+    bob << VersionType::currentVersion(4);
 
-    TEST(Validity, NewVersionNoClusterId) {
+    BSONObj versionDoc = bob.obj();
 
-        //
-        // Tests error on parsing new format with no clusterId
-        //
+    // Parses ok
+    string errMsg;
+    bool result = versionInfo.parseBSON(versionDoc, &errMsg);
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT(result);
 
-        VersionType versionInfo;
+    // Not valid
+    result = versionInfo.isValid(&errMsg);
+    ASSERT_NOT_EQUALS(errMsg, "");
+    ASSERT(!result);
+}
 
-        BSONObjBuilder bob;
-        bob << VersionType::minCompatibleVersion(3);
-        bob << VersionType::currentVersion(4);
-
-        BSONObj versionDoc = bob.obj();
-
-        // Parses ok
-        string errMsg;
-        bool result = versionInfo.parseBSON(versionDoc, &errMsg);
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT(result);
-
-        // Not valid
-        result = versionInfo.isValid(&errMsg);
-        ASSERT_NOT_EQUALS(errMsg, "");
-        ASSERT(!result);
-    }
-
-} // unnamed namespace
+}  // unnamed namespace

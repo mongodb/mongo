@@ -39,122 +39,111 @@
 namespace mongo {
 namespace rpc {
 
-    BSONObj makeEmptyMetadata() {
-        return BSONObj();
+BSONObj makeEmptyMetadata() {
+    return BSONObj();
+}
+
+Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj) {
+    auto swServerSelectionMetadata = ServerSelectionMetadata::readFromMetadata(metadataObj);
+    if (!swServerSelectionMetadata.isOK()) {
+        return swServerSelectionMetadata.getStatus();
+    }
+    ServerSelectionMetadata::get(txn) = std::move(swServerSelectionMetadata.getValue());
+
+    auto swAuditMetadata = AuditMetadata::readFromMetadata(metadataObj);
+    if (!swAuditMetadata.isOK()) {
+        return swAuditMetadata.getStatus();
+    }
+    AuditMetadata::get(txn) = std::move(swAuditMetadata.getValue());
+
+    return Status::OK();
+}
+
+Status writeRequestMetadata(OperationContext* txn, BSONObjBuilder* metadataBob) {
+    auto ssStatus = ServerSelectionMetadata::get(txn).writeToMetadata(metadataBob);
+    if (!ssStatus.isOK()) {
+        return ssStatus;
+    }
+    return Status::OK();
+}
+
+StatusWith<CommandAndMetadata> upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags) {
+    // We can reuse the same metadata BOB for every upconvert call, but we need to keep
+    // making new command BOBs as each metadata bob will need to remove fields. We can not use
+    // mutablebson here because the ServerSelectionMetadata upconvert routine performs
+    // manipulations (replacing a root with its child) that mutablebson doesn't
+    // support.
+    BSONObjBuilder metadataBob;
+
+    // Ordering is important here - ServerSelectionMetadata must be upconverted
+    // first, then AuditMetadata.
+    BSONObjBuilder ssmCommandBob;
+    auto upconvertStatus =
+        ServerSelectionMetadata::upconvert(legacyCmdObj, queryFlags, &ssmCommandBob, &metadataBob);
+    if (!upconvertStatus.isOK()) {
+        return upconvertStatus;
     }
 
-    Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj) {
-        auto swServerSelectionMetadata = ServerSelectionMetadata::readFromMetadata(metadataObj);
-        if (!swServerSelectionMetadata.isOK()) {
-            return swServerSelectionMetadata.getStatus();
-        }
-        ServerSelectionMetadata::get(txn) = std::move(swServerSelectionMetadata.getValue());
 
-        auto swAuditMetadata = AuditMetadata::readFromMetadata(metadataObj);
-        if (!swAuditMetadata.isOK()) {
-            return swAuditMetadata.getStatus();
-        }
-        AuditMetadata::get(txn) = std::move(swAuditMetadata.getValue());
+    BSONObjBuilder auditCommandBob;
+    upconvertStatus =
+        AuditMetadata::upconvert(ssmCommandBob.done(), queryFlags, &auditCommandBob, &metadataBob);
 
-        return Status::OK();
+    if (!upconvertStatus.isOK()) {
+        return upconvertStatus;
     }
 
-    Status writeRequestMetadata(OperationContext* txn, BSONObjBuilder* metadataBob) {
-        auto ssStatus = ServerSelectionMetadata::get(txn).writeToMetadata(metadataBob);
-        if (!ssStatus.isOK()) {
-            return ssStatus;
-        }
-        return Status::OK();
+
+    return std::make_tuple(auditCommandBob.obj(), metadataBob.obj());
+}
+
+StatusWith<LegacyCommandAndFlags> downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
+    int legacyQueryFlags = 0;
+    BSONObjBuilder auditCommandBob;
+    // Ordering is important here - AuditingMetadata must be downconverted first,
+    // then ServerSelectionMetadata.
+    auto downconvertStatus =
+        AuditMetadata::downconvert(cmdObj, metadata, &auditCommandBob, &legacyQueryFlags);
+
+    if (!downconvertStatus.isOK()) {
+        return downconvertStatus;
     }
 
-    StatusWith<CommandAndMetadata> upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags) {
-        // We can reuse the same metadata BOB for every upconvert call, but we need to keep
-        // making new command BOBs as each metadata bob will need to remove fields. We can not use
-        // mutablebson here because the ServerSelectionMetadata upconvert routine performs
-        // manipulations (replacing a root with its child) that mutablebson doesn't
-        // support.
-        BSONObjBuilder metadataBob;
 
-        // Ordering is important here - ServerSelectionMetadata must be upconverted
-        // first, then AuditMetadata.
-        BSONObjBuilder ssmCommandBob;
-        auto upconvertStatus = ServerSelectionMetadata::upconvert(legacyCmdObj,
-                                                                  queryFlags,
-                                                                  &ssmCommandBob,
-                                                                  &metadataBob);
-        if (!upconvertStatus.isOK()) {
-            return upconvertStatus;
-        }
-
-
-        BSONObjBuilder auditCommandBob;
-        upconvertStatus = AuditMetadata::upconvert(ssmCommandBob.done(),
-                                                   queryFlags,
-                                                   &auditCommandBob,
-                                                   &metadataBob);
-
-        if (!upconvertStatus.isOK()) {
-            return upconvertStatus;
-        }
-
-
-        return std::make_tuple(auditCommandBob.obj(), metadataBob.obj());
+    BSONObjBuilder ssmCommandBob;
+    downconvertStatus = ServerSelectionMetadata::downconvert(
+        auditCommandBob.done(), metadata, &ssmCommandBob, &legacyQueryFlags);
+    if (!downconvertStatus.isOK()) {
+        return downconvertStatus;
     }
 
-    StatusWith<LegacyCommandAndFlags> downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
-        int legacyQueryFlags = 0;
-        BSONObjBuilder auditCommandBob;
-        // Ordering is important here - AuditingMetadata must be downconverted first,
-        // then ServerSelectionMetadata.
-        auto downconvertStatus = AuditMetadata::downconvert(cmdObj,
-                                                            metadata,
-                                                            &auditCommandBob,
-                                                            &legacyQueryFlags);
 
-        if (!downconvertStatus.isOK()) {
-            return downconvertStatus;
-        }
+    return std::make_tuple(ssmCommandBob.obj(), std::move(legacyQueryFlags));
+}
 
+StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(BSONObj legacyReply) {
+    BSONObjBuilder commandReplyBob;
+    BSONObjBuilder metadataBob;
 
-        BSONObjBuilder ssmCommandBob;
-        downconvertStatus = ServerSelectionMetadata::downconvert(auditCommandBob.done(),
-                                                                 metadata,
-                                                                 &ssmCommandBob,
-                                                                 &legacyQueryFlags);
-        if (!downconvertStatus.isOK()) {
-            return downconvertStatus;
-        }
-
-
-        return std::make_tuple(ssmCommandBob.obj(), std::move(legacyQueryFlags));
+    auto upconvertStatus = ShardingMetadata::upconvert(legacyReply, &commandReplyBob, &metadataBob);
+    if (!upconvertStatus.isOK()) {
+        return upconvertStatus;
     }
 
-    StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(BSONObj legacyReply) {
-        BSONObjBuilder commandReplyBob;
-        BSONObjBuilder metadataBob;
+    return std::make_tuple(commandReplyBob.obj(), metadataBob.obj());
+}
 
-        auto upconvertStatus = ShardingMetadata::upconvert(legacyReply,
-                                                           &commandReplyBob,
-                                                           &metadataBob);
-        if (!upconvertStatus.isOK()) {
-            return upconvertStatus;
-        }
+StatusWith<BSONObj> downconvertReplyMetadata(BSONObj commandReply, BSONObj replyMetadata) {
+    BSONObjBuilder legacyCommandReplyBob;
 
-        return std::make_tuple(commandReplyBob.obj(), metadataBob.obj());
+    auto downconvertStatus =
+        ShardingMetadata::downconvert(commandReply, replyMetadata, &legacyCommandReplyBob);
+    if (!downconvertStatus.isOK()) {
+        return downconvertStatus;
     }
 
-    StatusWith<BSONObj> downconvertReplyMetadata(BSONObj commandReply, BSONObj replyMetadata) {
-        BSONObjBuilder legacyCommandReplyBob;
-
-        auto downconvertStatus = ShardingMetadata::downconvert(commandReply,
-                                                               replyMetadata,
-                                                               &legacyCommandReplyBob);
-        if (!downconvertStatus.isOK()) {
-            return downconvertStatus;
-        }
-
-        return legacyCommandReplyBob.obj();
-    }
+    return legacyCommandReplyBob.obj();
+}
 
 }  // namespace rpc
 }  // namespace mongo

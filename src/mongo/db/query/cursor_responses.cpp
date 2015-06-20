@@ -34,26 +34,26 @@
 
 namespace mongo {
 
-    void appendCursorResponseObject(long long cursorId,
-                                    StringData cursorNamespace,
-                                    BSONArray firstBatch,
-                                    BSONObjBuilder* builder) {
-        BSONObjBuilder cursorObj(builder->subobjStart("cursor"));
-        cursorObj.append("id", cursorId);
-        cursorObj.append("ns", cursorNamespace);
-        cursorObj.append("firstBatch", firstBatch);
-        cursorObj.done();
-    }
+void appendCursorResponseObject(long long cursorId,
+                                StringData cursorNamespace,
+                                BSONArray firstBatch,
+                                BSONObjBuilder* builder) {
+    BSONObjBuilder cursorObj(builder->subobjStart("cursor"));
+    cursorObj.append("id", cursorId);
+    cursorObj.append("ns", cursorNamespace);
+    cursorObj.append("firstBatch", firstBatch);
+    cursorObj.done();
+}
 
-    void appendGetMoreResponseObject(long long cursorId,
-                                     StringData cursorNamespace,
-                                     BSONArray nextBatch,
-                                     BSONObjBuilder* builder) {
-        BSONObjBuilder cursorObj(builder->subobjStart("cursor"));
-        cursorObj.append("id", cursorId);
-        cursorObj.append("ns", cursorNamespace);
-        cursorObj.append("nextBatch", nextBatch);
-        cursorObj.done();
-    }
+void appendGetMoreResponseObject(long long cursorId,
+                                 StringData cursorNamespace,
+                                 BSONArray nextBatch,
+                                 BSONObjBuilder* builder) {
+    BSONObjBuilder cursorObj(builder->subobjStart("cursor"));
+    cursorObj.append("id", cursorId);
+    cursorObj.append("ns", cursorNamespace);
+    cursorObj.append("nextBatch", nextBatch);
+    cursorObj.done();
+}
 
-} // namespace mongo
+}  // namespace mongo

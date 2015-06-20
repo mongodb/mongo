@@ -38,222 +38,219 @@
 
 namespace {
 
-    using mongo::ErrorCodes;
-    using mongo::Status;
+using mongo::ErrorCodes;
+using mongo::Status;
 
-    TEST(Basic, Accessors) {
-        Status status(ErrorCodes::MaxError, "error", 9999);
-        ASSERT_EQUALS(status.code(), ErrorCodes::MaxError);
-        ASSERT_EQUALS(status.reason(), "error");
-        ASSERT_EQUALS(status.location(), 9999);
-    }
+TEST(Basic, Accessors) {
+    Status status(ErrorCodes::MaxError, "error", 9999);
+    ASSERT_EQUALS(status.code(), ErrorCodes::MaxError);
+    ASSERT_EQUALS(status.reason(), "error");
+    ASSERT_EQUALS(status.location(), 9999);
+}
 
-    TEST(Basic, OKIsAValidStatus) {
-        Status status = Status::OK();
-        ASSERT_EQUALS(status.code(), ErrorCodes::OK);
-    }
+TEST(Basic, OKIsAValidStatus) {
+    Status status = Status::OK();
+    ASSERT_EQUALS(status.code(), ErrorCodes::OK);
+}
 
-    TEST(Basic, Compare) {
-        Status errMax(ErrorCodes::MaxError, "error");
-        ASSERT_TRUE(errMax.compare(errMax));
-        ASSERT_FALSE(errMax.compare(Status::OK()));
+TEST(Basic, Compare) {
+    Status errMax(ErrorCodes::MaxError, "error");
+    ASSERT_TRUE(errMax.compare(errMax));
+    ASSERT_FALSE(errMax.compare(Status::OK()));
 
-        Status errMaxWithLoc(ErrorCodes::MaxError, "error", 9998);
-        ASSERT_FALSE(errMaxWithLoc.compare(errMax));
-    }
+    Status errMaxWithLoc(ErrorCodes::MaxError, "error", 9998);
+    ASSERT_FALSE(errMaxWithLoc.compare(errMax));
+}
 
-    TEST(Cloning, Copy) {
-        Status orig(ErrorCodes::MaxError, "error");
-        ASSERT_EQUALS(orig.refCount(), 1U);
+TEST(Cloning, Copy) {
+    Status orig(ErrorCodes::MaxError, "error");
+    ASSERT_EQUALS(orig.refCount(), 1U);
 
-        Status dest(orig);
-        ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
-        ASSERT_EQUALS(dest.reason(), "error");
+    Status dest(orig);
+    ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
+    ASSERT_EQUALS(dest.reason(), "error");
 
-        ASSERT_EQUALS(dest.refCount(), 2U);
-        ASSERT_EQUALS(orig.refCount(), 2U);
-    }
+    ASSERT_EQUALS(dest.refCount(), 2U);
+    ASSERT_EQUALS(orig.refCount(), 2U);
+}
 
-    TEST(Cloning, MoveCopyOK) {
-        Status orig = Status::OK();
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+TEST(Cloning, MoveCopyOK) {
+    Status orig = Status::OK();
+    ASSERT_TRUE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 0U);
 
-        Status dest(std::move(orig));
+    Status dest(std::move(orig));
 
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+    ASSERT_TRUE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 0U);
 
-        ASSERT_TRUE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 0U);
-    }
+    ASSERT_TRUE(dest.isOK());
+    ASSERT_EQUALS(dest.refCount(), 0U);
+}
 
-    TEST(Cloning, MoveCopyError) {
-        Status orig(ErrorCodes::MaxError, "error");
-        ASSERT_FALSE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 1U);
+TEST(Cloning, MoveCopyError) {
+    Status orig(ErrorCodes::MaxError, "error");
+    ASSERT_FALSE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 1U);
 
-        Status dest(std::move(orig));
+    Status dest(std::move(orig));
 
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+    ASSERT_TRUE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 0U);
 
-        ASSERT_FALSE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 1U);
-        ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
-        ASSERT_EQUALS(dest.reason(), "error");
-    }
+    ASSERT_FALSE(dest.isOK());
+    ASSERT_EQUALS(dest.refCount(), 1U);
+    ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
+    ASSERT_EQUALS(dest.reason(), "error");
+}
 
-    TEST(Cloning, MoveAssignOKToOK) {
-        Status orig = Status::OK();
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+TEST(Cloning, MoveAssignOKToOK) {
+    Status orig = Status::OK();
+    ASSERT_TRUE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 0U);
 
-        Status dest = Status::OK();
-        ASSERT_TRUE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 0U);
+    Status dest = Status::OK();
+    ASSERT_TRUE(dest.isOK());
+    ASSERT_EQUALS(dest.refCount(), 0U);
 
-        dest = std::move(orig);
+    dest = std::move(orig);
 
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+    ASSERT_TRUE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 0U);
 
-        ASSERT_TRUE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 0U);
-    }
+    ASSERT_TRUE(dest.isOK());
+    ASSERT_EQUALS(dest.refCount(), 0U);
+}
 
-    TEST(Cloning, MoveAssignErrorToError) {
-        Status orig = Status(ErrorCodes::MaxError, "error");
-        ASSERT_FALSE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 1U);
-        ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
-        ASSERT_EQUALS(orig.reason(), "error");
+TEST(Cloning, MoveAssignErrorToError) {
+    Status orig = Status(ErrorCodes::MaxError, "error");
+    ASSERT_FALSE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 1U);
+    ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
+    ASSERT_EQUALS(orig.reason(), "error");
 
-        Status dest = Status(ErrorCodes::InternalError, "error2");
-        ASSERT_FALSE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 1U);
-        ASSERT_EQUALS(dest.code(), ErrorCodes::InternalError);
-        ASSERT_EQUALS(dest.reason(), "error2");
+    Status dest = Status(ErrorCodes::InternalError, "error2");
+    ASSERT_FALSE(dest.isOK());
+    ASSERT_EQUALS(dest.refCount(), 1U);
+    ASSERT_EQUALS(dest.code(), ErrorCodes::InternalError);
+    ASSERT_EQUALS(dest.reason(), "error2");
 
-        dest = std::move(orig);
+    dest = std::move(orig);
 
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+    ASSERT_TRUE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 0U);
 
-        ASSERT_FALSE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 1U);
-        ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
-        ASSERT_EQUALS(dest.reason(), "error");
-    }
+    ASSERT_FALSE(dest.isOK());
+    ASSERT_EQUALS(dest.refCount(), 1U);
+    ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
+    ASSERT_EQUALS(dest.reason(), "error");
+}
 
-    TEST(Cloning, MoveAssignErrorToOK) {
-        Status orig = Status(ErrorCodes::MaxError, "error");
-        ASSERT_FALSE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 1U);
-        ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
-        ASSERT_EQUALS(orig.reason(), "error");
+TEST(Cloning, MoveAssignErrorToOK) {
+    Status orig = Status(ErrorCodes::MaxError, "error");
+    ASSERT_FALSE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 1U);
+    ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
+    ASSERT_EQUALS(orig.reason(), "error");
 
-        Status dest = Status::OK();
-        ASSERT_TRUE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 0U);
+    Status dest = Status::OK();
+    ASSERT_TRUE(dest.isOK());
+    ASSERT_EQUALS(dest.refCount(), 0U);
 
-        dest = std::move(orig);
+    dest = std::move(orig);
 
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+    ASSERT_TRUE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 0U);
 
-        ASSERT_FALSE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 1U);
-        ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
-        ASSERT_EQUALS(dest.reason(), "error");
-    }
+    ASSERT_FALSE(dest.isOK());
+    ASSERT_EQUALS(dest.refCount(), 1U);
+    ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
+    ASSERT_EQUALS(dest.reason(), "error");
+}
 
-    TEST(Cloning, MoveAssignOKToError) {
-        Status orig = Status::OK();
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+TEST(Cloning, MoveAssignOKToError) {
+    Status orig = Status::OK();
+    ASSERT_TRUE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 0U);
 
-        Status dest = Status(ErrorCodes::MaxError, "error");
-        ASSERT_FALSE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 1U);
-        ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
-        ASSERT_EQUALS(dest.reason(), "error");
+    Status dest = Status(ErrorCodes::MaxError, "error");
+    ASSERT_FALSE(dest.isOK());
+    ASSERT_EQUALS(dest.refCount(), 1U);
+    ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
+    ASSERT_EQUALS(dest.reason(), "error");
 
-        orig = std::move(dest);
+    orig = std::move(dest);
 
-        ASSERT_FALSE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 1U);
-        ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
-        ASSERT_EQUALS(orig.reason(), "error");
+    ASSERT_FALSE(orig.isOK());
+    ASSERT_EQUALS(orig.refCount(), 1U);
+    ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
+    ASSERT_EQUALS(orig.reason(), "error");
 
-        ASSERT_TRUE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 0U);
-    }
+    ASSERT_TRUE(dest.isOK());
+    ASSERT_EQUALS(dest.refCount(), 0U);
+}
 
-    TEST(Cloning, OKIsNotRefCounted) {
-        ASSERT_EQUALS(Status::OK().refCount(), 0U);
+TEST(Cloning, OKIsNotRefCounted) {
+    ASSERT_EQUALS(Status::OK().refCount(), 0U);
 
-        Status myOk = Status::OK();
-        ASSERT_EQUALS(myOk.refCount(), 0U);
-        ASSERT_EQUALS(Status::OK().refCount(), 0U);
-    }
+    Status myOk = Status::OK();
+    ASSERT_EQUALS(myOk.refCount(), 0U);
+    ASSERT_EQUALS(Status::OK().refCount(), 0U);
+}
 
-    TEST(Parsing, CodeToEnum) {
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, ErrorCodes::fromInt(ErrorCodes::TypeMismatch));
-        ASSERT_EQUALS(ErrorCodes::UnknownError, ErrorCodes::fromInt(ErrorCodes::UnknownError));
-        ASSERT_EQUALS(ErrorCodes::MaxError, ErrorCodes::fromInt(ErrorCodes::MaxError));
-        ASSERT_EQUALS(ErrorCodes::OK, ErrorCodes::fromInt(0));
-    }
+TEST(Parsing, CodeToEnum) {
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, ErrorCodes::fromInt(ErrorCodes::TypeMismatch));
+    ASSERT_EQUALS(ErrorCodes::UnknownError, ErrorCodes::fromInt(ErrorCodes::UnknownError));
+    ASSERT_EQUALS(ErrorCodes::MaxError, ErrorCodes::fromInt(ErrorCodes::MaxError));
+    ASSERT_EQUALS(ErrorCodes::OK, ErrorCodes::fromInt(0));
+}
 
-    TEST(Transformers, ExceptionToStatus) {
-        using mongo::DBException;
-        using mongo::exceptionToStatus;
+TEST(Transformers, ExceptionToStatus) {
+    using mongo::DBException;
+    using mongo::exceptionToStatus;
 
-        auto reason = "oh no";
+    auto reason = "oh no";
 
-        Status fromDBExcept = [=](){
-            try {
-                throw DBException(reason, ErrorCodes::TypeMismatch);
-            }
-            catch (...) {
-                return exceptionToStatus();
-            }
-        }();
+    Status fromDBExcept = [=]() {
+        try {
+            throw DBException(reason, ErrorCodes::TypeMismatch);
+        } catch (...) {
+            return exceptionToStatus();
+        }
+    }();
 
-        ASSERT_NOT_OK(fromDBExcept);
-        ASSERT_EQUALS(fromDBExcept.reason(), reason);
-        ASSERT_EQUALS(fromDBExcept.code(), ErrorCodes::TypeMismatch);
+    ASSERT_NOT_OK(fromDBExcept);
+    ASSERT_EQUALS(fromDBExcept.reason(), reason);
+    ASSERT_EQUALS(fromDBExcept.code(), ErrorCodes::TypeMismatch);
 
-        Status fromStdExcept = [=]() {
-            try {
-                throw std::out_of_range(reason);
-            }
-            catch (...) {
-                return exceptionToStatus();
-            }
-        }();
+    Status fromStdExcept = [=]() {
+        try {
+            throw std::out_of_range(reason);
+        } catch (...) {
+            return exceptionToStatus();
+        }
+    }();
 
-        ASSERT_NOT_OK(fromStdExcept);
-        // we don't check the exact error message because the type name of the exception
-        // isn't demangled on windows.
-        ASSERT_TRUE(fromStdExcept.reason().find(reason) != std::string::npos);
-        ASSERT_EQUALS(fromStdExcept.code(), ErrorCodes::UnknownError);
+    ASSERT_NOT_OK(fromStdExcept);
+    // we don't check the exact error message because the type name of the exception
+    // isn't demangled on windows.
+    ASSERT_TRUE(fromStdExcept.reason().find(reason) != std::string::npos);
+    ASSERT_EQUALS(fromStdExcept.code(), ErrorCodes::UnknownError);
 
-        class bar : public boost::exception {};
+    class bar : public boost::exception {};
 
-        Status fromBoostExcept = [=]() {
-            try {
-                throw bar();
-            }
-            catch (...) {
-                return exceptionToStatus();
-            }
-        }();
+    Status fromBoostExcept = [=]() {
+        try {
+            throw bar();
+        } catch (...) {
+            return exceptionToStatus();
+        }
+    }();
 
-        ASSERT_NOT_OK(fromBoostExcept);
-        ASSERT_EQUALS(fromBoostExcept, ErrorCodes::UnknownError);
-        // Reason should include that it was a boost::exception
-        ASSERT_TRUE(fromBoostExcept.reason().find("boost::exception") != std::string::npos);
-    }
+    ASSERT_NOT_OK(fromBoostExcept);
+    ASSERT_EQUALS(fromBoostExcept, ErrorCodes::UnknownError);
+    // Reason should include that it was a boost::exception
+    ASSERT_TRUE(fromBoostExcept.reason().find("boost::exception") != std::string::npos);
+}
 
-} // unnamed namespace
+}  // unnamed namespace

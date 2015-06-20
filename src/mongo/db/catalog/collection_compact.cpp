@@ -48,154 +48,150 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::vector;
+using std::endl;
+using std::vector;
 
-    namespace {
-        BSONObj _compactAdjustIndexSpec( const BSONObj& oldSpec ) {
-            BSONObjBuilder b;
-            BSONObj::iterator i( oldSpec );
-            while( i.more() ) {
-                BSONElement e = i.next();
-                if ( str::equals( e.fieldName(), "v" ) ) {
-                    // Drop any preexisting index version spec.  The default index version will
-                    // be used instead for the new index.
-                    continue;
-                }
-                if ( str::equals( e.fieldName(), "background" ) ) {
-                    // Create the new index in the foreground.
-                    continue;
-                }
-                // Pass the element through to the new index spec.
-                b.append(e);
-            }
-            return b.obj();
+namespace {
+BSONObj _compactAdjustIndexSpec(const BSONObj& oldSpec) {
+    BSONObjBuilder b;
+    BSONObj::iterator i(oldSpec);
+    while (i.more()) {
+        BSONElement e = i.next();
+        if (str::equals(e.fieldName(), "v")) {
+            // Drop any preexisting index version spec.  The default index version will
+            // be used instead for the new index.
+            continue;
         }
+        if (str::equals(e.fieldName(), "background")) {
+            // Create the new index in the foreground.
+            continue;
+        }
+        // Pass the element through to the new index spec.
+        b.append(e);
+    }
+    return b.obj();
+}
 
-        class MyCompactAdaptor : public RecordStoreCompactAdaptor {
-        public:
-            MyCompactAdaptor(Collection* collection,
-                             MultiIndexBlock* indexBlock)
+class MyCompactAdaptor : public RecordStoreCompactAdaptor {
+public:
+    MyCompactAdaptor(Collection* collection, MultiIndexBlock* indexBlock)
 
-                : _collection( collection ),
-                  _multiIndexBlock(indexBlock) {
-            }
+        : _collection(collection), _multiIndexBlock(indexBlock) {}
 
-            virtual bool isDataValid( const RecordData& recData ) {
-                return recData.toBson().valid();
-            }
-
-            virtual size_t dataSize( const RecordData& recData ) {
-                return recData.toBson().objsize();
-            }
-
-            virtual void inserted( const RecordData& recData, const RecordId& newLocation ) {
-                _multiIndexBlock->insert( recData.toBson(), newLocation );
-            }
-
-        private:
-            Collection* _collection;
-
-            MultiIndexBlock* _multiIndexBlock;
-        };
-
+    virtual bool isDataValid(const RecordData& recData) {
+        return recData.toBson().valid();
     }
 
+    virtual size_t dataSize(const RecordData& recData) {
+        return recData.toBson().objsize();
+    }
 
-    StatusWith<CompactStats> Collection::compact( OperationContext* txn,
-                                                  const CompactOptions* compactOptions ) {
-        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+    virtual void inserted(const RecordData& recData, const RecordId& newLocation) {
+        _multiIndexBlock->insert(recData.toBson(), newLocation);
+    }
 
-        DisableDocumentValidation validationDisabler(txn);
+private:
+    Collection* _collection;
 
-        if ( !_recordStore->compactSupported() )
-            return StatusWith<CompactStats>( ErrorCodes::CommandNotSupported,
-                                             str::stream() <<
-                                             "cannot compact collection with record store: " <<
-                                             _recordStore->name() );
-
-        if (_recordStore->compactsInPlace()) {
-            // Since we are compacting in-place, we don't need to touch the indexes.
-            // TODO SERVER-16856 compact indexes
-            CompactStats stats;
-            Status status = _recordStore->compact(txn, NULL, compactOptions, &stats);
-            if (!status.isOK())
-                return StatusWith<CompactStats>(status);
-
-            return StatusWith<CompactStats>(stats);
-        }
-
-        if ( _indexCatalog.numIndexesInProgress( txn ) )
-            return StatusWith<CompactStats>( ErrorCodes::BadValue,
-                                             "cannot compact when indexes in progress" );
+    MultiIndexBlock* _multiIndexBlock;
+};
+}
 
 
-        // same data, but might perform a little different after compact?
-        _infoCache.reset( txn );
+StatusWith<CompactStats> Collection::compact(OperationContext* txn,
+                                             const CompactOptions* compactOptions) {
+    dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
-        vector<BSONObj> indexSpecs;
-        {
-            IndexCatalog::IndexIterator ii( _indexCatalog.getIndexIterator( txn, false ) );
-            while ( ii.more() ) {
-                IndexDescriptor* descriptor = ii.next();
+    DisableDocumentValidation validationDisabler(txn);
 
-                const BSONObj spec = _compactAdjustIndexSpec(descriptor->infoObj());
-                const BSONObj key = spec.getObjectField("key");
-                const Status keyStatus = validateKeyPattern(key);
-                if (!keyStatus.isOK()) {
-                    return StatusWith<CompactStats>(
-                        ErrorCodes::CannotCreateIndex,
-                        str::stream() << "Cannot compact collection due to invalid index "
-                                      << spec << ": " << keyStatus.reason() << " For more info see"
-                                      << " http://dochub.mongodb.org/core/index-validation");
-                }
-                indexSpecs.push_back(spec);
-            }
-        }
+    if (!_recordStore->compactSupported())
+        return StatusWith<CompactStats>(ErrorCodes::CommandNotSupported,
+                                        str::stream()
+                                            << "cannot compact collection with record store: "
+                                            << _recordStore->name());
 
-        // Give a chance to be interrupted *before* we drop all indexes.
-        txn->checkForInterrupt();
-
-        {
-            // note that the drop indexes call also invalidates all clientcursors for the namespace,
-            // which is important and wanted here
-            WriteUnitOfWork wunit(txn);
-            log() << "compact dropping indexes" << endl;
-            Status status = _indexCatalog.dropAllIndexes(txn, true);
-            if ( !status.isOK() ) {
-                return StatusWith<CompactStats>( status );
-            }
-            wunit.commit();
-        }
-
+    if (_recordStore->compactsInPlace()) {
+        // Since we are compacting in-place, we don't need to touch the indexes.
+        // TODO SERVER-16856 compact indexes
         CompactStats stats;
-
-        MultiIndexBlock indexer(txn, this);
-        indexer.allowInterruption();
-        indexer.ignoreUniqueConstraint(); // in compact we should be doing no checking
-
-        Status status = indexer.init( indexSpecs );
-        if ( !status.isOK() )
-            return StatusWith<CompactStats>( status );
-
-        MyCompactAdaptor adaptor(this, &indexer);
-
-        status = _recordStore->compact( txn, &adaptor, compactOptions, &stats);
+        Status status = _recordStore->compact(txn, NULL, compactOptions, &stats);
         if (!status.isOK())
             return StatusWith<CompactStats>(status);
 
-        log() << "starting index commits";
-        status = indexer.doneInserting();
-        if ( !status.isOK() )
-            return StatusWith<CompactStats>( status );
-
-        {
-            WriteUnitOfWork wunit(txn);
-            indexer.commit();
-            wunit.commit();
-        }
-
-        return StatusWith<CompactStats>( stats );
+        return StatusWith<CompactStats>(stats);
     }
+
+    if (_indexCatalog.numIndexesInProgress(txn))
+        return StatusWith<CompactStats>(ErrorCodes::BadValue,
+                                        "cannot compact when indexes in progress");
+
+
+    // same data, but might perform a little different after compact?
+    _infoCache.reset(txn);
+
+    vector<BSONObj> indexSpecs;
+    {
+        IndexCatalog::IndexIterator ii(_indexCatalog.getIndexIterator(txn, false));
+        while (ii.more()) {
+            IndexDescriptor* descriptor = ii.next();
+
+            const BSONObj spec = _compactAdjustIndexSpec(descriptor->infoObj());
+            const BSONObj key = spec.getObjectField("key");
+            const Status keyStatus = validateKeyPattern(key);
+            if (!keyStatus.isOK()) {
+                return StatusWith<CompactStats>(
+                    ErrorCodes::CannotCreateIndex,
+                    str::stream() << "Cannot compact collection due to invalid index " << spec
+                                  << ": " << keyStatus.reason() << " For more info see"
+                                  << " http://dochub.mongodb.org/core/index-validation");
+            }
+            indexSpecs.push_back(spec);
+        }
+    }
+
+    // Give a chance to be interrupted *before* we drop all indexes.
+    txn->checkForInterrupt();
+
+    {
+        // note that the drop indexes call also invalidates all clientcursors for the namespace,
+        // which is important and wanted here
+        WriteUnitOfWork wunit(txn);
+        log() << "compact dropping indexes" << endl;
+        Status status = _indexCatalog.dropAllIndexes(txn, true);
+        if (!status.isOK()) {
+            return StatusWith<CompactStats>(status);
+        }
+        wunit.commit();
+    }
+
+    CompactStats stats;
+
+    MultiIndexBlock indexer(txn, this);
+    indexer.allowInterruption();
+    indexer.ignoreUniqueConstraint();  // in compact we should be doing no checking
+
+    Status status = indexer.init(indexSpecs);
+    if (!status.isOK())
+        return StatusWith<CompactStats>(status);
+
+    MyCompactAdaptor adaptor(this, &indexer);
+
+    status = _recordStore->compact(txn, &adaptor, compactOptions, &stats);
+    if (!status.isOK())
+        return StatusWith<CompactStats>(status);
+
+    log() << "starting index commits";
+    status = indexer.doneInserting();
+    if (!status.isOK())
+        return StatusWith<CompactStats>(status);
+
+    {
+        WriteUnitOfWork wunit(txn);
+        indexer.commit();
+        wunit.commit();
+    }
+
+    return StatusWith<CompactStats>(stats);
+}
 
 }  // namespace mongo

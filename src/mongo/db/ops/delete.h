@@ -36,16 +36,15 @@
 
 namespace mongo {
 
-    class Database;
-    class OperationContext;
+class Database;
+class OperationContext;
 
-    long long deleteObjects(OperationContext* txn,
-                            Database* db,
-                            StringData ns,
-                            BSONObj pattern,
-                            PlanExecutor::YieldPolicy policy,
-                            bool justOne,
-                            bool god = false,
-                            bool fromMigrate = false);
-
+long long deleteObjects(OperationContext* txn,
+                        Database* db,
+                        StringData ns,
+                        BSONObj pattern,
+                        PlanExecutor::YieldPolicy policy,
+                        bool justOne,
+                        bool god = false,
+                        bool fromMigrate = false);
 }

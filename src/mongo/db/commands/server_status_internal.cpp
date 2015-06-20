@@ -37,53 +37,53 @@
 
 namespace mongo {
 
-    using std::cerr;
-    using std::endl;
-    using std::map;
-    using std::string;
+using std::cerr;
+using std::endl;
+using std::map;
+using std::string;
 
-    using namespace mongoutils;
+using namespace mongoutils;
 
-    MetricTree* MetricTree::theMetricTree = NULL;
+MetricTree* MetricTree::theMetricTree = NULL;
 
-    void MetricTree::add( ServerStatusMetric* metric ) {
-        string name = metric->getMetricName();
-        if ( name[0] == '.' )
-            _add( name.substr(1), metric );
-        else
-            _add( str::stream() << "metrics." << name, metric );
-    }
-
-    void MetricTree::_add( const string& path, ServerStatusMetric* metric ) {
-        size_t idx = path.find( "." );
-        if ( idx == string::npos ) {
-            _metrics[path] = metric;
-            return;
-        }
-
-        string myLevel = path.substr( 0, idx );
-        if ( _metrics.count( myLevel ) > 0 ) {
-            cerr << "metric conflict on: " << myLevel << endl;
-            fassertFailed( 16461 );
-        }
-
-        MetricTree*& sub = _subtrees[myLevel];
-        if ( ! sub )
-            sub = new MetricTree();
-        sub->_add( path.substr( idx + 1 ), metric );
-    }
-
-    void MetricTree::appendTo( BSONObjBuilder& b ) const {
-        for ( map<string,ServerStatusMetric*>::const_iterator i = _metrics.begin(); i != _metrics.end(); ++i ) {
-            i->second->appendAtLeaf( b );
-        }
-
-        for ( map<string,MetricTree*>::const_iterator i = _subtrees.begin(); i != _subtrees.end(); ++i ) {
-            BSONObjBuilder bb( b.subobjStart( i->first ) );
-            i->second->appendTo( bb );
-            bb.done();
-        }
-    }
-
+void MetricTree::add(ServerStatusMetric* metric) {
+    string name = metric->getMetricName();
+    if (name[0] == '.')
+        _add(name.substr(1), metric);
+    else
+        _add(str::stream() << "metrics." << name, metric);
 }
 
+void MetricTree::_add(const string& path, ServerStatusMetric* metric) {
+    size_t idx = path.find(".");
+    if (idx == string::npos) {
+        _metrics[path] = metric;
+        return;
+    }
+
+    string myLevel = path.substr(0, idx);
+    if (_metrics.count(myLevel) > 0) {
+        cerr << "metric conflict on: " << myLevel << endl;
+        fassertFailed(16461);
+    }
+
+    MetricTree*& sub = _subtrees[myLevel];
+    if (!sub)
+        sub = new MetricTree();
+    sub->_add(path.substr(idx + 1), metric);
+}
+
+void MetricTree::appendTo(BSONObjBuilder& b) const {
+    for (map<string, ServerStatusMetric*>::const_iterator i = _metrics.begin(); i != _metrics.end();
+         ++i) {
+        i->second->appendAtLeaf(b);
+    }
+
+    for (map<string, MetricTree*>::const_iterator i = _subtrees.begin(); i != _subtrees.end();
+         ++i) {
+        BSONObjBuilder bb(b.subobjStart(i->first));
+        i->second->appendTo(bb);
+        bb.done();
+    }
+}
+}

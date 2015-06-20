@@ -36,51 +36,49 @@
 
 namespace mongo {
 
+/**
+ * a.$ -> a
+ * @return true if out is set and we made a change
+ */
+bool getCanonicalIndexField(StringData fullName, std::string* out);
+
+
+/**
+ * Holds pre-processed index spec information to allow update to quickly determine if an update
+ * can be applied as a delta to a document, or if the document must be re-indexed.
+ */
+class UpdateIndexData {
+public:
+    UpdateIndexData();
+
     /**
-     * a.$ -> a
-     * @return true if out is set and we made a change
+     * Register a path.  Any update targeting this path (or a parent of this path) will
+     * trigger a recomputation of the document's index keys.
      */
-    bool getCanonicalIndexField( StringData fullName, std::string* out );
-
+    void addPath(StringData path);
 
     /**
-     * Holds pre-processed index spec information to allow update to quickly determine if an update
-     * can be applied as a delta to a document, or if the document must be re-indexed.
+     * Register a path component.  Any update targeting a path that contains this exact
+     * component will trigger a recomputation of the document's index keys.
      */
-    class UpdateIndexData {
-    public:
-        UpdateIndexData();
+    void addPathComponent(StringData pathComponent);
 
-        /**
-         * Register a path.  Any update targeting this path (or a parent of this path) will
-         * trigger a recomputation of the document's index keys.
-         */
-        void addPath( StringData path );
+    /**
+     * Register the "wildcard" path.  All updates will trigger a recomputation of the document's
+     * index keys.
+     */
+    void allPathsIndexed();
 
-        /**
-         * Register a path component.  Any update targeting a path that contains this exact
-         * component will trigger a recomputation of the document's index keys.
-         */
-        void addPathComponent( StringData pathComponent );
+    void clear();
 
-        /**
-         * Register the "wildcard" path.  All updates will trigger a recomputation of the document's
-         * index keys.
-         */
-        void allPathsIndexed();
+    bool mightBeIndexed(StringData path) const;
 
-        void clear();
+private:
+    bool _startsWith(StringData a, StringData b) const;
 
-        bool mightBeIndexed( StringData path ) const;
+    std::set<std::string> _canonicalPaths;
+    std::set<std::string> _pathComponents;
 
-    private:
-
-        bool _startsWith( StringData a, StringData b ) const;
-
-        std::set<std::string> _canonicalPaths;
-        std::set<std::string> _pathComponents;
-
-        bool _allPathsIndexed;
-    };
-
+    bool _allPathsIndexed;
+};
 }

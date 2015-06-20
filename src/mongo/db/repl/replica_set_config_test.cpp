@@ -36,682 +36,731 @@ namespace mongo {
 namespace repl {
 namespace {
 
-    TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")))));
-        ASSERT_OK(config.validate());
-        ASSERT_EQUALS("rs0", config.getReplSetName());
-        ASSERT_EQUALS(1, config.getConfigVersion());
-        ASSERT_EQUALS(1, config.getNumMembers());
-        ASSERT_EQUALS(0, config.membersBegin()->getId());
-        ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
-        ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
-        ASSERT_EQUALS(Seconds(10), config.getHeartbeatTimeoutPeriod());
-        ASSERT_TRUE(config.isChainingAllowed());
-        ASSERT_EQUALS(0, config.getProtocolVersion());
-    }
+TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS("rs0", config.getReplSetName());
+    ASSERT_EQUALS(1, config.getConfigVersion());
+    ASSERT_EQUALS(1, config.getNumMembers());
+    ASSERT_EQUALS(0, config.membersBegin()->getId());
+    ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
+    ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
+    ASSERT_EQUALS(Seconds(10), config.getHeartbeatTimeoutPeriod());
+    ASSERT_TRUE(config.isChainingAllowed());
+    ASSERT_EQUALS(0, config.getProtocolVersion());
+}
 
-    TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1234 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 234 <<
-                                                            "host" << "localhost:12345" <<
-                                                            "tags" << BSON("NYC" << "NY"))) <<
-                               "settings" << BSON("getLastErrorDefaults" <<
-                                                  BSON("w" << "majority") <<
-                                                  "getLastErrorModes" << BSON("eastCoast" <<
-                                                                              BSON("NYC" << 1 )) <<
-                                                  "chainingAllowed" << false <<
-                                                  "heartbeatTimeoutSecs" << 120) <<
-                               "protocolVersion" << 2)));
-        ASSERT_OK(config.validate());
-        ASSERT_EQUALS("rs0", config.getReplSetName());
-        ASSERT_EQUALS(1234, config.getConfigVersion());
-        ASSERT_EQUALS(1, config.getNumMembers());
-        ASSERT_EQUALS(234, config.membersBegin()->getId());
-        ASSERT_EQUALS(0, config.getDefaultWriteConcern().wNumNodes);
-        ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
-        ASSERT_FALSE(config.isChainingAllowed());
-        ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
-        ASSERT_EQUALS(2, config.getProtocolVersion());
-    }
+TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON(
+        "_id"
+        << "rs0"
+        << "version" << 1234 << "members" << BSON_ARRAY(BSON("_id" << 234 << "host"
+                                                                   << "localhost:12345"
+                                                                   << "tags" << BSON("NYC"
+                                                                                     << "NY")))
+        << "settings" << BSON("getLastErrorDefaults"
+                              << BSON("w"
+                                      << "majority") << "getLastErrorModes"
+                              << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed" << false
+                              << "heartbeatTimeoutSecs" << 120) << "protocolVersion" << 2)));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS("rs0", config.getReplSetName());
+    ASSERT_EQUALS(1234, config.getConfigVersion());
+    ASSERT_EQUALS(1, config.getNumMembers());
+    ASSERT_EQUALS(234, config.membersBegin()->getId());
+    ASSERT_EQUALS(0, config.getDefaultWriteConcern().wNumNodes);
+    ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
+    ASSERT_FALSE(config.isChainingAllowed());
+    ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
+    ASSERT_EQUALS(2, config.getProtocolVersion());
+}
 
-    TEST(ReplicaSetConfig, MajorityCalculationThreeVotersNoArbiters) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 2 <<
-                               "members" << BSON_ARRAY(
-                                       BSON("_id" << 1 << "host" << "h1:1") <<
-                                       BSON("_id" << 2 << "host" << "h2:1") <<
-                                       BSON("_id" << 3 << "host" << "h3:1") <<
-                                       BSON("_id" << 4 << "host" << "h4:1" << "votes" << 0) <<
-                                       BSON("_id" << 5 << "host" << "h5:1" << "votes" << 0)))));
-        ASSERT_OK(config.validate());
+TEST(ReplicaSetConfig, MajorityCalculationThreeVotersNoArbiters) {
+    ReplicaSetConfig config;
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 2 << "members"
+                               << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                        << "h1:1")
+                                             << BSON("_id" << 2 << "host"
+                                                           << "h2:1") << BSON("_id" << 3 << "host"
+                                                                                    << "h3:1")
+                                             << BSON("_id" << 4 << "host"
+                                                           << "h4:1"
+                                                           << "votes" << 0)
+                                             << BSON("_id" << 5 << "host"
+                                                           << "h5:1"
+                                                           << "votes" << 0)))));
+    ASSERT_OK(config.validate());
 
-        ASSERT_EQUALS(2, config.getWriteMajority());
-    }
+    ASSERT_EQUALS(2, config.getWriteMajority());
+}
 
-    TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfArbiters) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(
-                BSON("_id" << "mySet" <<
-                     "version" << 2 <<
-                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
-                                             BSON("host" << "node2:12345" << "_id" << 1) <<
-                                             BSON("host" << "node3:12345" << "_id" << 2) <<
-                                             BSON("host" << "node4:12345" <<
-                                                  "_id" << 3 <<
-                                                  "arbiterOnly" << true) <<
-                                             BSON("host" << "node5:12345" <<
-                                                  "_id" << 4 <<
-                                                  "arbiterOnly" << true)))));
-        ASSERT_OK(config.validate());
-        ASSERT_EQUALS(3, config.getWriteMajority());
-    }
+TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfArbiters) {
+    ReplicaSetConfig config;
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "mySet"
+                               << "version" << 2 << "members"
+                               << BSON_ARRAY(BSON("host"
+                                                  << "node1:12345"
+                                                  << "_id" << 0)
+                                             << BSON("host"
+                                                     << "node2:12345"
+                                                     << "_id" << 1) << BSON("host"
+                                                                            << "node3:12345"
+                                                                            << "_id" << 2)
+                                             << BSON("host"
+                                                     << "node4:12345"
+                                                     << "_id" << 3 << "arbiterOnly" << true)
+                                             << BSON("host"
+                                                     << "node5:12345"
+                                                     << "_id" << 4 << "arbiterOnly" << true)))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS(3, config.getWriteMajority());
+}
 
-    TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfArbitersOthersNoVote) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(
-                BSON("_id" << "mySet" <<
-                     "version" << 2 <<
-                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
-                                                  "_id" << 0 <<
-                                                  "votes" << 0) <<
-                                             BSON("host" << "node2:12345" <<
-                                                  "_id" << 1 <<
-                                                  "votes" << 0) <<
-                                             BSON("host" << "node3:12345" <<
-                                                  "_id" << 2 <<
-                                                  "votes" << 0) <<
-                                             BSON("host" << "node4:12345" <<
-                                                  "_id" << 3 <<
-                                                  "arbiterOnly" << true) <<
-                                             BSON("host" << "node5:12345" <<
-                                                  "_id" << 4 <<
-                                                  "arbiterOnly" << true)))));
-        ASSERT_OK(config.validate());
-        ASSERT_EQUALS(0, config.getWriteMajority());
-    }
+TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfArbitersOthersNoVote) {
+    ReplicaSetConfig config;
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "mySet"
+                               << "version" << 2 << "members"
+                               << BSON_ARRAY(BSON("host"
+                                                  << "node1:12345"
+                                                  << "_id" << 0 << "votes" << 0)
+                                             << BSON("host"
+                                                     << "node2:12345"
+                                                     << "_id" << 1 << "votes" << 0)
+                                             << BSON("host"
+                                                     << "node3:12345"
+                                                     << "_id" << 2 << "votes" << 0)
+                                             << BSON("host"
+                                                     << "node4:12345"
+                                                     << "_id" << 3 << "arbiterOnly" << true)
+                                             << BSON("host"
+                                                     << "node5:12345"
+                                                     << "_id" << 4 << "arbiterOnly" << true)))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS(0, config.getWriteMajority());
+}
 
-    TEST(ReplicaSetConfig, MajorityCalculationEvenNumberOfMembers) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(
-                BSON("_id" << "mySet" <<
-                     "version" << 2 <<
-                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
-                                             BSON("host" << "node2:12345" << "_id" << 1) <<
-                                             BSON("host" << "node3:12345" << "_id" << 2) <<
-                                             BSON("host" << "node4:12345" << "_id" << 3)))));
-        ASSERT_OK(config.validate());
-        ASSERT_EQUALS(3, config.getWriteMajority());
-    }
+TEST(ReplicaSetConfig, MajorityCalculationEvenNumberOfMembers) {
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "mySet"
+                                     << "version" << 2 << "members"
+                                     << BSON_ARRAY(BSON("host"
+                                                        << "node1:12345"
+                                                        << "_id" << 0)
+                                                   << BSON("host"
+                                                           << "node2:12345"
+                                                           << "_id" << 1) << BSON("host"
+                                                                                  << "node3:12345"
+                                                                                  << "_id" << 2)
+                                                   << BSON("host"
+                                                           << "node4:12345"
+                                                           << "_id" << 3)))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS(3, config.getWriteMajority());
+}
 
-    TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfSecondariesNoVotes) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(
-                BSON("_id" << "mySet" <<
-                     "version" << 2 <<
-                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
-                                             BSON("host" << "node2:12345" <<
-                                                  "_id" << 1 <<
-                                                  "votes" << 0) <<
-                                             BSON("host" << "node3:12345" <<
-                                                  "_id" << 2 <<
-                                                  "votes" << 0) <<
-                                             BSON("host" << "node4:12345" << "_id" << 3) <<
-                                             BSON("host" << "node5:12345" << "_id" << 4)))));
-        ASSERT_OK(config.validate());
-        ASSERT_EQUALS(2, config.getWriteMajority());
-    }
+TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfSecondariesNoVotes) {
+    ReplicaSetConfig config;
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "mySet"
+                               << "version" << 2 << "members"
+                               << BSON_ARRAY(BSON("host"
+                                                  << "node1:12345"
+                                                  << "_id" << 0)
+                                             << BSON("host"
+                                                     << "node2:12345"
+                                                     << "_id" << 1 << "votes" << 0)
+                                             << BSON("host"
+                                                     << "node3:12345"
+                                                     << "_id" << 2 << "votes" << 0)
+                                             << BSON("host"
+                                                     << "node4:12345"
+                                                     << "_id" << 3) << BSON("host"
+                                                                            << "node5:12345"
+                                                                            << "_id" << 4)))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS(2, config.getWriteMajority());
+}
 
-    TEST(ReplicaSetConfig, ParseFailsWithBadOrMissingIdField) {
-        ReplicaSetConfig config;
-        // Replica set name must be a string.
-        ASSERT_EQUALS(
-                ErrorCodes::TypeMismatch,
-                config.initialize(
-                        BSON("_id" << 1 <<
-                             "version" << 1 <<
-                             "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                          "host" << "localhost:12345")))));
+TEST(ReplicaSetConfig, ParseFailsWithBadOrMissingIdField) {
+    ReplicaSetConfig config;
+    // Replica set name must be a string.
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch,
+                  config.initialize(BSON("_id" << 1 << "version" << 1 << "members"
+                                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                        << "localhost:12345")))));
 
-        // Replica set name must be present.
-        ASSERT_EQUALS(
-                ErrorCodes::NoSuchKey,
-                config.initialize(
-                        BSON("version" << 1 <<
-                             "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                          "host" << "localhost:12345")))));
+    // Replica set name must be present.
+    ASSERT_EQUALS(
+        ErrorCodes::NoSuchKey,
+        config.initialize(
+            BSON("version" << 1 << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                      << "localhost:12345")))));
 
-        // Empty repl set name parses, but does not validate.
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")))));
+    // Empty repl set name parses, but does not validate.
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << ""
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
 
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-    }
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+}
 
-    TEST(ReplicaSetConfig, ParseFailsWithBadOrMissingVersionField) {
-        ReplicaSetConfig config;
-        // Config version field must be present.
-        ASSERT_EQUALS(
-                ErrorCodes::NoSuchKey,
-                config.initialize(
-                        BSON("_id" << "rs0" <<
-                             "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                          "host" << "localhost:12345")))));
-        ASSERT_EQUALS(
-                ErrorCodes::TypeMismatch,
-                config.initialize(
-                        BSON("_id" << "rs0" <<
-                             "version" << "1" <<
-                             "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                          "host" << "localhost:12345")))));
+TEST(ReplicaSetConfig, ParseFailsWithBadOrMissingVersionField) {
+    ReplicaSetConfig config;
+    // Config version field must be present.
+    ASSERT_EQUALS(
+        ErrorCodes::NoSuchKey,
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:12345")))));
+    ASSERT_EQUALS(
+        ErrorCodes::TypeMismatch,
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version"
+                               << "1"
+                               << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:12345")))));
 
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1.0 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")))));
-        ASSERT_OK(config.validate());
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 0.0 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")))));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" <<
-                               static_cast<long long>(std::numeric_limits<int>::max()) + 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")))));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-    }
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1.0 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_OK(config.validate());
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 0.0 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version"
+                               << static_cast<long long>(std::numeric_limits<int>::max()) + 1
+                               << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:12345")))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+}
 
-    TEST(ReplicaSetConfig, ParseFailsWithBadMembers) {
-        ReplicaSetConfig config;
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch,
-                      config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345") <<
-                                                       "localhost:23456"))));
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey,
-                      config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("host" << "localhost:12345")))));
-    }
+TEST(ReplicaSetConfig, ParseFailsWithBadMembers) {
+    ReplicaSetConfig config;
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch,
+                  config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345")
+                                                       << "localhost:23456"))));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                  config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "members"
+                                         << BSON_ARRAY(BSON("host"
+                                                            << "localhost:12345")))));
+}
 
-    TEST(ReplicaSetConfig, ParseFailsWithLocalNonLocalHostMix) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(BSON("_id" << "rs0" <<
-                                         "version" << 1 <<
-                                         "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                                      "host" << "localhost") <<
-                                                                 BSON("_id" << 1 <<
-                                                                      "host" << "otherhost")))));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-    }
+TEST(ReplicaSetConfig, ParseFailsWithLocalNonLocalHostMix) {
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost")
+                                                   << BSON("_id" << 1 << "host"
+                                                                 << "otherhost")))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+}
 
-    TEST(ReplicaSetConfig, ParseFailsWithNoElectableNodes) {
-        ReplicaSetConfig config;
-        const BSONObj configBsonNoElectableNodes = BSON(
-                "_id" << "rs0" <<
-                "version" << 1 <<
-                "members" << BSON_ARRAY(
-                        BSON("_id" << 0 << "host" << "localhost:1" << "priority" << 0) <<
-                        BSON("_id" << 1 << "host" << "localhost:2" << "priority" << 0)));
+TEST(ReplicaSetConfig, ParseFailsWithNoElectableNodes) {
+    ReplicaSetConfig config;
+    const BSONObj configBsonNoElectableNodes = BSON("_id"
+                                                    << "rs0"
+                                                    << "version" << 1 << "members"
+                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                             << "localhost:1"
+                                                                             << "priority" << 0)
+                                                                  << BSON("_id" << 1 << "host"
+                                                                                << "localhost:2"
+                                                                                << "priority"
+                                                                                << 0)));
 
-        ASSERT_OK(config.initialize(configBsonNoElectableNodes));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    ASSERT_OK(config.initialize(configBsonNoElectableNodes));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
-        const BSONObj configBsonNoElectableNodesOneArbiter = BSON(
-                "_id" << "rs0" <<
-                "version" << 1 <<
-                "members" << BSON_ARRAY(
-                        BSON("_id" << 0 << "host" << "localhost:1" << "arbiterOnly" << 1) <<
-                        BSON("_id" << 1 << "host" << "localhost:2" << "priority" << 0)));
+    const BSONObj configBsonNoElectableNodesOneArbiter =
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:1"
+                                                                     << "arbiterOnly" << 1)
+                                                          << BSON("_id" << 1 << "host"
+                                                                        << "localhost:2"
+                                                                        << "priority" << 0)));
 
-        ASSERT_OK(config.initialize(configBsonNoElectableNodesOneArbiter));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    ASSERT_OK(config.initialize(configBsonNoElectableNodesOneArbiter));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
-        const BSONObj configBsonNoElectableNodesTwoArbiters = BSON(
-                "_id" << "rs0" <<
-                "version" << 1 <<
-                "members" << BSON_ARRAY(
-                        BSON("_id" << 0 << "host" << "localhost:1" << "arbiterOnly" << 1) <<
-                        BSON("_id" << 1 << "host" << "localhost:2" << "arbiterOnly" << 1)));
+    const BSONObj configBsonNoElectableNodesTwoArbiters =
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:1"
+                                                                     << "arbiterOnly" << 1)
+                                                          << BSON("_id" << 1 << "host"
+                                                                        << "localhost:2"
+                                                                        << "arbiterOnly" << 1)));
 
-        ASSERT_OK(config.initialize(configBsonNoElectableNodesOneArbiter));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    ASSERT_OK(config.initialize(configBsonNoElectableNodesOneArbiter));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
-        const BSONObj configBsonOneElectableNode = BSON(
-                "_id" << "rs0" <<
-                "version" << 1 <<
-                "members" << BSON_ARRAY(
-                        BSON("_id" << 0 << "host" << "localhost:1" << "priority" << 0) <<
-                        BSON("_id" << 1 << "host" << "localhost:2" << "priority" << 1)));
-        ASSERT_OK(config.initialize(configBsonOneElectableNode));
-        ASSERT_OK(config.validate());
-    }
+    const BSONObj configBsonOneElectableNode = BSON("_id"
+                                                    << "rs0"
+                                                    << "version" << 1 << "members"
+                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                             << "localhost:1"
+                                                                             << "priority" << 0)
+                                                                  << BSON("_id" << 1 << "host"
+                                                                                << "localhost:2"
+                                                                                << "priority"
+                                                                                << 1)));
+    ASSERT_OK(config.initialize(configBsonOneElectableNode));
+    ASSERT_OK(config.validate());
+}
 
-    TEST(ReplicaSetConfig, ParseFailsWithTooFewVoters) {
-        ReplicaSetConfig config;
-        const BSONObj configBsonNoVoters = BSON(
-                "_id" << "rs0" <<
-                "version" << 1 <<
-                "members" << BSON_ARRAY(
-                        BSON("_id" << 0 << "host" << "localhost:1" << "votes" << 0) <<
-                        BSON("_id" << 1 << "host" << "localhost:2" << "votes" << 0)));
+TEST(ReplicaSetConfig, ParseFailsWithTooFewVoters) {
+    ReplicaSetConfig config;
+    const BSONObj configBsonNoVoters = BSON("_id"
+                                            << "rs0"
+                                            << "version" << 1 << "members"
+                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:1"
+                                                                     << "votes" << 0)
+                                                          << BSON("_id" << 1 << "host"
+                                                                        << "localhost:2"
+                                                                        << "votes" << 0)));
 
-        ASSERT_OK(config.initialize(configBsonNoVoters));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    ASSERT_OK(config.initialize(configBsonNoVoters));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
-        const BSONObj configBsonOneVoter = BSON(
-                "_id" << "rs0" <<
-                "version" << 1 <<
-                "members" << BSON_ARRAY(
-                        BSON("_id" << 0 << "host" << "localhost:1" << "votes" << 0) <<
-                        BSON("_id" << 1 << "host" << "localhost:2" << "votes" << 1)));
-        ASSERT_OK(config.initialize(configBsonOneVoter));
-        ASSERT_OK(config.validate());
-    }
+    const BSONObj configBsonOneVoter = BSON("_id"
+                                            << "rs0"
+                                            << "version" << 1 << "members"
+                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:1"
+                                                                     << "votes" << 0)
+                                                          << BSON("_id" << 1 << "host"
+                                                                        << "localhost:2"
+                                                                        << "votes" << 1)));
+    ASSERT_OK(config.initialize(configBsonOneVoter));
+    ASSERT_OK(config.validate());
+}
 
-    TEST(ReplicaSetConfig, ParseFailsWithTooManyVoters) {
-        ReplicaSetConfig config;
-        namespace mmb = mutablebson;
-        mmb::Document configDoc;
-        mmb::Element configDocRoot = configDoc.root();
-        ASSERT_OK(configDocRoot.appendString("_id", "rs0"));
-        ASSERT_OK(configDocRoot.appendInt("version", 1));
-        mmb::Element membersArray = configDoc.makeElementArray("members");
-        ASSERT_OK(configDocRoot.pushBack(membersArray));
-        for (size_t i = 0; i < ReplicaSetConfig::kMaxVotingMembers + 1; ++i) {
-            mmb::Element memberElement = configDoc.makeElementObject("");
-            ASSERT_OK(membersArray.pushBack(memberElement));
-            ASSERT_OK(memberElement.appendInt("_id", i));
-            ASSERT_OK(memberElement.appendString(
-                              "host", std::string(str::stream() << "localhost" << i + 1)));
-            ASSERT_OK(memberElement.appendInt("votes", 1));
-        }
-
-        const BSONObj configBsonTooManyVoters = configDoc.getObject();
-
-        membersArray.leftChild().findFirstChildNamed("votes").setValueInt(0);
-        const BSONObj configBsonMaxVoters = configDoc.getObject();
-
-
-        ASSERT_OK(config.initialize(configBsonMaxVoters));
-        ASSERT_OK(config.validate());
-        ASSERT_OK(config.initialize(configBsonTooManyVoters));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-    }
-
-    TEST(ReplicaSetConfig, ParseFailsWithDuplicateHost) {
-        ReplicaSetConfig config;
-        const BSONObj configBson = BSON(
-                "_id" << "rs0" <<
-                "version" << 1 <<
-                "members" << BSON_ARRAY(
-                        BSON("_id" << 0 << "host" << "localhost:1") <<
-                        BSON("_id" << 1 << "host" << "localhost:1")));
-        ASSERT_OK(config.initialize(configBson));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-    }
-
-    TEST(ReplicaSetConfig, ParseFailsWithTooManyNodes) {
-        ReplicaSetConfig config;
-        namespace mmb = mutablebson;
-        mmb::Document configDoc;
-        mmb::Element configDocRoot = configDoc.root();
-        ASSERT_OK(configDocRoot.appendString("_id", "rs0"));
-        ASSERT_OK(configDocRoot.appendInt("version", 1));
-        mmb::Element membersArray = configDoc.makeElementArray("members");
-        ASSERT_OK(configDocRoot.pushBack(membersArray));
-        for (size_t i = 0; i < ReplicaSetConfig::kMaxMembers; ++i) {
-            mmb::Element memberElement = configDoc.makeElementObject("");
-            ASSERT_OK(membersArray.pushBack(memberElement));
-            ASSERT_OK(memberElement.appendInt("_id", i));
-            ASSERT_OK(memberElement.appendString(
-                              "host", std::string(str::stream() << "localhost" << i + 1)));
-            if (i >= ReplicaSetConfig::kMaxVotingMembers) {
-                ASSERT_OK(memberElement.appendInt("votes", 0));
-            }
-        }
-        const BSONObj configBsonMaxNodes = configDoc.getObject();
-
+TEST(ReplicaSetConfig, ParseFailsWithTooManyVoters) {
+    ReplicaSetConfig config;
+    namespace mmb = mutablebson;
+    mmb::Document configDoc;
+    mmb::Element configDocRoot = configDoc.root();
+    ASSERT_OK(configDocRoot.appendString("_id", "rs0"));
+    ASSERT_OK(configDocRoot.appendInt("version", 1));
+    mmb::Element membersArray = configDoc.makeElementArray("members");
+    ASSERT_OK(configDocRoot.pushBack(membersArray));
+    for (size_t i = 0; i < ReplicaSetConfig::kMaxVotingMembers + 1; ++i) {
         mmb::Element memberElement = configDoc.makeElementObject("");
         ASSERT_OK(membersArray.pushBack(memberElement));
-        ASSERT_OK(memberElement.appendInt("_id", ReplicaSetConfig::kMaxMembers));
-        ASSERT_OK(memberElement.appendString(
-                          "host", std::string(str::stream() <<
-                                              "localhost" << ReplicaSetConfig::kMaxMembers + 1)));
-        ASSERT_OK(memberElement.appendInt("votes", 0));
-        const BSONObj configBsonTooManyNodes = configDoc.getObject();
-
-
-        ASSERT_OK(config.initialize(configBsonMaxNodes));
-        ASSERT_OK(config.validate());
-        ASSERT_OK(config.initialize(configBsonTooManyNodes));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+        ASSERT_OK(memberElement.appendInt("_id", i));
+        ASSERT_OK(
+            memberElement.appendString("host", std::string(str::stream() << "localhost" << i + 1)));
+        ASSERT_OK(memberElement.appendInt("votes", 1));
     }
 
-    TEST(ReplicaSetConfig, ParseFailsWithUnexpectedField) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "unexpectedfield" << "value"));
-        ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    }
+    const BSONObj configBsonTooManyVoters = configDoc.getObject();
 
-    TEST(ReplicaSetConfig, ParseFailsWithNonArrayMembersField) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << "value"));
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
-    }
+    membersArray.leftChild().findFirstChildNamed("votes").setValueInt(0);
+    const BSONObj configBsonMaxVoters = configDoc.getObject();
 
-    TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatTimeoutSecsField) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345")) <<
-                                               "settings" << BSON("heartbeatTimeoutSecs" << "no")));
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
-    }
 
-    TEST(ReplicaSetConfig, ParseFailsWithNonBoolChainingAllowedField) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345")) <<
-                                               "settings" << BSON("chainingAllowed" << "no")));
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
-    }
+    ASSERT_OK(config.initialize(configBsonMaxVoters));
+    ASSERT_OK(config.validate());
+    ASSERT_OK(config.initialize(configBsonTooManyVoters));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+}
 
-    TEST(ReplicaSetConfig, ParseFailsWithNonObjectSettingsField) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345")) <<
-                                               "settings" << "none"));
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
-    }
+TEST(ReplicaSetConfig, ParseFailsWithDuplicateHost) {
+    ReplicaSetConfig config;
+    const BSONObj configBson = BSON("_id"
+                                    << "rs0"
+                                    << "version" << 1 << "members"
+                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                             << "localhost:1")
+                                                  << BSON("_id" << 1 << "host"
+                                                                << "localhost:1")));
+    ASSERT_OK(config.initialize(configBson));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+}
 
-    TEST(ReplicaSetConfig, ParseFailsWithGetLastErrorDefaultsFieldUnparseable) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345")) <<
-                                               "settings" << BSON("getLastErrorDefaults" << BSON(
-                                                       "fsync" << "seven"))));
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    }
-
-    TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorDefaultsField) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345")) <<
-                                               "settings" << BSON("getLastErrorDefaults" << "no")));
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
-    }
-
-    TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorModesField) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345")) <<
-                                               "settings" << BSON("getLastErrorModes" << "no")));
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
-    }
-
-    TEST(ReplicaSetConfig, ParseFailsWithDuplicateGetLastErrorModesField) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345" << 
-                                                       "tags" << BSON("tag" << "yes"))) <<
-                                               "settings" << BSON("getLastErrorModes" << BSON(
-                                                        "one" << BSON("tag" << 1) <<
-                                                        "one" << BSON("tag" << 1)))));
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, status);
-    }
-
-    TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorModesEntryField) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345" << 
-                                                       "tags" << BSON("tag" << "yes"))) <<
-                                               "settings" << BSON("getLastErrorModes" << BSON(
-                                                        "one" << 1))));
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
-    }
-
-    TEST(ReplicaSetConfig, ParseFailsWithNonNumericGetLastErrorModesConstraintValue) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345" << 
-                                                       "tags" << BSON("tag" << "yes"))) <<
-                                               "settings" << BSON("getLastErrorModes" << BSON(
-                                                        "one" << BSON("tag" << "no")))));
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
-    }
-
-    TEST(ReplicaSetConfig, ParseFailsWithNegativeGetLastErrorModesConstraintValue) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345" << 
-                                                       "tags" << BSON("tag" << "yes"))) <<
-                                               "settings" << BSON("getLastErrorModes" << BSON(
-                                                        "one" << BSON("tag" << -1)))));
-        ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    }
-
-    TEST(ReplicaSetConfig, ParseFailsWithNonExistentGetLastErrorModesConstraintTag) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345" << 
-                                                       "tags" << BSON("tag" << "yes"))) <<
-                                               "settings" << BSON("getLastErrorModes" << BSON(
-                                                        "one" << BSON("tag2" << 1)))));
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
-    }
-
-    TEST(ReplicaSetConfig, ValidateFailsWithDuplicateMemberId) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345") <<
-                                                       BSON("_id" << 0 <<
-                                                       "host" << "someoneelse:12345"))));
-        ASSERT_OK(status);
-
-        status = config.validate();
-        ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    }
-
-    TEST(ReplicaSetConfig, ValidateFailsWithInvalidMember) {
-        ReplicaSetConfig config;
-        Status status = config.initialize(BSON("_id" << "rs0" <<
-                                               "version" << 1 <<
-                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                       "host" << "localhost:12345" <<
-                                                       "hidden" << true))));
-        ASSERT_OK(status);
-
-        status = config.validate();
-        ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    }
-
-    TEST(ReplicaSetConfig, ChainingAllowedField) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")) <<
-                               "settings" << BSON("chainingAllowed" << true))));
-        ASSERT_OK(config.validate());
-        ASSERT_TRUE(config.isChainingAllowed());
-
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")) <<
-                               "settings" << BSON("chainingAllowed" << false))));
-        ASSERT_OK(config.validate());
-        ASSERT_FALSE(config.isChainingAllowed());
-    }
-
-    TEST(ReplicaSetConfig, HeartbeatTimeoutField) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")) <<
-                               "settings" << BSON("heartbeatTimeoutSecs" << 20))));
-        ASSERT_OK(config.validate());
-        ASSERT_EQUALS(Seconds(20), config.getHeartbeatTimeoutPeriod());
-
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")) <<
-                               "settings" << BSON("heartbeatTimeoutSecs" << -20))));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-    }
-
-    TEST(ReplicaSetConfig, GleDefaultField) {
-        ReplicaSetConfig config;
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")) <<
-                               "settings" << BSON(
-                                       "getLastErrorDefaults" << BSON("w" << "majority")))));
-        ASSERT_OK(config.validate());
-        ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
-
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")) <<
-                               "settings" << BSON(
-                                       "getLastErrorDefaults" << BSON("w" << "frim")))));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")) <<
-                               "settings" << BSON(
-                                       "getLastErrorDefaults" << BSON("w" << 0)))));
-        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-
-        ASSERT_OK(config.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345" <<
-                                                            "tags" << BSON("a" << "v"))) <<
-                               "settings" << BSON(
-                                       "getLastErrorDefaults" << BSON("w" << "frim") <<
-                                       "getLastErrorModes" << BSON("frim" << BSON("a" << 1))))));
-        ASSERT_OK(config.validate());
-        ASSERT_EQUALS("frim", config.getDefaultWriteConcern().wMode);
-        ASSERT_OK(config.findCustomWriteMode("frim").getStatus());
-    }
-
-    bool operator==(const MemberConfig& a, const MemberConfig& b) {
-        // do tag comparisons
-        for (MemberConfig::TagIterator itrA = a.tagsBegin(); itrA != a.tagsEnd(); ++itrA) {
-            if (std::find(b.tagsBegin(), b.tagsEnd(), *itrA) == b.tagsEnd()) {
-                return false;
-            }
+TEST(ReplicaSetConfig, ParseFailsWithTooManyNodes) {
+    ReplicaSetConfig config;
+    namespace mmb = mutablebson;
+    mmb::Document configDoc;
+    mmb::Element configDocRoot = configDoc.root();
+    ASSERT_OK(configDocRoot.appendString("_id", "rs0"));
+    ASSERT_OK(configDocRoot.appendInt("version", 1));
+    mmb::Element membersArray = configDoc.makeElementArray("members");
+    ASSERT_OK(configDocRoot.pushBack(membersArray));
+    for (size_t i = 0; i < ReplicaSetConfig::kMaxMembers; ++i) {
+        mmb::Element memberElement = configDoc.makeElementObject("");
+        ASSERT_OK(membersArray.pushBack(memberElement));
+        ASSERT_OK(memberElement.appendInt("_id", i));
+        ASSERT_OK(
+            memberElement.appendString("host", std::string(str::stream() << "localhost" << i + 1)));
+        if (i >= ReplicaSetConfig::kMaxVotingMembers) {
+            ASSERT_OK(memberElement.appendInt("votes", 0));
         }
-        return a.getId() == b.getId() &&
-                a.getHostAndPort() == b.getHostAndPort() &&
-                a.getPriority() == b.getPriority() &&
-                a.getSlaveDelay() == b.getSlaveDelay() &&
-                a.isVoter() == b.isVoter() &&
-                a.isArbiter() == b.isArbiter() &&
-                a.isHidden() == b.isHidden() &&
-                a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
-                a.getNumTags() == b.getNumTags();
     }
+    const BSONObj configBsonMaxNodes = configDoc.getObject();
 
-    bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
-        // compare WriteConcernModes
-        std::vector<std::string> modeNames = a.getWriteConcernNames();
-        for (std::vector<std::string>::iterator it = modeNames.begin();
-                it != modeNames.end();
-                it++) {
-            ReplicaSetTagPattern patternA = a.findCustomWriteMode(*it).getValue();
-            ReplicaSetTagPattern patternB = b.findCustomWriteMode(*it).getValue();
-            for (ReplicaSetTagPattern::ConstraintIterator itrA = patternA.constraintsBegin();
-                    itrA != patternA.constraintsEnd();
-                    itrA++) {
-                bool same = false;
-                for (ReplicaSetTagPattern::ConstraintIterator itrB = patternB.constraintsBegin();
-                        itrB != patternB.constraintsEnd();
-                        itrB++) {
-                    if (itrA->getKeyIndex() == itrB->getKeyIndex() &&
-                            itrA->getMinCount() == itrB->getMinCount()) {
-                        same = true;
-                        break;
-                    }
-                }
-                if (!same) {
-                    return false;
-                }
-            }
+    mmb::Element memberElement = configDoc.makeElementObject("");
+    ASSERT_OK(membersArray.pushBack(memberElement));
+    ASSERT_OK(memberElement.appendInt("_id", ReplicaSetConfig::kMaxMembers));
+    ASSERT_OK(memberElement.appendString(
+        "host", std::string(str::stream() << "localhost" << ReplicaSetConfig::kMaxMembers + 1)));
+    ASSERT_OK(memberElement.appendInt("votes", 0));
+    const BSONObj configBsonTooManyNodes = configDoc.getObject();
+
+
+    ASSERT_OK(config.initialize(configBsonMaxNodes));
+    ASSERT_OK(config.validate());
+    ASSERT_OK(config.initialize(configBsonTooManyNodes));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithUnexpectedField) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "unexpectedfield"
+                                           << "value"));
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNonArrayMembersField) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "members"
+                                           << "value"));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatTimeoutSecsField) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345"))
+                                           << "settings" << BSON("heartbeatTimeoutSecs"
+                                                                 << "no")));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNonBoolChainingAllowedField) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345"))
+                                           << "settings" << BSON("chainingAllowed"
+                                                                 << "no")));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNonObjectSettingsField) {
+    ReplicaSetConfig config;
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345")) << "settings"
+                               << "none"));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithGetLastErrorDefaultsFieldUnparseable) {
+    ReplicaSetConfig config;
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345")) << "settings"
+                               << BSON("getLastErrorDefaults" << BSON("fsync"
+                                                                      << "seven"))));
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorDefaultsField) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345"))
+                                           << "settings" << BSON("getLastErrorDefaults"
+                                                                 << "no")));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorModesField) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345"))
+                                           << "settings" << BSON("getLastErrorModes"
+                                                                 << "no")));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithDuplicateGetLastErrorModesField) {
+    ReplicaSetConfig config;
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345"
+                                                        << "tags" << BSON("tag"
+                                                                          << "yes"))) << "settings"
+                               << BSON("getLastErrorModes"
+                                       << BSON("one" << BSON("tag" << 1) << "one"
+                                                     << BSON("tag" << 1)))));
+    ASSERT_EQUALS(ErrorCodes::DuplicateKey, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorModesEntryField) {
+    ReplicaSetConfig config;
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345"
+                                                        << "tags" << BSON("tag"
+                                                                          << "yes"))) << "settings"
+                               << BSON("getLastErrorModes" << BSON("one" << 1))));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNonNumericGetLastErrorModesConstraintValue) {
+    ReplicaSetConfig config;
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345"
+                                                        << "tags" << BSON("tag"
+                                                                          << "yes"))) << "settings"
+                               << BSON("getLastErrorModes" << BSON("one" << BSON("tag"
+                                                                                 << "no")))));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNegativeGetLastErrorModesConstraintValue) {
+    ReplicaSetConfig config;
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345"
+                                                        << "tags" << BSON("tag"
+                                                                          << "yes"))) << "settings"
+                               << BSON("getLastErrorModes" << BSON("one" << BSON("tag" << -1)))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNonExistentGetLastErrorModesConstraintTag) {
+    ReplicaSetConfig config;
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345"
+                                                        << "tags" << BSON("tag"
+                                                                          << "yes"))) << "settings"
+                               << BSON("getLastErrorModes" << BSON("one" << BSON("tag2" << 1)))));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
+}
+
+TEST(ReplicaSetConfig, ValidateFailsWithDuplicateMemberId) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345")
+                                                         << BSON("_id" << 0 << "host"
+                                                                       << "someoneelse:12345"))));
+    ASSERT_OK(status);
+
+    status = config.validate();
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(ReplicaSetConfig, ValidateFailsWithInvalidMember) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345"
+                                                                    << "hidden" << true))));
+    ASSERT_OK(status);
+
+    status = config.validate();
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(ReplicaSetConfig, ChainingAllowedField) {
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")) << "settings"
+                                     << BSON("chainingAllowed" << true))));
+    ASSERT_OK(config.validate());
+    ASSERT_TRUE(config.isChainingAllowed());
+
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")) << "settings"
+                                     << BSON("chainingAllowed" << false))));
+    ASSERT_OK(config.validate());
+    ASSERT_FALSE(config.isChainingAllowed());
+}
+
+TEST(ReplicaSetConfig, HeartbeatTimeoutField) {
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")) << "settings"
+                                     << BSON("heartbeatTimeoutSecs" << 20))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS(Seconds(20), config.getHeartbeatTimeoutPeriod());
+
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")) << "settings"
+                                     << BSON("heartbeatTimeoutSecs" << -20))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+}
+
+TEST(ReplicaSetConfig, GleDefaultField) {
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")) << "settings"
+                                     << BSON("getLastErrorDefaults" << BSON("w"
+                                                                            << "majority")))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
+
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")) << "settings"
+                                     << BSON("getLastErrorDefaults" << BSON("w"
+                                                                            << "frim")))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")) << "settings"
+                                     << BSON("getLastErrorDefaults" << BSON("w" << 0)))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345"
+                                                              << "tags" << BSON("a"
+                                                                                << "v")))
+                                     << "settings" << BSON("getLastErrorDefaults"
+                                                           << BSON("w"
+                                                                   << "frim") << "getLastErrorModes"
+                                                           << BSON("frim" << BSON("a" << 1))))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS("frim", config.getDefaultWriteConcern().wMode);
+    ASSERT_OK(config.findCustomWriteMode("frim").getStatus());
+}
+
+bool operator==(const MemberConfig& a, const MemberConfig& b) {
+    // do tag comparisons
+    for (MemberConfig::TagIterator itrA = a.tagsBegin(); itrA != a.tagsEnd(); ++itrA) {
+        if (std::find(b.tagsBegin(), b.tagsEnd(), *itrA) == b.tagsEnd()) {
+            return false;
         }
+    }
+    return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
+        a.getPriority() == b.getPriority() && a.getSlaveDelay() == b.getSlaveDelay() &&
+        a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
+        a.isHidden() == b.isHidden() && a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
+        a.getNumTags() == b.getNumTags();
+}
 
-        // compare the members
-        for (ReplicaSetConfig::MemberIterator memA = a.membersBegin();
-                memA != a.membersEnd();
-                memA++) {
+bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
+    // compare WriteConcernModes
+    std::vector<std::string> modeNames = a.getWriteConcernNames();
+    for (std::vector<std::string>::iterator it = modeNames.begin(); it != modeNames.end(); it++) {
+        ReplicaSetTagPattern patternA = a.findCustomWriteMode(*it).getValue();
+        ReplicaSetTagPattern patternB = b.findCustomWriteMode(*it).getValue();
+        for (ReplicaSetTagPattern::ConstraintIterator itrA = patternA.constraintsBegin();
+             itrA != patternA.constraintsEnd();
+             itrA++) {
             bool same = false;
-            for (ReplicaSetConfig::MemberIterator memB = b.membersBegin();
-                    memB != b.membersEnd();
-                    memB++) {
-                if (*memA == *memB) {
+            for (ReplicaSetTagPattern::ConstraintIterator itrB = patternB.constraintsBegin();
+                 itrB != patternB.constraintsEnd();
+                 itrB++) {
+                if (itrA->getKeyIndex() == itrB->getKeyIndex() &&
+                    itrA->getMinCount() == itrB->getMinCount()) {
                     same = true;
                     break;
                 }
@@ -720,292 +769,446 @@ namespace {
                 return false;
             }
         }
-
-        // simple comparisons
-        return a.getReplSetName() == b.getReplSetName() &&
-            a.getConfigVersion() == b.getConfigVersion() &&
-            a.getNumMembers() == b.getNumMembers() &&
-            a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
-            a.isChainingAllowed() == b.isChainingAllowed() &&
-            a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
-            a.getDefaultWriteConcern().wMode == b.getDefaultWriteConcern().wMode &&
-            a.getProtocolVersion() == b.getProtocolVersion();
     }
 
-    TEST(ReplicaSetConfig, toBSONRoundTripAbility) {
-        ReplicaSetConfig configA;
-        ReplicaSetConfig configB;
-        ASSERT_OK(configA.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 1 <<
-                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                            "host" << "localhost:12345")) <<
-                               "settings" << BSON("heartbeatTimeoutSecs" << 20))));
-        ASSERT_OK(configB.initialize(configA.toBSON()));
-        ASSERT_TRUE(configA == configB);
+    // compare the members
+    for (ReplicaSetConfig::MemberIterator memA = a.membersBegin(); memA != a.membersEnd(); memA++) {
+        bool same = false;
+        for (ReplicaSetConfig::MemberIterator memB = b.membersBegin(); memB != b.membersEnd();
+             memB++) {
+            if (*memA == *memB) {
+                same = true;
+                break;
+            }
+        }
+        if (!same) {
+            return false;
+        }
     }
 
-    TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
-        ReplicaSetConfig configA;
-        ReplicaSetConfig configB;
-        ASSERT_OK(configA.initialize(
-                BSON("_id" << "asdf"
-                  << "version" << 9
-                  << "members" << BSON_ARRAY(
-                          BSON("_id" << 0
-                            << "host" << "localhost:12345"
-                            << "arbiterOnly" << true
-                            << "votes" << 1
-                          ) <<
-                          BSON("_id" << 3
-                            << "host" << "localhost:3828"
-                            << "arbiterOnly" << false
-                            << "hidden" << true
-                            << "buildIndexes" << false
-                            << "priority" << 0
-                            << "slaveDelay" << 17
-                            << "votes" << 0
-                            << "tags" << BSON("coast" << "east" << "ssd" << "true")
-                          ) <<
-                          BSON("_id" << 2
-                            << "host" << "foo.com:3828"
-                            << "priority" << 9
-                            << "votes" << 0
-                            << "tags" << BSON("coast" << "west" << "hdd" << "true")
-                          ))
-                  << "settings" << BSON("heartbeatTimeoutSecs" << 20
-                                     << "chainingAllowd" << true
-                                     << "getLastErrorDefaults" << BSON("w" << "majority")
-                                     << "getLastErrorModes" << BSON(
-                                            "disks" << BSON("ssd" << 1 << "hdd" << 1)
-                                            << "coasts" << BSON("coast" << 2)))
-                                     )));
-        ASSERT_OK(configB.initialize(configA.toBSON()));
-        ASSERT_TRUE(configA == configB);
-    }
+    // simple comparisons
+    return a.getReplSetName() == b.getReplSetName() &&
+        a.getConfigVersion() == b.getConfigVersion() && a.getNumMembers() == b.getNumMembers() &&
+        a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
+        a.isChainingAllowed() == b.isChainingAllowed() &&
+        a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
+        a.getDefaultWriteConcern().wMode == b.getDefaultWriteConcern().wMode &&
+        a.getProtocolVersion() == b.getProtocolVersion();
+}
 
-    TEST(ReplicaSetConfig, toBSONRoundTripAbilityInvalid) {
-        ReplicaSetConfig configA;
-        ReplicaSetConfig configB;
-        ASSERT_OK(configA.initialize(
-                BSON("_id" << ""
-                  << "version" << -3
-                  << "members" << BSON_ARRAY(
-                          BSON("_id" << 0
-                            << "host" << "localhost:12345"
-                            << "arbiterOnly" << true
-                            << "votes" << 0
-                          ) <<
-                          BSON("_id" << 0
-                            << "host" << "localhost:3828"
-                            << "arbiterOnly" << false
-                            << "buildIndexes" << false
-                            << "priority" << 2
-                          ) <<
-                          BSON("_id" << 2
-                            << "host" << "localhost:3828"
-                            << "priority" << 9
-                            << "votes" << 0
-                          ))
-                  << "settings" << BSON("heartbeatTimeoutSecs" << -20))));
-        ASSERT_OK(configB.initialize(configA.toBSON()));
-        ASSERT_NOT_OK(configA.validate());
-        ASSERT_NOT_OK(configB.validate());
-        ASSERT_TRUE(configA == configB);
-    }
+TEST(ReplicaSetConfig, toBSONRoundTripAbility) {
+    ReplicaSetConfig configA;
+    ReplicaSetConfig configB;
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345")) << "settings"
+                                      << BSON("heartbeatTimeoutSecs" << 20))));
+    ASSERT_OK(configB.initialize(configA.toBSON()));
+    ASSERT_TRUE(configA == configB);
+}
 
-    TEST(ReplicaSetConfig, CheckIfWriteConcernCanBeSatisfied) {
-        ReplicaSetConfig configA;
-        ASSERT_OK(configA.initialize(
-                BSON("_id" << "rs0" <<
-                     "version" << 1 <<
-                     "members" << BSON_ARRAY(BSON("_id" << 0 <<
-                                                 "host" << "node0" <<
-                                                 "tags" << BSON("dc" << "NA" <<
-                                                                "rack" << "rackNA1")) <<
-                                             BSON("_id" << 1 <<
-                                                  "host" << "node1" <<
-                                                  "tags" << BSON("dc" << "NA" <<
-                                                                 "rack" << "rackNA2")) <<
-                                             BSON("_id" << 2 <<
-                                                  "host" << "node2" <<
-                                                  "tags" << BSON("dc" << "NA" <<
-                                                                 "rack" << "rackNA3")) <<
-                                             BSON("_id" << 3 <<
-                                                  "host" << "node3" <<
-                                                  "tags" << BSON("dc" << "EU" <<
-                                                                 "rack" << "rackEU1")) <<
-                                             BSON("_id" << 4 <<
-                                                  "host" << "node4" <<
-                                                  "tags" << BSON("dc" << "EU" <<
-                                                                 "rack" << "rackEU2")) <<
-                                             BSON("_id" << 5 <<
-                                                  "host" << "node5" <<
-                                                  "arbiterOnly" << true)) <<
-                     "settings" << BSON("getLastErrorModes" <<
-                             BSON("valid" << BSON("dc" << 2 << "rack" << 3) <<
-                                  "invalidNotEnoughValues" << BSON("dc" << 3) <<
-                                  "invalidNotEnoughNodes" << BSON("rack" << 6))))));
+TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
+    ReplicaSetConfig configA;
+    ReplicaSetConfig configB;
+    ASSERT_OK(configA.initialize(BSON(
+        "_id"
+        << "asdf"
+        << "version" << 9 << "members"
+        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                 << "localhost:12345"
+                                 << "arbiterOnly" << true << "votes" << 1)
+                      << BSON("_id" << 3 << "host"
+                                    << "localhost:3828"
+                                    << "arbiterOnly" << false << "hidden" << true << "buildIndexes"
+                                    << false << "priority" << 0 << "slaveDelay" << 17 << "votes"
+                                    << 0 << "tags" << BSON("coast"
+                                                           << "east"
+                                                           << "ssd"
+                                                           << "true"))
+                      << BSON("_id" << 2 << "host"
+                                    << "foo.com:3828"
+                                    << "priority" << 9 << "votes" << 0 << "tags"
+                                    << BSON("coast"
+                                            << "west"
+                                            << "hdd"
+                                            << "true"))) << "settings"
+        << BSON("heartbeatTimeoutSecs" << 20 << "chainingAllowd" << true << "getLastErrorDefaults"
+                                       << BSON("w"
+                                               << "majority") << "getLastErrorModes"
+                                       << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
+                                                       << BSON("coast" << 2))))));
+    ASSERT_OK(configB.initialize(configA.toBSON()));
+    ASSERT_TRUE(configA == configB);
+}
 
-        WriteConcernOptions validNumberWC;
-        validNumberWC.wNumNodes = 5;
-        ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(validNumberWC));
+TEST(ReplicaSetConfig, toBSONRoundTripAbilityInvalid) {
+    ReplicaSetConfig configA;
+    ReplicaSetConfig configB;
+    ASSERT_OK(
+        configA.initialize(BSON("_id"
+                                << ""
+                                << "version" << -3 << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                         << "localhost:12345"
+                                                         << "arbiterOnly" << true << "votes" << 0)
+                                              << BSON("_id" << 0 << "host"
+                                                            << "localhost:3828"
+                                                            << "arbiterOnly" << false
+                                                            << "buildIndexes" << false << "priority"
+                                                            << 2)
+                                              << BSON("_id" << 2 << "host"
+                                                            << "localhost:3828"
+                                                            << "priority" << 9 << "votes" << 0))
+                                << "settings" << BSON("heartbeatTimeoutSecs" << -20))));
+    ASSERT_OK(configB.initialize(configA.toBSON()));
+    ASSERT_NOT_OK(configA.validate());
+    ASSERT_NOT_OK(configB.validate());
+    ASSERT_TRUE(configA == configB);
+}
 
-        WriteConcernOptions invalidNumberWC;
-        invalidNumberWC.wNumNodes = 6;
-        ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
-                      configA.checkIfWriteConcernCanBeSatisfied(invalidNumberWC));
+TEST(ReplicaSetConfig, CheckIfWriteConcernCanBeSatisfied) {
+    ReplicaSetConfig configA;
+    ASSERT_OK(configA.initialize(BSON(
+        "_id"
+        << "rs0"
+        << "version" << 1 << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                << "node0"
+                                                                << "tags" << BSON("dc"
+                                                                                  << "NA"
+                                                                                  << "rack"
+                                                                                  << "rackNA1"))
+                                                     << BSON("_id" << 1 << "host"
+                                                                   << "node1"
+                                                                   << "tags" << BSON("dc"
+                                                                                     << "NA"
+                                                                                     << "rack"
+                                                                                     << "rackNA2"))
+                                                     << BSON("_id" << 2 << "host"
+                                                                   << "node2"
+                                                                   << "tags" << BSON("dc"
+                                                                                     << "NA"
+                                                                                     << "rack"
+                                                                                     << "rackNA3"))
+                                                     << BSON("_id" << 3 << "host"
+                                                                   << "node3"
+                                                                   << "tags" << BSON("dc"
+                                                                                     << "EU"
+                                                                                     << "rack"
+                                                                                     << "rackEU1"))
+                                                     << BSON("_id" << 4 << "host"
+                                                                   << "node4"
+                                                                   << "tags" << BSON("dc"
+                                                                                     << "EU"
+                                                                                     << "rack"
+                                                                                     << "rackEU2"))
+                                                     << BSON("_id" << 5 << "host"
+                                                                   << "node5"
+                                                                   << "arbiterOnly" << true))
+        << "settings" << BSON("getLastErrorModes"
+                              << BSON("valid" << BSON("dc" << 2 << "rack" << 3)
+                                              << "invalidNotEnoughValues" << BSON("dc" << 3)
+                                              << "invalidNotEnoughNodes" << BSON("rack" << 6))))));
 
-        WriteConcernOptions majorityWC;
-        majorityWC.wMode = "majority";
-        ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(majorityWC));
+    WriteConcernOptions validNumberWC;
+    validNumberWC.wNumNodes = 5;
+    ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(validNumberWC));
 
-        WriteConcernOptions validModeWC;
-        validModeWC.wMode = "valid";
-        ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(validModeWC));
+    WriteConcernOptions invalidNumberWC;
+    invalidNumberWC.wNumNodes = 6;
+    ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
+                  configA.checkIfWriteConcernCanBeSatisfied(invalidNumberWC));
 
-        WriteConcernOptions fakeModeWC;
-        fakeModeWC.wMode = "fake";
-        ASSERT_EQUALS(ErrorCodes::UnknownReplWriteConcern,
-                      configA.checkIfWriteConcernCanBeSatisfied(fakeModeWC));
+    WriteConcernOptions majorityWC;
+    majorityWC.wMode = "majority";
+    ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(majorityWC));
 
-        WriteConcernOptions invalidModeNotEnoughValuesWC;
-        invalidModeNotEnoughValuesWC.wMode = "invalidNotEnoughValues";
-        ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
-                      configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughValuesWC));
+    WriteConcernOptions validModeWC;
+    validModeWC.wMode = "valid";
+    ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(validModeWC));
 
-        WriteConcernOptions invalidModeNotEnoughNodesWC;
-        invalidModeNotEnoughNodesWC.wMode = "invalidNotEnoughNodes";
-        ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
-                      configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughNodesWC));
-    }
+    WriteConcernOptions fakeModeWC;
+    fakeModeWC.wMode = "fake";
+    ASSERT_EQUALS(ErrorCodes::UnknownReplWriteConcern,
+                  configA.checkIfWriteConcernCanBeSatisfied(fakeModeWC));
 
-    TEST(ReplicaSetConfig, CheckMaximumNodesOkay) {
-        ReplicaSetConfig configA;
-        ReplicaSetConfig configB;
-        ASSERT_OK(configA.initialize(
-                BSON("_id" << "rs0" <<
-                     "version" << 1 <<
-                     "members" << BSON_ARRAY(
-                            BSON("_id" << 0 << "host" << "node0") <<
-                            BSON("_id" << 1 << "host" << "node1") <<
-                            BSON("_id" << 2 << "host" << "node2") <<
-                            BSON("_id" << 3 << "host" << "node3") <<
-                            BSON("_id" << 4 << "host" << "node4") <<
-                            BSON("_id" << 5 << "host" << "node5") <<
-                            BSON("_id" << 6 << "host" << "node6") <<
-                            BSON("_id" << 7 << "host" << "node7" << "votes" << 0) <<
-                            BSON("_id" << 8 << "host" << "node8" << "votes" << 0) <<
-                            BSON("_id" << 9 << "host" << "node9" << "votes" << 0) <<
-                            BSON("_id" << 10 << "host" << "node10" << "votes" << 0) <<
-                            BSON("_id" << 11 << "host" << "node11" << "votes" << 0) <<
-                            BSON("_id" << 12 << "host" << "node12" << "votes" << 0) <<
-                            BSON("_id" << 13 << "host" << "node13" << "votes" << 0) <<
-                            BSON("_id" << 14 << "host" << "node14" << "votes" << 0) <<
-                            BSON("_id" << 15 << "host" << "node15" << "votes" << 0) <<
-                            BSON("_id" << 16 << "host" << "node16" << "votes" << 0) <<
-                            BSON("_id" << 17 << "host" << "node17" << "votes" << 0) <<
-                            BSON("_id" << 18 << "host" << "node18" << "votes" << 0) <<
-                            BSON("_id" << 19 << "host" << "node19" << "votes" << 0) <<
-                            BSON("_id" << 20 << "host" << "node20" << "votes" << 0) <<
-                            BSON("_id" << 21 << "host" << "node21" << "votes" << 0) <<
-                            BSON("_id" << 22 << "host" << "node22" << "votes" << 0) <<
-                            BSON("_id" << 23 << "host" << "node23" << "votes" << 0) <<
-                            BSON("_id" << 24 << "host" << "node24" << "votes" << 0) <<
-                            BSON("_id" << 25 << "host" << "node25" << "votes" << 0) <<
-                            BSON("_id" << 26 << "host" << "node26" << "votes" << 0) <<
-                            BSON("_id" << 27 << "host" << "node27" << "votes" << 0) <<
-                            BSON("_id" << 28 << "host" << "node28" << "votes" << 0) <<
-                            BSON("_id" << 29 << "host" << "node29" << "votes" << 0) <<
-                            BSON("_id" << 30 << "host" << "node30" << "votes" << 0) <<
-                            BSON("_id" << 31 << "host" << "node31" << "votes" << 0) <<
-                            BSON("_id" << 32 << "host" << "node32" << "votes" << 0) <<
-                            BSON("_id" << 33 << "host" << "node33" << "votes" << 0) <<
-                            BSON("_id" << 34 << "host" << "node34" << "votes" << 0) <<
-                            BSON("_id" << 35 << "host" << "node35" << "votes" << 0) <<
-                            BSON("_id" << 36 << "host" << "node36" << "votes" << 0) <<
-                            BSON("_id" << 37 << "host" << "node37" << "votes" << 0) <<
-                            BSON("_id" << 38 << "host" << "node38" << "votes" << 0) <<
-                            BSON("_id" << 39 << "host" << "node39" << "votes" << 0) <<
-                            BSON("_id" << 40 << "host" << "node40" << "votes" << 0) <<
-                            BSON("_id" << 41 << "host" << "node41" << "votes" << 0) <<
-                            BSON("_id" << 42 << "host" << "node42" << "votes" << 0) <<
-                            BSON("_id" << 43 << "host" << "node43" << "votes" << 0) <<
-                            BSON("_id" << 44 << "host" << "node44" << "votes" << 0) <<
-                            BSON("_id" << 45 << "host" << "node45" << "votes" << 0) <<
-                            BSON("_id" << 46 << "host" << "node46" << "votes" << 0) <<
-                            BSON("_id" << 47 << "host" << "node47" << "votes" << 0) <<
-                            BSON("_id" << 48 << "host" << "node48" << "votes" << 0) <<
-                            BSON("_id" << 49 << "host" << "node49" << "votes" << 0)))));
-        ASSERT_OK(configB.initialize(configA.toBSON()));
-        ASSERT_OK(configA.validate());
-        ASSERT_OK(configB.validate());
-        ASSERT_TRUE(configA == configB);
-    }
+    WriteConcernOptions invalidModeNotEnoughValuesWC;
+    invalidModeNotEnoughValuesWC.wMode = "invalidNotEnoughValues";
+    ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
+                  configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughValuesWC));
 
-    TEST(ReplicaSetConfig, CheckBeyondMaximumNodesFailsValidate) {
-        ReplicaSetConfig configA;
-        ReplicaSetConfig configB;
-        ASSERT_OK(configA.initialize(
-                BSON("_id" << "rs0" <<
-                     "version" << 1 <<
-                     "members" << BSON_ARRAY(
-                            BSON("_id" << 0 << "host" << "node0") <<
-                            BSON("_id" << 1 << "host" << "node1") <<
-                            BSON("_id" << 2 << "host" << "node2") <<
-                            BSON("_id" << 3 << "host" << "node3") <<
-                            BSON("_id" << 4 << "host" << "node4") <<
-                            BSON("_id" << 5 << "host" << "node5") <<
-                            BSON("_id" << 6 << "host" << "node6") <<
-                            BSON("_id" << 7 << "host" << "node7" << "votes" << 0) <<
-                            BSON("_id" << 8 << "host" << "node8" << "votes" << 0) <<
-                            BSON("_id" << 9 << "host" << "node9" << "votes" << 0) <<
-                            BSON("_id" << 10 << "host" << "node10" << "votes" << 0) <<
-                            BSON("_id" << 11 << "host" << "node11" << "votes" << 0) <<
-                            BSON("_id" << 12 << "host" << "node12" << "votes" << 0) <<
-                            BSON("_id" << 13 << "host" << "node13" << "votes" << 0) <<
-                            BSON("_id" << 14 << "host" << "node14" << "votes" << 0) <<
-                            BSON("_id" << 15 << "host" << "node15" << "votes" << 0) <<
-                            BSON("_id" << 16 << "host" << "node16" << "votes" << 0) <<
-                            BSON("_id" << 17 << "host" << "node17" << "votes" << 0) <<
-                            BSON("_id" << 18 << "host" << "node18" << "votes" << 0) <<
-                            BSON("_id" << 19 << "host" << "node19" << "votes" << 0) <<
-                            BSON("_id" << 20 << "host" << "node20" << "votes" << 0) <<
-                            BSON("_id" << 21 << "host" << "node21" << "votes" << 0) <<
-                            BSON("_id" << 22 << "host" << "node22" << "votes" << 0) <<
-                            BSON("_id" << 23 << "host" << "node23" << "votes" << 0) <<
-                            BSON("_id" << 24 << "host" << "node24" << "votes" << 0) <<
-                            BSON("_id" << 25 << "host" << "node25" << "votes" << 0) <<
-                            BSON("_id" << 26 << "host" << "node26" << "votes" << 0) <<
-                            BSON("_id" << 27 << "host" << "node27" << "votes" << 0) <<
-                            BSON("_id" << 28 << "host" << "node28" << "votes" << 0) <<
-                            BSON("_id" << 29 << "host" << "node29" << "votes" << 0) <<
-                            BSON("_id" << 30 << "host" << "node30" << "votes" << 0) <<
-                            BSON("_id" << 31 << "host" << "node31" << "votes" << 0) <<
-                            BSON("_id" << 32 << "host" << "node32" << "votes" << 0) <<
-                            BSON("_id" << 33 << "host" << "node33" << "votes" << 0) <<
-                            BSON("_id" << 34 << "host" << "node34" << "votes" << 0) <<
-                            BSON("_id" << 35 << "host" << "node35" << "votes" << 0) <<
-                            BSON("_id" << 36 << "host" << "node36" << "votes" << 0) <<
-                            BSON("_id" << 37 << "host" << "node37" << "votes" << 0) <<
-                            BSON("_id" << 38 << "host" << "node38" << "votes" << 0) <<
-                            BSON("_id" << 39 << "host" << "node39" << "votes" << 0) <<
-                            BSON("_id" << 40 << "host" << "node40" << "votes" << 0) <<
-                            BSON("_id" << 41 << "host" << "node41" << "votes" << 0) <<
-                            BSON("_id" << 42 << "host" << "node42" << "votes" << 0) <<
-                            BSON("_id" << 43 << "host" << "node43" << "votes" << 0) <<
-                            BSON("_id" << 44 << "host" << "node44" << "votes" << 0) <<
-                            BSON("_id" << 45 << "host" << "node45" << "votes" << 0) <<
-                            BSON("_id" << 46 << "host" << "node46" << "votes" << 0) <<
-                            BSON("_id" << 47 << "host" << "node47" << "votes" << 0) <<
-                            BSON("_id" << 48 << "host" << "node48" << "votes" << 0) <<
-                            BSON("_id" << 49 << "host" << "node49" << "votes" << 0) <<
-                            BSON("_id" << 50 << "host" << "node50" << "votes" << 0)))));
-        ASSERT_OK(configB.initialize(configA.toBSON()));
-        ASSERT_NOT_OK(configA.validate());
-        ASSERT_NOT_OK(configB.validate());
-        ASSERT_TRUE(configA == configB);
-    }
+    WriteConcernOptions invalidModeNotEnoughNodesWC;
+    invalidModeNotEnoughNodesWC.wMode = "invalidNotEnoughNodes";
+    ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
+                  configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughNodesWC));
+}
+
+TEST(ReplicaSetConfig, CheckMaximumNodesOkay) {
+    ReplicaSetConfig configA;
+    ReplicaSetConfig configB;
+    ASSERT_OK(configA.initialize(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "node0")
+                           << BSON("_id" << 1 << "host"
+                                         << "node1") << BSON("_id" << 2 << "host"
+                                                                   << "node2")
+                           << BSON("_id" << 3 << "host"
+                                         << "node3") << BSON("_id" << 4 << "host"
+                                                                   << "node4")
+                           << BSON("_id" << 5 << "host"
+                                         << "node5") << BSON("_id" << 6 << "host"
+                                                                   << "node6")
+                           << BSON("_id" << 7 << "host"
+                                         << "node7"
+                                         << "votes" << 0) << BSON("_id" << 8 << "host"
+                                                                        << "node8"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 9 << "host"
+                                         << "node9"
+                                         << "votes" << 0) << BSON("_id" << 10 << "host"
+                                                                        << "node10"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 11 << "host"
+                                         << "node11"
+                                         << "votes" << 0) << BSON("_id" << 12 << "host"
+                                                                        << "node12"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 13 << "host"
+                                         << "node13"
+                                         << "votes" << 0) << BSON("_id" << 14 << "host"
+                                                                        << "node14"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 15 << "host"
+                                         << "node15"
+                                         << "votes" << 0) << BSON("_id" << 16 << "host"
+                                                                        << "node16"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 17 << "host"
+                                         << "node17"
+                                         << "votes" << 0) << BSON("_id" << 18 << "host"
+                                                                        << "node18"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 19 << "host"
+                                         << "node19"
+                                         << "votes" << 0) << BSON("_id" << 20 << "host"
+                                                                        << "node20"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 21 << "host"
+                                         << "node21"
+                                         << "votes" << 0) << BSON("_id" << 22 << "host"
+                                                                        << "node22"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 23 << "host"
+                                         << "node23"
+                                         << "votes" << 0) << BSON("_id" << 24 << "host"
+                                                                        << "node24"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 25 << "host"
+                                         << "node25"
+                                         << "votes" << 0) << BSON("_id" << 26 << "host"
+                                                                        << "node26"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 27 << "host"
+                                         << "node27"
+                                         << "votes" << 0) << BSON("_id" << 28 << "host"
+                                                                        << "node28"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 29 << "host"
+                                         << "node29"
+                                         << "votes" << 0) << BSON("_id" << 30 << "host"
+                                                                        << "node30"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 31 << "host"
+                                         << "node31"
+                                         << "votes" << 0) << BSON("_id" << 32 << "host"
+                                                                        << "node32"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 33 << "host"
+                                         << "node33"
+                                         << "votes" << 0) << BSON("_id" << 34 << "host"
+                                                                        << "node34"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 35 << "host"
+                                         << "node35"
+                                         << "votes" << 0) << BSON("_id" << 36 << "host"
+                                                                        << "node36"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 37 << "host"
+                                         << "node37"
+                                         << "votes" << 0) << BSON("_id" << 38 << "host"
+                                                                        << "node38"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 39 << "host"
+                                         << "node39"
+                                         << "votes" << 0) << BSON("_id" << 40 << "host"
+                                                                        << "node40"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 41 << "host"
+                                         << "node41"
+                                         << "votes" << 0) << BSON("_id" << 42 << "host"
+                                                                        << "node42"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 43 << "host"
+                                         << "node43"
+                                         << "votes" << 0) << BSON("_id" << 44 << "host"
+                                                                        << "node44"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 45 << "host"
+                                         << "node45"
+                                         << "votes" << 0) << BSON("_id" << 46 << "host"
+                                                                        << "node46"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 47 << "host"
+                                         << "node47"
+                                         << "votes" << 0) << BSON("_id" << 48 << "host"
+                                                                        << "node48"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 49 << "host"
+                                         << "node49"
+                                         << "votes" << 0)))));
+    ASSERT_OK(configB.initialize(configA.toBSON()));
+    ASSERT_OK(configA.validate());
+    ASSERT_OK(configB.validate());
+    ASSERT_TRUE(configA == configB);
+}
+
+TEST(ReplicaSetConfig, CheckBeyondMaximumNodesFailsValidate) {
+    ReplicaSetConfig configA;
+    ReplicaSetConfig configB;
+    ASSERT_OK(configA.initialize(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "node0")
+                           << BSON("_id" << 1 << "host"
+                                         << "node1") << BSON("_id" << 2 << "host"
+                                                                   << "node2")
+                           << BSON("_id" << 3 << "host"
+                                         << "node3") << BSON("_id" << 4 << "host"
+                                                                   << "node4")
+                           << BSON("_id" << 5 << "host"
+                                         << "node5") << BSON("_id" << 6 << "host"
+                                                                   << "node6")
+                           << BSON("_id" << 7 << "host"
+                                         << "node7"
+                                         << "votes" << 0) << BSON("_id" << 8 << "host"
+                                                                        << "node8"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 9 << "host"
+                                         << "node9"
+                                         << "votes" << 0) << BSON("_id" << 10 << "host"
+                                                                        << "node10"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 11 << "host"
+                                         << "node11"
+                                         << "votes" << 0) << BSON("_id" << 12 << "host"
+                                                                        << "node12"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 13 << "host"
+                                         << "node13"
+                                         << "votes" << 0) << BSON("_id" << 14 << "host"
+                                                                        << "node14"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 15 << "host"
+                                         << "node15"
+                                         << "votes" << 0) << BSON("_id" << 16 << "host"
+                                                                        << "node16"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 17 << "host"
+                                         << "node17"
+                                         << "votes" << 0) << BSON("_id" << 18 << "host"
+                                                                        << "node18"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 19 << "host"
+                                         << "node19"
+                                         << "votes" << 0) << BSON("_id" << 20 << "host"
+                                                                        << "node20"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 21 << "host"
+                                         << "node21"
+                                         << "votes" << 0) << BSON("_id" << 22 << "host"
+                                                                        << "node22"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 23 << "host"
+                                         << "node23"
+                                         << "votes" << 0) << BSON("_id" << 24 << "host"
+                                                                        << "node24"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 25 << "host"
+                                         << "node25"
+                                         << "votes" << 0) << BSON("_id" << 26 << "host"
+                                                                        << "node26"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 27 << "host"
+                                         << "node27"
+                                         << "votes" << 0) << BSON("_id" << 28 << "host"
+                                                                        << "node28"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 29 << "host"
+                                         << "node29"
+                                         << "votes" << 0) << BSON("_id" << 30 << "host"
+                                                                        << "node30"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 31 << "host"
+                                         << "node31"
+                                         << "votes" << 0) << BSON("_id" << 32 << "host"
+                                                                        << "node32"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 33 << "host"
+                                         << "node33"
+                                         << "votes" << 0) << BSON("_id" << 34 << "host"
+                                                                        << "node34"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 35 << "host"
+                                         << "node35"
+                                         << "votes" << 0) << BSON("_id" << 36 << "host"
+                                                                        << "node36"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 37 << "host"
+                                         << "node37"
+                                         << "votes" << 0) << BSON("_id" << 38 << "host"
+                                                                        << "node38"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 39 << "host"
+                                         << "node39"
+                                         << "votes" << 0) << BSON("_id" << 40 << "host"
+                                                                        << "node40"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 41 << "host"
+                                         << "node41"
+                                         << "votes" << 0) << BSON("_id" << 42 << "host"
+                                                                        << "node42"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 43 << "host"
+                                         << "node43"
+                                         << "votes" << 0) << BSON("_id" << 44 << "host"
+                                                                        << "node44"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 45 << "host"
+                                         << "node45"
+                                         << "votes" << 0) << BSON("_id" << 46 << "host"
+                                                                        << "node46"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 47 << "host"
+                                         << "node47"
+                                         << "votes" << 0) << BSON("_id" << 48 << "host"
+                                                                        << "node48"
+                                                                        << "votes" << 0)
+                           << BSON("_id" << 49 << "host"
+                                         << "node49"
+                                         << "votes" << 0) << BSON("_id" << 50 << "host"
+                                                                        << "node50"
+                                                                        << "votes" << 0)))));
+    ASSERT_OK(configB.initialize(configA.toBSON()));
+    ASSERT_NOT_OK(configA.validate());
+    ASSERT_NOT_OK(configB.validate());
+    ASSERT_TRUE(configA == configB);
+}
 
 }  // namespace
 }  // namespace repl

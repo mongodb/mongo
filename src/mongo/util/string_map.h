@@ -34,34 +34,32 @@
 
 namespace mongo {
 
-    typedef StringData::Hasher StringMapDefaultHash;
+typedef StringData::Hasher StringMapDefaultHash;
 
-    struct StringMapDefaultEqual {
-        bool operator()( StringData a, StringData b ) const {
-            return a == b;
-        }
-    };
+struct StringMapDefaultEqual {
+    bool operator()(StringData a, StringData b) const {
+        return a == b;
+    }
+};
 
-    struct StringMapDefaultConvertor {
-        StringData operator()( const std::string& s ) const {
-            return StringData( s );
-        }
-    };
+struct StringMapDefaultConvertor {
+    StringData operator()(const std::string& s) const {
+        return StringData(s);
+    }
+};
 
-    struct StringMapDefaultConvertorOther {
-        std::string operator()( StringData s ) const {
-            return s.toString();
-        }
-    };
+struct StringMapDefaultConvertorOther {
+    std::string operator()(StringData s) const {
+        return s.toString();
+    }
+};
 
-    template< typename V >
-    class StringMap : public UnorderedFastKeyTable< StringData, // K_L
-                                                    std::string, // K_S
-                                                    V,           // V
-                                                    StringMapDefaultHash,
-                                                    StringMapDefaultEqual,
-                                                    StringMapDefaultConvertor,
-                                                    StringMapDefaultConvertorOther > {
-    };
+template <typename V>
+class StringMap : public UnorderedFastKeyTable<StringData,   // K_L
+                                               std::string,  // K_S
+                                               V,            // V
+                                               StringMapDefaultHash,
+                                               StringMapDefaultEqual,
+                                               StringMapDefaultConvertor,
+                                               StringMapDefaultConvertorOther> {};
 }
-

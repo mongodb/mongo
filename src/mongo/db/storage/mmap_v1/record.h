@@ -37,98 +37,141 @@
 
 namespace mongo {
 
-    class DeletedRecord;
+class DeletedRecord;
 
-    /* MmapV1RecordHeader is a record in a datafile.  DeletedRecord is similar but for deleted space.
+/* MmapV1RecordHeader is a record in a datafile.  DeletedRecord is similar but for deleted space.
 
-    *11:03:20 AM) dm10gen: regarding extentOfs...
-    (11:03:42 AM) dm10gen: an extent is a continugous disk area, which contains many Records and DeleteRecords
-    (11:03:56 AM) dm10gen: a DiskLoc has two pieces, the fileno and ofs.  (64 bit total)
-    (11:04:16 AM) dm10gen: to keep the headesr small, instead of storing a 64 bit ptr to the full extent address, we keep just the offset
-    (11:04:29 AM) dm10gen: we can do this as we know the record's address, and it has the same fileNo
-    (11:04:33 AM) dm10gen: see class DiskLoc for more info
-    (11:04:43 AM) dm10gen: so that is how MmapV1RecordHeader::myExtent() works
-    (11:04:53 AM) dm10gen: on an alloc(), when we build a new MmapV1RecordHeader, we must populate its extentOfs then
-    */
+*11:03:20 AM) dm10gen: regarding extentOfs...
+(11:03:42 AM) dm10gen: an extent is a continugous disk area, which contains many Records and DeleteRecords
+(11:03:56 AM) dm10gen: a DiskLoc has two pieces, the fileno and ofs.  (64 bit total)
+(11:04:16 AM) dm10gen: to keep the headesr small, instead of storing a 64 bit ptr to the full extent address, we keep just the offset
+(11:04:29 AM) dm10gen: we can do this as we know the record's address, and it has the same fileNo
+(11:04:33 AM) dm10gen: see class DiskLoc for more info
+(11:04:43 AM) dm10gen: so that is how MmapV1RecordHeader::myExtent() works
+(11:04:53 AM) dm10gen: on an alloc(), when we build a new MmapV1RecordHeader, we must populate its extentOfs then
+*/
 #pragma pack(1)
-    class MmapV1RecordHeader {
-    public:
-        enum HeaderSizeValue { HeaderSize = 16 };
+class MmapV1RecordHeader {
+public:
+    enum HeaderSizeValue { HeaderSize = 16 };
 
-        int lengthWithHeaders() const {  return _lengthWithHeaders; }
-        int& lengthWithHeaders() {  return _lengthWithHeaders; }
+    int lengthWithHeaders() const {
+        return _lengthWithHeaders;
+    }
+    int& lengthWithHeaders() {
+        return _lengthWithHeaders;
+    }
 
-        int extentOfs() const { return _extentOfs; }
-        int& extentOfs() { return _extentOfs; }
+    int extentOfs() const {
+        return _extentOfs;
+    }
+    int& extentOfs() {
+        return _extentOfs;
+    }
 
-        int nextOfs() const { return _nextOfs; }
-        int& nextOfs() { return _nextOfs; }
+    int nextOfs() const {
+        return _nextOfs;
+    }
+    int& nextOfs() {
+        return _nextOfs;
+    }
 
-        int prevOfs() const {  return _prevOfs; }
-        int& prevOfs() {  return _prevOfs; }
+    int prevOfs() const {
+        return _prevOfs;
+    }
+    int& prevOfs() {
+        return _prevOfs;
+    }
 
-        const char* data() const { return _data; }
-        char* data() { return _data; }
+    const char* data() const {
+        return _data;
+    }
+    char* data() {
+        return _data;
+    }
 
-        // XXX remove
-        const char* dataNoThrowing() const { return _data; }
-        char* dataNoThrowing() { return _data; }
+    // XXX remove
+    const char* dataNoThrowing() const {
+        return _data;
+    }
+    char* dataNoThrowing() {
+        return _data;
+    }
 
-        int netLength() const { return _netLength(); }
+    int netLength() const {
+        return _netLength();
+    }
 
-        /* use this when a record is deleted. basically a union with next/prev fields */
-        DeletedRecord& asDeleted() { return *((DeletedRecord*) this); }
+    /* use this when a record is deleted. basically a union with next/prev fields */
+    DeletedRecord& asDeleted() {
+        return *((DeletedRecord*)this);
+    }
 
-        DiskLoc myExtentLoc(const DiskLoc& myLoc) const { return DiskLoc(myLoc.a(), extentOfs() ); }
+    DiskLoc myExtentLoc(const DiskLoc& myLoc) const {
+        return DiskLoc(myLoc.a(), extentOfs());
+    }
 
-        struct NP {
-            int nextOfs;
-            int prevOfs;
-        };
-
-        NP* np() { return (NP*) &_nextOfs; }
-
-        RecordData toRecordData() const { return RecordData(_data, _netLength()); }
-
-    private:
-
-        int _netLength() const { return _lengthWithHeaders - HeaderSize; }
-
-        int _lengthWithHeaders;
-        int _extentOfs;
-        int _nextOfs;
-        int _prevOfs;
-
-        /** be careful when referencing this that your write intent was correct */
-        char _data[4];
-
-    public:
-        static bool MemoryTrackingEnabled;
-
+    struct NP {
+        int nextOfs;
+        int prevOfs;
     };
+
+    NP* np() {
+        return (NP*)&_nextOfs;
+    }
+
+    RecordData toRecordData() const {
+        return RecordData(_data, _netLength());
+    }
+
+private:
+    int _netLength() const {
+        return _lengthWithHeaders - HeaderSize;
+    }
+
+    int _lengthWithHeaders;
+    int _extentOfs;
+    int _nextOfs;
+    int _prevOfs;
+
+    /** be careful when referencing this that your write intent was correct */
+    char _data[4];
+
+public:
+    static bool MemoryTrackingEnabled;
+};
 #pragma pack()
 
-    // TODO: this probably moves to record_store.h
-    class DeletedRecord {
-    public:
+// TODO: this probably moves to record_store.h
+class DeletedRecord {
+public:
+    int lengthWithHeaders() const {
+        return _lengthWithHeaders;
+    }
+    int& lengthWithHeaders() {
+        return _lengthWithHeaders;
+    }
 
-        int lengthWithHeaders() const { return _lengthWithHeaders; }
-        int& lengthWithHeaders() { return _lengthWithHeaders; }
+    int extentOfs() const {
+        return _extentOfs;
+    }
+    int& extentOfs() {
+        return _extentOfs;
+    }
 
-        int extentOfs() const { return _extentOfs; }
-        int& extentOfs() { return _extentOfs; }
+    // TODO: we need to not const_cast here but problem is DiskLoc::writing
+    DiskLoc& nextDeleted() const {
+        return const_cast<DiskLoc&>(_nextDeleted);
+    }
 
-        // TODO: we need to not const_cast here but problem is DiskLoc::writing
-        DiskLoc& nextDeleted() const { return const_cast<DiskLoc&>(_nextDeleted); }
+private:
+    int _lengthWithHeaders;
 
-    private:
-        int _lengthWithHeaders;
+    int _extentOfs;
 
-        int _extentOfs;
+    DiskLoc _nextDeleted;
+};
 
-        DiskLoc _nextDeleted;
-    };
-
-    BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
+BOOST_STATIC_ASSERT(16 == sizeof(DeletedRecord));
 
 }  // namespace mongo

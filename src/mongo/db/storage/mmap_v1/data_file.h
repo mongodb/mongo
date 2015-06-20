@@ -35,158 +35,181 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
 #pragma pack(1)
-    class DataFileVersion {
-    public:
-        DataFileVersion(uint32_t major, uint32_t minor) :_major(major), _minor(minor) {}
+class DataFileVersion {
+public:
+    DataFileVersion(uint32_t major, uint32_t minor) : _major(major), _minor(minor) {}
 
-        static DataFileVersion defaultForNewFiles() {
-            return DataFileVersion(kCurrentMajor, kIndexes24AndNewer
-                                                | kMayHave28Freelist
-                                                );
-        }
+    static DataFileVersion defaultForNewFiles() {
+        return DataFileVersion(kCurrentMajor, kIndexes24AndNewer | kMayHave28Freelist);
+    }
 
-        bool isCompatibleWithCurrentCode() const {
-            if (_major != kCurrentMajor)
-                return false;
+    bool isCompatibleWithCurrentCode() const {
+        if (_major != kCurrentMajor)
+            return false;
 
-            if (_minor & ~kUsedMinorFlagsMask)
-                return false;
+        if (_minor & ~kUsedMinorFlagsMask)
+            return false;
 
-            const uint32_t indexCleanliness = _minor & kIndexPluginMask;
-            if (indexCleanliness != kIndexes24AndNewer && indexCleanliness != kIndexes22AndOlder)
-                return false;
+        const uint32_t indexCleanliness = _minor & kIndexPluginMask;
+        if (indexCleanliness != kIndexes24AndNewer && indexCleanliness != kIndexes22AndOlder)
+            return false;
 
-            // We are compatible with either setting of kMayHave28Freelist.
+        // We are compatible with either setting of kMayHave28Freelist.
 
-            return true;
-        }
+        return true;
+    }
 
-        bool is24IndexClean() const { return (_minor & kIndexPluginMask) == kIndexes24AndNewer; }
-        void setIs24IndexClean() { _minor = ((_minor & ~kIndexPluginMask) | kIndexes24AndNewer); }
+    bool is24IndexClean() const {
+        return (_minor & kIndexPluginMask) == kIndexes24AndNewer;
+    }
+    void setIs24IndexClean() {
+        _minor = ((_minor & ~kIndexPluginMask) | kIndexes24AndNewer);
+    }
 
-        bool mayHave28Freelist() const { return _minor & kMayHave28Freelist; }
-        void setMayHave28Freelist() { _minor |= kMayHave28Freelist; }
+    bool mayHave28Freelist() const {
+        return _minor & kMayHave28Freelist;
+    }
+    void setMayHave28Freelist() {
+        _minor |= kMayHave28Freelist;
+    }
 
-        uint32_t majorRaw() const { return _major; }
-        uint32_t minorRaw() const { return _minor; }
+    uint32_t majorRaw() const {
+        return _major;
+    }
+    uint32_t minorRaw() const {
+        return _minor;
+    }
 
-    private:
-        static const uint32_t kCurrentMajor = 4;
+private:
+    static const uint32_t kCurrentMajor = 4;
 
-        // minor layout:
-        // first 4 bits - index plugin cleanliness.
-        //    see IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded for details
-        // 5th bit - 1 if started with 3.0-style freelist implementation (SERVER-14081)
-        // 6th through 31st bit - reserved and must be set to 0.
-        static const uint32_t kIndexPluginMask = 0xf;
-        static const uint32_t kIndexes22AndOlder = 5;
-        static const uint32_t kIndexes24AndNewer = 6;
+    // minor layout:
+    // first 4 bits - index plugin cleanliness.
+    //    see IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded for details
+    // 5th bit - 1 if started with 3.0-style freelist implementation (SERVER-14081)
+    // 6th through 31st bit - reserved and must be set to 0.
+    static const uint32_t kIndexPluginMask = 0xf;
+    static const uint32_t kIndexes22AndOlder = 5;
+    static const uint32_t kIndexes24AndNewer = 6;
 
-        static const uint32_t kMayHave28Freelist = (1 << 4);
+    static const uint32_t kMayHave28Freelist = (1 << 4);
 
-        // All set bits we know about are covered by this mask.
-        static const uint32_t kUsedMinorFlagsMask = 0x1f;
+    // All set bits we know about are covered by this mask.
+    static const uint32_t kUsedMinorFlagsMask = 0x1f;
 
-        uint32_t _major;
-        uint32_t _minor;
-    };
+    uint32_t _major;
+    uint32_t _minor;
+};
 
-    // Note: Intentionally not defining relational operators for DataFileVersion as there is no
-    // total ordering of all versions now that '_minor' is used as a bit vector.
+// Note: Intentionally not defining relational operators for DataFileVersion as there is no
+// total ordering of all versions now that '_minor' is used as a bit vector.
 #pragma pack()
 
-    /*  a datafile - i.e. the "dbname.<#>" files :
+/*  a datafile - i.e. the "dbname.<#>" files :
 
-          ----------------------
-          DataFileHeader
-          ----------------------
-          Extent (for a particular namespace)
-            MmapV1RecordHeader
-            ...
-            MmapV1RecordHeader (some chained for unused space)
-          ----------------------
-          more Extents...
-          ----------------------
-    */
+      ----------------------
+      DataFileHeader
+      ----------------------
+      Extent (for a particular namespace)
+        MmapV1RecordHeader
+        ...
+        MmapV1RecordHeader (some chained for unused space)
+      ----------------------
+      more Extents...
+      ----------------------
+*/
 #pragma pack(1)
-    class DataFileHeader {
-    public:
-        DataFileVersion version;
-        int fileLength;
-        DiskLoc unused; /* unused is the portion of the file that doesn't belong to any allocated extents. -1 = no more */
-        int unusedLength;
-        DiskLoc freeListStart;
-        DiskLoc freeListEnd;
-        char reserved[8192 - 4*4 - 8*3];
+class DataFileHeader {
+public:
+    DataFileVersion version;
+    int fileLength;
+    DiskLoc
+        unused; /* unused is the portion of the file that doesn't belong to any allocated extents. -1 = no more */
+    int unusedLength;
+    DiskLoc freeListStart;
+    DiskLoc freeListEnd;
+    char reserved[8192 - 4 * 4 - 8 * 3];
 
-        char data[4]; // first extent starts here
+    char data[4];  // first extent starts here
 
-        enum { HeaderSize = 8192 };
+    enum { HeaderSize = 8192 };
 
-        bool uninitialized() const { return version.majorRaw() == 0; }
+    bool uninitialized() const {
+        return version.majorRaw() == 0;
+    }
 
-        void init(OperationContext* txn, int fileno, int filelength, const char* filename);
+    void init(OperationContext* txn, int fileno, int filelength, const char* filename);
 
-        void checkUpgrade(OperationContext* txn);
+    void checkUpgrade(OperationContext* txn);
 
-        bool isEmpty() const {
-            return uninitialized() || ( unusedLength == fileLength - HeaderSize - 16 );
-        }
-    };
+    bool isEmpty() const {
+        return uninitialized() || (unusedLength == fileLength - HeaderSize - 16);
+    }
+};
 #pragma pack()
 
 
-    class DataFile {
-    public:
-        DataFile(int fn) : _fileNo(fn), _mb(NULL) {
+class DataFile {
+public:
+    DataFile(int fn) : _fileNo(fn), _mb(NULL) {}
 
-        }
+    /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
+    Status openExisting(const char* filename);
 
-        /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-        Status openExisting(const char *filename );
+    /** creates if DNE */
+    void open(OperationContext* txn,
+              const char* filename,
+              int requestedDataSize = 0,
+              bool preallocateOnly = false);
 
-        /** creates if DNE */
-        void open(OperationContext* txn,
-                  const char *filename,
-                  int requestedDataSize = 0,
-                  bool preallocateOnly = false);
+    DiskLoc allocExtentArea(OperationContext* txn, int size);
 
-        DiskLoc allocExtentArea( OperationContext* txn, int size );
+    DataFileHeader* getHeader() {
+        return header();
+    }
+    const DataFileHeader* getHeader() const {
+        return header();
+    }
 
-        DataFileHeader* getHeader() { return header(); }
-        const DataFileHeader* getHeader() const { return header(); }
+    HANDLE getFd() {
+        return mmf.getFd();
+    }
+    unsigned long long length() const {
+        return mmf.length();
+    }
 
-        HANDLE getFd() { return mmf.getFd(); }
-        unsigned long long length() const { return mmf.length(); }
+    /* return max size an extent may be */
+    static int maxSize();
 
-        /* return max size an extent may be */
-        static int maxSize();
+    /** fsync */
+    void flush(bool sync);
 
-        /** fsync */
-        void flush( bool sync );
-
-    private:
-        friend class MmapV1ExtentManager;
-
-
-        void badOfs(int) const;
-        int _defaultSize() const;
-
-        void grow(DiskLoc dl, int size);
-
-        char* p() const { return (char *) _mb; }
-        DataFileHeader* header() { return static_cast<DataFileHeader*>( _mb ); }
-        const DataFileHeader* header() const { return static_cast<DataFileHeader*>( _mb ); }
+private:
+    friend class MmapV1ExtentManager;
 
 
-        const int _fileNo;
+    void badOfs(int) const;
+    int _defaultSize() const;
 
-        DurableMappedFile mmf;
-        void *_mb; // the memory mapped view
-    };
+    void grow(DiskLoc dl, int size);
+
+    char* p() const {
+        return (char*)_mb;
+    }
+    DataFileHeader* header() {
+        return static_cast<DataFileHeader*>(_mb);
+    }
+    const DataFileHeader* header() const {
+        return static_cast<DataFileHeader*>(_mb);
+    }
 
 
+    const int _fileNo;
+
+    DurableMappedFile mmf;
+    void* _mb;  // the memory mapped view
+};
 }

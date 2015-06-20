@@ -38,73 +38,68 @@
 
 namespace mongo {
 
-    class LogBuilder;
+class LogBuilder;
 
-    class ModifierCompare : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(ModifierCompare);
+class ModifierCompare : public ModifierInterface {
+    MONGO_DISALLOW_COPYING(ModifierCompare);
 
-    public:
+public:
+    enum ModifierCompareMode { MAX, MIN };
+    explicit ModifierCompare(ModifierCompareMode mode = MAX);
 
-        enum ModifierCompareMode { MAX, MIN };
-        explicit ModifierCompare(ModifierCompareMode mode = MAX);
+    virtual ~ModifierCompare();
 
-        virtual ~ModifierCompare();
+    //
+    // Modifier interface implementation
+    //
 
-        //
-        // Modifier interface implementation
-        //
+    /**
+     * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $set mod such as
+     * {$set: {<fieldname: <value>}}. init() extracts the field name and the value to be
+     * assigned to it from 'modExpr'. It returns OK if successful or a status describing
+     * the error.
+     */
+    virtual Status init(const BSONElement& modExpr, const Options& opts, bool* positional = NULL);
 
-        /**
-         * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $set mod such as
-         * {$set: {<fieldname: <value>}}. init() extracts the field name and the value to be
-         * assigned to it from 'modExpr'. It returns OK if successful or a status describing
-         * the error.
-         */
-        virtual Status init(const BSONElement& modExpr, const Options& opts,
-                            bool* positional = NULL);
+    /**
+     * Looks up the field name in the sub-tree rooted at 'root', and binds, if necessary,
+     * the '$' field part using the 'matchedfield' number. prepare() returns OK and
+     * fills in 'execInfo' with information of whether this mod is a no-op on 'root' and
+     * whether it is an in-place candidate. Otherwise, returns a status describing the
+     * error.
+     */
+    virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
-        /**
-         * Looks up the field name in the sub-tree rooted at 'root', and binds, if necessary,
-         * the '$' field part using the 'matchedfield' number. prepare() returns OK and
-         * fills in 'execInfo' with information of whether this mod is a no-op on 'root' and
-         * whether it is an in-place candidate. Otherwise, returns a status describing the
-         * error.
-         */
-        virtual Status prepare(mutablebson::Element root,
-                               StringData matchedField,
-                               ExecInfo* execInfo);
+    /**
+     * Applies the prepared mod over the element 'root' specified in the prepare()
+     * call. Returns OK if successful or a status describing the error.
+     */
+    virtual Status apply() const;
 
-        /**
-         * Applies the prepared mod over the element 'root' specified in the prepare()
-         * call. Returns OK if successful or a status describing the error.
-         */
-        virtual Status apply() const;
+    /**
+     * Adds a log entry to logRoot corresponding to the operation applied here. Returns OK
+     * if successful or a status describing the error.
+     */
+    virtual Status log(LogBuilder* logBuilder) const;
 
-        /**
-         * Adds a log entry to logRoot corresponding to the operation applied here. Returns OK
-         * if successful or a status describing the error.
-         */
-        virtual Status log(LogBuilder* logBuilder) const;
+private:
+    // Compare mode: min/max
+    const ModifierCompareMode _mode;
 
-    private:
+    // Access to each component of fieldName that's the target of this mod.
+    FieldRef _updatePath;
 
-        // Compare mode: min/max
-        const ModifierCompareMode _mode;
+    // 0 or index for $-positional in _updatePath.
+    size_t _pathReplacementPosition;
 
-        // Access to each component of fieldName that's the target of this mod.
-        FieldRef _updatePath;
+    // Element of the mod expression.
+    BSONElement _val;
 
-        // 0 or index for $-positional in _updatePath.
-        size_t _pathReplacementPosition;
+    // The instance of the field in the provided doc. This state is valid after a
+    // prepare() was issued and until a log() is issued. The document this mod is
+    // being prepared against must be live throughout all the calls.
+    struct PreparedState;
+    std::unique_ptr<PreparedState> _preparedState;
+};
 
-        // Element of the mod expression.
-        BSONElement _val;
-
-        // The instance of the field in the provided doc. This state is valid after a
-        // prepare() was issued and until a log() is issued. The document this mod is
-        // being prepared against must be live throughout all the calls.
-        struct PreparedState;
-        std::unique_ptr<PreparedState> _preparedState;
-    };
-
-} // namespace mongo
+}  // namespace mongo

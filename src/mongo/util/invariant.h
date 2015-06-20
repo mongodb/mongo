@@ -44,7 +44,8 @@ namespace mongo {
 
 MONGO_COMPILER_NORETURN void invariantFailed(const char* expr, const char* file, unsigned line);
 
-#define MONGO_invariant(_Expression) do {                               \
+#define MONGO_invariant(_Expression)                                    \
+    do {                                                                \
         if (MONGO_unlikely(!(_Expression))) {                           \
             ::mongo::invariantFailed(#_Expression, __FILE__, __LINE__); \
         }                                                               \
@@ -55,7 +56,9 @@ MONGO_COMPILER_NORETURN void invariantFailed(const char* expr, const char* file,
 /* dassert is 'debug assert' -- might want to turn off for production as these
    could be slow.
 */
-#define MONGO_dassert(x) if (kDebugBuild) invariant(x)
+#define MONGO_dassert(x) \
+    if (kDebugBuild)     \
+    invariant(x)
 
 #define dassert MONGO_dassert
 }  // namespace mongo

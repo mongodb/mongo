@@ -37,90 +37,77 @@
 
 namespace mongo {
 
-    template<typename T> class StatusWith;
+template <typename T>
+class StatusWith;
+
+/**
+ * Type of object describing a command to execute against a remote MongoDB node.
+ */
+struct RemoteCommandRequest {
+    // Indicates that there is no timeout for the request to complete
+    static const Milliseconds kNoTimeout;
+
+    // Indicates that there is no expiration time by when the request needs to complete
+    static const Date_t kNoExpirationDate;
+
+    RemoteCommandRequest() : timeout(kNoTimeout), expirationDate(kNoExpirationDate) {}
+
+    RemoteCommandRequest(const HostAndPort& theTarget,
+                         const std::string& theDbName,
+                         const BSONObj& theCmdObj,
+                         const Milliseconds timeoutMillis = kNoTimeout)
+        : target(theTarget), dbname(theDbName), cmdObj(theCmdObj), timeout(timeoutMillis) {
+        if (timeoutMillis == kNoTimeout) {
+            expirationDate = kNoExpirationDate;
+        }
+    }
+
+    std::string toString() const;
+
+    HostAndPort target;
+    std::string dbname;
+    BSONObj cmdObj;
+    Milliseconds timeout;
+
+    // Deadline by when the request must be completed
+    Date_t expirationDate;
+};
+
+
+/**
+ * Type of object describing the response of previously sent RemoteCommandRequest.
+ */
+struct RemoteCommandResponse {
+    RemoteCommandResponse() : data(), elapsedMillis(Milliseconds(0)) {}
+
+    RemoteCommandResponse(BSONObj obj, Milliseconds millis) : data(obj), elapsedMillis(millis) {}
+
+    std::string toString() const;
+
+    BSONObj data;
+    Milliseconds elapsedMillis;
+};
+
+
+/**
+ * Abstract interface used for executing commands against a MongoDB instance and retrieving
+ * results. It abstracts the logic of managing connections and turns the remote instance into
+ * a stateless request-response service.
+ */
+class RemoteCommandRunner {
+    MONGO_DISALLOW_COPYING(RemoteCommandRunner);
+
+public:
+    virtual ~RemoteCommandRunner() = default;
 
     /**
-     * Type of object describing a command to execute against a remote MongoDB node.
+     * Synchronously invokes the command described by "request" and returns the server's
+     * response or any status.
      */
-    struct RemoteCommandRequest {
+    virtual StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request) = 0;
 
-        // Indicates that there is no timeout for the request to complete
-        static const Milliseconds kNoTimeout;
+protected:
+    RemoteCommandRunner() = default;
+};
 
-        // Indicates that there is no expiration time by when the request needs to complete
-        static const Date_t kNoExpirationDate;
-
-        RemoteCommandRequest() : timeout(kNoTimeout),
-                                 expirationDate(kNoExpirationDate) {
-
-        }
-
-        RemoteCommandRequest(const HostAndPort& theTarget,
-                             const std::string& theDbName,
-                             const BSONObj& theCmdObj,
-                             const Milliseconds timeoutMillis = kNoTimeout)
-                : target(theTarget),
-                  dbname(theDbName),
-                  cmdObj(theCmdObj),
-                  timeout(timeoutMillis) {
-
-            if (timeoutMillis == kNoTimeout) {
-                expirationDate = kNoExpirationDate;
-            }
-        }
-
-        std::string toString() const;
-
-        HostAndPort target;
-        std::string dbname;
-        BSONObj cmdObj;
-        Milliseconds timeout;
-
-        // Deadline by when the request must be completed
-        Date_t expirationDate;
-    };
-
-
-    /**
-     * Type of object describing the response of previously sent RemoteCommandRequest.
-     */
-    struct RemoteCommandResponse {
-        RemoteCommandResponse() : data(),
-                                  elapsedMillis(Milliseconds(0)) {
-
-        }
-
-        RemoteCommandResponse(BSONObj obj, Milliseconds millis) : data(obj),
-                                                                  elapsedMillis(millis) {
-
-        }
-
-        std::string toString() const;
-
-        BSONObj data;
-        Milliseconds elapsedMillis;
-    };
-
-
-    /**
-     * Abstract interface used for executing commands against a MongoDB instance and retrieving
-     * results. It abstracts the logic of managing connections and turns the remote instance into
-     * a stateless request-response service.
-     */
-    class RemoteCommandRunner {
-        MONGO_DISALLOW_COPYING(RemoteCommandRunner);
-    public:
-        virtual ~RemoteCommandRunner() = default;
-
-        /**
-         * Synchronously invokes the command described by "request" and returns the server's
-         * response or any status.
-         */
-        virtual StatusWith<RemoteCommandResponse> runCommand(
-                                                    const RemoteCommandRequest& request) = 0;
-
-    protected:
-        RemoteCommandRunner() = default;
-    };
-
-} // namespace mongo
+}  // namespace mongo

@@ -34,65 +34,64 @@
 
 namespace mongo {
 
+/**
+ * Loads shared library or DLL at runtime
+ * Provides functionality to resolve symols and functions at runtime.
+ * Note: shared library is released by destructor
+ */
+class SharedLibrary {
+public:
     /**
-     * Loads shared library or DLL at runtime
-     * Provides functionality to resolve symols and functions at runtime.
-     * Note: shared library is released by destructor
+     * Releases reference to shared library on destruction.
+     *
+     * May unload the shared library.
+     * May invalidate all symbol pointers, depends on OS implementation.
      */
-    class SharedLibrary {
-    public:
-        /**
-         * Releases reference to shared library on destruction.
-         *
-         * May unload the shared library.
-         * May invalidate all symbol pointers, depends on OS implementation.
-         */
-        ~SharedLibrary();
+    ~SharedLibrary();
 
-        /*
-         * Loads the shared library
-         *
-         * Returns a handle to a SharedLibrary on success otherwise StatusWith contains the
-         * appropriate error.
-         */
-        static StatusWith<std::unique_ptr<SharedLibrary>> create(
-                const boost::filesystem::path& full_path);
+    /*
+     * Loads the shared library
+     *
+     * Returns a handle to a SharedLibrary on success otherwise StatusWith contains the
+     * appropriate error.
+     */
+    static StatusWith<std::unique_ptr<SharedLibrary>> create(
+        const boost::filesystem::path& full_path);
 
-        /**
-         * Retrieves the public symbol of a shared library specified in the name parameter.
-         *
-         * Returns a pointer to the symbol if it exists with Status::OK,
-         * returns NULL if the symbol does not exist with Status::OK,
-         * otherwise returns an error if the underlying OS infrastructure returns an error.
-         */
-        StatusWith<void*> getSymbol(StringData name);
+    /**
+     * Retrieves the public symbol of a shared library specified in the name parameter.
+     *
+     * Returns a pointer to the symbol if it exists with Status::OK,
+     * returns NULL if the symbol does not exist with Status::OK,
+     * otherwise returns an error if the underlying OS infrastructure returns an error.
+     */
+    StatusWith<void*> getSymbol(StringData name);
 
-        /**
-         * A generic function version of getSymbol, see notes in getSymbol for more information
-         * Callers should use getFunctionAs.
-         */
-        StatusWith<void (*)()> getFunction(StringData name);
+    /**
+     * A generic function version of getSymbol, see notes in getSymbol for more information
+     * Callers should use getFunctionAs.
+     */
+    StatusWith<void (*)()> getFunction(StringData name);
 
-        /**
-         * A type-safe version of getFunction, see notes in getSymbol for more information
-         */
-        template<typename FuncT>
-        StatusWith<FuncT> getFunctionAs(StringData name) {
+    /**
+     * A type-safe version of getFunction, see notes in getSymbol for more information
+     */
+    template <typename FuncT>
+    StatusWith<FuncT> getFunctionAs(StringData name) {
+        StatusWith<void (*)()> s = getFunction(name);
 
-            StatusWith<void (*) ()> s = getFunction(name);
-
-            if (!s.isOK()) {
-                return StatusWith<FuncT>(s.getStatus());
-            }
-
-            return StatusWith<FuncT>(reinterpret_cast<FuncT>(s.getValue()));
+        if (!s.isOK()) {
+            return StatusWith<FuncT>(s.getStatus());
         }
 
-    private:
-        SharedLibrary(void* handle);
+        return StatusWith<FuncT>(reinterpret_cast<FuncT>(s.getValue()));
+    }
 
-    private:
-        void* const _handle;
-    };
+private:
+    SharedLibrary(void* handle);
 
-} // namespace mongo
+private:
+    void* const _handle;
+};
+
+}  // namespace mongo

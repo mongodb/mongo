@@ -35,10 +35,10 @@
 
 namespace mongo {
 
-    struct TwoDIndexingParams {
-        std::string geo;
-        std::vector<std::pair<std::string, int> > other;
-        std::shared_ptr<GeoHashConverter> geoHashConverter;
-    };
+struct TwoDIndexingParams {
+    std::string geo;
+    std::vector<std::pair<std::string, int>> other;
+    std::shared_ptr<GeoHashConverter> geoHashConverter;
+};
 
 }  // namespace mongo

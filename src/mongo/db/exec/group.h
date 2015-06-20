@@ -34,135 +34,138 @@
 
 namespace mongo {
 
-    class Collection;
+class Collection;
 
+/**
+ * A description of a request for a group operation.  Copyable.
+ */
+struct GroupRequest {
+    // Namespace to operate on (e.g. "foo.bar").
+    std::string ns;
+
+    // A predicate describing the set of documents to group.
+    BSONObj query;
+
+    // The field(s) to group by.  Alternative to "keyFunctionCode".  Empty if "keyFunctionCode"
+    // is being used instead.
+    BSONObj keyPattern;
+
+    // A Javascript function that maps a document to a key object.  Alternative to "keyPattern".
+    // Empty is "keyPattern" is being used instead.
+    std::string keyFunctionCode;
+
+    // A Javascript function that takes a (input document, group result) pair and
+    // updates the group result document.
+    std::string reduceCode;
+
+    // Scope for the reduce function.  Optional.
+    BSONObj reduceScope;
+
+    // The initial value for the group result.
+    BSONObj initial;
+
+    // A Javascript function that "finalizes" a group result.  Optional.
+    std::string finalize;
+
+    // Whether this is an explain of a group.
+    bool explain;
+};
+
+/**
+ * Stage used by the group command.  Consumes input documents from its child stage (returning
+ * NEED_TIME once for each document produced by the child), returns ADVANCED exactly once with
+ * the entire group result, then returns EOF.
+ *
+ * Only created through the getExecutorGroup path.
+ */
+class GroupStage : public PlanStage {
+    MONGO_DISALLOW_COPYING(GroupStage);
+
+public:
+    GroupStage(OperationContext* txn,
+               const GroupRequest& request,
+               WorkingSet* workingSet,
+               PlanStage* child);
+    virtual ~GroupStage() {}
+
+    virtual StageState work(WorkingSetID* out);
+    virtual bool isEOF();
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_GROUP;
+    }
+
+    virtual PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats() const;
+
+    virtual const SpecificStats* getSpecificStats() const;
+
+    static const char* kStageType;
+
+private:
     /**
-     * A description of a request for a group operation.  Copyable.
+     * Keeps track of what this group is currently doing so that it can do the right thing on
+     * the next call to work().
      */
-    struct GroupRequest {
-        // Namespace to operate on (e.g. "foo.bar").
-        std::string ns;
+    enum GroupState {
+        // Need to initialize the underlying Javascript machinery.
+        GroupState_Initializing,
 
-        // A predicate describing the set of documents to group.
-        BSONObj query;
+        // Retrieving the next document from the child stage and processing it.
+        GroupState_ReadingFromChild,
 
-        // The field(s) to group by.  Alternative to "keyFunctionCode".  Empty if "keyFunctionCode"
-        // is being used instead.
-        BSONObj keyPattern;
-
-        // A Javascript function that maps a document to a key object.  Alternative to "keyPattern".
-        // Empty is "keyPattern" is being used instead.
-        std::string keyFunctionCode;
-
-        // A Javascript function that takes a (input document, group result) pair and
-        // updates the group result document.
-        std::string reduceCode;
-
-        // Scope for the reduce function.  Optional.
-        BSONObj reduceScope;
-
-        // The initial value for the group result.
-        BSONObj initial;
-
-        // A Javascript function that "finalizes" a group result.  Optional.
-        std::string finalize;
-
-        // Whether this is an explain of a group.
-        bool explain;
+        // Results have been returned.
+        GroupState_Done
     };
 
-    /**
-     * Stage used by the group command.  Consumes input documents from its child stage (returning
-     * NEED_TIME once for each document produced by the child), returns ADVANCED exactly once with
-     * the entire group result, then returns EOF.
-     *
-     * Only created through the getExecutorGroup path.
-     */
-    class GroupStage: public PlanStage {
-        MONGO_DISALLOW_COPYING(GroupStage);
-    public:
-        GroupStage(OperationContext* txn,
-                   const GroupRequest& request,
-                   WorkingSet* workingSet,
-                   PlanStage* child);
-        virtual ~GroupStage() { }
+    // Initializes _scope, _reduceFunction and _keyFunction using the global scripting engine.
+    void initGroupScripting();
 
-        virtual StageState work(WorkingSetID* out);
-        virtual bool isEOF();
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    // Updates _groupMap and _scope to account for the group key associated with this object.
+    // Returns an error status if an error occurred, else Status::OK().
+    Status processObject(const BSONObj& obj);
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    // Finalize the results for this group operation.  Returns an owned BSONObj with the results
+    // array.
+    BSONObj finalizeResults();
 
-        virtual StageType stageType() const { return STAGE_GROUP; }
+    // Transactional context for read locks.  Not owned by us.
+    OperationContext* _txn;
 
-        virtual PlanStageStats* getStats();
+    GroupRequest _request;
 
-        virtual const CommonStats* getCommonStats() const;
+    // The WorkingSet we annotate with results.  Not owned by us.
+    WorkingSet* _ws;
 
-        virtual const SpecificStats* getSpecificStats() const;
+    CommonStats _commonStats;
+    GroupStats _specificStats;
 
-        static const char* kStageType;
+    std::unique_ptr<PlanStage> _child;
 
-    private:
-        /**
-         * Keeps track of what this group is currently doing so that it can do the right thing on
-         * the next call to work().
-         */
-        enum GroupState {
-            // Need to initialize the underlying Javascript machinery.
-            GroupState_Initializing,
+    // Current state for this stage.
+    GroupState _groupState;
 
-            // Retrieving the next document from the child stage and processing it.
-            GroupState_ReadingFromChild,
+    // The Scope object that all script operations for this group stage will use.  Initialized
+    // by initGroupScripting().  Owned here.
+    std::unique_ptr<Scope> _scope;
 
-            // Results have been returned.
-            GroupState_Done
-        };
+    // The reduce function for the group operation.  Initialized by initGroupScripting().  Owned
+    // by _scope.
+    ScriptingFunction _reduceFunction;
 
-        // Initializes _scope, _reduceFunction and _keyFunction using the global scripting engine.
-        void initGroupScripting();
+    // The key function for the group operation if one was provided by the user, else 0.
+    // Initialized by initGroupScripting().  Owned by _scope.
+    ScriptingFunction _keyFunction;
 
-        // Updates _groupMap and _scope to account for the group key associated with this object.
-        // Returns an error status if an error occurred, else Status::OK().
-        Status processObject(const BSONObj& obj);
-
-        // Finalize the results for this group operation.  Returns an owned BSONObj with the results
-        // array.
-        BSONObj finalizeResults();
-
-        // Transactional context for read locks.  Not owned by us.
-        OperationContext* _txn;
-
-        GroupRequest _request;
-
-        // The WorkingSet we annotate with results.  Not owned by us.
-        WorkingSet* _ws;
-
-        CommonStats _commonStats;
-        GroupStats _specificStats;
-
-        std::unique_ptr<PlanStage> _child;
-
-        // Current state for this stage.
-        GroupState _groupState;
-
-        // The Scope object that all script operations for this group stage will use.  Initialized
-        // by initGroupScripting().  Owned here.
-        std::unique_ptr<Scope> _scope;
-
-        // The reduce function for the group operation.  Initialized by initGroupScripting().  Owned
-        // by _scope.
-        ScriptingFunction _reduceFunction;
-
-        // The key function for the group operation if one was provided by the user, else 0.
-        // Initialized by initGroupScripting().  Owned by _scope.
-        ScriptingFunction _keyFunction;
-
-        // Map from group key => group index.  The group index is used to index into "$arr", a
-        // variable owned by _scope which contains the group data for this key.
-        std::map<BSONObj, int, BSONObjCmp> _groupMap;
-    };
+    // Map from group key => group index.  The group index is used to index into "$arr", a
+    // variable owned by _scope which contains the group data for this key.
+    std::map<BSONObj, int, BSONObjCmp> _groupMap;
+};
 
 }  // namespace mongo

@@ -35,30 +35,28 @@
 #include "mongo/util/quick_exit.h"
 
 namespace mongo {
-    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoBridgeOptions)(InitializerContext* context) {
-        return addMongoBridgeOptions(&moe::startupOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_VALIDATE(MongoBridgeOptions)(InitializerContext* context) {
-        if (!handlePreValidationMongoBridgeOptions(moe::startupOptionsParsed)) {
-            quickExit(EXIT_SUCCESS);
-        }
-        Status ret = moe::startupOptionsParsed.validate();
-        if (!ret.isOK()) {
-            return ret;
-        }
-        return Status::OK();
-    }
-
-    MONGO_STARTUP_OPTIONS_STORE(MongoBridgeOptions)(InitializerContext* context) {
-        Status ret = storeMongoBridgeOptions(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            std::cerr << ret.toString() << std::endl;
-            std::cerr << "try '" << context->args()[0] << " --help' for more information"
-                      << std::endl;
-            quickExit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
-    }
+MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoBridgeOptions)(InitializerContext* context) {
+    return addMongoBridgeOptions(&moe::startupOptions);
 }
 
+MONGO_STARTUP_OPTIONS_VALIDATE(MongoBridgeOptions)(InitializerContext* context) {
+    if (!handlePreValidationMongoBridgeOptions(moe::startupOptionsParsed)) {
+        quickExit(EXIT_SUCCESS);
+    }
+    Status ret = moe::startupOptionsParsed.validate();
+    if (!ret.isOK()) {
+        return ret;
+    }
+    return Status::OK();
+}
+
+MONGO_STARTUP_OPTIONS_STORE(MongoBridgeOptions)(InitializerContext* context) {
+    Status ret = storeMongoBridgeOptions(moe::startupOptionsParsed, context->args());
+    if (!ret.isOK()) {
+        std::cerr << ret.toString() << std::endl;
+        std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
+        quickExit(EXIT_BADOPTIONS);
+    }
+    return Status::OK();
+}
+}

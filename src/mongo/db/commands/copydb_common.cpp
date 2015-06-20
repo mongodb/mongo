@@ -43,63 +43,63 @@
 namespace mongo {
 namespace copydb {
 
-    Status checkAuthForCopydbCommand(ClientBasic* client,
-                                     const std::string& dbname,
-                                     const BSONObj& cmdObj) {
-        bool fromSelf = StringData(cmdObj.getStringField("fromhost")).empty();
-        StringData fromdb = cmdObj.getStringField("fromdb");
-        StringData todb = cmdObj.getStringField("todb");
+Status checkAuthForCopydbCommand(ClientBasic* client,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj) {
+    bool fromSelf = StringData(cmdObj.getStringField("fromhost")).empty();
+    StringData fromdb = cmdObj.getStringField("fromdb");
+    StringData todb = cmdObj.getStringField("todb");
 
-        // get system collections
-        std::vector<std::string> legalClientSystemCollections;
-        legalClientSystemCollections.push_back("system.js");
-        if (fromdb == "admin") {
-            legalClientSystemCollections.push_back("system.users");
-            legalClientSystemCollections.push_back("system.roles");
-            legalClientSystemCollections.push_back("system.version");
-        } else if (fromdb == "local") { // TODO(spencer): shouldn't be possible. See SERVER-11383
-            legalClientSystemCollections.push_back("system.replset");
-        }
-
-        // Check authorization on destination db
-        ActionSet actions;
-        actions.addAction(ActionType::insert);
-        actions.addAction(ActionType::createIndex);
-        if (shouldBypassDocumentValidationForCommand(cmdObj)) {
-            actions.addAction(ActionType::bypassDocumentValidation);
-        }
-
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(todb), actions)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        actions.removeAllActions();
-        actions.addAction(ActionType::insert);
-        for (size_t i = 0; i < legalClientSystemCollections.size(); ++i) {
-            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnNamespace(
-                    NamespaceString(todb, legalClientSystemCollections[i]), actions)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-        }
-
-        if (fromSelf) {
-            // If copying from self, also require privileges on source db
-            actions.removeAllActions();
-            actions.addAction(ActionType::find);
-            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(fromdb), actions)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-            for (size_t i = 0; i < legalClientSystemCollections.size(); ++i) {
-                if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnNamespace(
-                        NamespaceString(fromdb, legalClientSystemCollections[i]), actions)) {
-                    return Status(ErrorCodes::Unauthorized, "Unauthorized");
-                }
-            }
-        }
-        return Status::OK();
+    // get system collections
+    std::vector<std::string> legalClientSystemCollections;
+    legalClientSystemCollections.push_back("system.js");
+    if (fromdb == "admin") {
+        legalClientSystemCollections.push_back("system.users");
+        legalClientSystemCollections.push_back("system.roles");
+        legalClientSystemCollections.push_back("system.version");
+    } else if (fromdb == "local") {  // TODO(spencer): shouldn't be possible. See SERVER-11383
+        legalClientSystemCollections.push_back("system.replset");
     }
 
-} // namespace copydb
-} // namespace mongo
+    // Check authorization on destination db
+    ActionSet actions;
+    actions.addAction(ActionType::insert);
+    actions.addAction(ActionType::createIndex);
+    if (shouldBypassDocumentValidationForCommand(cmdObj)) {
+        actions.addAction(ActionType::bypassDocumentValidation);
+    }
+
+    if (!AuthorizationSession::get(client)
+             ->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(todb), actions)) {
+        return Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
+
+    actions.removeAllActions();
+    actions.addAction(ActionType::insert);
+    for (size_t i = 0; i < legalClientSystemCollections.size(); ++i) {
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnNamespace(
+                NamespaceString(todb, legalClientSystemCollections[i]), actions)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+    }
+
+    if (fromSelf) {
+        // If copying from self, also require privileges on source db
+        actions.removeAllActions();
+        actions.addAction(ActionType::find);
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(fromdb), actions)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+        for (size_t i = 0; i < legalClientSystemCollections.size(); ++i) {
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnNamespace(
+                    NamespaceString(fromdb, legalClientSystemCollections[i]), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+        }
+    }
+    return Status::OK();
+}
+
+}  // namespace copydb
+}  // namespace mongo

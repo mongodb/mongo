@@ -37,85 +37,88 @@
 
 namespace mongo {
 
-    class TicketHolder {
-        MONGO_DISALLOW_COPYING(TicketHolder);
-    public:
-        explicit TicketHolder(int num);
-        ~TicketHolder();
+class TicketHolder {
+    MONGO_DISALLOW_COPYING(TicketHolder);
 
-        bool tryAcquire();
+public:
+    explicit TicketHolder(int num);
+    ~TicketHolder();
 
-        void waitForTicket();
+    bool tryAcquire();
 
-        void release();
+    void waitForTicket();
 
-        Status resize(int newSize);
+    void release();
 
-        int available() const;
+    Status resize(int newSize);
 
-        int used() const;
+    int available() const;
 
-        int outof() const;
+    int used() const;
 
-    private:
+    int outof() const;
+
+private:
 #if defined(__linux__)
-        mutable sem_t _sem;
+    mutable sem_t _sem;
 
-        // You can read _outof without a lock, but have to hold _resizeMutex to change.
-        AtomicInt32 _outof;
-        stdx::mutex _resizeMutex;
+    // You can read _outof without a lock, but have to hold _resizeMutex to change.
+    AtomicInt32 _outof;
+    stdx::mutex _resizeMutex;
 #else
-        bool _tryAcquire();
+    bool _tryAcquire();
 
-        AtomicInt32 _outof;
-        int _num;
-        stdx::mutex _mutex;
-        stdx::condition_variable _newTicket;
+    AtomicInt32 _outof;
+    int _num;
+    stdx::mutex _mutex;
+    stdx::condition_variable _newTicket;
 #endif
-    };
+};
 
-    class ScopedTicket {
-    public:
+class ScopedTicket {
+public:
+    ScopedTicket(TicketHolder* holder) : _holder(holder) {
+        _holder->waitForTicket();
+    }
 
-        ScopedTicket(TicketHolder* holder) : _holder(holder) {
-            _holder->waitForTicket();
-        }
+    ~ScopedTicket() {
+        _holder->release();
+    }
 
-        ~ScopedTicket() {
+private:
+    TicketHolder* _holder;
+};
+
+class TicketHolderReleaser {
+    MONGO_DISALLOW_COPYING(TicketHolderReleaser);
+
+public:
+    TicketHolderReleaser() {
+        _holder = NULL;
+    }
+
+    explicit TicketHolderReleaser(TicketHolder* holder) {
+        _holder = holder;
+    }
+
+    ~TicketHolderReleaser() {
+        if (_holder) {
             _holder->release();
         }
+    }
 
-    private:
-        TicketHolder* _holder;
-    };
+    bool hasTicket() const {
+        return _holder != NULL;
+    }
 
-    class TicketHolderReleaser {
-        MONGO_DISALLOW_COPYING(TicketHolderReleaser);
-    public:
-        TicketHolderReleaser() {
-            _holder = NULL;
+    void reset(TicketHolder* holder = NULL) {
+        if (_holder) {
+            _holder->release();
         }
+        _holder = holder;
+    }
 
-        explicit TicketHolderReleaser(TicketHolder* holder) {
-            _holder = holder;
-        }
-
-        ~TicketHolderReleaser() {
-            if (_holder) {
-                _holder->release();
-            }
-        }
-
-        bool hasTicket() const { return _holder != NULL; }
-
-        void reset(TicketHolder* holder = NULL) {
-            if (_holder) {
-                _holder->release();
-            }
-            _holder = holder;
-        }
-
-    private:
-        TicketHolder * _holder;
-    };
+private:
+    TicketHolder* _holder;
+};
 }

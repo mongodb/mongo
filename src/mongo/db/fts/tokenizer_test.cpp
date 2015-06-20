@@ -33,91 +33,88 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-    namespace fts {
+namespace fts {
 
-        TEST( Tokenizer, Empty1 ) {
-            Tokenizer i( &languageEnglishV2, "" );
-            ASSERT( !i.more() );
-        }
-
-        TEST( Tokenizer, Basic1 ) {
-            Tokenizer i( &languageEnglishV2, "blue red green" );
-
-            ASSERT( i.more() );
-            ASSERT_EQUALS( i.next().data.toString(), "blue" );
-
-            ASSERT( i.more() );
-            ASSERT_EQUALS( i.next().data.toString(), "red" );
-
-            ASSERT( i.more() );
-            ASSERT_EQUALS( i.next().data.toString(), "green" );
-
-            ASSERT( !i.more() );
-        }
-
-        TEST( Tokenizer, Basic2 ) {
-            Tokenizer i( &languageEnglishV2, "blue-red" );
-
-            Token a = i.next();
-            Token b = i.next();
-            Token c = i.next();
-            Token d = i.next();
-
-            ASSERT_EQUALS( Token::TEXT, a.type );
-            ASSERT_EQUALS( Token::DELIMITER, b.type );
-            ASSERT_EQUALS( Token::TEXT, c.type );
-            ASSERT_EQUALS( Token::INVALID, d.type );
-
-            ASSERT_EQUALS( "blue", a.data.toString() );
-            ASSERT_EQUALS( "-", b.data.toString() );
-            ASSERT_EQUALS( "red", c.data.toString() );
-        }
-
-        TEST( Tokenizer, Basic3 ) {
-            Tokenizer i( &languageEnglishV2, "blue -red" );
-
-            Token a = i.next();
-            Token b = i.next();
-            Token c = i.next();
-            Token d = i.next();
-
-            ASSERT_EQUALS( Token::TEXT, a.type );
-            ASSERT_EQUALS( Token::DELIMITER, b.type );
-            ASSERT_EQUALS( Token::TEXT, c.type );
-            ASSERT_EQUALS( Token::INVALID, d.type );
-
-            ASSERT_EQUALS( "blue", a.data.toString() );
-            ASSERT_EQUALS( "-", b.data.toString() );
-            ASSERT_EQUALS( "red", c.data.toString() );
-
-            ASSERT_EQUALS( 0U, a.offset );
-            ASSERT_EQUALS( 5U, b.offset );
-            ASSERT_EQUALS( 6U, c.offset );
-        }
-
-        TEST( Tokenizer, Quote1English ) {
-            Tokenizer i( &languageEnglishV2, "eliot's car" );
-
-            Token a = i.next();
-            Token b = i.next();
-
-            ASSERT_EQUALS( "eliot's", a.data.toString() );
-            ASSERT_EQUALS( "car", b.data.toString() );
-        }
-
-        TEST( Tokenizer, Quote1French ) {
-            Tokenizer i( &languageFrenchV2, "eliot's car" );
-
-            Token a = i.next();
-            Token b = i.next();
-            Token c = i.next();
-
-            ASSERT_EQUALS( "eliot", a.data.toString() );
-            ASSERT_EQUALS( "s", b.data.toString() );
-            ASSERT_EQUALS( "car", c.data.toString() );
-        }
-
-    }
+TEST(Tokenizer, Empty1) {
+    Tokenizer i(&languageEnglishV2, "");
+    ASSERT(!i.more());
 }
 
+TEST(Tokenizer, Basic1) {
+    Tokenizer i(&languageEnglishV2, "blue red green");
 
+    ASSERT(i.more());
+    ASSERT_EQUALS(i.next().data.toString(), "blue");
+
+    ASSERT(i.more());
+    ASSERT_EQUALS(i.next().data.toString(), "red");
+
+    ASSERT(i.more());
+    ASSERT_EQUALS(i.next().data.toString(), "green");
+
+    ASSERT(!i.more());
+}
+
+TEST(Tokenizer, Basic2) {
+    Tokenizer i(&languageEnglishV2, "blue-red");
+
+    Token a = i.next();
+    Token b = i.next();
+    Token c = i.next();
+    Token d = i.next();
+
+    ASSERT_EQUALS(Token::TEXT, a.type);
+    ASSERT_EQUALS(Token::DELIMITER, b.type);
+    ASSERT_EQUALS(Token::TEXT, c.type);
+    ASSERT_EQUALS(Token::INVALID, d.type);
+
+    ASSERT_EQUALS("blue", a.data.toString());
+    ASSERT_EQUALS("-", b.data.toString());
+    ASSERT_EQUALS("red", c.data.toString());
+}
+
+TEST(Tokenizer, Basic3) {
+    Tokenizer i(&languageEnglishV2, "blue -red");
+
+    Token a = i.next();
+    Token b = i.next();
+    Token c = i.next();
+    Token d = i.next();
+
+    ASSERT_EQUALS(Token::TEXT, a.type);
+    ASSERT_EQUALS(Token::DELIMITER, b.type);
+    ASSERT_EQUALS(Token::TEXT, c.type);
+    ASSERT_EQUALS(Token::INVALID, d.type);
+
+    ASSERT_EQUALS("blue", a.data.toString());
+    ASSERT_EQUALS("-", b.data.toString());
+    ASSERT_EQUALS("red", c.data.toString());
+
+    ASSERT_EQUALS(0U, a.offset);
+    ASSERT_EQUALS(5U, b.offset);
+    ASSERT_EQUALS(6U, c.offset);
+}
+
+TEST(Tokenizer, Quote1English) {
+    Tokenizer i(&languageEnglishV2, "eliot's car");
+
+    Token a = i.next();
+    Token b = i.next();
+
+    ASSERT_EQUALS("eliot's", a.data.toString());
+    ASSERT_EQUALS("car", b.data.toString());
+}
+
+TEST(Tokenizer, Quote1French) {
+    Tokenizer i(&languageFrenchV2, "eliot's car");
+
+    Token a = i.next();
+    Token b = i.next();
+    Token c = i.next();
+
+    ASSERT_EQUALS("eliot", a.data.toString());
+    ASSERT_EQUALS("s", b.data.toString());
+    ASSERT_EQUALS("car", c.data.toString());
+}
+}
+}

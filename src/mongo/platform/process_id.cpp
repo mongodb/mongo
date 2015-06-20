@@ -36,40 +36,44 @@
 
 namespace mongo {
 
-    BOOST_STATIC_ASSERT(sizeof(NativeProcessId) == sizeof(uint32_t));
+BOOST_STATIC_ASSERT(sizeof(NativeProcessId) == sizeof(uint32_t));
 
-    namespace {
+namespace {
 #ifdef _WIN32
-        inline NativeProcessId getCurrentNativeProcessId() { return GetCurrentProcessId(); }
+inline NativeProcessId getCurrentNativeProcessId() {
+    return GetCurrentProcessId();
+}
 #else
-        inline NativeProcessId getCurrentNativeProcessId() { return getpid(); }
+inline NativeProcessId getCurrentNativeProcessId() {
+    return getpid();
+}
 #endif
-    }  // namespace
+}  // namespace
 
-    ProcessId ProcessId::getCurrent() {
-        return fromNative(getCurrentNativeProcessId());
-    }
+ProcessId ProcessId::getCurrent() {
+    return fromNative(getCurrentNativeProcessId());
+}
 
-    int64_t ProcessId::asInt64() const {
-        typedef std::numeric_limits<NativeProcessId> limits;
-        if (limits::is_signed)
-            return _npid;
-        else
-            return static_cast<int64_t>(static_cast<uint64_t>(_npid));
-    }
+int64_t ProcessId::asInt64() const {
+    typedef std::numeric_limits<NativeProcessId> limits;
+    if (limits::is_signed)
+        return _npid;
+    else
+        return static_cast<int64_t>(static_cast<uint64_t>(_npid));
+}
 
-    long long ProcessId::asLongLong() const {
-        return static_cast<long long>(asInt64());
-    }
+long long ProcessId::asLongLong() const {
+    return static_cast<long long>(asInt64());
+}
 
-    std::string ProcessId::toString() const {
-        std::ostringstream os;
-        os << *this;
-        return os.str();
-    }
+std::string ProcessId::toString() const {
+    std::ostringstream os;
+    os << *this;
+    return os.str();
+}
 
-    std::ostream& operator<<(std::ostream& os, ProcessId pid) {
-        return os << pid.toNative();
-    }
+std::ostream& operator<<(std::ostream& os, ProcessId pid) {
+    return os << pid.toNative();
+}
 
 }  // namespace mongo

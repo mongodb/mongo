@@ -33,48 +33,48 @@
 
 namespace mongo {
 
+/**
+ * Note: This is NOT thread-safe.
+ *
+ * Example usage:
+ *
+ * RemoteCommandRunnerMock executor;
+ * executor.setNextExpectedCommand([](const RemoteCommandRequest& request) {
+ *     ASSERT_EQUALS("config", request.dbname);
+ * },
+ * RemoteCommandResponse(BSON("ok" << 1), Milliseconds(0)));
+ *
+ * auto response = executor.runCommand(RemoteCommandRequest()); // Assertion error!
+ */
+class RemoteCommandRunnerMock final : public RemoteCommandRunner {
+public:
+    RemoteCommandRunnerMock();
+    virtual ~RemoteCommandRunnerMock();
+
     /**
-     * Note: This is NOT thread-safe.
-     *
-     * Example usage:
-     *
-     * RemoteCommandRunnerMock executor;
-     * executor.setNextExpectedCommand([](const RemoteCommandRequest& request) {
-     *     ASSERT_EQUALS("config", request.dbname);
-     * },
-     * RemoteCommandResponse(BSON("ok" << 1), Milliseconds(0)));
-     *
-     * auto response = executor.runCommand(RemoteCommandRequest()); // Assertion error!
+     * Shortcut for unit-tests.
      */
-    class RemoteCommandRunnerMock final : public RemoteCommandRunner {
-    public:
-        RemoteCommandRunnerMock();
-        virtual ~RemoteCommandRunnerMock();
+    static RemoteCommandRunnerMock* get(RemoteCommandRunner* runner);
 
-        /**
-         * Shortcut for unit-tests.
-         */
-        static RemoteCommandRunnerMock* get(RemoteCommandRunner* runner);
+    /**
+     * Runs the function set by the last call to setNextExpectedCommand. Calling this more
+     * than once after a single call to setNextExpectedCommand will result in an assertion
+     * failure.
+     *
+     * Returns the value set on a previous call to setNextExpectedCommand.
+     */
+    StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request) override;
 
-        /**
-         * Runs the function set by the last call to setNextExpectedCommand. Calling this more
-         * than once after a single call to setNextExpectedCommand will result in an assertion
-         * failure.
-         *
-         * Returns the value set on a previous call to setNextExpectedCommand.
-         */
-        StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request) override;
+    /**
+     * Sets the checker method to use and it's return value the next time runCommand is
+     * called.
+     */
+    void setNextExpectedCommand(
+        stdx::function<void(const RemoteCommandRequest& request)> checkerFunc,
+        StatusWith<RemoteCommandResponse> returnThis);
 
-        /**
-         * Sets the checker method to use and it's return value the next time runCommand is
-         * called.
-         */
-        void setNextExpectedCommand(
-                stdx::function<void (const RemoteCommandRequest& request)> checkerFunc,
-                StatusWith<RemoteCommandResponse> returnThis);
-
-    private:
-        stdx::function<void (const RemoteCommandRequest& request)> _runCommandChecker;
-        StatusWith<RemoteCommandResponse> _response;
-    };
+private:
+    stdx::function<void(const RemoteCommandRequest& request)> _runCommandChecker;
+    StatusWith<RemoteCommandResponse> _response;
+};
 }

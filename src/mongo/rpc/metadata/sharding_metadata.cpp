@@ -41,115 +41,105 @@ namespace rpc {
 
 namespace {
 
-    const char kGLEStatsFieldName[] = "$gleStats";
-    const char kGLEStatsLastOpTimeFieldName[] = "lastOpTime";
-    const char kGLEStatsElectionIdFieldName[] = "electionId";
+const char kGLEStatsFieldName[] = "$gleStats";
+const char kGLEStatsLastOpTimeFieldName[] = "lastOpTime";
+const char kGLEStatsElectionIdFieldName[] = "electionId";
 
 }  // namespace
 
-    StatusWith<ShardingMetadata> ShardingMetadata::readFromMetadata(const BSONObj& metadataObj) {
-        BSONElement smElem;
-        auto smExtractStatus = bsonExtractTypedField(metadataObj,
-                                                     kGLEStatsFieldName,
-                                                     mongo::Object,
-                                                     &smElem);
-        if (!smExtractStatus.isOK()) {
-            return smExtractStatus;
-        }
-
-        if (smElem.embeddedObject().nFields() != 2) {
-            return Status(ErrorCodes::InvalidOptions,
-                          str::stream() << "The $gleStats object can only have 2 fields, but got "
-                                        << smElem.embeddedObject().toString());
-        }
-
-        BSONElement lastOpTimeElem;
-        auto lastOpTimeExtractStatus = bsonExtractTypedField(smElem.embeddedObject(),
-                                                             kGLEStatsLastOpTimeFieldName,
-                                                             mongo::bsonTimestamp,
-                                                             &lastOpTimeElem);
-        if (!lastOpTimeExtractStatus.isOK()) {
-            return lastOpTimeExtractStatus;
-        }
-
-        BSONElement lastElectionIdElem;
-        auto lastElectionIdExtractStatus = bsonExtractTypedField(smElem.embeddedObject(),
-                                                                 kGLEStatsElectionIdFieldName,
-                                                                 mongo::jstOID,
-                                                                 &lastElectionIdElem);
-        if (!lastElectionIdExtractStatus.isOK()) {
-            return lastElectionIdExtractStatus;
-        }
-
-        return ShardingMetadata(lastOpTimeElem.timestamp(), lastElectionIdElem.OID());
+StatusWith<ShardingMetadata> ShardingMetadata::readFromMetadata(const BSONObj& metadataObj) {
+    BSONElement smElem;
+    auto smExtractStatus =
+        bsonExtractTypedField(metadataObj, kGLEStatsFieldName, mongo::Object, &smElem);
+    if (!smExtractStatus.isOK()) {
+        return smExtractStatus;
     }
 
-    Status ShardingMetadata::writeToMetadata(BSONObjBuilder* metadataBob) const {
-        BSONObjBuilder subobj(metadataBob->subobjStart(kGLEStatsFieldName));
-        subobj.append(kGLEStatsLastOpTimeFieldName, getLastOpTime());
-        subobj.append(kGLEStatsElectionIdFieldName, getLastElectionId());
-        return Status::OK();
+    if (smElem.embeddedObject().nFields() != 2) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "The $gleStats object can only have 2 fields, but got "
+                                    << smElem.embeddedObject().toString());
     }
 
-    Status ShardingMetadata::downconvert(const BSONObj& commandReply,
-                                         const BSONObj& replyMetadata,
-                                         BSONObjBuilder* legacyCommandReplyBob) {
-
-        legacyCommandReplyBob->appendElements(commandReply);
-
-        auto swShardingMetadata = readFromMetadata(replyMetadata);
-        if (swShardingMetadata.isOK()) {
-            // We can reuse the same logic to write the sharding metadata out to the legacy
-            // command as the element has the same format whether it is there or on the metadata
-            // object.
-            swShardingMetadata.getValue().writeToMetadata(legacyCommandReplyBob);
-        }
-        else if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
-            // It is valid to not have a $gleStats field.
-        }
-        else {
-            return swShardingMetadata.getStatus();
-        }
-        return Status::OK();
+    BSONElement lastOpTimeElem;
+    auto lastOpTimeExtractStatus = bsonExtractTypedField(smElem.embeddedObject(),
+                                                         kGLEStatsLastOpTimeFieldName,
+                                                         mongo::bsonTimestamp,
+                                                         &lastOpTimeElem);
+    if (!lastOpTimeExtractStatus.isOK()) {
+        return lastOpTimeExtractStatus;
     }
 
-    Status ShardingMetadata::upconvert(const BSONObj& legacyCommand,
-                                       BSONObjBuilder* commandBob,
-                                       BSONObjBuilder* metadataBob) {
-        // We can reuse the same logic to read the sharding metadata out from the legacy command
-        // as it has the same format whether it is there or on the metadata object.
-        auto swShardingMetadata = readFromMetadata(legacyCommand);
-        if (swShardingMetadata.isOK()) {
-            swShardingMetadata.getValue().writeToMetadata(metadataBob);
+    BSONElement lastElectionIdElem;
+    auto lastElectionIdExtractStatus = bsonExtractTypedField(
+        smElem.embeddedObject(), kGLEStatsElectionIdFieldName, mongo::jstOID, &lastElectionIdElem);
+    if (!lastElectionIdExtractStatus.isOK()) {
+        return lastElectionIdExtractStatus;
+    }
 
-            // Write out the command excluding the $gleStats subobject.
-            for (const auto& elem : legacyCommand) {
-                if (elem.fieldNameStringData() != StringData(kGLEStatsFieldName)) {
-                    commandBob->append(elem);
-                }
+    return ShardingMetadata(lastOpTimeElem.timestamp(), lastElectionIdElem.OID());
+}
+
+Status ShardingMetadata::writeToMetadata(BSONObjBuilder* metadataBob) const {
+    BSONObjBuilder subobj(metadataBob->subobjStart(kGLEStatsFieldName));
+    subobj.append(kGLEStatsLastOpTimeFieldName, getLastOpTime());
+    subobj.append(kGLEStatsElectionIdFieldName, getLastElectionId());
+    return Status::OK();
+}
+
+Status ShardingMetadata::downconvert(const BSONObj& commandReply,
+                                     const BSONObj& replyMetadata,
+                                     BSONObjBuilder* legacyCommandReplyBob) {
+    legacyCommandReplyBob->appendElements(commandReply);
+
+    auto swShardingMetadata = readFromMetadata(replyMetadata);
+    if (swShardingMetadata.isOK()) {
+        // We can reuse the same logic to write the sharding metadata out to the legacy
+        // command as the element has the same format whether it is there or on the metadata
+        // object.
+        swShardingMetadata.getValue().writeToMetadata(legacyCommandReplyBob);
+    } else if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
+        // It is valid to not have a $gleStats field.
+    } else {
+        return swShardingMetadata.getStatus();
+    }
+    return Status::OK();
+}
+
+Status ShardingMetadata::upconvert(const BSONObj& legacyCommand,
+                                   BSONObjBuilder* commandBob,
+                                   BSONObjBuilder* metadataBob) {
+    // We can reuse the same logic to read the sharding metadata out from the legacy command
+    // as it has the same format whether it is there or on the metadata object.
+    auto swShardingMetadata = readFromMetadata(legacyCommand);
+    if (swShardingMetadata.isOK()) {
+        swShardingMetadata.getValue().writeToMetadata(metadataBob);
+
+        // Write out the command excluding the $gleStats subobject.
+        for (const auto& elem : legacyCommand) {
+            if (elem.fieldNameStringData() != StringData(kGLEStatsFieldName)) {
+                commandBob->append(elem);
             }
-        } else if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
-            // it is valid to not have a $gleStats field
-            commandBob->appendElements(legacyCommand);
         }
-        else {
-            return swShardingMetadata.getStatus();
-        }
-        return Status::OK();
+    } else if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
+        // it is valid to not have a $gleStats field
+        commandBob->appendElements(legacyCommand);
+    } else {
+        return swShardingMetadata.getStatus();
     }
+    return Status::OK();
+}
 
-    ShardingMetadata::ShardingMetadata(Timestamp lastOpTime, OID lastElectionId)
-        : _lastOpTime(std::move(lastOpTime))
-        , _lastElectionId(std::move(lastElectionId))
-    {}
+ShardingMetadata::ShardingMetadata(Timestamp lastOpTime, OID lastElectionId)
+    : _lastOpTime(std::move(lastOpTime)), _lastElectionId(std::move(lastElectionId)) {}
 
-    const Timestamp& ShardingMetadata::getLastOpTime() const {
-        return _lastOpTime;
-    }
+const Timestamp& ShardingMetadata::getLastOpTime() const {
+    return _lastOpTime;
+}
 
-    const OID& ShardingMetadata::getLastElectionId() const {
-        return _lastElectionId;
-    }
+const OID& ShardingMetadata::getLastElectionId() const {
+    return _lastElectionId;
+}
 
 }  // namespace rpc
 }  // namespace mongo

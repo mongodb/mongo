@@ -37,169 +37,162 @@
 
 namespace mongo {
 
-    class DummyRecordStoreV1MetaData : public RecordStoreV1MetaData {
-    public:
-        DummyRecordStoreV1MetaData( bool capped, int userFlags );
-        virtual ~DummyRecordStoreV1MetaData(){}
+class DummyRecordStoreV1MetaData : public RecordStoreV1MetaData {
+public:
+    DummyRecordStoreV1MetaData(bool capped, int userFlags);
+    virtual ~DummyRecordStoreV1MetaData() {}
 
-        virtual const DiskLoc& capExtent() const;
-        virtual void setCapExtent( OperationContext* txn, const DiskLoc& loc );
+    virtual const DiskLoc& capExtent() const;
+    virtual void setCapExtent(OperationContext* txn, const DiskLoc& loc);
 
-        virtual const DiskLoc& capFirstNewRecord() const;
-        virtual void setCapFirstNewRecord( OperationContext* txn, const DiskLoc& loc );
+    virtual const DiskLoc& capFirstNewRecord() const;
+    virtual void setCapFirstNewRecord(OperationContext* txn, const DiskLoc& loc);
 
-        virtual long long dataSize() const;
-        virtual long long numRecords() const;
+    virtual long long dataSize() const;
+    virtual long long numRecords() const;
 
-        virtual void incrementStats( OperationContext* txn,
-                                     long long dataSizeIncrement,
-                                     long long numRecordsIncrement );
+    virtual void incrementStats(OperationContext* txn,
+                                long long dataSizeIncrement,
+                                long long numRecordsIncrement);
 
-        virtual void setStats( OperationContext* txn,
-                               long long dataSize,
-                               long long numRecords );
+    virtual void setStats(OperationContext* txn, long long dataSize, long long numRecords);
 
-        virtual DiskLoc deletedListEntry( int bucket ) const;
-        virtual void setDeletedListEntry( OperationContext* txn,
-                                          int bucket,
-                                          const DiskLoc& loc );
+    virtual DiskLoc deletedListEntry(int bucket) const;
+    virtual void setDeletedListEntry(OperationContext* txn, int bucket, const DiskLoc& loc);
 
-        virtual DiskLoc deletedListLegacyGrabBag() const;
-        virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc);
+    virtual DiskLoc deletedListLegacyGrabBag() const;
+    virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc);
 
-        virtual void orphanDeletedList(OperationContext* txn);
+    virtual void orphanDeletedList(OperationContext* txn);
 
-        virtual const DiskLoc& firstExtent( OperationContext* txn ) const;
-        virtual void setFirstExtent( OperationContext* txn, const DiskLoc& loc );
+    virtual const DiskLoc& firstExtent(OperationContext* txn) const;
+    virtual void setFirstExtent(OperationContext* txn, const DiskLoc& loc);
 
-        virtual const DiskLoc& lastExtent( OperationContext* txn ) const;
-        virtual void setLastExtent( OperationContext* txn, const DiskLoc& loc );
+    virtual const DiskLoc& lastExtent(OperationContext* txn) const;
+    virtual void setLastExtent(OperationContext* txn, const DiskLoc& loc);
 
-        virtual bool isCapped() const;
+    virtual bool isCapped() const;
 
-        virtual bool isUserFlagSet( int flag ) const;
-        virtual int userFlags() const { return _userFlags; }
-        virtual bool setUserFlag( OperationContext* txn, int flag );
-        virtual bool clearUserFlag( OperationContext* txn, int flag );
-        virtual bool replaceUserFlags( OperationContext* txn, int flags );
+    virtual bool isUserFlagSet(int flag) const;
+    virtual int userFlags() const {
+        return _userFlags;
+    }
+    virtual bool setUserFlag(OperationContext* txn, int flag);
+    virtual bool clearUserFlag(OperationContext* txn, int flag);
+    virtual bool replaceUserFlags(OperationContext* txn, int flags);
 
 
-        virtual int lastExtentSize( OperationContext* txn ) const;
-        virtual void setLastExtentSize( OperationContext* txn, int newMax );
+    virtual int lastExtentSize(OperationContext* txn) const;
+    virtual void setLastExtentSize(OperationContext* txn, int newMax);
 
-        virtual long long maxCappedDocs() const;
+    virtual long long maxCappedDocs() const;
 
-    protected:
+protected:
+    DiskLoc _capExtent;
+    DiskLoc _capFirstNewRecord;
 
-        DiskLoc _capExtent;
-        DiskLoc _capFirstNewRecord;
+    long long _dataSize;
+    long long _numRecords;
 
-        long long _dataSize;
-        long long _numRecords;
+    DiskLoc _firstExtent;
+    DiskLoc _lastExtent;
 
-        DiskLoc _firstExtent;
-        DiskLoc _lastExtent;
+    bool _capped;
+    int _userFlags;
+    long long _maxCappedDocs;
 
-        bool _capped;
-        int _userFlags;
-        long long _maxCappedDocs;
+    int _lastExtentSize;
+    double _paddingFactor;
 
-        int _lastExtentSize;
-        double _paddingFactor;
+    std::vector<DiskLoc> _deletedLists;
+    DiskLoc _deletedListLegacyGrabBag;
+};
 
-        std::vector<DiskLoc> _deletedLists;
-        DiskLoc _deletedListLegacyGrabBag;
+class DummyExtentManager : public ExtentManager {
+public:
+    virtual ~DummyExtentManager();
+
+    virtual Status init(OperationContext* txn);
+
+    virtual int numFiles() const;
+    virtual long long fileSize() const;
+
+    virtual DiskLoc allocateExtent(OperationContext* txn, bool capped, int size, bool enforceQuota);
+
+    virtual void freeExtents(OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt);
+
+    virtual void freeExtent(OperationContext* txn, DiskLoc extent);
+
+    virtual void freeListStats(OperationContext* txn,
+                               int* numExtents,
+                               int64_t* totalFreeSizeBytes) const;
+
+    virtual MmapV1RecordHeader* recordForV1(const DiskLoc& loc) const;
+
+    virtual std::unique_ptr<RecordFetcher> recordNeedsFetch(const DiskLoc& loc) const final;
+
+    virtual Extent* extentForV1(const DiskLoc& loc) const;
+
+    virtual DiskLoc extentLocForV1(const DiskLoc& loc) const;
+
+    virtual Extent* getExtent(const DiskLoc& loc, bool doSanityCheck = true) const;
+
+    virtual int maxSize() const;
+
+    virtual CacheHint* cacheHint(const DiskLoc& extentLoc, const HintType& hint);
+
+protected:
+    struct ExtentInfo {
+        char* data;
+        size_t length;
     };
 
-    class DummyExtentManager : public ExtentManager {
-    public:
-        virtual ~DummyExtentManager();
+    std::vector<ExtentInfo> _extents;
+};
 
-        virtual Status init(OperationContext* txn);
+struct LocAndSize {
+    DiskLoc loc;
+    int size;  // with headers
+};
 
-        virtual int numFiles() const;
-        virtual long long fileSize() const;
+/**
+ * Creates a V1 storage/mmap_v1 with the passed in records and DeletedRecords (drecs).
+ *
+ * List of LocAndSize are terminated by a Null DiskLoc. Passing a NULL pointer is shorthand for
+ * an empty list. Each extent gets it's own DiskLoc file number. DiskLoc Offsets must be > 1000.
+ *
+ * records must be sorted by extent/file. offsets within an extent can be in any order.
+ *
+ * In a simple RS, drecs must be grouped into size-buckets, but the ordering within the size
+ * buckets is up to you.
+ *
+ * In a capped collection, all drecs form a single list and must be grouped by extent, with each
+ * extent having at least one drec. capFirstNewRecord() and capExtent() *must* be correctly set
+ * on md before calling.
+ *
+ * You are responsible for ensuring the records and drecs don't overlap.
+ *
+ * ExtentManager and MetaData must both be empty.
+ */
+void initializeV1RS(OperationContext* txn,
+                    const LocAndSize* records,
+                    const LocAndSize* drecs,
+                    const LocAndSize* legacyGrabBag,
+                    DummyExtentManager* em,
+                    DummyRecordStoreV1MetaData* md);
 
-        virtual DiskLoc allocateExtent( OperationContext* txn,
-                                        bool capped,
-                                        int size,
-                                        bool enforceQuota );
-
-        virtual void freeExtents( OperationContext* txn,
-                                  DiskLoc firstExt, DiskLoc lastExt );
-
-        virtual void freeExtent( OperationContext* txn, DiskLoc extent );
-
-        virtual void freeListStats(OperationContext* txn,
-                                   int* numExtents,
-                                   int64_t* totalFreeSizeBytes) const;
-
-        virtual MmapV1RecordHeader* recordForV1( const DiskLoc& loc ) const;
-
-        virtual std::unique_ptr<RecordFetcher> recordNeedsFetch( const DiskLoc& loc ) const final;
-
-        virtual Extent* extentForV1( const DiskLoc& loc ) const;
-
-        virtual DiskLoc extentLocForV1( const DiskLoc& loc ) const;
-
-        virtual Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const;
-
-        virtual int maxSize() const;
-
-        virtual CacheHint* cacheHint( const DiskLoc& extentLoc, const HintType& hint );
-
-    protected:
-        struct ExtentInfo {
-            char* data;
-            size_t length;
-        };
-
-        std::vector<ExtentInfo> _extents;
-    };
-    
-    struct LocAndSize {
-        DiskLoc loc;
-        int size; // with headers
-    };
-
-    /**
-     * Creates a V1 storage/mmap_v1 with the passed in records and DeletedRecords (drecs).
-     *
-     * List of LocAndSize are terminated by a Null DiskLoc. Passing a NULL pointer is shorthand for
-     * an empty list. Each extent gets it's own DiskLoc file number. DiskLoc Offsets must be > 1000.
-     *
-     * records must be sorted by extent/file. offsets within an extent can be in any order.
-     *
-     * In a simple RS, drecs must be grouped into size-buckets, but the ordering within the size
-     * buckets is up to you.
-     *
-     * In a capped collection, all drecs form a single list and must be grouped by extent, with each
-     * extent having at least one drec. capFirstNewRecord() and capExtent() *must* be correctly set
-     * on md before calling.
-     *
-     * You are responsible for ensuring the records and drecs don't overlap.
-     *
-     * ExtentManager and MetaData must both be empty.
-     */
-    void initializeV1RS(OperationContext* txn,
-                        const LocAndSize* records,
-                        const LocAndSize* drecs,
-                        const LocAndSize* legacyGrabBag,
-                        DummyExtentManager* em,
-                        DummyRecordStoreV1MetaData* md);
-
-    /**
-     * Asserts that the V1RecordStore defined by md has the passed in records and drecs in the
-     * correct order.
-     *
-     * List of LocAndSize are terminated by a Null DiskLoc. Passing a NULL pointer means don't check
-     * that list.
-     */
-    void assertStateV1RS(OperationContext* txn,
-                         const LocAndSize* records,
-                         const LocAndSize* drecs,
-                         const LocAndSize* legacyGrabBag,
-                         const ExtentManager* em,
-                         const DummyRecordStoreV1MetaData* md);
+/**
+ * Asserts that the V1RecordStore defined by md has the passed in records and drecs in the
+ * correct order.
+ *
+ * List of LocAndSize are terminated by a Null DiskLoc. Passing a NULL pointer means don't check
+ * that list.
+ */
+void assertStateV1RS(OperationContext* txn,
+                     const LocAndSize* records,
+                     const LocAndSize* drecs,
+                     const LocAndSize* legacyGrabBag,
+                     const ExtentManager* em,
+                     const DummyRecordStoreV1MetaData* md);
 
 }  // namespace mongo

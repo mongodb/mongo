@@ -39,36 +39,34 @@
 namespace mongo {
 namespace rpc {
 
-    class LegacyReplyBuilder : public ReplyBuilderInterface {
-    public:
+class LegacyReplyBuilder : public ReplyBuilderInterface {
+public:
+    LegacyReplyBuilder();
+    LegacyReplyBuilder(std::unique_ptr<Message>);
+    ~LegacyReplyBuilder() final;
 
-        LegacyReplyBuilder();
-        LegacyReplyBuilder(std::unique_ptr<Message>);
-        ~LegacyReplyBuilder() final;
+    LegacyReplyBuilder& setMetadata(BSONObj metadata) final;
+    LegacyReplyBuilder& setRawCommandReply(BSONObj commandReply) final;
 
-        LegacyReplyBuilder& setMetadata(BSONObj metadata) final;
-        LegacyReplyBuilder& setRawCommandReply(BSONObj commandReply) final;
+    LegacyReplyBuilder& addOutputDocs(DocumentRange outputDocs) final;
+    LegacyReplyBuilder& addOutputDoc(BSONObj outputDoc) final;
 
-        LegacyReplyBuilder& addOutputDocs(DocumentRange outputDocs) final;
-        LegacyReplyBuilder& addOutputDoc(BSONObj outputDoc) final;
+    State getState() const final;
 
-        State getState() const final;
+    void reset() final;
 
-        void reset() final;
+    std::unique_ptr<Message> done() final;
 
-        std::unique_ptr<Message> done() final;
+    Protocol getProtocol() const final;
 
-        Protocol getProtocol() const final;
+    std::size_t availableSpaceForOutputDocs() const final;
 
-        std::size_t availableSpaceForOutputDocs() const final;
-
-    private:
-
-        BufBuilder _builder{};
-        BSONObj _metadata{};
-        std::unique_ptr<Message> _message;
-        State _state{State::kMetadata};
-    };
+private:
+    BufBuilder _builder{};
+    BSONObj _metadata{};
+    std::unique_ptr<Message> _message;
+    State _state{State::kMetadata};
+};
 
 }  // namespace rpc
 }  // namespace mongo

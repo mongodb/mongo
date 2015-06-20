@@ -44,114 +44,109 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::string;
+using std::unique_ptr;
+using std::string;
 
 namespace {
 
-    Status getStatus(const BatchedCommandResponse& response) {
-        if (response.getOk() == 0) {
-            return Status(static_cast<ErrorCodes::Error>(response.getErrCode()),
-                                                         response.getErrMessage());
-        }
-
-        if (response.isErrDetailsSet()) {
-            const WriteErrorDetail* errDetail = response.getErrDetails().front();
-
-            return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
-                                                         errDetail->getErrMessage());
-        }
-
-        if (response.isWriteConcernErrorSet()) {
-            const WCErrorDetail* errDetail = response.getWriteConcernError();
-
-            return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
-                                                         errDetail->getErrMessage());
-        }
-
-        return Status::OK();
+Status getStatus(const BatchedCommandResponse& response) {
+    if (response.getOk() == 0) {
+        return Status(static_cast<ErrorCodes::Error>(response.getErrCode()),
+                      response.getErrMessage());
     }
 
-} // namespace
+    if (response.isErrDetailsSet()) {
+        const WriteErrorDetail* errDetail = response.getErrDetails().front();
 
-    Status CatalogManager::insert(const string& ns,
-                                  const BSONObj& doc,
-                                  BatchedCommandResponse* response) {
-
-        unique_ptr<BatchedInsertRequest> insert(new BatchedInsertRequest());
-        insert->addToDocuments(doc);
-
-        BatchedCommandRequest request(insert.release());
-        request.setNS(ns);
-        request.setWriteConcern(WriteConcernOptions::Majority);
-
-        BatchedCommandResponse dummyResponse;
-        if (response == NULL) {
-            response = &dummyResponse;
-        }
-
-        // Make sure to add ids to the request, since this is an insert operation
-        unique_ptr<BatchedCommandRequest> requestWithIds(
-                                            BatchedCommandRequest::cloneWithIds(request));
-        const BatchedCommandRequest& requestToSend =
-                                            requestWithIds.get() ? *requestWithIds : request;
-
-        writeConfigServerDirect(requestToSend, response);
-        return getStatus(*response);
+        return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
+                      errDetail->getErrMessage());
     }
 
-    Status CatalogManager::update(const string& ns,
-                                  const BSONObj& query,
-                                  const BSONObj& update,
-                                  bool upsert,
-                                  bool multi,
-                                  BatchedCommandResponse* response) {
+    if (response.isWriteConcernErrorSet()) {
+        const WCErrorDetail* errDetail = response.getWriteConcernError();
 
-        unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
-        updateDoc->setQuery(query);
-        updateDoc->setUpdateExpr(update);
-        updateDoc->setUpsert(upsert);
-        updateDoc->setMulti(multi);
-
-        unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
-        updateRequest->addToUpdates(updateDoc.release());
-        updateRequest->setWriteConcern(WriteConcernOptions::Majority);
-
-        BatchedCommandRequest request(updateRequest.release());
-        request.setNS(ns);
-
-        BatchedCommandResponse dummyResponse;
-        if (response == NULL) {
-            response = &dummyResponse;
-        }
-
-        writeConfigServerDirect(request, response);
-        return getStatus(*response);
+        return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
+                      errDetail->getErrMessage());
     }
 
-    Status CatalogManager::remove(const string& ns,
-                                  const BSONObj& query,
-                                  int limit,
-                                  BatchedCommandResponse* response) {
+    return Status::OK();
+}
 
-        unique_ptr<BatchedDeleteDocument> deleteDoc(new BatchedDeleteDocument);
-        deleteDoc->setQuery(query);
-        deleteDoc->setLimit(limit);
+}  // namespace
 
-        unique_ptr<BatchedDeleteRequest> deleteRequest(new BatchedDeleteRequest());
-        deleteRequest->addToDeletes(deleteDoc.release());
-        deleteRequest->setWriteConcern(WriteConcernOptions::Majority);
+Status CatalogManager::insert(const string& ns,
+                              const BSONObj& doc,
+                              BatchedCommandResponse* response) {
+    unique_ptr<BatchedInsertRequest> insert(new BatchedInsertRequest());
+    insert->addToDocuments(doc);
 
-        BatchedCommandRequest request(deleteRequest.release());
-        request.setNS(ns);
+    BatchedCommandRequest request(insert.release());
+    request.setNS(ns);
+    request.setWriteConcern(WriteConcernOptions::Majority);
 
-        BatchedCommandResponse dummyResponse;
-        if (response == NULL) {
-            response = &dummyResponse;
-        }
-
-        writeConfigServerDirect(request, response);
-        return getStatus(*response);
+    BatchedCommandResponse dummyResponse;
+    if (response == NULL) {
+        response = &dummyResponse;
     }
 
-} // namespace mongo
+    // Make sure to add ids to the request, since this is an insert operation
+    unique_ptr<BatchedCommandRequest> requestWithIds(BatchedCommandRequest::cloneWithIds(request));
+    const BatchedCommandRequest& requestToSend = requestWithIds.get() ? *requestWithIds : request;
+
+    writeConfigServerDirect(requestToSend, response);
+    return getStatus(*response);
+}
+
+Status CatalogManager::update(const string& ns,
+                              const BSONObj& query,
+                              const BSONObj& update,
+                              bool upsert,
+                              bool multi,
+                              BatchedCommandResponse* response) {
+    unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
+    updateDoc->setQuery(query);
+    updateDoc->setUpdateExpr(update);
+    updateDoc->setUpsert(upsert);
+    updateDoc->setMulti(multi);
+
+    unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
+    updateRequest->addToUpdates(updateDoc.release());
+    updateRequest->setWriteConcern(WriteConcernOptions::Majority);
+
+    BatchedCommandRequest request(updateRequest.release());
+    request.setNS(ns);
+
+    BatchedCommandResponse dummyResponse;
+    if (response == NULL) {
+        response = &dummyResponse;
+    }
+
+    writeConfigServerDirect(request, response);
+    return getStatus(*response);
+}
+
+Status CatalogManager::remove(const string& ns,
+                              const BSONObj& query,
+                              int limit,
+                              BatchedCommandResponse* response) {
+    unique_ptr<BatchedDeleteDocument> deleteDoc(new BatchedDeleteDocument);
+    deleteDoc->setQuery(query);
+    deleteDoc->setLimit(limit);
+
+    unique_ptr<BatchedDeleteRequest> deleteRequest(new BatchedDeleteRequest());
+    deleteRequest->addToDeletes(deleteDoc.release());
+    deleteRequest->setWriteConcern(WriteConcernOptions::Majority);
+
+    BatchedCommandRequest request(deleteRequest.release());
+    request.setNS(ns);
+
+    BatchedCommandResponse dummyResponse;
+    if (response == NULL) {
+        response = &dummyResponse;
+    }
+
+    writeConfigServerDirect(request, response);
+    return getStatus(*response);
+}
+
+}  // namespace mongo

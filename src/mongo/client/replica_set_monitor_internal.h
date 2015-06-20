@@ -49,165 +49,162 @@
 
 namespace mongo {
 
-    struct ReplicaSetMonitor::IsMasterReply {
-        IsMasterReply() : ok(false) {}
-        IsMasterReply(const HostAndPort& host, int64_t latencyMicros, const BSONObj& reply)
-                : ok(false)
-                , host(host)
-                , latencyMicros(latencyMicros) {
-            parse(reply);
+struct ReplicaSetMonitor::IsMasterReply {
+    IsMasterReply() : ok(false) {}
+    IsMasterReply(const HostAndPort& host, int64_t latencyMicros, const BSONObj& reply)
+        : ok(false), host(host), latencyMicros(latencyMicros) {
+        parse(reply);
+    }
+
+    /**
+     * Never throws. If parsing fails for any reason, sets ok to false.
+     */
+    void parse(const BSONObj& obj);
+
+    bool ok;      // if false, ignore all other fields
+    BSONObj raw;  // Always owned. Other fields are allowed to be a view into this.
+    std::string setName;
+    bool isMaster;
+    bool secondary;
+    bool hidden;
+    OID electionId;                     // Set if this isMaster reply is from the primary
+    HostAndPort primary;                // empty if not present
+    std::set<HostAndPort> normalHosts;  // both "hosts" and "passives"
+    BSONObj tags;
+
+    // remaining fields aren't in isMaster reply, but are known to caller.
+    HostAndPort host;
+    int64_t latencyMicros;  // ignored if negative
+};
+
+struct ReplicaSetMonitor::SetState {
+    MONGO_DISALLOW_COPYING(SetState);
+
+public:
+    // A single node in the replicaSet
+    struct Node {
+        explicit Node(const HostAndPort& host) : host(host), latencyMicros(unknownLatency) {
+            markFailed();
         }
 
-        /**
-         * Never throws. If parsing fails for any reason, sets ok to false.
-         */
-        void parse(const BSONObj& obj);
+        void markFailed() {
+            isUp = false;
+            isMaster = false;
+        }
 
-        bool ok; // if false, ignore all other fields
-        BSONObj raw; // Always owned. Other fields are allowed to be a view into this.
-        std::string setName;
-        bool isMaster;
-        bool secondary;
-        bool hidden;
-        OID electionId; // Set if this isMaster reply is from the primary
-        HostAndPort primary; // empty if not present
-        std::set<HostAndPort> normalHosts; // both "hosts" and "passives"
-        BSONObj tags;
-
-        // remaining fields aren't in isMaster reply, but are known to caller.
-        HostAndPort host;
-        int64_t latencyMicros; // ignored if negative
-    };
-
-    struct ReplicaSetMonitor::SetState {
-        MONGO_DISALLOW_COPYING(SetState);
-    public:
-
-        // A single node in the replicaSet
-        struct Node {
-            explicit Node(const HostAndPort& host)
-                    : host(host)
-                    , latencyMicros(unknownLatency) {
-                markFailed();
-            }
-
-            void markFailed() {
-                isUp = false;
-                isMaster = false;
-            }
-
-            bool matches(const ReadPreference pref) const;
-
-            /**
-             * Checks if the given tag matches the tag attached to this node.
-             *
-             * Example:
-             *
-             * Tag of this node: { "dc": "nyc", "region": "na", "rack": "4" }
-             *
-             * match: {}
-             * match: { "dc": "nyc", "rack": 4 }
-             * match: { "region": "na", "dc": "nyc" }
-             * not match: { "dc": "nyc", "rack": 2 }
-             * not match: { "dc": "sf" }
-             */
-            bool matches(const BSONObj& tag) const;
-
-            /**
-             * Updates this Node based on information in reply. The reply must be from this host.
-             */
-            void update(const IsMasterReply& reply);
-
-            // Intentionally chosen to compare worse than all known latencies.
-            static const int64_t unknownLatency; // = numeric_limits<int64_t>::max()
-
-            HostAndPort host;
-            bool isUp;
-            bool isMaster; // implies isUp
-            int64_t latencyMicros; // unknownLatency if unknown
-            BSONObj tags; // owned
-        };
-
-        typedef std::vector<Node> Nodes;
+        bool matches(const ReadPreference pref) const;
 
         /**
-         * seedNodes must not be empty
-         */
-        SetState(StringData name, const std::set<HostAndPort>& seedNodes);
-
-        /**
-         * Returns a host matching criteria or an empty host if no known host matches.
+         * Checks if the given tag matches the tag attached to this node.
          *
-         * Note: Uses only local data and does not go over the network.
+         * Example:
+         *
+         * Tag of this node: { "dc": "nyc", "region": "na", "rack": "4" }
+         *
+         * match: {}
+         * match: { "dc": "nyc", "rack": 4 }
+         * match: { "region": "na", "dc": "nyc" }
+         * not match: { "dc": "nyc", "rack": 2 }
+         * not match: { "dc": "sf" }
          */
-        HostAndPort getMatchingHost(const ReadPreferenceSetting& criteria) const;
+        bool matches(const BSONObj& tag) const;
 
         /**
-         * Returns the Node with the given host, or NULL if no Node has that host.
+         * Updates this Node based on information in reply. The reply must be from this host.
          */
-        Node* findNode(const HostAndPort& host);
+        void update(const IsMasterReply& reply);
 
-        /**
-         * Returns the Node with the given host, or creates one if no Node has that host.
-         * Maintains the sorted order of nodes.
-         */
-        Node* findOrCreateNode(const HostAndPort& host);
+        // Intentionally chosen to compare worse than all known latencies.
+        static const int64_t unknownLatency;  // = numeric_limits<int64_t>::max()
 
-        void updateNodeIfInNodes(const IsMasterReply& reply);
-
-        std::string getServerAddress() const;
-
-        /**
-         * Before unlocking, do DEV checkInvariants();
-         */
-        void checkInvariants() const;
-
-        stdx::mutex mutex; // must hold this to access any other member or method (except name).
-
-        // If Refresher::getNextStep returns WAIT, you should wait on the condition_variable,
-        // releasing mutex. It will be notified when either getNextStep will return something other
-        // than WAIT, or a new host is available for consideration by getMatchingHost. Essentially,
-        // this will be hit whenever the _refreshUntilMatches loop has the potential to make
-        // progress.
-        // TODO consider splitting cv into two: one for when looking for a master, one for all other
-        // cases.
-        stdx::condition_variable cv;
-
-        const std::string name; // safe to read outside lock since it is const
-        int consecutiveFailedScans;
-        std::set<HostAndPort> seedNodes; // updated whenever a master reports set membership changes
-        OID maxElectionId; // largest election id observed by this ReplicaSetMonitor
-        HostAndPort lastSeenMaster; // empty if we have never seen a master. can be same as current
-        Nodes nodes; // maintained sorted and unique by host
-        ScanStatePtr currentScan; // NULL if no scan in progress
-        int64_t latencyThresholdMicros;
-        mutable PseudoRandom rand; // only used for host selection to balance load
-        mutable int roundRobin; // used when useDeterministicHostSelection is true
+        HostAndPort host;
+        bool isUp;
+        bool isMaster;          // implies isUp
+        int64_t latencyMicros;  // unknownLatency if unknown
+        BSONObj tags;           // owned
     };
 
-    struct ReplicaSetMonitor::ScanState {
-        MONGO_DISALLOW_COPYING(ScanState);
-    public:
-        ScanState() : foundUpMaster(false), foundAnyUpNodes(false) {}
+    typedef std::vector<Node> Nodes;
 
-        /**
-         * Adds all hosts in container that aren't in triedHosts to hostsToScan, then shuffles the
-         * queue.
-         */
-        template <typename Container>
-        void enqueAllUntriedHosts(const Container& container, PseudoRandom& rand);
+    /**
+     * seedNodes must not be empty
+     */
+    SetState(StringData name, const std::set<HostAndPort>& seedNodes);
 
-        // Access to fields is guarded by associated SetState's mutex.
-        bool foundUpMaster;
-        bool foundAnyUpNodes;
-        std::deque<HostAndPort> hostsToScan; // Work queue.
-        std::set<HostAndPort> possibleNodes; // Nodes reported by non-primary hosts.
-        std::set<HostAndPort> waitingFor; // Hosts we have dispatched but haven't replied yet.
-        std::set<HostAndPort> triedHosts; // Hosts that have been returned from getNextStep.
+    /**
+     * Returns a host matching criteria or an empty host if no known host matches.
+     *
+     * Note: Uses only local data and does not go over the network.
+     */
+    HostAndPort getMatchingHost(const ReadPreferenceSetting& criteria) const;
 
-        // All responses go here until we find a master.
-        typedef std::vector<IsMasterReply> UnconfirmedReplies;
-        UnconfirmedReplies unconfirmedReplies;
-    };
+    /**
+     * Returns the Node with the given host, or NULL if no Node has that host.
+     */
+    Node* findNode(const HostAndPort& host);
 
-} // namespace mongo
+    /**
+     * Returns the Node with the given host, or creates one if no Node has that host.
+     * Maintains the sorted order of nodes.
+     */
+    Node* findOrCreateNode(const HostAndPort& host);
+
+    void updateNodeIfInNodes(const IsMasterReply& reply);
+
+    std::string getServerAddress() const;
+
+    /**
+     * Before unlocking, do DEV checkInvariants();
+     */
+    void checkInvariants() const;
+
+    stdx::mutex mutex;  // must hold this to access any other member or method (except name).
+
+    // If Refresher::getNextStep returns WAIT, you should wait on the condition_variable,
+    // releasing mutex. It will be notified when either getNextStep will return something other
+    // than WAIT, or a new host is available for consideration by getMatchingHost. Essentially,
+    // this will be hit whenever the _refreshUntilMatches loop has the potential to make
+    // progress.
+    // TODO consider splitting cv into two: one for when looking for a master, one for all other
+    // cases.
+    stdx::condition_variable cv;
+
+    const std::string name;  // safe to read outside lock since it is const
+    int consecutiveFailedScans;
+    std::set<HostAndPort> seedNodes;  // updated whenever a master reports set membership changes
+    OID maxElectionId;                // largest election id observed by this ReplicaSetMonitor
+    HostAndPort lastSeenMaster;  // empty if we have never seen a master. can be same as current
+    Nodes nodes;                 // maintained sorted and unique by host
+    ScanStatePtr currentScan;    // NULL if no scan in progress
+    int64_t latencyThresholdMicros;
+    mutable PseudoRandom rand;  // only used for host selection to balance load
+    mutable int roundRobin;     // used when useDeterministicHostSelection is true
+};
+
+struct ReplicaSetMonitor::ScanState {
+    MONGO_DISALLOW_COPYING(ScanState);
+
+public:
+    ScanState() : foundUpMaster(false), foundAnyUpNodes(false) {}
+
+    /**
+     * Adds all hosts in container that aren't in triedHosts to hostsToScan, then shuffles the
+     * queue.
+     */
+    template <typename Container>
+    void enqueAllUntriedHosts(const Container& container, PseudoRandom& rand);
+
+    // Access to fields is guarded by associated SetState's mutex.
+    bool foundUpMaster;
+    bool foundAnyUpNodes;
+    std::deque<HostAndPort> hostsToScan;  // Work queue.
+    std::set<HostAndPort> possibleNodes;  // Nodes reported by non-primary hosts.
+    std::set<HostAndPort> waitingFor;     // Hosts we have dispatched but haven't replied yet.
+    std::set<HostAndPort> triedHosts;     // Hosts that have been returned from getNextStep.
+
+    // All responses go here until we find a master.
+    typedef std::vector<IsMasterReply> UnconfirmedReplies;
+    UnconfirmedReplies unconfirmedReplies;
+};
+
+}  // namespace mongo

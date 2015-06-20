@@ -34,76 +34,79 @@
 
 namespace mongo {
 
+/**
+ * Client decoration that holds information needed to by mongos to process
+ * getLastError commands.
+ */
+class ClusterLastErrorInfo {
+public:
+    static const ClientBasic::Decoration<ClusterLastErrorInfo> get;
+
+    /** new request not associated (yet or ever) with a client */
+    void newRequest();
+
     /**
-     * Client decoration that holds information needed to by mongos to process
-     * getLastError commands.
+     * notes that this client use this shard
+     * keeps track of all shards accessed this request
      */
-    class ClusterLastErrorInfo {
-    public:
-        static const ClientBasic::Decoration<ClusterLastErrorInfo> get;
+    void addShardHost(const std::string& shardHost);
 
-        /** new request not associated (yet or ever) with a client */
-        void newRequest();
+    /**
+     * Notes that this client wrote to these particular hosts with write commands.
+     */
+    void addHostOpTime(ConnectionString connstr, HostOpTime stat);
+    void addHostOpTimes(const HostOpTimeMap& hostOpTimes);
 
-        /**
-         * notes that this client use this shard
-         * keeps track of all shards accessed this request
-         */
-        void addShardHost( const std::string& shardHost );
+    /**
+     * gets shards used on the previous request
+     */
+    std::set<std::string>* getPrevShardHosts() const {
+        return &_prev->shardHostsWritten;
+    }
 
-        /**
-         * Notes that this client wrote to these particular hosts with write commands.
-         */
-        void addHostOpTime(ConnectionString connstr, HostOpTime stat);
-        void addHostOpTimes( const HostOpTimeMap& hostOpTimes );
+    /**
+     * Gets the shards, hosts, and opTimes the client last wrote to with write commands.
+     */
+    const HostOpTimeMap& getPrevHostOpTimes() const {
+        return _prev->hostOpTimes;
+    }
 
-        /**
-         * gets shards used on the previous request
-         */
-        std::set<std::string>* getPrevShardHosts() const { return &_prev->shardHostsWritten; }
+    /**
+     * resets the information stored for the current request
+     */
+    void clearRequestInfo() {
+        _cur->clear();
+    }
 
-        /**
-         * Gets the shards, hosts, and opTimes the client last wrote to with write commands.
-         */
-        const HostOpTimeMap& getPrevHostOpTimes() const {
-            return _prev->hostOpTimes;
+    void disableForCommand();
+
+private:
+    struct RequestInfo {
+        void clear() {
+            shardHostsWritten.clear();
+            hostOpTimes.clear();
         }
 
-        /**
-         * resets the information stored for the current request
-         */
-        void clearRequestInfo(){ _cur->clear(); }
-
-        void disableForCommand();
-
-    private:
-        struct RequestInfo {
-
-            void clear() {
-                shardHostsWritten.clear();
-                hostOpTimes.clear();
-            }
-
-            std::set<std::string> shardHostsWritten;
-            HostOpTimeMap hostOpTimes;
-        };
-
-        // We use 2 so we can flip for getLastError type operations.
-        RequestInfo _infos[2];
-        RequestInfo* _cur = &_infos[0];
-        RequestInfo* _prev = &_infos[1];
+        std::set<std::string> shardHostsWritten;
+        HostOpTimeMap hostOpTimes;
     };
 
-    /**
-     * Looks for $gleStats in a command's reply metadata, and fills in the ClusterLastErrorInfo
-     * for this thread's associated Client with the data, if found.
-     *
-     * This data will be used by subsequent GLE calls, to ensure we look for the correct
-     * write on the correct PRIMARY.
-     * result: the result from calling runCommand
-     * conn: the std::string name of the hostAndPort where the command ran. This can be a replica
-     *       set seed list.
-     */
-    void saveGLEStats(const BSONObj& metadataObj, StringData conn);
+    // We use 2 so we can flip for getLastError type operations.
+    RequestInfo _infos[2];
+    RequestInfo* _cur = &_infos[0];
+    RequestInfo* _prev = &_infos[1];
+};
+
+/**
+ * Looks for $gleStats in a command's reply metadata, and fills in the ClusterLastErrorInfo
+ * for this thread's associated Client with the data, if found.
+ *
+ * This data will be used by subsequent GLE calls, to ensure we look for the correct
+ * write on the correct PRIMARY.
+ * result: the result from calling runCommand
+ * conn: the std::string name of the hostAndPort where the command ran. This can be a replica
+ *       set seed list.
+ */
+void saveGLEStats(const BSONObj& metadataObj, StringData conn);
 
 }  // namespace mongo

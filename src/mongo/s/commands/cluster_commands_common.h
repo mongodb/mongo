@@ -35,27 +35,27 @@
 
 namespace mongo {
 
-    class BSONObj;
+class BSONObj;
 
-    /**
-     * Utility function to compute a single error code from a vector of command results.
-     *
-     * @return If there is an error code common to all of the error results, returns that error
-     *          code; otherwise, returns 0.
-     */
-    int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& results);
+/**
+ * Utility function to compute a single error code from a vector of command results.
+ *
+ * @return If there is an error code common to all of the error results, returns that error
+ *          code; otherwise, returns 0.
+ */
+int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& results);
 
-    /**
-     * Utility function to return an empty result set from a command.
-     */
-    bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns);
+/**
+ * Utility function to return an empty result set from a command.
+ */
+bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns);
 
-    /**
-     * Utility function to parse a cursor command response and save the cursor in the CursorCache
-     * "refs" container. Returns Status::OK() if the cursor was successfully saved or no cursor
-     * was specified in the command response, and returns an error Status if a parsing error was
-     * encountered.
-     */
-    Status storePossibleCursor(const std::string& server, const BSONObj& cmdResult);
+/**
+ * Utility function to parse a cursor command response and save the cursor in the CursorCache
+ * "refs" container. Returns Status::OK() if the cursor was successfully saved or no cursor
+ * was specified in the command response, and returns an error Status if a parsing error was
+ * encountered.
+ */
+Status storePossibleCursor(const std::string& server, const BSONObj& cmdResult);
 
-} // namespace mongo
+}  // namespace mongo

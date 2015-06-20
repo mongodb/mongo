@@ -32,55 +32,57 @@
 
 namespace mongo {
 
+/**
+ * Implementation of the client side of a SASL authentication conversation.
+ * using the Cyrus SASL library.
+ */
+class CyrusSaslClientSession : public SaslClientSession {
+    MONGO_DISALLOW_COPYING(CyrusSaslClientSession);
+
+public:
+    CyrusSaslClientSession();
+    ~CyrusSaslClientSession();
+
     /**
-     * Implementation of the client side of a SASL authentication conversation.
-     * using the Cyrus SASL library.
+     * Overriding to store the password data in sasl_secret_t format
      */
-    class CyrusSaslClientSession : public SaslClientSession {
-        MONGO_DISALLOW_COPYING(CyrusSaslClientSession);
-    public:
+    virtual void setParameter(Parameter id, StringData value);
 
-        CyrusSaslClientSession();
-        ~CyrusSaslClientSession();
+    /**
+     * Returns the value of the parameterPassword parameter in the form of a sasl_secret_t, used
+     * by the Cyrus SASL library's SASL_CB_PASS callback.  The session object owns the storage
+     * referenced by the returned sasl_secret_t*, which will remain in scope according to the
+     * same rules as given for SaslClientSession::getParameter().
+     */
+    sasl_secret_t* getPasswordAsSecret();
 
-        /**
-         * Overriding to store the password data in sasl_secret_t format
-         */
-        virtual void setParameter(Parameter id, StringData value);
+    virtual Status initialize();
 
-        /**
-         * Returns the value of the parameterPassword parameter in the form of a sasl_secret_t, used
-         * by the Cyrus SASL library's SASL_CB_PASS callback.  The session object owns the storage
-         * referenced by the returned sasl_secret_t*, which will remain in scope according to the
-         * same rules as given for SaslClientSession::getParameter().
-         */
-        sasl_secret_t* getPasswordAsSecret();
+    virtual Status step(StringData inputData, std::string* outputData);
 
-        virtual Status initialize();
+    virtual bool isDone() const {
+        return _done;
+    }
 
-        virtual Status step(StringData inputData, std::string* outputData);
+private:
+    /// Maximum number of Cyrus SASL callbacks stored in _callbacks.
+    static const int maxCallbacks = 4;
 
-        virtual bool isDone() const { return _done; }
+    /// Underlying Cyrus SASL library connection object.
+    sasl_conn_t* _saslConnection;
 
-    private:
-        /// Maximum number of Cyrus SASL callbacks stored in _callbacks.
-        static const int maxCallbacks = 4;
+    // Number of successfully completed conversation steps.
+    int _step;
 
-        /// Underlying Cyrus SASL library connection object.
-        sasl_conn_t* _saslConnection;
+    /// See isDone().
+    bool _done;
 
-        // Number of successfully completed conversation steps.
-        int _step;
+    /// Stored of password in sasl_secret_t format
+    std::unique_ptr<char[]> _secret;
 
-        /// See isDone().
-        bool _done;
-
-        /// Stored of password in sasl_secret_t format
-        std::unique_ptr<char[]> _secret;
-
-        /// Callbacks registered on _saslConnection for providing the Cyrus SASL library with
-        /// parameter values, etc.
-        sasl_callback_t _callbacks[maxCallbacks];
-    };
+    /// Callbacks registered on _saslConnection for providing the Cyrus SASL library with
+    /// parameter values, etc.
+    sasl_callback_t _callbacks[maxCallbacks];
+};
 
 }  // namespace mongo

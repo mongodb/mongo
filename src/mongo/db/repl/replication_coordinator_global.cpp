@@ -34,16 +34,15 @@
 namespace mongo {
 namespace repl {
 
-    ReplicationCoordinator* getGlobalReplicationCoordinator() {
-        ReplicationCoordinator* globalReplCoordinator = ReplicationCoordinator::get(
-            getGlobalServiceContext());
-        return globalReplCoordinator;
-    }
+ReplicationCoordinator* getGlobalReplicationCoordinator() {
+    ReplicationCoordinator* globalReplCoordinator =
+        ReplicationCoordinator::get(getGlobalServiceContext());
+    return globalReplCoordinator;
+}
 
-    void setGlobalReplicationCoordinator(ReplicationCoordinator* coord) {
-        repl::ReplicationCoordinator::set(getGlobalServiceContext(),
-                                          std::move(
-                                              std::unique_ptr<ReplicationCoordinator>(coord)));
-    }
-} // namespace repl
-} // namespace mongo
+void setGlobalReplicationCoordinator(ReplicationCoordinator* coord) {
+    repl::ReplicationCoordinator::set(getGlobalServiceContext(),
+                                      std::move(std::unique_ptr<ReplicationCoordinator>(coord)));
+}
+}  // namespace repl
+}  // namespace mongo

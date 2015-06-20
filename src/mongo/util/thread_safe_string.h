@@ -37,44 +37,44 @@
 
 namespace mongo {
 
-    /**
-     * this is a thread safe string
-     * you will never get a bad pointer, though data may be mungedd
-     */
-    class ThreadSafeString {
-        MONGO_DISALLOW_COPYING(ThreadSafeString);
-    public:
-        ThreadSafeString( size_t size=256 )
-            : _size( size ) , _buf( new char[size] ) {
-            memset( _buf , '\0' , _size );
-        }
+/**
+ * this is a thread safe string
+ * you will never get a bad pointer, though data may be mungedd
+ */
+class ThreadSafeString {
+    MONGO_DISALLOW_COPYING(ThreadSafeString);
 
-        ~ThreadSafeString() {
-            delete[] _buf;
-        }
+public:
+    ThreadSafeString(size_t size = 256) : _size(size), _buf(new char[size]) {
+        memset(_buf, '\0', _size);
+    }
 
-        std::string toString() const {
-            return _buf;
-        }
+    ~ThreadSafeString() {
+        delete[] _buf;
+    }
 
-        ThreadSafeString& operator=( StringData str ) {
-            size_t s = str.size();
-            if ( s >= _size - 2 )
-                s = _size - 2;
-            strncpy( _buf , str.rawData() , s );
-            _buf[s] = '\0';
-            return *this;
-        }
+    std::string toString() const {
+        return _buf;
+    }
 
-        bool empty() const {
-            return _buf[0] == '\0';
-        }
+    ThreadSafeString& operator=(StringData str) {
+        size_t s = str.size();
+        if (s >= _size - 2)
+            s = _size - 2;
+        strncpy(_buf, str.rawData(), s);
+        _buf[s] = '\0';
+        return *this;
+    }
 
-    private:
-        const size_t _size;
-        char *const _buf;
-    };
+    bool empty() const {
+        return _buf[0] == '\0';
+    }
 
-    std::ostream& operator<<(std::ostream &s, const ThreadSafeString &o);
+private:
+    const size_t _size;
+    char* const _buf;
+};
 
-} // namespace mongo
+std::ostream& operator<<(std::ostream& s, const ThreadSafeString& o);
+
+}  // namespace mongo

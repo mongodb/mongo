@@ -45,199 +45,200 @@
 
 namespace QueryStageDistinct {
 
-    class DistinctBase {
-    public:
-        DistinctBase() : _client(&_txn) { 
+class DistinctBase {
+public:
+    DistinctBase() : _client(&_txn) {}
 
+    virtual ~DistinctBase() {
+        _client.dropCollection(ns());
+    }
+
+    void addIndex(const BSONObj& obj) {
+        ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
+    }
+
+    void insert(const BSONObj& obj) {
+        _client.insert(ns(), obj);
+    }
+
+    /**
+     * Returns the projected value from the working set that would
+     * be returned in the 'values' field of the distinct command result.
+     * Limited to NumberInt BSON types because this is the only
+     * BSON type used in this suite of tests.
+     */
+    static int getIntFieldDotted(const WorkingSet& ws,
+                                 WorkingSetID wsid,
+                                 const std::string& field) {
+        // For some reason (at least under OS X clang), we cannot refer to INVALID_ID
+        // inside the test assertion macro.
+        WorkingSetID invalid = WorkingSet::INVALID_ID;
+        ASSERT_NOT_EQUALS(invalid, wsid);
+
+        WorkingSetMember* member = ws.get(wsid);
+
+        // Distinct hack execution is always covered.
+        // Key value is retrieved from working set key data
+        // instead of RecordId.
+        ASSERT_FALSE(member->hasObj());
+        BSONElement keyElt;
+        ASSERT_TRUE(member->getFieldDotted(field, &keyElt));
+        ASSERT_TRUE(keyElt.isNumber());
+
+        return keyElt.numberInt();
+    }
+
+    static const char* ns() {
+        return "unittests.QueryStageDistinct";
+    }
+
+protected:
+    OperationContextImpl _txn;
+
+private:
+    DBDirectClient _client;
+};
+
+
+// Tests distinct with single key indices.
+class QueryStageDistinctBasic : public DistinctBase {
+public:
+    virtual ~QueryStageDistinctBasic() {}
+
+    void run() {
+        // Insert a ton of documents with a: 1
+        for (size_t i = 0; i < 1000; ++i) {
+            insert(BSON("a" << 1));
         }
 
-        virtual ~DistinctBase() {
-            _client.dropCollection(ns());
+        // Insert a ton of other documents with a: 2
+        for (size_t i = 0; i < 1000; ++i) {
+            insert(BSON("a" << 2));
         }
 
-        void addIndex(const BSONObj& obj) {
-            ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
+        // Make an index on a:1
+        addIndex(BSON("a" << 1));
+
+        AutoGetCollectionForRead ctx(&_txn, ns());
+        Collection* coll = ctx.getCollection();
+
+        // Set up the distinct stage.
+        DistinctParams params;
+        params.descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("a" << 1));
+        verify(params.descriptor);
+        params.direction = 1;
+        // Distinct-ing over the 0-th field of the keypattern.
+        params.fieldNo = 0;
+        // We'll look at all values in the bounds.
+        params.bounds.isSimpleRange = false;
+        OrderedIntervalList oil("a");
+        oil.intervals.push_back(IndexBoundsBuilder::allValues());
+        params.bounds.fields.push_back(oil);
+
+        WorkingSet ws;
+        DistinctScan distinct(&_txn, params, &ws);
+
+        WorkingSetID wsid;
+        // Get our first result.
+        int firstResultWorks = 0;
+        while (PlanStage::ADVANCED != distinct.work(&wsid)) {
+            ++firstResultWorks;
+        }
+        // 5 is a bogus number.  There's some amount of setup done by the first few calls but
+        // we should return the first result relatively promptly.
+        ASSERT_LESS_THAN(firstResultWorks, 5);
+        ASSERT_EQUALS(1, getIntFieldDotted(ws, wsid, "a"));
+
+        // Getting our second result should be very quick as we just skip
+        // over the first result.
+        int secondResultWorks = 0;
+        while (PlanStage::ADVANCED != distinct.work(&wsid)) {
+            ++secondResultWorks;
+        }
+        ASSERT_EQUALS(2, getIntFieldDotted(ws, wsid, "a"));
+        // This is 0 because we don't have to loop for several values; we just skip over
+        // all the 'a' values.
+        ASSERT_EQUALS(0, secondResultWorks);
+
+        ASSERT_EQUALS(PlanStage::IS_EOF, distinct.work(&wsid));
+    }
+};
+
+// Tests distinct with multikey indices.
+class QueryStageDistinctMultiKey : public DistinctBase {
+public:
+    virtual ~QueryStageDistinctMultiKey() {}
+
+    void run() {
+        // Insert a ton of documents with a: [1, 2, 3]
+        for (size_t i = 0; i < 1000; ++i) {
+            insert(BSON("a" << BSON_ARRAY(1 << 2 << 3)));
         }
 
-        void insert(const BSONObj& obj) {
-            _client.insert(ns(), obj);
+        // Insert a ton of other documents with a: [4, 5, 6]
+        for (size_t i = 0; i < 1000; ++i) {
+            insert(BSON("a" << BSON_ARRAY(4 << 5 << 6)));
         }
 
-        /**
-         * Returns the projected value from the working set that would
-         * be returned in the 'values' field of the distinct command result.
-         * Limited to NumberInt BSON types because this is the only
-         * BSON type used in this suite of tests.
-         */
-        static int getIntFieldDotted(const WorkingSet& ws, WorkingSetID wsid,
-                                     const std::string& field) {
-            // For some reason (at least under OS X clang), we cannot refer to INVALID_ID
-            // inside the test assertion macro.
-            WorkingSetID invalid = WorkingSet::INVALID_ID;
-            ASSERT_NOT_EQUALS(invalid, wsid);
+        // Make an index on a:1
+        addIndex(BSON("a" << 1));
 
-            WorkingSetMember* member = ws.get(wsid);
+        AutoGetCollectionForRead ctx(&_txn, ns());
+        Collection* coll = ctx.getCollection();
 
-            // Distinct hack execution is always covered.
-            // Key value is retrieved from working set key data
-            // instead of RecordId.
-            ASSERT_FALSE(member->hasObj());
-            BSONElement keyElt;
-            ASSERT_TRUE(member->getFieldDotted(field, &keyElt));
-            ASSERT_TRUE(keyElt.isNumber());
+        // Set up the distinct stage.
+        DistinctParams params;
+        params.descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("a" << 1));
+        ASSERT_TRUE(params.descriptor->isMultikey(&_txn));
 
-            return keyElt.numberInt();
-        }
+        verify(params.descriptor);
+        params.direction = 1;
+        // Distinct-ing over the 0-th field of the keypattern.
+        params.fieldNo = 0;
+        // We'll look at all values in the bounds.
+        params.bounds.isSimpleRange = false;
+        OrderedIntervalList oil("a");
+        oil.intervals.push_back(IndexBoundsBuilder::allValues());
+        params.bounds.fields.push_back(oil);
 
-        static const char* ns() { return "unittests.QueryStageDistinct"; }
+        WorkingSet ws;
+        DistinctScan distinct(&_txn, params, &ws);
 
-    protected:
-        OperationContextImpl _txn;
+        // We should see each number in the range [1, 6] exactly once.
+        std::set<int> seen;
 
-    private:
-        DBDirectClient _client;
-    };
+        WorkingSetID wsid;
+        PlanStage::StageState state;
+        while (PlanStage::IS_EOF != (state = distinct.work(&wsid))) {
+            if (PlanStage::ADVANCED == state) {
+                // Check int value.
+                int currentNumber = getIntFieldDotted(ws, wsid, "a");
+                ASSERT_GREATER_THAN_OR_EQUALS(currentNumber, 1);
+                ASSERT_LESS_THAN_OR_EQUALS(currentNumber, 6);
 
-
-    // Tests distinct with single key indices.
-    class QueryStageDistinctBasic : public DistinctBase {
-    public:
-        virtual ~QueryStageDistinctBasic() { }
-
-        void run() {
-            // Insert a ton of documents with a: 1
-            for (size_t i = 0; i < 1000; ++i) {
-                insert(BSON("a" << 1));
+                // Should see this number only once.
+                ASSERT_TRUE(seen.find(currentNumber) == seen.end());
+                seen.insert(currentNumber);
             }
-
-            // Insert a ton of other documents with a: 2
-            for (size_t i = 0; i < 1000; ++i) {
-                insert(BSON("a" << 2));
-            }
-
-            // Make an index on a:1
-            addIndex(BSON("a" << 1));
-
-            AutoGetCollectionForRead ctx(&_txn, ns());
-            Collection* coll = ctx.getCollection();
-
-            // Set up the distinct stage.
-            DistinctParams params;
-            params.descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("a" << 1));
-            verify(params.descriptor);
-            params.direction = 1;
-            // Distinct-ing over the 0-th field of the keypattern.
-            params.fieldNo = 0;
-            // We'll look at all values in the bounds.
-            params.bounds.isSimpleRange = false;
-            OrderedIntervalList oil("a");
-            oil.intervals.push_back(IndexBoundsBuilder::allValues());
-            params.bounds.fields.push_back(oil);
-
-            WorkingSet ws;
-            DistinctScan distinct(&_txn, params, &ws);
-
-            WorkingSetID wsid;
-            // Get our first result.
-            int firstResultWorks = 0;
-            while (PlanStage::ADVANCED != distinct.work(&wsid)) {
-                ++firstResultWorks;
-            }
-            // 5 is a bogus number.  There's some amount of setup done by the first few calls but
-            // we should return the first result relatively promptly.
-            ASSERT_LESS_THAN(firstResultWorks, 5);
-            ASSERT_EQUALS(1, getIntFieldDotted(ws, wsid, "a"));
-
-            // Getting our second result should be very quick as we just skip
-            // over the first result.
-            int secondResultWorks = 0;
-            while (PlanStage::ADVANCED != distinct.work(&wsid)) {
-                ++secondResultWorks;
-            }
-            ASSERT_EQUALS(2, getIntFieldDotted(ws, wsid, "a"));
-            // This is 0 because we don't have to loop for several values; we just skip over
-            // all the 'a' values.
-            ASSERT_EQUALS(0, secondResultWorks);
-
-            ASSERT_EQUALS(PlanStage::IS_EOF, distinct.work(&wsid));
         }
-    };
 
-    // Tests distinct with multikey indices.
-    class QueryStageDistinctMultiKey : public DistinctBase {
-    public:
-        virtual ~QueryStageDistinctMultiKey() { }
+        ASSERT_EQUALS(6U, seen.size());
+    }
+};
 
-        void run() {
-            // Insert a ton of documents with a: [1, 2, 3]
-            for (size_t i = 0; i < 1000; ++i) {
-                insert(BSON("a" << BSON_ARRAY(1 << 2 << 3)));
-            }
+// XXX: add a test case with bounds where skipping to the next key gets us a result that's not
+// valid w.r.t. our query.
 
-            // Insert a ton of other documents with a: [4, 5, 6]
-            for (size_t i = 0; i < 1000; ++i) {
-                insert(BSON("a" << BSON_ARRAY(4 << 5 << 6)));
-            }
+class All : public Suite {
+public:
+    All() : Suite("query_stage_distinct") {}
 
-            // Make an index on a:1
-            addIndex(BSON("a" << 1));
+    void setupTests() {
+        add<QueryStageDistinctBasic>();
+        add<QueryStageDistinctMultiKey>();
+    }
+};
 
-            AutoGetCollectionForRead ctx(&_txn, ns());
-            Collection* coll = ctx.getCollection();
-
-            // Set up the distinct stage.
-            DistinctParams params;
-            params.descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("a" << 1));
-            ASSERT_TRUE(params.descriptor->isMultikey(&_txn));
-
-            verify(params.descriptor);
-            params.direction = 1;
-            // Distinct-ing over the 0-th field of the keypattern.
-            params.fieldNo = 0;
-            // We'll look at all values in the bounds.
-            params.bounds.isSimpleRange = false;
-            OrderedIntervalList oil("a");
-            oil.intervals.push_back(IndexBoundsBuilder::allValues());
-            params.bounds.fields.push_back(oil);
-
-            WorkingSet ws;
-            DistinctScan distinct(&_txn, params, &ws);
-
-            // We should see each number in the range [1, 6] exactly once.
-            std::set<int> seen;
-
-            WorkingSetID wsid;
-            PlanStage::StageState state;
-            while (PlanStage::IS_EOF != (state = distinct.work(&wsid))) {
-                if (PlanStage::ADVANCED == state) {
-                    // Check int value.
-                    int currentNumber = getIntFieldDotted(ws, wsid, "a");
-                    ASSERT_GREATER_THAN_OR_EQUALS(currentNumber, 1);
-                    ASSERT_LESS_THAN_OR_EQUALS(currentNumber, 6);
-
-                    // Should see this number only once.
-                    ASSERT_TRUE(seen.find(currentNumber) == seen.end());
-                    seen.insert(currentNumber);
-                }
-            }
-
-            ASSERT_EQUALS(6U, seen.size());
-        }
-    };
-
-    // XXX: add a test case with bounds where skipping to the next key gets us a result that's not
-    // valid w.r.t. our query.
-
-    class All : public Suite {
-    public:
-        All() : Suite( "query_stage_distinct" ) { }
-
-        void setupTests() {
-            add<QueryStageDistinctBasic>();
-            add<QueryStageDistinctMultiKey>();
-        }
-    };
-
-    SuiteInstance<All> queryStageDistinctAll;
+SuiteInstance<All> queryStageDistinctAll;
 
 }  // namespace QueryStageDistinct

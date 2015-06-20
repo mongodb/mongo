@@ -32,41 +32,41 @@
 
 namespace mongo {
 
-    class ServiceContextNoop final : public ServiceContext {
-    public:
-        StorageEngine* getGlobalStorageEngine() override;
+class ServiceContextNoop final : public ServiceContext {
+public:
+    StorageEngine* getGlobalStorageEngine() override;
 
-        void initializeGlobalStorageEngine() override;
+    void initializeGlobalStorageEngine() override;
 
-        void shutdownGlobalStorageEngineCleanly() override;
+    void shutdownGlobalStorageEngineCleanly() override;
 
-        void registerStorageEngine(const std::string& name,
-                                   const StorageEngine::Factory* factory) override;
+    void registerStorageEngine(const std::string& name,
+                               const StorageEngine::Factory* factory) override;
 
-        bool isRegisteredStorageEngine(const std::string& name) override;
+    bool isRegisteredStorageEngine(const std::string& name) override;
 
-        StorageFactoriesIterator* makeStorageFactoriesIterator() override;
+    StorageFactoriesIterator* makeStorageFactoriesIterator() override;
 
-        bool killOperation(unsigned int opId) override;
+    bool killOperation(unsigned int opId) override;
 
-        void killAllUserOperations(const OperationContext* txn) override;
+    void killAllUserOperations(const OperationContext* txn) override;
 
-        void setKillAllOperations() override;
+    void setKillAllOperations() override;
 
-        void unsetKillAllOperations() override;
+    void unsetKillAllOperations() override;
 
-        bool getKillAllOperations() override;
+    bool getKillAllOperations() override;
 
-        void registerKillOpListener(KillOpListenerInterface* listener) override;
+    void registerKillOpListener(KillOpListenerInterface* listener) override;
 
-        std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
+    std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
 
-        void setOpObserver(std::unique_ptr<OpObserver> opObserver) override;
+    void setOpObserver(std::unique_ptr<OpObserver> opObserver) override;
 
-        OpObserver* getOpObserver() override;
+    OpObserver* getOpObserver() override;
 
-    private:
-        AtomicUInt32 _nextOpId{1};
-    };
+private:
+    AtomicUInt32 _nextOpId{1};
+};
 
 }  // namespace mongo

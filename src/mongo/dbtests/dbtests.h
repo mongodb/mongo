@@ -40,26 +40,23 @@ using namespace mongo::unittest;
 using std::shared_ptr;
 
 namespace mongo {
-    class BSONObj;
-    class OperationContext;
-    class Status;
-    class StringData;
+class BSONObj;
+class OperationContext;
+class Status;
+class StringData;
 
 namespace dbtests {
-    // This specifies default dbpath for our testing framework
-    extern const std::string default_test_dbpath;
+// This specifies default dbpath for our testing framework
+extern const std::string default_test_dbpath;
 
-    /**
-     * Creates an index if it does not already exist.
-     */
-    Status createIndex(OperationContext* txn,
-                       StringData ns,
-                       const BSONObj& keys,
-                       bool unique = false);
+/**
+ * Creates an index if it does not already exist.
+ */
+Status createIndex(OperationContext* txn, StringData ns, const BSONObj& keys, bool unique = false);
 
-    /**
-     * Creates an index from a BSON spec, if it does not already exist.
-     */
-    Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& spec);
+/**
+ * Creates an index from a BSON spec, if it does not already exist.
+ */
+Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& spec);
 }  // namespace dbtests
 }  // namespace mongo

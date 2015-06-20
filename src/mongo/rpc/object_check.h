@@ -32,16 +32,17 @@
 
 // We do not use the rpc namespace here so we can specialize Validator.
 namespace mongo {
-    class BSONObj;
-    class Status;
+class BSONObj;
+class Status;
 
-    /**
-     * A validator for BSON objects. The implementation will validate the input object
-     * if validation is enabled, or return Status::OK() otherwise.
-     */
-    template<> struct Validator<BSONObj> {
-        static Status validateLoad(const char* ptr, size_t length);
-        static Status validateStore(const BSONObj& toStore);
-    };
+/**
+ * A validator for BSON objects. The implementation will validate the input object
+ * if validation is enabled, or return Status::OK() otherwise.
+ */
+template <>
+struct Validator<BSONObj> {
+    static Status validateLoad(const char* ptr, size_t length);
+    static Status validateStore(const BSONObj& toStore);
+};
 
 }  // namespace mongo

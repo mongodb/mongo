@@ -39,28 +39,28 @@
 
 namespace mongo {
 
-    /**
-     * The implementation of AuthzManagerExternalState functionality for mongod.
-     */
-    class AuthzManagerExternalStateMongod : public AuthzManagerExternalStateLocal {
-        MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMongod);
+/**
+ * The implementation of AuthzManagerExternalState functionality for mongod.
+ */
+class AuthzManagerExternalStateMongod : public AuthzManagerExternalStateLocal {
+    MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMongod);
 
-    public:
-        AuthzManagerExternalStateMongod();
-        virtual ~AuthzManagerExternalStateMongod();
+public:
+    AuthzManagerExternalStateMongod();
+    virtual ~AuthzManagerExternalStateMongod();
 
-        std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
-                AuthorizationManager* authzManager) override;
+    std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
+        AuthorizationManager* authzManager) override;
 
-        virtual Status findOne(OperationContext* txn,
-                               const NamespaceString& collectionName,
-                               const BSONObj& query,
-                               BSONObj* result);
-        virtual Status query(OperationContext* txn,
-                             const NamespaceString& collectionName,
-                             const BSONObj& query,
-                             const BSONObj& projection,
-                             const stdx::function<void(const BSONObj&)>& resultProcessor);
-    };
+    virtual Status findOne(OperationContext* txn,
+                           const NamespaceString& collectionName,
+                           const BSONObj& query,
+                           BSONObj* result);
+    virtual Status query(OperationContext* txn,
+                         const NamespaceString& collectionName,
+                         const BSONObj& query,
+                         const BSONObj& projection,
+                         const stdx::function<void(const BSONObj&)>& resultProcessor);
+};
 
-} // namespace mongo
+}  // namespace mongo

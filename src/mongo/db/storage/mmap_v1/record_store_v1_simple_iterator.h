@@ -33,39 +33,41 @@
 
 namespace mongo {
 
-    class SimpleRecordStoreV1;
+class SimpleRecordStoreV1;
 
-    /**
-     * This class iterates over a non-capped collection identified by 'ns'.
-     * The collection must exist when the constructor is called.
-     *
-     * If start is not DiskLoc(), the iteration begins at that DiskLoc.
-     */
-    class SimpleRecordStoreV1Iterator final : public RecordCursor {
-    public:
-        SimpleRecordStoreV1Iterator( OperationContext* txn,
-                                     const SimpleRecordStoreV1* records,
-                                     bool forward);
+/**
+ * This class iterates over a non-capped collection identified by 'ns'.
+ * The collection must exist when the constructor is called.
+ *
+ * If start is not DiskLoc(), the iteration begins at that DiskLoc.
+ */
+class SimpleRecordStoreV1Iterator final : public RecordCursor {
+public:
+    SimpleRecordStoreV1Iterator(OperationContext* txn,
+                                const SimpleRecordStoreV1* records,
+                                bool forward);
 
-        boost::optional<Record> next() final;
-        boost::optional<Record> seekExact(const RecordId& id) final;
-        void savePositioned() final;
-        bool restore(OperationContext* txn) final;
-        void invalidate(const RecordId& dl) final;
-        std::unique_ptr<RecordFetcher> fetcherForNext() const final;
-        std::unique_ptr<RecordFetcher> fetcherForId(const RecordId& id) const final;
+    boost::optional<Record> next() final;
+    boost::optional<Record> seekExact(const RecordId& id) final;
+    void savePositioned() final;
+    bool restore(OperationContext* txn) final;
+    void invalidate(const RecordId& dl) final;
+    std::unique_ptr<RecordFetcher> fetcherForNext() const final;
+    std::unique_ptr<RecordFetcher> fetcherForId(const RecordId& id) const final;
 
-    private:
-        void advance();
-        bool isEOF() { return _curr.isNull(); }
+private:
+    void advance();
+    bool isEOF() {
+        return _curr.isNull();
+    }
 
-         // for getNext, not owned
-        OperationContext* _txn;
+    // for getNext, not owned
+    OperationContext* _txn;
 
-        // The result returned on the next call to getNext().
-        DiskLoc _curr;
-        const SimpleRecordStoreV1* const _recordStore;
-        const bool _forward;
-    };
+    // The result returned on the next call to getNext().
+    DiskLoc _curr;
+    const SimpleRecordStoreV1* const _recordStore;
+    const bool _forward;
+};
 
 }  // namespace mongo

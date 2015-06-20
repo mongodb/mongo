@@ -38,217 +38,198 @@
 
 namespace mongo {
 
-    using std::vector;
+using std::vector;
 
-    namespace mb = mutablebson;
-    namespace str = mongoutils::str;
+namespace mb = mutablebson;
+namespace str = mongoutils::str;
 
-    struct ModifierPullAll::PreparedState {
+struct ModifierPullAll::PreparedState {
+    PreparedState(mutablebson::Document* targetDoc)
+        : doc(*targetDoc),
+          pathFoundIndex(0),
+          pathFoundElement(doc.end()),
+          applyCalled(false),
+          elementsToRemove() {}
 
-        PreparedState(mutablebson::Document* targetDoc)
-            : doc(*targetDoc)
-            , pathFoundIndex(0)
-            , pathFoundElement(doc.end())
-            , applyCalled(false)
-            , elementsToRemove() {
-        }
+    // Document that is going to be changed.
+    mutablebson::Document& doc;
 
-        // Document that is going to be changed.
-        mutablebson::Document& doc;
+    // Index in _fieldRef for which an Element exist in the document.
+    size_t pathFoundIndex;
 
-        // Index in _fieldRef for which an Element exist in the document.
-        size_t pathFoundIndex;
+    // Element corresponding to _fieldRef[0.._idxFound].
+    mutablebson::Element pathFoundElement;
 
-        // Element corresponding to _fieldRef[0.._idxFound].
-        mutablebson::Element pathFoundElement;
+    bool applyCalled;
 
-        bool applyCalled;
+    // Elements to be removed
+    vector<mutablebson::Element> elementsToRemove;
+};
 
-        // Elements to be removed
-       vector<mutablebson::Element> elementsToRemove;
-    };
+namespace {
 
-    namespace {
-
-        struct mutableElementEqualsBSONElement : std::unary_function<BSONElement, bool>
-        {
-            mutableElementEqualsBSONElement(const mutablebson::Element& elem) : _what(elem) {}
-            bool operator()(const BSONElement& elem) const {
-                return _what.compareWithBSONElement(elem, false) == 0;
-            }
-            const mutablebson::Element& _what;
-        };
-    } // namespace
-
-    ModifierPullAll::ModifierPullAll()
-        : _fieldRef()
-        , _positionalPathIndex(0)
-        , _elementsToFind() {
+struct mutableElementEqualsBSONElement : std::unary_function<BSONElement, bool> {
+    mutableElementEqualsBSONElement(const mutablebson::Element& elem) : _what(elem) {}
+    bool operator()(const BSONElement& elem) const {
+        return _what.compareWithBSONElement(elem, false) == 0;
     }
+    const mutablebson::Element& _what;
+};
+}  // namespace
 
-    ModifierPullAll::~ModifierPullAll() {
-    }
+ModifierPullAll::ModifierPullAll() : _fieldRef(), _positionalPathIndex(0), _elementsToFind() {}
 
-    Status ModifierPullAll::init(const BSONElement& modExpr, const Options& opts,
-                                 bool* positional) {
+ModifierPullAll::~ModifierPullAll() {}
 
-        //
-        // field name analysis
-        //
+Status ModifierPullAll::init(const BSONElement& modExpr, const Options& opts, bool* positional) {
+    //
+    // field name analysis
+    //
 
-        // Break down the field name into its 'dotted' components (aka parts) and check that
-        // there are no empty parts.
-        _fieldRef.parse(modExpr.fieldName());
-        Status status = fieldchecker::isUpdatable(_fieldRef);
-        if (! status.isOK()) {
-            return status;
-        }
-
-        // If a $-positional operator was used, get the index in which it occurred
-        // and ensure only one occurrence.
-        size_t foundCount;
-        bool foundDollar = fieldchecker::isPositional(_fieldRef,
-                                                      &_positionalPathIndex,
-                                                      &foundCount);
-
-        if (positional)
-            *positional = foundDollar;
-
-        if (foundDollar && foundCount > 1) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                        << _fieldRef.dottedField() << "'");
-        }
-
-        //
-        // value analysis
-        //
-
-        if (modExpr.type() != Array) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "$pullAll requires an array argument but was given a "
-                                        << typeName(modExpr.type()));
-        }
-
-        // store the stuff to remove later
-        _elementsToFind = modExpr.Array();
-
-        return Status::OK();
-    }
-
-    Status ModifierPullAll::prepare(mutablebson::Element root,
-                                    StringData matchedField,
-                                    ExecInfo* execInfo) {
-
-        _preparedState.reset(new PreparedState(&root.getDocument()));
-
-        // If we have a $-positional field, it is time to bind it to an actual field part.
-        if (_positionalPathIndex) {
-            if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "The positional operator did not find the match "
-                                                "needed from the query. Unexpanded update: "
-                                            << _fieldRef.dottedField());
-            }
-            _fieldRef.setPart(_positionalPathIndex, matchedField);
-        }
-
-        // Locate the field name in 'root'. Note that if we don't have the full path in the
-        // doc, there isn't anything to unset, really.
-        Status status = pathsupport::findLongestPrefix(_fieldRef,
-                                                       root,
-                                                       &_preparedState->pathFoundIndex,
-                                                       &_preparedState->pathFoundElement);
-        // Check if we didn't find the full path
-        if (status.isOK()) {
-            const bool destExists = (_preparedState->pathFoundIndex == (_fieldRef.numParts()-1));
-
-            if (!destExists) {
-                execInfo->noOp = true;
-            } else {
-                // If the path exists, we require the target field to be already an
-                // array.
-                if (_preparedState->pathFoundElement.getType() != Array) {
-                    mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
-                    return Status(
-                        ErrorCodes::BadValue,
-                        str::stream() << "Can only apply $pullAll to an array. "
-                                      << idElem.toString()
-                                      << " has the field "
-                                      <<  _preparedState->pathFoundElement.getFieldName()
-                                      << " of non-array type "
-                                      << typeName(_preparedState->pathFoundElement.getType()));
-                }
-
-                // No children, nothing to do -- not an error state
-                if (!_preparedState->pathFoundElement.hasChildren()) {
-                    execInfo->noOp = true;
-                } else {
-                    mutablebson::Element elem = _preparedState->pathFoundElement.leftChild();
-                    while (elem.ok()) {
-                        if (std::find_if(_elementsToFind.begin(),
-                                         _elementsToFind.end(),
-                                         mutableElementEqualsBSONElement(elem))
-                                            != _elementsToFind.end()) {
-                            _preparedState->elementsToRemove.push_back(elem);
-                        }
-                        elem = elem.rightSibling();
-                    }
-
-                    // Nothing to remove so it is a noOp.
-                    if (_preparedState->elementsToRemove.empty())
-                        execInfo->noOp = true;
-                }
-            }
-        } else {
-            // Let the caller know we can't do anything given the mod, _fieldRef, and doc.
-            execInfo->noOp = true;
-
-
-            //okay if path not found
-            if (status.code() == ErrorCodes::NonExistentPath)
-                status = Status::OK();
-        }
-
-        // Let the caller know what field we care about
-        execInfo->fieldRef[0] = &_fieldRef;
-
+    // Break down the field name into its 'dotted' components (aka parts) and check that
+    // there are no empty parts.
+    _fieldRef.parse(modExpr.fieldName());
+    Status status = fieldchecker::isUpdatable(_fieldRef);
+    if (!status.isOK()) {
         return status;
     }
 
-    Status ModifierPullAll::apply() const {
-        _preparedState->applyCalled = true;
+    // If a $-positional operator was used, get the index in which it occurred
+    // and ensure only one occurrence.
+    size_t foundCount;
+    bool foundDollar = fieldchecker::isPositional(_fieldRef, &_positionalPathIndex, &foundCount);
 
-        vector<mutablebson::Element>::const_iterator curr =
-                                            _preparedState->elementsToRemove.begin();
-        const vector<mutablebson::Element>::const_iterator end =
-                                            _preparedState->elementsToRemove.end();
-        for ( ; curr != end; ++curr) {
-            const_cast<mutablebson::Element&>(*curr).remove();
-        }
-        return Status::OK();
+    if (positional)
+        *positional = foundDollar;
+
+    if (foundDollar && foundCount > 1) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                    << _fieldRef.dottedField() << "'");
     }
 
-    Status ModifierPullAll::log(LogBuilder* logBuilder) const {
-        // log document
-        mutablebson::Document& doc = logBuilder->getDocument();
-        const bool pathExists = _preparedState->pathFoundElement.ok() &&
-            (_preparedState->pathFoundIndex == (_fieldRef.numParts() - 1));
+    //
+    // value analysis
+    //
 
-        if (!pathExists)
-            return logBuilder->addToUnsets(_fieldRef.dottedField());
-
-        // value for the logElement ("field.path.name": <value>)
-        mutablebson::Element logElement = doc.makeElementWithNewFieldName(
-                                                            _fieldRef.dottedField(),
-                                                            _preparedState->pathFoundElement);
-
-        if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError,
-                          str::stream() << "Could not append entry to $pullAll oplog entry: "
-                                        << "set '" << _fieldRef.dottedField() << "' -> "
-                                        << _preparedState->pathFoundElement.toString() );
-        }
-        return logBuilder->addToSets(logElement);
+    if (modExpr.type() != Array) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "$pullAll requires an array argument but was given a "
+                                    << typeName(modExpr.type()));
     }
-} // namespace mongo
+
+    // store the stuff to remove later
+    _elementsToFind = modExpr.Array();
+
+    return Status::OK();
+}
+
+Status ModifierPullAll::prepare(mutablebson::Element root,
+                                StringData matchedField,
+                                ExecInfo* execInfo) {
+    _preparedState.reset(new PreparedState(&root.getDocument()));
+
+    // If we have a $-positional field, it is time to bind it to an actual field part.
+    if (_positionalPathIndex) {
+        if (matchedField.empty()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "The positional operator did not find the match "
+                                           "needed from the query. Unexpanded update: "
+                                        << _fieldRef.dottedField());
+        }
+        _fieldRef.setPart(_positionalPathIndex, matchedField);
+    }
+
+    // Locate the field name in 'root'. Note that if we don't have the full path in the
+    // doc, there isn't anything to unset, really.
+    Status status = pathsupport::findLongestPrefix(
+        _fieldRef, root, &_preparedState->pathFoundIndex, &_preparedState->pathFoundElement);
+    // Check if we didn't find the full path
+    if (status.isOK()) {
+        const bool destExists = (_preparedState->pathFoundIndex == (_fieldRef.numParts() - 1));
+
+        if (!destExists) {
+            execInfo->noOp = true;
+        } else {
+            // If the path exists, we require the target field to be already an
+            // array.
+            if (_preparedState->pathFoundElement.getType() != Array) {
+                mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
+                return Status(ErrorCodes::BadValue,
+                              str::stream()
+                                  << "Can only apply $pullAll to an array. " << idElem.toString()
+                                  << " has the field "
+                                  << _preparedState->pathFoundElement.getFieldName()
+                                  << " of non-array type "
+                                  << typeName(_preparedState->pathFoundElement.getType()));
+            }
+
+            // No children, nothing to do -- not an error state
+            if (!_preparedState->pathFoundElement.hasChildren()) {
+                execInfo->noOp = true;
+            } else {
+                mutablebson::Element elem = _preparedState->pathFoundElement.leftChild();
+                while (elem.ok()) {
+                    if (std::find_if(_elementsToFind.begin(),
+                                     _elementsToFind.end(),
+                                     mutableElementEqualsBSONElement(elem)) !=
+                        _elementsToFind.end()) {
+                        _preparedState->elementsToRemove.push_back(elem);
+                    }
+                    elem = elem.rightSibling();
+                }
+
+                // Nothing to remove so it is a noOp.
+                if (_preparedState->elementsToRemove.empty())
+                    execInfo->noOp = true;
+            }
+        }
+    } else {
+        // Let the caller know we can't do anything given the mod, _fieldRef, and doc.
+        execInfo->noOp = true;
+
+
+        // okay if path not found
+        if (status.code() == ErrorCodes::NonExistentPath)
+            status = Status::OK();
+    }
+
+    // Let the caller know what field we care about
+    execInfo->fieldRef[0] = &_fieldRef;
+
+    return status;
+}
+
+Status ModifierPullAll::apply() const {
+    _preparedState->applyCalled = true;
+
+    vector<mutablebson::Element>::const_iterator curr = _preparedState->elementsToRemove.begin();
+    const vector<mutablebson::Element>::const_iterator end = _preparedState->elementsToRemove.end();
+    for (; curr != end; ++curr) {
+        const_cast<mutablebson::Element&>(*curr).remove();
+    }
+    return Status::OK();
+}
+
+Status ModifierPullAll::log(LogBuilder* logBuilder) const {
+    // log document
+    mutablebson::Document& doc = logBuilder->getDocument();
+    const bool pathExists = _preparedState->pathFoundElement.ok() &&
+        (_preparedState->pathFoundIndex == (_fieldRef.numParts() - 1));
+
+    if (!pathExists)
+        return logBuilder->addToUnsets(_fieldRef.dottedField());
+
+    // value for the logElement ("field.path.name": <value>)
+    mutablebson::Element logElement =
+        doc.makeElementWithNewFieldName(_fieldRef.dottedField(), _preparedState->pathFoundElement);
+
+    if (!logElement.ok()) {
+        return Status(ErrorCodes::InternalError,
+                      str::stream() << "Could not append entry to $pullAll oplog entry: "
+                                    << "set '" << _fieldRef.dottedField() << "' -> "
+                                    << _preparedState->pathFoundElement.toString());
+    }
+    return logBuilder->addToSets(logElement);
+}
+}  // namespace mongo

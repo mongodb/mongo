@@ -34,45 +34,51 @@
 
 #include "mongo/util/assert_util.h"
 
-#define MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN do { int wcr__Attempts = 0; do { try
-#define MONGO_WRITE_CONFLICT_RETRY_LOOP_END(PTXN, OPSTR, NSSTR)         \
-        catch (const ::mongo::WriteConflictException &wce) {            \
-            const OperationContext* ptxn = (PTXN);                      \
-            ++CurOp::get(ptxn)->debug().writeConflicts;      \
-            wce.logAndBackoff(wcr__Attempts, (OPSTR), (NSSTR));         \
-            ++wcr__Attempts;                                            \
-            ptxn->recoveryUnit()->abandonSnapshot();                   \
-            continue;                                                   \
-        }                                                               \
-        break;                                                          \
-    } while (true); } while (false);
+#define MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN \
+    do {                                      \
+        int wcr__Attempts = 0;                \
+        do {                                  \
+            try
+#define MONGO_WRITE_CONFLICT_RETRY_LOOP_END(PTXN, OPSTR, NSSTR) \
+    catch (const ::mongo::WriteConflictException& wce) {        \
+        const OperationContext* ptxn = (PTXN);                  \
+        ++CurOp::get(ptxn)->debug().writeConflicts;             \
+        wce.logAndBackoff(wcr__Attempts, (OPSTR), (NSSTR));     \
+        ++wcr__Attempts;                                        \
+        ptxn->recoveryUnit()->abandonSnapshot();                \
+        continue;                                               \
+    }                                                           \
+    break;                                                      \
+    }                                                           \
+    while (true)                                                \
+        ;                                                       \
+    }                                                           \
+    while (false)                                               \
+        ;
 
 namespace mongo {
 
+/**
+ * This is thrown if during a write, two or more operations conflict with each other.
+ * For example if two operations get the same version of a document, and then both try to
+ * modify that document, this exception will get thrown by one of them.
+ */
+class WriteConflictException : public DBException {
+public:
+    WriteConflictException();
+
     /**
-     * This is thrown if during a write, two or more operations conflict with each other.
-     * For example if two operations get the same version of a document, and then both try to
-     * modify that document, this exception will get thrown by one of them.
+     * Will log a message if sensible and will do an exponential backoff to make sure
+     * we don't hammer the same doc over and over.
+     * @param attempt - what attempt is this, 1 based
+     * @param operation - e.g. "update"
      */
-    class WriteConflictException : public DBException {
-    public:
-        WriteConflictException();
+    static void logAndBackoff(int attempt, StringData operation, StringData ns);
 
-        /**
-         * Will log a message if sensible and will do an exponential backoff to make sure
-         * we don't hammer the same doc over and over.
-         * @param attempt - what attempt is this, 1 based
-         * @param operation - e.g. "update"
-         */
-        static void logAndBackoff(int attempt,
-                                  StringData operation,
-                                  StringData ns);
-
-        /**
-         * If true, will call printStackTrace on every WriteConflictException created.
-         * Can be set via setParameter named traceWriteConflictExceptions.
-         */
-        static bool trace;
-    };
-
+    /**
+     * If true, will call printStackTrace on every WriteConflictException created.
+     * Can be set via setParameter named traceWriteConflictExceptions.
+     */
+    static bool trace;
+};
 }

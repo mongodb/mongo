@@ -34,25 +34,26 @@
 
 namespace mongo {
 
-    class ConnectionString;
-    class RemoteCommandTargeter;
+class ConnectionString;
+class RemoteCommandTargeter;
+
+/**
+ * Constructs RemoteCommandTargeters based on the specific type of the target (standalone,
+ * replica set, etc).
+ */
+class RemoteCommandTargeterFactory {
+    MONGO_DISALLOW_COPYING(RemoteCommandTargeterFactory);
+
+public:
+    virtual ~RemoteCommandTargeterFactory() = default;
 
     /**
-     * Constructs RemoteCommandTargeters based on the specific type of the target (standalone,
-     * replica set, etc).
+     * Instantiates a RemoteCommandTargeter for the specified connection string.
      */
-    class RemoteCommandTargeterFactory {
-        MONGO_DISALLOW_COPYING(RemoteCommandTargeterFactory);
-    public:
-        virtual ~RemoteCommandTargeterFactory() = default;
+    virtual std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) = 0;
 
-        /**
-         * Instantiates a RemoteCommandTargeter for the specified connection string.
-         */
-        virtual std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) = 0;
+protected:
+    RemoteCommandTargeterFactory() = default;
+};
 
-    protected:
-        RemoteCommandTargeterFactory() = default;
-    };
-
-} // namespace mongo
+}  // namespace mongo

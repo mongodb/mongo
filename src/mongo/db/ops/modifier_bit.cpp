@@ -38,263 +38,233 @@
 
 namespace mongo {
 
-    namespace mb = mutablebson;
-    namespace str = mongoutils::str;
+namespace mb = mutablebson;
+namespace str = mongoutils::str;
 
-    struct ModifierBit::PreparedState {
+struct ModifierBit::PreparedState {
+    PreparedState(mutablebson::Document& doc)
+        : doc(doc), idxFound(0), elemFound(doc.end()), noOp(false) {}
 
-        PreparedState(mutablebson::Document& doc)
-            : doc(doc)
-            , idxFound(0)
-            , elemFound(doc.end())
-            , noOp(false) {
-        }
+    // Document that is going to be changed.
+    mutablebson::Document& doc;
 
-        // Document that is going to be changed.
-        mutablebson::Document& doc;
+    // Index in _fieldRef for which an Element exist in the document.
+    size_t idxFound;
 
-        // Index in _fieldRef for which an Element exist in the document.
-        size_t idxFound;
+    // Element corresponding to _fieldRef[0.._idxFound].
+    mutablebson::Element elemFound;
 
-        // Element corresponding to _fieldRef[0.._idxFound].
-        mutablebson::Element elemFound;
+    // Value to be applied.
+    SafeNum newValue;
 
-        // Value to be applied.
-        SafeNum newValue;
+    // True if this update is a no-op
+    bool noOp;
+};
 
-        // True if this update is a no-op
-        bool noOp;
-    };
+ModifierBit::ModifierBit() : ModifierInterface(), _fieldRef(), _posDollar(0), _ops() {}
 
-    ModifierBit::ModifierBit()
-        : ModifierInterface ()
-        , _fieldRef()
-        , _posDollar(0)
-        , _ops() {
+ModifierBit::~ModifierBit() {}
+
+Status ModifierBit::init(const BSONElement& modExpr, const Options& opts, bool* positional) {
+    // Perform standard field name and updateable checks.
+    _fieldRef.parse(modExpr.fieldName());
+    Status status = fieldchecker::isUpdatable(_fieldRef);
+    if (!status.isOK()) {
+        return status;
     }
 
-    ModifierBit::~ModifierBit() {
+    // If a $-positional operator was used, get the index in which it occurred
+    // and ensure only one occurrence.
+    size_t foundCount;
+    bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
+
+    if (positional)
+        *positional = foundDollar;
+
+    if (foundDollar && foundCount > 1) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                    << _fieldRef.dottedField() << "'");
     }
 
-    Status ModifierBit::init(const BSONElement& modExpr, const Options& opts,
-                             bool* positional) {
+    if (modExpr.type() != mongo::Object)
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "The $bit modifier is not compatible with a "
+                                    << typeName(modExpr.type())
+                                    << ". You must pass in an embedded document: "
+                                       "{$bit: {field: {and/or/xor: #}}");
 
-        // Perform standard field name and updateable checks.
-        _fieldRef.parse(modExpr.fieldName());
-        Status status = fieldchecker::isUpdatable(_fieldRef);
-        if (! status.isOK()) {
-            return status;
-        }
+    BSONObjIterator opsIterator(modExpr.embeddedObject());
 
-        // If a $-positional operator was used, get the index in which it occurred
-        // and ensure only one occurrence.
-        size_t foundCount;
-        bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
+    while (opsIterator.more()) {
+        BSONElement curOp = opsIterator.next();
 
-        if (positional)
-            *positional = foundDollar;
+        const StringData payloadFieldName = curOp.fieldName();
 
-        if (foundDollar && foundCount > 1) {
+        SafeNumOp op = NULL;
+
+        if (payloadFieldName == "and") {
+            op = &SafeNum::bitAnd;
+        } else if (payloadFieldName == "or") {
+            op = &SafeNum::bitOr;
+        } else if (payloadFieldName == "xor") {
+            op = &SafeNum::bitXor;
+        } else {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                        << _fieldRef.dottedField() << "'");
+                          str::stream()
+                              << "The $bit modifier only supports 'and', 'or', and 'xor', not '"
+                              << payloadFieldName << "' which is an unknown operator: {" << curOp
+                              << "}");
         }
 
-        if (modExpr.type() != mongo::Object)
+        if ((curOp.type() != mongo::NumberInt) && (curOp.type() != mongo::NumberLong))
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "The $bit modifier is not compatible with a "
-                                        << typeName(modExpr.type())
-                                        << ". You must pass in an embedded document: "
-                                           "{$bit: {field: {and/or/xor: #}}");
+                          str::stream()
+                              << "The $bit modifier field must be an Integer(32/64 bit); a '"
+                              << typeName(curOp.type()) << "' is not supported here: {" << curOp
+                              << "}");
 
-        BSONObjIterator opsIterator(modExpr.embeddedObject());
+        const OpEntry entry = {SafeNum(curOp), op};
+        _ops.push_back(entry);
+    }
 
-        while (opsIterator.more()) {
-            BSONElement curOp = opsIterator.next();
+    dassert(!_ops.empty());
 
-            const StringData payloadFieldName = curOp.fieldName();
+    return Status::OK();
+}
 
-            SafeNumOp op = NULL;
+Status ModifierBit::prepare(mutablebson::Element root,
+                            StringData matchedField,
+                            ExecInfo* execInfo) {
+    _preparedState.reset(new PreparedState(root.getDocument()));
 
-            if (payloadFieldName == "and") {
-                op = &SafeNum::bitAnd;
-            }
-            else if (payloadFieldName == "or") {
-                op = &SafeNum::bitOr;
-            }
-            else if (payloadFieldName == "xor") {
-                op = &SafeNum::bitXor;
-            }
-            else {
-                return Status(
-                    ErrorCodes::BadValue,
-                    str::stream() << "The $bit modifier only supports 'and', 'or', and 'xor', not '"
-                                  << payloadFieldName
-                                  << "' which is an unknown operator: {" << curOp << "}");
-            }
-
-            if ((curOp.type() != mongo::NumberInt) &&
-                (curOp.type() != mongo::NumberLong))
-                return Status(
-                    ErrorCodes::BadValue,
-                    str::stream() << "The $bit modifier field must be an Integer(32/64 bit); a '"
-                                  << typeName(curOp.type())
-                                  << "' is not supported here: {" << curOp << "}");
-
-            const OpEntry entry = {SafeNum(curOp), op};
-            _ops.push_back(entry);
+    // If we have a $-positional field, it is time to bind it to an actual field part.
+    if (_posDollar) {
+        if (matchedField.empty()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "The positional operator did not find the match "
+                                           "needed from the query. Unexpanded update: "
+                                        << _fieldRef.dottedField());
         }
+        _fieldRef.setPart(_posDollar, matchedField);
+    }
 
-        dassert(!_ops.empty());
+    // Locate the field name in 'root'.
+    Status status = pathsupport::findLongestPrefix(
+        _fieldRef, root, &_preparedState->idxFound, &_preparedState->elemFound);
 
+
+    // FindLongestPrefix may say the path does not exist at all, which is fine here, or
+    // that the path was not viable or otherwise wrong, in which case, the mod cannot
+    // proceed.
+    if (status.code() == ErrorCodes::NonExistentPath) {
+        _preparedState->elemFound = root.getDocument().end();
+    } else if (!status.isOK()) {
+        return status;
+    }
+
+    // We register interest in the field name. The driver needs this info to sort out if
+    // there is any conflict among mods.
+    execInfo->fieldRef[0] = &_fieldRef;
+
+    //
+    // in-place and no-op logic
+    //
+
+    // If the field path is not fully present, then this mod cannot be in place, nor is a
+    // noOp.
+    if (!_preparedState->elemFound.ok() || _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
+        // If no target element exists, the value we will write is the result of applying
+        // the operation to a zero-initialized integer element.
+        _preparedState->newValue = apply(SafeNum(static_cast<int>(0)));
         return Status::OK();
     }
 
-    Status ModifierBit::prepare(mutablebson::Element root,
-                                StringData matchedField,
-                                ExecInfo* execInfo) {
+    if (!_preparedState->elemFound.isIntegral()) {
+        mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Cannot apply $bit to a value of non-integral type."
+                                    << idElem.toString() << " has the field "
+                                    << _preparedState->elemFound.getFieldName()
+                                    << " of non-integer type "
+                                    << typeName(_preparedState->elemFound.getType()));
+    }
 
-        _preparedState.reset(new PreparedState(root.getDocument()));
+    const SafeNum currentValue = _preparedState->elemFound.getValueSafeNum();
 
-        // If we have a $-positional field, it is time to bind it to an actual field part.
-        if (_posDollar) {
-            if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "The positional operator did not find the match "
-                                                "needed from the query. Unexpanded update: "
-                                            << _fieldRef.dottedField());
-            }
-            _fieldRef.setPart(_posDollar, matchedField);
-        }
+    // Apply the op over the existing value and the mod value, and capture the result.
+    _preparedState->newValue = apply(currentValue);
 
-        // Locate the field name in 'root'.
-        Status status = pathsupport::findLongestPrefix(_fieldRef,
-                                                       root,
-                                                       &_preparedState->idxFound,
-                                                       &_preparedState->elemFound);
-
-
-        // FindLongestPrefix may say the path does not exist at all, which is fine here, or
-        // that the path was not viable or otherwise wrong, in which case, the mod cannot
-        // proceed.
-        if (status.code() == ErrorCodes::NonExistentPath) {
-            _preparedState->elemFound = root.getDocument().end();
-        }
-        else if (!status.isOK()) {
-            return status;
-        }
-
-        // We register interest in the field name. The driver needs this info to sort out if
-        // there is any conflict among mods.
-        execInfo->fieldRef[0] = &_fieldRef;
-
-        //
-        // in-place and no-op logic
-        //
-
-        // If the field path is not fully present, then this mod cannot be in place, nor is a
-        // noOp.
-        if (!_preparedState->elemFound.ok() ||
-            _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
-            // If no target element exists, the value we will write is the result of applying
-            // the operation to a zero-initialized integer element.
-            _preparedState->newValue = apply(SafeNum(static_cast<int>(0)));
-            return Status::OK();
-        }
-
-        if (!_preparedState->elemFound.isIntegral()) {
-            mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
-            return Status(
-                ErrorCodes::BadValue,
-                str::stream() << "Cannot apply $bit to a value of non-integral type."
-                              << idElem.toString()
-                              << " has the field " <<  _preparedState->elemFound.getFieldName()
-                              << " of non-integer type "
-                              << typeName(_preparedState->elemFound.getType()));
-        }
-
-        const SafeNum currentValue = _preparedState->elemFound.getValueSafeNum();
-
-        // Apply the op over the existing value and the mod value, and capture the result.
-        _preparedState->newValue = apply(currentValue);
-
-        if (!_preparedState->newValue.isValid()) {
-            // TODO: Include list of ops, if that is easy, at some future point.
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Failed to apply $bit operations to current value: "
-                                        << currentValue.debugString());
-        }
-        // If the values are identical (same type, same value), then this is a no-op.
-        if (_preparedState->newValue.isIdentical(currentValue)) {
-            _preparedState->noOp = execInfo->noOp = true;
-            return Status::OK();
-        }
-
+    if (!_preparedState->newValue.isValid()) {
+        // TODO: Include list of ops, if that is easy, at some future point.
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Failed to apply $bit operations to current value: "
+                                    << currentValue.debugString());
+    }
+    // If the values are identical (same type, same value), then this is a no-op.
+    if (_preparedState->newValue.isIdentical(currentValue)) {
+        _preparedState->noOp = execInfo->noOp = true;
         return Status::OK();
     }
 
-    Status ModifierBit::apply() const {
-        dassert(_preparedState->noOp == false);
+    return Status::OK();
+}
 
-        // If there's no need to create any further field part, the $bit is simply a value
-        // assignment.
-        if (_preparedState->elemFound.ok() &&
-            _preparedState->idxFound == (_fieldRef.numParts() - 1)) {
-            return _preparedState->elemFound.setValueSafeNum(_preparedState->newValue);
-        }
+Status ModifierBit::apply() const {
+    dassert(_preparedState->noOp == false);
 
-        //
-        // Complete document path logic
-        //
-
-        // Creates the final element that's going to be $set in 'doc'.
-        mutablebson::Document& doc = _preparedState->doc;
-        StringData lastPart = _fieldRef.getPart(_fieldRef.numParts() - 1);
-        mutablebson::Element elemToSet = doc.makeElementSafeNum(lastPart, _preparedState->newValue);
-        if (!elemToSet.ok()) {
-            return Status(ErrorCodes::InternalError, "can't create new element");
-        }
-
-        // Now, we can be in two cases here, as far as attaching the element being set goes:
-        // (a) none of the parts in the element's path exist, or (b) some parts of the path
-        // exist but not all.
-        if (!_preparedState->elemFound.ok()) {
-            _preparedState->elemFound = doc.root();
-            _preparedState->idxFound = 0;
-        }
-        else {
-            _preparedState->idxFound++;
-        }
-
-        // createPathAt() will complete the path and attach 'elemToSet' at the end of it.
-        return pathsupport::createPathAt(_fieldRef,
-                                         _preparedState->idxFound,
-                                         _preparedState->elemFound,
-                                         elemToSet);
+    // If there's no need to create any further field part, the $bit is simply a value
+    // assignment.
+    if (_preparedState->elemFound.ok() && _preparedState->idxFound == (_fieldRef.numParts() - 1)) {
+        return _preparedState->elemFound.setValueSafeNum(_preparedState->newValue);
     }
 
-    Status ModifierBit::log(LogBuilder* logBuilder) const {
+    //
+    // Complete document path logic
+    //
 
-        mutablebson::Element logElement = logBuilder->getDocument().makeElementSafeNum(
-            _fieldRef.dottedField(),
-            _preparedState->newValue);
-
-        if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError,
-                          str::stream() << "Could not append entry to $bit oplog entry: "
-                                        << "set '" << _fieldRef.dottedField() << "' -> "
-                                        << _preparedState->newValue.debugString() );
-        }
-        return logBuilder->addToSets(logElement);
-
+    // Creates the final element that's going to be $set in 'doc'.
+    mutablebson::Document& doc = _preparedState->doc;
+    StringData lastPart = _fieldRef.getPart(_fieldRef.numParts() - 1);
+    mutablebson::Element elemToSet = doc.makeElementSafeNum(lastPart, _preparedState->newValue);
+    if (!elemToSet.ok()) {
+        return Status(ErrorCodes::InternalError, "can't create new element");
     }
 
-    SafeNum ModifierBit::apply(SafeNum value) const {
-        OpEntries::const_iterator where = _ops.begin();
-        const OpEntries::const_iterator end = _ops.end();
-        for (; where != end; ++where)
-            value = (value.*(where->op))(where->val);
-        return value;
+    // Now, we can be in two cases here, as far as attaching the element being set goes:
+    // (a) none of the parts in the element's path exist, or (b) some parts of the path
+    // exist but not all.
+    if (!_preparedState->elemFound.ok()) {
+        _preparedState->elemFound = doc.root();
+        _preparedState->idxFound = 0;
+    } else {
+        _preparedState->idxFound++;
     }
 
-} // namespace mongo
+    // createPathAt() will complete the path and attach 'elemToSet' at the end of it.
+    return pathsupport::createPathAt(
+        _fieldRef, _preparedState->idxFound, _preparedState->elemFound, elemToSet);
+}
+
+Status ModifierBit::log(LogBuilder* logBuilder) const {
+    mutablebson::Element logElement = logBuilder->getDocument().makeElementSafeNum(
+        _fieldRef.dottedField(), _preparedState->newValue);
+
+    if (!logElement.ok()) {
+        return Status(ErrorCodes::InternalError,
+                      str::stream() << "Could not append entry to $bit oplog entry: "
+                                    << "set '" << _fieldRef.dottedField() << "' -> "
+                                    << _preparedState->newValue.debugString());
+    }
+    return logBuilder->addToSets(logElement);
+}
+
+SafeNum ModifierBit::apply(SafeNum value) const {
+    OpEntries::const_iterator where = _ops.begin();
+    const OpEntries::const_iterator end = _ops.end();
+    for (; where != end; ++where)
+        value = (value.*(where->op))(where->val);
+    return value;
+}
+
+}  // namespace mongo

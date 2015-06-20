@@ -35,41 +35,45 @@
 
 namespace mongo {
 
-    void logOpForDbHash( OperationContext* txn, const char* ns );
+void logOpForDbHash(OperationContext* txn, const char* ns);
 
-    class DBHashCmd : public Command {
-    public:
-        DBHashCmd();
+class DBHashCmd : public Command {
+public:
+    DBHashCmd();
 
-        virtual bool slaveOk() const { return true; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out);
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out);
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int,
-                         std::string& errmsg,
-                         BSONObjBuilder& result);
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int,
+                     std::string& errmsg,
+                     BSONObjBuilder& result);
 
-        void wipeCacheForCollection(OperationContext* txn, StringData ns);
+    void wipeCacheForCollection(OperationContext* txn, StringData ns);
 
-    private:
+private:
+    /**
+     * RecoveryUnit::Change subclass used to commit work for dbhash logOp listener
+     */
+    class DBHashLogOpHandler;
 
-        /**
-         * RecoveryUnit::Change subclass used to commit work for dbhash logOp listener
-         */
-        class DBHashLogOpHandler;
+    bool isCachable(StringData ns) const;
 
-        bool isCachable( StringData ns ) const;
+    std::string hashCollection(OperationContext* opCtx,
+                               Database* db,
+                               const std::string& fullCollectionName,
+                               bool* fromCache);
 
-        std::string hashCollection( OperationContext* opCtx, Database* db, const std::string& fullCollectionName, bool* fromCache );
-
-        std::map<std::string,std::string> _cachedHashed;
-        stdx::mutex _cachedHashedMutex;
-
-    };
-
+    std::map<std::string, std::string> _cachedHashed;
+    stdx::mutex _cachedHashedMutex;
+};
 }

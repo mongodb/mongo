@@ -48,330 +48,328 @@
 
 namespace mongo {
 
-    using std::set;
-    using std::map;
-    using std::string;
+using std::set;
+using std::map;
+using std::string;
 
-    namespace JSFiles {
-        extern const JSFile servers;
-        extern const JSFile shardingtest;
-        extern const JSFile servers_misc;
-        extern const JSFile replsettest;
-        extern const JSFile replsetbridge;
-    }
+namespace JSFiles {
+extern const JSFile servers;
+extern const JSFile shardingtest;
+extern const JSFile servers_misc;
+extern const JSFile replsettest;
+extern const JSFile replsetbridge;
+}
 
-    namespace shell_utils {
+namespace shell_utils {
 
-        std::string _dbConnect;
-        std::string _dbAuth;
+std::string _dbConnect;
+std::string _dbAuth;
 
-        const char *argv0 = 0;
-        void RecordMyLocation( const char *_argv0 ) { argv0 = _argv0; }
+const char* argv0 = 0;
+void RecordMyLocation(const char* _argv0) {
+    argv0 = _argv0;
+}
 
-        // helpers
+// helpers
 
-        BSONObj makeUndefined() {
-            BSONObjBuilder b;
-            b.appendUndefined( "" );
-            return b.obj();
-        }
-        const BSONObj undefinedReturn = makeUndefined();
+BSONObj makeUndefined() {
+    BSONObjBuilder b;
+    b.appendUndefined("");
+    return b.obj();
+}
+const BSONObj undefinedReturn = makeUndefined();
 
-        BSONElement singleArg(const BSONObj& args) {
-            uassert( 12597 , "need to specify 1 argument" , args.nFields() == 1 );
-            return args.firstElement();
-        }
+BSONElement singleArg(const BSONObj& args) {
+    uassert(12597, "need to specify 1 argument", args.nFields() == 1);
+    return args.firstElement();
+}
 
-        const char* getUserDir() {
+const char* getUserDir() {
 #ifdef _WIN32
-            return getenv( "USERPROFILE" );
+    return getenv("USERPROFILE");
 #else
-            return getenv( "HOME" );
+    return getenv("HOME");
 #endif
-        }
+}
 
-        // real methods
+// real methods
 
-        BSONObj Quit(const BSONObj& args, void* data) {
-            // If no arguments are given first element will be EOO, which
-            // converts to the integer value 0.
-            goingAwaySoon();
-            int exit_code = int( args.firstElement().number() );
-            quickExit(exit_code);
-            return undefinedReturn;
-        }
+BSONObj Quit(const BSONObj& args, void* data) {
+    // If no arguments are given first element will be EOO, which
+    // converts to the integer value 0.
+    goingAwaySoon();
+    int exit_code = int(args.firstElement().number());
+    quickExit(exit_code);
+    return undefinedReturn;
+}
 
-        BSONObj JSGetMemInfo( const BSONObj& args, void* data ) {
-            ProcessInfo pi;
-            uassert( 10258 ,  "processinfo not supported" , pi.supported() );
+BSONObj JSGetMemInfo(const BSONObj& args, void* data) {
+    ProcessInfo pi;
+    uassert(10258, "processinfo not supported", pi.supported());
 
-            BSONObjBuilder e;
-            e.append( "virtual" , pi.getVirtualMemorySize() );
-            e.append( "resident" , pi.getResidentSize() );
+    BSONObjBuilder e;
+    e.append("virtual", pi.getVirtualMemorySize());
+    e.append("resident", pi.getResidentSize());
 
-            BSONObjBuilder b;
-            b.append( "ret" , e.obj() );
+    BSONObjBuilder b;
+    b.append("ret", e.obj());
 
-            return b.obj();
-        }
+    return b.obj();
+}
 
 #if !defined(_WIN32)
-        ThreadLocalValue< unsigned int > _randomSeed;
+ThreadLocalValue<unsigned int> _randomSeed;
 #endif
 
-        BSONObj JSSrand( const BSONObj &a, void* data ) {
-            uassert( 12518, "srand requires a single numeric argument",
-                     a.nFields() == 1 && a.firstElement().isNumber() );
+BSONObj JSSrand(const BSONObj& a, void* data) {
+    uassert(12518,
+            "srand requires a single numeric argument",
+            a.nFields() == 1 && a.firstElement().isNumber());
 #if !defined(_WIN32)
-            _randomSeed.set( static_cast< unsigned int >( a.firstElement().numberLong() ) ); // grab least significant digits
+    _randomSeed.set(
+        static_cast<unsigned int>(a.firstElement().numberLong()));  // grab least significant digits
 #else
-            srand( static_cast< unsigned int >( a.firstElement().numberLong() ) );
+    srand(static_cast<unsigned int>(a.firstElement().numberLong()));
 #endif
-            return undefinedReturn;
-        }
+    return undefinedReturn;
+}
 
-        BSONObj JSRand( const BSONObj &a, void* data ) {
-            uassert( 12519, "rand accepts no arguments", a.nFields() == 0 );
-            unsigned r;
+BSONObj JSRand(const BSONObj& a, void* data) {
+    uassert(12519, "rand accepts no arguments", a.nFields() == 0);
+    unsigned r;
 #if !defined(_WIN32)
-            r = rand_r( &_randomSeed.getRef() );
+    r = rand_r(&_randomSeed.getRef());
 #else
-            r = rand();
+    r = rand();
 #endif
-            return BSON( "" << double( r ) / ( double( RAND_MAX ) + 1 ) );
-        }
+    return BSON("" << double(r) / (double(RAND_MAX) + 1));
+}
 
-        BSONObj isWindows(const BSONObj& a, void* data) {
-            uassert( 13006, "isWindows accepts no arguments", a.nFields() == 0 );
+BSONObj isWindows(const BSONObj& a, void* data) {
+    uassert(13006, "isWindows accepts no arguments", a.nFields() == 0);
 #ifdef _WIN32
-            return BSON( "" << true );
+    return BSON("" << true);
 #else
-            return BSON( "" << false );
+    return BSON("" << false);
 #endif
-        }
+}
 
-        BSONObj isAddressSanitizerActive(const BSONObj& a, void* data) {
-            bool isSanitized = false;
-            // See the following for information on how we detect address sanitizer in clang and gcc.
-            //
-            // - http://clang.llvm.org/docs/AddressSanitizer.html#has-feature-address-sanitizer
-            // - https://gcc.gnu.org/ml/gcc-patches/2012-11/msg01827.html
-            //
+BSONObj isAddressSanitizerActive(const BSONObj& a, void* data) {
+    bool isSanitized = false;
+// See the following for information on how we detect address sanitizer in clang and gcc.
+//
+// - http://clang.llvm.org/docs/AddressSanitizer.html#has-feature-address-sanitizer
+// - https://gcc.gnu.org/ml/gcc-patches/2012-11/msg01827.html
+//
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
-            isSanitized = true;
+    isSanitized = true;
 #endif
 #elif defined(__SANITIZE_ADDRESS__)
-            isSanitized = true;
+    isSanitized = true;
 #endif
-            return BSON( "" << isSanitized );
-        }
+    return BSON("" << isSanitized);
+}
 
-        BSONObj getBuildInfo(const BSONObj& a, void* data) {
-            uassert( 16822, "getBuildInfo accepts no arguments", a.nFields() == 0 );
-            BSONObjBuilder b;
-            appendBuildInfo(b);
-            return BSON( "" << b.done() );
-        }
+BSONObj getBuildInfo(const BSONObj& a, void* data) {
+    uassert(16822, "getBuildInfo accepts no arguments", a.nFields() == 0);
+    BSONObjBuilder b;
+    appendBuildInfo(b);
+    return BSON("" << b.done());
+}
 
-        BSONObj isKeyTooLarge(const BSONObj& a, void* data) {
-            uassert(17428, "keyTooLarge takes exactly 2 arguments", a.nFields() == 2);
-            BSONObjIterator i(a);
-            BSONObj index = i.next().Obj();
-            BSONObj doc = i.next().Obj();
+BSONObj isKeyTooLarge(const BSONObj& a, void* data) {
+    uassert(17428, "keyTooLarge takes exactly 2 arguments", a.nFields() == 2);
+    BSONObjIterator i(a);
+    BSONObj index = i.next().Obj();
+    BSONObj doc = i.next().Obj();
 
-            return BSON("" << isAnyIndexKeyTooLarge(index, doc));
-        }
+    return BSON("" << isAnyIndexKeyTooLarge(index, doc));
+}
 
-        BSONObj validateIndexKey(const BSONObj& a, void* data) {
-            BSONObj key = a[0].Obj();
-            Status indexValid = validateKeyPattern(key);
-            if (!indexValid.isOK()) {
-                return BSON("" << BSON("ok" << false << "type"
-                               << indexValid.codeString() << "errmsg" << indexValid.reason()));
-            }
-            return BSON("" << BSON("ok" << true));
-        }
+BSONObj validateIndexKey(const BSONObj& a, void* data) {
+    BSONObj key = a[0].Obj();
+    Status indexValid = validateKeyPattern(key);
+    if (!indexValid.isOK()) {
+        return BSON("" << BSON("ok" << false << "type" << indexValid.codeString() << "errmsg"
+                                    << indexValid.reason()));
+    }
+    return BSON("" << BSON("ok" << true));
+}
 
-        BSONObj replMonitorStats(const BSONObj& a, void* data) {
-            uassert(17134, "replMonitorStats requires a single string argument (the ReplSet name)",
-                    a.nFields() == 1 && a.firstElement().type() == String);
+BSONObj replMonitorStats(const BSONObj& a, void* data) {
+    uassert(17134,
+            "replMonitorStats requires a single string argument (the ReplSet name)",
+            a.nFields() == 1 && a.firstElement().type() == String);
 
-            ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(a.firstElement().valuestrsafe());
-            if (!rsm) {
-                return BSON("" << "no ReplSetMonitor exists by that name");
-            }
+    ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(a.firstElement().valuestrsafe());
+    if (!rsm) {
+        return BSON(""
+                    << "no ReplSetMonitor exists by that name");
+    }
 
-            BSONObjBuilder result;
-            rsm->appendInfo(result);
-            return result.obj();
-        }
+    BSONObjBuilder result;
+    rsm->appendInfo(result);
+    return result.obj();
+}
 
-        BSONObj useWriteCommandsDefault(const BSONObj& a, void* data) {
-            return BSON("" << shellGlobalParams.useWriteCommandsDefault);
-        }
+BSONObj useWriteCommandsDefault(const BSONObj& a, void* data) {
+    return BSON("" << shellGlobalParams.useWriteCommandsDefault);
+}
 
-        BSONObj writeMode(const BSONObj&, void*) {
-            return BSON("" << shellGlobalParams.writeMode);
-        }
+BSONObj writeMode(const BSONObj&, void*) {
+    return BSON("" << shellGlobalParams.writeMode);
+}
 
-        BSONObj readMode(const BSONObj&, void*) {
-            return BSON("" << shellGlobalParams.readMode);
-        }
+BSONObj readMode(const BSONObj&, void*) {
+    return BSON("" << shellGlobalParams.readMode);
+}
 
-        BSONObj interpreterVersion(const BSONObj& a, void* data) {
-            uassert( 16453, "interpreterVersion accepts no arguments", a.nFields() == 0 );
-            return BSON( "" << globalScriptEngine->getInterpreterVersionString() );
-        }
+BSONObj interpreterVersion(const BSONObj& a, void* data) {
+    uassert(16453, "interpreterVersion accepts no arguments", a.nFields() == 0);
+    return BSON("" << globalScriptEngine->getInterpreterVersionString());
+}
 
-        void installShellUtils( Scope& scope ) {
-            scope.injectNative( "quit", Quit );
-            scope.injectNative( "getMemInfo" , JSGetMemInfo );
-            scope.injectNative( "_replMonitorStats" , replMonitorStats );
-            scope.injectNative( "_srand" , JSSrand );
-            scope.injectNative( "_rand" , JSRand );
-            scope.injectNative( "_isWindows" , isWindows );
-            scope.injectNative( "_isAddressSanitizerActive", isAddressSanitizerActive );
-            scope.injectNative( "interpreterVersion", interpreterVersion );
-            scope.injectNative( "getBuildInfo", getBuildInfo );
-            scope.injectNative( "isKeyTooLarge", isKeyTooLarge );
-            scope.injectNative( "validateIndexKey", validateIndexKey );
+void installShellUtils(Scope& scope) {
+    scope.injectNative("quit", Quit);
+    scope.injectNative("getMemInfo", JSGetMemInfo);
+    scope.injectNative("_replMonitorStats", replMonitorStats);
+    scope.injectNative("_srand", JSSrand);
+    scope.injectNative("_rand", JSRand);
+    scope.injectNative("_isWindows", isWindows);
+    scope.injectNative("_isAddressSanitizerActive", isAddressSanitizerActive);
+    scope.injectNative("interpreterVersion", interpreterVersion);
+    scope.injectNative("getBuildInfo", getBuildInfo);
+    scope.injectNative("isKeyTooLarge", isKeyTooLarge);
+    scope.injectNative("validateIndexKey", validateIndexKey);
 
 #ifndef MONGO_SAFE_SHELL
-            //can't launch programs
-            installShellUtilsLauncher( scope );
-            installShellUtilsExtended( scope );
+    // can't launch programs
+    installShellUtilsLauncher(scope);
+    installShellUtilsExtended(scope);
 #endif
-        }
+}
 
-        void initScope( Scope &scope ) {
-            // Need to define this method before JSFiles::utils is executed.
-            scope.injectNative("_useWriteCommandsDefault", useWriteCommandsDefault);
-            scope.injectNative("_writeMode", writeMode);
-            scope.injectNative("_readMode", readMode);
-            scope.externalSetup();
-            mongo::shell_utils::installShellUtils( scope );
-            scope.execSetup(JSFiles::servers);
-            scope.execSetup(JSFiles::shardingtest);
-            scope.execSetup(JSFiles::servers_misc);
-            scope.execSetup(JSFiles::replsettest);
-            scope.execSetup(JSFiles::replsetbridge);
+void initScope(Scope& scope) {
+    // Need to define this method before JSFiles::utils is executed.
+    scope.injectNative("_useWriteCommandsDefault", useWriteCommandsDefault);
+    scope.injectNative("_writeMode", writeMode);
+    scope.injectNative("_readMode", readMode);
+    scope.externalSetup();
+    mongo::shell_utils::installShellUtils(scope);
+    scope.execSetup(JSFiles::servers);
+    scope.execSetup(JSFiles::shardingtest);
+    scope.execSetup(JSFiles::servers_misc);
+    scope.execSetup(JSFiles::replsettest);
+    scope.execSetup(JSFiles::replsetbridge);
 
-            scope.injectNative("benchRun", BenchRunner::benchRunSync);
-            scope.injectNative("benchRunSync", BenchRunner::benchRunSync);
-            scope.injectNative("benchStart", BenchRunner::benchStart);
-            scope.injectNative("benchFinish", BenchRunner::benchFinish);
+    scope.injectNative("benchRun", BenchRunner::benchRunSync);
+    scope.injectNative("benchRunSync", BenchRunner::benchRunSync);
+    scope.injectNative("benchStart", BenchRunner::benchStart);
+    scope.injectNative("benchFinish", BenchRunner::benchFinish);
 
-            if ( !_dbConnect.empty() ) {
-                uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );
-            }
-            if ( !_dbAuth.empty() ) {
-                uassert( 12514, "login failed", scope.exec( _dbAuth , "(auth)" , true , true , false ) );
-            }
-        }
-
-        Prompter::Prompter( const string &prompt ) :
-            _prompt( prompt ),
-            _confirmed() {
-        }
-
-        bool Prompter::confirm() {
-            if ( _confirmed ) {
-                return true;
-            }
-
-            // The printf and scanf functions provide thread safe i/o.
-            
-            printf( "\n%s (y/n): ", _prompt.c_str() );
-            
-            char yn = '\0';
-            int nScanMatches = scanf( "%c", &yn );
-            bool matchedY = ( nScanMatches == 1 && ( yn == 'y' || yn == 'Y' ) );
-            
-            return _confirmed = matchedY;
-        }
-
-        ConnectionRegistry::ConnectionRegistry() = default;
-
-        void ConnectionRegistry::registerConnection( DBClientWithCommands &client ) {
-            BSONObj info;
-            if ( client.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) ) {
-                string connstr = dynamic_cast<DBClientBase&>( client ).getServerAddress();
-                stdx::lock_guard<stdx::mutex> lk( _mutex );
-                _connectionUris[ connstr ].insert( info[ "you" ].str() );
-            }
-        }
-
-        void ConnectionRegistry::killOperationsOnAllConnections( bool withPrompt ) const {
-            Prompter prompter( "do you want to kill the current op(s) on the server?" );
-            stdx::lock_guard<stdx::mutex> lk( _mutex );
-            for( map<string,set<string> >::const_iterator i = _connectionUris.begin();
-                i != _connectionUris.end(); ++i ) {
-
-                auto status = ConnectionString::parse(i->first);
-                if (!status.isOK()) {
-                    continue;
-                }
-
-                const ConnectionString cs(status.getValue());
-
-                string errmsg;
-                std::unique_ptr<DBClientWithCommands> conn( cs.connect( errmsg ) );
-                if ( !conn ) {
-                    continue;
-                }
-                
-                const set<string>& uris = i->second;
-
-                BSONObj currentOpRes;
-                conn->runPseudoCommand("admin",
-                                       "currentOp",
-                                       "$cmd.sys.inprog", {}, currentOpRes);
-                auto inprog = currentOpRes["inprog"].embeddedObject();
-                BSONForEach( op, inprog ) {
-                    if ( uris.count( op[ "client" ].String() ) ) {
-                        if ( !withPrompt || prompter.confirm() ) {
-                            BSONObjBuilder cmdBob;
-                            BSONObj info;
-                            cmdBob.append("op", op["opid"]);
-                            auto cmdArgs = cmdBob.done();
-                            conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop",
-                                                   cmdArgs, info);
-                        }
-                        else {
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-        
-        ConnectionRegistry connectionRegistry;
-
-        bool _nokillop = false;
-        void onConnect( DBClientWithCommands &c ) {
-            if ( _nokillop ) {
-                return;
-            }
-            c.setClientRPCProtocols(shellGlobalParams.rpcProtocols);
-            connectionRegistry.registerConnection( c );
-        }
-
-        bool fileExists(const std::string& file) {
-            try {
-#ifdef _WIN32
-                boost::filesystem::path p(toWideString(file.c_str()));
-#else
-                boost::filesystem::path p(file);
-#endif
-                return boost::filesystem::exists(p);
-            }
-            catch ( ... ) {
-                return false;
-            }
-        }
-
-
-        stdx::mutex &mongoProgramOutputMutex(*(new stdx::mutex()));
+    if (!_dbConnect.empty()) {
+        uassert(12513, "connect failed", scope.exec(_dbConnect, "(connect)", false, true, false));
     }
+    if (!_dbAuth.empty()) {
+        uassert(12514, "login failed", scope.exec(_dbAuth, "(auth)", true, true, false));
+    }
+}
+
+Prompter::Prompter(const string& prompt) : _prompt(prompt), _confirmed() {}
+
+bool Prompter::confirm() {
+    if (_confirmed) {
+        return true;
+    }
+
+    // The printf and scanf functions provide thread safe i/o.
+
+    printf("\n%s (y/n): ", _prompt.c_str());
+
+    char yn = '\0';
+    int nScanMatches = scanf("%c", &yn);
+    bool matchedY = (nScanMatches == 1 && (yn == 'y' || yn == 'Y'));
+
+    return _confirmed = matchedY;
+}
+
+ConnectionRegistry::ConnectionRegistry() = default;
+
+void ConnectionRegistry::registerConnection(DBClientWithCommands& client) {
+    BSONObj info;
+    if (client.runCommand("admin", BSON("whatsmyuri" << 1), info)) {
+        string connstr = dynamic_cast<DBClientBase&>(client).getServerAddress();
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _connectionUris[connstr].insert(info["you"].str());
+    }
+}
+
+void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
+    Prompter prompter("do you want to kill the current op(s) on the server?");
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    for (map<string, set<string>>::const_iterator i = _connectionUris.begin();
+         i != _connectionUris.end();
+         ++i) {
+        auto status = ConnectionString::parse(i->first);
+        if (!status.isOK()) {
+            continue;
+        }
+
+        const ConnectionString cs(status.getValue());
+
+        string errmsg;
+        std::unique_ptr<DBClientWithCommands> conn(cs.connect(errmsg));
+        if (!conn) {
+            continue;
+        }
+
+        const set<string>& uris = i->second;
+
+        BSONObj currentOpRes;
+        conn->runPseudoCommand("admin", "currentOp", "$cmd.sys.inprog", {}, currentOpRes);
+        auto inprog = currentOpRes["inprog"].embeddedObject();
+        BSONForEach(op, inprog) {
+            if (uris.count(op["client"].String())) {
+                if (!withPrompt || prompter.confirm()) {
+                    BSONObjBuilder cmdBob;
+                    BSONObj info;
+                    cmdBob.append("op", op["opid"]);
+                    auto cmdArgs = cmdBob.done();
+                    conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop", cmdArgs, info);
+                } else {
+                    return;
+                }
+            }
+        }
+    }
+}
+
+ConnectionRegistry connectionRegistry;
+
+bool _nokillop = false;
+void onConnect(DBClientWithCommands& c) {
+    if (_nokillop) {
+        return;
+    }
+    c.setClientRPCProtocols(shellGlobalParams.rpcProtocols);
+    connectionRegistry.registerConnection(c);
+}
+
+bool fileExists(const std::string& file) {
+    try {
+#ifdef _WIN32
+        boost::filesystem::path p(toWideString(file.c_str()));
+#else
+        boost::filesystem::path p(file);
+#endif
+        return boost::filesystem::exists(p);
+    } catch (...) {
+        return false;
+    }
+}
+
+
+stdx::mutex& mongoProgramOutputMutex(*(new stdx::mutex()));
+}
 }

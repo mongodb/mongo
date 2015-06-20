@@ -33,29 +33,29 @@
 
 namespace mongo {
 
-    class RemoteCommandTargeterMock final : public RemoteCommandTargeter {
-    public:
-        RemoteCommandTargeterMock();
-        virtual ~RemoteCommandTargeterMock();
+class RemoteCommandTargeterMock final : public RemoteCommandTargeter {
+public:
+    RemoteCommandTargeterMock();
+    virtual ~RemoteCommandTargeterMock();
 
-        /**
-         * Shortcut for unit-tests.
-         */
-        static RemoteCommandTargeterMock* get(RemoteCommandTargeter* targeter);
+    /**
+     * Shortcut for unit-tests.
+     */
+    static RemoteCommandTargeterMock* get(RemoteCommandTargeter* targeter);
 
-        /**
-         * Returns the return value last set by setFindHostReturnValue.
-         * Returns ErrorCodes::InternalError if setFindHostReturnValue was never called.
-         */
-        StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
+    /**
+     * Returns the return value last set by setFindHostReturnValue.
+     * Returns ErrorCodes::InternalError if setFindHostReturnValue was never called.
+     */
+    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
 
-        /**
-         * Sets the return value for the next call to findHost.
-         */
-        void setFindHostReturnValue(StatusWith<HostAndPort> returnValue);
+    /**
+     * Sets the return value for the next call to findHost.
+     */
+    void setFindHostReturnValue(StatusWith<HostAndPort> returnValue);
 
-    private:
-        StatusWith<HostAndPort> _findHostReturnValue;
-    };
+private:
+    StatusWith<HostAndPort> _findHostReturnValue;
+};
 
-} // namespace mongo
+}  // namespace mongo

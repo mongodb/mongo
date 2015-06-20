@@ -36,164 +36,163 @@
 
 namespace mongo {
 
-    ListOfMatchExpression::~ListOfMatchExpression() {
-        for ( unsigned i = 0; i < _expressions.size(); i++ )
-            delete _expressions[i];
-        _expressions.clear();
+ListOfMatchExpression::~ListOfMatchExpression() {
+    for (unsigned i = 0; i < _expressions.size(); i++)
+        delete _expressions[i];
+    _expressions.clear();
+}
+
+void ListOfMatchExpression::add(MatchExpression* e) {
+    verify(e);
+    _expressions.push_back(e);
+}
+
+
+void ListOfMatchExpression::_debugList(StringBuilder& debug, int level) const {
+    for (unsigned i = 0; i < _expressions.size(); i++)
+        _expressions[i]->debugString(debug, level + 1);
+}
+
+void ListOfMatchExpression::_listToBSON(BSONArrayBuilder* out) const {
+    for (unsigned i = 0; i < _expressions.size(); i++) {
+        BSONObjBuilder childBob(out->subobjStart());
+        _expressions[i]->toBSON(&childBob);
     }
+    out->doneFast();
+}
 
-    void ListOfMatchExpression::add( MatchExpression* e ) {
-        verify( e );
-        _expressions.push_back( e );
-    }
-
-
-    void ListOfMatchExpression::_debugList( StringBuilder& debug, int level ) const {
-        for ( unsigned i = 0; i < _expressions.size(); i++ )
-            _expressions[i]->debugString( debug, level + 1 );
-    }
-
-    void ListOfMatchExpression::_listToBSON(BSONArrayBuilder* out) const {
-        for ( unsigned i = 0; i < _expressions.size(); i++ ) {
-            BSONObjBuilder childBob(out->subobjStart());
-            _expressions[i]->toBSON(&childBob);
-        }
-        out->doneFast();
-    }
-
-    bool ListOfMatchExpression::equivalent( const MatchExpression* other ) const {
-        if ( matchType() != other->matchType() )
-            return false;
-
-        const ListOfMatchExpression* realOther = static_cast<const ListOfMatchExpression*>( other );
-
-        if ( _expressions.size() != realOther->_expressions.size() )
-            return false;
-
-        // TOOD: order doesn't matter
-        for ( unsigned i = 0; i < _expressions.size(); i++ )
-            if ( !_expressions[i]->equivalent( realOther->_expressions[i] ) )
-                return false;
-
-        return true;
-    }
-
-    // -----
-
-    bool AndMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        for ( size_t i = 0; i < numChildren(); i++ ) {
-            if ( !getChild(i)->matches( doc, details ) ) {
-                if ( details )
-                    details->resetOutput();
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool AndMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        for ( size_t i = 0; i < numChildren(); i++ ) {
-            if ( !getChild(i)->matchesSingleElement( e ) ) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-
-    void AndMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << "$and\n";
-        _debugList( debug, level );
-    }
-
-    void AndMatchExpression::toBSON(BSONObjBuilder* out) const {
-        BSONArrayBuilder arrBob(out->subarrayStart("$and"));
-        _listToBSON(&arrBob);
-    }
-
-    // -----
-
-    bool OrMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        for ( size_t i = 0; i < numChildren(); i++ ) {
-            if ( getChild(i)->matches( doc, NULL ) ) {
-                return true;
-            }
-        }
+bool ListOfMatchExpression::equivalent(const MatchExpression* other) const {
+    if (matchType() != other->matchType())
         return false;
-    }
 
-    bool OrMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        for ( size_t i = 0; i < numChildren(); i++ ) {
-            if ( getChild(i)->matchesSingleElement( e ) ) {
-                return true;
-            }
-        }
+    const ListOfMatchExpression* realOther = static_cast<const ListOfMatchExpression*>(other);
+
+    if (_expressions.size() != realOther->_expressions.size())
         return false;
-    }
 
-
-    void OrMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << "$or\n";
-        _debugList( debug, level );
-    }
-
-    void OrMatchExpression::toBSON(BSONObjBuilder* out) const {
-        BSONArrayBuilder arrBob(out->subarrayStart("$or"));
-        _listToBSON(&arrBob);
-    }
-
-    // ----
-
-    bool NorMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        for ( size_t i = 0; i < numChildren(); i++ ) {
-            if ( getChild(i)->matches( doc, NULL ) ) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool NorMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        for ( size_t i = 0; i < numChildren(); i++ ) {
-            if ( getChild(i)->matchesSingleElement( e ) ) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    void NorMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << "$nor\n";
-        _debugList( debug, level );
-    }
-
-    void NorMatchExpression::toBSON(BSONObjBuilder* out) const {
-        BSONArrayBuilder arrBob(out->subarrayStart("$nor"));
-        _listToBSON(&arrBob);
-    }
-
-    // -------
-
-    void NotMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << "$not\n";
-        _exp->debugString( debug, level + 1 );
-    }
-
-    void NotMatchExpression::toBSON(BSONObjBuilder* out) const {
-        BSONObjBuilder childBob(out->subobjStart("$not"));
-        _exp->toBSON(&childBob);
-        childBob.doneFast();
-    }
-
-    bool NotMatchExpression::equivalent( const MatchExpression* other ) const {
-        if ( matchType() != other->matchType() )
+    // TOOD: order doesn't matter
+    for (unsigned i = 0; i < _expressions.size(); i++)
+        if (!_expressions[i]->equivalent(realOther->_expressions[i]))
             return false;
 
-        return _exp->equivalent( other->getChild(0) );
-    }
+    return true;
+}
 
+// -----
+
+bool AndMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
+    for (size_t i = 0; i < numChildren(); i++) {
+        if (!getChild(i)->matches(doc, details)) {
+            if (details)
+                details->resetOutput();
+            return false;
+        }
+    }
+    return true;
+}
+
+bool AndMatchExpression::matchesSingleElement(const BSONElement& e) const {
+    for (size_t i = 0; i < numChildren(); i++) {
+        if (!getChild(i)->matchesSingleElement(e)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+void AndMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << "$and\n";
+    _debugList(debug, level);
+}
+
+void AndMatchExpression::toBSON(BSONObjBuilder* out) const {
+    BSONArrayBuilder arrBob(out->subarrayStart("$and"));
+    _listToBSON(&arrBob);
+}
+
+// -----
+
+bool OrMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
+    for (size_t i = 0; i < numChildren(); i++) {
+        if (getChild(i)->matches(doc, NULL)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool OrMatchExpression::matchesSingleElement(const BSONElement& e) const {
+    for (size_t i = 0; i < numChildren(); i++) {
+        if (getChild(i)->matchesSingleElement(e)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+void OrMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << "$or\n";
+    _debugList(debug, level);
+}
+
+void OrMatchExpression::toBSON(BSONObjBuilder* out) const {
+    BSONArrayBuilder arrBob(out->subarrayStart("$or"));
+    _listToBSON(&arrBob);
+}
+
+// ----
+
+bool NorMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
+    for (size_t i = 0; i < numChildren(); i++) {
+        if (getChild(i)->matches(doc, NULL)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool NorMatchExpression::matchesSingleElement(const BSONElement& e) const {
+    for (size_t i = 0; i < numChildren(); i++) {
+        if (getChild(i)->matchesSingleElement(e)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void NorMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << "$nor\n";
+    _debugList(debug, level);
+}
+
+void NorMatchExpression::toBSON(BSONObjBuilder* out) const {
+    BSONArrayBuilder arrBob(out->subarrayStart("$nor"));
+    _listToBSON(&arrBob);
+}
+
+// -------
+
+void NotMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << "$not\n";
+    _exp->debugString(debug, level + 1);
+}
+
+void NotMatchExpression::toBSON(BSONObjBuilder* out) const {
+    BSONObjBuilder childBob(out->subobjStart("$not"));
+    _exp->toBSON(&childBob);
+    childBob.doneFast();
+}
+
+bool NotMatchExpression::equivalent(const MatchExpression* other) const {
+    if (matchType() != other->matchType())
+        return false;
+
+    return _exp->equivalent(other->getChild(0));
+}
 }

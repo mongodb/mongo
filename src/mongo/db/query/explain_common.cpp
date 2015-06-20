@@ -34,9 +34,9 @@
 
 namespace mongo {
 
-    // static
-    const char* ExplainCommon::verbosityString(ExplainCommon::Verbosity verbosity) {
-        switch (verbosity) {
+// static
+const char* ExplainCommon::verbosityString(ExplainCommon::Verbosity verbosity) {
+    switch (verbosity) {
         case QUERY_PLANNER:
             return "queryPlanner";
         case EXEC_STATS:
@@ -46,31 +46,30 @@ namespace mongo {
         default:
             invariant(0);
             return "unknown";
+    }
+}
+
+// static
+Status ExplainCommon::parseCmdBSON(const BSONObj& cmdObj, ExplainCommon::Verbosity* verbosity) {
+    if (Object != cmdObj.firstElement().type()) {
+        return Status(ErrorCodes::BadValue, "explain command requires a nested object");
+    }
+
+    *verbosity = ExplainCommon::EXEC_ALL_PLANS;
+    if (!cmdObj["verbosity"].eoo()) {
+        const char* verbStr = cmdObj["verbosity"].valuestrsafe();
+        if (mongoutils::str::equals(verbStr, "queryPlanner")) {
+            *verbosity = ExplainCommon::QUERY_PLANNER;
+        } else if (mongoutils::str::equals(verbStr, "executionStats")) {
+            *verbosity = ExplainCommon::EXEC_STATS;
+        } else if (!mongoutils::str::equals(verbStr, "allPlansExecution")) {
+            return Status(ErrorCodes::BadValue,
+                          "verbosity string must be one of "
+                          "{'queryPlanner', 'executionStats', 'allPlansExecution'}");
         }
     }
 
-    // static
-    Status ExplainCommon::parseCmdBSON(const BSONObj& cmdObj, ExplainCommon::Verbosity* verbosity) {
-        if (Object != cmdObj.firstElement().type()) {
-            return Status(ErrorCodes::BadValue, "explain command requires a nested object");
-        }
+    return Status::OK();
+}
 
-        *verbosity = ExplainCommon::EXEC_ALL_PLANS;
-        if (!cmdObj["verbosity"].eoo()) {
-            const char* verbStr = cmdObj["verbosity"].valuestrsafe();
-            if (mongoutils::str::equals(verbStr, "queryPlanner")) {
-                *verbosity = ExplainCommon::QUERY_PLANNER;
-            }
-            else if (mongoutils::str::equals(verbStr, "executionStats")) {
-                *verbosity = ExplainCommon::EXEC_STATS;
-            }
-            else if (!mongoutils::str::equals(verbStr, "allPlansExecution")) {
-                return Status(ErrorCodes::BadValue, "verbosity string must be one of "
-                    "{'queryPlanner', 'executionStats', 'allPlansExecution'}");
-            }
-        }
-
-        return Status::OK();
-    }
-
-} // namespace mongo
+}  // namespace mongo

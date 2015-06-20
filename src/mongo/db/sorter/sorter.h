@@ -83,154 +83,148 @@
  */
 
 namespace mongo {
-    namespace sorter {
-        // Everything in this namespace is internal to the sorter
-        class FileDeleter;
+namespace sorter {
+// Everything in this namespace is internal to the sorter
+class FileDeleter;
+}
+
+/**
+ * Runtime options that control the Sorter's behavior
+ */
+struct SortOptions {
+    unsigned long long limit;    /// number of KV pairs to be returned. 0 for no limit.
+    size_t maxMemoryUsageBytes;  /// Approximate.
+    bool extSortAllowed;         /// If false, uassert if more mem needed than allowed.
+    std::string tempDir;         /// Directory to directly place files in.
+                                 /// Must be explicitly set if extSortAllowed is true.
+
+    SortOptions() : limit(0), maxMemoryUsageBytes(64 * 1024 * 1024), extSortAllowed(false) {}
+
+    /// Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
+
+    SortOptions& Limit(unsigned long long newLimit) {
+        limit = newLimit;
+        return *this;
     }
 
-    /**
-     * Runtime options that control the Sorter's behavior
-     */
-    struct SortOptions {
-        unsigned long long limit; /// number of KV pairs to be returned. 0 for no limit.
-        size_t maxMemoryUsageBytes; /// Approximate.
-        bool extSortAllowed; /// If false, uassert if more mem needed than allowed.
-        std::string tempDir; /// Directory to directly place files in.
-                             /// Must be explicitly set if extSortAllowed is true.
+    SortOptions& MaxMemoryUsageBytes(size_t newMaxMemoryUsageBytes) {
+        maxMemoryUsageBytes = newMaxMemoryUsageBytes;
+        return *this;
+    }
 
-        SortOptions()
-            : limit(0)
-            , maxMemoryUsageBytes(64*1024*1024)
-            , extSortAllowed(false)
-        {}
+    SortOptions& ExtSortAllowed(bool newExtSortAllowed = true) {
+        extSortAllowed = newExtSortAllowed;
+        return *this;
+    }
 
-        /// Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
+    SortOptions& TempDir(const std::string& newTempDir) {
+        tempDir = newTempDir;
+        return *this;
+    }
+};
 
-        SortOptions& Limit(unsigned long long newLimit) {
-            limit = newLimit;
-            return *this;
-        }
+/// This is the output from the sorting framework
+template <typename Key, typename Value>
+class SortIteratorInterface {
+    MONGO_DISALLOW_COPYING(SortIteratorInterface);
 
-        SortOptions& MaxMemoryUsageBytes(size_t newMaxMemoryUsageBytes) {
-            maxMemoryUsageBytes = newMaxMemoryUsageBytes;
-            return *this;
-        }
+public:
+    typedef std::pair<Key, Value> Data;
 
-        SortOptions& ExtSortAllowed(bool newExtSortAllowed=true) {
-            extSortAllowed = newExtSortAllowed;
-            return *this;
-        }
+    // Unowned objects are only valid until next call to any method
 
-        SortOptions& TempDir(const std::string& newTempDir) {
-            tempDir = newTempDir;
-            return *this;
-        }
-    };
+    virtual bool more() = 0;
+    virtual std::pair<Key, Value> next() = 0;
 
-    /// This is the output from the sorting framework
-    template <typename Key, typename Value>
-    class SortIteratorInterface {
-        MONGO_DISALLOW_COPYING(SortIteratorInterface);
-    public:
-        typedef std::pair<Key, Value> Data;
+    virtual ~SortIteratorInterface() {}
 
-        // Unowned objects are only valid until next call to any method
+    /// Returns an iterator that merges the passed in iterators
+    template <typename Comparator>
+    static SortIteratorInterface* merge(
+        const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,
+        const SortOptions& opts,
+        const Comparator& comp);
 
-        virtual bool more() =0;
-        virtual std::pair<Key, Value> next() =0;
+protected:
+    SortIteratorInterface() {}  // can only be constructed as a base
+};
 
-        virtual ~SortIteratorInterface() {}
+/// This is the main way to input data to the sorting framework
+template <typename Key, typename Value>
+class Sorter {
+    MONGO_DISALLOW_COPYING(Sorter);
 
-        /// Returns an iterator that merges the passed in iterators
-        template <typename Comparator>
-        static SortIteratorInterface* merge(
-                const std::vector<std::shared_ptr<SortIteratorInterface> >& iters,
-                const SortOptions& opts,
-                const Comparator& comp);
-    protected:
-        SortIteratorInterface() {} // can only be constructed as a base
-    };
+public:
+    typedef std::pair<Key, Value> Data;
+    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef std::pair<typename Key::SorterDeserializeSettings,
+                      typename Value::SorterDeserializeSettings> Settings;
 
-    /// This is the main way to input data to the sorting framework
-    template <typename Key, typename Value>
-    class Sorter {
-        MONGO_DISALLOW_COPYING(Sorter);
-    public:
-        typedef std::pair<Key, Value> Data;
-        typedef SortIteratorInterface<Key, Value> Iterator;
-        typedef std::pair<typename Key::SorterDeserializeSettings
-                         ,typename Value::SorterDeserializeSettings
-                         > Settings;
+    template <typename Comparator>
+    static Sorter* make(const SortOptions& opts,
+                        const Comparator& comp,
+                        const Settings& settings = Settings());
 
-        template <typename Comparator>
-        static Sorter* make(const SortOptions& opts,
-                            const Comparator& comp,
-                            const Settings& settings = Settings());
+    virtual void add(const Key&, const Value&) = 0;
+    virtual Iterator* done() = 0;  /// Can't add more data after calling done()
 
-        virtual void add(const Key&, const Value&) =0;
-        virtual Iterator* done() =0; /// Can't add more data after calling done()
+    virtual ~Sorter() {}
 
-        virtual ~Sorter() {}
+    // TEMP these are here for compatibility. Will be replaced with a general stats API
+    virtual int numFiles() const = 0;
+    virtual size_t memUsed() const = 0;
 
-        // TEMP these are here for compatibility. Will be replaced with a general stats API
-        virtual int numFiles() const =0;
-        virtual size_t memUsed() const =0;
+protected:
+    Sorter() {}  // can only be constructed as a base
+};
 
-    protected:
-        Sorter() {} // can only be constructed as a base
-    };
+/// Writes pre-sorted data to a sorted file and hands-back an Iterator over that file.
+template <typename Key, typename Value>
+class SortedFileWriter {
+    MONGO_DISALLOW_COPYING(SortedFileWriter);
 
-    /// Writes pre-sorted data to a sorted file and hands-back an Iterator over that file.
-    template <typename Key, typename Value>
-    class SortedFileWriter {
-        MONGO_DISALLOW_COPYING(SortedFileWriter);
-    public:
-        typedef SortIteratorInterface<Key, Value> Iterator;
-        typedef std::pair<typename Key::SorterDeserializeSettings
-                         ,typename Value::SorterDeserializeSettings
-                         > Settings;
+public:
+    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef std::pair<typename Key::SorterDeserializeSettings,
+                      typename Value::SorterDeserializeSettings> Settings;
 
-        explicit SortedFileWriter(const SortOptions& opts,
-                                  const Settings& settings = Settings());
+    explicit SortedFileWriter(const SortOptions& opts, const Settings& settings = Settings());
 
-        void addAlreadySorted(const Key&, const Value&);
-        Iterator* done(); /// Can't add more data after calling done()
+    void addAlreadySorted(const Key&, const Value&);
+    Iterator* done();  /// Can't add more data after calling done()
 
-    private:
-        void spill();
+private:
+    void spill();
 
-        const Settings _settings;
-        std::string _fileName;
-        std::shared_ptr<sorter::FileDeleter> _fileDeleter; // Must outlive _file
-        std::ofstream _file;
-        BufBuilder _buffer;
-    };
+    const Settings _settings;
+    std::string _fileName;
+    std::shared_ptr<sorter::FileDeleter> _fileDeleter;  // Must outlive _file
+    std::ofstream _file;
+    BufBuilder _buffer;
+};
 }
 
 /**
  * #include "mongo/db/sorter/sorter.cpp" and call this in a single translation
  * unit once for each unique set of template parameters.
  */
-#define MONGO_CREATE_SORTER(Key, Value, Comparator) \
-    /* public classes */ \
-    template class ::mongo::Sorter<Key, Value>; \
-    template class ::mongo::SortIteratorInterface<Key, Value>; \
-    template class ::mongo::SortedFileWriter<Key, Value>; \
-    /* internal classes */ \
-    template class ::mongo::sorter::NoLimitSorter<Key, Value, Comparator>; \
-    template class ::mongo::sorter::LimitOneSorter<Key, Value, Comparator>; \
-    template class ::mongo::sorter::TopKSorter<Key, Value, Comparator>; \
-    template class ::mongo::sorter::MergeIterator<Key, Value, Comparator>; \
-    template class ::mongo::sorter::InMemIterator<Key, Value>; \
-    template class ::mongo::sorter::FileIterator<Key, Value>; \
-    /* factory functions */ \
-    template ::mongo::SortIteratorInterface<Key, Value>* \
-                ::mongo::SortIteratorInterface<Key, Value>::merge<Comparator>( \
-                    const std::vector<std::shared_ptr<SortIteratorInterface> >& iters, \
-                    const SortOptions& opts, \
-                    const Comparator& comp); \
-    template ::mongo::Sorter<Key, Value>* \
-                ::mongo::Sorter<Key, Value>::make<Comparator>( \
-                    const SortOptions& opts, \
-                    const Comparator& comp, \
-                    const Settings& settings);
+#define MONGO_CREATE_SORTER(Key, Value, Comparator)                                      \
+    /* public classes */                                                                 \
+    template class ::mongo::Sorter<Key, Value>;                                          \
+    template class ::mongo::SortIteratorInterface<Key, Value>;                           \
+    template class ::mongo::SortedFileWriter<Key, Value>;                                \
+    /* internal classes */                                                               \
+    template class ::mongo::sorter::NoLimitSorter<Key, Value, Comparator>;               \
+    template class ::mongo::sorter::LimitOneSorter<Key, Value, Comparator>;              \
+    template class ::mongo::sorter::TopKSorter<Key, Value, Comparator>;                  \
+    template class ::mongo::sorter::MergeIterator<Key, Value, Comparator>;               \
+    template class ::mongo::sorter::InMemIterator<Key, Value>;                           \
+    template class ::mongo::sorter::FileIterator<Key, Value>;                            \
+    /* factory functions */                                                              \
+    template ::mongo::SortIteratorInterface<Key, Value>* ::mongo::                       \
+        SortIteratorInterface<Key, Value>::merge<Comparator>(                            \
+            const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,            \
+            const SortOptions& opts,                                                     \
+            const Comparator& comp);                                                     \
+    template ::mongo::Sorter<Key, Value>* ::mongo::Sorter<Key, Value>::make<Comparator>( \
+        const SortOptions& opts, const Comparator& comp, const Settings& settings);

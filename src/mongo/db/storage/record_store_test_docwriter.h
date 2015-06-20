@@ -35,26 +35,28 @@
 namespace mongo {
 namespace {
 
-    class StringDocWriter : public DocWriter {
-    public:
-        StringDocWriter( const std::string &data, bool padding )
-            : _data( data ), _padding( padding ) {
-        }
+class StringDocWriter : public DocWriter {
+public:
+    StringDocWriter(const std::string& data, bool padding) : _data(data), _padding(padding) {}
 
-        ~StringDocWriter() { }
+    ~StringDocWriter() {}
 
-        void writeDocument( char *buf ) const {
-            memcpy( buf, _data.c_str(), documentSize() );
-        }
+    void writeDocument(char* buf) const {
+        memcpy(buf, _data.c_str(), documentSize());
+    }
 
-        size_t documentSize() const { return _data.size() + 1; }
+    size_t documentSize() const {
+        return _data.size() + 1;
+    }
 
-        bool addPadding() const { return _padding; }
+    bool addPadding() const {
+        return _padding;
+    }
 
-    private:
-        std::string _data;
-        bool _padding;
-    };
+private:
+    std::string _data;
+    bool _padding;
+};
 
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

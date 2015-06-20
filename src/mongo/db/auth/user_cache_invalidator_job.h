@@ -32,25 +32,25 @@
 
 namespace mongo {
 
-    class AuthorizationManager;
+class AuthorizationManager;
 
-    /**
-     * Background job that runs only in mongos and periodically checks in with the config servers
-     * to determine whether any authorization information has changed, and if so causes the
-     * AuthorizationManager to throw out its in-memory cache of User objects (which contains the
-     * users' credentials, roles, privileges, etc).
-     */
-    class UserCacheInvalidator : public BackgroundJob {
-    public:
-        explicit UserCacheInvalidator(AuthorizationManager* authzManager);
+/**
+ * Background job that runs only in mongos and periodically checks in with the config servers
+ * to determine whether any authorization information has changed, and if so causes the
+ * AuthorizationManager to throw out its in-memory cache of User objects (which contains the
+ * users' credentials, roles, privileges, etc).
+ */
+class UserCacheInvalidator : public BackgroundJob {
+public:
+    explicit UserCacheInvalidator(AuthorizationManager* authzManager);
 
-    protected:
-        virtual std::string name() const;
-        virtual void run();
+protected:
+    virtual std::string name() const;
+    virtual void run();
 
-    private:
-        AuthorizationManager* _authzManager;
-        OID _previousCacheGeneration;
-    };
+private:
+    AuthorizationManager* _authzManager;
+    OID _previousCacheGeneration;
+};
 
-} // namespace mongo
+}  // namespace mongo

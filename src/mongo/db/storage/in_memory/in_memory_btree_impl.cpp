@@ -42,448 +42,450 @@
 
 namespace mongo {
 
-    using std::shared_ptr;
-    using std::string;
-    using std::vector;
+using std::shared_ptr;
+using std::string;
+using std::vector;
 
 namespace {
 
-    const int TempKeyMaxSize = 1024; // this goes away with SERVER-3372
+const int TempKeyMaxSize = 1024;  // this goes away with SERVER-3372
 
-    bool hasFieldNames(const BSONObj& obj) {
-        BSONForEach(e, obj) {
-            if (e.fieldName()[0])
-                return true;
+bool hasFieldNames(const BSONObj& obj) {
+    BSONForEach(e, obj) {
+        if (e.fieldName()[0])
+            return true;
+    }
+    return false;
+}
+
+BSONObj stripFieldNames(const BSONObj& query) {
+    if (!hasFieldNames(query))
+        return query;
+
+    BSONObjBuilder bb;
+    BSONForEach(e, query) {
+        bb.appendAs(e, StringData());
+    }
+    return bb.obj();
+}
+
+typedef std::set<IndexKeyEntry, IndexEntryComparison> IndexSet;
+
+// taken from btree_logic.cpp
+Status dupKeyError(const BSONObj& key) {
+    StringBuilder sb;
+    sb << "E11000 duplicate key error ";
+    // sb << "index: " << _indexName << " "; // TODO
+    sb << "dup key: " << key;
+    return Status(ErrorCodes::DuplicateKey, sb.str());
+}
+
+bool isDup(const IndexSet& data, const BSONObj& key, RecordId loc) {
+    const IndexSet::const_iterator it = data.find(IndexKeyEntry(key, RecordId()));
+    if (it == data.end())
+        return false;
+
+    // Not a dup if the entry is for the same loc.
+    return it->loc != loc;
+}
+
+class InMemoryBtreeBuilderImpl : public SortedDataBuilderInterface {
+public:
+    InMemoryBtreeBuilderImpl(IndexSet* data, long long* currentKeySize, bool dupsAllowed)
+        : _data(data),
+          _currentKeySize(currentKeySize),
+          _dupsAllowed(dupsAllowed),
+          _comparator(_data->key_comp()) {
+        invariant(_data->empty());
+    }
+
+    Status addKey(const BSONObj& key, const RecordId& loc) {
+        // inserts should be in ascending (key, RecordId) order.
+
+        if (key.objsize() >= TempKeyMaxSize) {
+            return Status(ErrorCodes::KeyTooLong, "key too big");
         }
+
+        invariant(loc.isNormal());
+        invariant(!hasFieldNames(key));
+
+        if (!_data->empty()) {
+            // Compare specified key with last inserted key, ignoring its RecordId
+            int cmp = _comparator.compare(IndexKeyEntry(key, RecordId()), *_last);
+            if (cmp < 0 || (_dupsAllowed && cmp == 0 && loc < _last->loc)) {
+                return Status(ErrorCodes::InternalError,
+                              "expected ascending (key, RecordId) order in bulk builder");
+            } else if (!_dupsAllowed && cmp == 0 && loc != _last->loc) {
+                return dupKeyError(key);
+            }
+        }
+
+        BSONObj owned = key.getOwned();
+        _last = _data->insert(_data->end(), IndexKeyEntry(owned, loc));
+        *_currentKeySize += key.objsize();
+
+        return Status::OK();
+    }
+
+private:
+    IndexSet* const _data;
+    long long* _currentKeySize;
+    const bool _dupsAllowed;
+
+    IndexEntryComparison _comparator;  // used by the bulk builder to detect duplicate keys
+    IndexSet::const_iterator _last;    // or (key, RecordId) ordering violations
+};
+
+class InMemoryBtreeImpl : public SortedDataInterface {
+public:
+    InMemoryBtreeImpl(IndexSet* data) : _data(data) {
+        _currentKeySize = 0;
+    }
+
+    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
+        return new InMemoryBtreeBuilderImpl(_data, &_currentKeySize, dupsAllowed);
+    }
+
+    virtual Status insert(OperationContext* txn,
+                          const BSONObj& key,
+                          const RecordId& loc,
+                          bool dupsAllowed) {
+        invariant(loc.isNormal());
+        invariant(!hasFieldNames(key));
+
+        if (key.objsize() >= TempKeyMaxSize) {
+            string msg = mongoutils::str::stream()
+                << "InMemoryBtree::insert: key too large to index, failing " << ' ' << key.objsize()
+                << ' ' << key;
+            return Status(ErrorCodes::KeyTooLong, msg);
+        }
+
+        // TODO optimization: save the iterator from the dup-check to speed up insert
+        if (!dupsAllowed && isDup(*_data, key, loc))
+            return dupKeyError(key);
+
+        IndexKeyEntry entry(key.getOwned(), loc);
+        if (_data->insert(entry).second) {
+            _currentKeySize += key.objsize();
+            txn->recoveryUnit()->registerChange(new IndexChange(_data, entry, true));
+        }
+        return Status::OK();
+    }
+
+    virtual void unindex(OperationContext* txn,
+                         const BSONObj& key,
+                         const RecordId& loc,
+                         bool dupsAllowed) {
+        invariant(loc.isNormal());
+        invariant(!hasFieldNames(key));
+
+        IndexKeyEntry entry(key.getOwned(), loc);
+        const size_t numDeleted = _data->erase(entry);
+        invariant(numDeleted <= 1);
+        if (numDeleted == 1) {
+            _currentKeySize -= key.objsize();
+            txn->recoveryUnit()->registerChange(new IndexChange(_data, entry, false));
+        }
+    }
+
+    virtual void fullValidate(OperationContext* txn,
+                              bool full,
+                              long long* numKeysOut,
+                              BSONObjBuilder* output) const {
+        // TODO check invariants?
+        *numKeysOut = _data->size();
+    }
+
+    virtual bool appendCustomStats(OperationContext* txn,
+                                   BSONObjBuilder* output,
+                                   double scale) const {
         return false;
     }
 
-    BSONObj stripFieldNames(const BSONObj& query) {
-        if (!hasFieldNames(query))
-            return query;
-
-        BSONObjBuilder bb;
-        BSONForEach(e, query) {
-            bb.appendAs(e, StringData());
-        }
-        return bb.obj();
+    virtual long long getSpaceUsedBytes(OperationContext* txn) const {
+        return _currentKeySize + (sizeof(IndexKeyEntry) * _data->size());
     }
 
-    typedef std::set<IndexKeyEntry, IndexEntryComparison> IndexSet;
-
-    // taken from btree_logic.cpp
-    Status dupKeyError(const BSONObj& key) {
-        StringBuilder sb;
-        sb << "E11000 duplicate key error ";
-        // sb << "index: " << _indexName << " "; // TODO
-        sb << "dup key: " << key;
-        return Status(ErrorCodes::DuplicateKey, sb.str());
+    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) {
+        invariant(!hasFieldNames(key));
+        if (isDup(*_data, key, loc))
+            return dupKeyError(key);
+        return Status::OK();
     }
 
-    bool isDup(const IndexSet& data, const BSONObj& key, RecordId loc) {
-        const IndexSet::const_iterator it = data.find(IndexKeyEntry(key, RecordId()));
-        if (it == data.end())
-            return false;
-
-        // Not a dup if the entry is for the same loc.
-        return it->loc != loc;
+    virtual bool isEmpty(OperationContext* txn) {
+        return _data->empty();
     }
 
-    class InMemoryBtreeBuilderImpl : public SortedDataBuilderInterface {
+    virtual Status touch(OperationContext* txn) const {
+        // already in memory...
+        return Status::OK();
+    }
+
+    class Cursor final : public SortedDataInterface::Cursor {
     public:
-        InMemoryBtreeBuilderImpl(IndexSet* data, long long* currentKeySize, bool dupsAllowed)
-                : _data(data),
-                  _currentKeySize( currentKeySize ),
-                  _dupsAllowed(dupsAllowed),
-                  _comparator(_data->key_comp()) {
-            invariant(_data->empty());
-        }
+        Cursor(OperationContext* txn, const IndexSet& data, bool isForward)
+            : _txn(txn), _data(data), _forward(isForward), _it(data.end()) {}
 
-        Status addKey(const BSONObj& key, const RecordId& loc) {
-            // inserts should be in ascending (key, RecordId) order.
-
-            if ( key.objsize() >= TempKeyMaxSize ) {
-                return Status(ErrorCodes::KeyTooLong, "key too big");
-            }
-
-            invariant(loc.isNormal());
-            invariant(!hasFieldNames(key));
-
-            if (!_data->empty()) {
-                // Compare specified key with last inserted key, ignoring its RecordId
-                int cmp = _comparator.compare(IndexKeyEntry(key, RecordId()), *_last);
-                if (cmp < 0 || (_dupsAllowed && cmp == 0 && loc < _last->loc)) {
-                    return Status(ErrorCodes::InternalError,
-                                  "expected ascending (key, RecordId) order in bulk builder");
-                }
-                else if (!_dupsAllowed && cmp == 0 && loc != _last->loc) {
-                    return dupKeyError(key);
-                }
-            }
-
-            BSONObj owned = key.getOwned();
-            _last = _data->insert(_data->end(), IndexKeyEntry(owned, loc));
-            *_currentKeySize += key.objsize();
-
-            return Status::OK();
-        }
-
-    private:
-        IndexSet* const _data;
-        long long* _currentKeySize;
-        const bool _dupsAllowed;
-
-        IndexEntryComparison _comparator;  // used by the bulk builder to detect duplicate keys
-        IndexSet::const_iterator _last;    // or (key, RecordId) ordering violations
-    };
-
-    class InMemoryBtreeImpl : public SortedDataInterface {
-    public:
-        InMemoryBtreeImpl(IndexSet* data)
-            : _data(data) {
-            _currentKeySize = 0;
-        }
-
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
-                                                           bool dupsAllowed) {
-            return new InMemoryBtreeBuilderImpl(_data, &_currentKeySize, dupsAllowed);
-        }
-
-        virtual Status insert(OperationContext* txn,
-                              const BSONObj& key,
-                              const RecordId& loc,
-                              bool dupsAllowed) {
-
-            invariant(loc.isNormal());
-            invariant(!hasFieldNames(key));
-
-            if ( key.objsize() >= TempKeyMaxSize ) {
-                string msg = mongoutils::str::stream()
-                    << "InMemoryBtree::insert: key too large to index, failing "
-                    << ' ' << key.objsize() << ' ' << key;
-                return Status(ErrorCodes::KeyTooLong, msg);
-            }
-
-            // TODO optimization: save the iterator from the dup-check to speed up insert
-            if (!dupsAllowed && isDup(*_data, key, loc))
-                return dupKeyError(key);
-
-            IndexKeyEntry entry(key.getOwned(), loc);
-            if ( _data->insert(entry).second ) {
-                _currentKeySize += key.objsize();
-                txn->recoveryUnit()->registerChange(new IndexChange(_data, entry, true));
-            }
-            return Status::OK();
-        }
-
-        virtual void unindex(OperationContext* txn,
-                             const BSONObj& key,
-                             const RecordId& loc,
-                             bool dupsAllowed) {
-            invariant(loc.isNormal());
-            invariant(!hasFieldNames(key));
-
-            IndexKeyEntry entry(key.getOwned(), loc);
-            const size_t numDeleted = _data->erase(entry);
-            invariant(numDeleted <= 1);
-            if ( numDeleted == 1 ) {
-                _currentKeySize -= key.objsize();
-                txn->recoveryUnit()->registerChange(new IndexChange(_data, entry, false));
-            }
-        }
-
-        virtual void fullValidate(OperationContext* txn, bool full, long long *numKeysOut,
-                                  BSONObjBuilder* output) const {
-            // TODO check invariants?
-            *numKeysOut = _data->size();
-        }
-
-        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
-            const {
-            return false;
-        }
-
-        virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
-            return _currentKeySize + ( sizeof(IndexKeyEntry) * _data->size() );
-        }
-
-        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) {
-            invariant(!hasFieldNames(key));
-            if (isDup(*_data, key, loc))
-                return dupKeyError(key);
-            return Status::OK();
-        }
-
-        virtual bool isEmpty(OperationContext* txn) {
-            return _data->empty();
-        }
-
-        virtual Status touch(OperationContext* txn) const{
-            // already in memory...
-            return Status::OK();
-        }
-
-        class Cursor final : public SortedDataInterface::Cursor {
-        public:
-            Cursor(OperationContext* txn, const IndexSet& data, bool isForward)
-                : _txn(txn),
-                  _data(data),
-                  _forward(isForward),
-                  _it(data.end())
-            {}
-            
-            boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
-                if (_lastMoveWasRestore) {
-                    // Return current position rather than advancing.
-                    _lastMoveWasRestore = false;
-                }
-                else {
-                    advance();
-                    if (atEndPoint()) _isEOF = true;
-                }
-
-                if (_isEOF) return {};
-                return *_it;
-            }
-        
-            void setEndPosition(const BSONObj& key, bool inclusive) override {
-                if (key.isEmpty()) {
-                    // This means scan to end of index.
-                    _endState = {};
-                    return;
-                }
-                
-                // NOTE: this uses the opposite min/max rules as a normal seek because a forward
-                // scan should land after the key if inclusive and before if exclusive.
-                _endState = EndState(stripFieldNames(key),
-                                     _forward == inclusive ? RecordId::max() : RecordId::min());
-                seekEndCursor();
-            }
-
-            boost::optional<IndexKeyEntry> seek(const BSONObj& key, bool inclusive,
-                                                RequestedInfo parts) override {
-                const BSONObj query = stripFieldNames(key);
-                locate(query, _forward == inclusive ? RecordId::min() : RecordId::max());
+        boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
+            if (_lastMoveWasRestore) {
+                // Return current position rather than advancing.
                 _lastMoveWasRestore = false;
-                if (_isEOF) return {};
-                dassert(inclusive ? compareKeys(_it->key, query) >= 0
-                                  : compareKeys(_it->key, query) > 0);
-                return *_it;
-            }
-
-            boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
-                                                RequestedInfo parts) override {
-                // Query encodes exclusive case so it can be treated as an inclusive query.
-                const BSONObj query = IndexEntryComparison::makeQueryObject(seekPoint, _forward);
-                locate(query, _forward ? RecordId::min() : RecordId::max());
-                _lastMoveWasRestore = false;
-                if (_isEOF) return {};
-                dassert(compareKeys(_it->key, query) >= 0);
-                return *_it;
-            }
-
-            void savePositioned() override {
-                // Keep original position if we haven't moved since the last restore.
-                _txn = nullptr;
-                if (_lastMoveWasRestore) return;
-
-                if (_isEOF) {
-                    saveUnpositioned();
-                    return;
-                }
-
-                _savedAtEnd = false;
-                _savedKey = _it->key.getOwned();
-                _savedLoc = _it->loc;
-                // Doing nothing with end cursor since it will do full reseek on restore.
-            }
-
-            void saveUnpositioned() override {
-                _txn = nullptr;
-                _savedAtEnd = true;
-                // Doing nothing with end cursor since it will do full reseek on restore.
-            }
-
-            void restore(OperationContext* txn) override {
-                _txn = txn;
-
-                // Always do a full seek on restore. We cannot use our last position since index
-                // entries may have been inserted closer to our endpoint and we would need to move
-                // over them.
-                seekEndCursor();
-
-                if (_savedAtEnd) {
+            } else {
+                advance();
+                if (atEndPoint())
                     _isEOF = true;
-                    return;
-                }
-                
-                // Need to find our position from the root.
-                locate(_savedKey, _savedLoc);
-
-                _lastMoveWasRestore = _isEOF // We weren't EOF but now are.
-                                   || _data.value_comp().compare(*_it, {_savedKey, _savedLoc}) != 0;
             }
 
-        private:
-            bool atEndPoint() const {
-                return _endState && _it == _endState->it;
-            }
-
-            // Advances once in the direction of the scan, updating _isEOF as needed.
-            // Does nothing if already _isEOF.
-            void advance() {
-                if (_isEOF) return;
-                if (_forward) {
-                    if (_it != _data.end()) ++_it;
-                    if (_it == _data.end() || atEndPoint()) _isEOF = true;
-                }
-                else {
-                    if (_it == _data.begin() || _data.empty()) {
-                        _isEOF = true;
-                    }
-                    else {
-                        --_it;
-                    }
-                    if (atEndPoint()) _isEOF = true;
-                }
-            }
-
-            bool atOrPastEndPointAfterSeeking() const {
-                if (_isEOF) return true;
-                if (!_endState) return false;
-               
-                const int cmp = _data.value_comp().compare(*_it, _endState->query);
-
-                // We set up _endState->query to be in between the last in-range value and the first
-                // out-of-range value. In particular, it is constructed to never equal any legal
-                // index key.
-                dassert(cmp != 0);
-
-                if (_forward) {
-                    // We may have landed after the end point.
-                    return cmp > 0;
-                }
-                else {
-                    // We may have landed before the end point.
-                    return cmp < 0;
-                }
-            }
-
-            void locate(const BSONObj& key, const RecordId& loc) {
-                _isEOF = false;
-                const auto query = IndexKeyEntry(key, loc);
-                _it = _data.lower_bound(query);
-                if (_forward) {
-                    if (_it == _data.end()) _isEOF = true;
-                }
-                else {
-                    // lower_bound lands us on or after query. Reverse cursors must be on or before.
-                    if (_it == _data.end() || _data.value_comp().compare(*_it, query) > 0)
-                        advance(); // sets _isEOF if there is nothing more to return.
-                }
-
-                if (atOrPastEndPointAfterSeeking()) _isEOF = true;
-            }
-
-            // Returns comparison relative to direction of scan. If rhs would be seen later, returns
-            // a positive value.
-            int compareKeys(const BSONObj& lhs, const BSONObj& rhs) const {
-                int cmp = _data.value_comp().compare({lhs, RecordId()}, {rhs, RecordId()});
-                return _forward ? cmp : -cmp;
-            }
-
-            void seekEndCursor() {
-                if (!_endState || _data.empty()) return;
-
-                auto it = _data.lower_bound(_endState->query);
-                if (!_forward) {
-                    // lower_bound lands us on or after query. Reverse cursors must be on or before.
-                    if (it == _data.end() || _data.value_comp().compare(*it,
-                                                                        _endState->query) > 0) {
-                        if (it == _data.begin()) {
-                            it = _data.end(); // all existing data in range.
-                        }
-                        else {
-                            --it;
-                        }
-                    }
-                }
-
-                if (it != _data.end()) dassert(compareKeys(it->key, _endState->query.key) >= 0);
-                _endState->it = it;
-            }
-
-            OperationContext* _txn; // not owned
-            const IndexSet& _data;
-            const bool _forward;
-            bool _isEOF = true;
-            IndexSet::const_iterator _it;
-            
-            struct EndState {
-                EndState(BSONObj key, RecordId loc) : query(std::move(key), loc) {}
-
-                IndexKeyEntry query;
-                IndexSet::const_iterator it;
-            };
-            boost::optional<EndState> _endState;
-
-            // Used by next to decide to return current position rather than moving. Should be reset
-            // to false by any operation that moves the cursor, other than subsequent save/restore
-            // pairs.
-            bool _lastMoveWasRestore = false;
-
-            // For save/restore since _it may be invalidated during a yield.
-            bool _savedAtEnd = false;
-            BSONObj _savedKey;
-            RecordId _savedLoc;
-        };
-
-        virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(
-                OperationContext* txn,
-                bool isForward) const {
-            return stdx::make_unique<Cursor>(txn, *_data, isForward);
+            if (_isEOF)
+                return {};
+            return *_it;
         }
 
-        virtual Status initAsEmpty(OperationContext* txn) {
-            // No-op
-            return Status::OK();
+        void setEndPosition(const BSONObj& key, bool inclusive) override {
+            if (key.isEmpty()) {
+                // This means scan to end of index.
+                _endState = {};
+                return;
+            }
+
+            // NOTE: this uses the opposite min/max rules as a normal seek because a forward
+            // scan should land after the key if inclusive and before if exclusive.
+            _endState = EndState(stripFieldNames(key),
+                                 _forward == inclusive ? RecordId::max() : RecordId::min());
+            seekEndCursor();
+        }
+
+        boost::optional<IndexKeyEntry> seek(const BSONObj& key,
+                                            bool inclusive,
+                                            RequestedInfo parts) override {
+            const BSONObj query = stripFieldNames(key);
+            locate(query, _forward == inclusive ? RecordId::min() : RecordId::max());
+            _lastMoveWasRestore = false;
+            if (_isEOF)
+                return {};
+            dassert(inclusive ? compareKeys(_it->key, query) >= 0
+                              : compareKeys(_it->key, query) > 0);
+            return *_it;
+        }
+
+        boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
+                                            RequestedInfo parts) override {
+            // Query encodes exclusive case so it can be treated as an inclusive query.
+            const BSONObj query = IndexEntryComparison::makeQueryObject(seekPoint, _forward);
+            locate(query, _forward ? RecordId::min() : RecordId::max());
+            _lastMoveWasRestore = false;
+            if (_isEOF)
+                return {};
+            dassert(compareKeys(_it->key, query) >= 0);
+            return *_it;
+        }
+
+        void savePositioned() override {
+            // Keep original position if we haven't moved since the last restore.
+            _txn = nullptr;
+            if (_lastMoveWasRestore)
+                return;
+
+            if (_isEOF) {
+                saveUnpositioned();
+                return;
+            }
+
+            _savedAtEnd = false;
+            _savedKey = _it->key.getOwned();
+            _savedLoc = _it->loc;
+            // Doing nothing with end cursor since it will do full reseek on restore.
+        }
+
+        void saveUnpositioned() override {
+            _txn = nullptr;
+            _savedAtEnd = true;
+            // Doing nothing with end cursor since it will do full reseek on restore.
+        }
+
+        void restore(OperationContext* txn) override {
+            _txn = txn;
+
+            // Always do a full seek on restore. We cannot use our last position since index
+            // entries may have been inserted closer to our endpoint and we would need to move
+            // over them.
+            seekEndCursor();
+
+            if (_savedAtEnd) {
+                _isEOF = true;
+                return;
+            }
+
+            // Need to find our position from the root.
+            locate(_savedKey, _savedLoc);
+
+            _lastMoveWasRestore = _isEOF  // We weren't EOF but now are.
+                || _data.value_comp().compare(*_it, {_savedKey, _savedLoc}) != 0;
         }
 
     private:
-        class IndexChange : public RecoveryUnit::Change {
-        public:
-            IndexChange(IndexSet* data, const IndexKeyEntry& entry, bool insert)
-                : _data(data), _entry(entry), _insert(insert)
-            {}
+        bool atEndPoint() const {
+            return _endState && _it == _endState->it;
+        }
 
-            virtual void commit() {}
-            virtual void rollback() {
-                if (_insert)
-                    _data->erase(_entry);
-                else
-                    _data->insert(_entry);
+        // Advances once in the direction of the scan, updating _isEOF as needed.
+        // Does nothing if already _isEOF.
+        void advance() {
+            if (_isEOF)
+                return;
+            if (_forward) {
+                if (_it != _data.end())
+                    ++_it;
+                if (_it == _data.end() || atEndPoint())
+                    _isEOF = true;
+            } else {
+                if (_it == _data.begin() || _data.empty()) {
+                    _isEOF = true;
+                } else {
+                    --_it;
+                }
+                if (atEndPoint())
+                    _isEOF = true;
+            }
+        }
+
+        bool atOrPastEndPointAfterSeeking() const {
+            if (_isEOF)
+                return true;
+            if (!_endState)
+                return false;
+
+            const int cmp = _data.value_comp().compare(*_it, _endState->query);
+
+            // We set up _endState->query to be in between the last in-range value and the first
+            // out-of-range value. In particular, it is constructed to never equal any legal
+            // index key.
+            dassert(cmp != 0);
+
+            if (_forward) {
+                // We may have landed after the end point.
+                return cmp > 0;
+            } else {
+                // We may have landed before the end point.
+                return cmp < 0;
+            }
+        }
+
+        void locate(const BSONObj& key, const RecordId& loc) {
+            _isEOF = false;
+            const auto query = IndexKeyEntry(key, loc);
+            _it = _data.lower_bound(query);
+            if (_forward) {
+                if (_it == _data.end())
+                    _isEOF = true;
+            } else {
+                // lower_bound lands us on or after query. Reverse cursors must be on or before.
+                if (_it == _data.end() || _data.value_comp().compare(*_it, query) > 0)
+                    advance();  // sets _isEOF if there is nothing more to return.
             }
 
-        private:
-            IndexSet* _data;
-            const IndexKeyEntry _entry;
-            const bool _insert;
-        };
-
-        IndexSet* _data;
-        long long _currentKeySize;
-    };
-} // namespace
-
-    // IndexCatalogEntry argument taken by non-const pointer for consistency with other Btree
-    // factories. We don't actually modify it.
-    SortedDataInterface* getInMemoryBtreeImpl(const Ordering& ordering,
-                                              std::shared_ptr<void>* dataInOut) {
-        invariant(dataInOut);
-        if (!*dataInOut) {
-            *dataInOut = std::make_shared<IndexSet>(IndexEntryComparison(ordering));
+            if (atOrPastEndPointAfterSeeking())
+                _isEOF = true;
         }
-        return new InMemoryBtreeImpl(static_cast<IndexSet*>(dataInOut->get()));
+
+        // Returns comparison relative to direction of scan. If rhs would be seen later, returns
+        // a positive value.
+        int compareKeys(const BSONObj& lhs, const BSONObj& rhs) const {
+            int cmp = _data.value_comp().compare({lhs, RecordId()}, {rhs, RecordId()});
+            return _forward ? cmp : -cmp;
+        }
+
+        void seekEndCursor() {
+            if (!_endState || _data.empty())
+                return;
+
+            auto it = _data.lower_bound(_endState->query);
+            if (!_forward) {
+                // lower_bound lands us on or after query. Reverse cursors must be on or before.
+                if (it == _data.end() || _data.value_comp().compare(*it, _endState->query) > 0) {
+                    if (it == _data.begin()) {
+                        it = _data.end();  // all existing data in range.
+                    } else {
+                        --it;
+                    }
+                }
+            }
+
+            if (it != _data.end())
+                dassert(compareKeys(it->key, _endState->query.key) >= 0);
+            _endState->it = it;
+        }
+
+        OperationContext* _txn;  // not owned
+        const IndexSet& _data;
+        const bool _forward;
+        bool _isEOF = true;
+        IndexSet::const_iterator _it;
+
+        struct EndState {
+            EndState(BSONObj key, RecordId loc) : query(std::move(key), loc) {}
+
+            IndexKeyEntry query;
+            IndexSet::const_iterator it;
+        };
+        boost::optional<EndState> _endState;
+
+        // Used by next to decide to return current position rather than moving. Should be reset
+        // to false by any operation that moves the cursor, other than subsequent save/restore
+        // pairs.
+        bool _lastMoveWasRestore = false;
+
+        // For save/restore since _it may be invalidated during a yield.
+        bool _savedAtEnd = false;
+        BSONObj _savedKey;
+        RecordId _savedLoc;
+    };
+
+    virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
+                                                                   bool isForward) const {
+        return stdx::make_unique<Cursor>(txn, *_data, isForward);
     }
+
+    virtual Status initAsEmpty(OperationContext* txn) {
+        // No-op
+        return Status::OK();
+    }
+
+private:
+    class IndexChange : public RecoveryUnit::Change {
+    public:
+        IndexChange(IndexSet* data, const IndexKeyEntry& entry, bool insert)
+            : _data(data), _entry(entry), _insert(insert) {}
+
+        virtual void commit() {}
+        virtual void rollback() {
+            if (_insert)
+                _data->erase(_entry);
+            else
+                _data->insert(_entry);
+        }
+
+    private:
+        IndexSet* _data;
+        const IndexKeyEntry _entry;
+        const bool _insert;
+    };
+
+    IndexSet* _data;
+    long long _currentKeySize;
+};
+}  // namespace
+
+// IndexCatalogEntry argument taken by non-const pointer for consistency with other Btree
+// factories. We don't actually modify it.
+SortedDataInterface* getInMemoryBtreeImpl(const Ordering& ordering,
+                                          std::shared_ptr<void>* dataInOut) {
+    invariant(dataInOut);
+    if (!*dataInOut) {
+        *dataInOut = std::make_shared<IndexSet>(IndexEntryComparison(ordering));
+    }
+    return new InMemoryBtreeImpl(static_cast<IndexSet*>(dataInOut->get()));
+}
 
 }  // namespace mongo

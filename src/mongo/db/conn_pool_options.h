@@ -30,25 +30,23 @@
 
 namespace mongo {
 
-    // NOTE:
-    // The connection pools themselves are placed in different files and are currently hard to move
-    // due to spaghetti dependencies.
-    // TODO: Extract conn pools from driver files and shardconnection.cpp
+// NOTE:
+// The connection pools themselves are placed in different files and are currently hard to move
+// due to spaghetti dependencies.
+// TODO: Extract conn pools from driver files and shardconnection.cpp
+
+/**
+ * Struct namespace for connection pool options on mongos and mongod
+ */
+struct ConnPoolOptions {
+    /**
+     * Maximum connections per host the connection pool should use
+     */
+    static int maxConnsPerHost;
 
     /**
-     * Struct namespace for connection pool options on mongos and mongod
+     * Maximum connections per host the sharded conn pool should use
      */
-    struct ConnPoolOptions {
-
-        /**
-         * Maximum connections per host the connection pool should use
-         */
-        static int maxConnsPerHost;
-
-        /**
-         * Maximum connections per host the sharded conn pool should use
-         */
-        static int maxShardedConnsPerHost;
-    };
-
+    static int maxShardedConnsPerHost;
+};
 }

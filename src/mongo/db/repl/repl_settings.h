@@ -38,90 +38,91 @@
 namespace mongo {
 namespace repl {
 
-    extern int maxSyncSourceLagSecs;
+extern int maxSyncSourceLagSecs;
 
-    bool anyReplEnabled();
+bool anyReplEnabled();
 
-    /* replication slave? (possibly with slave)
-       --slave cmd line setting -> SimpleSlave
-    */
-    typedef enum { NotSlave=0, SimpleSlave } SlaveTypes;
+/* replication slave? (possibly with slave)
+   --slave cmd line setting -> SimpleSlave
+*/
+typedef enum { NotSlave = 0, SimpleSlave } SlaveTypes;
 
-    class ReplSettings {
-    public:
-        SlaveTypes slave;
+class ReplSettings {
+public:
+    SlaveTypes slave;
 
-        /** true means we are master and doing replication.  if we are not writing to oplog, this won't be true. */
-        bool master;
+    /** true means we are master and doing replication.  if we are not writing to oplog, this won't be true. */
+    bool master;
 
-        bool fastsync;
+    bool fastsync;
 
-        bool autoresync;
+    bool autoresync;
 
-        int slavedelay;
+    int slavedelay;
 
-        long long oplogSize;   // --oplogSize
+    long long oplogSize;  // --oplogSize
 
-        // for master/slave replication
-        std::string source;    // --source
-        std::string only;      // --only
-        int pretouch;          // --pretouch for replication application (experimental)
+    // for master/slave replication
+    std::string source;  // --source
+    std::string only;    // --only
+    int pretouch;        // --pretouch for replication application (experimental)
 
-        std::string replSet;       // --replSet[/<seedlist>]
-        std::string ourSetName() const {
-            std::string setname;
-            size_t sl = replSet.find('/');
-            if( sl == std::string::npos )
-                return replSet;
-            return replSet.substr(0, sl);
-        }
-        bool usingReplSets() const { return !replSet.empty(); }
+    std::string replSet;  // --replSet[/<seedlist>]
+    std::string ourSetName() const {
+        std::string setname;
+        size_t sl = replSet.find('/');
+        if (sl == std::string::npos)
+            return replSet;
+        return replSet.substr(0, sl);
+    }
+    bool usingReplSets() const {
+        return !replSet.empty();
+    }
 
-        std::string rsIndexPrefetch;// --indexPrefetch
+    std::string rsIndexPrefetch;  // --indexPrefetch
 
-        ReplSettings()
-            : slave(NotSlave),
-            master(false),
-            fastsync(),
-            autoresync(false),
-            slavedelay(),
-            oplogSize(0),
-            pretouch(0) {
-        }
+    ReplSettings()
+        : slave(NotSlave),
+          master(false),
+          fastsync(),
+          autoresync(false),
+          slavedelay(),
+          oplogSize(0),
+          pretouch(0) {}
 
-        // TODO(spencer): Remove explicit copy constructor after we no longer have mutable state
-        // in ReplSettings.
-        ReplSettings(const ReplSettings& other) :
-            slave(other.slave),
-            master(other.master),
-            fastsync(other.fastsync),
-            autoresync(other.autoresync),
-            slavedelay(other.slavedelay),
-            oplogSize(other.oplogSize),
-            source(other.source),
-            only(other.only),
-            pretouch(other.pretouch),
-            replSet(other.replSet),
-            rsIndexPrefetch(other.rsIndexPrefetch) {}
+    // TODO(spencer): Remove explicit copy constructor after we no longer have mutable state
+    // in ReplSettings.
+    ReplSettings(const ReplSettings& other)
+        : slave(other.slave),
+          master(other.master),
+          fastsync(other.fastsync),
+          autoresync(other.autoresync),
+          slavedelay(other.slavedelay),
+          oplogSize(other.oplogSize),
+          source(other.source),
+          only(other.only),
+          pretouch(other.pretouch),
+          replSet(other.replSet),
+          rsIndexPrefetch(other.rsIndexPrefetch) {}
 
-        ReplSettings& operator=(const ReplSettings& other) {
-            if (this == &other) return *this;
-
-            slave = other.slave;
-            master = other.master;
-            fastsync = other.fastsync;
-            autoresync = other.autoresync;
-            slavedelay = other.slavedelay;
-            oplogSize = other.oplogSize;
-            source = other.source;
-            only = other.only;
-            pretouch = other.pretouch;
-            replSet = other.replSet;
-            rsIndexPrefetch = other.rsIndexPrefetch;
+    ReplSettings& operator=(const ReplSettings& other) {
+        if (this == &other)
             return *this;
-        }
 
-    };
+        slave = other.slave;
+        master = other.master;
+        fastsync = other.fastsync;
+        autoresync = other.autoresync;
+        slavedelay = other.slavedelay;
+        oplogSize = other.oplogSize;
+        source = other.source;
+        only = other.only;
+        pretouch = other.pretouch;
+        replSet = other.replSet;
+        rsIndexPrefetch = other.rsIndexPrefetch;
+        return *this;
+    }
+};
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

@@ -48,43 +48,43 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-    Status dropDatabase(OperationContext* txn, const std::string& dbName) {
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lk(txn->lockState());
-            AutoGetDb autoDB(txn, dbName, MODE_X);
-            Database* const db = autoDB.getDb();
-            if (!db) {
-                return Status(ErrorCodes::DatabaseNotFound,
-                        str::stream() << "Could not drop database " << dbName
-                                      << " because it does not exist");
+Status dropDatabase(OperationContext* txn, const std::string& dbName) {
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction transaction(txn, MODE_X);
+        Lock::GlobalWrite lk(txn->lockState());
+        AutoGetDb autoDB(txn, dbName, MODE_X);
+        Database* const db = autoDB.getDb();
+        if (!db) {
+            return Status(ErrorCodes::DatabaseNotFound,
+                          str::stream() << "Could not drop database " << dbName
+                                        << " because it does not exist");
+        }
+        OldClientContext context(txn, dbName);
 
-            }
-            OldClientContext context(txn, dbName);
+        bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName);
 
-            bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName);
+        if (userInitiatedWritesAndNotPrimary) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while dropping database " << dbName);
+        }
 
-            if (userInitiatedWritesAndNotPrimary) {
-                return Status(ErrorCodes::NotMaster,
-                        str::stream() << "Not primary while dropping database " << dbName);
-            }
+        log() << "dropDatabase " << dbName << " starting";
 
-            log() << "dropDatabase " << dbName << " starting";
+        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
+        mongo::dropDatabase(txn, db);
 
-            BackgroundOperation::assertNoBgOpInProgForDb(dbName);
-            mongo::dropDatabase(txn, db);
+        log() << "dropDatabase " << dbName << " finished";
 
-            log() << "dropDatabase " << dbName << " finished";
+        WriteUnitOfWork wunit(txn);
 
-            WriteUnitOfWork wunit(txn);
+        getGlobalServiceContext()->getOpObserver()->onDropDatabase(txn, dbName + ".$cmd");
 
-            getGlobalServiceContext()->getOpObserver()->onDropDatabase(txn, dbName + ".$cmd");
-
-            wunit.commit();
-        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropDatabase", dbName);
-
-        return Status::OK();
+        wunit.commit();
     }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropDatabase", dbName);
 
-} // namespace mongo
+    return Status::OK();
+}
+
+}  // namespace mongo

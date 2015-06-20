@@ -34,144 +34,136 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    UpdateIndexData::UpdateIndexData() : _allPathsIndexed( false ) { }
+UpdateIndexData::UpdateIndexData() : _allPathsIndexed(false) {}
 
-    void UpdateIndexData::addPath( StringData path ) {
-        string s;
-        if ( getCanonicalIndexField( path, &s ) ) {
-            _canonicalPaths.insert( s );
-        }
-        else {
-            _canonicalPaths.insert( path.toString() );
-        }
+void UpdateIndexData::addPath(StringData path) {
+    string s;
+    if (getCanonicalIndexField(path, &s)) {
+        _canonicalPaths.insert(s);
+    } else {
+        _canonicalPaths.insert(path.toString());
     }
+}
 
-    void UpdateIndexData::addPathComponent( StringData pathComponent ) {
-        _pathComponents.insert( pathComponent.toString() );
-    }
+void UpdateIndexData::addPathComponent(StringData pathComponent) {
+    _pathComponents.insert(pathComponent.toString());
+}
 
-    void UpdateIndexData::allPathsIndexed() {
-        _allPathsIndexed = true;
-    }
+void UpdateIndexData::allPathsIndexed() {
+    _allPathsIndexed = true;
+}
 
-    void UpdateIndexData::clear() {
-        _canonicalPaths.clear();
-        _pathComponents.clear();
-        _allPathsIndexed = false;
-    }
+void UpdateIndexData::clear() {
+    _canonicalPaths.clear();
+    _pathComponents.clear();
+    _allPathsIndexed = false;
+}
 
-    bool UpdateIndexData::mightBeIndexed( StringData path ) const {
-        if ( _allPathsIndexed ) {
-            return true;
-        }
-
-        StringData use = path;
-        string x;
-        if ( getCanonicalIndexField( path, &x ) )
-            use = StringData( x );
-
-        for ( std::set<string>::const_iterator i = _canonicalPaths.begin();
-              i != _canonicalPaths.end();
-              ++i ) {
-
-            StringData idx( *i );
-
-            if ( _startsWith( use, idx ) )
-                return true;
-
-            if ( _startsWith( idx, use ) )
-                return true;
-        }
-
-        FieldRef pathFieldRef( path );
-        for ( std::set<string>::const_iterator i = _pathComponents.begin();
-              i != _pathComponents.end();
-              ++i ) {
-            const string& pathComponent = *i;
-            for ( size_t partIdx = 0; partIdx < pathFieldRef.numParts(); ++partIdx ) {
-                if ( pathComponent == pathFieldRef.getPart( partIdx ) ) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    bool UpdateIndexData::_startsWith( StringData a, StringData b ) const {
-        if ( !a.startsWith( b ) )
-            return false;
-
-        // make sure there is a dot or EOL right after
-
-        if ( a.size() == b.size() )
-            return true;
-
-        return a[b.size()] == '.';
-    }
-
-    bool getCanonicalIndexField( StringData fullName, string* out ) {
-        // check if fieldName contains ".$" or ".###" substrings (#=digit) and skip them
-        // however do not skip the first field even if it meets these criteria
-
-        if ( fullName.find( '.' ) == string::npos )
-            return false;
-
-        bool modified = false;
-
-        StringBuilder buf;
-        for ( size_t i=0; i<fullName.size(); i++ ) {
-
-            char c = fullName[i];
-
-            if ( c != '.' ) {
-                buf << c;
-                continue;
-            }
-
-            if ( i + 1 == fullName.size() ) {
-                // ends with '.'
-                buf << c;
-                continue;
-            }
-
-            // check for ".$", skip if present
-            if ( fullName[i+1] == '$' ) {
-                // only do this if its not something like $a
-                if ( i + 2 >= fullName.size() || fullName[i+2] == '.' ) {
-                    i++;
-                    modified = true;
-                    continue;
-                }
-            }
-
-            // check for ".###" for any number of digits (no letters)
-            if ( isdigit( fullName[i+1] ) ) {
-                size_t j = i;
-                // skip digits
-                while ( j+1 < fullName.size() && isdigit( fullName[j+1] ) )
-                    j++;
-
-                if ( j+1 == fullName.size() || fullName[j+1] == '.' ) {
-                    // only digits found, skip forward
-                    i = j;
-                    modified = true;
-                    continue;
-                }
-            }
-
-            buf << c;
-        }
-
-        if ( !modified )
-            return false;
-
-        *out = buf.str();
+bool UpdateIndexData::mightBeIndexed(StringData path) const {
+    if (_allPathsIndexed) {
         return true;
     }
 
+    StringData use = path;
+    string x;
+    if (getCanonicalIndexField(path, &x))
+        use = StringData(x);
 
+    for (std::set<string>::const_iterator i = _canonicalPaths.begin(); i != _canonicalPaths.end();
+         ++i) {
+        StringData idx(*i);
+
+        if (_startsWith(use, idx))
+            return true;
+
+        if (_startsWith(idx, use))
+            return true;
+    }
+
+    FieldRef pathFieldRef(path);
+    for (std::set<string>::const_iterator i = _pathComponents.begin(); i != _pathComponents.end();
+         ++i) {
+        const string& pathComponent = *i;
+        for (size_t partIdx = 0; partIdx < pathFieldRef.numParts(); ++partIdx) {
+            if (pathComponent == pathFieldRef.getPart(partIdx)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
+bool UpdateIndexData::_startsWith(StringData a, StringData b) const {
+    if (!a.startsWith(b))
+        return false;
+
+    // make sure there is a dot or EOL right after
+
+    if (a.size() == b.size())
+        return true;
+
+    return a[b.size()] == '.';
+}
+
+bool getCanonicalIndexField(StringData fullName, string* out) {
+    // check if fieldName contains ".$" or ".###" substrings (#=digit) and skip them
+    // however do not skip the first field even if it meets these criteria
+
+    if (fullName.find('.') == string::npos)
+        return false;
+
+    bool modified = false;
+
+    StringBuilder buf;
+    for (size_t i = 0; i < fullName.size(); i++) {
+        char c = fullName[i];
+
+        if (c != '.') {
+            buf << c;
+            continue;
+        }
+
+        if (i + 1 == fullName.size()) {
+            // ends with '.'
+            buf << c;
+            continue;
+        }
+
+        // check for ".$", skip if present
+        if (fullName[i + 1] == '$') {
+            // only do this if its not something like $a
+            if (i + 2 >= fullName.size() || fullName[i + 2] == '.') {
+                i++;
+                modified = true;
+                continue;
+            }
+        }
+
+        // check for ".###" for any number of digits (no letters)
+        if (isdigit(fullName[i + 1])) {
+            size_t j = i;
+            // skip digits
+            while (j + 1 < fullName.size() && isdigit(fullName[j + 1]))
+                j++;
+
+            if (j + 1 == fullName.size() || fullName[j + 1] == '.') {
+                // only digits found, skip forward
+                i = j;
+                modified = true;
+                continue;
+            }
+        }
+
+        buf << c;
+    }
+
+    if (!modified)
+        return false;
+
+    *out = buf.str();
+    return true;
+}
+}

@@ -35,48 +35,47 @@
 
 namespace mongo {
 
-    class OldThreadPool;
-    class OperationContext;
+class OldThreadPool;
+class OperationContext;
 
 namespace repl {
 
-    class TaskRunner;
+class TaskRunner;
+
+/**
+ * Test fixture for tests that require a TaskRunner and/or
+ * ThreadPool.
+ */
+class TaskRunnerTest : public unittest::Test {
+public:
+    static Status getDetectableErrorStatus();
 
     /**
-     * Test fixture for tests that require a TaskRunner and/or
-     * ThreadPool.
+     * Returns ID of mock operation context returned from createOperationContext().
+     * Returns -1 if txn is null.
+     * Returns -2 if txn cannot be converted to a mock operation context containing an ID.
      */
-    class TaskRunnerTest : public unittest::Test {
-    public:
-        static Status getDetectableErrorStatus();
+    static int getOperationContextId(OperationContext* txn);
 
-        /**
-         * Returns ID of mock operation context returned from createOperationContext().
-         * Returns -1 if txn is null.
-         * Returns -2 if txn cannot be converted to a mock operation context containing an ID.
-         */
-        static int getOperationContextId(OperationContext* txn);
+    /**
+     * Returns an noop operation context with an embedded numerical ID.
+     */
+    virtual OperationContext* createOperationContext() const;
 
-        /**
-         * Returns an noop operation context with an embedded numerical ID.
-         */
-        virtual OperationContext* createOperationContext() const;
+    OldThreadPool& getThreadPool() const;
+    TaskRunner& getTaskRunner() const;
 
-        OldThreadPool& getThreadPool() const;
-        TaskRunner& getTaskRunner() const;
+    void resetTaskRunner(TaskRunner* taskRunner);
+    void destroyTaskRunner();
 
-        void resetTaskRunner(TaskRunner* taskRunner);
-        void destroyTaskRunner();
+protected:
+    void setUp() override;
+    void tearDown() override;
 
-    protected:
+private:
+    std::unique_ptr<OldThreadPool> _threadPool;
+    std::unique_ptr<TaskRunner> _taskRunner;
+};
 
-        void setUp() override;
-        void tearDown() override;
-
-    private:
-        std::unique_ptr<OldThreadPool> _threadPool;
-        std::unique_ptr<TaskRunner> _taskRunner;
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

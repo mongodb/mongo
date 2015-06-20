@@ -37,28 +37,28 @@
 namespace mongo {
 namespace logger {
 
-    /**
-     * Appender for writing to the console (stdout).
-     */
-    template <typename Event, typename ConsoleType = Console>
-    class ConsoleAppender : public Appender<Event> {
-        MONGO_DISALLOW_COPYING(ConsoleAppender);
+/**
+ * Appender for writing to the console (stdout).
+ */
+template <typename Event, typename ConsoleType = Console>
+class ConsoleAppender : public Appender<Event> {
+    MONGO_DISALLOW_COPYING(ConsoleAppender);
 
-    public:
-        typedef Encoder<Event> EventEncoder;
+public:
+    typedef Encoder<Event> EventEncoder;
 
-        explicit ConsoleAppender(EventEncoder* encoder) : _encoder(encoder) {}
-        virtual Status append(const Event& event) {
-            ConsoleType console;
-            _encoder->encode(event, console.out()).flush();
-            if (!console.out())
-                return Status(ErrorCodes::LogWriteFailed, "Error writing log message to console.");
-            return Status::OK();
-        }
+    explicit ConsoleAppender(EventEncoder* encoder) : _encoder(encoder) {}
+    virtual Status append(const Event& event) {
+        ConsoleType console;
+        _encoder->encode(event, console.out()).flush();
+        if (!console.out())
+            return Status(ErrorCodes::LogWriteFailed, "Error writing log message to console.");
+        return Status::OK();
+    }
 
-    private:
-        std::unique_ptr<EventEncoder> _encoder;
-    };
+private:
+    std::unique_ptr<EventEncoder> _encoder;
+};
 
 }  // namespace logger
 }  // namespace mongo

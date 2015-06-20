@@ -40,50 +40,47 @@
 namespace mongo {
 namespace rpc {
 
-    const OperationContext::Decoration<AuditMetadata> AuditMetadata::get =
-        OperationContext::declareDecoration<AuditMetadata>();
+const OperationContext::Decoration<AuditMetadata> AuditMetadata::get =
+    OperationContext::declareDecoration<AuditMetadata>();
 
-    AuditMetadata::AuditMetadata(
-        boost::optional<UsersAndRoles> impersonatedUsersAndRoles
-    )
-        : _impersonatedUsersAndRoles(std::move(impersonatedUsersAndRoles))
-    {}
+AuditMetadata::AuditMetadata(boost::optional<UsersAndRoles> impersonatedUsersAndRoles)
+    : _impersonatedUsersAndRoles(std::move(impersonatedUsersAndRoles)) {}
 
 #if !defined(MONGO_ENTERPRISE_VERSION)
 
-    StatusWith<AuditMetadata> AuditMetadata::readFromMetadata(const BSONObj&) {
-        return AuditMetadata(boost::none);
-    }
+StatusWith<AuditMetadata> AuditMetadata::readFromMetadata(const BSONObj&) {
+    return AuditMetadata(boost::none);
+}
 
-    Status AuditMetadata::writeToMetadata(BSONObjBuilder*) const {
-        return Status::OK();
-    }
+Status AuditMetadata::writeToMetadata(BSONObjBuilder*) const {
+    return Status::OK();
+}
 
-    Status AuditMetadata::downconvert(const BSONObj& command,
-                                      const BSONObj&,
-                                      BSONObjBuilder* commandBob,
-                                      int*) {
-        commandBob->appendElements(command);
-        return Status::OK();
-    }
+Status AuditMetadata::downconvert(const BSONObj& command,
+                                  const BSONObj&,
+                                  BSONObjBuilder* commandBob,
+                                  int*) {
+    commandBob->appendElements(command);
+    return Status::OK();
+}
 
-    Status AuditMetadata::upconvert(const BSONObj& command,
-                                    const int,
-                                    BSONObjBuilder* commandBob,
-                                    BSONObjBuilder*) {
-        commandBob->appendElements(command);
-        return Status::OK();
-    }
+Status AuditMetadata::upconvert(const BSONObj& command,
+                                const int,
+                                BSONObjBuilder* commandBob,
+                                BSONObjBuilder*) {
+    commandBob->appendElements(command);
+    return Status::OK();
+}
 
 #endif
 
-    const boost::optional<AuditMetadata::UsersAndRoles>&
-    AuditMetadata::getImpersonatedUsersAndRoles() const {
-        return _impersonatedUsersAndRoles;
-    }
+const boost::optional<AuditMetadata::UsersAndRoles>& AuditMetadata::getImpersonatedUsersAndRoles()
+    const {
+    return _impersonatedUsersAndRoles;
+}
 
-    const char kLegacyImpersonatedUsersFieldName[] = "impersonatedUsers";
-    const char kLegacyImpersonatedRolesFieldName[] = "impersonatedRoles";
+const char kLegacyImpersonatedUsersFieldName[] = "impersonatedUsers";
+const char kLegacyImpersonatedRolesFieldName[] = "impersonatedRoles";
 
 }  // namespace rpc
 }  // namespace mongo

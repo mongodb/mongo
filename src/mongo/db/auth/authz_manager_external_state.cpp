@@ -32,9 +32,9 @@
 
 namespace mongo {
 
-    stdx::function<std::unique_ptr<AuthzManagerExternalState>()> AuthzManagerExternalState::create;
+stdx::function<std::unique_ptr<AuthzManagerExternalState>()> AuthzManagerExternalState::create;
 
-    AuthzManagerExternalState::AuthzManagerExternalState() = default;
-    AuthzManagerExternalState::~AuthzManagerExternalState() = default;
+AuthzManagerExternalState::AuthzManagerExternalState() = default;
+AuthzManagerExternalState::~AuthzManagerExternalState() = default;
 
 }  // namespace mongo

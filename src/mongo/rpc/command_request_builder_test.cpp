@@ -36,57 +36,56 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(RequestBuilder, RoundTrip) {
+TEST(RequestBuilder, RoundTrip) {
+    auto databaseName = "barbaz";
+    auto commandName = "foobar";
 
-        auto databaseName = "barbaz";
-        auto commandName = "foobar";
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
 
-        BSONObjBuilder metadataBob{};
-        metadataBob.append("foo", "bar");
-        auto metadata = metadataBob.done();
+    BSONObjBuilder commandArgsBob{};
+    commandArgsBob.append("bar", "baz");
+    auto commandArgs = commandArgsBob.done();
 
-        BSONObjBuilder commandArgsBob{};
-        commandArgsBob.append("bar", "baz");
-        auto commandArgs = commandArgsBob.done();
+    BSONObjBuilder inputDoc1Bob{};
+    inputDoc1Bob.append("z", "t");
+    auto inputDoc1 = inputDoc1Bob.done();
 
-        BSONObjBuilder inputDoc1Bob{};
-        inputDoc1Bob.append("z", "t");
-        auto inputDoc1 = inputDoc1Bob.done();
+    BSONObjBuilder inputDoc2Bob{};
+    inputDoc2Bob.append("h", "j");
+    auto inputDoc2 = inputDoc2Bob.done();
 
-        BSONObjBuilder inputDoc2Bob{};
-        inputDoc2Bob.append("h", "j");
-        auto inputDoc2 = inputDoc2Bob.done();
+    BSONObjBuilder inputDoc3Bob{};
+    inputDoc3Bob.append("g", "p");
+    auto inputDoc3 = inputDoc3Bob.done();
 
-        BSONObjBuilder inputDoc3Bob{};
-        inputDoc3Bob.append("g", "p");
-        auto inputDoc3 = inputDoc3Bob.done();
+    BufBuilder inputDocs;
+    inputDoc1.appendSelfToBufBuilder(inputDocs);
+    inputDoc2.appendSelfToBufBuilder(inputDocs);
+    inputDoc3.appendSelfToBufBuilder(inputDocs);
 
-        BufBuilder inputDocs;
-        inputDoc1.appendSelfToBufBuilder(inputDocs);
-        inputDoc2.appendSelfToBufBuilder(inputDocs);
-        inputDoc3.appendSelfToBufBuilder(inputDocs);
+    rpc::DocumentRange inputDocRange{inputDocs.buf(), inputDocs.buf() + inputDocs.len()};
 
-        rpc::DocumentRange inputDocRange{inputDocs.buf(), inputDocs.buf() + inputDocs.len()};
+    rpc::CommandRequestBuilder r;
 
-        rpc::CommandRequestBuilder r;
+    auto msg = r.setDatabase(databaseName)
+                   .setCommandName(commandName)
+                   .setMetadata(metadata)
+                   .setCommandArgs(commandArgs)
+                   .addInputDocs(inputDocRange)
+                   .done();
 
-        auto msg = r.setDatabase(databaseName)
-                    .setCommandName(commandName)
-                    .setMetadata(metadata)
-                    .setCommandArgs(commandArgs)
-                    .addInputDocs(inputDocRange)
-                    .done();
+    rpc::CommandRequest parsed(msg.get());
 
-        rpc::CommandRequest parsed(msg.get());
-
-        ASSERT_EQUALS(parsed.getDatabase(), databaseName);
-        ASSERT_EQUALS(parsed.getCommandName(), commandName);
-        ASSERT_EQUALS(parsed.getMetadata(), metadata);
-        ASSERT_EQUALS(parsed.getCommandArgs(), commandArgs);
-        // need ostream overloads for ASSERT_EQUALS
-        ASSERT_TRUE(parsed.getInputDocs() == inputDocRange);
-    }
+    ASSERT_EQUALS(parsed.getDatabase(), databaseName);
+    ASSERT_EQUALS(parsed.getCommandName(), commandName);
+    ASSERT_EQUALS(parsed.getMetadata(), metadata);
+    ASSERT_EQUALS(parsed.getCommandArgs(), commandArgs);
+    // need ostream overloads for ASSERT_EQUALS
+    ASSERT_TRUE(parsed.getInputDocs() == inputDocRange);
+}
 
 }  // namespace

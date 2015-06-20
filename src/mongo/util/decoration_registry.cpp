@@ -32,64 +32,59 @@
 
 namespace mongo {
 
-    DecorationContainer::DecorationDescriptor DecorationRegistry::declareDecoration(
-            const size_t sizeBytes,
-            const size_t alignBytes,
-            const DecorationConstructorFn constructor,
-            const DecorationDestructorFn destructor) {
-
-        const size_t misalignment = _totalSizeBytes % alignBytes;
-        if (misalignment) {
-            _totalSizeBytes += alignBytes - misalignment;
-        }
-        DecorationContainer::DecorationDescriptor result(_totalSizeBytes);
-        _decorationInfo.push_back(DecorationInfo(result, constructor, destructor));
-        _totalSizeBytes += sizeBytes;
-        return result;
+DecorationContainer::DecorationDescriptor DecorationRegistry::declareDecoration(
+    const size_t sizeBytes,
+    const size_t alignBytes,
+    const DecorationConstructorFn constructor,
+    const DecorationDestructorFn destructor) {
+    const size_t misalignment = _totalSizeBytes % alignBytes;
+    if (misalignment) {
+        _totalSizeBytes += alignBytes - misalignment;
     }
+    DecorationContainer::DecorationDescriptor result(_totalSizeBytes);
+    _decorationInfo.push_back(DecorationInfo(result, constructor, destructor));
+    _totalSizeBytes += sizeBytes;
+    return result;
+}
 
-    void DecorationRegistry::construct(DecorationContainer* decorable) const {
-        auto iter = _decorationInfo.cbegin();
-        try {
-            for (; iter != _decorationInfo.cend(); ++iter) {
-                iter->constructor(decorable->getDecoration(iter->descriptor));
-            }
+void DecorationRegistry::construct(DecorationContainer* decorable) const {
+    auto iter = _decorationInfo.cbegin();
+    try {
+        for (; iter != _decorationInfo.cend(); ++iter) {
+            iter->constructor(decorable->getDecoration(iter->descriptor));
         }
-        catch (...) {
-            try {
-                while (iter != _decorationInfo.cbegin()) {
-                    --iter;
-                    iter->destructor(decorable->getDecoration(iter->descriptor));
-                }
-            }
-            catch (...) {
-                std::terminate();
-            }
-            throw;
-        }
-    }
-
-    void DecorationRegistry::destruct(DecorationContainer* decorable) const {
+    } catch (...) {
         try {
-            for (DecorationInfoVector::const_reverse_iterator iter = _decorationInfo.rbegin(),
-                     end = _decorationInfo.rend();
-                 iter != end;
-                 ++iter) {
-
+            while (iter != _decorationInfo.cbegin()) {
+                --iter;
                 iter->destructor(decorable->getDecoration(iter->descriptor));
             }
-        }
-        catch (...) {
+        } catch (...) {
             std::terminate();
         }
+        throw;
     }
+}
 
-    DecorationRegistry::DecorationInfo::DecorationInfo(
-            DecorationContainer::DecorationDescriptor inDescriptor,
-            DecorationConstructorFn inConstructor,
-            DecorationDestructorFn inDestructor) :
-        descriptor(std::move(inDescriptor)),
-        constructor(std::move(inConstructor)),
-        destructor(std::move(inDestructor)) {}
+void DecorationRegistry::destruct(DecorationContainer* decorable) const {
+    try {
+        for (DecorationInfoVector::const_reverse_iterator iter = _decorationInfo.rbegin(),
+                                                          end = _decorationInfo.rend();
+             iter != end;
+             ++iter) {
+            iter->destructor(decorable->getDecoration(iter->descriptor));
+        }
+    } catch (...) {
+        std::terminate();
+    }
+}
+
+DecorationRegistry::DecorationInfo::DecorationInfo(
+    DecorationContainer::DecorationDescriptor inDescriptor,
+    DecorationConstructorFn inConstructor,
+    DecorationDestructorFn inDestructor)
+    : descriptor(std::move(inDescriptor)),
+      constructor(std::move(inConstructor)),
+      destructor(std::move(inDestructor)) {}
 
 }  // namespace mongo

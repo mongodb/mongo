@@ -37,123 +37,118 @@
 
 namespace mongo {
 
-    ConnectionString::ConnectionString(const HostAndPort& server) : _type(MASTER) {
-        _servers.push_back(server);
-        _finishInit();
-    }
+ConnectionString::ConnectionString(const HostAndPort& server) : _type(MASTER) {
+    _servers.push_back(server);
+    _finishInit();
+}
 
-    ConnectionString::ConnectionString(StringData setName, std::vector<HostAndPort> servers)
-        : _type(SET),
-          _servers(std::move(servers)),
-          _setName(setName.toString()) {
+ConnectionString::ConnectionString(StringData setName, std::vector<HostAndPort> servers)
+    : _type(SET), _servers(std::move(servers)), _setName(setName.toString()) {
+    _finishInit();
+}
 
-        _finishInit();
-    }
+ConnectionString::ConnectionString(ConnectionType type,
+                                   const std::string& s,
+                                   const std::string& setName) {
+    _type = type;
+    _setName = setName;
+    _fillServers(s);
 
-    ConnectionString::ConnectionString(ConnectionType type,
-                                       const std::string& s,
-                                       const std::string& setName) {
-        _type = type;
-        _setName = setName;
-        _fillServers(s);
-
-        switch (_type) {
+    switch (_type) {
         case MASTER:
             verify(_servers.size() == 1);
             break;
         case SET:
             verify(_setName.size());
-            verify(_servers.size() >= 1); // 1 is ok since we can derive
+            verify(_servers.size() >= 1);  // 1 is ok since we can derive
             break;
         default:
             verify(_servers.size() > 0);
-        }
-
-        _finishInit();
     }
 
-    ConnectionString::ConnectionString(const std::string& s, ConnectionType favoredMultipleType) {
-        _fillServers(s);
+    _finishInit();
+}
 
-        if (_type != INVALID) {
-            // set already
-        }
-        else if (_servers.size() == 1) {
-            _type = MASTER;
-        }
-        else {
-            _type = favoredMultipleType;
-            verify(_type == SET || _type == SYNC);
-        }
+ConnectionString::ConnectionString(const std::string& s, ConnectionType favoredMultipleType) {
+    _fillServers(s);
 
-        _finishInit();
+    if (_type != INVALID) {
+        // set already
+    } else if (_servers.size() == 1) {
+        _type = MASTER;
+    } else {
+        _type = favoredMultipleType;
+        verify(_type == SET || _type == SYNC);
     }
 
-    ConnectionString ConnectionString::forReplicaSet(StringData setName,
-                                                     std::vector<HostAndPort> servers) {
-        return ConnectionString(setName, std::move(servers));
+    _finishInit();
+}
+
+ConnectionString ConnectionString::forReplicaSet(StringData setName,
+                                                 std::vector<HostAndPort> servers) {
+    return ConnectionString(setName, std::move(servers));
+}
+
+void ConnectionString::_fillServers(std::string s) {
+    //
+    // Custom-handled servers/replica sets start with '$'
+    // According to RFC-1123/952, this will not overlap with valid hostnames
+    // (also disallows $replicaSetName hosts)
+    //
+
+    if (s.find('$') == 0)
+        _type = CUSTOM;
+
+    {
+        std::string::size_type idx = s.find('/');
+        if (idx != std::string::npos) {
+            _setName = s.substr(0, idx);
+            s = s.substr(idx + 1);
+            if (_type != CUSTOM)
+                _type = SET;
+        }
     }
 
-    void ConnectionString::_fillServers( std::string s ) {
+    std::string::size_type idx;
+    while ((idx = s.find(',')) != std::string::npos) {
+        _servers.push_back(HostAndPort(s.substr(0, idx)));
+        s = s.substr(idx + 1);
+    }
+    _servers.push_back(HostAndPort(s));
+}
 
-        //
-        // Custom-handled servers/replica sets start with '$'
-        // According to RFC-1123/952, this will not overlap with valid hostnames
-        // (also disallows $replicaSetName hosts)
-        //
-
-        if( s.find( '$' ) == 0 ) _type = CUSTOM;
-
-        {
-            std::string::size_type idx = s.find( '/' );
-            if ( idx != std::string::npos ) {
-                _setName = s.substr( 0 , idx );
-                s = s.substr( idx + 1 );
-                if( _type != CUSTOM ) _type = SET;
-            }
+void ConnectionString::_finishInit() {
+    // Needed here as well b/c the parsing logic isn't used in all constructors
+    // TODO: Refactor so that the parsing logic *is* used in all constructors
+    if (_type == MASTER && _servers.size() > 0) {
+        if (_servers[0].host().find('$') == 0) {
+            _type = CUSTOM;
         }
-
-        std::string::size_type idx;
-        while ( ( idx = s.find( ',' ) ) != std::string::npos ) {
-            _servers.push_back(HostAndPort(s.substr(0, idx)));
-            s = s.substr( idx + 1 );
-        }
-        _servers.push_back(HostAndPort(s));
-
     }
 
-    void ConnectionString::_finishInit() {
-        // Needed here as well b/c the parsing logic isn't used in all constructors
-        // TODO: Refactor so that the parsing logic *is* used in all constructors
-        if (_type == MASTER && _servers.size() > 0) {
-            if (_servers[0].host().find('$') == 0) {
-                _type = CUSTOM;
-            }
-        }
+    std::stringstream ss;
 
-        std::stringstream ss;
-
-        if (_type == SET) {
-            ss << _setName << "/";
-        }
-
-        for (unsigned i = 0; i < _servers.size(); i++) {
-            if (i > 0) {
-                ss << ",";
-            }
-
-            ss << _servers[i].toString();
-        }
-
-        _string = ss.str();
+    if (_type == SET) {
+        ss << _setName << "/";
     }
 
-    bool ConnectionString::sameLogicalEndpoint(const ConnectionString& other) const {
-        if (_type != other._type) {
-            return false;
+    for (unsigned i = 0; i < _servers.size(); i++) {
+        if (i > 0) {
+            ss << ",";
         }
 
-        switch (_type) {
+        ss << _servers[i].toString();
+    }
+
+    _string = ss.str();
+}
+
+bool ConnectionString::sameLogicalEndpoint(const ConnectionString& other) const {
+    if (_type != other._type) {
+        return false;
+    }
+
+    switch (_type) {
         case INVALID:
             return true;
         case MASTER:
@@ -175,59 +170,60 @@ namespace mongo {
                     }
                 }
 
-                if (!found) return false;
+                if (!found)
+                    return false;
             }
 
             return true;
         case CUSTOM:
             return _string == other._string;
-        }
-
-        MONGO_UNREACHABLE;
     }
 
-    ConnectionString ConnectionString::parse(const std::string& url, std::string& errmsg) {
-        auto status = parse(url);
-        if (status.isOK()) {
-            errmsg = "";
-            return status.getValue();
-        }
+    MONGO_UNREACHABLE;
+}
 
-        errmsg = status.getStatus().toString();
-        return ConnectionString();
+ConnectionString ConnectionString::parse(const std::string& url, std::string& errmsg) {
+    auto status = parse(url);
+    if (status.isOK()) {
+        errmsg = "";
+        return status.getValue();
     }
 
-    StatusWith<ConnectionString> ConnectionString::parse(const std::string& url) {
-        const std::string::size_type i = url.find('/');
+    errmsg = status.getStatus().toString();
+    return ConnectionString();
+}
 
-        // Replica set
-        if (i != std::string::npos && i != 0) {
-            return ConnectionString(SET, url.substr(i + 1), url.substr(0, i));
-        }
+StatusWith<ConnectionString> ConnectionString::parse(const std::string& url) {
+    const std::string::size_type i = url.find('/');
 
-        const int numCommas = str::count(url, ',');
-
-        // Single host
-        if (numCommas == 0) {
-            HostAndPort singleHost;
-            Status status = singleHost.initialize(url);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            return ConnectionString(singleHost);
-        }
-
-        // Sharding config server
-        if (numCommas == 2) {
-            return ConnectionString(SYNC, url, "");
-        }
-
-        return Status(ErrorCodes::FailedToParse, str::stream() << "invalid url [" << url << "]");
+    // Replica set
+    if (i != std::string::npos && i != 0) {
+        return ConnectionString(SET, url.substr(i + 1), url.substr(0, i));
     }
 
-    std::string ConnectionString::typeToString(ConnectionType type) {
-        switch (type) {
+    const int numCommas = str::count(url, ',');
+
+    // Single host
+    if (numCommas == 0) {
+        HostAndPort singleHost;
+        Status status = singleHost.initialize(url);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return ConnectionString(singleHost);
+    }
+
+    // Sharding config server
+    if (numCommas == 2) {
+        return ConnectionString(SYNC, url, "");
+    }
+
+    return Status(ErrorCodes::FailedToParse, str::stream() << "invalid url [" << url << "]");
+}
+
+std::string ConnectionString::typeToString(ConnectionType type) {
+    switch (type) {
         case INVALID:
             return "invalid";
         case MASTER:
@@ -238,9 +234,9 @@ namespace mongo {
             return "sync";
         case CUSTOM:
             return "custom";
-        }
-
-        MONGO_UNREACHABLE;
     }
 
-} // namespace mongo
+    MONGO_UNREACHABLE;
+}
+
+}  // namespace mongo

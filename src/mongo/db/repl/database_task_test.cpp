@@ -37,149 +37,147 @@
 
 namespace {
 
-    using namespace mongo;
-    using namespace mongo::repl;
+using namespace mongo;
+using namespace mongo::repl;
 
-    const std::string databaseName = "mydb";
-    const std::string collectionName = "mycoll";
-    const NamespaceString nss(databaseName, collectionName);
+const std::string databaseName = "mydb";
+const std::string collectionName = "mycoll";
+const NamespaceString nss(databaseName, collectionName);
 
-    class DatabaseTaskTest : public TaskRunnerTest {
-    public:
-        OperationContext* createOperationContext() const override;
+class DatabaseTaskTest : public TaskRunnerTest {
+public:
+    OperationContext* createOperationContext() const override;
+};
+
+OperationContext* DatabaseTaskTest::createOperationContext() const {
+    return new OperationContextReplMock();
+}
+
+TEST_F(DatabaseTaskTest, TaskRunnerErrorStatus) {
+    // Should not attempt to acquire lock on error status from task runner.
+    auto task = [](OperationContext* txn, const Status& status) {
+        ASSERT_FALSE(txn);
+        ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
+        return TaskRunner::NextAction::kInvalid;
     };
+    auto testLockTask = [](DatabaseTask::Task task) {
+        ASSERT_TRUE(TaskRunner::NextAction::kInvalid ==
+                    task(nullptr, Status(ErrorCodes::BadValue, "")));
+    };
+    testLockTask(DatabaseTask::makeGlobalExclusiveLockTask(task));
+    testLockTask(DatabaseTask::makeDatabaseLockTask(task, databaseName, MODE_X));
+    testLockTask(DatabaseTask::makeCollectionLockTask(task, nss, MODE_X));
+}
 
-    OperationContext* DatabaseTaskTest::createOperationContext() const {
-        return new OperationContextReplMock();
-    }
-
-    TEST_F(DatabaseTaskTest, TaskRunnerErrorStatus) {
-        // Should not attempt to acquire lock on error status from task runner.
-        auto task = [](OperationContext* txn, const Status& status) {
-            ASSERT_FALSE(txn);
-            ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
-            return TaskRunner::NextAction::kInvalid;
-        };
-        auto testLockTask = [](DatabaseTask::Task task) {
-            ASSERT_TRUE(TaskRunner::NextAction::kInvalid ==
-                task(nullptr, Status(ErrorCodes::BadValue, "")));
-        };
-        testLockTask(DatabaseTask::makeGlobalExclusiveLockTask(task));
-        testLockTask(DatabaseTask::makeDatabaseLockTask(task, databaseName, MODE_X));
-        testLockTask(DatabaseTask::makeCollectionLockTask(task, nss, MODE_X));
-    }
-
-    TEST_F(DatabaseTaskTest, RunGlobalExclusiveLockTask) {
-        stdx::mutex mutex;
-        bool called = false;
-        OperationContext* txn = nullptr;
-        bool lockIsW = false;
-        Status status = getDetectableErrorStatus();
-        // Task returning 'void' implies NextAction::NoAction.
-        auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-            stdx::lock_guard<stdx::mutex> lk(mutex);
-            called = true;
-            txn = theTxn;
-            lockIsW = txn->lockState()->isW();
-            status = theStatus;
-            return TaskRunner::NextAction::kCancel;
-        };
-        getTaskRunner().schedule(DatabaseTask::makeGlobalExclusiveLockTask(task));
-        getThreadPool().join();
-        ASSERT_FALSE(getTaskRunner().isActive());
-
+TEST_F(DatabaseTaskTest, RunGlobalExclusiveLockTask) {
+    stdx::mutex mutex;
+    bool called = false;
+    OperationContext* txn = nullptr;
+    bool lockIsW = false;
+    Status status = getDetectableErrorStatus();
+    // Task returning 'void' implies NextAction::NoAction.
+    auto task = [&](OperationContext* theTxn, const Status& theStatus) {
         stdx::lock_guard<stdx::mutex> lk(mutex);
-        ASSERT_TRUE(called);
-        ASSERT(txn);
-        ASSERT_TRUE(lockIsW);
-        ASSERT_OK(status);
-    }
+        called = true;
+        txn = theTxn;
+        lockIsW = txn->lockState()->isW();
+        status = theStatus;
+        return TaskRunner::NextAction::kCancel;
+    };
+    getTaskRunner().schedule(DatabaseTask::makeGlobalExclusiveLockTask(task));
+    getThreadPool().join();
+    ASSERT_FALSE(getTaskRunner().isActive());
 
-    void _testRunDatabaseLockTask(DatabaseTaskTest& test, LockMode mode) {
-        stdx::mutex mutex;
-        bool called = false;
-        OperationContext* txn = nullptr;
-        bool isDatabaseLockedForMode = false;
-        Status status = test.getDetectableErrorStatus();
-        // Task returning 'void' implies NextAction::NoAction.
-        auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-            stdx::lock_guard<stdx::mutex> lk(mutex);
-            called = true;
-            txn = theTxn;
-            isDatabaseLockedForMode = txn->lockState()->isDbLockedForMode(databaseName, mode);
-            status = theStatus;
-            return TaskRunner::NextAction::kCancel;
-        };
-        test.getTaskRunner().schedule(
-            DatabaseTask::makeDatabaseLockTask(task, databaseName, mode));
-        test.getThreadPool().join();
-        ASSERT_FALSE(test.getTaskRunner().isActive());
+    stdx::lock_guard<stdx::mutex> lk(mutex);
+    ASSERT_TRUE(called);
+    ASSERT(txn);
+    ASSERT_TRUE(lockIsW);
+    ASSERT_OK(status);
+}
 
+void _testRunDatabaseLockTask(DatabaseTaskTest& test, LockMode mode) {
+    stdx::mutex mutex;
+    bool called = false;
+    OperationContext* txn = nullptr;
+    bool isDatabaseLockedForMode = false;
+    Status status = test.getDetectableErrorStatus();
+    // Task returning 'void' implies NextAction::NoAction.
+    auto task = [&](OperationContext* theTxn, const Status& theStatus) {
         stdx::lock_guard<stdx::mutex> lk(mutex);
-        ASSERT_TRUE(called);
-        ASSERT(txn);
-        ASSERT_TRUE(isDatabaseLockedForMode);
-        ASSERT_OK(status);
-    }
+        called = true;
+        txn = theTxn;
+        isDatabaseLockedForMode = txn->lockState()->isDbLockedForMode(databaseName, mode);
+        status = theStatus;
+        return TaskRunner::NextAction::kCancel;
+    };
+    test.getTaskRunner().schedule(DatabaseTask::makeDatabaseLockTask(task, databaseName, mode));
+    test.getThreadPool().join();
+    ASSERT_FALSE(test.getTaskRunner().isActive());
 
-    TEST_F(DatabaseTaskTest, RunDatabaseLockTaskModeX) {
-        _testRunDatabaseLockTask(*this, MODE_X);
-    }
+    stdx::lock_guard<stdx::mutex> lk(mutex);
+    ASSERT_TRUE(called);
+    ASSERT(txn);
+    ASSERT_TRUE(isDatabaseLockedForMode);
+    ASSERT_OK(status);
+}
 
-    TEST_F(DatabaseTaskTest, RunDatabaseLockTaskModeS) {
-        _testRunDatabaseLockTask(*this, MODE_S);
-    }
+TEST_F(DatabaseTaskTest, RunDatabaseLockTaskModeX) {
+    _testRunDatabaseLockTask(*this, MODE_X);
+}
 
-    TEST_F(DatabaseTaskTest, RunDatabaseLockTaskModeIX) {
-        _testRunDatabaseLockTask(*this, MODE_IX);
-    }
+TEST_F(DatabaseTaskTest, RunDatabaseLockTaskModeS) {
+    _testRunDatabaseLockTask(*this, MODE_S);
+}
 
-    TEST_F(DatabaseTaskTest, RunDatabaseLockTaskModeIS) {
-        _testRunDatabaseLockTask(*this, MODE_IS);
-    }
+TEST_F(DatabaseTaskTest, RunDatabaseLockTaskModeIX) {
+    _testRunDatabaseLockTask(*this, MODE_IX);
+}
 
-    void _testRunCollectionLockTask(DatabaseTaskTest& test, LockMode mode) {
-        stdx::mutex mutex;
-        bool called = false;
-        OperationContext* txn = nullptr;
-        bool isCollectionLockedForMode = false;
-        Status status = test.getDetectableErrorStatus();
-        // Task returning 'void' implies NextAction::NoAction.
-        auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-            stdx::lock_guard<stdx::mutex> lk(mutex);
-            called = true;
-            txn = theTxn;
-            isCollectionLockedForMode =
-                txn->lockState()->isCollectionLockedForMode(nss.toString(), mode);
-            status = theStatus;
-            return TaskRunner::NextAction::kCancel;
-        };
-        test.getTaskRunner().schedule(
-            DatabaseTask::makeCollectionLockTask(task, nss, mode));
-        test.getThreadPool().join();
-        ASSERT_FALSE(test.getTaskRunner().isActive());
+TEST_F(DatabaseTaskTest, RunDatabaseLockTaskModeIS) {
+    _testRunDatabaseLockTask(*this, MODE_IS);
+}
 
+void _testRunCollectionLockTask(DatabaseTaskTest& test, LockMode mode) {
+    stdx::mutex mutex;
+    bool called = false;
+    OperationContext* txn = nullptr;
+    bool isCollectionLockedForMode = false;
+    Status status = test.getDetectableErrorStatus();
+    // Task returning 'void' implies NextAction::NoAction.
+    auto task = [&](OperationContext* theTxn, const Status& theStatus) {
         stdx::lock_guard<stdx::mutex> lk(mutex);
-        ASSERT_TRUE(called);
-        ASSERT(txn);
-        ASSERT_TRUE(isCollectionLockedForMode);
-        ASSERT_OK(status);
-    }
+        called = true;
+        txn = theTxn;
+        isCollectionLockedForMode =
+            txn->lockState()->isCollectionLockedForMode(nss.toString(), mode);
+        status = theStatus;
+        return TaskRunner::NextAction::kCancel;
+    };
+    test.getTaskRunner().schedule(DatabaseTask::makeCollectionLockTask(task, nss, mode));
+    test.getThreadPool().join();
+    ASSERT_FALSE(test.getTaskRunner().isActive());
 
-    TEST_F(DatabaseTaskTest, RunCollectionLockTaskModeX) {
-        _testRunCollectionLockTask(*this, MODE_X);
-    }
+    stdx::lock_guard<stdx::mutex> lk(mutex);
+    ASSERT_TRUE(called);
+    ASSERT(txn);
+    ASSERT_TRUE(isCollectionLockedForMode);
+    ASSERT_OK(status);
+}
 
-    TEST_F(DatabaseTaskTest, RunCollectionLockTaskModeS) {
-        _testRunCollectionLockTask(*this, MODE_S);
-    }
+TEST_F(DatabaseTaskTest, RunCollectionLockTaskModeX) {
+    _testRunCollectionLockTask(*this, MODE_X);
+}
 
-    TEST_F(DatabaseTaskTest, RunCollectionLockTaskModeIX) {
-        _testRunCollectionLockTask(*this, MODE_IX);
-    }
+TEST_F(DatabaseTaskTest, RunCollectionLockTaskModeS) {
+    _testRunCollectionLockTask(*this, MODE_S);
+}
 
-    TEST_F(DatabaseTaskTest, RunCollectionLockTaskModeIS) {
-        _testRunCollectionLockTask(*this, MODE_IS);
-    }
+TEST_F(DatabaseTaskTest, RunCollectionLockTaskModeIX) {
+    _testRunCollectionLockTask(*this, MODE_IX);
+}
 
-} // namespace
+TEST_F(DatabaseTaskTest, RunCollectionLockTaskModeIS) {
+    _testRunCollectionLockTask(*this, MODE_IS);
+}
+
+}  // namespace

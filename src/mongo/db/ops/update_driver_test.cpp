@@ -42,362 +42,351 @@
 
 namespace {
 
-    using mongo::BSONObj;
-    using mongo::BSONElement;
-    using mongo::BSONObjIterator;
-    using mongo::FieldRef;
-    using mongo::fromjson;
-    using mongo::OwnedPointerVector;
-    using mongo::UpdateIndexData;
-    using mongo::mutablebson::Document;
-    using mongo::StringData;
-    using mongo::UpdateDriver;
-    using mongoutils::str::stream;
+using mongo::BSONObj;
+using mongo::BSONElement;
+using mongo::BSONObjIterator;
+using mongo::FieldRef;
+using mongo::fromjson;
+using mongo::OwnedPointerVector;
+using mongo::UpdateIndexData;
+using mongo::mutablebson::Document;
+using mongo::StringData;
+using mongo::UpdateDriver;
+using mongoutils::str::stream;
 
-    TEST(Parse, Normal) {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        ASSERT_OK(driver.parse(fromjson("{$set:{a:1}}")));
-        ASSERT_EQUALS(driver.numMods(), 1U);
-        ASSERT_FALSE(driver.isDocReplacement());
+TEST(Parse, Normal) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    ASSERT_OK(driver.parse(fromjson("{$set:{a:1}}")));
+    ASSERT_EQUALS(driver.numMods(), 1U);
+    ASSERT_FALSE(driver.isDocReplacement());
+}
+
+TEST(Parse, MultiMods) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    ASSERT_OK(driver.parse(fromjson("{$set:{a:1, b:1}}")));
+    ASSERT_EQUALS(driver.numMods(), 2U);
+    ASSERT_FALSE(driver.isDocReplacement());
+}
+
+TEST(Parse, MixingMods) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    ASSERT_OK(driver.parse(fromjson("{$set:{a:1}, $unset:{b:1}}")));
+    ASSERT_EQUALS(driver.numMods(), 2U);
+    ASSERT_FALSE(driver.isDocReplacement());
+}
+
+TEST(Parse, ObjectReplacment) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    ASSERT_OK(driver.parse(fromjson("{obj: \"obj replacement\"}")));
+    ASSERT_TRUE(driver.isDocReplacement());
+}
+
+TEST(Parse, EmptyMod) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    ASSERT_NOT_OK(driver.parse(fromjson("{$set:{}}")));
+}
+
+TEST(Parse, WrongMod) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    ASSERT_NOT_OK(driver.parse(fromjson("{$xyz:{a:1}}")));
+}
+
+TEST(Parse, WrongType) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    ASSERT_NOT_OK(driver.parse(fromjson("{$set:[{a:1}]}")));
+}
+
+TEST(Parse, ModsWithLaterObjReplacement) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    ASSERT_NOT_OK(driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}")));
+}
+
+TEST(Parse, PushAll) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    ASSERT_OK(driver.parse(fromjson("{$pushAll:{a:[1,2,3]}}")));
+    ASSERT_EQUALS(driver.numMods(), 1U);
+    ASSERT_FALSE(driver.isDocReplacement());
+}
+
+TEST(Parse, SetOnInsert) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    ASSERT_OK(driver.parse(fromjson("{$setOnInsert:{a:1}}")));
+    ASSERT_EQUALS(driver.numMods(), 1U);
+    ASSERT_FALSE(driver.isDocReplacement());
+}
+
+//
+// Tests of creating a base for an upsert from a query document
+// $or, $and, $all get special handling, as does the _id field
+//
+// NONGOAL: Testing all query parsing and nesting combinations
+//
+
+class CreateFromQueryFixture : public mongo::unittest::Test {
+public:
+    CreateFromQueryFixture()
+        : _driverOps(new UpdateDriver(UpdateDriver::Options())),
+          _driverRepl(new UpdateDriver(UpdateDriver::Options())) {
+        _driverOps->parse(fromjson("{$set:{'_':1}}"));
+        _driverRepl->parse(fromjson("{}"));
     }
 
-    TEST(Parse, MultiMods) {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        ASSERT_OK(driver.parse(fromjson("{$set:{a:1, b:1}}")));
-        ASSERT_EQUALS(driver.numMods(), 2U);
-        ASSERT_FALSE(driver.isDocReplacement());
+    Document& doc() {
+        return _doc;
     }
 
-    TEST(Parse, MixingMods) {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        ASSERT_OK(driver.parse(fromjson("{$set:{a:1}, $unset:{b:1}}")));
-        ASSERT_EQUALS(driver.numMods(), 2U);
-        ASSERT_FALSE(driver.isDocReplacement());
+    UpdateDriver& driverOps() {
+        return *_driverOps;
     }
 
-    TEST(Parse, ObjectReplacment) {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        ASSERT_OK(driver.parse(fromjson("{obj: \"obj replacement\"}")));
-        ASSERT_TRUE(driver.isDocReplacement());
+    UpdateDriver& driverRepl() {
+        return *_driverRepl;
     }
 
-    TEST(Parse, EmptyMod) {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        ASSERT_NOT_OK(driver.parse(fromjson("{$set:{}}")));
-    }
+private:
+    std::unique_ptr<UpdateDriver> _driverOps;
+    std::unique_ptr<UpdateDriver> _driverRepl;
+    Document _doc;
+};
 
-    TEST(Parse, WrongMod) {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        ASSERT_NOT_OK(driver.parse(fromjson("{$xyz:{a:1}}")));
-    }
+// Make name nicer to report
+typedef CreateFromQueryFixture CreateFromQuery;
 
-    TEST(Parse, WrongType) {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        ASSERT_NOT_OK(driver.parse(fromjson("{$set:[{a:1}]}")));
-    }
+static void assertSameFields(const BSONObj& docA, const BSONObj& docB);
 
-    TEST(Parse, ModsWithLaterObjReplacement)  {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        ASSERT_NOT_OK(driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}")));
-    }
-
-    TEST(Parse, PushAll) {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        ASSERT_OK(driver.parse(fromjson("{$pushAll:{a:[1,2,3]}}")));
-        ASSERT_EQUALS(driver.numMods(), 1U);
-        ASSERT_FALSE(driver.isDocReplacement());
-    }
-
-    TEST(Parse, SetOnInsert) {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        ASSERT_OK(driver.parse(fromjson("{$setOnInsert:{a:1}}")));
-        ASSERT_EQUALS(driver.numMods(), 1U);
-        ASSERT_FALSE(driver.isDocReplacement());
-    }
-
-    //
-    // Tests of creating a base for an upsert from a query document
-    // $or, $and, $all get special handling, as does the _id field
-    //
-    // NONGOAL: Testing all query parsing and nesting combinations
-    //
-
-    class CreateFromQueryFixture : public mongo::unittest::Test {
-    public:
-
-        CreateFromQueryFixture()
-            : _driverOps(new UpdateDriver(UpdateDriver::Options())),
-              _driverRepl(new UpdateDriver(UpdateDriver::Options())) {
-            _driverOps->parse(fromjson("{$set:{'_':1}}"));
-            _driverRepl->parse(fromjson("{}"));
-        }
-
-        Document& doc() {
-            return _doc;
-        }
-
-        UpdateDriver& driverOps() {
-            return *_driverOps;
-        }
-
-        UpdateDriver& driverRepl() {
-            return *_driverRepl;
-        }
-
-    private:
-        std::unique_ptr<UpdateDriver> _driverOps;
-        std::unique_ptr<UpdateDriver> _driverRepl;
-        Document _doc;
-    };
-
-    // Make name nicer to report
-    typedef CreateFromQueryFixture CreateFromQuery;
-
-    static void assertSameFields(const BSONObj& docA, const BSONObj& docB);
-
-    /**
-     * Recursively asserts that two BSONElements contain the same data or sub-elements,
-     * ignoring element order.
-     */
-    static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
-        if (elA.type() != elB.type() || (!elA.isABSONObj() && !elA.valuesEqual(elB))) {
+/**
+ * Recursively asserts that two BSONElements contain the same data or sub-elements,
+ * ignoring element order.
+ */
+static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
+    if (elA.type() != elB.type() || (!elA.isABSONObj() && !elA.valuesEqual(elB))) {
+        FAIL(stream() << "element " << elA << " not equal to " << elB);
+    } else if (elA.type() == mongo::Array) {
+        std::vector<BSONElement> elsA = elA.Array();
+        std::vector<BSONElement> elsB = elB.Array();
+        if (elsA.size() != elsB.size())
             FAIL(stream() << "element " << elA << " not equal to " << elB);
+
+        std::vector<BSONElement>::iterator arrItA = elsA.begin();
+        std::vector<BSONElement>::iterator arrItB = elsB.begin();
+        for (; arrItA != elsA.end(); ++arrItA, ++arrItB) {
+            assertSameElements(*arrItA, *arrItB);
         }
-        else if (elA.type() == mongo::Array) {
-            std::vector<BSONElement> elsA = elA.Array();
-            std::vector<BSONElement> elsB = elB.Array();
-            if (elsA.size() != elsB.size())
-                FAIL(stream() << "element " << elA << " not equal to " << elB);
+    } else if (elA.type() == mongo::Object) {
+        assertSameFields(elA.Obj(), elB.Obj());
+    }
+}
 
-            std::vector<BSONElement>::iterator arrItA = elsA.begin();
-            std::vector<BSONElement>::iterator arrItB = elsB.begin();
-            for (; arrItA != elsA.end(); ++arrItA, ++arrItB) {
-                assertSameElements(*arrItA, *arrItB);
-            }
-        }
-        else if (elA.type() == mongo::Object) {
-            assertSameFields(elA.Obj(), elB.Obj());
-        }
+/**
+ * Recursively asserts that two BSONObjects contain the same elements,
+ * ignoring element order.
+ */
+static void assertSameFields(const BSONObj& docA, const BSONObj& docB) {
+    if (docA.nFields() != docB.nFields())
+        FAIL(stream() << "document " << docA << " has different fields than " << docB);
+
+    std::map<StringData, BSONElement> docAMap;
+    BSONObjIterator itA(docA);
+    while (itA.more()) {
+        BSONElement elA = itA.next();
+        docAMap.insert(std::make_pair(elA.fieldNameStringData(), elA));
     }
 
-    /**
-     * Recursively asserts that two BSONObjects contain the same elements,
-     * ignoring element order.
-     */
-    static void assertSameFields(const BSONObj& docA, const BSONObj& docB) {
+    BSONObjIterator itB(docB);
+    while (itB.more()) {
+        BSONElement elB = itB.next();
 
-        if (docA.nFields() != docB.nFields())
-            FAIL(stream() << "document " << docA << " has different fields than " << docB);
+        std::map<StringData, BSONElement>::iterator seenIt =
+            docAMap.find(elB.fieldNameStringData());
+        if (seenIt == docAMap.end())
+            FAIL(stream() << "element " << elB << " not found in " << docA);
 
-        std::map<StringData, BSONElement> docAMap;
-        BSONObjIterator itA(docA);
-        while (itA.more()) {
-            BSONElement elA = itA.next();
-            docAMap.insert(std::make_pair(elA.fieldNameStringData(), elA));
-        }
-
-        BSONObjIterator itB(docB);
-        while (itB.more()) {
-            BSONElement elB = itB.next();
-
-            std::map<StringData, BSONElement>::iterator seenIt = docAMap.find(elB
-                .fieldNameStringData());
-            if (seenIt == docAMap.end())
-                FAIL(stream() << "element " << elB << " not found in " << docA);
-
-            BSONElement elA = seenIt->second;
-            assertSameElements(elA, elB);
-        }
+        BSONElement elA = seenIt->second;
+        assertSameElements(elA, elB);
     }
+}
 
-    TEST_F(CreateFromQuery, BasicOp) {
-        BSONObj query = fromjson("{a:1,b:2}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(query, doc().getObject());
-    }
+TEST_F(CreateFromQuery, BasicOp) {
+    BSONObj query = fromjson("{a:1,b:2}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(query, doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, BasicOpEq) {
-        BSONObj query = fromjson("{a:{$eq:1}}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{a:1}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, BasicOpEq) {
+    BSONObj query = fromjson("{a:{$eq:1}}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{a:1}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, BasicOpWithId) {
-        BSONObj query = fromjson("{_id:1,a:1,b:2}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(query, doc().getObject());
-    }
+TEST_F(CreateFromQuery, BasicOpWithId) {
+    BSONObj query = fromjson("{_id:1,a:1,b:2}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(query, doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, BasicRepl) {
-        BSONObj query = fromjson("{a:1,b:2}");
-        ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, BasicRepl) {
+    BSONObj query = fromjson("{a:1,b:2}");
+    ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, BasicReplWithId) {
-        BSONObj query = fromjson("{_id:1,a:1,b:2}");
-        ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{_id:1}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, BasicReplWithId) {
+    BSONObj query = fromjson("{_id:1,a:1,b:2}");
+    ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{_id:1}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, BasicReplWithIdEq) {
-        BSONObj query = fromjson("{_id:{$eq:1},a:1,b:2}");
-        ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{_id:1}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, BasicReplWithIdEq) {
+    BSONObj query = fromjson("{_id:{$eq:1},a:1,b:2}");
+    ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{_id:1}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, NoRootIdOp) {
-        BSONObj query = fromjson("{'_id.a':1,'_id.b':2}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{_id:{a:1,b:2}}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, NoRootIdOp) {
+    BSONObj query = fromjson("{'_id.a':1,'_id.b':2}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{_id:{a:1,b:2}}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, NoRootIdRepl) {
-        BSONObj query = fromjson("{'_id.a':1,'_id.b':2}");
-        ASSERT_NOT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
-    }
+TEST_F(CreateFromQuery, NoRootIdRepl) {
+    BSONObj query = fromjson("{'_id.a':1,'_id.b':2}");
+    ASSERT_NOT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
+}
 
-    TEST_F(CreateFromQuery, NestedSharedRootOp) {
-        BSONObj query = fromjson("{'a.c':1,'a.b':{$eq:2}}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{a:{c:1,b:2}}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, NestedSharedRootOp) {
+    BSONObj query = fromjson("{'a.c':1,'a.b':{$eq:2}}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{a:{c:1,b:2}}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, OrQueryOp) {
-        BSONObj query = fromjson("{$or:[{a:1}]}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{a:1}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, OrQueryOp) {
+    BSONObj query = fromjson("{$or:[{a:1}]}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{a:1}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, OrQueryIdRepl) {
-        BSONObj query = fromjson("{$or:[{_id:1}]}");
-        ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{_id:1}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, OrQueryIdRepl) {
+    BSONObj query = fromjson("{$or:[{_id:1}]}");
+    ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{_id:1}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, OrQueryNoExtractOps) {
-        BSONObj query = fromjson("{$or:[{a:1}, {b:2}]}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(BSONObj(), doc().getObject());
-    }
+TEST_F(CreateFromQuery, OrQueryNoExtractOps) {
+    BSONObj query = fromjson("{$or:[{a:1}, {b:2}]}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(BSONObj(), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, OrQueryNoExtractIdRepl) {
-        BSONObj query = fromjson("{$or:[{_id:1}, {_id:2}]}");
-        ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(BSONObj(), doc().getObject());
-    }
+TEST_F(CreateFromQuery, OrQueryNoExtractIdRepl) {
+    BSONObj query = fromjson("{$or:[{_id:1}, {_id:2}]}");
+    ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(BSONObj(), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, AndQueryOp) {
-        BSONObj query = fromjson("{$and:[{'a.c':1},{'a.b':{$eq:2}}]}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{a:{c:1,b:2}}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, AndQueryOp) {
+    BSONObj query = fromjson("{$and:[{'a.c':1},{'a.b':{$eq:2}}]}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{a:{c:1,b:2}}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, AndQueryIdRepl) {
-        BSONObj query = fromjson("{$and:[{_id:1},{a:{$eq:2}}]}");
-        ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{_id:1}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, AndQueryIdRepl) {
+    BSONObj query = fromjson("{$and:[{_id:1},{a:{$eq:2}}]}");
+    ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{_id:1}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, AllArrayOp) {
-        BSONObj query = fromjson("{a:{$all:[1]}}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{a:1}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, AllArrayOp) {
+    BSONObj query = fromjson("{a:{$all:[1]}}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{a:1}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, AllArrayIdRepl) {
-        BSONObj query = fromjson("{_id:{$all:[1]}, b:2}");
-        ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(fromjson("{_id:1}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, AllArrayIdRepl) {
+    BSONObj query = fromjson("{_id:{$all:[1]}, b:2}");
+    ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(fromjson("{_id:1}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, ConflictFieldsFailOp) {
-        BSONObj query = fromjson("{a:1,'a.b':1}");
-        ASSERT_NOT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-    }
+TEST_F(CreateFromQuery, ConflictFieldsFailOp) {
+    BSONObj query = fromjson("{a:1,'a.b':1}");
+    ASSERT_NOT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+}
 
-    TEST_F(CreateFromQuery, ConflictFieldsFailSameValueOp) {
-        BSONObj query = fromjson("{a:{b:1},'a.b':1}");
-        ASSERT_NOT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-    }
+TEST_F(CreateFromQuery, ConflictFieldsFailSameValueOp) {
+    BSONObj query = fromjson("{a:{b:1},'a.b':1}");
+    ASSERT_NOT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+}
 
-    TEST_F(CreateFromQuery, ConflictWithIdRepl) {
-        BSONObj query = fromjson("{_id:1,'_id.a':1}");
-        ASSERT_NOT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
-    }
+TEST_F(CreateFromQuery, ConflictWithIdRepl) {
+    BSONObj query = fromjson("{_id:1,'_id.a':1}");
+    ASSERT_NOT_OK(driverRepl().populateDocumentWithQueryFields(query, NULL, doc()));
+}
 
-    TEST_F(CreateFromQuery, ConflictAndQueryOp) {
-        BSONObj query = fromjson("{$and:[{a:{b:1}},{'a.b':{$eq:1}}]}");
-        ASSERT_NOT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-    }
+TEST_F(CreateFromQuery, ConflictAndQueryOp) {
+    BSONObj query = fromjson("{$and:[{a:{b:1}},{'a.b':{$eq:1}}]}");
+    ASSERT_NOT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+}
 
-    TEST_F(CreateFromQuery, ConflictAllMultipleValsOp) {
-        BSONObj query = fromjson("{a:{$all:[1, 2]}}");
-        ASSERT_NOT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-    }
+TEST_F(CreateFromQuery, ConflictAllMultipleValsOp) {
+    BSONObj query = fromjson("{a:{$all:[1, 2]}}");
+    ASSERT_NOT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+}
 
-    TEST_F(CreateFromQuery, NoConflictOrQueryOp) {
-        BSONObj query = fromjson("{$or:[{a:{b:1}},{'a.b':{$eq:1}}]}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(BSONObj(), doc().getObject());
-    }
+TEST_F(CreateFromQuery, NoConflictOrQueryOp) {
+    BSONObj query = fromjson("{$or:[{a:{b:1}},{'a.b':{$eq:1}}]}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(BSONObj(), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, ImmutableFieldsOp) {
-        BSONObj query = fromjson("{$or:[{a:{b:1}},{'a.b':{$eq:1}}]}");
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
-        assertSameFields(BSONObj(), doc().getObject());
-    }
+TEST_F(CreateFromQuery, ImmutableFieldsOp) {
+    BSONObj query = fromjson("{$or:[{a:{b:1}},{'a.b':{$eq:1}}]}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, NULL, doc()));
+    assertSameFields(BSONObj(), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, ShardKeyRepl) {
-        BSONObj query = fromjson("{a:{$eq:1}}, b:2}");
-        OwnedPointerVector<FieldRef> immutablePaths;
-        immutablePaths.push_back(new FieldRef("a"));
-        ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query,
-                                                               &immutablePaths.vector(),
-                                                               doc()));
-        assertSameFields(fromjson("{a:1}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, ShardKeyRepl) {
+    BSONObj query = fromjson("{a:{$eq:1}}, b:2}");
+    OwnedPointerVector<FieldRef> immutablePaths;
+    immutablePaths.push_back(new FieldRef("a"));
+    ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, &immutablePaths.vector(), doc()));
+    assertSameFields(fromjson("{a:1}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, NestedShardKeyRepl) {
-        BSONObj query = fromjson("{a:{$eq:1},'b.c':2},d:2}");
-        OwnedPointerVector<FieldRef> immutablePaths;
-        immutablePaths.push_back(new FieldRef("a"));
-        immutablePaths.push_back(new FieldRef("b.c"));
-        ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query,
-                                                               &immutablePaths.vector(),
-                                                               doc()));
-        assertSameFields(fromjson("{a:1,b:{c:2}}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, NestedShardKeyRepl) {
+    BSONObj query = fromjson("{a:{$eq:1},'b.c':2},d:2}");
+    OwnedPointerVector<FieldRef> immutablePaths;
+    immutablePaths.push_back(new FieldRef("a"));
+    immutablePaths.push_back(new FieldRef("b.c"));
+    ASSERT_OK(driverRepl().populateDocumentWithQueryFields(query, &immutablePaths.vector(), doc()));
+    assertSameFields(fromjson("{a:1,b:{c:2}}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, NestedShardKeyOp) {
-        BSONObj query = fromjson("{a:{$eq:1},'b.c':2,d:{$all:[3]}},e:2}");
-        OwnedPointerVector<FieldRef> immutablePaths;
-        immutablePaths.push_back(new FieldRef("a"));
-        immutablePaths.push_back(new FieldRef("b.c"));
-        ASSERT_OK(driverOps().populateDocumentWithQueryFields(query,
-                                                              &immutablePaths.vector(),
-                                                              doc()));
-        assertSameFields(fromjson("{a:1,b:{c:2},d:3}"), doc().getObject());
-    }
+TEST_F(CreateFromQuery, NestedShardKeyOp) {
+    BSONObj query = fromjson("{a:{$eq:1},'b.c':2,d:{$all:[3]}},e:2}");
+    OwnedPointerVector<FieldRef> immutablePaths;
+    immutablePaths.push_back(new FieldRef("a"));
+    immutablePaths.push_back(new FieldRef("b.c"));
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(query, &immutablePaths.vector(), doc()));
+    assertSameFields(fromjson("{a:1,b:{c:2},d:3}"), doc().getObject());
+}
 
-    TEST_F(CreateFromQuery, NotFullShardKeyRepl) {
-        BSONObj query = fromjson("{a:{$eq:1}, 'b.c':2}, d:2}");
-        OwnedPointerVector<FieldRef> immutablePaths;
-        immutablePaths.push_back(new FieldRef("a"));
-        immutablePaths.push_back(new FieldRef("b"));
-        ASSERT_NOT_OK(driverRepl().populateDocumentWithQueryFields(query,
-                                                                   &immutablePaths.vector(),
-                                                                   doc()));
-    }
+TEST_F(CreateFromQuery, NotFullShardKeyRepl) {
+    BSONObj query = fromjson("{a:{$eq:1}, 'b.c':2}, d:2}");
+    OwnedPointerVector<FieldRef> immutablePaths;
+    immutablePaths.push_back(new FieldRef("a"));
+    immutablePaths.push_back(new FieldRef("b"));
+    ASSERT_NOT_OK(
+        driverRepl().populateDocumentWithQueryFields(query, &immutablePaths.vector(), doc()));
+}
 
-} // unnamed namespace
+}  // unnamed namespace

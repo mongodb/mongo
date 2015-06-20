@@ -37,169 +37,244 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class BSONObjBuilder;
-    class Status;
+class BSONObj;
+class BSONObjBuilder;
+class Status;
 
 namespace repl {
 
+/**
+ * Response structure for the replSetHeartbeat command.
+ */
+class ReplSetHeartbeatResponse {
+public:
     /**
-     * Response structure for the replSetHeartbeat command.
+     * Initializes this ReplSetHeartbeatResponse from the contents of "doc".
+     * "term" is only used to complete a V0 OpTime (which is really a Timestamp).
      */
-    class ReplSetHeartbeatResponse {
-    public:
+    Status initialize(const BSONObj& doc, long long term);
 
-        /**
-         * Initializes this ReplSetHeartbeatResponse from the contents of "doc".
-         * "term" is only used to complete a V0 OpTime (which is really a Timestamp).
-         */
-        Status initialize(const BSONObj& doc, long long term);
+    /**
+     * Appends all non-default values to "builder".
+     */
+    void addToBSON(BSONObjBuilder* builder, bool isProtocolVersionV1) const;
 
-        /**
-         * Appends all non-default values to "builder".
-         */
-        void addToBSON(BSONObjBuilder* builder, bool isProtocolVersionV1) const;
+    /**
+     * Returns a BSONObj consisting of all non-default values to "builder".
+     */
+    BSONObj toBSON(bool isProtocolVersionV1) const;
 
-        /**
-         * Returns a BSONObj consisting of all non-default values to "builder".
-         */
-        BSONObj toBSON(bool isProtocolVersionV1) const;
+    /**
+     * Returns toBSON().toString()
+     */
+    const std::string toString() const {
+        return toBSON(true).toString();
+    }
 
-        /**
-         * Returns toBSON().toString()
-         */
-        const std::string toString() const { return toBSON(true).toString(); }
+    bool hasDataSet() const {
+        return _hasDataSet;
+    }
+    bool hasData() const {
+        return _hasData;
+    }
+    bool isMismatched() const {
+        return _mismatch;
+    }
+    bool isReplSet() const {
+        return _isReplSet;
+    }
+    bool isStateDisagreement() const {
+        return _stateDisagreement;
+    }
+    const std::string& getReplicaSetName() const {
+        return _setName;
+    }
+    bool hasState() const {
+        return _stateSet;
+    }
+    MemberState getState() const;
+    bool hasElectionTime() const {
+        return _electionTimeSet;
+    }
+    Timestamp getElectionTime() const;
+    bool hasIsElectable() const {
+        return _electableSet;
+    }
+    bool isElectable() const;
+    const std::string& getHbMsg() const {
+        return _hbmsg;
+    }
+    bool hasTime() const {
+        return _timeSet;
+    }
+    Seconds getTime() const;
+    const HostAndPort& getSyncingTo() const {
+        return _syncingTo;
+    }
+    int getConfigVersion() const {
+        return _configVersion;
+    }
+    bool hasConfig() const {
+        return _configSet;
+    }
+    const ReplicaSetConfig& getConfig() const;
+    bool hasPrimaryId() const {
+        return _primaryIdSet;
+    }
+    long long getPrimaryId() const;
+    long long getTerm() const {
+        return _term;
+    }
+    bool hasOpTime() const {
+        return _opTimeSet;
+    }
+    OpTime getOpTime() const;
 
-        bool hasDataSet() const { return _hasDataSet; }
-        bool hasData() const { return _hasData; }
-        bool isMismatched() const { return _mismatch; }
-        bool isReplSet() const { return _isReplSet; }
-        bool isStateDisagreement() const { return _stateDisagreement; }
-        const std::string& getReplicaSetName() const { return _setName; }
-        bool hasState() const { return _stateSet; }
-        MemberState getState() const;
-        bool hasElectionTime() const { return _electionTimeSet; }
-        Timestamp getElectionTime() const;
-        bool hasIsElectable() const { return _electableSet; }
-        bool isElectable() const;
-        const std::string& getHbMsg() const { return _hbmsg; }
-        bool hasTime() const { return _timeSet; }
-        Seconds getTime() const;
-        const HostAndPort& getSyncingTo() const { return _syncingTo; }
-        int getConfigVersion() const { return _configVersion; }
-        bool hasConfig() const { return _configSet; }
-        const ReplicaSetConfig& getConfig() const;
-        bool hasPrimaryId() const { return _primaryIdSet; }
-        long long getPrimaryId() const;
-        long long getTerm() const { return _term; }
-        bool hasOpTime() const { return _opTimeSet; }
-        OpTime getOpTime() const;
+    /**
+     * Sets _mismatch to true.
+     */
+    void noteMismatched() {
+        _mismatch = true;
+    }
 
-        /**
-         * Sets _mismatch to true.
-         */
-        void noteMismatched() { _mismatch = true; }
+    /**
+     * Sets _isReplSet to true.
+     */
+    void noteReplSet() {
+        _isReplSet = true;
+    }
 
-        /**
-         * Sets _isReplSet to true.
-         */
-        void noteReplSet() { _isReplSet = true; }
+    /**
+     * Sets _stateDisagreement to true.
+     */
+    void noteStateDisagreement() {
+        _stateDisagreement = true;
+    }
 
-        /**
-         * Sets _stateDisagreement to true.
-         */
-        void noteStateDisagreement() { _stateDisagreement = true; }
+    /**
+     * Sets _hasData to true, and _hasDataSet to true to indicate _hasData has been modified
+     */
+    void noteHasData() {
+        _hasDataSet = _hasData = true;
+    }
 
-        /**
-         * Sets _hasData to true, and _hasDataSet to true to indicate _hasData has been modified
-         */
-        void noteHasData() { _hasDataSet = _hasData = true;}
+    /**
+     * Sets _setName to "name".
+     */
+    void setSetName(std::string name) {
+        _setName = name;
+    }
 
-        /**
-         * Sets _setName to "name".
-         */
-        void setSetName(std::string name) { _setName = name; }
+    /**
+     * Sets _state to "state".
+     */
+    void setState(MemberState state) {
+        _stateSet = true;
+        _state = state;
+    }
 
-        /**
-         * Sets _state to "state".
-         */
-        void setState(MemberState state) { _stateSet = true; _state = state; }
+    /**
+     * Sets the optional "electionTime" field to the given Timestamp.
+     */
+    void setElectionTime(Timestamp time) {
+        _electionTimeSet = true;
+        _electionTime = time;
+    }
 
-        /**
-         * Sets the optional "electionTime" field to the given Timestamp.
-         */
-        void setElectionTime(Timestamp time) { _electionTimeSet = true; _electionTime = time; }
+    /**
+     * Sets _electable to "electable" and sets _electableSet to true to indicate
+     * that the value of _electable has been modified.
+     */
+    void setElectable(bool electable) {
+        _electableSet = true;
+        _electable = electable;
+    }
 
-        /**
-         * Sets _electable to "electable" and sets _electableSet to true to indicate
-         * that the value of _electable has been modified.
-         */
-        void setElectable(bool electable) { _electableSet = true; _electable = electable; }
+    /**
+     * Sets _hbmsg to "hbmsg".
+     */
+    void setHbMsg(std::string hbmsg) {
+        _hbmsg = hbmsg;
+    }
 
-        /**
-         * Sets _hbmsg to "hbmsg".
-         */
-        void setHbMsg(std::string hbmsg) { _hbmsg = hbmsg; }
+    /**
+     * Sets the optional "time" field of the response to "theTime", which is
+     * a count of seconds since the UNIX epoch.
+     */
+    void setTime(Seconds theTime) {
+        _timeSet = true;
+        _time = theTime;
+    }
 
-        /**
-         * Sets the optional "time" field of the response to "theTime", which is
-         * a count of seconds since the UNIX epoch.
-         */
-        void setTime(Seconds theTime) { _timeSet = true; _time = theTime; }
+    /**
+     * Sets _syncingTo to "syncingTo".
+     */
+    void setSyncingTo(const HostAndPort& syncingTo) {
+        _syncingTo = syncingTo;
+    }
 
-        /**
-         * Sets _syncingTo to "syncingTo".
-         */
-        void setSyncingTo(const HostAndPort& syncingTo) { _syncingTo = syncingTo; }
+    /**
+     * Sets _configVersion to "configVersion".
+     */
+    void setConfigVersion(int configVersion) {
+        _configVersion = configVersion;
+    }
 
-        /**
-         * Sets _configVersion to "configVersion".
-         */
-        void setConfigVersion(int configVersion) { _configVersion = configVersion; }
+    /**
+     * Initializes _config with "config".
+     */
+    void setConfig(const ReplicaSetConfig& config) {
+        _configSet = true;
+        _config = config;
+    }
 
-        /**
-         * Initializes _config with "config".
-         */
-        void setConfig(const ReplicaSetConfig& config) { _configSet = true; _config = config; }
+    void setPrimaryId(long long primaryId) {
+        _primaryIdSet = true;
+        _primaryId = primaryId;
+    }
+    void setOpTime(OpTime time) {
+        _opTimeSet = true;
+        _opTime = time;
+    }
+    void setTerm(long long term) {
+        _term = term;
+    }
 
-        void setPrimaryId(long long primaryId) { _primaryIdSet = true; _primaryId = primaryId; }
-        void setOpTime(OpTime time) { _opTimeSet = true; _opTime = time; }
-        void setTerm(long long term) { _term = term; }
-    private:
-        bool _electionTimeSet = false;
-        Timestamp _electionTime;
+private:
+    bool _electionTimeSet = false;
+    Timestamp _electionTime;
 
-        bool _timeSet = false;
-        Seconds _time = Seconds(0);  // Seconds since UNIX epoch.
+    bool _timeSet = false;
+    Seconds _time = Seconds(0);  // Seconds since UNIX epoch.
 
-        bool _opTimeSet = false;
-        OpTime _opTime;
+    bool _opTimeSet = false;
+    OpTime _opTime;
 
-        bool _electableSet = false;
-        bool _electable = false;
+    bool _electableSet = false;
+    bool _electable = false;
 
-        bool _hasDataSet = false;
-        bool _hasData = false;
+    bool _hasDataSet = false;
+    bool _hasData = false;
 
-        bool _mismatch = false;
-        bool _isReplSet = false;
-        bool _stateDisagreement = false;
+    bool _mismatch = false;
+    bool _isReplSet = false;
+    bool _stateDisagreement = false;
 
-        bool _stateSet = false;
-        MemberState _state;
+    bool _stateSet = false;
+    MemberState _state;
 
-        int _configVersion = -1;
-        std::string _setName;
-        std::string _hbmsg;
-        HostAndPort _syncingTo;
+    int _configVersion = -1;
+    std::string _setName;
+    std::string _hbmsg;
+    HostAndPort _syncingTo;
 
-        bool _configSet = false;
-        ReplicaSetConfig _config;
+    bool _configSet = false;
+    ReplicaSetConfig _config;
 
-        bool _primaryIdSet = false;
-        long long _primaryId = -1;
-        long long _term = -1;
-    };
+    bool _primaryIdSet = false;
+    long long _primaryId = -1;
+    long long _term = -1;
+};
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

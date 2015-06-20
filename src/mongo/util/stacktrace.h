@@ -44,24 +44,24 @@
 
 namespace mongo {
 
-    /**
-      * Returns a log stream builder suitable for printStackTrace() default argument
-      * Do not use in any other context.
-      */
-    inline logger::LogstreamBuilder getStackTraceLogger() {
-        using namespace logger;
-        return LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Log());
-    }
+/**
+  * Returns a log stream builder suitable for printStackTrace() default argument
+  * Do not use in any other context.
+  */
+inline logger::LogstreamBuilder getStackTraceLogger() {
+    using namespace logger;
+    return LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Log());
+}
 
-    // Print stack trace information to "os", default to the log stream.
-    void printStackTrace(std::ostream &os=getStackTraceLogger().stream());
+// Print stack trace information to "os", default to the log stream.
+void printStackTrace(std::ostream& os = getStackTraceLogger().stream());
 
 #if defined(_WIN32)
-    // Print stack trace (using a specified stack context) to "os", default to the log stream.
-    void printWindowsStackTrace(CONTEXT &context, std::ostream &os=getStackTraceLogger().stream());
+// Print stack trace (using a specified stack context) to "os", default to the log stream.
+void printWindowsStackTrace(CONTEXT& context, std::ostream& os = getStackTraceLogger().stream());
 
-    // Print error message from C runtime followed by stack trace
-    int crtDebugCallback(int, char* originalMessage, int*);
+// Print error message from C runtime followed by stack trace
+int crtDebugCallback(int, char* originalMessage, int*);
 #endif
 
 }  // namespace mongo

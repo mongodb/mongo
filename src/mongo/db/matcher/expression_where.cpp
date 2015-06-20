@@ -42,175 +42,162 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::endl;
-    using std::string;
-    using std::stringstream;
+using std::unique_ptr;
+using std::endl;
+using std::string;
+using std::stringstream;
 
-    class WhereMatchExpression : public MatchExpression {
-    public:
-        WhereMatchExpression(OperationContext* txn)
-            : MatchExpression(WHERE),
-              _txn(txn) {
+class WhereMatchExpression : public MatchExpression {
+public:
+    WhereMatchExpression(OperationContext* txn) : MatchExpression(WHERE), _txn(txn) {
+        invariant(_txn != NULL);
 
-            invariant(_txn != NULL);
-
-            _func = 0;
-        }
-
-        virtual ~WhereMatchExpression(){}
-
-        Status init(StringData dbName, StringData theCode, const BSONObj& scope);
-
-        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
-
-        virtual bool matchesSingleElement( const BSONElement& e ) const {
-            return false;
-        }
-
-        virtual MatchExpression* shallowClone() const {
-            WhereMatchExpression* e = new WhereMatchExpression(_txn);
-            e->init(_dbName, _code, _userScope);
-            if (getTag()) {
-                e->setTag(getTag()->clone());
-            }
-            return e;
-        }
-
-        virtual void debugString( StringBuilder& debug, int level = 0 ) const;
-
-        virtual void toBSON(BSONObjBuilder* out) const;
-
-        virtual bool equivalent( const MatchExpression* other ) const ;
-
-        virtual void resetTag() { setTag(NULL); }
-
-    private:
-
-        string _dbName;
-        string _code;
-        BSONObj _userScope;
-
-        unique_ptr<Scope> _scope;
-        ScriptingFunction _func;
-
-        // Not owned. See comments insde WhereCallbackReal for the lifetime of this pointer.
-        OperationContext* _txn;
-    };
-
-    Status WhereMatchExpression::init( StringData dbName,
-                                       StringData theCode,
-                                       const BSONObj& scope ) {
-
-        if (dbName.size() == 0) {
-            return Status(ErrorCodes::BadValue, "ns for $where cannot be empty");
-        }
-
-        if (theCode.size() == 0) {
-            return Status(ErrorCodes::BadValue, "code for $where cannot be empty");
-        }
-
-        _dbName = dbName.toString();
-        _code = theCode.toString();
-        _userScope = scope.getOwned();
-
-        const string userToken = AuthorizationSession::get(ClientBasic::getCurrent())
-                                                          ->getAuthenticatedUserNamesToken();
-
-        try {
-            _scope = globalScriptEngine->getPooledScope(_txn, _dbName, "where" + userToken);
-            _func = _scope->createFunction(_code.c_str());
-        } catch (...) {
-            return exceptionToStatus();
-        }
-
-        if ( !_func )
-            return Status( ErrorCodes::BadValue, "$where compile error" );
-
-        return Status::OK();
+        _func = 0;
     }
 
-    bool WhereMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        uassert(28692, "$where compile error", _func);
-        BSONObj obj = doc->toBSON();
+    virtual ~WhereMatchExpression() {}
 
-        if ( ! _userScope.isEmpty() ) {
-            _scope->init( &_userScope );
+    Status init(StringData dbName, StringData theCode, const BSONObj& scope);
+
+    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const;
+
+    virtual bool matchesSingleElement(const BSONElement& e) const {
+        return false;
+    }
+
+    virtual MatchExpression* shallowClone() const {
+        WhereMatchExpression* e = new WhereMatchExpression(_txn);
+        e->init(_dbName, _code, _userScope);
+        if (getTag()) {
+            e->setTag(getTag()->clone());
         }
-
-        _scope->setObject( "obj", const_cast< BSONObj & >( obj ) );
-        _scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
-
-        int err = _scope->invoke( _func, 0, &obj, 1000 * 60, false );
-        if ( err == -3 ) { // INVOKE_ERROR
-            stringstream ss;
-            ss << "error on invocation of $where function:\n"
-               << _scope->getError();
-            uassert( 16812, ss.str(), false);
-        }
-        else if ( err != 0 ) {   // ! INVOKE_SUCCESS
-            uassert( 16813, "unknown error in invocation of $where function", false);
-        }
-
-        return _scope->getBoolean( "__returnValue" ) != 0;
+        return e;
     }
 
-    void WhereMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << "$where\n";
+    virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-        _debugAddSpace( debug, level + 1 );
-        debug << "dbName: " << _dbName << "\n";
+    virtual void toBSON(BSONObjBuilder* out) const;
 
-        _debugAddSpace( debug, level + 1 );
-        debug << "code: " << _code << "\n";
+    virtual bool equivalent(const MatchExpression* other) const;
 
-        _debugAddSpace( debug, level + 1 );
-        debug << "scope: " << _userScope << "\n";
+    virtual void resetTag() {
+        setTag(NULL);
     }
 
-    void WhereMatchExpression::toBSON(BSONObjBuilder* out) const {
-        out->append("$where", _code);
+private:
+    string _dbName;
+    string _code;
+    BSONObj _userScope;
+
+    unique_ptr<Scope> _scope;
+    ScriptingFunction _func;
+
+    // Not owned. See comments insde WhereCallbackReal for the lifetime of this pointer.
+    OperationContext* _txn;
+};
+
+Status WhereMatchExpression::init(StringData dbName, StringData theCode, const BSONObj& scope) {
+    if (dbName.size() == 0) {
+        return Status(ErrorCodes::BadValue, "ns for $where cannot be empty");
     }
 
-    bool WhereMatchExpression::equivalent( const MatchExpression* other ) const {
-        if ( matchType() != other->matchType() )
-            return false;
-        const WhereMatchExpression* realOther = static_cast<const WhereMatchExpression*>(other);
-        return
-            _dbName == realOther->_dbName &&
-            _code == realOther->_code &&
-            _userScope == realOther->_userScope;
+    if (theCode.size() == 0) {
+        return Status(ErrorCodes::BadValue, "code for $where cannot be empty");
     }
 
-    WhereCallbackReal::WhereCallbackReal(OperationContext* txn, StringData dbName)
-        : _txn(txn),
-          _dbName(dbName) {
+    _dbName = dbName.toString();
+    _code = theCode.toString();
+    _userScope = scope.getOwned();
 
+    const string userToken =
+        AuthorizationSession::get(ClientBasic::getCurrent())->getAuthenticatedUserNamesToken();
+
+    try {
+        _scope = globalScriptEngine->getPooledScope(_txn, _dbName, "where" + userToken);
+        _func = _scope->createFunction(_code.c_str());
+    } catch (...) {
+        return exceptionToStatus();
     }
 
-    StatusWithMatchExpression WhereCallbackReal::parseWhere(const BSONElement& where) const {
-        if (!globalScriptEngine)
-            return StatusWithMatchExpression(ErrorCodes::BadValue,
-                                             "no globalScriptEngine in $where parsing");
+    if (!_func)
+        return Status(ErrorCodes::BadValue, "$where compile error");
 
-        unique_ptr<WhereMatchExpression> exp(new WhereMatchExpression(_txn));
-        if (where.type() == String || where.type() == Code) {
-            Status s = exp->init(_dbName, where.valuestr(), BSONObj());
-            if (!s.isOK())
-                return StatusWithMatchExpression(s);
-            return StatusWithMatchExpression(exp.release());
-        }
+    return Status::OK();
+}
 
-        if (where.type() == CodeWScope) {
-            Status s = exp->init(_dbName,
-                                 where.codeWScopeCode(),
-                                 BSONObj(where.codeWScopeScopeDataUnsafe()));
-            if (!s.isOK())
-                return StatusWithMatchExpression(s);
-            return StatusWithMatchExpression(exp.release());
-        }
+bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
+    uassert(28692, "$where compile error", _func);
+    BSONObj obj = doc->toBSON();
 
-        return StatusWithMatchExpression(ErrorCodes::BadValue, "$where got bad type");
+    if (!_userScope.isEmpty()) {
+        _scope->init(&_userScope);
     }
+
+    _scope->setObject("obj", const_cast<BSONObj&>(obj));
+    _scope->setBoolean("fullObject", true);  // this is a hack b/c fullObject used to be relevant
+
+    int err = _scope->invoke(_func, 0, &obj, 1000 * 60, false);
+    if (err == -3) {  // INVOKE_ERROR
+        stringstream ss;
+        ss << "error on invocation of $where function:\n" << _scope->getError();
+        uassert(16812, ss.str(), false);
+    } else if (err != 0) {  // ! INVOKE_SUCCESS
+        uassert(16813, "unknown error in invocation of $where function", false);
+    }
+
+    return _scope->getBoolean("__returnValue") != 0;
+}
+
+void WhereMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << "$where\n";
+
+    _debugAddSpace(debug, level + 1);
+    debug << "dbName: " << _dbName << "\n";
+
+    _debugAddSpace(debug, level + 1);
+    debug << "code: " << _code << "\n";
+
+    _debugAddSpace(debug, level + 1);
+    debug << "scope: " << _userScope << "\n";
+}
+
+void WhereMatchExpression::toBSON(BSONObjBuilder* out) const {
+    out->append("$where", _code);
+}
+
+bool WhereMatchExpression::equivalent(const MatchExpression* other) const {
+    if (matchType() != other->matchType())
+        return false;
+    const WhereMatchExpression* realOther = static_cast<const WhereMatchExpression*>(other);
+    return _dbName == realOther->_dbName && _code == realOther->_code &&
+        _userScope == realOther->_userScope;
+}
+
+WhereCallbackReal::WhereCallbackReal(OperationContext* txn, StringData dbName)
+    : _txn(txn), _dbName(dbName) {}
+
+StatusWithMatchExpression WhereCallbackReal::parseWhere(const BSONElement& where) const {
+    if (!globalScriptEngine)
+        return StatusWithMatchExpression(ErrorCodes::BadValue,
+                                         "no globalScriptEngine in $where parsing");
+
+    unique_ptr<WhereMatchExpression> exp(new WhereMatchExpression(_txn));
+    if (where.type() == String || where.type() == Code) {
+        Status s = exp->init(_dbName, where.valuestr(), BSONObj());
+        if (!s.isOK())
+            return StatusWithMatchExpression(s);
+        return StatusWithMatchExpression(exp.release());
+    }
+
+    if (where.type() == CodeWScope) {
+        Status s =
+            exp->init(_dbName, where.codeWScopeCode(), BSONObj(where.codeWScopeScopeDataUnsafe()));
+        if (!s.isOK())
+            return StatusWithMatchExpression(s);
+        return StatusWithMatchExpression(exp.release());
+    }
+
+    return StatusWithMatchExpression(ErrorCodes::BadValue, "$where got bad type");
+}
 }

@@ -36,40 +36,40 @@
 
 namespace mongo {
 
-    // static
-    void QueryYield::yieldAllLocks(OperationContext* txn, RecordFetcher* fetcher) {
-        // Things have to happen here in a specific order:
-        //   1) Tell the RecordFetcher to do any setup which needs to happen inside locks
-        //   2) Release lock mgr locks
-        //   3) Go to sleep
-        //   4) Touch the record we're yielding on, if there is one (RecordFetcher::fetch)
-        //   5) Reacquire lock mgr locks
+// static
+void QueryYield::yieldAllLocks(OperationContext* txn, RecordFetcher* fetcher) {
+    // Things have to happen here in a specific order:
+    //   1) Tell the RecordFetcher to do any setup which needs to happen inside locks
+    //   2) Release lock mgr locks
+    //   3) Go to sleep
+    //   4) Touch the record we're yielding on, if there is one (RecordFetcher::fetch)
+    //   5) Reacquire lock mgr locks
 
-        Locker* locker = txn->lockState();
+    Locker* locker = txn->lockState();
 
-        Locker::LockSnapshot snapshot;
+    Locker::LockSnapshot snapshot;
 
-        if (fetcher) {
-            fetcher->setup();
-        }
-
-        // Nothing was unlocked, just return, yielding is pointless.
-        if (!locker->saveLockStateAndUnlock(&snapshot)) {
-            return;
-        }
-
-        // Top-level locks are freed, release any potential low-level (storage engine-specific
-        // locks). If we are yielding, we are at a safe place to do so.
-        txn->recoveryUnit()->abandonSnapshot();
-
-        // Track the number of yields in CurOp.
-        CurOp::get(txn)->yielded();
-
-        if (fetcher) {
-            fetcher->fetch();
-        }
-
-        locker->restoreLockState(snapshot);
+    if (fetcher) {
+        fetcher->setup();
     }
 
-} // namespace mongo
+    // Nothing was unlocked, just return, yielding is pointless.
+    if (!locker->saveLockStateAndUnlock(&snapshot)) {
+        return;
+    }
+
+    // Top-level locks are freed, release any potential low-level (storage engine-specific
+    // locks). If we are yielding, we are at a safe place to do so.
+    txn->recoveryUnit()->abandonSnapshot();
+
+    // Track the number of yields in CurOp.
+    CurOp::get(txn)->yielded();
+
+    if (fetcher) {
+        fetcher->fetch();
+    }
+
+    locker->restoreLockState(snapshot);
+}
+
+}  // namespace mongo

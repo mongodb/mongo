@@ -37,57 +37,57 @@
 #include "mongo/db/auth/role_name.h"
 
 namespace mongo {
-    class BSONObj;
-    class BSONObjBuilder;
-    class Status;
-    template <typename T> class StatusWith;
+class BSONObj;
+class BSONObjBuilder;
+class Status;
+template <typename T>
+class StatusWith;
 
 namespace rpc {
 
-    /**
-     * This class comprises the request metadata fields involving auditing.
-     */
-    class AuditMetadata {
-    public:
-        static const OperationContext::Decoration<AuditMetadata> get;
+/**
+ * This class comprises the request metadata fields involving auditing.
+ */
+class AuditMetadata {
+public:
+    static const OperationContext::Decoration<AuditMetadata> get;
 
-        // Decorable requires a default constructor.
-        AuditMetadata() = default;
+    // Decorable requires a default constructor.
+    AuditMetadata() = default;
 
-        static StatusWith<AuditMetadata> readFromMetadata(const BSONObj& metadataObj);
+    static StatusWith<AuditMetadata> readFromMetadata(const BSONObj& metadataObj);
 
-        Status writeToMetadata(BSONObjBuilder* metadataBob) const;
+    Status writeToMetadata(BSONObjBuilder* metadataBob) const;
 
-        static Status downconvert(const BSONObj& command,
-                                  const BSONObj& metadata,
-                                  BSONObjBuilder* legacyCommandBob,
-                                  int* legacyQueryFlags);
+    static Status downconvert(const BSONObj& command,
+                              const BSONObj& metadata,
+                              BSONObjBuilder* legacyCommandBob,
+                              int* legacyQueryFlags);
 
-        static Status upconvert(const BSONObj& legacyCommand,
-                                const int legacyQueryFlags,
-                                BSONObjBuilder* commandBob,
-                                BSONObjBuilder* metadataBob);
+    static Status upconvert(const BSONObj& legacyCommand,
+                            const int legacyQueryFlags,
+                            BSONObjBuilder* commandBob,
+                            BSONObjBuilder* metadataBob);
 
-        using UsersAndRoles = std::tuple<std::vector<UserName>,
-                                         std::vector<RoleName>>;
+    using UsersAndRoles = std::tuple<std::vector<UserName>, std::vector<RoleName>>;
 
-        const boost::optional<UsersAndRoles>& getImpersonatedUsersAndRoles() const;
+    const boost::optional<UsersAndRoles>& getImpersonatedUsersAndRoles() const;
 
-        AuditMetadata(boost::optional<UsersAndRoles> impersonatedUsersAndRoles);
+    AuditMetadata(boost::optional<UsersAndRoles> impersonatedUsersAndRoles);
 
-    private:
-        boost::optional<UsersAndRoles> _impersonatedUsersAndRoles;
-    };
+private:
+    boost::optional<UsersAndRoles> _impersonatedUsersAndRoles;
+};
 
-    /**
-     * The legacy field name used to hold impersonated users.
-     */
-    extern const char kLegacyImpersonatedUsersFieldName[];
+/**
+ * The legacy field name used to hold impersonated users.
+ */
+extern const char kLegacyImpersonatedUsersFieldName[];
 
-    /**
-     * The legacy field name used to hold impersonated roles.
-     */
-    extern const char kLegacyImpersonatedRolesFieldName[];
+/**
+ * The legacy field name used to hold impersonated roles.
+ */
+extern const char kLegacyImpersonatedRolesFieldName[];
 
 }  // namespace rpc
 }  // namespace mongo

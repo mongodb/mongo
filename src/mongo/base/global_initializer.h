@@ -28,14 +28,14 @@
 #pragma once
 
 namespace mongo {
-    class Initializer;
+class Initializer;
 
-    /**
-     * Get the process-global initializer object.
-     *
-     * See mongo/base/initializer.h and mongo/base/init.h for information about process
-     * initialization in mongo applications.
-     */
-    Initializer& getGlobalInitializer();
+/**
+ * Get the process-global initializer object.
+ *
+ * See mongo/base/initializer.h and mongo/base/init.h for information about process
+ * initialization in mongo applications.
+ */
+Initializer& getGlobalInitializer();
 
 }  // namespace mongo

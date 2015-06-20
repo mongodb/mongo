@@ -39,365 +39,322 @@
 
 namespace {
 
-    using std::unique_ptr;
-    using std::string;
-    using std::vector;
+using std::unique_ptr;
+using std::string;
+using std::vector;
 
-    using namespace mongo;
+using namespace mongo;
 
-    WriteErrorDetail* buildError( int code, const BSONObj& info, const string& message ) {
+WriteErrorDetail* buildError(int code, const BSONObj& info, const string& message) {
+    WriteErrorDetail* error = new WriteErrorDetail();
+    error->setErrCode(code);
+    error->setErrInfo(info);
+    error->setErrMessage(message);
 
-        WriteErrorDetail* error = new WriteErrorDetail();
-        error->setErrCode( code );
-        error->setErrInfo( info );
-        error->setErrMessage( message );
+    return error;
+}
 
-        return error;
-    }
-
-    TEST(WriteOpTests, BasicError) {
-
-        //
-        // Test of basic error-setting on write op
-        //
-
-        BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
-        request.setNS( "foo.bar" );
-        request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
-
-        WriteOp writeOp( BatchItemRef( &request, 0 ) );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
-
-        unique_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
-                                                          BSON( "data" << 12345 ),
-                                                          "some message" ) );
-
-        writeOp.setOpError( *error );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Error );
-        ASSERT_EQUALS( writeOp.getOpError().getErrCode(), error->getErrCode() );
-        ASSERT_EQUALS( writeOp.getOpError().getErrInfo()["data"].Int(),
-                       error->getErrInfo()["data"].Int() );
-        ASSERT_EQUALS( writeOp.getOpError().getErrMessage(), error->getErrMessage() );
-    }
-
-    TEST(WriteOpTests, TargetSingle) {
-
-        //
-        // Basic targeting test
-        //
-
-        NamespaceString nss( "foo.bar" );
-
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
-
-        vector<MockRange*> mockRanges;
-        mockRanges.push_back( new MockRange( endpoint,
-                                             nss,
-                                             BSON( "x" << MINKEY ),
-                                             BSON( "x" << MAXKEY ) ) );
-
-        BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
-        request.setNS( nss.ns() );
-        request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
-
-        // Do single-target write op
-
-        WriteOp writeOp( BatchItemRef( &request, 0 ) );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
-
-        MockNSTargeter targeter;
-        targeter.init( mockRanges );
-
-        OwnedPointerVector<TargetedWrite> targetedOwned;
-        vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-        Status status = writeOp.targetWrites( targeter, &targeted );
-
-        ASSERT( status.isOK() );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Pending );
-        ASSERT_EQUALS( targeted.size(), 1u );
-        assertEndpointsEqual( targeted.front()->endpoint, endpoint );
-
-        writeOp.noteWriteComplete( *targeted.front() );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Completed );
-    }
-
-    BatchedDeleteDocument* buildDeleteDoc( const BSONObj& doc ) {
-
-        BatchedDeleteDocument* deleteDoc = new BatchedDeleteDocument();
-
-        string errMsg;
-        bool ok = deleteDoc->parseBSON( doc, &errMsg );
-        ASSERT_EQUALS( errMsg, "" );
-        ASSERT( ok );
-        return deleteDoc;
-    }
-
-    struct EndpointComp {
-        bool operator()( const TargetedWrite* writeA, const TargetedWrite* writeB ) const {
-            return writeA->endpoint.shardName.compare( writeB->endpoint.shardName ) < 0;
-        }
-    };
-
-    inline void sortByEndpoint( vector<TargetedWrite*>* writes ) {
-        std::sort( writes->begin(), writes->end(), EndpointComp() );
-    }
-
-    TEST(WriteOpTests, TargetMultiOneShard) {
-
-        //
-        // Multi-write targeting test where our query goes to one shard
-        //
-
-        NamespaceString nss( "foo.bar" );
-
-        ShardEndpoint endpointA( "shardA", ChunkVersion(10, 0, OID()) );
-        ShardEndpoint endpointB( "shardB", ChunkVersion(20, 0, OID()) );
-        ShardEndpoint endpointC( "shardB", ChunkVersion(20, 0, OID()) );
-
-        vector<MockRange*> mockRanges;
-        mockRanges.push_back( new MockRange( endpointA,
-                                             nss,
-                                             BSON( "x" << MINKEY ),
-                                             BSON( "x" << 0 ) ) );
-        mockRanges.push_back( new MockRange( endpointB,
-                                             nss,
-                                             BSON( "x" << 0 ),
-                                             BSON( "x" << 10 ) ) );
-        mockRanges.push_back( new MockRange( endpointC,
-                                             nss,
-                                             BSON( "x" << 10 ),
-                                             BSON( "x" << MAXKEY ) ) );
-
-        BatchedCommandRequest request( BatchedCommandRequest::BatchType_Delete );
-        request.setNS( nss.ns() );
-        // Only hits first shard
-        BSONObj query = BSON( "x" << GTE << -2 << LT << -1 );
-        request.getDeleteRequest()->addToDeletes( buildDeleteDoc( BSON( "q" << query ) ) );
-
-        WriteOp writeOp( BatchItemRef( &request, 0 ) );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
-
-        MockNSTargeter targeter;
-        targeter.init( mockRanges );
-
-        OwnedPointerVector<TargetedWrite> targetedOwned;
-        vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-        Status status = writeOp.targetWrites( targeter, &targeted );
-
-        ASSERT( status.isOK() );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Pending );
-        ASSERT_EQUALS( targeted.size(), 1u );
-        assertEndpointsEqual( targeted.front()->endpoint, endpointA );
-
-        writeOp.noteWriteComplete( *targeted.front() );
-
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Completed );
-
-    }
-
-    TEST(WriteOpTests, TargetMultiAllShards) {
-
-        //
-        // Multi-write targeting test where our write goes to more than one shard
-        //
-
-        NamespaceString nss( "foo.bar" );
-
-        ShardEndpoint endpointA( "shardA", ChunkVersion(10, 0, OID()) );
-        ShardEndpoint endpointB( "shardB", ChunkVersion(20, 0, OID()) );
-        ShardEndpoint endpointC( "shardB", ChunkVersion(20, 0, OID()) );
-
-        vector<MockRange*> mockRanges;
-        mockRanges.push_back( new MockRange( endpointA,
-                                             nss,
-                                             BSON( "x" << MINKEY ),
-                                             BSON( "x" << 0 ) ) );
-        mockRanges.push_back( new MockRange( endpointB,
-                                             nss,
-                                             BSON( "x" << 0 ),
-                                             BSON( "x" << 10 ) ) );
-        mockRanges.push_back( new MockRange( endpointC,
-                                             nss,
-                                             BSON( "x" << 10 ),
-                                             BSON( "x" << MAXKEY ) ) );
-
-        BatchedCommandRequest request( BatchedCommandRequest::BatchType_Delete );
-        request.setNS( nss.ns() );
-        BSONObj query = BSON( "x" << GTE << -1 << LT << 1 );
-        request.getDeleteRequest()->addToDeletes( buildDeleteDoc( BSON( "q" << query ) ) );
-
-        // Do multi-target write op
-
-        WriteOp writeOp( BatchItemRef( &request, 0 ) );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
-
-        MockNSTargeter targeter;
-        targeter.init( mockRanges );
-
-        OwnedPointerVector<TargetedWrite> targetedOwned;
-        vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-        Status status = writeOp.targetWrites( targeter, &targeted );
-
-        ASSERT( status.isOK() );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Pending );
-        ASSERT_EQUALS( targeted.size(), 3u );
-        sortByEndpoint( &targeted );
-        ASSERT_EQUALS( targeted[0]->endpoint.shardName, endpointA.shardName );
-        ASSERT( ChunkVersion::isIgnoredVersion( targeted[0]->endpoint.shardVersion ) );
-        ASSERT_EQUALS( targeted[1]->endpoint.shardName, endpointB.shardName );
-        ASSERT( ChunkVersion::isIgnoredVersion( targeted[1]->endpoint.shardVersion ) );
-        ASSERT_EQUALS( targeted[2]->endpoint.shardName, endpointC.shardName );
-        ASSERT( ChunkVersion::isIgnoredVersion( targeted[2]->endpoint.shardVersion ) );
-
-        writeOp.noteWriteComplete( *targeted[0] );
-        writeOp.noteWriteComplete( *targeted[1] );
-        writeOp.noteWriteComplete( *targeted[2] );
-
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Completed );
-    }
-
-    TEST(WriteOpTests, ErrorSingle) {
-
-        //
-        // Single error after targeting test
-        //
-
-        NamespaceString nss( "foo.bar" );
-
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
-
-        vector<MockRange*> mockRanges;
-        mockRanges.push_back( new MockRange( endpoint,
-                                             nss,
-                                             BSON( "x" << MINKEY ),
-                                             BSON( "x" << MAXKEY ) ) );
-
-        BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
-        request.setNS( nss.ns() );
-        request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
-
-        // Do single-target write op
-
-        WriteOp writeOp( BatchItemRef( &request, 0 ) );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
-
-        MockNSTargeter targeter;
-        targeter.init( mockRanges );
-
-        OwnedPointerVector<TargetedWrite> targetedOwned;
-        vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-        Status status = writeOp.targetWrites( targeter, &targeted );
-
-        ASSERT( status.isOK() );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Pending );
-        ASSERT_EQUALS( targeted.size(), 1u );
-        assertEndpointsEqual( targeted.front()->endpoint, endpoint );
-
-        unique_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
-                                                          BSON( "data" << 12345 ),
-                                                          "some message" ) );
-
-        writeOp.noteWriteError( *targeted.front(), *error );
-
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Error );
-        ASSERT_EQUALS( writeOp.getOpError().getErrCode(), error->getErrCode() );
-        ASSERT_EQUALS( writeOp.getOpError().getErrInfo()["data"].Int(),
-                       error->getErrInfo()["data"].Int() );
-        ASSERT_EQUALS( writeOp.getOpError().getErrMessage(), error->getErrMessage() );
-    }
-
-    TEST(WriteOpTests, CancelSingle) {
-
-        //
-        // Cancel single targeting test
-        //
-
-        NamespaceString nss( "foo.bar" );
-
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
-
-        vector<MockRange*> mockRanges;
-        mockRanges.push_back( new MockRange( endpoint,
-                                             nss,
-                                             BSON( "x" << MINKEY ),
-                                             BSON( "x" << MAXKEY ) ) );
-
-        BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
-        request.setNS( nss.ns() );
-        request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
-
-        // Do single-target write op
-
-        WriteOp writeOp( BatchItemRef( &request, 0 ) );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
-
-        MockNSTargeter targeter;
-        targeter.init( mockRanges );
-
-        OwnedPointerVector<TargetedWrite> targetedOwned;
-        vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-        Status status = writeOp.targetWrites( targeter, &targeted );
-
-        ASSERT( status.isOK() );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Pending );
-        ASSERT_EQUALS( targeted.size(), 1u );
-        assertEndpointsEqual( targeted.front()->endpoint, endpoint );
-
-        writeOp.cancelWrites( NULL );
-
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
-    }
-
+TEST(WriteOpTests, BasicError) {
     //
-    // Test retryable errors
+    // Test of basic error-setting on write op
     //
 
-    TEST(WriteOpTests, RetrySingleOp) {
+    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
+    request.setNS("foo.bar");
+    request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-        //
-        // Retry single targeting test
-        //
+    WriteOp writeOp(BatchItemRef(&request, 0));
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
-        NamespaceString nss( "foo.bar" );
+    unique_ptr<WriteErrorDetail> error(
+        buildError(ErrorCodes::UnknownError, BSON("data" << 12345), "some message"));
 
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
+    writeOp.setOpError(*error);
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
+    ASSERT_EQUALS(writeOp.getOpError().getErrCode(), error->getErrCode());
+    ASSERT_EQUALS(writeOp.getOpError().getErrInfo()["data"].Int(),
+                  error->getErrInfo()["data"].Int());
+    ASSERT_EQUALS(writeOp.getOpError().getErrMessage(), error->getErrMessage());
+}
 
-        vector<MockRange*> mockRanges;
-        mockRanges.push_back( new MockRange( endpoint,
-                                             nss,
-                                             BSON( "x" << MINKEY ),
-                                             BSON( "x" << MAXKEY ) ) );
+TEST(WriteOpTests, TargetSingle) {
+    //
+    // Basic targeting test
+    //
 
-        BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
-        request.setNS( nss.ns() );
-        request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
+    NamespaceString nss("foo.bar");
 
-        // Do single-target write op
+    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
 
-        WriteOp writeOp( BatchItemRef( &request, 0 ) );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
+    vector<MockRange*> mockRanges;
+    mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
 
-        MockNSTargeter targeter;
-        targeter.init( mockRanges );
+    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
+    request.setNS(nss.ns());
+    request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-        OwnedPointerVector<TargetedWrite> targetedOwned;
-        vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-        Status status = writeOp.targetWrites( targeter, &targeted );
+    // Do single-target write op
 
-        ASSERT( status.isOK() );
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Pending );
-        ASSERT_EQUALS( targeted.size(), 1u );
-        assertEndpointsEqual( targeted.front()->endpoint, endpoint );
+    WriteOp writeOp(BatchItemRef(&request, 0));
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
-        // Stale exception
+    MockNSTargeter targeter;
+    targeter.init(mockRanges);
 
-        unique_ptr<WriteErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
-                                                          BSON( "data" << 12345 ),
-                                                          "some message" ) );
+    OwnedPointerVector<TargetedWrite> targetedOwned;
+    vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    Status status = writeOp.targetWrites(targeter, &targeted);
 
-        writeOp.noteWriteError( *targeted.front(), *error );
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(targeted.size(), 1u);
+    assertEndpointsEqual(targeted.front()->endpoint, endpoint);
 
-        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
+    writeOp.noteWriteComplete(*targeted.front());
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Completed);
+}
+
+BatchedDeleteDocument* buildDeleteDoc(const BSONObj& doc) {
+    BatchedDeleteDocument* deleteDoc = new BatchedDeleteDocument();
+
+    string errMsg;
+    bool ok = deleteDoc->parseBSON(doc, &errMsg);
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT(ok);
+    return deleteDoc;
+}
+
+struct EndpointComp {
+    bool operator()(const TargetedWrite* writeA, const TargetedWrite* writeB) const {
+        return writeA->endpoint.shardName.compare(writeB->endpoint.shardName) < 0;
     }
+};
 
-} // unnamed namespace
+inline void sortByEndpoint(vector<TargetedWrite*>* writes) {
+    std::sort(writes->begin(), writes->end(), EndpointComp());
+}
+
+TEST(WriteOpTests, TargetMultiOneShard) {
+    //
+    // Multi-write targeting test where our query goes to one shard
+    //
+
+    NamespaceString nss("foo.bar");
+
+    ShardEndpoint endpointA("shardA", ChunkVersion(10, 0, OID()));
+    ShardEndpoint endpointB("shardB", ChunkVersion(20, 0, OID()));
+    ShardEndpoint endpointC("shardB", ChunkVersion(20, 0, OID()));
+
+    vector<MockRange*> mockRanges;
+    mockRanges.push_back(new MockRange(endpointA, nss, BSON("x" << MINKEY), BSON("x" << 0)));
+    mockRanges.push_back(new MockRange(endpointB, nss, BSON("x" << 0), BSON("x" << 10)));
+    mockRanges.push_back(new MockRange(endpointC, nss, BSON("x" << 10), BSON("x" << MAXKEY)));
+
+    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
+    request.setNS(nss.ns());
+    // Only hits first shard
+    BSONObj query = BSON("x" << GTE << -2 << LT << -1);
+    request.getDeleteRequest()->addToDeletes(buildDeleteDoc(BSON("q" << query)));
+
+    WriteOp writeOp(BatchItemRef(&request, 0));
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
+
+    MockNSTargeter targeter;
+    targeter.init(mockRanges);
+
+    OwnedPointerVector<TargetedWrite> targetedOwned;
+    vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    Status status = writeOp.targetWrites(targeter, &targeted);
+
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(targeted.size(), 1u);
+    assertEndpointsEqual(targeted.front()->endpoint, endpointA);
+
+    writeOp.noteWriteComplete(*targeted.front());
+
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Completed);
+}
+
+TEST(WriteOpTests, TargetMultiAllShards) {
+    //
+    // Multi-write targeting test where our write goes to more than one shard
+    //
+
+    NamespaceString nss("foo.bar");
+
+    ShardEndpoint endpointA("shardA", ChunkVersion(10, 0, OID()));
+    ShardEndpoint endpointB("shardB", ChunkVersion(20, 0, OID()));
+    ShardEndpoint endpointC("shardB", ChunkVersion(20, 0, OID()));
+
+    vector<MockRange*> mockRanges;
+    mockRanges.push_back(new MockRange(endpointA, nss, BSON("x" << MINKEY), BSON("x" << 0)));
+    mockRanges.push_back(new MockRange(endpointB, nss, BSON("x" << 0), BSON("x" << 10)));
+    mockRanges.push_back(new MockRange(endpointC, nss, BSON("x" << 10), BSON("x" << MAXKEY)));
+
+    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
+    request.setNS(nss.ns());
+    BSONObj query = BSON("x" << GTE << -1 << LT << 1);
+    request.getDeleteRequest()->addToDeletes(buildDeleteDoc(BSON("q" << query)));
+
+    // Do multi-target write op
+
+    WriteOp writeOp(BatchItemRef(&request, 0));
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
+
+    MockNSTargeter targeter;
+    targeter.init(mockRanges);
+
+    OwnedPointerVector<TargetedWrite> targetedOwned;
+    vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    Status status = writeOp.targetWrites(targeter, &targeted);
+
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(targeted.size(), 3u);
+    sortByEndpoint(&targeted);
+    ASSERT_EQUALS(targeted[0]->endpoint.shardName, endpointA.shardName);
+    ASSERT(ChunkVersion::isIgnoredVersion(targeted[0]->endpoint.shardVersion));
+    ASSERT_EQUALS(targeted[1]->endpoint.shardName, endpointB.shardName);
+    ASSERT(ChunkVersion::isIgnoredVersion(targeted[1]->endpoint.shardVersion));
+    ASSERT_EQUALS(targeted[2]->endpoint.shardName, endpointC.shardName);
+    ASSERT(ChunkVersion::isIgnoredVersion(targeted[2]->endpoint.shardVersion));
+
+    writeOp.noteWriteComplete(*targeted[0]);
+    writeOp.noteWriteComplete(*targeted[1]);
+    writeOp.noteWriteComplete(*targeted[2]);
+
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Completed);
+}
+
+TEST(WriteOpTests, ErrorSingle) {
+    //
+    // Single error after targeting test
+    //
+
+    NamespaceString nss("foo.bar");
+
+    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+
+    vector<MockRange*> mockRanges;
+    mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
+
+    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
+    request.setNS(nss.ns());
+    request.getInsertRequest()->addToDocuments(BSON("x" << 1));
+
+    // Do single-target write op
+
+    WriteOp writeOp(BatchItemRef(&request, 0));
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
+
+    MockNSTargeter targeter;
+    targeter.init(mockRanges);
+
+    OwnedPointerVector<TargetedWrite> targetedOwned;
+    vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    Status status = writeOp.targetWrites(targeter, &targeted);
+
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(targeted.size(), 1u);
+    assertEndpointsEqual(targeted.front()->endpoint, endpoint);
+
+    unique_ptr<WriteErrorDetail> error(
+        buildError(ErrorCodes::UnknownError, BSON("data" << 12345), "some message"));
+
+    writeOp.noteWriteError(*targeted.front(), *error);
+
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
+    ASSERT_EQUALS(writeOp.getOpError().getErrCode(), error->getErrCode());
+    ASSERT_EQUALS(writeOp.getOpError().getErrInfo()["data"].Int(),
+                  error->getErrInfo()["data"].Int());
+    ASSERT_EQUALS(writeOp.getOpError().getErrMessage(), error->getErrMessage());
+}
+
+TEST(WriteOpTests, CancelSingle) {
+    //
+    // Cancel single targeting test
+    //
+
+    NamespaceString nss("foo.bar");
+
+    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+
+    vector<MockRange*> mockRanges;
+    mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
+
+    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
+    request.setNS(nss.ns());
+    request.getInsertRequest()->addToDocuments(BSON("x" << 1));
+
+    // Do single-target write op
+
+    WriteOp writeOp(BatchItemRef(&request, 0));
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
+
+    MockNSTargeter targeter;
+    targeter.init(mockRanges);
+
+    OwnedPointerVector<TargetedWrite> targetedOwned;
+    vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    Status status = writeOp.targetWrites(targeter, &targeted);
+
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(targeted.size(), 1u);
+    assertEndpointsEqual(targeted.front()->endpoint, endpoint);
+
+    writeOp.cancelWrites(NULL);
+
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
+}
+
+//
+// Test retryable errors
+//
+
+TEST(WriteOpTests, RetrySingleOp) {
+    //
+    // Retry single targeting test
+    //
+
+    NamespaceString nss("foo.bar");
+
+    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+
+    vector<MockRange*> mockRanges;
+    mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
+
+    BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
+    request.setNS(nss.ns());
+    request.getInsertRequest()->addToDocuments(BSON("x" << 1));
+
+    // Do single-target write op
+
+    WriteOp writeOp(BatchItemRef(&request, 0));
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
+
+    MockNSTargeter targeter;
+    targeter.init(mockRanges);
+
+    OwnedPointerVector<TargetedWrite> targetedOwned;
+    vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    Status status = writeOp.targetWrites(targeter, &targeted);
+
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(targeted.size(), 1u);
+    assertEndpointsEqual(targeted.front()->endpoint, endpoint);
+
+    // Stale exception
+
+    unique_ptr<WriteErrorDetail> error(
+        buildError(ErrorCodes::StaleShardVersion, BSON("data" << 12345), "some message"));
+
+    writeOp.noteWriteError(*targeted.front(), *error);
+
+    ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
+}
+
+}  // unnamed namespace

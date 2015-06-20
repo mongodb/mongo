@@ -39,12 +39,12 @@
 #pragma once
 
 namespace mongo {
-    class SavedCursorRegistry;
+class SavedCursorRegistry;
 
-    SortedDataInterface* getMMAPV1Interface(HeadManager* headManager,
-                                            RecordStore* recordStore,
-                                            SavedCursorRegistry* cursorRegistry,
-                                            const Ordering& ordering,
-                                            const std::string& indexName,
-                                            int version);
+SortedDataInterface* getMMAPV1Interface(HeadManager* headManager,
+                                        RecordStore* recordStore,
+                                        SavedCursorRegistry* cursorRegistry,
+                                        const Ordering& ordering,
+                                        const std::string& indexName,
+                                        int version);
 }  // namespace mongo

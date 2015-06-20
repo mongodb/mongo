@@ -34,45 +34,47 @@
 #include "mongo/base/string_data.h"
 
 namespace mongo {
-    
-    class SaslClientSession;
-    template <typename T> class StatusWith;
-    
+
+class SaslClientSession;
+template <typename T>
+class StatusWith;
+
+/**
+ * Abstract class for implementing the clent-side
+ * of a SASL mechanism conversation.
+ */
+class SaslClientConversation {
+    MONGO_DISALLOW_COPYING(SaslClientConversation);
+
+public:
     /**
-     * Abstract class for implementing the clent-side
-     * of a SASL mechanism conversation.
+     * Implements the client side of a SASL authentication mechanism.
+     *
+     * "saslClientSession" is the corresponding SASLClientSession.
+     * "saslClientSession" must stay in scope until the SaslClientConversation's
+     *  destructor completes.
+     *
+     **/
+    explicit SaslClientConversation(SaslClientSession* saslClientSession)
+        : _saslClientSession(saslClientSession) {}
+
+    virtual ~SaslClientConversation();
+
+    /**
+     * Performs one step of the client side of the authentication session,
+     * consuming "inputData" and producing "*outputData".
+     *
+     * A return of Status::OK() indicates successful progress towards authentication.
+     * A return of !Status::OK() indicates failed authentication
+     *
+     * A return of true means that the authentication process has finished.
+     * A return of false means that the authentication process has more steps.
+     *
      */
-    class SaslClientConversation {
-        MONGO_DISALLOW_COPYING(SaslClientConversation);
-    public:
-        /**
-         * Implements the client side of a SASL authentication mechanism.
-         *
-         * "saslClientSession" is the corresponding SASLClientSession.
-         * "saslClientSession" must stay in scope until the SaslClientConversation's 
-         *  destructor completes.
-         * 
-         **/
-        explicit SaslClientConversation(SaslClientSession* saslClientSession) :
-            _saslClientSession(saslClientSession) {}
+    virtual StatusWith<bool> step(StringData inputData, std::string* outputData) = 0;
 
-        virtual ~SaslClientConversation();
-
-        /**
-         * Performs one step of the client side of the authentication session,
-         * consuming "inputData" and producing "*outputData".
-         *
-         * A return of Status::OK() indicates successful progress towards authentication. 
-         * A return of !Status::OK() indicates failed authentication
-         *
-         * A return of true means that the authentication process has finished.
-         * A return of false means that the authentication process has more steps.
-         *
-         */
-        virtual StatusWith<bool> step(StringData inputData, std::string* outputData) = 0;
-
-    protected:
-        SaslClientSession* _saslClientSession;
-    };
+protected:
+    SaslClientSession* _saslClientSession;
+};
 
 }  // namespace mongo

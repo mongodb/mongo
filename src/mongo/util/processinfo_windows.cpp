@@ -42,284 +42,284 @@ using std::unique_ptr;
 
 namespace mongo {
 
-    // dynamically link to psapi.dll (in case this version of Windows
-    // does not support what we need)
-    struct PsApiInit {
-        bool supported;
-        typedef BOOL (WINAPI *pQueryWorkingSetEx)(HANDLE hProcess, 
-                                                  PVOID pv, 
-                                                  DWORD cb);
-        pQueryWorkingSetEx QueryWSEx;
-        
-        PsApiInit() {
-            HINSTANCE psapiLib = LoadLibrary( TEXT("psapi.dll") );
-            if (psapiLib) {
-                QueryWSEx = reinterpret_cast<pQueryWorkingSetEx>
-                    ( GetProcAddress( psapiLib, "QueryWorkingSetEx" ) );
-                if (QueryWSEx) {
-                    supported = true;
-                    return;
-                }
-            }
-            supported = false;
-        }
-    };
+// dynamically link to psapi.dll (in case this version of Windows
+// does not support what we need)
+struct PsApiInit {
+    bool supported;
+    typedef BOOL(WINAPI* pQueryWorkingSetEx)(HANDLE hProcess, PVOID pv, DWORD cb);
+    pQueryWorkingSetEx QueryWSEx;
 
-    static PsApiInit* psapiGlobal = NULL;
-
-    int _wconvertmtos( SIZE_T s ) {
-        return (int)( s / ( 1024 * 1024 ) );
-    }
-
-    ProcessInfo::ProcessInfo( ProcessId pid ) {
-    }
-
-    ProcessInfo::~ProcessInfo() {
-    }
-
-    bool ProcessInfo::supported() {
-        return true;
-    }
-
-    int ProcessInfo::getVirtualMemorySize() {
-        MEMORYSTATUSEX mse;
-        mse.dwLength = sizeof(mse);
-        BOOL status = GlobalMemoryStatusEx(&mse);
-        if (!status) {
-            DWORD gle = GetLastError();
-            error() << "GlobalMemoryStatusEx failed with " << errnoWithDescription(gle);
-            fassert(28621, status);
-        }
-
-        DWORDLONG x = (mse.ullTotalVirtual - mse.ullAvailVirtual) / (1024 * 1024);
-        invariant( x <= 0x7fffffff );
-        return (int) x;
-    }
-
-    int ProcessInfo::getResidentSize() {
-        PROCESS_MEMORY_COUNTERS pmc;
-        BOOL status = GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
-        if (!status) {
-            DWORD gle = GetLastError();
-            error() << "GetProcessMemoryInfo failed with " << errnoWithDescription(gle);
-            fassert(28622, status);
-        }
-
-        return _wconvertmtos( pmc.WorkingSetSize );
-    }
-
-    double ProcessInfo::getSystemMemoryPressurePercentage() {
-        MEMORYSTATUSEX mse;
-        mse.dwLength = sizeof(mse);
-        BOOL status = GlobalMemoryStatusEx( &mse );
-        if (!status) {
-            DWORD gle = GetLastError();
-            error() << "GlobalMemoryStatusEx failed with " << errnoWithDescription(gle);
-            fassert(28623, status);
-        }
-
-        DWORDLONG totalPageFile = mse.ullTotalPageFile;
-        if (totalPageFile == 0) {
-            return false;
-        }
-
-        // If the page file is >= 50%, say we are low on system memory
-        // If the page file is >= 75%, we are running very low on system memory
-        //
-        DWORDLONG highWatermark = totalPageFile / 2;
-        DWORDLONG veryHighWatermark = 3 * (totalPageFile / 4);
-
-        DWORDLONG usedPageFile = mse.ullTotalPageFile - mse.ullAvailPageFile;
-
-        // Below the watermark, we are fine
-        // Also check we will not do a divide by zero below
-        if (usedPageFile < highWatermark ||
-            veryHighWatermark <= highWatermark) {
-            return 0.0;
-        }
-
-        // Above the high watermark, we tell MMapV1 how much to remap
-        // < 1.0, we have some pressure, but not much so do not be very aggressive
-        // 1.0 = we are at very high watermark, remap everything
-        // > 1.0, the user may run out of memory, remap everything
-        // i.e., Example (N - 50) / (75 - 50)
-        return static_cast<double>(usedPageFile - highWatermark) /
-                                  (veryHighWatermark - highWatermark);
-    }
-
-    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
-        MEMORYSTATUSEX mse;
-        mse.dwLength = sizeof(mse);
-        PROCESS_MEMORY_COUNTERS pmc;
-        if( GetProcessMemoryInfo( GetCurrentProcess() , &pmc, sizeof(pmc) ) ) {
-            info.append("page_faults", static_cast<int>(pmc.PageFaultCount));
-            info.append("usagePageFileMB", static_cast<int>(pmc.PagefileUsage / 1024 / 1024));
-        }
-        if( GlobalMemoryStatusEx( &mse ) ) {
-            info.append("totalPageFileMB", static_cast<int>(mse.ullTotalPageFile / 1024 / 1024));
-            info.append("availPageFileMB", static_cast<int>(mse.ullAvailPageFile / 1024 / 1024));
-            info.append("ramMB", static_cast<int>(mse.ullTotalPhys / 1024 / 1024));
-        }
-
-#ifndef _WIN64
-        BOOL wow64Process;
-        BOOL retWow64 = IsWow64Process(GetCurrentProcess(), &wow64Process);
-        info.append("wow64Process", static_cast<bool>(retWow64 && wow64Process));
-#endif
-    }
-
-    bool getFileVersion(const char *filePath, DWORD &fileVersionMS, DWORD &fileVersionLS) {
-        DWORD verSize = GetFileVersionInfoSizeA(filePath, NULL);
-        if (verSize == 0) {
-            DWORD gle = GetLastError();
-            warning() << "GetFileVersionInfoSizeA on " << filePath << " failed with " << errnoWithDescription(gle);
-            return false;
-        }
-
-        std::unique_ptr<char[]> verData(new char[verSize]);
-        if (GetFileVersionInfoA(filePath, NULL, verSize, verData.get()) == 0) {
-            DWORD gle = GetLastError();
-            warning() << "GetFileVersionInfoSizeA on " << filePath << " failed with " << errnoWithDescription(gle);
-            return false;
-        }
-
-        UINT size;
-        VS_FIXEDFILEINFO *verInfo;
-        if (VerQueryValueA(verData.get(), "\\", (LPVOID *)&verInfo, &size) == 0) {
-            DWORD gle = GetLastError();
-            warning() << "VerQueryValueA on " << filePath << " failed with " << errnoWithDescription(gle);
-            return false;
-        }
-    
-        if (size != sizeof(VS_FIXEDFILEINFO)) {
-            warning() << "VerQueryValueA on " << filePath << " returned structure with unexpected size";
-            return false;
-        }
-
-        fileVersionMS = verInfo->dwFileVersionMS;
-        fileVersionLS = verInfo->dwFileVersionLS;
-        return true;
-    }
-
-    // If the version of the ntfs.sys driver shows that the KB2731284 hotfix or a later update
-    // is installed, zeroing out data files is unnecessary. The file version numbers used below
-    // are taken from the Hotfix File Information at http://support.microsoft.com/kb/2731284.
-    bool isKB2731284OrLaterUpdateInstalled() {
-        UINT pathBufferSize = GetSystemDirectoryA(NULL, 0);
-        if (pathBufferSize == 0) {
-            DWORD gle = GetLastError();
-            warning() << "GetSystemDirectoryA failed with " << errnoWithDescription(gle);
-            return false;
-        }
-
-        std::unique_ptr<char[]> systemDirectory(new char[pathBufferSize]);
-        UINT systemDirectoryPathLen;
-        systemDirectoryPathLen = GetSystemDirectoryA(systemDirectory.get(), pathBufferSize);
-        if (systemDirectoryPathLen == 0) {
-            DWORD gle = GetLastError();
-            warning() << "GetSystemDirectoryA failed with " << errnoWithDescription(gle);
-            return false;
-        }
-
-        if (systemDirectoryPathLen != pathBufferSize - 1) {
-            warning() << "GetSystemDirectoryA returned unexpected path length";
-            return false;
-        }
-
-        string ntfsDotSysPath = systemDirectory.get();
-        if (ntfsDotSysPath.back() != '\\') {
-            ntfsDotSysPath.append("\\");
-        }
-        ntfsDotSysPath.append("drivers\\ntfs.sys");
-        DWORD fileVersionMS;
-        DWORD fileVersionLS;
-        if (getFileVersion(ntfsDotSysPath.c_str(), fileVersionMS, fileVersionLS)) {
-            WORD fileVersionFirstNumber = HIWORD(fileVersionMS);
-            WORD fileVersionSecondNumber = LOWORD(fileVersionMS);
-            WORD fileVersionThirdNumber = HIWORD(fileVersionLS);
-            WORD fileVersionFourthNumber = LOWORD(fileVersionLS);
-
-            if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 && fileVersionThirdNumber == 7600 &&
-                    fileVersionFourthNumber >= 21296 && fileVersionFourthNumber <= 21999) {
-                return true; 
-            } else if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 && fileVersionThirdNumber == 7601 &&
-                    fileVersionFourthNumber >= 22083 && fileVersionFourthNumber <= 22999) {
-                return true; 
+    PsApiInit() {
+        HINSTANCE psapiLib = LoadLibrary(TEXT("psapi.dll"));
+        if (psapiLib) {
+            QueryWSEx =
+                reinterpret_cast<pQueryWorkingSetEx>(GetProcAddress(psapiLib, "QueryWorkingSetEx"));
+            if (QueryWSEx) {
+                supported = true;
+                return;
             }
         }
+        supported = false;
+    }
+};
 
+static PsApiInit* psapiGlobal = NULL;
+
+int _wconvertmtos(SIZE_T s) {
+    return (int)(s / (1024 * 1024));
+}
+
+ProcessInfo::ProcessInfo(ProcessId pid) {}
+
+ProcessInfo::~ProcessInfo() {}
+
+bool ProcessInfo::supported() {
+    return true;
+}
+
+int ProcessInfo::getVirtualMemorySize() {
+    MEMORYSTATUSEX mse;
+    mse.dwLength = sizeof(mse);
+    BOOL status = GlobalMemoryStatusEx(&mse);
+    if (!status) {
+        DWORD gle = GetLastError();
+        error() << "GlobalMemoryStatusEx failed with " << errnoWithDescription(gle);
+        fassert(28621, status);
+    }
+
+    DWORDLONG x = (mse.ullTotalVirtual - mse.ullAvailVirtual) / (1024 * 1024);
+    invariant(x <= 0x7fffffff);
+    return (int)x;
+}
+
+int ProcessInfo::getResidentSize() {
+    PROCESS_MEMORY_COUNTERS pmc;
+    BOOL status = GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
+    if (!status) {
+        DWORD gle = GetLastError();
+        error() << "GetProcessMemoryInfo failed with " << errnoWithDescription(gle);
+        fassert(28622, status);
+    }
+
+    return _wconvertmtos(pmc.WorkingSetSize);
+}
+
+double ProcessInfo::getSystemMemoryPressurePercentage() {
+    MEMORYSTATUSEX mse;
+    mse.dwLength = sizeof(mse);
+    BOOL status = GlobalMemoryStatusEx(&mse);
+    if (!status) {
+        DWORD gle = GetLastError();
+        error() << "GlobalMemoryStatusEx failed with " << errnoWithDescription(gle);
+        fassert(28623, status);
+    }
+
+    DWORDLONG totalPageFile = mse.ullTotalPageFile;
+    if (totalPageFile == 0) {
         return false;
     }
 
-    void ProcessInfo::SystemInfo::collectSystemInfo() {
-        BSONObjBuilder bExtra;
-        stringstream verstr;
-        OSVERSIONINFOEX osvi;   // os version
-        MEMORYSTATUSEX mse;     // memory stats
-        SYSTEM_INFO ntsysinfo;  //system stats
+    // If the page file is >= 50%, say we are low on system memory
+    // If the page file is >= 75%, we are running very low on system memory
+    //
+    DWORDLONG highWatermark = totalPageFile / 2;
+    DWORDLONG veryHighWatermark = 3 * (totalPageFile / 4);
 
-        // get basic processor properties
-        GetNativeSystemInfo( &ntsysinfo );
-        addrSize = (ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? 64 : 32);
-        numCores = ntsysinfo.dwNumberOfProcessors;
-        pageSize = static_cast<unsigned long long>(ntsysinfo.dwPageSize);
-        bExtra.append("pageSize", static_cast<long long>(pageSize));
+    DWORDLONG usedPageFile = mse.ullTotalPageFile - mse.ullAvailPageFile;
 
-        // get memory info
-        mse.dwLength = sizeof( mse );
-        if ( GlobalMemoryStatusEx( &mse ) ) {
-            memSize = mse.ullTotalPhys;
+    // Below the watermark, we are fine
+    // Also check we will not do a divide by zero below
+    if (usedPageFile < highWatermark || veryHighWatermark <= highWatermark) {
+        return 0.0;
+    }
+
+    // Above the high watermark, we tell MMapV1 how much to remap
+    // < 1.0, we have some pressure, but not much so do not be very aggressive
+    // 1.0 = we are at very high watermark, remap everything
+    // > 1.0, the user may run out of memory, remap everything
+    // i.e., Example (N - 50) / (75 - 50)
+    return static_cast<double>(usedPageFile - highWatermark) / (veryHighWatermark - highWatermark);
+}
+
+void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
+    MEMORYSTATUSEX mse;
+    mse.dwLength = sizeof(mse);
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+        info.append("page_faults", static_cast<int>(pmc.PageFaultCount));
+        info.append("usagePageFileMB", static_cast<int>(pmc.PagefileUsage / 1024 / 1024));
+    }
+    if (GlobalMemoryStatusEx(&mse)) {
+        info.append("totalPageFileMB", static_cast<int>(mse.ullTotalPageFile / 1024 / 1024));
+        info.append("availPageFileMB", static_cast<int>(mse.ullAvailPageFile / 1024 / 1024));
+        info.append("ramMB", static_cast<int>(mse.ullTotalPhys / 1024 / 1024));
+    }
+
+#ifndef _WIN64
+    BOOL wow64Process;
+    BOOL retWow64 = IsWow64Process(GetCurrentProcess(), &wow64Process);
+    info.append("wow64Process", static_cast<bool>(retWow64 && wow64Process));
+#endif
+}
+
+bool getFileVersion(const char* filePath, DWORD& fileVersionMS, DWORD& fileVersionLS) {
+    DWORD verSize = GetFileVersionInfoSizeA(filePath, NULL);
+    if (verSize == 0) {
+        DWORD gle = GetLastError();
+        warning() << "GetFileVersionInfoSizeA on " << filePath << " failed with "
+                  << errnoWithDescription(gle);
+        return false;
+    }
+
+    std::unique_ptr<char[]> verData(new char[verSize]);
+    if (GetFileVersionInfoA(filePath, NULL, verSize, verData.get()) == 0) {
+        DWORD gle = GetLastError();
+        warning() << "GetFileVersionInfoSizeA on " << filePath << " failed with "
+                  << errnoWithDescription(gle);
+        return false;
+    }
+
+    UINT size;
+    VS_FIXEDFILEINFO* verInfo;
+    if (VerQueryValueA(verData.get(), "\\", (LPVOID*)&verInfo, &size) == 0) {
+        DWORD gle = GetLastError();
+        warning() << "VerQueryValueA on " << filePath << " failed with "
+                  << errnoWithDescription(gle);
+        return false;
+    }
+
+    if (size != sizeof(VS_FIXEDFILEINFO)) {
+        warning() << "VerQueryValueA on " << filePath << " returned structure with unexpected size";
+        return false;
+    }
+
+    fileVersionMS = verInfo->dwFileVersionMS;
+    fileVersionLS = verInfo->dwFileVersionLS;
+    return true;
+}
+
+// If the version of the ntfs.sys driver shows that the KB2731284 hotfix or a later update
+// is installed, zeroing out data files is unnecessary. The file version numbers used below
+// are taken from the Hotfix File Information at http://support.microsoft.com/kb/2731284.
+bool isKB2731284OrLaterUpdateInstalled() {
+    UINT pathBufferSize = GetSystemDirectoryA(NULL, 0);
+    if (pathBufferSize == 0) {
+        DWORD gle = GetLastError();
+        warning() << "GetSystemDirectoryA failed with " << errnoWithDescription(gle);
+        return false;
+    }
+
+    std::unique_ptr<char[]> systemDirectory(new char[pathBufferSize]);
+    UINT systemDirectoryPathLen;
+    systemDirectoryPathLen = GetSystemDirectoryA(systemDirectory.get(), pathBufferSize);
+    if (systemDirectoryPathLen == 0) {
+        DWORD gle = GetLastError();
+        warning() << "GetSystemDirectoryA failed with " << errnoWithDescription(gle);
+        return false;
+    }
+
+    if (systemDirectoryPathLen != pathBufferSize - 1) {
+        warning() << "GetSystemDirectoryA returned unexpected path length";
+        return false;
+    }
+
+    string ntfsDotSysPath = systemDirectory.get();
+    if (ntfsDotSysPath.back() != '\\') {
+        ntfsDotSysPath.append("\\");
+    }
+    ntfsDotSysPath.append("drivers\\ntfs.sys");
+    DWORD fileVersionMS;
+    DWORD fileVersionLS;
+    if (getFileVersion(ntfsDotSysPath.c_str(), fileVersionMS, fileVersionLS)) {
+        WORD fileVersionFirstNumber = HIWORD(fileVersionMS);
+        WORD fileVersionSecondNumber = LOWORD(fileVersionMS);
+        WORD fileVersionThirdNumber = HIWORD(fileVersionLS);
+        WORD fileVersionFourthNumber = LOWORD(fileVersionLS);
+
+        if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 &&
+            fileVersionThirdNumber == 7600 && fileVersionFourthNumber >= 21296 &&
+            fileVersionFourthNumber <= 21999) {
+            return true;
+        } else if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 &&
+                   fileVersionThirdNumber == 7601 && fileVersionFourthNumber >= 22083 &&
+                   fileVersionFourthNumber <= 22999) {
+            return true;
         }
+    }
 
-        // get OS version info
-        ZeroMemory( &osvi, sizeof( osvi ) );
-        osvi.dwOSVersionInfoSize = sizeof( osvi );
-        if ( GetVersionEx( (OSVERSIONINFO*)&osvi ) ) {
+    return false;
+}
 
-            verstr << osvi.dwMajorVersion << "." << osvi.dwMinorVersion;
-            if ( osvi.wServicePackMajor )
-                verstr << " SP" << osvi.wServicePackMajor;
-            verstr << " (build " << osvi.dwBuildNumber << ")";
+void ProcessInfo::SystemInfo::collectSystemInfo() {
+    BSONObjBuilder bExtra;
+    stringstream verstr;
+    OSVERSIONINFOEX osvi;   // os version
+    MEMORYSTATUSEX mse;     // memory stats
+    SYSTEM_INFO ntsysinfo;  // system stats
 
-            osName = "Microsoft ";
-            switch ( osvi.dwMajorVersion ) {
+    // get basic processor properties
+    GetNativeSystemInfo(&ntsysinfo);
+    addrSize = (ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? 64 : 32);
+    numCores = ntsysinfo.dwNumberOfProcessors;
+    pageSize = static_cast<unsigned long long>(ntsysinfo.dwPageSize);
+    bExtra.append("pageSize", static_cast<long long>(pageSize));
+
+    // get memory info
+    mse.dwLength = sizeof(mse);
+    if (GlobalMemoryStatusEx(&mse)) {
+        memSize = mse.ullTotalPhys;
+    }
+
+    // get OS version info
+    ZeroMemory(&osvi, sizeof(osvi));
+    osvi.dwOSVersionInfoSize = sizeof(osvi);
+    if (GetVersionEx((OSVERSIONINFO*)&osvi)) {
+        verstr << osvi.dwMajorVersion << "." << osvi.dwMinorVersion;
+        if (osvi.wServicePackMajor)
+            verstr << " SP" << osvi.wServicePackMajor;
+        verstr << " (build " << osvi.dwBuildNumber << ")";
+
+        osName = "Microsoft ";
+        switch (osvi.dwMajorVersion) {
             case 6:
-                switch ( osvi.dwMinorVersion ) {
+                switch (osvi.dwMinorVersion) {
                     case 3:
-                        if ( osvi.wProductType == VER_NT_WORKSTATION )
+                        if (osvi.wProductType == VER_NT_WORKSTATION)
                             osName += "Windows 8.1";
                         else
                             osName += "Windows Server 2012 R2";
                         break;
                     case 2:
-                        if ( osvi.wProductType == VER_NT_WORKSTATION )
+                        if (osvi.wProductType == VER_NT_WORKSTATION)
                             osName += "Windows 8";
                         else
                             osName += "Windows Server 2012";
                         break;
                     case 1:
-                        if ( osvi.wProductType == VER_NT_WORKSTATION )
+                        if (osvi.wProductType == VER_NT_WORKSTATION)
                             osName += "Windows 7";
                         else
                             osName += "Windows Server 2008 R2";
 
                         // Windows 6.1 is either Windows 7 or Windows 2008 R2. There is no SP2 for
                         // either of these two operating systems, but the check will hold if one
-                        // were released. This code assumes that SP2 will include fix for 
+                        // were released. This code assumes that SP2 will include fix for
                         // http://support.microsoft.com/kb/2731284.
                         //
                         if ((osvi.wServicePackMajor >= 0) && (osvi.wServicePackMajor < 2)) {
                             if (isKB2731284OrLaterUpdateInstalled()) {
-                                log() << "Hotfix KB2731284 or later update is installed, no need to zero-out data files";
+                                log() << "Hotfix KB2731284 or later update is installed, no need "
+                                         "to zero-out data files";
                                 fileZeroNeeded = false;
                             } else {
-                                log() << "Hotfix KB2731284 or later update is not installed, will zero-out data files";
+                                log() << "Hotfix KB2731284 or later update is not installed, will "
+                                         "zero-out data files";
                                 fileZeroNeeded = true;
                             }
                         }
                         break;
                     case 0:
-                        if ( osvi.wProductType == VER_NT_WORKSTATION )
+                        if (osvi.wProductType == VER_NT_WORKSTATION)
                             osName += "Windows Vista";
                         else
                             osName += "Windows Server 2008";
@@ -331,7 +331,7 @@ namespace mongo {
                 }
                 break;
             case 5:
-                switch ( osvi.dwMinorVersion ) {
+                switch (osvi.dwMinorVersion) {
                     case 2:
                         osName += "Windows Server 2003";
                         break;
@@ -339,7 +339,7 @@ namespace mongo {
                         osName += "Windows XP";
                         break;
                     case 0:
-                        if ( osvi.wProductType == VER_NT_WORKSTATION )
+                        if (osvi.wProductType == VER_NT_WORKSTATION)
                             osName += "Windows 2000 Professional";
                         else
                             osName += "Windows 2000 Server";
@@ -350,84 +350,83 @@ namespace mongo {
                         break;
                 }
                 break;
-            }
         }
-        else {
-            // unable to get any version data
-            osName += "Windows NT";
-        }
-
-        if ( ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ) { cpuArch = "x86_64"; }
-        else if ( ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL ) { cpuArch = "x86"; }
-        else if ( ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64 ) { cpuArch = "ia64"; }
-        else { cpuArch = "unknown"; }
-
-        osType = "Windows";
-        osVersion = verstr.str();
-        hasNuma = checkNumaEnabled();
-        _extraStats = bExtra.obj();
-        if (psapiGlobal == NULL) {
-            psapiGlobal = new PsApiInit();
-        }
-
+    } else {
+        // unable to get any version data
+        osName += "Windows NT";
     }
 
-    bool ProcessInfo::checkNumaEnabled() {
-        typedef BOOL(WINAPI *LPFN_GLPI)(
-            PSYSTEM_LOGICAL_PROCESSOR_INFORMATION,
-            PDWORD);
-
-        DWORD returnLength = 0;
-        DWORD numaNodeCount = 0;
-        unique_ptr<SYSTEM_LOGICAL_PROCESSOR_INFORMATION[]> buffer;
-
-        LPFN_GLPI glpi(reinterpret_cast<LPFN_GLPI>(GetProcAddress(
-            GetModuleHandleW(L"kernel32"),
-            "GetLogicalProcessorInformation")));
-        if (glpi == NULL) {
-            return false;
-        }
-
-        DWORD returnCode = 0;
-        do {
-            returnCode = glpi(buffer.get(), &returnLength);
-
-            if (returnCode == FALSE) {
-                if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-                    buffer.reset(reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION>(
-                        new BYTE[returnLength]));
-                }
-                else {
-                    DWORD gle = GetLastError();
-                    warning() << "GetLogicalProcessorInformation failed with "
-                        << errnoWithDescription(gle);
-                    return false;
-                }
-            }
-        } while (returnCode == FALSE);
-
-        PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = buffer.get();
-
-        unsigned int byteOffset = 0;
-        while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
-            if (ptr->Relationship == RelationNumaNode) {
-                // Non-NUMA systems report a single record of this type.
-                numaNodeCount++;
-            }
-
-            byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
-            ptr++;
-        }
-
-        // For non-NUMA machines, the count is 1
-        return numaNodeCount > 1;
+    if (ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) {
+        cpuArch = "x86_64";
+    } else if (ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+        cpuArch = "x86";
+    } else if (ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) {
+        cpuArch = "ia64";
+    } else {
+        cpuArch = "unknown";
     }
 
-    bool ProcessInfo::blockCheckSupported() {
-        return psapiGlobal->supported;
+    osType = "Windows";
+    osVersion = verstr.str();
+    hasNuma = checkNumaEnabled();
+    _extraStats = bExtra.obj();
+    if (psapiGlobal == NULL) {
+        psapiGlobal = new PsApiInit();
+    }
+}
+
+bool ProcessInfo::checkNumaEnabled() {
+    typedef BOOL(WINAPI * LPFN_GLPI)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
+
+    DWORD returnLength = 0;
+    DWORD numaNodeCount = 0;
+    unique_ptr<SYSTEM_LOGICAL_PROCESSOR_INFORMATION[]> buffer;
+
+    LPFN_GLPI glpi(reinterpret_cast<LPFN_GLPI>(
+        GetProcAddress(GetModuleHandleW(L"kernel32"), "GetLogicalProcessorInformation")));
+    if (glpi == NULL) {
+        return false;
     }
 
-    bool ProcessInfo::blockInMemory(const void* start) {
+    DWORD returnCode = 0;
+    do {
+        returnCode = glpi(buffer.get(), &returnLength);
+
+        if (returnCode == FALSE) {
+            if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+                buffer.reset(reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION>(
+                    new BYTE[returnLength]));
+            } else {
+                DWORD gle = GetLastError();
+                warning() << "GetLogicalProcessorInformation failed with "
+                          << errnoWithDescription(gle);
+                return false;
+            }
+        }
+    } while (returnCode == FALSE);
+
+    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = buffer.get();
+
+    unsigned int byteOffset = 0;
+    while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
+        if (ptr->Relationship == RelationNumaNode) {
+            // Non-NUMA systems report a single record of this type.
+            numaNodeCount++;
+        }
+
+        byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+        ptr++;
+    }
+
+    // For non-NUMA machines, the count is 1
+    return numaNodeCount > 1;
+}
+
+bool ProcessInfo::blockCheckSupported() {
+    return psapiGlobal->supported;
+}
+
+bool ProcessInfo::blockInMemory(const void* start) {
 #if 0
         // code for printing out page fault addresses and pc's --
         // this could be useful for targetting heavy pagefault locations in the code
@@ -442,35 +441,34 @@ namespace mongo {
             }
         }
 #endif
-        PSAPI_WORKING_SET_EX_INFORMATION wsinfo;
-        wsinfo.VirtualAddress = const_cast<void*>(start);
-        BOOL result = psapiGlobal->QueryWSEx( GetCurrentProcess(), &wsinfo, sizeof(wsinfo) );
-        if ( result )
-            if ( wsinfo.VirtualAttributes.Valid )
-                return true;
+    PSAPI_WORKING_SET_EX_INFORMATION wsinfo;
+    wsinfo.VirtualAddress = const_cast<void*>(start);
+    BOOL result = psapiGlobal->QueryWSEx(GetCurrentProcess(), &wsinfo, sizeof(wsinfo));
+    if (result)
+        if (wsinfo.VirtualAttributes.Valid)
+            return true;
+    return false;
+}
+
+bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
+    out->resize(numPages);
+    unique_ptr<PSAPI_WORKING_SET_EX_INFORMATION[]> wsinfo(
+        new PSAPI_WORKING_SET_EX_INFORMATION[numPages]);
+
+    const void* startOfFirstPage = alignToStartOfPage(start);
+    for (size_t i = 0; i < numPages; i++) {
+        wsinfo[i].VirtualAddress = reinterpret_cast<void*>(
+            reinterpret_cast<unsigned long long>(startOfFirstPage) + i * getPageSize());
+    }
+
+    BOOL result = psapiGlobal->QueryWSEx(
+        GetCurrentProcess(), wsinfo.get(), sizeof(PSAPI_WORKING_SET_EX_INFORMATION) * numPages);
+
+    if (!result)
         return false;
+    for (size_t i = 0; i < numPages; ++i) {
+        (*out)[i] = wsinfo[i].VirtualAttributes.Valid ? 1 : 0;
     }
-
-    bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
-        out->resize(numPages);
-        unique_ptr<PSAPI_WORKING_SET_EX_INFORMATION[]> wsinfo(
-                new PSAPI_WORKING_SET_EX_INFORMATION[numPages]);
-
-        const void* startOfFirstPage = alignToStartOfPage(start);
-        for (size_t i = 0; i < numPages; i++) {
-            wsinfo[i].VirtualAddress = reinterpret_cast<void*>(
-                    reinterpret_cast<unsigned long long>(startOfFirstPage) + i * getPageSize());
-        }
-
-        BOOL result = psapiGlobal->QueryWSEx(GetCurrentProcess(),
-                                            wsinfo.get(),
-                                            sizeof(PSAPI_WORKING_SET_EX_INFORMATION) * numPages);
-
-        if (!result) return false;
-        for (size_t i = 0; i < numPages; ++i) {
-            (*out)[i] = wsinfo[i].VirtualAttributes.Valid ? 1 : 0;
-        }
-        return true;
-    }
-
+    return true;
+}
 }

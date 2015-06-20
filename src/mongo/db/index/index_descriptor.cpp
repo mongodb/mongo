@@ -35,61 +35,54 @@
 
 namespace mongo {
 
-    namespace {
-        void populateOptionsMap( std::map<StringData, BSONElement>& theMap,
-                                 const BSONObj& spec ) {
+namespace {
+void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj& spec) {
+    BSONObjIterator it(spec);
+    while (it.more()) {
+        const BSONElement e = it.next();
 
-            BSONObjIterator it( spec );
-            while ( it.more() ) {
-                const BSONElement e = it.next();
-
-                StringData fieldName = e.fieldNameStringData();
-                if ( fieldName == "key" ||
-                     fieldName == "ns" ||
-                     fieldName == "name" ||
-                     fieldName == "v" || // not considered for equivalence
-                     fieldName == "textIndexVersion" || // same as "v"
-                     fieldName == "2dsphereIndexVersion" || // same as "v"
-                     fieldName == "background" || // this is a creation time option only
-                     fieldName == "dropDups" || // this is now ignored
-                     fieldName == "sparse" || // checked specially
-                     fieldName == "unique" // check specially
-                     ) {
-                    continue;
-                }
-                theMap[ fieldName ] = e;
-            }
+        StringData fieldName = e.fieldNameStringData();
+        if (fieldName == "key" || fieldName == "ns" || fieldName == "name" ||
+            fieldName == "v" ||                     // not considered for equivalence
+            fieldName == "textIndexVersion" ||      // same as "v"
+            fieldName == "2dsphereIndexVersion" ||  // same as "v"
+            fieldName == "background" ||            // this is a creation time option only
+            fieldName == "dropDups" ||              // this is now ignored
+            fieldName == "sparse" ||                // checked specially
+            fieldName == "unique"                   // check specially
+            ) {
+            continue;
         }
+        theMap[fieldName] = e;
+    }
+}
+}
+
+bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) const {
+    if (isSparse() != other->isSparse()) {
+        return false;
     }
 
-    bool IndexDescriptor::areIndexOptionsEquivalent( const IndexDescriptor* other ) const {
-
-        if ( isSparse() != other->isSparse() ) {
-            return false;
-        }
-
-        if ( !isIdIndex() &&
-             unique() != other->unique() ) {
-            // Note: { _id: 1 } or { _id: -1 } implies unique: true.
-            return false;
-        }
-
-        // Then compare the rest of the options.
-
-        std::map<StringData, BSONElement> existingOptionsMap;
-        populateOptionsMap( existingOptionsMap, infoObj() );
-
-        std::map<StringData, BSONElement> newOptionsMap;
-        populateOptionsMap( newOptionsMap, other->infoObj() );
-
-        return existingOptionsMap == newOptionsMap;
+    if (!isIdIndex() && unique() != other->unique()) {
+        // Note: { _id: 1 } or { _id: -1 } implies unique: true.
+        return false;
     }
 
-    void IndexDescriptor::_checkOk() const {
-        if ( _magic == 123987 )
-            return;
-        log() << "uh oh: " << (void*)(this) << " " << _magic;
-        invariant(0);
-    }
+    // Then compare the rest of the options.
 
+    std::map<StringData, BSONElement> existingOptionsMap;
+    populateOptionsMap(existingOptionsMap, infoObj());
+
+    std::map<StringData, BSONElement> newOptionsMap;
+    populateOptionsMap(newOptionsMap, other->infoObj());
+
+    return existingOptionsMap == newOptionsMap;
+}
+
+void IndexDescriptor::_checkOk() const {
+    if (_magic == 123987)
+        return;
+    log() << "uh oh: " << (void*)(this) << " " << _magic;
+    invariant(0);
+}
 }

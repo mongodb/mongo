@@ -31,28 +31,31 @@
 
 namespace mongo {
 
-    Status TerminatedHelper::makeLoadNoTerminalStatus(char c, size_t length,
-                                                      std::ptrdiff_t debug_offset) {
-        str::stream ss;
-        ss << "couldn't locate terminal char (" << c << ") in buffer[" << length
-           << "] at offset: " << debug_offset;
-        return Status(ErrorCodes::Overflow, ss);
-    }
+Status TerminatedHelper::makeLoadNoTerminalStatus(char c,
+                                                  size_t length,
+                                                  std::ptrdiff_t debug_offset) {
+    str::stream ss;
+    ss << "couldn't locate terminal char (" << c << ") in buffer[" << length
+       << "] at offset: " << debug_offset;
+    return Status(ErrorCodes::Overflow, ss);
+}
 
-    Status TerminatedHelper::makeLoadShortReadStatus(char c, size_t read, size_t length,
-                                                     std::ptrdiff_t debug_offset) {
-        str::stream ss;
-        ss << "only read (" << read << ") bytes. (" << length << ") bytes to terminal char (" << c
-           << ") at offset: " << debug_offset;
+Status TerminatedHelper::makeLoadShortReadStatus(char c,
+                                                 size_t read,
+                                                 size_t length,
+                                                 std::ptrdiff_t debug_offset) {
+    str::stream ss;
+    ss << "only read (" << read << ") bytes. (" << length << ") bytes to terminal char (" << c
+       << ") at offset: " << debug_offset;
 
-        return Status(ErrorCodes::Overflow, ss);
-    }
+    return Status(ErrorCodes::Overflow, ss);
+}
 
-    Status TerminatedHelper::makeStoreStatus(char c, size_t length, std::ptrdiff_t debug_offset) {
-        str::stream ss;
-        ss << "couldn't write terminal char (" << c << ") in buffer[" << length
-           << "] at offset: " << debug_offset;
-        return Status(ErrorCodes::Overflow, ss);
-    }
+Status TerminatedHelper::makeStoreStatus(char c, size_t length, std::ptrdiff_t debug_offset) {
+    str::stream ss;
+    ss << "couldn't write terminal char (" << c << ") in buffer[" << length
+       << "] at offset: " << debug_offset;
+    return Status(ErrorCodes::Overflow, ss);
+}
 
 }  // namespace mongo

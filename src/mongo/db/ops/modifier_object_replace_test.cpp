@@ -43,267 +43,267 @@
 
 namespace {
 
-    using mongo::BSONObj;
-    using mongo::fromjson;
-    using mongo::LogBuilder;
-    using mongo::ModifierInterface;
-    using mongo::ModifierObjectReplace;
-    using mongo::mutablebson::ConstElement;
-    using mongo::mutablebson::countChildren;
-    using mongo::mutablebson::Document;
-    using mongo::mutablebson::Element;
-    using mongo::mutablebson::findFirstChildNamed;
-    using mongo::NumberInt;
-    using mongo::Status;
-    using mongo::StringData;
+using mongo::BSONObj;
+using mongo::fromjson;
+using mongo::LogBuilder;
+using mongo::ModifierInterface;
+using mongo::ModifierObjectReplace;
+using mongo::mutablebson::ConstElement;
+using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Document;
+using mongo::mutablebson::Element;
+using mongo::mutablebson::findFirstChildNamed;
+using mongo::NumberInt;
+using mongo::Status;
+using mongo::StringData;
 
-    /** Helper to build and manipulate a $set mod. */
-    class Mod {
-    public:
-        Mod() : _mod() {}
+/** Helper to build and manipulate a $set mod. */
+class Mod {
+public:
+    Mod() : _mod() {}
 
-        explicit Mod(BSONObj modObj)
-            : _mod() {
-            _modObj = modObj;
-            ASSERT_OK(_mod.init(BSON("" << modObj).firstElement(),
-                                ModifierInterface::Options::normal()));
-        }
-
-        Status prepare(Element root,
-                       StringData matchedField,
-                       ModifierInterface::ExecInfo* execInfo) {
-            return _mod.prepare(root, matchedField, execInfo);
-        }
-
-        Status apply() const {
-            return _mod.apply();
-        }
-
-        Status log(LogBuilder* logBuilder) const {
-            return _mod.log(logBuilder);
-        }
-
-        ModifierObjectReplace& mod() { return _mod; }
-        BSONObj& obj() { return _modObj; }
-
-    private:
-        ModifierObjectReplace _mod;
-        BSONObj _modObj;
-    };
-
-    // Normal replacements below
-    TEST(Normal, SingleFieldDoc){
-        Document doc(fromjson("{_id:1, a:1}"));
-        Mod mod(fromjson("{_id:1, b:12}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(doc, fromjson("{_id:1, b:12}"));
-
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(doc, logDoc);
+    explicit Mod(BSONObj modObj) : _mod() {
+        _modObj = modObj;
+        ASSERT_OK(
+            _mod.init(BSON("" << modObj).firstElement(), ModifierInterface::Options::normal()));
     }
 
-    TEST(Normal, ComplexDoc){
-        Document doc(fromjson("{_id:1, a:1}"));
-        Mod mod(fromjson("{_id:1, b:[123], c: {r:true}}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(doc, fromjson("{_id:1, b:[123], c: {r:true}}"));
-
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(doc, logDoc);
+    Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
+        return _mod.prepare(root, matchedField, execInfo);
     }
 
-    TEST(Normal, OnlyIdField){
-        Document doc(fromjson("{}"));
-        Mod mod(fromjson("{_id:1}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(doc, mod.obj());
-
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(doc, logDoc);
+    Status apply() const {
+        return _mod.apply();
     }
 
-    // These updates have to do with updates without an _id field
-    // (the existing _id isn't removed)
-    TEST(IdLeft, EmptyDocReplacement){
-        Document doc(fromjson("{_id:1}"));
-        Mod mod(fromjson("{}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(doc, fromjson("{_id:1}"));
-
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(doc, logDoc);
+    Status log(LogBuilder* logBuilder) const {
+        return _mod.log(logBuilder);
     }
 
-    TEST(IdLeft, EmptyDoc){
-        Document doc(fromjson("{_id:1}"));
-        Mod mod(fromjson("{}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(doc, fromjson("{_id:1}"));
-
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(doc, logDoc);
+    ModifierObjectReplace& mod() {
+        return _mod;
+    }
+    BSONObj& obj() {
+        return _modObj;
     }
 
-    TEST(IdLeft, SingleFieldAddition){
-        Document doc(fromjson("{_id:1}"));
-        Mod mod(fromjson("{a:1}"));
+private:
+    ModifierObjectReplace _mod;
+    BSONObj _modObj;
+};
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
+// Normal replacements below
+TEST(Normal, SingleFieldDoc) {
+    Document doc(fromjson("{_id:1, a:1}"));
+    Mod mod(fromjson("{_id:1, b:12}"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(doc, fromjson("{_id:1, a:1}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(doc, logDoc);
-    }
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, fromjson("{_id:1, b:12}"));
 
-    TEST(IdLeft, SingleFieldReplaced){
-        Document doc(fromjson("{a: []}"));
-        Mod mod(fromjson("{a:10}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(doc, logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
+TEST(Normal, ComplexDoc) {
+    Document doc(fromjson("{_id:1, a:1}"));
+    Mod mod(fromjson("{_id:1, b:[123], c: {r:true}}"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(doc, mod.obj());
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(doc, logDoc);
-    }
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, fromjson("{_id:1, b:[123], c: {r:true}}"));
 
-    TEST(IdLeft, SwapFields){
-        Document doc(fromjson("{_id:1, a:1}"));
-        Mod mod(fromjson("{b:1}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(doc, logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
+TEST(Normal, OnlyIdField) {
+    Document doc(fromjson("{}"));
+    Mod mod(fromjson("{_id:1}"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(doc, fromjson("{_id:1, b:1}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(doc, logDoc);
-    }
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, mod.obj());
 
-    TEST(IdImmutable, ReplaceIdNumber){
-        Document doc(fromjson("{_id:1, a:1}"));
-        Mod mod(fromjson("{_id:2}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(doc, logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_NOT_OK(mod.apply());
-    }
+// These updates have to do with updates without an _id field
+// (the existing _id isn't removed)
+TEST(IdLeft, EmptyDocReplacement) {
+    Document doc(fromjson("{_id:1}"));
+    Mod mod(fromjson("{}"));
 
-    TEST(IdImmutable, ReplaceIdNumberSameVal){
-        Document doc(fromjson("{_id:1, a:1}"));
-        Mod mod(fromjson("{_id:2}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_NOT_OK(mod.apply());
-    }
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, fromjson("{_id:1}"));
 
-    TEST(IdImmutable, ReplaceEmbeddedId){
-        Document doc(fromjson("{_id:{a:1, b:2}, a:1}"));
-        Mod mod(fromjson("{_id:{b:2, a:1}}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(doc, logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_NOT_OK(mod.apply());
-    }
+TEST(IdLeft, EmptyDoc) {
+    Document doc(fromjson("{_id:1}"));
+    Mod mod(fromjson("{}"));
 
-    TEST(Timestamp, IdNotReplaced){
-        Document doc(fromjson("{}"));
-        Mod mod(fromjson("{_id:Timestamp(0,0), a:1}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, fromjson("{_id:1}"));
 
-        ASSERT_OK(mod.apply());
-        ASSERT_EQUALS(doc, mod.obj());
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(doc, logDoc);
+}
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(mod.obj(), logDoc);
+TEST(IdLeft, SingleFieldAddition) {
+    Document doc(fromjson("{_id:1}"));
+    Mod mod(fromjson("{a:1}"));
 
-        Element idElem = findFirstChildNamed(logDoc.root(), "_id");
-        ASSERT(idElem.ok());
-        ASSERT(idElem.getValueTimestamp().isNull());
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
 
-    }
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, fromjson("{_id:1, a:1}"));
 
-    TEST(Timestamp, ReplaceAll){
-        Document doc(fromjson("{}"));
-        Mod mod(fromjson("{a:Timestamp(0,0), r:1, x:1, b:Timestamp(0,0)}"));
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(doc, logDoc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
+TEST(IdLeft, SingleFieldReplaced) {
+    Document doc(fromjson("{a: []}"));
+    Mod mod(fromjson("{a:10}"));
 
-        ASSERT_OK(mod.apply());
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, mod.obj());
 
-        Element elem = findFirstChildNamed(doc.root(), "a");
-        ASSERT(elem.ok());
-        ASSERT_NOT_EQUALS(0U, elem.getValueTimestamp().getSecs());
-        ASSERT_NOT_EQUALS(0U, elem.getValueTimestamp().getInc());
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(doc, logDoc);
+}
 
-        elem = findFirstChildNamed(doc.root(), "b");
-        ASSERT(elem.ok());
-        ASSERT_NOT_EQUALS(0U, elem.getValueTimestamp().getSecs());
-        ASSERT_NOT_EQUALS(0U, elem.getValueTimestamp().getInc());
-    }
+TEST(IdLeft, SwapFields) {
+    Document doc(fromjson("{_id:1, a:1}"));
+    Mod mod(fromjson("{b:1}"));
 
-} // unnamed namespace
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, fromjson("{_id:1, b:1}"));
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(doc, logDoc);
+}
+
+TEST(IdImmutable, ReplaceIdNumber) {
+    Document doc(fromjson("{_id:1, a:1}"));
+    Mod mod(fromjson("{_id:2}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_NOT_OK(mod.apply());
+}
+
+TEST(IdImmutable, ReplaceIdNumberSameVal) {
+    Document doc(fromjson("{_id:1, a:1}"));
+    Mod mod(fromjson("{_id:2}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_NOT_OK(mod.apply());
+}
+
+TEST(IdImmutable, ReplaceEmbeddedId) {
+    Document doc(fromjson("{_id:{a:1, b:2}, a:1}"));
+    Mod mod(fromjson("{_id:{b:2, a:1}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_NOT_OK(mod.apply());
+}
+
+TEST(Timestamp, IdNotReplaced) {
+    Document doc(fromjson("{}"));
+    Mod mod(fromjson("{_id:Timestamp(0,0), a:1}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, mod.obj());
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(mod.obj(), logDoc);
+
+    Element idElem = findFirstChildNamed(logDoc.root(), "_id");
+    ASSERT(idElem.ok());
+    ASSERT(idElem.getValueTimestamp().isNull());
+}
+
+TEST(Timestamp, ReplaceAll) {
+    Document doc(fromjson("{}"));
+    Mod mod(fromjson("{a:Timestamp(0,0), r:1, x:1, b:Timestamp(0,0)}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+
+    Element elem = findFirstChildNamed(doc.root(), "a");
+    ASSERT(elem.ok());
+    ASSERT_NOT_EQUALS(0U, elem.getValueTimestamp().getSecs());
+    ASSERT_NOT_EQUALS(0U, elem.getValueTimestamp().getInc());
+
+    elem = findFirstChildNamed(doc.root(), "b");
+    ASSERT(elem.ok());
+    ASSERT_NOT_EQUALS(0U, elem.getValueTimestamp().getSecs());
+    ASSERT_NOT_EQUALS(0U, elem.getValueTimestamp().getInc());
+}
+
+}  // unnamed namespace

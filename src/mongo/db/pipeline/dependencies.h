@@ -35,43 +35,38 @@
 #include "mongo/db/pipeline/document.h"
 
 namespace mongo {
-    class ParsedDeps;
+class ParsedDeps;
+
+/**
+ * This struct allows components in an agg pipeline to report what they need from their input.
+ */
+struct DepsTracker {
+    DepsTracker() : needWholeDocument(false), needTextScore(false) {}
 
     /**
-     * This struct allows components in an agg pipeline to report what they need from their input.
+     * Returns a projection object covering the dependencies tracked by this class.
      */
-    struct DepsTracker {
-        DepsTracker()
-            : needWholeDocument(false)
-            , needTextScore(false)
-        {}
+    BSONObj toProjection() const;
 
-        /**
-         * Returns a projection object covering the dependencies tracked by this class.
-         */
-        BSONObj toProjection() const;
+    boost::optional<ParsedDeps> toParsedDeps() const;
 
-        boost::optional<ParsedDeps> toParsedDeps() const;
+    std::set<std::string> fields;  // names of needed fields in dotted notation
+    bool needWholeDocument;        // if true, ignore fields and assume the whole document is needed
+    bool needTextScore;
+};
 
-        std::set<std::string> fields; // names of needed fields in dotted notation
-        bool needWholeDocument; // if true, ignore fields and assume the whole document is needed
-        bool needTextScore;
-    };
+/**
+ * This class is designed to quickly extract the needed fields from a BSONObj into a Document.
+ * It should only be created by a call to DepsTracker::ParsedDeps
+ */
+class ParsedDeps {
+public:
+    Document extractFields(const BSONObj& input) const;
 
-    /**
-     * This class is designed to quickly extract the needed fields from a BSONObj into a Document.
-     * It should only be created by a call to DepsTracker::ParsedDeps
-     */
-    class ParsedDeps {
-    public:
-        Document extractFields(const BSONObj& input) const;
+private:
+    friend struct DepsTracker;  // so it can call constructor
+    explicit ParsedDeps(const Document& fields) : _fields(fields) {}
 
-    private:
-        friend struct DepsTracker; // so it can call constructor
-        explicit ParsedDeps(const Document& fields)
-            : _fields(fields)
-        {}
-
-        Document _fields;
-    };
+    Document _fields;
+};
 }

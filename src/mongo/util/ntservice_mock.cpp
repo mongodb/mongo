@@ -29,9 +29,9 @@
 namespace mongo {
 namespace ntservice {
 
-    bool shouldStartService() {
-        return false;
-    }
+bool shouldStartService() {
+    return false;
+}
 
 }  // namespace ntservice
 }  // namespace mongo

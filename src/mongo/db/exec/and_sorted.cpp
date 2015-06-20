@@ -35,292 +35,289 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::numeric_limits;
-    using std::vector;
+using std::unique_ptr;
+using std::numeric_limits;
+using std::vector;
 
-    // static
-    const char* AndSortedStage::kStageType = "AND_SORTED";
+// static
+const char* AndSortedStage::kStageType = "AND_SORTED";
 
-    AndSortedStage::AndSortedStage(WorkingSet* ws, const Collection* collection)
-        : _collection(collection),
-          _ws(ws),
-          _targetNode(numeric_limits<size_t>::max()),
-          _targetId(WorkingSet::INVALID_ID), _isEOF(false),
-          _commonStats(kStageType) { }
+AndSortedStage::AndSortedStage(WorkingSet* ws, const Collection* collection)
+    : _collection(collection),
+      _ws(ws),
+      _targetNode(numeric_limits<size_t>::max()),
+      _targetId(WorkingSet::INVALID_ID),
+      _isEOF(false),
+      _commonStats(kStageType) {}
 
-    AndSortedStage::~AndSortedStage() {
-        for (size_t i = 0; i < _children.size(); ++i) { delete _children[i]; }
+AndSortedStage::~AndSortedStage() {
+    for (size_t i = 0; i < _children.size(); ++i) {
+        delete _children[i];
+    }
+}
+
+void AndSortedStage::addChild(PlanStage* child) {
+    _children.push_back(child);
+}
+
+bool AndSortedStage::isEOF() {
+    return _isEOF;
+}
+
+PlanStage::StageState AndSortedStage::work(WorkingSetID* out) {
+    ++_commonStats.works;
+
+    // Adds the amount of time taken by work() to executionTimeMillis.
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
+
+    if (isEOF()) {
+        return PlanStage::IS_EOF;
     }
 
-    void AndSortedStage::addChild(PlanStage* child) {
-        _children.push_back(child);
+    if (0 == _specificStats.failedAnd.size()) {
+        _specificStats.failedAnd.resize(_children.size());
     }
 
-    bool AndSortedStage::isEOF() { return _isEOF; }
+    // If we don't have any nodes that we're work()-ing until they hit a certain RecordId...
+    if (0 == _workingTowardRep.size()) {
+        // Get a target RecordId.
+        return getTargetLoc(out);
+    }
 
-    PlanStage::StageState AndSortedStage::work(WorkingSetID* out) {
-        ++_commonStats.works;
+    // Move nodes toward the target RecordId.
+    // If all nodes reach the target RecordId, return it.  The next call to work() will set a new
+    // target.
+    return moveTowardTargetLoc(out);
+}
 
-        // Adds the amount of time taken by work() to executionTimeMillis.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
+PlanStage::StageState AndSortedStage::getTargetLoc(WorkingSetID* out) {
+    verify(numeric_limits<size_t>::max() == _targetNode);
+    verify(WorkingSet::INVALID_ID == _targetId);
+    verify(RecordId() == _targetLoc);
 
-        if (isEOF()) { return PlanStage::IS_EOF; }
+    // Pick one, and get a loc to work toward.
+    WorkingSetID id = WorkingSet::INVALID_ID;
+    StageState state = _children[0]->work(&id);
 
-        if (0 == _specificStats.failedAnd.size()) {
-            _specificStats.failedAnd.resize(_children.size());
+    if (PlanStage::ADVANCED == state) {
+        WorkingSetMember* member = _ws->get(id);
+
+        // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
+        // with this WSM.
+        if (!member->hasLoc()) {
+            _ws->flagForReview(id);
+            return PlanStage::NEED_TIME;
         }
 
-        // If we don't have any nodes that we're work()-ing until they hit a certain RecordId...
-        if (0 == _workingTowardRep.size()) {
-            // Get a target RecordId.
-            return getTargetLoc(out);
+        verify(member->hasLoc());
+
+        // We have a value from one child to AND with.
+        _targetNode = 0;
+        _targetId = id;
+        _targetLoc = member->loc;
+
+        // We have to AND with all other children.
+        for (size_t i = 1; i < _children.size(); ++i) {
+            _workingTowardRep.push(i);
         }
 
-        // Move nodes toward the target RecordId.
-        // If all nodes reach the target RecordId, return it.  The next call to work() will set a new
-        // target.
-        return moveTowardTargetLoc(out);
+        ++_commonStats.needTime;
+        return PlanStage::NEED_TIME;
+    } else if (PlanStage::IS_EOF == state) {
+        _isEOF = true;
+        return state;
+    } else if (PlanStage::FAILURE == state) {
+        *out = id;
+        // If a stage fails, it may create a status WSM to indicate why it
+        // failed, in which case 'id' is valid.  If ID is invalid, we
+        // create our own error message.
+        if (WorkingSet::INVALID_ID == id) {
+            mongoutils::str::stream ss;
+            ss << "sorted AND stage failed to read in results from first child";
+            Status status(ErrorCodes::InternalError, ss);
+            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
+        }
+        _isEOF = true;
+        return state;
+    } else {
+        if (PlanStage::NEED_TIME == state) {
+            ++_commonStats.needTime;
+        } else if (PlanStage::NEED_YIELD == state) {
+            ++_commonStats.needYield;
+            *out = id;
+        }
+
+        // NEED_TIME, NEED_YIELD.
+        return state;
     }
+}
 
-    PlanStage::StageState AndSortedStage::getTargetLoc(WorkingSetID* out) {
-        verify(numeric_limits<size_t>::max() == _targetNode);
-        verify(WorkingSet::INVALID_ID == _targetId);
-        verify(RecordId() == _targetLoc);
+PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
+    verify(numeric_limits<size_t>::max() != _targetNode);
+    verify(WorkingSet::INVALID_ID != _targetId);
 
-        // Pick one, and get a loc to work toward.
-        WorkingSetID id = WorkingSet::INVALID_ID;
-        StageState state = _children[0]->work(&id);
+    // We have nodes that haven't hit _targetLoc yet.
+    size_t workingChildNumber = _workingTowardRep.front();
+    PlanStage* next = _children[workingChildNumber];
+    WorkingSetID id = WorkingSet::INVALID_ID;
+    StageState state = next->work(&id);
 
-        if (PlanStage::ADVANCED == state) {
-            WorkingSetMember* member = _ws->get(id);
+    if (PlanStage::ADVANCED == state) {
+        WorkingSetMember* member = _ws->get(id);
 
-            // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
-            // with this WSM.
-            if (!member->hasLoc()) {
-                _ws->flagForReview(id);
-                return PlanStage::NEED_TIME;
+        // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
+        // with this WSM.
+        if (!member->hasLoc()) {
+            _ws->flagForReview(id);
+            return PlanStage::NEED_TIME;
+        }
+
+        verify(member->hasLoc());
+
+        if (member->loc == _targetLoc) {
+            // The front element has hit _targetLoc.  Don't move it forward anymore/work on
+            // another element.
+            _workingTowardRep.pop();
+            AndCommon::mergeFrom(_ws->get(_targetId), *member);
+            _ws->free(id);
+
+            if (0 == _workingTowardRep.size()) {
+                WorkingSetID toReturn = _targetId;
+
+                _targetNode = numeric_limits<size_t>::max();
+                _targetId = WorkingSet::INVALID_ID;
+                _targetLoc = RecordId();
+
+                *out = toReturn;
+                ++_commonStats.advanced;
+                return PlanStage::ADVANCED;
             }
+            // More children need to be advanced to _targetLoc.
+            ++_commonStats.needTime;
+            return PlanStage::NEED_TIME;
+        } else if (member->loc < _targetLoc) {
+            // The front element of _workingTowardRep hasn't hit the thing we're AND-ing with
+            // yet.  Try again later.
+            _ws->free(id);
+            ++_commonStats.needTime;
+            return PlanStage::NEED_TIME;
+        } else {
+            // member->loc > _targetLoc.
+            // _targetLoc wasn't successfully AND-ed with the other sub-plans.  We toss it and
+            // try AND-ing with the next value.
+            _specificStats.failedAnd[_targetNode]++;
 
-            verify(member->hasLoc());
-
-            // We have a value from one child to AND with.
-            _targetNode = 0;
-            _targetId = id;
+            _ws->free(_targetId);
+            _targetNode = workingChildNumber;
             _targetLoc = member->loc;
-
-            // We have to AND with all other children.
-            for (size_t i = 1; i < _children.size(); ++i) {
-                _workingTowardRep.push(i);
+            _targetId = id;
+            _workingTowardRep = std::queue<size_t>();
+            for (size_t i = 0; i < _children.size(); ++i) {
+                if (workingChildNumber != i) {
+                    _workingTowardRep.push(i);
+                }
             }
-
+            // Need time to chase after the new _targetLoc.
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
-        else if (PlanStage::IS_EOF == state) {
-            _isEOF = true;
-            return state;
+    } else if (PlanStage::IS_EOF == state) {
+        _isEOF = true;
+        _ws->free(_targetId);
+        return state;
+    } else if (PlanStage::FAILURE == state || PlanStage::DEAD == state) {
+        *out = id;
+        // If a stage fails, it may create a status WSM to indicate why it
+        // failed, in which case 'id' is valid.  If ID is invalid, we
+        // create our own error message.
+        if (WorkingSet::INVALID_ID == id) {
+            mongoutils::str::stream ss;
+            ss << "sorted AND stage failed to read in results from child " << workingChildNumber;
+            Status status(ErrorCodes::InternalError, ss);
+            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
         }
-        else if (PlanStage::FAILURE == state) {
+        _isEOF = true;
+        _ws->free(_targetId);
+        return state;
+    } else {
+        if (PlanStage::NEED_TIME == state) {
+            ++_commonStats.needTime;
+        } else if (PlanStage::NEED_YIELD == state) {
+            ++_commonStats.needYield;
             *out = id;
-            // If a stage fails, it may create a status WSM to indicate why it
-            // failed, in which case 'id' is valid.  If ID is invalid, we
-            // create our own error message.
-            if (WorkingSet::INVALID_ID == id) {
-                mongoutils::str::stream ss;
-                ss << "sorted AND stage failed to read in results from first child";
-                Status status(ErrorCodes::InternalError, ss);
-                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
-            }
-            _isEOF = true;
-            return state;
         }
-        else {
-            if (PlanStage::NEED_TIME == state) {
-                ++_commonStats.needTime;
-            }
-            else if (PlanStage::NEED_YIELD == state) {
-                ++_commonStats.needYield;
-                *out = id;
-            }
 
-            // NEED_TIME, NEED_YIELD.
-            return state;
-        }
+        return state;
+    }
+}
+
+void AndSortedStage::saveState() {
+    ++_commonStats.yields;
+
+    for (size_t i = 0; i < _children.size(); ++i) {
+        _children[i]->saveState();
+    }
+}
+
+void AndSortedStage::restoreState(OperationContext* opCtx) {
+    ++_commonStats.unyields;
+
+    for (size_t i = 0; i < _children.size(); ++i) {
+        _children[i]->restoreState(opCtx);
+    }
+}
+
+void AndSortedStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    ++_commonStats.invalidates;
+
+    if (isEOF()) {
+        return;
     }
 
-    PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
-        verify(numeric_limits<size_t>::max() != _targetNode);
-        verify(WorkingSet::INVALID_ID != _targetId);
-
-        // We have nodes that haven't hit _targetLoc yet.
-        size_t workingChildNumber = _workingTowardRep.front();
-        PlanStage* next = _children[workingChildNumber];
-        WorkingSetID id = WorkingSet::INVALID_ID;
-        StageState state = next->work(&id);
-
-        if (PlanStage::ADVANCED == state) {
-            WorkingSetMember* member = _ws->get(id);
-
-            // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
-            // with this WSM.
-            if (!member->hasLoc()) {
-                _ws->flagForReview(id);
-                return PlanStage::NEED_TIME;
-            }
-
-            verify(member->hasLoc());
-
-            if (member->loc == _targetLoc) {
-                // The front element has hit _targetLoc.  Don't move it forward anymore/work on
-                // another element.
-                _workingTowardRep.pop();
-                AndCommon::mergeFrom(_ws->get(_targetId), *member);
-                _ws->free(id);
-
-                if (0 == _workingTowardRep.size()) {
-                    WorkingSetID toReturn = _targetId;
-
-                    _targetNode = numeric_limits<size_t>::max();
-                    _targetId = WorkingSet::INVALID_ID;
-                    _targetLoc = RecordId();
-
-                    *out = toReturn;
-                    ++_commonStats.advanced;
-                    return PlanStage::ADVANCED;
-                }
-                // More children need to be advanced to _targetLoc.
-                ++_commonStats.needTime;
-                return PlanStage::NEED_TIME;
-            }
-            else if (member->loc < _targetLoc) {
-                // The front element of _workingTowardRep hasn't hit the thing we're AND-ing with
-                // yet.  Try again later.
-                _ws->free(id);
-                ++_commonStats.needTime;
-                return PlanStage::NEED_TIME;
-            }
-            else {
-                // member->loc > _targetLoc.
-                // _targetLoc wasn't successfully AND-ed with the other sub-plans.  We toss it and
-                // try AND-ing with the next value.
-                _specificStats.failedAnd[_targetNode]++;
-
-                _ws->free(_targetId);
-                _targetNode = workingChildNumber;
-                _targetLoc = member->loc;
-                _targetId = id;
-                _workingTowardRep = std::queue<size_t>();
-                for (size_t i = 0; i < _children.size(); ++i) {
-                    if (workingChildNumber != i) {
-                        _workingTowardRep.push(i);
-                    }
-                }
-                // Need time to chase after the new _targetLoc.
-                ++_commonStats.needTime;
-                return PlanStage::NEED_TIME;
-            }
-        }
-        else if (PlanStage::IS_EOF == state) {
-            _isEOF = true;
-            _ws->free(_targetId);
-            return state;
-        }
-        else if (PlanStage::FAILURE == state || PlanStage::DEAD == state) {
-            *out = id;
-            // If a stage fails, it may create a status WSM to indicate why it
-            // failed, in which case 'id' is valid.  If ID is invalid, we
-            // create our own error message.
-            if (WorkingSet::INVALID_ID == id) {
-                mongoutils::str::stream ss;
-                ss << "sorted AND stage failed to read in results from child " << workingChildNumber;
-                Status status(ErrorCodes::InternalError, ss);
-                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
-            }
-            _isEOF = true;
-            _ws->free(_targetId);
-            return state;
-        }
-        else {
-            if (PlanStage::NEED_TIME == state) {
-                ++_commonStats.needTime;
-            }
-            else if (PlanStage::NEED_YIELD == state) {
-                ++_commonStats.needYield;
-                *out = id;
-            }
-
-            return state;
-        }
+    for (size_t i = 0; i < _children.size(); ++i) {
+        _children[i]->invalidate(txn, dl, type);
     }
 
-    void AndSortedStage::saveState() {
-        ++_commonStats.yields;
+    if (dl == _targetLoc) {
+        // We're in the middle of moving children forward until they hit _targetLoc, which is no
+        // longer a valid target.  If it's a deletion we can't AND it with anything, if it's a
+        // mutation the predicates implied by the AND may no longer be true.  So no matter what,
+        // fetch it, flag for review, and find another _targetLoc.
+        ++_specificStats.flagged;
 
-        for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->saveState();
-        }
+        // The RecordId could still be a valid result so flag it and save it for later.
+        WorkingSetCommon::fetchAndInvalidateLoc(txn, _ws->get(_targetId), _collection);
+        _ws->flagForReview(_targetId);
+
+        _targetId = WorkingSet::INVALID_ID;
+        _targetNode = numeric_limits<size_t>::max();
+        _targetLoc = RecordId();
+        _workingTowardRep = std::queue<size_t>();
+    }
+}
+
+vector<PlanStage*> AndSortedStage::getChildren() const {
+    return _children;
+}
+
+PlanStageStats* AndSortedStage::getStats() {
+    _commonStats.isEOF = isEOF();
+
+    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_SORTED));
+    ret->specific.reset(new AndSortedStats(_specificStats));
+    for (size_t i = 0; i < _children.size(); ++i) {
+        ret->children.push_back(_children[i]->getStats());
     }
 
-    void AndSortedStage::restoreState(OperationContext* opCtx) {
-        ++_commonStats.unyields;
+    return ret.release();
+}
 
-        for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->restoreState(opCtx);
-        }
-    }
+const CommonStats* AndSortedStage::getCommonStats() const {
+    return &_commonStats;
+}
 
-    void AndSortedStage::invalidate(OperationContext* txn,
-                                    const RecordId& dl,
-                                    InvalidationType type) {
-        ++_commonStats.invalidates;
-
-        if (isEOF()) { return; }
-
-        for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(txn, dl, type);
-        }
-
-        if (dl == _targetLoc) {
-            // We're in the middle of moving children forward until they hit _targetLoc, which is no
-            // longer a valid target.  If it's a deletion we can't AND it with anything, if it's a
-            // mutation the predicates implied by the AND may no longer be true.  So no matter what,
-            // fetch it, flag for review, and find another _targetLoc.
-            ++_specificStats.flagged;
-
-            // The RecordId could still be a valid result so flag it and save it for later.
-            WorkingSetCommon::fetchAndInvalidateLoc(txn, _ws->get(_targetId), _collection);
-            _ws->flagForReview(_targetId);
-
-            _targetId = WorkingSet::INVALID_ID;
-            _targetNode = numeric_limits<size_t>::max();
-            _targetLoc = RecordId();
-            _workingTowardRep = std::queue<size_t>();
-        }
-    }
-
-    vector<PlanStage*> AndSortedStage::getChildren() const {
-        return _children;
-    }
-
-    PlanStageStats* AndSortedStage::getStats() {
-        _commonStats.isEOF = isEOF();
-
-        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_SORTED));
-        ret->specific.reset(new AndSortedStats(_specificStats));
-        for (size_t i = 0; i < _children.size(); ++i) {
-            ret->children.push_back(_children[i]->getStats());
-        }
-
-        return ret.release();
-    }
-
-    const CommonStats* AndSortedStage::getCommonStats() const {
-        return &_commonStats;
-    }
-
-    const SpecificStats* AndSortedStage::getSpecificStats() const {
-        return &_specificStats;
-    }
+const SpecificStats* AndSortedStage::getSpecificStats() const {
+    return &_specificStats;
+}
 
 }  // namespace mongo

@@ -39,72 +39,70 @@
 #endif
 
 namespace mongo {
-    void breakpoint() {
+void breakpoint() {
 #ifdef _WIN32
-        DEV DebugBreak();
+    DEV DebugBreak();
 #endif
 #ifndef _WIN32
-        // code to raise a breakpoint in GDB
-        ONCE {
-            //prevent SIGTRAP from crashing the program if default action is specified and we are not in gdb
-            struct sigaction current;
-            sigaction(SIGTRAP, NULL, &current);
-            if (current.sa_handler == SIG_DFL) {
-                signal(SIGTRAP, SIG_IGN);
-            }
+    // code to raise a breakpoint in GDB
+    ONCE {
+        // prevent SIGTRAP from crashing the program if default action is specified and we are not in gdb
+        struct sigaction current;
+        sigaction(SIGTRAP, NULL, &current);
+        if (current.sa_handler == SIG_DFL) {
+            signal(SIGTRAP, SIG_IGN);
         }
-
-        raise(SIGTRAP);
-#endif
     }
+
+    raise(SIGTRAP);
+#endif
+}
 
 #if defined(USE_GDBSERVER)
 
-    /* Magic gdb trampoline
-     * Do not call directly! call setupSIGTRAPforGDB()
-     * Assumptions:
-     *  1) gdbserver is on your path
-     *  2) You have run "handle SIGSTOP noprint" in gdb
-     *  3) serverGlobalParams.port + 2000 is free
-     */
-    void launchGDB(int) {
-        // Don't come back here
-        signal(SIGTRAP, SIG_IGN);
+/* Magic gdb trampoline
+ * Do not call directly! call setupSIGTRAPforGDB()
+ * Assumptions:
+ *  1) gdbserver is on your path
+ *  2) You have run "handle SIGSTOP noprint" in gdb
+ *  3) serverGlobalParams.port + 2000 is free
+ */
+void launchGDB(int) {
+    // Don't come back here
+    signal(SIGTRAP, SIG_IGN);
 
-        const int newPort = serverGlobalParams.port + 2000;
+    const int newPort = serverGlobalParams.port + 2000;
 
-        char pidToDebug[16];
-        int pidRet = snprintf(pidToDebug, sizeof(pidToDebug), "%d", getpid());
-        invariant(pidRet >= 0 && size_t(pidRet) < sizeof(pidToDebug));
+    char pidToDebug[16];
+    int pidRet = snprintf(pidToDebug, sizeof(pidToDebug), "%d", getpid());
+    invariant(pidRet >= 0 && size_t(pidRet) < sizeof(pidToDebug));
 
-        char hostPort[32];
-        int hostRet = snprintf(hostPort, sizeof(hostPort), "localhost:%d", newPort);
-        invariant(hostRet >= 0 && size_t(hostRet) < sizeof(hostPort));
+    char hostPort[32];
+    int hostRet = snprintf(hostPort, sizeof(hostPort), "localhost:%d", newPort);
+    invariant(hostRet >= 0 && size_t(hostRet) < sizeof(hostPort));
 
-        char msg[128];
-        int msgRet = snprintf(msg, sizeof(msg),
-                              "\n\n\t**** Launching gdbserver on %s ****\n\n", hostPort);
-        invariant(msgRet >= 0 && size_t(msgRet) < sizeof(msg));
-        invariant(write(STDERR_FILENO, msg, msgRet) == msgRet);
+    char msg[128];
+    int msgRet =
+        snprintf(msg, sizeof(msg), "\n\n\t**** Launching gdbserver on %s ****\n\n", hostPort);
+    invariant(msgRet >= 0 && size_t(msgRet) < sizeof(msg));
+    invariant(write(STDERR_FILENO, msg, msgRet) == msgRet);
 
-        if (fork() == 0) {
-            //child
-            execlp("gdbserver", "gdbserver", "--attach", hostPort, pidToDebug, NULL);
-            perror(NULL);
-            _exit(1);
-        }
-        else {
-            //parent
-            raise(SIGSTOP); // pause all threads until gdb connects and continues
-            raise(SIGTRAP); // break inside gdbserver
-        }
+    if (fork() == 0) {
+        // child
+        execlp("gdbserver", "gdbserver", "--attach", hostPort, pidToDebug, NULL);
+        perror(NULL);
+        _exit(1);
+    } else {
+        // parent
+        raise(SIGSTOP);  // pause all threads until gdb connects and continues
+        raise(SIGTRAP);  // break inside gdbserver
     }
+}
 
-    void setupSIGTRAPforGDB() {
-        verify( signal(SIGTRAP , launchGDB ) != SIG_ERR );
-    }
+void setupSIGTRAPforGDB() {
+    verify(signal(SIGTRAP, launchGDB) != SIG_ERR);
+}
 #else
-    void setupSIGTRAPforGDB() {
-    }
+void setupSIGTRAPforGDB() {}
 #endif
 }

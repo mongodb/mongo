@@ -46,51 +46,47 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-    SaslAuthenticationSession::SaslAuthenticationSessionFactoryFn
-        SaslAuthenticationSession::create;
+SaslAuthenticationSession::SaslAuthenticationSessionFactoryFn SaslAuthenticationSession::create;
 
-    // Mechanism name constants.
-    const char SaslAuthenticationSession::mechanismCRAMMD5[] = "CRAM-MD5";
-    const char SaslAuthenticationSession::mechanismDIGESTMD5[] = "DIGEST-MD5";
-    const char SaslAuthenticationSession::mechanismSCRAMSHA1[] = "SCRAM-SHA-1";
-    const char SaslAuthenticationSession::mechanismGSSAPI[] = "GSSAPI";
-    const char SaslAuthenticationSession::mechanismPLAIN[] = "PLAIN";
+// Mechanism name constants.
+const char SaslAuthenticationSession::mechanismCRAMMD5[] = "CRAM-MD5";
+const char SaslAuthenticationSession::mechanismDIGESTMD5[] = "DIGEST-MD5";
+const char SaslAuthenticationSession::mechanismSCRAMSHA1[] = "SCRAM-SHA-1";
+const char SaslAuthenticationSession::mechanismGSSAPI[] = "GSSAPI";
+const char SaslAuthenticationSession::mechanismPLAIN[] = "PLAIN";
 
-    /**
-     * Standard method in mongodb for determining if "authenticatedUser" may act as "requestedUser."
-     *
-     * The standard rule in MongoDB is simple.  The authenticated user name must be the same as the
-     * requested user name.
-     */
-    bool isAuthorizedCommon(SaslAuthenticationSession* session,
-                            StringData requestedUser,
-                            StringData authenticatedUser) {
+/**
+ * Standard method in mongodb for determining if "authenticatedUser" may act as "requestedUser."
+ *
+ * The standard rule in MongoDB is simple.  The authenticated user name must be the same as the
+ * requested user name.
+ */
+bool isAuthorizedCommon(SaslAuthenticationSession* session,
+                        StringData requestedUser,
+                        StringData authenticatedUser) {
+    return requestedUser == authenticatedUser;
+}
 
-        return requestedUser == authenticatedUser;
+SaslAuthenticationSession::SaslAuthenticationSession(AuthorizationSession* authzSession)
+    : AuthenticationSession(AuthenticationSession::SESSION_TYPE_SASL),
+      _authzSession(authzSession),
+      _saslStep(0),
+      _conversationId(0),
+      _autoAuthorize(false),
+      _done(false) {}
+
+SaslAuthenticationSession::~SaslAuthenticationSession(){};
+
+StringData SaslAuthenticationSession::getAuthenticationDatabase() const {
+    if (Command::testCommandsEnabled && _authenticationDatabase == "admin" &&
+        getPrincipalId() == internalSecurity.user->getName().getUser()) {
+        // Allows authenticating as the internal user against the admin database.  This is to
+        // support the auth passthrough test framework on mongos (since you can't use the local
+        // database on a mongos, so you can't auth as the internal user without this).
+        return internalSecurity.user->getName().getDB();
+    } else {
+        return _authenticationDatabase;
     }
-
-    SaslAuthenticationSession::SaslAuthenticationSession(AuthorizationSession* authzSession) :
-        AuthenticationSession(AuthenticationSession::SESSION_TYPE_SASL),
-        _authzSession(authzSession),
-        _saslStep(0),
-        _conversationId(0),
-        _autoAuthorize(false),
-        _done(false) {
-    }
-
-    SaslAuthenticationSession::~SaslAuthenticationSession() {};
-
-    StringData SaslAuthenticationSession::getAuthenticationDatabase() const {
-        if (Command::testCommandsEnabled &&
-                _authenticationDatabase == "admin" &&
-                getPrincipalId() == internalSecurity.user->getName().getUser()) {
-            // Allows authenticating as the internal user against the admin database.  This is to
-            // support the auth passthrough test framework on mongos (since you can't use the local
-            // database on a mongos, so you can't auth as the internal user without this).
-            return internalSecurity.user->getName().getDB();
-        } else {
-            return _authenticationDatabase;
-        }
-    }
+}
 
 }  // namespace mongo

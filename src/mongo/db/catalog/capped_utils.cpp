@@ -51,118 +51,111 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-    Status emptyCapped(OperationContext* txn,
-                       const NamespaceString& collectionName) {
-        ScopedTransaction scopedXact(txn, MODE_IX);
-        AutoGetDb autoDb(txn, collectionName.db(), MODE_X);
+Status emptyCapped(OperationContext* txn, const NamespaceString& collectionName) {
+    ScopedTransaction scopedXact(txn, MODE_IX);
+    AutoGetDb autoDb(txn, collectionName.db(), MODE_X);
 
-        bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(
-                    collectionName);
+    bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionName);
 
-        if (userInitiatedWritesAndNotPrimary) {
-            return Status(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while truncating collection "
-                                        << collectionName.ns());
-        }
-
-        Database* db = autoDb.getDb();
-        massert(13429, "no such database", db);
-
-        Collection* collection = db->getCollection(collectionName);
-        massert(28584, "no such collection", collection);
-
-        BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
-
-        WriteUnitOfWork wuow(txn);
-
-        Status status = collection->truncate(txn);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        getGlobalServiceContext()->getOpObserver()->onEmptyCapped(txn, collection->ns());
-
-        wuow.commit();
-
-        return Status::OK();
+    if (userInitiatedWritesAndNotPrimary) {
+        return Status(ErrorCodes::NotMaster,
+                      str::stream() << "Not primary while truncating collection "
+                                    << collectionName.ns());
     }
 
-    Status cloneCollectionAsCapped(OperationContext* txn,
-                                   Database* db,
-                                   const std::string& shortFrom,
-                                   const std::string& shortTo,
-                                   double size,
-                                   bool temp) {
+    Database* db = autoDb.getDb();
+    massert(13429, "no such database", db);
 
-        std::string fromNs = db->name() + "." + shortFrom;
-        std::string toNs = db->name() + "." + shortTo;
+    Collection* collection = db->getCollection(collectionName);
+    massert(28584, "no such collection", collection);
 
-        Collection* fromCollection = db->getCollection(fromNs);
-        if (!fromCollection)
-            return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "source collection " << fromNs <<  " does not exist");
+    BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
 
-        if (db->getCollection(toNs))
-            return Status(ErrorCodes::NamespaceExists, "to collection already exists");
+    WriteUnitOfWork wuow(txn);
 
-        // create new collection
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            const auto fromOptions = fromCollection->getCatalogEntry()
-                                                   ->getCollectionOptions(txn)
-                                                   .toBSON();
-            OldClientContext ctx(txn,  toNs);
-            BSONObjBuilder spec;
-            spec.appendBool("capped", true);
-            spec.append("size", size);
-            if (temp)
-                spec.appendBool("temp", true);
-            spec.appendElementsUnique(fromOptions);
+    Status status = collection->truncate(txn);
+    if (!status.isOK()) {
+        return status;
+    }
 
-            WriteUnitOfWork wunit(txn);
-            Status status = userCreateNS(txn, ctx.db(), toNs, spec.done());
-            if (!status.isOK())
-                return status;
-            wunit.commit();
-        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "cloneCollectionAsCapped", fromNs);
+    getGlobalServiceContext()->getOpObserver()->onEmptyCapped(txn, collection->ns());
 
-        Collection* toCollection = db->getCollection(toNs);
-        invariant(toCollection); // we created above
+    wuow.commit();
 
-        // how much data to ignore because it won't fit anyway
-        // datasize and extentSize can't be compared exactly, so add some padding to 'size'
+    return Status::OK();
+}
 
-        long long allocatedSpaceGuess =
-            std::max(static_cast<long long>(size * 2),
-                     static_cast<long long>(toCollection->getRecordStore()->storageSize(txn) * 2));
+Status cloneCollectionAsCapped(OperationContext* txn,
+                               Database* db,
+                               const std::string& shortFrom,
+                               const std::string& shortTo,
+                               double size,
+                               bool temp) {
+    std::string fromNs = db->name() + "." + shortFrom;
+    std::string toNs = db->name() + "." + shortTo;
 
-        long long excessSize = fromCollection->dataSize(txn) - allocatedSpaceGuess;
+    Collection* fromCollection = db->getCollection(fromNs);
+    if (!fromCollection)
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "source collection " << fromNs << " does not exist");
 
-        std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-                    txn,
-                    fromNs,
-                    fromCollection,
-                    InternalPlanner::FORWARD));
+    if (db->getCollection(toNs))
+        return Status(ErrorCodes::NamespaceExists, "to collection already exists");
 
-        exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY);
+    // create new collection
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        const auto fromOptions =
+            fromCollection->getCatalogEntry()->getCollectionOptions(txn).toBSON();
+        OldClientContext ctx(txn, toNs);
+        BSONObjBuilder spec;
+        spec.appendBool("capped", true);
+        spec.append("size", size);
+        if (temp)
+            spec.appendBool("temp", true);
+        spec.appendElementsUnique(fromOptions);
 
-        Snapshotted<BSONObj> objToClone;
-        RecordId loc;
-        PlanExecutor::ExecState state = PlanExecutor::FAILURE; // suppress uninitialized warnings
+        WriteUnitOfWork wunit(txn);
+        Status status = userCreateNS(txn, ctx.db(), toNs, spec.done());
+        if (!status.isOK())
+            return status;
+        wunit.commit();
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "cloneCollectionAsCapped", fromNs);
 
-        DisableDocumentValidation validationDisabler(txn);
+    Collection* toCollection = db->getCollection(toNs);
+    invariant(toCollection);  // we created above
 
-        int retries = 0; // non-zero when retrying our last document.
-        while (true) {
-            if (!retries) {
-                state = exec->getNextSnapshotted(&objToClone, &loc);
-            }
+    // how much data to ignore because it won't fit anyway
+    // datasize and extentSize can't be compared exactly, so add some padding to 'size'
 
-            switch(state) {
+    long long allocatedSpaceGuess =
+        std::max(static_cast<long long>(size * 2),
+                 static_cast<long long>(toCollection->getRecordStore()->storageSize(txn) * 2));
+
+    long long excessSize = fromCollection->dataSize(txn) - allocatedSpaceGuess;
+
+    std::unique_ptr<PlanExecutor> exec(
+        InternalPlanner::collectionScan(txn, fromNs, fromCollection, InternalPlanner::FORWARD));
+
+    exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY);
+
+    Snapshotted<BSONObj> objToClone;
+    RecordId loc;
+    PlanExecutor::ExecState state = PlanExecutor::FAILURE;  // suppress uninitialized warnings
+
+    DisableDocumentValidation validationDisabler(txn);
+
+    int retries = 0;  // non-zero when retrying our last document.
+    while (true) {
+        if (!retries) {
+            state = exec->getNextSnapshotted(&objToClone, &loc);
+        }
+
+        switch (state) {
             case PlanExecutor::IS_EOF:
                 return Status::OK();
-            case PlanExecutor::ADVANCED:
-            {
+            case PlanExecutor::ADVANCED: {
                 if (excessSize > 0) {
                     // 4x is for padding, power of 2, etc...
                     excessSize -= (4 * objToClone.value().objsize());
@@ -178,116 +171,103 @@ namespace mongo {
                 //    CollectionScan PlanStage does not have a FAILURE scenario.
                 // 3) All other PlanExecutor states are handled above
                 invariant(false);
-            }
+        }
 
-            try {
-                // Make sure we are working with the latest version of the document.
-                if (objToClone.snapshotId() != txn->recoveryUnit()->getSnapshotId()
-                    && !fromCollection->findDoc(txn, loc, &objToClone)) {
-                    // doc was deleted so don't clone it.
-                    retries = 0;
-                    continue;
-                }
-
-                WriteUnitOfWork wunit(txn);
-                toCollection->insertDocument(txn,
-                                             objToClone.value(),
-                                             true,
-                                             txn->writesAreReplicated());
-                wunit.commit();
-
-                // Go to the next document
+        try {
+            // Make sure we are working with the latest version of the document.
+            if (objToClone.snapshotId() != txn->recoveryUnit()->getSnapshotId() &&
+                !fromCollection->findDoc(txn, loc, &objToClone)) {
+                // doc was deleted so don't clone it.
                 retries = 0;
+                continue;
             }
-            catch (const WriteConflictException& wce) {
-                CurOp::get(txn)->debug().writeConflicts++;
-                retries++; // logAndBackoff expects this to be 1 on first call.
-                wce.logAndBackoff(retries, "cloneCollectionAsCapped", fromNs);
 
-                // Can't use WRITE_CONFLICT_RETRY_LOOP macros since we need to save/restore exec
-                // around call to abandonSnapshot.
-                exec->saveState();
-                txn->recoveryUnit()->abandonSnapshot();
-                exec->restoreState(txn); // Handles any WCEs internally.
-            }
-        }
-
-        invariant(false); // unreachable
-    }
-
-    Status convertToCapped(OperationContext* txn,
-                           const NamespaceString& collectionName,
-                           double size) {
-
-        StringData dbname = collectionName.db();
-        StringData shortSource = collectionName.coll();
-
-        ScopedTransaction transaction(txn, MODE_IX);
-        AutoGetDb autoDb(txn, collectionName.db(), MODE_X);
-
-        bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionName);
-
-        if (userInitiatedWritesAndNotPrimary) {
-            return Status(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while converting "
-                                        << collectionName.ns() << " to a capped collection");
-        }
-
-        Database* const db = autoDb.getDb();
-        if (!db) {
-            return Status(ErrorCodes::DatabaseNotFound,
-                          str::stream() << "database " << dbname << " not found");
-        }
-
-        BackgroundOperation::assertNoBgOpInProgForDb(dbname);
-
-        std::string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
-        std::string longTmpName = str::stream() << dbname << "." << shortTmpName;
-
-        if (db->getCollection(longTmpName)) {
             WriteUnitOfWork wunit(txn);
-            Status status = db->dropCollection(txn, longTmpName);
-            if (!status.isOK())
-                return status;
-        }
-
-
-        const bool shouldReplicateWrites = txn->writesAreReplicated();
-        txn->setReplicatedWrites(false);
-        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
-        Status status = cloneCollectionAsCapped(txn,
-                                                db,
-                                                shortSource.toString(),
-                                                shortTmpName,
-                                                size,
-                                                true);
-
-        if (!status.isOK()) {
-            return status;
-        }
-
-        verify(db->getCollection(longTmpName));
-
-        {
-            WriteUnitOfWork wunit(txn);
-            status = db->dropCollection(txn, collectionName.ns());
-            txn->setReplicatedWrites(shouldReplicateWrites);
-            if (!status.isOK())
-                return status;
-
-            status = db->renameCollection(txn, longTmpName, collectionName.ns(), false);
-            if (!status.isOK())
-                return status;
-
-            getGlobalServiceContext()->getOpObserver()->onConvertToCapped(
-                    txn,
-                    NamespaceString(collectionName),
-                    size);
-
+            toCollection->insertDocument(txn, objToClone.value(), true, txn->writesAreReplicated());
             wunit.commit();
+
+            // Go to the next document
+            retries = 0;
+        } catch (const WriteConflictException& wce) {
+            CurOp::get(txn)->debug().writeConflicts++;
+            retries++;  // logAndBackoff expects this to be 1 on first call.
+            wce.logAndBackoff(retries, "cloneCollectionAsCapped", fromNs);
+
+            // Can't use WRITE_CONFLICT_RETRY_LOOP macros since we need to save/restore exec
+            // around call to abandonSnapshot.
+            exec->saveState();
+            txn->recoveryUnit()->abandonSnapshot();
+            exec->restoreState(txn);  // Handles any WCEs internally.
         }
-        return Status::OK();
     }
 
-} // namespace mongo
+    invariant(false);  // unreachable
+}
+
+Status convertToCapped(OperationContext* txn, const NamespaceString& collectionName, double size) {
+    StringData dbname = collectionName.db();
+    StringData shortSource = collectionName.coll();
+
+    ScopedTransaction transaction(txn, MODE_IX);
+    AutoGetDb autoDb(txn, collectionName.db(), MODE_X);
+
+    bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionName);
+
+    if (userInitiatedWritesAndNotPrimary) {
+        return Status(ErrorCodes::NotMaster,
+                      str::stream() << "Not primary while converting " << collectionName.ns()
+                                    << " to a capped collection");
+    }
+
+    Database* const db = autoDb.getDb();
+    if (!db) {
+        return Status(ErrorCodes::DatabaseNotFound,
+                      str::stream() << "database " << dbname << " not found");
+    }
+
+    BackgroundOperation::assertNoBgOpInProgForDb(dbname);
+
+    std::string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
+    std::string longTmpName = str::stream() << dbname << "." << shortTmpName;
+
+    if (db->getCollection(longTmpName)) {
+        WriteUnitOfWork wunit(txn);
+        Status status = db->dropCollection(txn, longTmpName);
+        if (!status.isOK())
+            return status;
+    }
+
+
+    const bool shouldReplicateWrites = txn->writesAreReplicated();
+    txn->setReplicatedWrites(false);
+    ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
+    Status status =
+        cloneCollectionAsCapped(txn, db, shortSource.toString(), shortTmpName, size, true);
+
+    if (!status.isOK()) {
+        return status;
+    }
+
+    verify(db->getCollection(longTmpName));
+
+    {
+        WriteUnitOfWork wunit(txn);
+        status = db->dropCollection(txn, collectionName.ns());
+        txn->setReplicatedWrites(shouldReplicateWrites);
+        if (!status.isOK())
+            return status;
+
+        status = db->renameCollection(txn, longTmpName, collectionName.ns(), false);
+        if (!status.isOK())
+            return status;
+
+        getGlobalServiceContext()->getOpObserver()->onConvertToCapped(
+            txn, NamespaceString(collectionName), size);
+
+        wunit.commit();
+    }
+    return Status::OK();
+}
+
+}  // namespace mongo

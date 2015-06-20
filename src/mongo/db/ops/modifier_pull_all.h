@@ -38,50 +38,44 @@
 
 namespace mongo {
 
-    class LogBuilder;
+class LogBuilder;
 
-    class ModifierPullAll : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(ModifierPullAll);
+class ModifierPullAll : public ModifierInterface {
+    MONGO_DISALLOW_COPYING(ModifierPullAll);
 
-    public:
+public:
+    ModifierPullAll();
+    virtual ~ModifierPullAll();
 
-        ModifierPullAll();
-        virtual ~ModifierPullAll();
+    /**
+     * The modifier $pullAll takes an array of values to match literally, and remove
+     *
+     * Ex. {$pullAll : {<field> : [<values>]}}
+     * {$pullAll :{ array : [1,2] } } will transform {array: [1,2,3]} -> {array: [3]}
+     */
+    virtual Status init(const BSONElement& modExpr, const Options& opts, bool* positional = NULL);
 
-        /**
-         * The modifier $pullAll takes an array of values to match literally, and remove
-         *
-         * Ex. {$pullAll : {<field> : [<values>]}}
-         * {$pullAll :{ array : [1,2] } } will transform {array: [1,2,3]} -> {array: [3]}
-         */
-        virtual Status init(const BSONElement& modExpr, const Options& opts,
-                            bool* positional = NULL);
-
-        virtual Status prepare(mutablebson::Element root,
-                               StringData matchedField,
-                               ExecInfo* execInfo);
+    virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
 
-        virtual Status apply() const;
+    virtual Status apply() const;
 
-        virtual Status log(LogBuilder* logBuilder) const;
+    virtual Status log(LogBuilder* logBuilder) const;
 
-    private:
+private:
+    // Access to each component of fieldName that's the target of this mod.
+    FieldRef _fieldRef;
 
-        // Access to each component of fieldName that's the target of this mod.
-        FieldRef _fieldRef;
+    // 0 or index for $-positional in _fieldRef.
+    size_t _positionalPathIndex;
 
-        // 0 or index for $-positional in _fieldRef.
-        size_t _positionalPathIndex;
+    // The instance of the field in the provided doc.
+    // This data is valid after prepare, for use by log and apply
+    struct PreparedState;
+    std::unique_ptr<PreparedState> _preparedState;
 
-        // The instance of the field in the provided doc.
-        // This data is valid after prepare, for use by log and apply
-        struct PreparedState;
-        std::unique_ptr<PreparedState> _preparedState;
+    // User specified elements to remove
+    std::vector<BSONElement> _elementsToFind;
+};
 
-        // User specified elements to remove
-        std::vector<BSONElement> _elementsToFind;
-
-    };
-
-} // namespace mongo
+}  // namespace mongo

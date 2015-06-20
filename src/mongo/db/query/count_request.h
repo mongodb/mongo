@@ -36,59 +36,72 @@
 namespace mongo {
 
 
-    template<typename T> class StatusWith;
+template <typename T>
+class StatusWith;
+
+/**
+ * A description of a request for a count operation. Copyable.
+ */
+class CountRequest {
+public:
+    /**
+     * Construct an empty request.
+     */
+    CountRequest(const std::string& fullNs, BSONObj query);
+
+    const std::string& getNs() const {
+        return _fullNs;
+    }
+    const BSONObj getQuery() const {
+        return _query;
+    }
+
+    long long getLimit() const {
+        return _limit.value_or(0);
+    }
+    void setLimit(long long limit) {
+        _limit = limit;
+    }
+
+    long long getSkip() const {
+        return _skip.value_or(0);
+    }
+    void setSkip(long long skip) {
+        _skip = skip;
+    }
+
+    const BSONObj getHint() const {
+        return _hint.value_or(BSONObj());
+    }
+    void setHint(BSONObj hint);
 
     /**
-     * A description of a request for a count operation. Copyable.
+     * Constructs a BSON representation of this request, which can be used for sending it in
+     * commands.
      */
-    class CountRequest {
-    public:
+    BSONObj toBSON() const;
 
-        /**
-         * Construct an empty request.
-         */
-        CountRequest(const std::string& fullNs, BSONObj query);
+    /**
+     * Construct a CountRequest from the command specification and db name.
+     */
+    static StatusWith<CountRequest> parseFromBSON(const std::string& dbname, const BSONObj& cmdObj);
 
-        const std::string& getNs() const { return _fullNs; }
-        const BSONObj getQuery() const { return _query; }
+private:
+    // Namespace to operate on (e.g. "foo.bar").
+    const std::string _fullNs;
 
-        long long getLimit() const { return _limit.value_or(0); }
-        void setLimit(long long limit) { _limit = limit; }
+    // A predicate describing the set of documents to count.
+    const BSONObj _query;
 
-        long long getSkip() const { return _skip.value_or(0); }
-        void setSkip(long long skip) { _skip = skip; }
+    // Optional. An integer limiting the number of documents to count.
+    boost::optional<long long> _limit;
 
-        const BSONObj getHint() const { return _hint.value_or(BSONObj()); }
-        void setHint(BSONObj hint);
+    // Optional. An integer indicating to not include the first n documents in the count.
+    boost::optional<long long> _skip;
 
-        /**
-         * Constructs a BSON representation of this request, which can be used for sending it in
-         * commands.
-         */
-        BSONObj toBSON() const;
+    // Optional. Indicates to the query planner that it should generate a count plan using a
+    // particular index.
+    boost::optional<BSONObj> _hint;
+};
 
-        /**
-         * Construct a CountRequest from the command specification and db name.
-         */
-        static StatusWith<CountRequest> parseFromBSON(const std::string& dbname,
-                                                      const BSONObj& cmdObj);
-
-    private:
-        // Namespace to operate on (e.g. "foo.bar").
-        const std::string _fullNs;
-
-        // A predicate describing the set of documents to count.
-        const BSONObj _query;
-
-        // Optional. An integer limiting the number of documents to count.
-        boost::optional<long long> _limit;
-
-        // Optional. An integer indicating to not include the first n documents in the count.
-        boost::optional<long long> _skip;
-
-        // Optional. Indicates to the query planner that it should generate a count plan using a
-        // particular index.
-        boost::optional<BSONObj> _hint;
-    };
-
-} // namespace mongo
+}  // namespace mongo

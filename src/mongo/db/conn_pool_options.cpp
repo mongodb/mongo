@@ -38,41 +38,39 @@
 
 namespace mongo {
 
-    int ConnPoolOptions::maxConnsPerHost(200);
-    int ConnPoolOptions::maxShardedConnsPerHost(200);
+int ConnPoolOptions::maxConnsPerHost(200);
+int ConnPoolOptions::maxShardedConnsPerHost(200);
 
-    namespace {
+namespace {
 
-        ExportedServerParameter<int> //
-        maxConnsPerHostParameter(ServerParameterSet::getGlobal(),
-                                 "connPoolMaxConnsPerHost",
-                                 &ConnPoolOptions::maxConnsPerHost,
-                                 true,
-                                 false /* can't change at runtime */);
+ExportedServerParameter<int>  //
+    maxConnsPerHostParameter(ServerParameterSet::getGlobal(),
+                             "connPoolMaxConnsPerHost",
+                             &ConnPoolOptions::maxConnsPerHost,
+                             true,
+                             false /* can't change at runtime */);
 
-        ExportedServerParameter<int> //
-        maxShardedConnsPerHostParameter(ServerParameterSet::getGlobal(),
-                                        "connPoolMaxShardedConnsPerHost",
-                                        &ConnPoolOptions::maxShardedConnsPerHost,
-                                        true,
-                                        false /* can't change at runtime */);
+ExportedServerParameter<int>  //
+    maxShardedConnsPerHostParameter(ServerParameterSet::getGlobal(),
+                                    "connPoolMaxShardedConnsPerHost",
+                                    &ConnPoolOptions::maxShardedConnsPerHost,
+                                    true,
+                                    false /* can't change at runtime */);
 
-        MONGO_INITIALIZER(InitializeConnectionPools)(InitializerContext* context) {
+MONGO_INITIALIZER(InitializeConnectionPools)(InitializerContext* context) {
+    // Initialize the sharded and unsharded outgoing connection pools
+    // NOTES:
+    // - All mongods and mongoses have both pools
+    // - The connection hooks for sharding are added on startup (mongos) or on first sharded
+    //   operation (mongod)
 
-            // Initialize the sharded and unsharded outgoing connection pools
-            // NOTES:
-            // - All mongods and mongoses have both pools
-            // - The connection hooks for sharding are added on startup (mongos) or on first sharded
-            //   operation (mongod)
+    globalConnPool.setName("connection pool");
+    globalConnPool.setMaxPoolSize(ConnPoolOptions::maxConnsPerHost);
 
-            globalConnPool.setName("connection pool");
-            globalConnPool.setMaxPoolSize(ConnPoolOptions::maxConnsPerHost);
+    shardConnectionPool.setName("sharded connection pool");
+    shardConnectionPool.setMaxPoolSize(ConnPoolOptions::maxShardedConnsPerHost);
 
-            shardConnectionPool.setName("sharded connection pool");
-            shardConnectionPool.setMaxPoolSize(ConnPoolOptions::maxShardedConnsPerHost);
-
-            return Status::OK();
-        }
-    }
-
+    return Status::OK();
+}
+}
 }

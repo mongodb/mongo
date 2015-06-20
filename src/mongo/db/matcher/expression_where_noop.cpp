@@ -35,104 +35,102 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::string;
+using std::unique_ptr;
+using std::string;
 
-    /**
-     * Bogus no-op $where match expression to parse $where in mongos,
-     * since mongos doesn't have script engine to compile JS functions.
-     *
-     * Linked into mongos, instead of the real WhereMatchExpression.
-     */
-    class WhereNoOpMatchExpression : public MatchExpression {
-    public:
-        WhereNoOpMatchExpression() : MatchExpression( WHERE ){ }
-        virtual ~WhereNoOpMatchExpression(){}
+/**
+ * Bogus no-op $where match expression to parse $where in mongos,
+ * since mongos doesn't have script engine to compile JS functions.
+ *
+ * Linked into mongos, instead of the real WhereMatchExpression.
+ */
+class WhereNoOpMatchExpression : public MatchExpression {
+public:
+    WhereNoOpMatchExpression() : MatchExpression(WHERE) {}
+    virtual ~WhereNoOpMatchExpression() {}
 
-        Status init( StringData theCode );
+    Status init(StringData theCode);
 
-        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const {
-            return false;
+    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const {
+        return false;
+    }
+
+    virtual bool matchesSingleElement(const BSONElement& e) const {
+        return false;
+    }
+
+    virtual MatchExpression* shallowClone() const {
+        WhereNoOpMatchExpression* e = new WhereNoOpMatchExpression();
+        e->init(_code);
+        if (getTag()) {
+            e->setTag(getTag()->clone());
         }
-
-        virtual bool matchesSingleElement( const BSONElement& e ) const {
-            return false;
-        }
-
-        virtual MatchExpression* shallowClone() const {
-            WhereNoOpMatchExpression* e = new WhereNoOpMatchExpression();
-            e->init(_code);
-            if ( getTag() ) {
-                e->setTag(getTag()->clone());
-            }
-            return e;
-        }
-
-        virtual void debugString( StringBuilder& debug, int level = 0 ) const;
-
-        virtual void toBSON(BSONObjBuilder* out) const;
-
-        virtual bool equivalent( const MatchExpression* other ) const ;
-
-        virtual void resetTag() { setTag(NULL); }
-
-    private:
-        string _code;
-    };
-
-    Status WhereNoOpMatchExpression::init(StringData theCode ) {
-        if ( theCode.size() == 0 )
-            return Status( ErrorCodes::BadValue, "code for $where cannot be empty" );
-
-        _code = theCode.toString();
-
-        return Status::OK();
+        return e;
     }
 
-    void WhereNoOpMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << "$where (only in mongos)\n";
+    virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-        _debugAddSpace( debug, level + 1 );
-        debug << "code: " << _code << "\n";
+    virtual void toBSON(BSONObjBuilder* out) const;
+
+    virtual bool equivalent(const MatchExpression* other) const;
+
+    virtual void resetTag() {
+        setTag(NULL);
     }
 
-    void WhereNoOpMatchExpression::toBSON(BSONObjBuilder* out) const {
-        out->append("$where", _code);
+private:
+    string _code;
+};
+
+Status WhereNoOpMatchExpression::init(StringData theCode) {
+    if (theCode.size() == 0)
+        return Status(ErrorCodes::BadValue, "code for $where cannot be empty");
+
+    _code = theCode.toString();
+
+    return Status::OK();
+}
+
+void WhereNoOpMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << "$where (only in mongos)\n";
+
+    _debugAddSpace(debug, level + 1);
+    debug << "code: " << _code << "\n";
+}
+
+void WhereNoOpMatchExpression::toBSON(BSONObjBuilder* out) const {
+    out->append("$where", _code);
+}
+
+bool WhereNoOpMatchExpression::equivalent(const MatchExpression* other) const {
+    if (matchType() != other->matchType())
+        return false;
+    const WhereNoOpMatchExpression* noopOther = static_cast<const WhereNoOpMatchExpression*>(other);
+    return _code == noopOther->_code;
+}
+
+
+// -----------------
+
+WhereCallbackNoop::WhereCallbackNoop() {}
+
+StatusWithMatchExpression WhereCallbackNoop::parseWhere(const BSONElement& where) const {
+    unique_ptr<WhereNoOpMatchExpression> exp(new WhereNoOpMatchExpression());
+    if (where.type() == String || where.type() == Code) {
+        Status s = exp->init(where.valuestr());
+        if (!s.isOK())
+            return StatusWithMatchExpression(s);
+        return StatusWithMatchExpression(exp.release());
     }
 
-    bool WhereNoOpMatchExpression::equivalent( const MatchExpression* other ) const {
-        if ( matchType() != other->matchType() )
-            return false;
-        const WhereNoOpMatchExpression* noopOther = static_cast<const WhereNoOpMatchExpression*>(other);
-        return _code == noopOther->_code;
+    if (where.type() == CodeWScope) {
+        Status s = exp->init(where.codeWScopeCode());
+        if (!s.isOK())
+            return StatusWithMatchExpression(s);
+        return StatusWithMatchExpression(exp.release());
     }
 
-
-    // -----------------
-
-    WhereCallbackNoop::WhereCallbackNoop() {
-
-    }
-
-    StatusWithMatchExpression WhereCallbackNoop::parseWhere(const BSONElement& where) const {
-
-
-        unique_ptr<WhereNoOpMatchExpression> exp( new WhereNoOpMatchExpression() );
-        if ( where.type() == String || where.type() == Code ) {
-            Status s = exp->init( where.valuestr() );
-            if ( !s.isOK() )
-                return StatusWithMatchExpression( s );
-            return StatusWithMatchExpression( exp.release() );
-        }
-
-        if ( where.type() == CodeWScope ) {
-            Status s = exp->init( where.codeWScopeCode() );
-            if ( !s.isOK() )
-                return StatusWithMatchExpression( s );
-            return StatusWithMatchExpression( exp.release() );
-        }
-
-        return StatusWithMatchExpression( ErrorCodes::BadValue, "$where got bad type" );
-    }
+    return StatusWithMatchExpression(ErrorCodes::BadValue, "$where got bad type");
+}
 }

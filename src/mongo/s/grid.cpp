@@ -41,87 +41,83 @@
 
 namespace mongo {
 
-    Grid::Grid() : _allowLocalShard(true) {
+Grid::Grid() : _allowLocalShard(true) {}
 
-    }
+void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
+                std::unique_ptr<ShardRegistry> shardRegistry) {
+    invariant(!_catalogManager);
+    invariant(!_catalogCache);
+    invariant(!_shardRegistry);
 
-    void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
-                    std::unique_ptr<ShardRegistry> shardRegistry) {
+    _catalogManager = std::move(catalogManager);
+    _catalogCache = stdx::make_unique<CatalogCache>(_catalogManager.get());
+    _shardRegistry = std::move(shardRegistry);
+}
 
-        invariant(!_catalogManager);
-        invariant(!_catalogCache);
-        invariant(!_shardRegistry);
-
-        _catalogManager = std::move(catalogManager);
-        _catalogCache = stdx::make_unique<CatalogCache>(_catalogManager.get());
-        _shardRegistry = std::move(shardRegistry);
-    }
-
-    StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {
-        auto status = catalogCache()->getDatabase(dbName);
-        if (status.isOK()) {
-            return status;
-        }
-
-        if (status == ErrorCodes::DatabaseNotFound) {
-            auto statusCreateDb = catalogManager()->createDatabase(dbName);
-            if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
-                return catalogCache()->getDatabase(dbName);
-            }
-
-            return statusCreateDb;
-        }
-
+StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {
+    auto status = catalogCache()->getDatabase(dbName);
+    if (status.isOK()) {
         return status;
     }
 
-    bool Grid::allowLocalHost() const {
-        return _allowLocalShard;
-    }
-
-    void Grid::setAllowLocalHost( bool allow ) {
-        _allowLocalShard = allow;
-    }
-
-    /*
-     * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a particular
-     * collection.
-     */
-    bool Grid::shouldBalance(const SettingsType& balancerSettings) const {
-        if (balancerSettings.isBalancerStoppedSet() && balancerSettings.getBalancerStopped()) {
-            return false;
+    if (status == ErrorCodes::DatabaseNotFound) {
+        auto statusCreateDb = catalogManager()->createDatabase(dbName);
+        if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
+            return catalogCache()->getDatabase(dbName);
         }
 
-        if (balancerSettings.isBalancerActiveWindowSet()) {
-            boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-            return balancerSettings.inBalancingWindow(now);
-        }
+        return statusCreateDb;
+    }
 
+    return status;
+}
+
+bool Grid::allowLocalHost() const {
+    return _allowLocalShard;
+}
+
+void Grid::setAllowLocalHost(bool allow) {
+    _allowLocalShard = allow;
+}
+
+/*
+ * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a particular
+ * collection.
+ */
+bool Grid::shouldBalance(const SettingsType& balancerSettings) const {
+    if (balancerSettings.isBalancerStoppedSet() && balancerSettings.getBalancerStopped()) {
+        return false;
+    }
+
+    if (balancerSettings.isBalancerActiveWindowSet()) {
+        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+        return balancerSettings.inBalancingWindow(now);
+    }
+
+    return true;
+}
+
+bool Grid::getConfigShouldBalance() const {
+    auto balSettingsResult = grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
+    if (!balSettingsResult.isOK()) {
+        warning() << balSettingsResult.getStatus();
+        return false;
+    }
+    SettingsType balSettings = balSettingsResult.getValue();
+
+    if (!balSettings.isKeySet()) {
+        // Balancer settings doc does not exist. Default to yes.
         return true;
     }
 
-    bool Grid::getConfigShouldBalance() const {
-        auto balSettingsResult =
-            grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
-        if (!balSettingsResult.isOK()) {
-            warning() << balSettingsResult.getStatus();
-            return false;
-        }
-        SettingsType balSettings = balSettingsResult.getValue();
+    return shouldBalance(balSettings);
+}
 
-        if (!balSettings.isKeySet()) {
-            // Balancer settings doc does not exist. Default to yes.
-            return true;
-        }
+void Grid::clearForUnitTests() {
+    _catalogManager.reset();
+    _catalogCache.reset();
+    _shardRegistry.reset();
+}
 
-        return shouldBalance(balSettings);
-    }
-
-    void Grid::clearForUnitTests() {
-        _catalogManager.reset();
-        _catalogCache.reset();
-        _shardRegistry.reset();
-    }
-
-    Grid grid;
+Grid grid;
 }

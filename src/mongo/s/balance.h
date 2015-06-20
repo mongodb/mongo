@@ -35,85 +35,86 @@
 
 namespace mongo {
 
-    class BalancerPolicy;
-    struct MigrateInfo;
-    struct WriteConcernOptions;
+class BalancerPolicy;
+struct MigrateInfo;
+struct WriteConcernOptions;
+
+/**
+ * The balancer is a background task that tries to keep the number of chunks across all
+ * servers of the cluster even. Although every mongos will have one balancer running, only one
+ * of them will be active at the any given point in time. The balancer uses a distributed lock
+ * for that coordination.
+ *
+ * The balancer does act continuously but in "rounds". At a given round, it would decide if
+ * there is an imbalance by checking the difference in chunks between the most and least
+ * loaded shards. It would issue a request for a chunk migration per round, if it found so.
+ */
+class Balancer : public BackgroundJob {
+public:
+    Balancer();
+    virtual ~Balancer();
+
+    // BackgroundJob methods
+
+    virtual void run();
+
+    virtual std::string name() const {
+        return "Balancer";
+    }
+
+private:
+    // hostname:port of my mongos
+    std::string _myid;
+
+    // time the Balancer started running
+    time_t _started;
+
+    // number of moved chunks in last round
+    int _balancedLastTime;
+
+    // decide which chunks to move; owned here.
+    std::unique_ptr<BalancerPolicy> _policy;
 
     /**
-     * The balancer is a background task that tries to keep the number of chunks across all
-     * servers of the cluster even. Although every mongos will have one balancer running, only one
-     * of them will be active at the any given point in time. The balancer uses a distributed lock
-     * for that coordination.
+     * Checks that the balancer can connect to all servers it needs to do its job.
      *
-     * The balancer does act continuously but in "rounds". At a given round, it would decide if
-     * there is an imbalance by checking the difference in chunks between the most and least
-     * loaded shards. It would issue a request for a chunk migration per round, if it found so.
+     * @return true if balancing can be started
+     *
+     * This method throws on a network exception
      */
-    class Balancer : public BackgroundJob {
-    public:
-        Balancer();
-        virtual ~Balancer();
+    bool _init();
 
-        // BackgroundJob methods
+    /**
+     * Gathers all the necessary information about shards and chunks, and decides whether there are candidate chunks to
+     * be moved.
+     *
+     * @param conn is the connection with the config server(s)
+     * @param candidateChunks (IN/OUT) filled with candidate chunks, one per collection, that could possibly be moved
+     */
+    void _doBalanceRound(std::vector<std::shared_ptr<MigrateInfo>>* candidateChunks);
 
-        virtual void run();
+    /**
+     * Issues chunk migration request, one at a time.
+     *
+     * @param candidateChunks possible chunks to move
+     * @param writeConcern detailed write concern. NULL means the default write concern.
+     * @param waitForDelete wait for deletes to complete after each chunk move
+     * @return number of chunks effectively moved
+     */
+    int _moveChunks(const std::vector<std::shared_ptr<MigrateInfo>>& candidateChunks,
+                    const WriteConcernOptions* writeConcern,
+                    bool waitForDelete);
 
-        virtual std::string name() const { return "Balancer"; }
+    /**
+     * Marks this balancer as being live on the config server(s).
+     */
+    void _ping(bool waiting = false);
 
-    private:
-        // hostname:port of my mongos
-        std::string _myid;
+    /**
+     * @return true if all the servers listed in configdb as being shards are reachable and are distinct processes
+     */
+    bool _checkOIDs();
+};
 
-        // time the Balancer started running
-        time_t _started;
-
-        // number of moved chunks in last round
-        int _balancedLastTime;
-
-        // decide which chunks to move; owned here.
-        std::unique_ptr<BalancerPolicy> _policy;
-        
-        /**
-         * Checks that the balancer can connect to all servers it needs to do its job.
-         *
-         * @return true if balancing can be started
-         *
-         * This method throws on a network exception
-         */
-        bool _init();
-
-        /**
-         * Gathers all the necessary information about shards and chunks, and decides whether there are candidate chunks to
-         * be moved.
-         *
-         * @param conn is the connection with the config server(s)
-         * @param candidateChunks (IN/OUT) filled with candidate chunks, one per collection, that could possibly be moved
-         */
-        void _doBalanceRound(std::vector<std::shared_ptr<MigrateInfo>>* candidateChunks);
-
-        /**
-         * Issues chunk migration request, one at a time.
-         *
-         * @param candidateChunks possible chunks to move
-         * @param writeConcern detailed write concern. NULL means the default write concern.
-         * @param waitForDelete wait for deletes to complete after each chunk move
-         * @return number of chunks effectively moved
-         */
-        int _moveChunks(const std::vector<std::shared_ptr<MigrateInfo>>& candidateChunks,
-                        const WriteConcernOptions* writeConcern,
-                        bool waitForDelete);
-
-        /**
-         * Marks this balancer as being live on the config server(s).
-         */
-        void _ping( bool waiting = false );
-
-        /**
-         * @return true if all the servers listed in configdb as being shards are reachable and are distinct processes
-         */
-        bool _checkOIDs();
-
-    };
-
-    extern Balancer balancer;
+extern Balancer balancer;
 }

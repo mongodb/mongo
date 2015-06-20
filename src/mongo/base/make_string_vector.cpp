@@ -33,15 +33,15 @@
 
 namespace mongo {
 
-    std::vector<std::string> _makeStringVector(int ignored, ...) {
-        va_list ap;
-        va_start(ap, ignored);
-        std::vector<std::string> result;
-        const char* arg = NULL;
-        while ((arg = va_arg(ap, const char *)))
-            result.push_back(arg);
-        va_end(ap);
-        return result;
-    }
+std::vector<std::string> _makeStringVector(int ignored, ...) {
+    va_list ap;
+    va_start(ap, ignored);
+    std::vector<std::string> result;
+    const char* arg = NULL;
+    while ((arg = va_arg(ap, const char*)))
+        result.push_back(arg);
+    va_end(ap);
+    return result;
+}
 
 }  // namespace mongo

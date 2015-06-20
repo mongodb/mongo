@@ -37,49 +37,49 @@
 
 namespace mongo {
 
-    namespace task {
+namespace task {
 
-        Task::Task()
-            : BackgroundJob( true /* deleteSelf */ ) {
-            n = 0;
-            repeat = 0;
+Task::Task() : BackgroundJob(true /* deleteSelf */) {
+    n = 0;
+    repeat = 0;
+}
+
+void Task::halt() {
+    repeat = 0;
+}
+
+void Task::setUp() {}
+
+void Task::run() {
+    verify(n == 0);
+
+    setUp();
+
+    while (1) {
+        n++;
+        try {
+            doWork();
+        } catch (...) {
         }
-
-        void Task::halt() { repeat = 0; }
-
-        void Task::setUp() {}
-
-        void Task::run() {
-            verify( n == 0 );
-
-            setUp();
-
-            while( 1 ) {
-                n++;
-                try {
-                    doWork();
-                }
-                catch(...) { }
-                sleepmillis(repeat);
-                if( inShutdown() )
-                    break;
-                if( repeat == 0 )
-                    break;
-            }
-        }
-
-        void Task::begin() {
-            go();
-        }
-
-        void fork(Task *t) {
-            t->begin();
-        }
-
-        void repeat(Task *t, unsigned millis) {
-            t->repeat = millis;
-            t->begin();
-        }
-
+        sleepmillis(repeat);
+        if (inShutdown())
+            break;
+        if (repeat == 0)
+            break;
     }
+}
+
+void Task::begin() {
+    go();
+}
+
+void fork(Task* t) {
+    t->begin();
+}
+
+void repeat(Task* t, unsigned millis) {
+    t->repeat = millis;
+    t->begin();
+}
+}
 }

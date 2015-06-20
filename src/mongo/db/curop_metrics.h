@@ -30,8 +30,8 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
-    void recordCurOpMetrics(OperationContext* opCtx);
+void recordCurOpMetrics(OperationContext* opCtx);
 
 }  // namespace mongo

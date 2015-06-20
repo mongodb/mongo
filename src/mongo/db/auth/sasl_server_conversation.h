@@ -37,52 +37,53 @@
 #include "mongo/db/auth/user.h"
 
 namespace mongo {
-    
-    class SaslAuthenticationSession;
-    template <typename T> class StatusWith;
-    
+
+class SaslAuthenticationSession;
+template <typename T>
+class StatusWith;
+
+/**
+ * Abstract class for implementing the server-side
+ * of a SASL mechanism conversation.
+ */
+class SaslServerConversation {
+    MONGO_DISALLOW_COPYING(SaslServerConversation);
+
+public:
     /**
-     * Abstract class for implementing the server-side
-     * of a SASL mechanism conversation.
+     * Implements the server side of a SASL authentication mechanism.
+     *
+     * "saslAuthSession" is the corresponding SASLAuthenticationSession.
+     * "saslAuthSession" must stay in scope until the SaslServerConversation's
+     *  destructor completes.
+     *
+     **/
+    explicit SaslServerConversation(SaslAuthenticationSession* saslAuthSession)
+        : _saslAuthSession(saslAuthSession), _user("") {}
+
+    virtual ~SaslServerConversation();
+
+    /**
+     * Performs one step of the server side of the authentication session,
+     * consuming "inputData" and producing "*outputData".
+     *
+     * A return of Status::OK() indicates successful progress towards authentication.
+     * A return of !Status::OK() indicates failed authentication
+     *
+     * A return of true means that the authentication process has finished.
+     * A return of false means that the authentication process has more steps.
+     *
      */
-    class SaslServerConversation {
-        MONGO_DISALLOW_COPYING(SaslServerConversation);
-    public:
-        /**
-         * Implements the server side of a SASL authentication mechanism.
-         *
-         * "saslAuthSession" is the corresponding SASLAuthenticationSession.
-         * "saslAuthSession" must stay in scope until the SaslServerConversation's 
-         *  destructor completes.
-         * 
-         **/
-        explicit SaslServerConversation(SaslAuthenticationSession* saslAuthSession) :
-            _saslAuthSession(saslAuthSession),
-            _user("") {}
+    virtual StatusWith<bool> step(StringData inputData, std::string* outputData) = 0;
 
-        virtual ~SaslServerConversation();
+    /**
+     * Gets the SASL principal id (user name) for the conversation
+     **/
+    std::string getPrincipalId();
 
-        /**
-         * Performs one step of the server side of the authentication session,
-         * consuming "inputData" and producing "*outputData".
-         *
-         * A return of Status::OK() indicates successful progress towards authentication. 
-         * A return of !Status::OK() indicates failed authentication
-         *
-         * A return of true means that the authentication process has finished.
-         * A return of false means that the authentication process has more steps.
-         *
-         */
-        virtual StatusWith<bool> step(StringData inputData, std::string* outputData) = 0;
-
-        /**
-         * Gets the SASL principal id (user name) for the conversation
-         **/
-        std::string getPrincipalId();
-    
-    protected:
-        SaslAuthenticationSession* _saslAuthSession;
-        std::string _user;
-    };
+protected:
+    SaslAuthenticationSession* _saslAuthSession;
+    std::string _user;
+};
 
 }  // namespace mongo

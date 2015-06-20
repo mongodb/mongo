@@ -44,359 +44,345 @@ using std::stringstream;
 
 namespace mongo {
 
-    // Insert multiple records and iterate through them in the forward direction.
-    // When curr() or getNext() is called on an iterator positioned at EOF,
-    // the iterator returns RecordId() and stays at EOF.
-    TEST( RecordStoreTestHarness, IterateOverMultipleRecords ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Insert multiple records and iterate through them in the forward direction.
+// When curr() or getNext() is called on an iterator positioned at EOF,
+// the iterator returns RecordId() and stays at EOF.
+TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    const int nToInsert = 10;
+    RecordId locs[nToInsert];
+    std::string datas[nToInsert];
+    for (int i = 0; i < nToInsert; i++) {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
+            stringstream ss;
+            ss << "record " << i;
+            string data = ss.str();
 
-        const int nToInsert = 10;
-        RecordId locs[nToInsert];
-        std::string datas[nToInsert];
-        for ( int i = 0; i < nToInsert; i++ ) {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                stringstream ss;
-                ss << "record " << i;
-                string data = ss.str();
-
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                locs[i] = res.getValue();
-                datas[i] = data;
-                uow.commit();
-            }
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
-        }
-
-        std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            auto cursor = rs->getCursor(opCtx.get());
-            for ( int i = 0; i < nToInsert; i++ ) {
-                const auto record = cursor->next();
-                ASSERT(record);
-                ASSERT_EQUALS( locs[i], record->id );
-                ASSERT_EQUALS( datas[i], record->data.data() );
-            }
-            ASSERT(!cursor->next());
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            locs[i] = res.getValue();
+            datas[i] = data;
+            uow.commit();
         }
     }
 
-    // Insert multiple records and iterate through them in the reverse direction.
-    // When curr() or getNext() is called on an iterator positioned at EOF,
-    // the iterator returns RecordId() and stays at EOF.
-    TEST( RecordStoreTestHarness, IterateOverMultipleRecordsReversed ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+    std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        auto cursor = rs->getCursor(opCtx.get());
+        for (int i = 0; i < nToInsert; i++) {
+            const auto record = cursor->next();
+            ASSERT(record);
+            ASSERT_EQUALS(locs[i], record->id);
+            ASSERT_EQUALS(datas[i], record->data.data());
         }
+        ASSERT(!cursor->next());
+    }
+}
 
-        const int nToInsert = 10;
-        RecordId locs[nToInsert];
-        std::string datas[nToInsert];
-        for ( int i = 0; i < nToInsert; i++ ) {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                stringstream ss;
-                ss << "record " << i;
-                string data = ss.str();
+// Insert multiple records and iterate through them in the reverse direction.
+// When curr() or getNext() is called on an iterator positioned at EOF,
+// the iterator returns RecordId() and stays at EOF.
+TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                locs[i] = res.getValue();
-                datas[i] = data;
-                uow.commit();
-            }
-        }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
 
+    const int nToInsert = 10;
+    RecordId locs[nToInsert];
+    std::string datas[nToInsert];
+    for (int i = 0; i < nToInsert; i++) {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
-        }
+            stringstream ss;
+            ss << "record " << i;
+            string data = ss.str();
 
-        std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-
-            auto cursor = rs->getCursor(opCtx.get(), false);
-            for ( int i = nToInsert - 1; i >= 0; i-- ) {
-                const auto record = cursor->next();
-                ASSERT(record);
-                ASSERT_EQUALS( locs[i], record->id );
-                ASSERT_EQUALS( datas[i], record->data.data() );
-            }
-            ASSERT(!cursor->next());
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            locs[i] = res.getValue();
+            datas[i] = data;
+            uow.commit();
         }
     }
 
-    // Insert multiple records and try to create a forward iterator
-    // starting at an interior position.
-    TEST( RecordStoreTestHarness, IterateStartFromMiddle ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+    std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+
+        auto cursor = rs->getCursor(opCtx.get(), false);
+        for (int i = nToInsert - 1; i >= 0; i--) {
+            const auto record = cursor->next();
+            ASSERT(record);
+            ASSERT_EQUALS(locs[i], record->id);
+            ASSERT_EQUALS(datas[i], record->data.data());
         }
+        ASSERT(!cursor->next());
+    }
+}
 
-        const int nToInsert = 10;
-        RecordId locs[nToInsert];
-        std::string datas[nToInsert];
-        for ( int i = 0; i < nToInsert; i++ ) {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                stringstream ss;
-                ss << "record " << i;
-                string data = ss.str();
+// Insert multiple records and try to create a forward iterator
+// starting at an interior position.
+TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                locs[i] = res.getValue();
-                datas[i] = data;
-                uow.commit();
-            }
-        }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
 
+    const int nToInsert = 10;
+    RecordId locs[nToInsert];
+    std::string datas[nToInsert];
+    for (int i = 0; i < nToInsert; i++) {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
-        }
+            stringstream ss;
+            ss << "record " << i;
+            string data = ss.str();
 
-        std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-
-            int start = nToInsert / 2;
-            auto cursor = rs->getCursor(opCtx.get());
-            for ( int i = start; i < nToInsert; i++ ) {
-                const auto record = (i == start) ? cursor->seekExact(locs[i]) : cursor->next();
-                ASSERT(record);
-                ASSERT_EQUALS( locs[i], record->id );
-                ASSERT_EQUALS( datas[i], record->data.data() );
-            }
-            ASSERT(!cursor->next());
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            locs[i] = res.getValue();
+            datas[i] = data;
+            uow.commit();
         }
     }
 
-    // Insert multiple records and try to create a reverse iterator
-    // starting at an interior position.
-    TEST( RecordStoreTestHarness, IterateStartFromMiddleReversed ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+    std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+
+        int start = nToInsert / 2;
+        auto cursor = rs->getCursor(opCtx.get());
+        for (int i = start; i < nToInsert; i++) {
+            const auto record = (i == start) ? cursor->seekExact(locs[i]) : cursor->next();
+            ASSERT(record);
+            ASSERT_EQUALS(locs[i], record->id);
+            ASSERT_EQUALS(datas[i], record->data.data());
         }
+        ASSERT(!cursor->next());
+    }
+}
 
-        const int nToInsert = 10;
-        RecordId locs[nToInsert];
-        std::string datas[nToInsert];
-        for ( int i = 0; i < nToInsert; i++ ) {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                stringstream ss;
-                ss << "record " << i;
-                string data = ss.str();
+// Insert multiple records and try to create a reverse iterator
+// starting at an interior position.
+TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                locs[i] = res.getValue();
-                datas[i] = data;
-                uow.commit();
-            }
-        }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
 
+    const int nToInsert = 10;
+    RecordId locs[nToInsert];
+    std::string datas[nToInsert];
+    for (int i = 0; i < nToInsert; i++) {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
-        }
+            stringstream ss;
+            ss << "record " << i;
+            string data = ss.str();
 
-        std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-
-            int start = nToInsert / 2;
-            auto cursor = rs->getCursor(opCtx.get(), false);
-            for ( int i = start; i >= 0; i-- ) {
-                const auto record = (i == start) ? cursor->seekExact(locs[i]) : cursor->next();
-                ASSERT(record);
-                ASSERT_EQUALS( locs[i], record->id );
-                ASSERT_EQUALS( datas[i], record->data.data() );
-            }
-            ASSERT(!cursor->next());
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            locs[i] = res.getValue();
+            datas[i] = data;
+            uow.commit();
         }
     }
 
-    // Insert several records, and iterate to the end. Ensure that the record iterator
-    // is EOF. Add an additional record, saving and restoring the iterator state, and check
-    // that the iterator remains EOF.
-    TEST( RecordStoreTestHarness, RecordIteratorEOF ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+    std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+
+        int start = nToInsert / 2;
+        auto cursor = rs->getCursor(opCtx.get(), false);
+        for (int i = start; i >= 0; i--) {
+            const auto record = (i == start) ? cursor->seekExact(locs[i]) : cursor->next();
+            ASSERT(record);
+            ASSERT_EQUALS(locs[i], record->id);
+            ASSERT_EQUALS(datas[i], record->data.data());
         }
+        ASSERT(!cursor->next());
+    }
+}
 
-        const int nToInsert = 10;
-        RecordId locs[nToInsert];
-        std::string datas[nToInsert];
-        for ( int i = 0; i < nToInsert; i++ ) {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                StringBuilder sb;
-                sb << "record " << i;
-                string data = sb.str();
+// Insert several records, and iterate to the end. Ensure that the record iterator
+// is EOF. Add an additional record, saving and restoring the iterator state, and check
+// that the iterator remains EOF.
+TEST(RecordStoreTestHarness, RecordIteratorEOF) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                locs[i] = res.getValue();
-                datas[i] = data;
-                uow.commit();
-            }
-        }
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
 
+    const int nToInsert = 10;
+    RecordId locs[nToInsert];
+    std::string datas[nToInsert];
+    for (int i = 0; i < nToInsert; i++) {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-
-            // Get a forward iterator starting at the beginning of the record store.
-            auto cursor = rs->getCursor(opCtx.get());
-
-            // Iterate, checking EOF along the way.
-            for ( int i = 0; i < nToInsert; i++ ) {
-                const auto record = cursor->next();
-                ASSERT(record);
-                ASSERT_EQUALS( locs[i], record->id );
-                ASSERT_EQUALS( datas[i], record->data.data() );
-            }
-            ASSERT(!cursor->next());
-
-            // Add a record and ensure we're still EOF.
-            cursor->savePositioned();
-
             StringBuilder sb;
-            sb << "record " << nToInsert + 1;
+            sb << "record " << i;
             string data = sb.str();
 
-            WriteUnitOfWork uow( opCtx.get() );
-            StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                        data.c_str(),
-                                                        data.size() + 1,
-                                                        false );
-            ASSERT_OK( res.getStatus() );
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            locs[i] = res.getValue();
+            datas[i] = data;
             uow.commit();
-
-            ASSERT( cursor->restore( opCtx.get() ) );
-
-            // Iterator should still be EOF.
-            ASSERT(!cursor->next());
-            ASSERT(!cursor->next());
         }
     }
 
-    // Test calling savePositioned and restore after each call to next
-    TEST( RecordStoreTestHarness, RecordIteratorSavePositionedRestore ) {
-        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+
+        // Get a forward iterator starting at the beginning of the record store.
+        auto cursor = rs->getCursor(opCtx.get());
+
+        // Iterate, checking EOF along the way.
+        for (int i = 0; i < nToInsert; i++) {
+            const auto record = cursor->next();
+            ASSERT(record);
+            ASSERT_EQUALS(locs[i], record->id);
+            ASSERT_EQUALS(datas[i], record->data.data());
         }
+        ASSERT(!cursor->next());
 
-        const int nToInsert = 10;
-        RecordId locs[nToInsert];
-        std::string datas[nToInsert];
-        for ( int i = 0; i < nToInsert; i++ ) {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                StringBuilder sb;
-                sb << "record " << i;
-                string data = sb.str();
+        // Add a record and ensure we're still EOF.
+        cursor->savePositioned();
 
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                locs[i] = res.getValue();
-                datas[i] = data;
-                uow.commit();
-            }
-        }
+        StringBuilder sb;
+        sb << "record " << nToInsert + 1;
+        string data = sb.str();
 
+        WriteUnitOfWork uow(opCtx.get());
+        StatusWith<RecordId> res =
+            rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+        ASSERT_OK(res.getStatus());
+        uow.commit();
+
+        ASSERT(cursor->restore(opCtx.get()));
+
+        // Iterator should still be EOF.
+        ASSERT(!cursor->next());
+        ASSERT(!cursor->next());
+    }
+}
+
+// Test calling savePositioned and restore after each call to next
+TEST(RecordStoreTestHarness, RecordIteratorSavePositionedRestore) {
+    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    const int nToInsert = 10;
+    RecordId locs[nToInsert];
+    std::string datas[nToInsert];
+    for (int i = 0; i < nToInsert; i++) {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
+            StringBuilder sb;
+            sb << "record " << i;
+            string data = sb.str();
+
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            locs[i] = res.getValue();
+            datas[i] = data;
+            uow.commit();
         }
+    }
 
-        {
-            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
 
-            // Get a forward iterator starting at the beginning of the record store.
-            auto cursor = rs->getCursor(opCtx.get());
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
 
-            // Iterate, checking EOF along the way.
-            for ( int i = 0; i < nToInsert; i++ ) {
-                cursor->savePositioned();
-                cursor->savePositioned(); // It is legal to save twice in a row.
-                cursor->restore(opCtx.get());
+        // Get a forward iterator starting at the beginning of the record store.
+        auto cursor = rs->getCursor(opCtx.get());
 
-                const auto record = cursor->next();
-                ASSERT(record);
-                ASSERT_EQUALS( locs[i], record->id );
-                ASSERT_EQUALS( datas[i], record->data.data() );
-            }
-
+        // Iterate, checking EOF along the way.
+        for (int i = 0; i < nToInsert; i++) {
             cursor->savePositioned();
-            cursor->savePositioned(); // It is legal to save twice in a row.
+            cursor->savePositioned();  // It is legal to save twice in a row.
             cursor->restore(opCtx.get());
 
-            ASSERT(!cursor->next());
+            const auto record = cursor->next();
+            ASSERT(record);
+            ASSERT_EQUALS(locs[i], record->id);
+            ASSERT_EQUALS(datas[i], record->data.data());
         }
-    }
 
-} // namespace mongo
+        cursor->savePositioned();
+        cursor->savePositioned();  // It is legal to save twice in a row.
+        cursor->restore(opCtx.get());
+
+        ASSERT(!cursor->next());
+    }
+}
+
+}  // namespace mongo

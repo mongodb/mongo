@@ -45,214 +45,196 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::endl;
-    using std::string;
-    using std::vector;
+using std::unique_ptr;
+using std::endl;
+using std::string;
+using std::vector;
 
-    /**
-     * This parameter turns on fastest config reads for auth data only - *.system.users collections
-     * and the "usersInfo" command.  This should be enough to prevent a non-responsive config from
-     * hanging other operations in a cluster.
-     */
-    MONGO_EXPORT_SERVER_PARAMETER(internalSCCAllowFastestAuthConfigReads, bool, false);
+/**
+ * This parameter turns on fastest config reads for auth data only - *.system.users collections
+ * and the "usersInfo" command.  This should be enough to prevent a non-responsive config from
+ * hanging other operations in a cluster.
+ */
+MONGO_EXPORT_SERVER_PARAMETER(internalSCCAllowFastestAuthConfigReads, bool, false);
 
-    /**
-     * TESTING ONLY.
-     *
-     * This parameter turns on fastest config reads for *all* config.* collections except those
-     * deemed extremely critical (config.version, config.locks).
-     *
-     * NOT FOR PRODUCTION USE.
-     */
-    MONGO_EXPORT_SERVER_PARAMETER(internalSCCAllowFastestMetadataConfigReads, bool, false);
+/**
+ * TESTING ONLY.
+ *
+ * This parameter turns on fastest config reads for *all* config.* collections except those
+ * deemed extremely critical (config.version, config.locks).
+ *
+ * NOT FOR PRODUCTION USE.
+ */
+MONGO_EXPORT_SERVER_PARAMETER(internalSCCAllowFastestMetadataConfigReads, bool, false);
 
+//
+// The shared environment for MultiHostQueries
+//
+
+namespace {
+
+class MultiQueryEnv : public MultiHostQueryOp::SystemEnv {
+public:
+    virtual ~MultiQueryEnv() {}
+
+    Date_t currentTimeMillis();
+
+    StatusWith<DBClientCursor*> doBlockingQuery(const ConnectionString& host,
+                                                const QuerySpec& query);
+};
+
+StatusWith<DBClientCursor*> MultiQueryEnv::doBlockingQuery(const ConnectionString& host,
+                                                           const QuerySpec& query) {
     //
-    // The shared environment for MultiHostQueries
+    // Note that this function may be active during shutdown.  This means that we must
+    // handle connection pool shutdown exceptions (uasserts).  The results of this
+    // operation must then be correctly discarded by the calling thread.
     //
 
-    namespace {
+    unique_ptr<DBClientCursor> cursor;
 
-        class MultiQueryEnv : public MultiHostQueryOp::SystemEnv {
-        public:
+    try {
+        ScopedDbConnection conn(host, 30.0 /* timeout secs */);
 
-            virtual ~MultiQueryEnv() {
-            }
+        cursor = conn->query(query.ns(),
+                             query.filter(),
+                             query.ntoreturn(),
+                             query.ntoskip(),
+                             query.fieldsPtr(),
+                             query.options(),
+                             0);
 
-            Date_t currentTimeMillis();
+        if (NULL == cursor.get()) {
+            // Confusingly, exceptions here are written to the log, not thrown
 
-            StatusWith<DBClientCursor*> doBlockingQuery(const ConnectionString& host,
-                                                        const QuerySpec& query);
-        };
+            StringBuilder builder;
+            builder << "error querying server " << host.toString()
+                    << ", could not create cursor for query";
 
-        StatusWith<DBClientCursor*> MultiQueryEnv::doBlockingQuery(const ConnectionString& host,
-                                                                   const QuerySpec& query) {
-
-            //
-            // Note that this function may be active during shutdown.  This means that we must
-            // handle connection pool shutdown exceptions (uasserts).  The results of this
-            // operation must then be correctly discarded by the calling thread.
-            //
-
-            unique_ptr<DBClientCursor> cursor;
-
-            try {
-
-                ScopedDbConnection conn(host, 30.0 /* timeout secs */);
-
-                cursor = conn->query(query.ns(),
-                                     query.filter(),
-                                     query.ntoreturn(),
-                                     query.ntoskip(),
-                                     query.fieldsPtr(),
-                                     query.options(),
-                                     0);
-
-                if ( NULL == cursor.get()) {
-
-                    // Confusingly, exceptions here are written to the log, not thrown
-
-                    StringBuilder builder;
-                    builder << "error querying server " << host.toString()
-                            << ", could not create cursor for query";
-
-                    warning() << builder.str() << endl;
-                    return StatusWith<DBClientCursor*>(ErrorCodes::HostUnreachable, builder.str());
-                }
-
-                // Confusingly, this *detaches* the cursor from the connection it was established
-                // on, further getMore calls will use a (potentially different) ScopedDbConnection.
-                //
-                // Calls done() too.
-                cursor->attach(&conn);
-            }
-            catch (const DBException& ex) {
-                return StatusWith<DBClientCursor*>(ex.toStatus());
-            }
-
-            return StatusWith<DBClientCursor*>(cursor.release());
+            warning() << builder.str() << endl;
+            return StatusWith<DBClientCursor*>(ErrorCodes::HostUnreachable, builder.str());
         }
 
-        Date_t MultiQueryEnv::currentTimeMillis() {
-            return jsTime();
-        }
+        // Confusingly, this *detaches* the cursor from the connection it was established
+        // on, further getMore calls will use a (potentially different) ScopedDbConnection.
+        //
+        // Calls done() too.
+        cursor->attach(&conn);
+    } catch (const DBException& ex) {
+        return StatusWith<DBClientCursor*>(ex.toStatus());
     }
 
-    // Shared networking environment which executes queries.
-    // NOTE: This environment must stay in scope as long as per-host threads are executing queries -
-    // i.e. for the lifetime of the server.
-    // Once the thread pools are disposed and connections shut down, the per-host threads should
-    // be self-contained and correctly shut down after discarding the results.
-    static MultiQueryEnv* _multiQueryEnv;
+    return StatusWith<DBClientCursor*>(cursor.release());
+}
 
-    namespace {
+Date_t MultiQueryEnv::currentTimeMillis() {
+    return jsTime();
+}
+}
 
-        //
-        // Create the shared multi-query environment at startup
-        //
+// Shared networking environment which executes queries.
+// NOTE: This environment must stay in scope as long as per-host threads are executing queries -
+// i.e. for the lifetime of the server.
+// Once the thread pools are disposed and connections shut down, the per-host threads should
+// be self-contained and correctly shut down after discarding the results.
+static MultiQueryEnv* _multiQueryEnv;
 
-        MONGO_INITIALIZER(InitMultiQueryEnv)(InitializerContext* context) {
-            // Leaked intentionally
-            _multiQueryEnv = new MultiQueryEnv();
-            return Status::OK();
-        }
-    }
+namespace {
 
-    //
-    // Per-SCC handling of queries
-    //
+//
+// Create the shared multi-query environment at startup
+//
 
-    SCCFastQueryHandler::SCCFastQueryHandler() :
-        _queryThreads(1, false) {
-    }
+MONGO_INITIALIZER(InitMultiQueryEnv)(InitializerContext* context) {
+    // Leaked intentionally
+    _multiQueryEnv = new MultiQueryEnv();
+    return Status::OK();
+}
+}
 
-    bool SCCFastQueryHandler::canHandleQuery(const string& ns, Query query) {
+//
+// Per-SCC handling of queries
+//
 
-        if (!internalSCCAllowFastestAuthConfigReads &&
-            !internalSCCAllowFastestMetadataConfigReads) {
-            return false;
-        }
+SCCFastQueryHandler::SCCFastQueryHandler() : _queryThreads(1, false) {}
 
-        //
-        // More operations can be added here
-        //
-        // NOTE: Not all operations actually pass through the SCC _queryOnActive path - notable
-        // exceptions include anything related to direct query ops and direct operations for
-        // connection maintenance.
-        //
-
-        NamespaceString nss(ns);
-        if (nss.isCommand()) {
-            BSONObj cmdObj = query.getFilter();
-            string cmdName = cmdObj.firstElement().fieldName();
-            if (cmdName == "usersInfo")
-                return true;
-        }
-        else if (nss.coll() == "system.users") {
-            return true;
-        }
-
-        //
-        // Allow fastest config reads for all collections except for those involved in locks and
-        // cluster versioning.
-        //
-
-        if (!internalSCCAllowFastestMetadataConfigReads)
-            return false;
-
-        if (nss.db() != "config")
-            return false;
-
-        if (nss.coll() != "version" && nss.coll() != "locks" && nss.coll() != "lockpings") {
-            return true;
-        }
-
+bool SCCFastQueryHandler::canHandleQuery(const string& ns, Query query) {
+    if (!internalSCCAllowFastestAuthConfigReads && !internalSCCAllowFastestMetadataConfigReads) {
         return false;
     }
 
-    static vector<ConnectionString> getHosts(const vector<string> hostStrings) {
+    //
+    // More operations can be added here
+    //
+    // NOTE: Not all operations actually pass through the SCC _queryOnActive path - notable
+    // exceptions include anything related to direct query ops and direct operations for
+    // connection maintenance.
+    //
 
-        vector<ConnectionString> hosts;
-        for (vector<string>::const_iterator it = hostStrings.begin(); it != hostStrings.end();
-            ++it) {
-
-            string errMsg;
-            ConnectionString host;
-            hosts.push_back(ConnectionString::parse(*it, errMsg));
-            invariant( hosts.back().type() != ConnectionString::INVALID );
-        }
-
-        return hosts;
+    NamespaceString nss(ns);
+    if (nss.isCommand()) {
+        BSONObj cmdObj = query.getFilter();
+        string cmdName = cmdObj.firstElement().fieldName();
+        if (cmdName == "usersInfo")
+            return true;
+    } else if (nss.coll() == "system.users") {
+        return true;
     }
 
-    unique_ptr<DBClientCursor> SCCFastQueryHandler::handleQuery(const vector<string>& hostStrings,
-                                                              const string& ns,
-                                                              Query query,
-                                                              int nToReturn,
-                                                              int nToSkip,
-                                                              const BSONObj* fieldsToReturn,
-                                                              int queryOptions,
-                                                              int batchSize) {
+    //
+    // Allow fastest config reads for all collections except for those involved in locks and
+    // cluster versioning.
+    //
 
-        MultiHostQueryOp queryOp(_multiQueryEnv, &_queryThreads);
+    if (!internalSCCAllowFastestMetadataConfigReads)
+        return false;
 
-        QuerySpec querySpec(ns,
-                            query.obj,
-                            fieldsToReturn ? *fieldsToReturn : BSONObj(),
-                            nToSkip,
-                            nToReturn,
-                            queryOptions);
+    if (nss.db() != "config")
+        return false;
 
-        // TODO: Timeout must be passed down here as well - 30s timeout may not be applicable for
-        // all operations handled.
-        StatusWith<DBClientCursor*> status = queryOp.queryAny(getHosts(hostStrings),
-                                                              querySpec,
-                                                              30 * 1000);
-        uassertStatusOK(status.getStatus());
-
-        unique_ptr<DBClientCursor> cursor(status.getValue());
-        return cursor;
+    if (nss.coll() != "version" && nss.coll() != "locks" && nss.coll() != "lockpings") {
+        return true;
     }
 
+    return false;
 }
 
+static vector<ConnectionString> getHosts(const vector<string> hostStrings) {
+    vector<ConnectionString> hosts;
+    for (vector<string>::const_iterator it = hostStrings.begin(); it != hostStrings.end(); ++it) {
+        string errMsg;
+        ConnectionString host;
+        hosts.push_back(ConnectionString::parse(*it, errMsg));
+        invariant(hosts.back().type() != ConnectionString::INVALID);
+    }
+
+    return hosts;
+}
+
+unique_ptr<DBClientCursor> SCCFastQueryHandler::handleQuery(const vector<string>& hostStrings,
+                                                            const string& ns,
+                                                            Query query,
+                                                            int nToReturn,
+                                                            int nToSkip,
+                                                            const BSONObj* fieldsToReturn,
+                                                            int queryOptions,
+                                                            int batchSize) {
+    MultiHostQueryOp queryOp(_multiQueryEnv, &_queryThreads);
+
+    QuerySpec querySpec(ns,
+                        query.obj,
+                        fieldsToReturn ? *fieldsToReturn : BSONObj(),
+                        nToSkip,
+                        nToReturn,
+                        queryOptions);
+
+    // TODO: Timeout must be passed down here as well - 30s timeout may not be applicable for
+    // all operations handled.
+    StatusWith<DBClientCursor*> status =
+        queryOp.queryAny(getHosts(hostStrings), querySpec, 30 * 1000);
+    uassertStatusOK(status.getStatus());
+
+    unique_ptr<DBClientCursor> cursor(status.getValue());
+    return cursor;
+}
+}

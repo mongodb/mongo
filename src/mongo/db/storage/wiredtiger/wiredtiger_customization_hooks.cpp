@@ -38,39 +38,37 @@
 
 namespace mongo {
 
-    /* Make a WiredTigerCustomizationHooks pointer a decoration on the global ServiceContext */
-    MONGO_INITIALIZER_WITH_PREREQUISITES(SetWiredTigerCustomizationHooks,
-                                        ("SetGlobalEnvironment"))
-            (InitializerContext* context) {
-        auto customizationHooks = stdx::make_unique<EmptyWiredTigerCustomizationHooks>();
-        WiredTigerCustomizationHooks::set(getGlobalServiceContext(), std::move(customizationHooks));
+/* Make a WiredTigerCustomizationHooks pointer a decoration on the global ServiceContext */
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetWiredTigerCustomizationHooks, ("SetGlobalEnvironment"))
+(InitializerContext* context) {
+    auto customizationHooks = stdx::make_unique<EmptyWiredTigerCustomizationHooks>();
+    WiredTigerCustomizationHooks::set(getGlobalServiceContext(), std::move(customizationHooks));
 
-        return Status::OK();
-    }
+    return Status::OK();
+}
 
-    namespace {
-        const auto getCustomizationHooks =
-            ServiceContext::declareDecoration<std::unique_ptr<WiredTigerCustomizationHooks>>();
-    } // namespace
+namespace {
+const auto getCustomizationHooks =
+    ServiceContext::declareDecoration<std::unique_ptr<WiredTigerCustomizationHooks>>();
+}  // namespace
 
-    void WiredTigerCustomizationHooks::set(
-            ServiceContext* service,
-            std::unique_ptr<WiredTigerCustomizationHooks> custHooks) {
-        auto& hooks = getCustomizationHooks(service);
-        invariant(custHooks);
-        hooks = std::move(custHooks);
-    }
+void WiredTigerCustomizationHooks::set(ServiceContext* service,
+                                       std::unique_ptr<WiredTigerCustomizationHooks> custHooks) {
+    auto& hooks = getCustomizationHooks(service);
+    invariant(custHooks);
+    hooks = std::move(custHooks);
+}
 
-    WiredTigerCustomizationHooks* WiredTigerCustomizationHooks::get(ServiceContext* service) {
-        return getCustomizationHooks(service).get();
-    }
+WiredTigerCustomizationHooks* WiredTigerCustomizationHooks::get(ServiceContext* service) {
+    return getCustomizationHooks(service).get();
+}
 
-    EmptyWiredTigerCustomizationHooks::~EmptyWiredTigerCustomizationHooks() {}
+EmptyWiredTigerCustomizationHooks::~EmptyWiredTigerCustomizationHooks() {}
 
-    void EmptyWiredTigerCustomizationHooks::appendUID(BSONObjBuilder* builder) {}
+void EmptyWiredTigerCustomizationHooks::appendUID(BSONObjBuilder* builder) {}
 
-    std::string EmptyWiredTigerCustomizationHooks::getOpenConfig(StringData tableName) {
-        return "";
-    }
+std::string EmptyWiredTigerCustomizationHooks::getOpenConfig(StringData tableName) {
+    return "";
+}
 
-} // namespace mongo
+}  // namespace mongo

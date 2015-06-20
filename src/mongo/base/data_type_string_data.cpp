@@ -31,13 +31,13 @@
 
 namespace mongo {
 
-    Status DataType::Handler<StringData>::makeStoreStatus(
-        const StringData& sdata, size_t length, std::ptrdiff_t debug_offset) {
-
-        str::stream ss;
-        ss << "buffer size too small to write StringData(" << sdata.size() << ") bytes into buffer["
-           << length << "] at offset: " << debug_offset;
-        return Status(ErrorCodes::Overflow, ss);
-    }
+Status DataType::Handler<StringData>::makeStoreStatus(const StringData& sdata,
+                                                      size_t length,
+                                                      std::ptrdiff_t debug_offset) {
+    str::stream ss;
+    ss << "buffer size too small to write StringData(" << sdata.size() << ") bytes into buffer["
+       << length << "] at offset: " << debug_offset;
+    return Status(ErrorCodes::Overflow, ss);
+}
 
 }  // namespace mongo

@@ -38,66 +38,60 @@
 
 namespace mongo {
 
-    class LogBuilder;
+class LogBuilder;
 
-    class ModifierUnset : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(ModifierUnset);
+class ModifierUnset : public ModifierInterface {
+    MONGO_DISALLOW_COPYING(ModifierUnset);
 
-    public:
+public:
+    ModifierUnset();
 
-        ModifierUnset();
+    //
+    // Modifier interface implementation
+    //
 
-        //
-        // Modifier interface implementation
-        //
+    virtual ~ModifierUnset();
 
-        virtual ~ModifierUnset();
+    /**
+     * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $set mod such as
+     * {$unset: {<fieldname: <value>}}. init() extracts the field name and the value to be
+     * assigned to it from 'modExpr'. It returns OK if successful or a status describing
+     * the error.
+     */
+    virtual Status init(const BSONElement& modExpr, const Options& opts, bool* positional = NULL);
 
-        /**
-         * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $set mod such as
-         * {$unset: {<fieldname: <value>}}. init() extracts the field name and the value to be
-         * assigned to it from 'modExpr'. It returns OK if successful or a status describing
-         * the error.
-         */
-        virtual Status init(const BSONElement& modExpr, const Options& opts,
-                            bool* positional = NULL);
+    /**
+     * Locates the field to be removed under the 'root' element, if it exist, and fills in
+     * 'execInfo' accordingly. Return OK if successful or a status describing the error.
+     */
+    virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
-        /**
-         * Locates the field to be removed under the 'root' element, if it exist, and fills in
-         * 'execInfo' accordingly. Return OK if successful or a status describing the error.
-         */
-        virtual Status prepare(mutablebson::Element root,
-                               StringData matchedField,
-                               ExecInfo* execInfo);
+    /**
+     * Removes the found element from the document. If such element was inside an array,
+     * removal means setting that array position to 'null'.
+     */
+    virtual Status apply() const;
 
-        /**
-         * Removes the found element from the document. If such element was inside an array,
-         * removal means setting that array position to 'null'.
-         */
-        virtual Status apply() const;
+    /**
+     * Adds the exact $unset mod to the log.
+     */
+    virtual Status log(LogBuilder* logBuilder) const;
 
-        /**
-         * Adds the exact $unset mod to the log.
-         */
-        virtual Status log(LogBuilder* logBuilder) const;
+private:
+    // Access to each component of fieldName that's the target of this mod.
+    FieldRef _fieldRef;
 
-    private:
+    // 0 or index for $-positional in _fieldRef.
+    size_t _posDollar;
 
-        // Access to each component of fieldName that's the target of this mod.
-        FieldRef _fieldRef;
+    // Element of the $set expression.
+    BSONElement _val;
 
-        // 0 or index for $-positional in _fieldRef.
-        size_t _posDollar;
+    // The instance of the field in the provided doc. This state is valid after a
+    // prepare() was issued and until a log() is issued. The document this mod is
+    // being prepared against must be live throughout all the calls.
+    struct PreparedState;
+    std::unique_ptr<PreparedState> _preparedState;
+};
 
-        // Element of the $set expression.
-        BSONElement _val;
-
-        // The instance of the field in the provided doc. This state is valid after a
-        // prepare() was issued and until a log() is issued. The document this mod is
-        // being prepared against must be live throughout all the calls.
-        struct PreparedState;
-        std::unique_ptr<PreparedState> _preparedState;
-
-    };
-
-} // namespace mongo
+}  // namespace mongo

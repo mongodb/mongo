@@ -33,279 +33,287 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::string;
+using std::unique_ptr;
+using std::string;
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
-    const std::string BatchedDeleteRequest::BATCHED_DELETE_REQUEST = "delete";
-    const BSONField<std::string> BatchedDeleteRequest::collName( "delete" );
-    const BSONField<std::vector<BatchedDeleteDocument*> > BatchedDeleteRequest::deletes( "deletes" );
-    const BSONField<BSONObj> BatchedDeleteRequest::writeConcern( "writeConcern" );
-    const BSONField<bool> BatchedDeleteRequest::ordered( "ordered", true );
-    const BSONField<BSONObj> BatchedDeleteRequest::metadata("metadata");
+const std::string BatchedDeleteRequest::BATCHED_DELETE_REQUEST = "delete";
+const BSONField<std::string> BatchedDeleteRequest::collName("delete");
+const BSONField<std::vector<BatchedDeleteDocument*>> BatchedDeleteRequest::deletes("deletes");
+const BSONField<BSONObj> BatchedDeleteRequest::writeConcern("writeConcern");
+const BSONField<bool> BatchedDeleteRequest::ordered("ordered", true);
+const BSONField<BSONObj> BatchedDeleteRequest::metadata("metadata");
 
-    BatchedDeleteRequest::BatchedDeleteRequest() {
-        clear();
+BatchedDeleteRequest::BatchedDeleteRequest() {
+    clear();
+}
+
+BatchedDeleteRequest::~BatchedDeleteRequest() {
+    unsetDeletes();
+}
+
+bool BatchedDeleteRequest::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    BatchedDeleteRequest::~BatchedDeleteRequest() {
-        unsetDeletes();
+    // All the mandatory fields must be present.
+    if (!_isCollNameSet) {
+        *errMsg = stream() << "missing " << collName.name() << " field";
+        return false;
     }
 
-    bool BatchedDeleteRequest::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
-
-        // All the mandatory fields must be present.
-        if (!_isCollNameSet) {
-            *errMsg = stream() << "missing " << collName.name() << " field";
-            return false;
-        }
-
-        if (!_isDeletesSet) {
-            *errMsg = stream() << "missing " << deletes.name() << " field";
-            return false;
-        }
-
-        return true;
+    if (!_isDeletesSet) {
+        *errMsg = stream() << "missing " << deletes.name() << " field";
+        return false;
     }
 
-    BSONObj BatchedDeleteRequest::toBSON() const {
-        BSONObjBuilder builder;
+    return true;
+}
 
-        if (_isCollNameSet) builder.append(collName(), _collName);
+BSONObj BatchedDeleteRequest::toBSON() const {
+    BSONObjBuilder builder;
 
-        if (_isDeletesSet) {
-            BSONArrayBuilder deletesBuilder(builder.subarrayStart(deletes()));
-            for (std::vector<BatchedDeleteDocument*>::const_iterator it = _deletes.begin();
-                 it != _deletes.end();
-                 ++it) {
-                BSONObj deleteDocument = (*it)->toBSON();
-                deletesBuilder.append(deleteDocument);
-            }
-            deletesBuilder.done();
-        }
+    if (_isCollNameSet)
+        builder.append(collName(), _collName);
 
-        if (_isWriteConcernSet) builder.append(writeConcern(), _writeConcern);
-
-        if (_isOrderedSet) builder.append(ordered(), _ordered);
-
-        if (_metadata) builder.append(metadata(), _metadata->toBSON());
-
-        return builder.obj();
-    }
-
-    bool BatchedDeleteRequest::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
-
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
-
-        FieldParser::FieldState fieldState;
-        std::string collNameTemp;
-        fieldState = FieldParser::extract(source, collName, &collNameTemp, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _collName = NamespaceString(collNameTemp);
-        _isCollNameSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, deletes, &_deletes, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isDeletesSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, writeConcern, &_writeConcern, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, ordered, &_ordered, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isOrderedSet = fieldState == FieldParser::FIELD_SET;
-
-        BSONObj metadataObj;
-        fieldState = FieldParser::extract(source, metadata, &metadataObj, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-
-        if (!metadataObj.isEmpty()) {
-            _metadata.reset(new BatchedRequestMetadata());
-            if (!_metadata->parseBSON(metadataObj, errMsg)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    void BatchedDeleteRequest::clear() {
-        _collName = NamespaceString();
-        _isCollNameSet = false;
-
-        unsetDeletes();
-
-        _writeConcern = BSONObj();
-        _isWriteConcernSet = false;
-
-        _ordered = false;
-        _isOrderedSet = false;
-
-        _metadata.reset();
-    }
-
-    void BatchedDeleteRequest::cloneTo(BatchedDeleteRequest* other) const {
-        other->clear();
-
-        other->_collName = _collName;
-        other->_isCollNameSet = _isCollNameSet;
-
-        for(std::vector<BatchedDeleteDocument*>::const_iterator it = _deletes.begin();
-            it != _deletes.end();
-            ++it) {
-            unique_ptr<BatchedDeleteDocument> tempBatchDeleteDocument(new BatchedDeleteDocument);
-            (*it)->cloneTo(tempBatchDeleteDocument.get());
-            other->addToDeletes(tempBatchDeleteDocument.release());
-        }
-        other->_isDeletesSet = _isDeletesSet;
-
-        other->_writeConcern = _writeConcern;
-        other->_isWriteConcernSet = _isWriteConcernSet;
-
-        other->_ordered = _ordered;
-        other->_isOrderedSet = _isOrderedSet;
-
-        if (_metadata) {
-            other->_metadata.reset(new BatchedRequestMetadata());
-            _metadata->cloneTo(other->_metadata.get());
-        }
-    }
-
-    std::string BatchedDeleteRequest::toString() const {
-        return toBSON().toString();
-    }
-    
-    void BatchedDeleteRequest::setCollName(StringData collName) {
-        _collName = NamespaceString(collName);
-        _isCollNameSet = true;
-    }
-
-    const std::string& BatchedDeleteRequest::getCollName() const {
-        dassert(_isCollNameSet);
-        return _collName.ns();
-    }
-
-    void BatchedDeleteRequest::setCollNameNS(const NamespaceString& collName) {
-        _collName = collName;
-        _isCollNameSet = true;
-    }
-
-    const NamespaceString& BatchedDeleteRequest::getCollNameNS() const {
-        dassert(_isCollNameSet);
-        return _collName;
-    }
-
-    const NamespaceString& BatchedDeleteRequest::getTargetingNSS() const {
-        return getCollNameNS();
-    }
-
-    void BatchedDeleteRequest::setDeletes(const std::vector<BatchedDeleteDocument*>& deletes) {
-        for (std::vector<BatchedDeleteDocument*>::const_iterator it = deletes.begin();
-             it != deletes.end();
+    if (_isDeletesSet) {
+        BSONArrayBuilder deletesBuilder(builder.subarrayStart(deletes()));
+        for (std::vector<BatchedDeleteDocument*>::const_iterator it = _deletes.begin();
+             it != _deletes.end();
              ++it) {
-            unique_ptr<BatchedDeleteDocument> tempBatchDeleteDocument(new BatchedDeleteDocument);
-            (*it)->cloneTo(tempBatchDeleteDocument.get());
-            addToDeletes(tempBatchDeleteDocument.release());
+            BSONObj deleteDocument = (*it)->toBSON();
+            deletesBuilder.append(deleteDocument);
         }
-        _isDeletesSet = deletes.size() > 0;
+        deletesBuilder.done();
     }
 
-    void BatchedDeleteRequest::addToDeletes(BatchedDeleteDocument* deletes) {
-        _deletes.push_back(deletes);
-        _isDeletesSet = true;
-    }
+    if (_isWriteConcernSet)
+        builder.append(writeConcern(), _writeConcern);
 
-    void BatchedDeleteRequest::unsetDeletes() {
-        for(std::vector<BatchedDeleteDocument*>::iterator it = _deletes.begin();
-            it != _deletes.end();
-            ++it) {
-            delete *it;
-        }
-        _deletes.clear();
-        _isDeletesSet = false;
-    }
+    if (_isOrderedSet)
+        builder.append(ordered(), _ordered);
 
-    bool BatchedDeleteRequest::isDeletesSet() const {
-        return _isDeletesSet;
-    }
+    if (_metadata)
+        builder.append(metadata(), _metadata->toBSON());
 
-    size_t BatchedDeleteRequest::sizeDeletes() const {
-        return _deletes.size();
-    }
+    return builder.obj();
+}
 
-    const std::vector<BatchedDeleteDocument*>& BatchedDeleteRequest::getDeletes() const {
-        dassert(_isDeletesSet);
-        return _deletes;
-    }
+bool BatchedDeleteRequest::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-    const BatchedDeleteDocument* BatchedDeleteRequest::getDeletesAt(size_t pos) const {
-        dassert(_isDeletesSet);
-        dassert(_deletes.size() > pos);
-        return _deletes.at(pos);
-    }
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-    void BatchedDeleteRequest::setWriteConcern(const BSONObj& writeConcern) {
-        _writeConcern = writeConcern.getOwned();
-        _isWriteConcernSet = true;
-    }
+    FieldParser::FieldState fieldState;
+    std::string collNameTemp;
+    fieldState = FieldParser::extract(source, collName, &collNameTemp, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _collName = NamespaceString(collNameTemp);
+    _isCollNameSet = fieldState == FieldParser::FIELD_SET;
 
-    void BatchedDeleteRequest::unsetWriteConcern() {
-         _isWriteConcernSet = false;
-     }
+    fieldState = FieldParser::extract(source, deletes, &_deletes, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isDeletesSet = fieldState == FieldParser::FIELD_SET;
 
-    bool BatchedDeleteRequest::isWriteConcernSet() const {
-         return _isWriteConcernSet;
-    }
+    fieldState = FieldParser::extract(source, writeConcern, &_writeConcern, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
 
-    const BSONObj& BatchedDeleteRequest::getWriteConcern() const {
-        dassert(_isWriteConcernSet);
-        return _writeConcern;
-    }
+    fieldState = FieldParser::extract(source, ordered, &_ordered, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isOrderedSet = fieldState == FieldParser::FIELD_SET;
 
-    void BatchedDeleteRequest::setOrdered(bool ordered) {
-        _ordered = ordered;
-        _isOrderedSet = true;
-    }
+    BSONObj metadataObj;
+    fieldState = FieldParser::extract(source, metadata, &metadataObj, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
 
-    void BatchedDeleteRequest::unsetOrdered() {
-         _isOrderedSet = false;
-     }
-
-    bool BatchedDeleteRequest::isOrderedSet() const {
-         return _isOrderedSet;
-    }
-
-    bool BatchedDeleteRequest::getOrdered() const {
-        if (_isOrderedSet) {
-            return _ordered;
-        }
-        else {
-            return ordered.getDefault();
+    if (!metadataObj.isEmpty()) {
+        _metadata.reset(new BatchedRequestMetadata());
+        if (!_metadata->parseBSON(metadataObj, errMsg)) {
+            return false;
         }
     }
 
-    void BatchedDeleteRequest::setMetadata(BatchedRequestMetadata* metadata) {
-        _metadata.reset(metadata);
-    }
+    return true;
+}
 
-    void BatchedDeleteRequest::unsetMetadata() {
-        _metadata.reset();
-    }
+void BatchedDeleteRequest::clear() {
+    _collName = NamespaceString();
+    _isCollNameSet = false;
 
-    bool BatchedDeleteRequest::isMetadataSet() const {
-        return _metadata.get();
-    }
+    unsetDeletes();
 
-    BatchedRequestMetadata* BatchedDeleteRequest::getMetadata() const {
-        return _metadata.get();
-    }
+    _writeConcern = BSONObj();
+    _isWriteConcernSet = false;
 
-} // namespace mongo
+    _ordered = false;
+    _isOrderedSet = false;
+
+    _metadata.reset();
+}
+
+void BatchedDeleteRequest::cloneTo(BatchedDeleteRequest* other) const {
+    other->clear();
+
+    other->_collName = _collName;
+    other->_isCollNameSet = _isCollNameSet;
+
+    for (std::vector<BatchedDeleteDocument*>::const_iterator it = _deletes.begin();
+         it != _deletes.end();
+         ++it) {
+        unique_ptr<BatchedDeleteDocument> tempBatchDeleteDocument(new BatchedDeleteDocument);
+        (*it)->cloneTo(tempBatchDeleteDocument.get());
+        other->addToDeletes(tempBatchDeleteDocument.release());
+    }
+    other->_isDeletesSet = _isDeletesSet;
+
+    other->_writeConcern = _writeConcern;
+    other->_isWriteConcernSet = _isWriteConcernSet;
+
+    other->_ordered = _ordered;
+    other->_isOrderedSet = _isOrderedSet;
+
+    if (_metadata) {
+        other->_metadata.reset(new BatchedRequestMetadata());
+        _metadata->cloneTo(other->_metadata.get());
+    }
+}
+
+std::string BatchedDeleteRequest::toString() const {
+    return toBSON().toString();
+}
+
+void BatchedDeleteRequest::setCollName(StringData collName) {
+    _collName = NamespaceString(collName);
+    _isCollNameSet = true;
+}
+
+const std::string& BatchedDeleteRequest::getCollName() const {
+    dassert(_isCollNameSet);
+    return _collName.ns();
+}
+
+void BatchedDeleteRequest::setCollNameNS(const NamespaceString& collName) {
+    _collName = collName;
+    _isCollNameSet = true;
+}
+
+const NamespaceString& BatchedDeleteRequest::getCollNameNS() const {
+    dassert(_isCollNameSet);
+    return _collName;
+}
+
+const NamespaceString& BatchedDeleteRequest::getTargetingNSS() const {
+    return getCollNameNS();
+}
+
+void BatchedDeleteRequest::setDeletes(const std::vector<BatchedDeleteDocument*>& deletes) {
+    for (std::vector<BatchedDeleteDocument*>::const_iterator it = deletes.begin();
+         it != deletes.end();
+         ++it) {
+        unique_ptr<BatchedDeleteDocument> tempBatchDeleteDocument(new BatchedDeleteDocument);
+        (*it)->cloneTo(tempBatchDeleteDocument.get());
+        addToDeletes(tempBatchDeleteDocument.release());
+    }
+    _isDeletesSet = deletes.size() > 0;
+}
+
+void BatchedDeleteRequest::addToDeletes(BatchedDeleteDocument* deletes) {
+    _deletes.push_back(deletes);
+    _isDeletesSet = true;
+}
+
+void BatchedDeleteRequest::unsetDeletes() {
+    for (std::vector<BatchedDeleteDocument*>::iterator it = _deletes.begin(); it != _deletes.end();
+         ++it) {
+        delete *it;
+    }
+    _deletes.clear();
+    _isDeletesSet = false;
+}
+
+bool BatchedDeleteRequest::isDeletesSet() const {
+    return _isDeletesSet;
+}
+
+size_t BatchedDeleteRequest::sizeDeletes() const {
+    return _deletes.size();
+}
+
+const std::vector<BatchedDeleteDocument*>& BatchedDeleteRequest::getDeletes() const {
+    dassert(_isDeletesSet);
+    return _deletes;
+}
+
+const BatchedDeleteDocument* BatchedDeleteRequest::getDeletesAt(size_t pos) const {
+    dassert(_isDeletesSet);
+    dassert(_deletes.size() > pos);
+    return _deletes.at(pos);
+}
+
+void BatchedDeleteRequest::setWriteConcern(const BSONObj& writeConcern) {
+    _writeConcern = writeConcern.getOwned();
+    _isWriteConcernSet = true;
+}
+
+void BatchedDeleteRequest::unsetWriteConcern() {
+    _isWriteConcernSet = false;
+}
+
+bool BatchedDeleteRequest::isWriteConcernSet() const {
+    return _isWriteConcernSet;
+}
+
+const BSONObj& BatchedDeleteRequest::getWriteConcern() const {
+    dassert(_isWriteConcernSet);
+    return _writeConcern;
+}
+
+void BatchedDeleteRequest::setOrdered(bool ordered) {
+    _ordered = ordered;
+    _isOrderedSet = true;
+}
+
+void BatchedDeleteRequest::unsetOrdered() {
+    _isOrderedSet = false;
+}
+
+bool BatchedDeleteRequest::isOrderedSet() const {
+    return _isOrderedSet;
+}
+
+bool BatchedDeleteRequest::getOrdered() const {
+    if (_isOrderedSet) {
+        return _ordered;
+    } else {
+        return ordered.getDefault();
+    }
+}
+
+void BatchedDeleteRequest::setMetadata(BatchedRequestMetadata* metadata) {
+    _metadata.reset(metadata);
+}
+
+void BatchedDeleteRequest::unsetMetadata() {
+    _metadata.reset();
+}
+
+bool BatchedDeleteRequest::isMetadataSet() const {
+    return _metadata.get();
+}
+
+BatchedRequestMetadata* BatchedDeleteRequest::getMetadata() const {
+    return _metadata.get();
+}
+
+}  // namespace mongo

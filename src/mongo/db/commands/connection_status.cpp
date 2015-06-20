@@ -35,100 +35,99 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
+using std::string;
+using std::stringstream;
 
-    class CmdConnectionStatus : public Command {
-    public:
-        CmdConnectionStatus() : Command("connectionStatus") {}
-        virtual bool slaveOk() const { return true; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
+class CmdConnectionStatus : public Command {
+public:
+    CmdConnectionStatus() : Command("connectionStatus") {}
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {}  // No auth required
 
-        void help(stringstream& h) const {
-            h << "Returns connection-specific information such as logged-in users and their roles";
+    void help(stringstream& h) const {
+        h << "Returns connection-specific information such as logged-in users and their roles";
+    }
+
+    bool run(OperationContext* txn,
+             const string&,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        AuthorizationSession* authSession = AuthorizationSession::get(ClientBasic::getCurrent());
+
+        bool showPrivileges;
+        Status status =
+            bsonExtractBooleanFieldWithDefault(cmdObj, "showPrivileges", false, &showPrivileges);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
         }
 
-        bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg,
-                 BSONObjBuilder& result) {
-            AuthorizationSession* authSession =
-                    AuthorizationSession::get(ClientBasic::getCurrent());
+        BSONObjBuilder authInfo(result.subobjStart("authInfo"));
+        {
+            BSONArrayBuilder authenticatedUsers(authInfo.subarrayStart("authenticatedUsers"));
+            UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
 
-            bool showPrivileges;
-            Status status = bsonExtractBooleanFieldWithDefault(cmdObj,
-                                                               "showPrivileges",
-                                                               false,
-                                                               &showPrivileges);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+            for (; nameIter.more(); nameIter.next()) {
+                BSONObjBuilder userInfoBuilder(authenticatedUsers.subobjStart());
+                userInfoBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME,
+                                       nameIter->getUser());
+                userInfoBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME, nameIter->getDB());
             }
+        }
+        {
+            BSONArrayBuilder authenticatedRoles(authInfo.subarrayStart("authenticatedUserRoles"));
+            RoleNameIterator roleIter = authSession->getAuthenticatedRoleNames();
 
-            BSONObjBuilder authInfo(result.subobjStart("authInfo"));
-            {
-                BSONArrayBuilder authenticatedUsers(authInfo.subarrayStart("authenticatedUsers"));
-                UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
-
-                for ( ; nameIter.more(); nameIter.next()) {
-                    BSONObjBuilder userInfoBuilder(authenticatedUsers.subobjStart());
-                    userInfoBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME,
-                                           nameIter->getUser());
-                    userInfoBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME,
-                                           nameIter->getDB());
-                }
+            for (; roleIter.more(); roleIter.next()) {
+                BSONObjBuilder roleInfoBuilder(authenticatedRoles.subobjStart());
+                roleInfoBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME,
+                                       roleIter->getRole());
+                roleInfoBuilder.append(AuthorizationManager::ROLE_DB_FIELD_NAME, roleIter->getDB());
             }
-            {
-                BSONArrayBuilder authenticatedRoles(
-                        authInfo.subarrayStart("authenticatedUserRoles"));
-                RoleNameIterator roleIter = authSession->getAuthenticatedRoleNames();
+        }
+        if (showPrivileges) {
+            BSONArrayBuilder authenticatedPrivileges(
+                authInfo.subarrayStart("authenticatedUserPrivileges"));
 
-                for ( ; roleIter.more(); roleIter.next()) {
-                    BSONObjBuilder roleInfoBuilder(authenticatedRoles.subobjStart());
-                    roleInfoBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME,
-                                           roleIter->getRole());
-                    roleInfoBuilder.append(AuthorizationManager::ROLE_DB_FIELD_NAME,
-                                           roleIter->getDB());
-                }
-            }
-            if (showPrivileges) {
-                BSONArrayBuilder authenticatedPrivileges(
-                        authInfo.subarrayStart("authenticatedUserPrivileges"));
+            // Create a unified map of resources to privileges, to avoid duplicate
+            // entries in the connection status output.
+            User::ResourcePrivilegeMap unifiedResourcePrivilegeMap;
+            UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
 
-                // Create a unified map of resources to privileges, to avoid duplicate
-                // entries in the connection status output.
-                User::ResourcePrivilegeMap unifiedResourcePrivilegeMap;
-                UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
-
-                for ( ; nameIter.more(); nameIter.next()) {
-                    User* authUser = authSession->lookupUser(*nameIter);
-                    const User::ResourcePrivilegeMap& resourcePrivilegeMap =
-                        authUser->getPrivileges();
-                    for (User::ResourcePrivilegeMap::const_iterator it =
-                            resourcePrivilegeMap.begin();
-                            it != resourcePrivilegeMap.end();
-                            ++it) {
-                        if (unifiedResourcePrivilegeMap.find(it->first) ==
-                                unifiedResourcePrivilegeMap.end()) {
-                            unifiedResourcePrivilegeMap[it->first] = it->second;
-                        } else {
-                            unifiedResourcePrivilegeMap[it->first].addActions(
-                                    it->second.getActions());
-                        }
+            for (; nameIter.more(); nameIter.next()) {
+                User* authUser = authSession->lookupUser(*nameIter);
+                const User::ResourcePrivilegeMap& resourcePrivilegeMap = authUser->getPrivileges();
+                for (User::ResourcePrivilegeMap::const_iterator it = resourcePrivilegeMap.begin();
+                     it != resourcePrivilegeMap.end();
+                     ++it) {
+                    if (unifiedResourcePrivilegeMap.find(it->first) ==
+                        unifiedResourcePrivilegeMap.end()) {
+                        unifiedResourcePrivilegeMap[it->first] = it->second;
+                    } else {
+                        unifiedResourcePrivilegeMap[it->first].addActions(it->second.getActions());
                     }
                 }
-
-                for (User::ResourcePrivilegeMap::const_iterator it =
-                        unifiedResourcePrivilegeMap.begin();
-                        it != unifiedResourcePrivilegeMap.end();
-                        ++it) {
-                    authenticatedPrivileges << it->second.toBSON();
-                }
             }
 
-            authInfo.doneFast();
-
-            return true;
+            for (User::ResourcePrivilegeMap::const_iterator it =
+                     unifiedResourcePrivilegeMap.begin();
+                 it != unifiedResourcePrivilegeMap.end();
+                 ++it) {
+                authenticatedPrivileges << it->second.toBSON();
+            }
         }
-    } cmdConnectionStatus;
+
+        authInfo.doneFast();
+
+        return true;
+    }
+} cmdConnectionStatus;
 }

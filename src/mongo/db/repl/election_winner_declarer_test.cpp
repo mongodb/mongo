@@ -44,189 +44,177 @@ namespace mongo {
 namespace repl {
 namespace {
 
-    using executor::NetworkInterfaceMock;
-    using unittest::assertGet;
+using executor::NetworkInterfaceMock;
+using unittest::assertGet;
 
-    bool stringContains(const std::string &haystack, const std::string& needle) {
-        return haystack.find(needle) != std::string::npos;
+bool stringContains(const std::string& haystack, const std::string& needle) {
+    return haystack.find(needle) != std::string::npos;
+}
+
+
+class ElectionWinnerDeclarerTest : public mongo::unittest::Test {
+public:
+    virtual void setUp() {
+        std::string setName = "rs0";
+        long long winnerId = 0;
+        long long term = 1;
+        std::vector<HostAndPort> hosts = {
+            HostAndPort("host0"), HostAndPort("host1"), HostAndPort("host2")};
+
+        _declarer.reset(new ElectionWinnerDeclarer::Algorithm(setName, winnerId, term, hosts));
     }
 
-
-    class ElectionWinnerDeclarerTest : public mongo::unittest::Test {
-    public:
-        virtual void setUp() {
-            std::string setName = "rs0";
-            long long winnerId = 0;
-            long long term = 1;
-            std::vector<HostAndPort> hosts = {HostAndPort("host0"),
-                                              HostAndPort("host1"),
-                                              HostAndPort("host2")};
-
-            _declarer.reset(new ElectionWinnerDeclarer::Algorithm(setName,
-                                                                  winnerId,
-                                                                  term,
-                                                                  hosts));
-        }
-
-        virtual void tearDown() {
-            _declarer.reset(NULL);
-        }
-
-    protected:
-        int64_t countLogLinesContaining(const std::string& needle) {
-            return std::count_if(getCapturedLogMessages().begin(),
-                                 getCapturedLogMessages().end(),
-                                 stdx::bind(stringContains,
-                                            stdx::placeholders::_1,
-                                            needle));
-        }
-
-        bool hasReceivedSufficientResponses() {
-            return _declarer->hasReceivedSufficientResponses();
-        }
-
-        Status getStatus() {
-            return _declarer->getStatus();
-        }
-
-        void processResponse(const RemoteCommandRequest& request, const ResponseStatus& response) {
-            _declarer->processResponse(request, response);
-        }
-
-        RemoteCommandRequest requestFrom(std::string hostname) {
-            return RemoteCommandRequest(HostAndPort(hostname),
-                                        "", // fields do not matter in ElectionWinnerDeclarer
-                                        BSONObj(),
-                                        Milliseconds(0));
-        }
-
-        ResponseStatus badResponseStatus() {
-            return ResponseStatus(ErrorCodes::NodeNotFound, "not on my watch");
-        }
-
-        ResponseStatus staleTermResponse() {
-            return ResponseStatus(NetworkInterfaceMock::Response(BSON("ok" << 0
-                                                                   << "code" << ErrorCodes::BadValue
-                                                                   << "errmsg"
-                                                                   << "term has already passed"
-                                                                   << "term" << 3),
-                                                                 Milliseconds(10)));
-        }
-
-        ResponseStatus alreadyAnotherPrimaryResponse() {
-            return ResponseStatus(NetworkInterfaceMock::Response(BSON("ok" << 0
-                                                                   << "code" << ErrorCodes::BadValue
-                                                                   << "errmsg"
-                                                                   << "term already has a primary"
-                                                                   << "term" << 1),
-                                                                 Milliseconds(10)));
-        }
-
-        ResponseStatus differentConfigVersionResponse() {
-            return ResponseStatus(NetworkInterfaceMock::Response(BSON("ok" << 0
-                                                                  << "code" << ErrorCodes::BadValue
-                                                                  << "errmsg"
-                                                                  << "config version does not match"
-                                                                  << "term" << 1),
-                                                                 Milliseconds(10)));
-        }
-
-        ResponseStatus differentSetNameResponse() {
-            return ResponseStatus(NetworkInterfaceMock::Response(BSON("ok" << 0
-                                                                  << "code" << ErrorCodes::BadValue
-                                                                  << "errmsg"
-                                                                  << "replSet name does not match"
-                                                                  << "term" << 1),
-                                                                 Milliseconds(10)));
-        }
-
-        ResponseStatus goodResponse() {
-            return ResponseStatus(NetworkInterfaceMock::Response(BSON("ok" << 1
-                                                                  << "term" << 1),
-                                                                 Milliseconds(10)));
-        }
-
-    private:
-        unique_ptr<ElectionWinnerDeclarer::Algorithm> _declarer;
-
-    };
-
-    TEST_F(ElectionWinnerDeclarerTest, FinishWithOnlyGoodResponses) {
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host0"), goodResponse());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host1"), goodResponse());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host2"), goodResponse());
-        ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_OK(getStatus());
+    virtual void tearDown() {
+        _declarer.reset(NULL);
     }
 
-    TEST_F(ElectionWinnerDeclarerTest, FailedDueToStaleTerm) {
-        startCapturingLogMessages();
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host0"), goodResponse());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host1"), staleTermResponse());
-        ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_EQUALS(1, countLogLinesContaining("Got error response from host1"));
-        stopCapturingLogMessages();
-        ASSERT_EQUALS(getStatus().reason(), "term has already passed");
+protected:
+    int64_t countLogLinesContaining(const std::string& needle) {
+        return std::count_if(getCapturedLogMessages().begin(),
+                             getCapturedLogMessages().end(),
+                             stdx::bind(stringContains, stdx::placeholders::_1, needle));
     }
 
-    TEST_F(ElectionWinnerDeclarerTest, FailedDueToAnotherPrimary) {
-        startCapturingLogMessages();
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host0"), goodResponse());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host1"), alreadyAnotherPrimaryResponse());
-        ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_EQUALS(1, countLogLinesContaining("Got error response from host1"));
-        stopCapturingLogMessages();
-        ASSERT_EQUALS(getStatus().reason(), "term already has a primary");
+    bool hasReceivedSufficientResponses() {
+        return _declarer->hasReceivedSufficientResponses();
     }
 
-    TEST_F(ElectionWinnerDeclarerTest, FailedDueToDifferentSetName) {
-        startCapturingLogMessages();
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host0"), goodResponse());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host1"), differentSetNameResponse());
-        ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_EQUALS(1, countLogLinesContaining("Got error response from host1"));
-        stopCapturingLogMessages();
-        ASSERT_EQUALS(getStatus().reason(), "replSet name does not match");
+    Status getStatus() {
+        return _declarer->getStatus();
     }
 
-    TEST_F(ElectionWinnerDeclarerTest, FinishWithOnlyGoodResponsesAndMissingNode) {
-        startCapturingLogMessages();
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host0"), goodResponse());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host1"), badResponseStatus());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host2"), goodResponse());
-        ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host1"));
-        stopCapturingLogMessages();
-        ASSERT_OK(getStatus());
+    void processResponse(const RemoteCommandRequest& request, const ResponseStatus& response) {
+        _declarer->processResponse(request, response);
     }
 
-    TEST_F(ElectionWinnerDeclarerTest, FinishWithOnlyMissingResponses) {
-        startCapturingLogMessages();
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host0"), badResponseStatus());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host1"), badResponseStatus());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-        processResponse(requestFrom("host2"), badResponseStatus());
-        ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host0"));
-        ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host1"));
-        ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host2"));
-        stopCapturingLogMessages();
-        ASSERT_OK(getStatus());
+    RemoteCommandRequest requestFrom(std::string hostname) {
+        return RemoteCommandRequest(HostAndPort(hostname),
+                                    "",  // fields do not matter in ElectionWinnerDeclarer
+                                    BSONObj(),
+                                    Milliseconds(0));
     }
+
+    ResponseStatus badResponseStatus() {
+        return ResponseStatus(ErrorCodes::NodeNotFound, "not on my watch");
+    }
+
+    ResponseStatus staleTermResponse() {
+        return ResponseStatus(NetworkInterfaceMock::Response(
+            BSON("ok" << 0 << "code" << ErrorCodes::BadValue << "errmsg"
+                      << "term has already passed"
+                      << "term" << 3),
+            Milliseconds(10)));
+    }
+
+    ResponseStatus alreadyAnotherPrimaryResponse() {
+        return ResponseStatus(NetworkInterfaceMock::Response(
+            BSON("ok" << 0 << "code" << ErrorCodes::BadValue << "errmsg"
+                      << "term already has a primary"
+                      << "term" << 1),
+            Milliseconds(10)));
+    }
+
+    ResponseStatus differentConfigVersionResponse() {
+        return ResponseStatus(NetworkInterfaceMock::Response(
+            BSON("ok" << 0 << "code" << ErrorCodes::BadValue << "errmsg"
+                      << "config version does not match"
+                      << "term" << 1),
+            Milliseconds(10)));
+    }
+
+    ResponseStatus differentSetNameResponse() {
+        return ResponseStatus(NetworkInterfaceMock::Response(
+            BSON("ok" << 0 << "code" << ErrorCodes::BadValue << "errmsg"
+                      << "replSet name does not match"
+                      << "term" << 1),
+            Milliseconds(10)));
+    }
+
+    ResponseStatus goodResponse() {
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(BSON("ok" << 1 << "term" << 1), Milliseconds(10)));
+    }
+
+private:
+    unique_ptr<ElectionWinnerDeclarer::Algorithm> _declarer;
+};
+
+TEST_F(ElectionWinnerDeclarerTest, FinishWithOnlyGoodResponses) {
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host0"), goodResponse());
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host1"), goodResponse());
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host2"), goodResponse());
+    ASSERT_TRUE(hasReceivedSufficientResponses());
+    ASSERT_OK(getStatus());
+}
+
+TEST_F(ElectionWinnerDeclarerTest, FailedDueToStaleTerm) {
+    startCapturingLogMessages();
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host0"), goodResponse());
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host1"), staleTermResponse());
+    ASSERT_TRUE(hasReceivedSufficientResponses());
+    ASSERT_EQUALS(1, countLogLinesContaining("Got error response from host1"));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(getStatus().reason(), "term has already passed");
+}
+
+TEST_F(ElectionWinnerDeclarerTest, FailedDueToAnotherPrimary) {
+    startCapturingLogMessages();
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host0"), goodResponse());
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host1"), alreadyAnotherPrimaryResponse());
+    ASSERT_TRUE(hasReceivedSufficientResponses());
+    ASSERT_EQUALS(1, countLogLinesContaining("Got error response from host1"));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(getStatus().reason(), "term already has a primary");
+}
+
+TEST_F(ElectionWinnerDeclarerTest, FailedDueToDifferentSetName) {
+    startCapturingLogMessages();
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host0"), goodResponse());
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host1"), differentSetNameResponse());
+    ASSERT_TRUE(hasReceivedSufficientResponses());
+    ASSERT_EQUALS(1, countLogLinesContaining("Got error response from host1"));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(getStatus().reason(), "replSet name does not match");
+}
+
+TEST_F(ElectionWinnerDeclarerTest, FinishWithOnlyGoodResponsesAndMissingNode) {
+    startCapturingLogMessages();
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host0"), goodResponse());
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host1"), badResponseStatus());
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host2"), goodResponse());
+    ASSERT_TRUE(hasReceivedSufficientResponses());
+    ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host1"));
+    stopCapturingLogMessages();
+    ASSERT_OK(getStatus());
+}
+
+TEST_F(ElectionWinnerDeclarerTest, FinishWithOnlyMissingResponses) {
+    startCapturingLogMessages();
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host0"), badResponseStatus());
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host1"), badResponseStatus());
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+    processResponse(requestFrom("host2"), badResponseStatus());
+    ASSERT_TRUE(hasReceivedSufficientResponses());
+    ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host0"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host1"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host2"));
+    stopCapturingLogMessages();
+    ASSERT_OK(getStatus());
+}
 
 }  // namespace
 }  // namespace repl

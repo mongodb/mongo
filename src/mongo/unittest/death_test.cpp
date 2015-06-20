@@ -43,13 +43,14 @@
 #include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
 
-#define checkSyscall(EXPR) do {                                         \
+#define checkSyscall(EXPR)                                              \
+    do {                                                                \
         if (-1 == (EXPR)) {                                             \
             const int err = errno;                                      \
             severe() << #EXPR " failed: " << errnoWithDescription(err); \
             invariantFailed("-1 != (" #EXPR ")", __FILE__, __LINE__);   \
         }                                                               \
-    } while(false)
+    } while (false)
 
 namespace mongo {
 namespace unittest {
@@ -81,12 +82,12 @@ void DeathTestImpl::_doTest() {
             invariant(pid == -1);
             const int err = errno;
             switch (err) {
-            case EINTR:
-                continue;
-            default:
-                severe() << "Unrecoverable error while waiting for " << child <<
-                    ": " << errnoWithDescription(err);
-                MONGO_UNREACHABLE;
+                case EINTR:
+                    continue;
+                default:
+                    severe() << "Unrecoverable error while waiting for " << child << ": "
+                             << errnoWithDescription(err);
+                    MONGO_UNREACHABLE;
             }
         }
         if (WIFSIGNALED(stat) || (WIFEXITED(stat) && WEXITSTATUS(stat) != 0)) {
@@ -94,8 +95,7 @@ void DeathTestImpl::_doTest() {
             // but haven't figured out how, so just return.
             ASSERT_STRING_CONTAINS(os.str(), getPattern());
             return;
-        }
-        else {
+        } else {
             invariant(!WIFSTOPPED(stat));
         }
         FAIL("Expected death, found life\n\n") << os.str();
@@ -107,8 +107,7 @@ void DeathTestImpl::_doTest() {
     checkSyscall(dup2(1, 2));
     try {
         _test->run();
-    }
-    catch (const TestAssertionFailureException& tafe) {
+    } catch (const TestAssertionFailureException& tafe) {
         log() << "Caught test exception while expecting death: " << tafe;
         // To fail the test, we must exit with a successful error code, because the parent process
         // is checking for the child to die with an exit code indicating an error.
@@ -118,5 +117,5 @@ void DeathTestImpl::_doTest() {
 #endif
 }
 
-} // namespace unittest
-} // namespace mongo
+}  // namespace unittest
+}  // namespace mongo

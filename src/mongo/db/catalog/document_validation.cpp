@@ -31,6 +31,6 @@
 #include "mongo/db/catalog/document_validation.h"
 
 namespace mongo {
-    const OperationContext::Decoration<bool> documentValidationDisabled =
-        OperationContext::declareDecoration<bool>();
+const OperationContext::Decoration<bool> documentValidationDisabled =
+    OperationContext::declareDecoration<bool>();
 }

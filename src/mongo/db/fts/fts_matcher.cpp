@@ -37,144 +37,138 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        using std::string;
+using std::string;
 
-        /**
-         * Does the string 'phrase' occur in the string 'haystack'?  Match is case-insensitive if
-         * 'caseSensitive' is false; otherwise, an exact substring match is performed.
-         */
-        static bool phraseMatches( const string& phrase,
-                                   const string& haystack,
-                                   bool caseSensitive ) {
-            if ( caseSensitive ) {
-                return haystack.find( phrase ) != string::npos;
-            }
-            return strcasestr( haystack.c_str(), phrase.c_str() ) != NULL;
-        }
+/**
+ * Does the string 'phrase' occur in the string 'haystack'?  Match is case-insensitive if
+ * 'caseSensitive' is false; otherwise, an exact substring match is performed.
+ */
+static bool phraseMatches(const string& phrase, const string& haystack, bool caseSensitive) {
+    if (caseSensitive) {
+        return haystack.find(phrase) != string::npos;
+    }
+    return strcasestr(haystack.c_str(), phrase.c_str()) != NULL;
+}
 
-        FTSMatcher::FTSMatcher( const FTSQuery& query, const FTSSpec& spec )
-            : _query( query ),
-              _spec( spec ) {
-        }
+FTSMatcher::FTSMatcher(const FTSQuery& query, const FTSSpec& spec) : _query(query), _spec(spec) {}
 
-        bool FTSMatcher::matches( const BSONObj& obj ) const {
-            if ( canSkipPositiveTermCheck() ) {
-                // We can assume that 'obj' has at least one positive term, and dassert as a sanity
-                // check.
-                dassert( hasPositiveTerm( obj ) );
-            }
-            else {
-                if ( !hasPositiveTerm( obj ) ) {
-                    return false;
-                }
-            }
-
-            if ( hasNegativeTerm( obj ) ) {
-                return false;
-            }
-
-            if ( !positivePhrasesMatch( obj ) ) {
-                return false;
-            }
-
-            return negativePhrasesMatch( obj );
-        }
-
-        bool FTSMatcher::hasPositiveTerm( const BSONObj& obj ) const {
-            FTSElementIterator it( _spec, obj );
-
-            while ( it.more() ) {
-                FTSIteratorValue val = it.next();
-                if ( _hasPositiveTerm_string( val._language, val._text ) ) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        bool FTSMatcher::_hasPositiveTerm_string( const FTSLanguage* language,
-                                                  const string& raw ) const {
-            std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
-
-            tokenizer->reset(raw.c_str(), _query.getCaseSensitive() ?
-                FTSTokenizer::GenerateCaseSensitiveTokens : FTSTokenizer::None);
-
-            while (tokenizer->moveNext()) {
-                string word = tokenizer->get().toString();
-                if (_query.getPositiveTerms().count(word) > 0) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        bool FTSMatcher::hasNegativeTerm( const BSONObj& obj ) const {
-            if ( _query.getNegatedTerms().size() == 0 ) {
-                return false;
-            }
-
-            FTSElementIterator it( _spec, obj );
-
-            while ( it.more() ) {
-                FTSIteratorValue val = it.next();
-                if ( _hasNegativeTerm_string( val._language, val._text ) ) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        bool FTSMatcher::_hasNegativeTerm_string( const FTSLanguage* language,
-                                                  const string& raw ) const {
-            std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
-
-            tokenizer->reset(raw.c_str(), _query.getCaseSensitive() ?
-                FTSTokenizer::GenerateCaseSensitiveTokens : FTSTokenizer::None);
-
-            while (tokenizer->moveNext()) {
-                string word = tokenizer->get().toString();
-                if ( _query.getNegatedTerms().count( word ) > 0 ) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        bool FTSMatcher::positivePhrasesMatch( const BSONObj& obj ) const {
-            for ( size_t i = 0; i < _query.getPositivePhr().size(); i++ ) {
-                if ( !_phraseMatch( _query.getPositivePhr()[i], obj ) ) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        bool FTSMatcher::negativePhrasesMatch( const BSONObj& obj ) const {
-            for ( size_t i = 0; i < _query.getNegatedPhr().size(); i++ ) {
-                if ( _phraseMatch( _query.getNegatedPhr()[i], obj ) ) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        bool FTSMatcher::_phraseMatch( const string& phrase, const BSONObj& obj ) const {
-            FTSElementIterator it( _spec, obj );
-
-            while ( it.more() ) {
-                FTSIteratorValue val = it.next();
-                if ( phraseMatches( phrase, val._text, _query.getCaseSensitive() ) ) {
-                    return true;
-                }
-            }
-
+bool FTSMatcher::matches(const BSONObj& obj) const {
+    if (canSkipPositiveTermCheck()) {
+        // We can assume that 'obj' has at least one positive term, and dassert as a sanity
+        // check.
+        dassert(hasPositiveTerm(obj));
+    } else {
+        if (!hasPositiveTerm(obj)) {
             return false;
         }
     }
+
+    if (hasNegativeTerm(obj)) {
+        return false;
+    }
+
+    if (!positivePhrasesMatch(obj)) {
+        return false;
+    }
+
+    return negativePhrasesMatch(obj);
+}
+
+bool FTSMatcher::hasPositiveTerm(const BSONObj& obj) const {
+    FTSElementIterator it(_spec, obj);
+
+    while (it.more()) {
+        FTSIteratorValue val = it.next();
+        if (_hasPositiveTerm_string(val._language, val._text)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool FTSMatcher::_hasPositiveTerm_string(const FTSLanguage* language, const string& raw) const {
+    std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
+
+    tokenizer->reset(raw.c_str(),
+                     _query.getCaseSensitive() ? FTSTokenizer::GenerateCaseSensitiveTokens
+                                               : FTSTokenizer::None);
+
+    while (tokenizer->moveNext()) {
+        string word = tokenizer->get().toString();
+        if (_query.getPositiveTerms().count(word) > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool FTSMatcher::hasNegativeTerm(const BSONObj& obj) const {
+    if (_query.getNegatedTerms().size() == 0) {
+        return false;
+    }
+
+    FTSElementIterator it(_spec, obj);
+
+    while (it.more()) {
+        FTSIteratorValue val = it.next();
+        if (_hasNegativeTerm_string(val._language, val._text)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool FTSMatcher::_hasNegativeTerm_string(const FTSLanguage* language, const string& raw) const {
+    std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
+
+    tokenizer->reset(raw.c_str(),
+                     _query.getCaseSensitive() ? FTSTokenizer::GenerateCaseSensitiveTokens
+                                               : FTSTokenizer::None);
+
+    while (tokenizer->moveNext()) {
+        string word = tokenizer->get().toString();
+        if (_query.getNegatedTerms().count(word) > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool FTSMatcher::positivePhrasesMatch(const BSONObj& obj) const {
+    for (size_t i = 0; i < _query.getPositivePhr().size(); i++) {
+        if (!_phraseMatch(_query.getPositivePhr()[i], obj)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool FTSMatcher::negativePhrasesMatch(const BSONObj& obj) const {
+    for (size_t i = 0; i < _query.getNegatedPhr().size(); i++) {
+        if (_phraseMatch(_query.getNegatedPhr()[i], obj)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool FTSMatcher::_phraseMatch(const string& phrase, const BSONObj& obj) const {
+    FTSElementIterator it(_spec, obj);
+
+    while (it.more()) {
+        FTSIteratorValue val = it.next();
+        if (phraseMatches(phrase, val._text, _query.getCaseSensitive())) {
+            return true;
+        }
+    }
+
+    return false;
+}
+}
 }

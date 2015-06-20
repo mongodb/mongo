@@ -30,27 +30,27 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class BSONObjBuilder;
-    class Status;
+class BSONObj;
+class BSONObjBuilder;
+class Status;
 
 namespace repl {
 
-    class LastVote {
-    public:
-        Status initialize(const BSONObj& argsObj);
+class LastVote {
+public:
+    Status initialize(const BSONObj& argsObj);
 
-        long long getTerm() const;
-        long long getCandidateId() const;
+    long long getTerm() const;
+    long long getCandidateId() const;
 
-        void setTerm(long long term);
-        void setCandidateId(long long candidateId);
-        BSONObj toBSON() const;
+    void setTerm(long long term);
+    void setCandidateId(long long candidateId);
+    BSONObj toBSON() const;
 
-    private:
-        long long _candidateId = -1;
-        long long _term = -1;
-    };
+private:
+    long long _candidateId = -1;
+    long long _term = -1;
+};
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

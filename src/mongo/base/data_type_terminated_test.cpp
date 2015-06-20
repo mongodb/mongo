@@ -34,39 +34,39 @@
 
 namespace mongo {
 
-    TEST(DataTypeTerminated, Basic) {
-        char buf[100];
-        char a[] = "a";
-        char b[] = "bb";
-        char c[] = "ccc";
+TEST(DataTypeTerminated, Basic) {
+    char buf[100];
+    char a[] = "a";
+    char b[] = "bb";
+    char c[] = "ccc";
 
-        {
-            DataRangeCursor drc(buf, buf + sizeof(buf));
-            ConstDataRange cdr_a(a, a + sizeof(a) + -1);
-            ConstDataRange cdr_b(b, b + sizeof(b) + -1);
-            ConstDataRange cdr_c(c, c + sizeof(c) + -1);
+    {
+        DataRangeCursor drc(buf, buf + sizeof(buf));
+        ConstDataRange cdr_a(a, a + sizeof(a) + -1);
+        ConstDataRange cdr_b(b, b + sizeof(b) + -1);
+        ConstDataRange cdr_c(c, c + sizeof(c) + -1);
 
-            ASSERT_OK(drc.writeAndAdvance(Terminated<'\0', ConstDataRange>(cdr_a)));
-            ASSERT_OK(drc.writeAndAdvance(Terminated<'\0', ConstDataRange>(cdr_b)));
-            ASSERT_OK(drc.writeAndAdvance(Terminated<'\0', ConstDataRange>(cdr_c)));
+        ASSERT_OK(drc.writeAndAdvance(Terminated<'\0', ConstDataRange>(cdr_a)));
+        ASSERT_OK(drc.writeAndAdvance(Terminated<'\0', ConstDataRange>(cdr_b)));
+        ASSERT_OK(drc.writeAndAdvance(Terminated<'\0', ConstDataRange>(cdr_c)));
 
-            ASSERT_EQUALS(1 + 2 + 3 + 3, drc.data() - buf);
-        }
-
-        {
-            ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
-
-            Terminated<'\0', ConstDataRange> tcdr;
-
-            ASSERT_OK(cdrc.readAndAdvance(&tcdr));
-            ASSERT_EQUALS(std::string(a), tcdr.value.data());
-
-            ASSERT_OK(cdrc.readAndAdvance(&tcdr));
-            ASSERT_EQUALS(std::string(b), tcdr.value.data());
-
-            ASSERT_OK(cdrc.readAndAdvance(&tcdr));
-            ASSERT_EQUALS(std::string(c), tcdr.value.data());
-        }
+        ASSERT_EQUALS(1 + 2 + 3 + 3, drc.data() - buf);
     }
 
-} // namespace mongo
+    {
+        ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
+
+        Terminated<'\0', ConstDataRange> tcdr;
+
+        ASSERT_OK(cdrc.readAndAdvance(&tcdr));
+        ASSERT_EQUALS(std::string(a), tcdr.value.data());
+
+        ASSERT_OK(cdrc.readAndAdvance(&tcdr));
+        ASSERT_EQUALS(std::string(b), tcdr.value.data());
+
+        ASSERT_OK(cdrc.readAndAdvance(&tcdr));
+        ASSERT_EQUALS(std::string(c), tcdr.value.data());
+    }
+}
+
+}  // namespace mongo

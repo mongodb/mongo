@@ -36,310 +36,309 @@
 
 namespace mongo {
 
-    class FieldParser {
-    public:
-        /**
-         * Returns true and fills in 'out' with the contents of the field described by 'field'
-         * or with the value in 'def', depending on whether the field is present and has the
-         * correct type in 'doc' or not, respectively. Otherwise, if the field exists but has
-         * the wrong type, returns false.
-         *
-         * NOTE ON BSON OWNERSHIP:
-         *
-         *   The caller must assume that this class will point to data inside 'doc' without
-         *   copying it. In practice this means that 'doc' MUST EXIST for as long as 'out'
-         *   stays in scope.
-         */
+class FieldParser {
+public:
+    /**
+     * Returns true and fills in 'out' with the contents of the field described by 'field'
+     * or with the value in 'def', depending on whether the field is present and has the
+     * correct type in 'doc' or not, respectively. Otherwise, if the field exists but has
+     * the wrong type, returns false.
+     *
+     * NOTE ON BSON OWNERSHIP:
+     *
+     *   The caller must assume that this class will point to data inside 'doc' without
+     *   copying it. In practice this means that 'doc' MUST EXIST for as long as 'out'
+     *   stays in scope.
+     */
 
-        enum FieldState {
-            // The field is present but has the wrong type
-            FIELD_INVALID = 0,
+    enum FieldState {
+        // The field is present but has the wrong type
+        FIELD_INVALID = 0,
 
-            // The field is present and has the correct type
-            FIELD_SET,
+        // The field is present and has the correct type
+        FIELD_SET,
 
-            // The field is absent in the BSON object but set from default
-            FIELD_DEFAULT,
+        // The field is absent in the BSON object but set from default
+        FIELD_DEFAULT,
 
-            // The field is absent and no default was specified
-            FIELD_NONE
-        };
-
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<bool>& field,
-                                   bool* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<bool>& field,
-                                   bool* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<BSONArray>& field,
-                                   BSONArray* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<BSONArray>& field,
-                                   BSONArray* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<BSONObj>& field,
-                                   BSONObj* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<BSONObj>& field,
-                                   BSONObj* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<Date_t>& field,
-                                   Date_t* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<Date_t>& field,
-                                   Date_t* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<Timestamp>& field,
-                                   Timestamp* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<Timestamp>& field,
-                                   Timestamp* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<std::string>& field,
-                                   std::string* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<std::string>& field,
-                                   std::string* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<OID>& field,
-                                   OID* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<OID>& field,
-                                   OID* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<int>& field,
-                                   int* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<int>& field,
-                                   int* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<long long>& field,
-                                   long long* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<long long>& field,
-                                   long long* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<double>& field,
-                                   double* out,
-                                   std::string* errMsg = NULL );
-
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<double>& field,
-                                   double* out,
-                                   std::string* errMsg = NULL );
-
-        /**
-         * The following extractNumber methods do implicit conversion between any numeric type and
-         * the BSONField type.  This can be useful when an exact numeric type is not needed, for
-         * example if the field is sometimes modified from the shell which can change the type.
-         */
-        static FieldState extractNumber( BSONObj doc,
-                                         const BSONField<int>& field,
-                                         int* out,
-                                         std::string* errMsg = NULL );
-
-        static FieldState extractNumber( BSONElement elem,
-                                         const BSONField<int>& field,
-                                         int* out,
-                                         std::string* errMsg = NULL );
-
-        static FieldState extractNumber( BSONObj doc,
-                                         const BSONField<long long>& field,
-                                         long long* out,
-                                         std::string* errMsg = NULL );
-
-        static FieldState extractNumber( BSONElement elem,
-                                         const BSONField<long long>& field,
-                                         long long* out,
-                                         std::string* errMsg = NULL );
-
-        static FieldState extractNumber( BSONObj doc,
-                                         const BSONField<double>& field,
-                                         double* out,
-                                         std::string* errMsg = NULL );
-
-        static FieldState extractNumber( BSONElement elem,
-                                         const BSONField<double>& field,
-                                         double* out,
-                                         std::string* errMsg = NULL );
-
-        /**
-         * Extracts a document id from a particular field name, which may be of any type but Array.
-         * Wraps the extracted id value in a BSONObj with one element and empty field name.
-         */
-        static FieldState extractID( BSONObj doc,
-                                     const BSONField<BSONObj>& field,
-                                     BSONObj* out,
-                                     std::string* errMsg = NULL );
-
-        static FieldState extractID( BSONElement elem,
-                                     const BSONField<BSONObj>& field,
-                                     BSONObj* out,
-                                     std::string* errMsg = NULL );
-
-        // TODO: BSONElement extraction of types below
-
-        /**
-         * Extracts a mandatory BSONSerializable structure 'field' from the object 'doc'. Write
-         * the extracted contents to '*out' if successful or fills '*errMsg', if exising,
-         * otherwise.  This variant relies on T having a parseBSON, which all
-         * BSONSerializable's have.
-         *
-         * TODO: Tighten for BSONSerializable's only
-         */
-        template<typename T>
-        static FieldState extract(BSONObj doc,
-                            const BSONField<T>& field,
-                            T* out,
-                            std::string* errMsg = NULL);
-
-        template<typename T>
-        static FieldState extract(BSONObj doc,
-                            const BSONField<T*>& field,
-                            T** out,
-                            std::string* errMsg = NULL);
-
-        /**
-         * Similar to the mandatory 'extract' but on a optional field. '*out' would only be
-         * allocated if the field is present. The ownership of '*out' would be transferred to
-         * the caller, in that case.
-         *
-         * TODO: Tighten for BSONSerializable's only
-         */
-        template<typename T>
-        static FieldState extract(BSONObj doc,
-                            const BSONField<T>& field,
-                            T** out,  // alloc variation
-                            std::string* errMsg = NULL);
-
-        /**
-         * Extracts a mandatory repetition of BSONSerializable structures, 'field', from the
-         * object 'doc'. Write the extracted contents to '*out' if successful or fills
-         * '*errMsg', if exising, otherwise.  This variant relies on T having a parseBSON,
-         * which all BSONSerializable's have.
-         *
-         * The vector owns the instances of T.
-         *
-         * TODO: Tighten for BSONSerializable's only
-         */
-        template<typename T>
-        static FieldState extract(BSONObj doc,
-                            const BSONField<std::vector<T*> >& field,
-                            std::vector<T*>* out,
-                            std::string* errMsg = NULL);
-
-        /**
-         * Extracts a mandatory repetition of BSONSerializable structures, 'field', from the
-         * field 'elem'. Write the extracted contents to '*out' if successful or fills
-         * '*errMsg', if exising, otherwise.  This variant relies on T having a parseBSON,
-         * which all BSONSerializable's have.
-         *
-         * The vector owns the instances of T.
-         *
-         * TODO: Tighten for BSONSerializable's only
-         */
-        template<typename T>
-        static FieldState extract(BSONElement elem,
-                            const BSONField<std::vector<T*> >& field,
-                            std::vector<T*>* out,
-                            std::string* errMsg = NULL);
-
-        /**
-         * Similar to the mandatory repetition' extract but on an optional field. '*out' would
-         * only be allocated if the field is present. The ownership of '*out' would be
-         * transferred to the caller, in that case.
-         *
-         * The vector owns the instances of T.
-         *
-         * TODO: Tighten for BSONSerializable's only
-         */
-        template<typename T>
-        static FieldState extract(BSONObj doc,
-                            const BSONField<std::vector<T*> >& field,
-                            std::vector<T*>** out,
-                            std::string* errMsg = NULL);
-
-        //
-        // ==================== Below DEPRECATED; use types instead ====================
-        //
-
-        /**
-         * The following extract methods are templatized to handle extraction of vectors and
-         * maps of sub-objects.  Keys in the map should be StringData compatible.
-         *
-         * It's possible to nest extraction of vectors and maps to any depth, i.e:
-         *
-         * std::vector<map<std::string,vector<std::string> > > val;
-         * FieldParser::extract(doc, field, val, &val);
-         */
-        template<typename T>
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<std::vector<T> >& field,
-                                   std::vector<T>* out,
-                                   std::string* errMsg = NULL );
-
-        template<typename T>
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<std::vector<T> >& field,
-                                   std::vector<T>* out,
-                                   std::string* errMsg = NULL );
-
-        template<typename K, typename T>
-        static FieldState extract( BSONObj doc,
-                                   const BSONField<std::map<K, T> >& field,
-                                   std::map<K, T>* out,
-                                   std::string* errMsg = NULL );
-
-        template<typename K, typename T>
-        static FieldState extract( BSONElement elem,
-                                   const BSONField<std::map<K, T> >& field,
-                                   std::map<K, T>* out,
-                                   std::string* errMsg = NULL );
-
-    private:
-        template<typename T>
-        static void clearOwnedVector(std::vector<T*>* vec);
+        // The field is absent and no default was specified
+        FIELD_NONE
     };
 
-} // namespace mongo
+    static FieldState extract(BSONObj doc,
+                              const BSONField<bool>& field,
+                              bool* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONElement elem,
+                              const BSONField<bool>& field,
+                              bool* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONObj doc,
+                              const BSONField<BSONArray>& field,
+                              BSONArray* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONElement elem,
+                              const BSONField<BSONArray>& field,
+                              BSONArray* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONObj doc,
+                              const BSONField<BSONObj>& field,
+                              BSONObj* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONElement elem,
+                              const BSONField<BSONObj>& field,
+                              BSONObj* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONObj doc,
+                              const BSONField<Date_t>& field,
+                              Date_t* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONElement elem,
+                              const BSONField<Date_t>& field,
+                              Date_t* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONObj doc,
+                              const BSONField<Timestamp>& field,
+                              Timestamp* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONElement elem,
+                              const BSONField<Timestamp>& field,
+                              Timestamp* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONObj doc,
+                              const BSONField<std::string>& field,
+                              std::string* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONElement elem,
+                              const BSONField<std::string>& field,
+                              std::string* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONObj doc,
+                              const BSONField<OID>& field,
+                              OID* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONElement elem,
+                              const BSONField<OID>& field,
+                              OID* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONObj doc,
+                              const BSONField<int>& field,
+                              int* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONElement elem,
+                              const BSONField<int>& field,
+                              int* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONObj doc,
+                              const BSONField<long long>& field,
+                              long long* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONElement elem,
+                              const BSONField<long long>& field,
+                              long long* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONElement elem,
+                              const BSONField<double>& field,
+                              double* out,
+                              std::string* errMsg = NULL);
+
+    static FieldState extract(BSONObj doc,
+                              const BSONField<double>& field,
+                              double* out,
+                              std::string* errMsg = NULL);
+
+    /**
+     * The following extractNumber methods do implicit conversion between any numeric type and
+     * the BSONField type.  This can be useful when an exact numeric type is not needed, for
+     * example if the field is sometimes modified from the shell which can change the type.
+     */
+    static FieldState extractNumber(BSONObj doc,
+                                    const BSONField<int>& field,
+                                    int* out,
+                                    std::string* errMsg = NULL);
+
+    static FieldState extractNumber(BSONElement elem,
+                                    const BSONField<int>& field,
+                                    int* out,
+                                    std::string* errMsg = NULL);
+
+    static FieldState extractNumber(BSONObj doc,
+                                    const BSONField<long long>& field,
+                                    long long* out,
+                                    std::string* errMsg = NULL);
+
+    static FieldState extractNumber(BSONElement elem,
+                                    const BSONField<long long>& field,
+                                    long long* out,
+                                    std::string* errMsg = NULL);
+
+    static FieldState extractNumber(BSONObj doc,
+                                    const BSONField<double>& field,
+                                    double* out,
+                                    std::string* errMsg = NULL);
+
+    static FieldState extractNumber(BSONElement elem,
+                                    const BSONField<double>& field,
+                                    double* out,
+                                    std::string* errMsg = NULL);
+
+    /**
+     * Extracts a document id from a particular field name, which may be of any type but Array.
+     * Wraps the extracted id value in a BSONObj with one element and empty field name.
+     */
+    static FieldState extractID(BSONObj doc,
+                                const BSONField<BSONObj>& field,
+                                BSONObj* out,
+                                std::string* errMsg = NULL);
+
+    static FieldState extractID(BSONElement elem,
+                                const BSONField<BSONObj>& field,
+                                BSONObj* out,
+                                std::string* errMsg = NULL);
+
+    // TODO: BSONElement extraction of types below
+
+    /**
+     * Extracts a mandatory BSONSerializable structure 'field' from the object 'doc'. Write
+     * the extracted contents to '*out' if successful or fills '*errMsg', if exising,
+     * otherwise.  This variant relies on T having a parseBSON, which all
+     * BSONSerializable's have.
+     *
+     * TODO: Tighten for BSONSerializable's only
+     */
+    template <typename T>
+    static FieldState extract(BSONObj doc,
+                              const BSONField<T>& field,
+                              T* out,
+                              std::string* errMsg = NULL);
+
+    template <typename T>
+    static FieldState extract(BSONObj doc,
+                              const BSONField<T*>& field,
+                              T** out,
+                              std::string* errMsg = NULL);
+
+    /**
+     * Similar to the mandatory 'extract' but on a optional field. '*out' would only be
+     * allocated if the field is present. The ownership of '*out' would be transferred to
+     * the caller, in that case.
+     *
+     * TODO: Tighten for BSONSerializable's only
+     */
+    template <typename T>
+    static FieldState extract(BSONObj doc,
+                              const BSONField<T>& field,
+                              T** out,  // alloc variation
+                              std::string* errMsg = NULL);
+
+    /**
+     * Extracts a mandatory repetition of BSONSerializable structures, 'field', from the
+     * object 'doc'. Write the extracted contents to '*out' if successful or fills
+     * '*errMsg', if exising, otherwise.  This variant relies on T having a parseBSON,
+     * which all BSONSerializable's have.
+     *
+     * The vector owns the instances of T.
+     *
+     * TODO: Tighten for BSONSerializable's only
+     */
+    template <typename T>
+    static FieldState extract(BSONObj doc,
+                              const BSONField<std::vector<T*>>& field,
+                              std::vector<T*>* out,
+                              std::string* errMsg = NULL);
+
+    /**
+     * Extracts a mandatory repetition of BSONSerializable structures, 'field', from the
+     * field 'elem'. Write the extracted contents to '*out' if successful or fills
+     * '*errMsg', if exising, otherwise.  This variant relies on T having a parseBSON,
+     * which all BSONSerializable's have.
+     *
+     * The vector owns the instances of T.
+     *
+     * TODO: Tighten for BSONSerializable's only
+     */
+    template <typename T>
+    static FieldState extract(BSONElement elem,
+                              const BSONField<std::vector<T*>>& field,
+                              std::vector<T*>* out,
+                              std::string* errMsg = NULL);
+
+    /**
+     * Similar to the mandatory repetition' extract but on an optional field. '*out' would
+     * only be allocated if the field is present. The ownership of '*out' would be
+     * transferred to the caller, in that case.
+     *
+     * The vector owns the instances of T.
+     *
+     * TODO: Tighten for BSONSerializable's only
+     */
+    template <typename T>
+    static FieldState extract(BSONObj doc,
+                              const BSONField<std::vector<T*>>& field,
+                              std::vector<T*>** out,
+                              std::string* errMsg = NULL);
+
+    //
+    // ==================== Below DEPRECATED; use types instead ====================
+    //
+
+    /**
+     * The following extract methods are templatized to handle extraction of vectors and
+     * maps of sub-objects.  Keys in the map should be StringData compatible.
+     *
+     * It's possible to nest extraction of vectors and maps to any depth, i.e:
+     *
+     * std::vector<map<std::string,vector<std::string> > > val;
+     * FieldParser::extract(doc, field, val, &val);
+     */
+    template <typename T>
+    static FieldState extract(BSONObj doc,
+                              const BSONField<std::vector<T>>& field,
+                              std::vector<T>* out,
+                              std::string* errMsg = NULL);
+
+    template <typename T>
+    static FieldState extract(BSONElement elem,
+                              const BSONField<std::vector<T>>& field,
+                              std::vector<T>* out,
+                              std::string* errMsg = NULL);
+
+    template <typename K, typename T>
+    static FieldState extract(BSONObj doc,
+                              const BSONField<std::map<K, T>>& field,
+                              std::map<K, T>* out,
+                              std::string* errMsg = NULL);
+
+    template <typename K, typename T>
+    static FieldState extract(BSONElement elem,
+                              const BSONField<std::map<K, T>>& field,
+                              std::map<K, T>* out,
+                              std::string* errMsg = NULL);
+
+private:
+    template <typename T>
+    static void clearOwnedVector(std::vector<T*>* vec);
+};
+
+}  // namespace mongo
 
 // Inline functions for templating
 #include "field_parser-inl.h"
-

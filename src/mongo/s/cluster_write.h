@@ -35,50 +35,47 @@
 
 namespace mongo {
 
-    class ClusterWriterStats;
-    class BatchWriteExecStats;
+class ClusterWriterStats;
+class BatchWriteExecStats;
 
-    class ClusterWriter {
-    public:
+class ClusterWriter {
+public:
+    ClusterWriter(bool autoSplit, int timeoutMillis);
 
-        ClusterWriter( bool autoSplit, int timeoutMillis );
+    void write(const BatchedCommandRequest& request, BatchedCommandResponse* response);
 
-        void write( const BatchedCommandRequest& request, BatchedCommandResponse* response );
+    const ClusterWriterStats& getStats();
 
-        const ClusterWriterStats& getStats();
+private:
+    const bool _autoSplit;
+    const int _timeoutMillis;
 
-    private:
-        const bool _autoSplit;
-        const int _timeoutMillis;
+    std::unique_ptr<ClusterWriterStats> _stats;
+};
 
-        std::unique_ptr<ClusterWriterStats> _stats;
-    };
+class ClusterWriterStats {
+public:
+    // Transfers ownership to the cluster write stats
+    void setShardStats(BatchWriteExecStats* _shardStats);
 
-    class ClusterWriterStats {
-    public:
+    bool hasShardStats() const;
 
-        // Transfers ownership to the cluster write stats
-        void setShardStats( BatchWriteExecStats* _shardStats );
+    const BatchWriteExecStats& getShardStats() const;
 
-        bool hasShardStats() const;
+    // TODO: When we have ConfigCoordinator stats, put these here too.
 
-        const BatchWriteExecStats& getShardStats() const;
+private:
+    std::unique_ptr<BatchWriteExecStats> _shardStats;
+};
 
-        // TODO: When we have ConfigCoordinator stats, put these here too.
+/**
+ * Used only for writes to the config server, config and admin databases.
+ *
+ * Note: response can be NULL if you don't care about the write statistics.
+ */
+Status clusterCreateIndex(const std::string& ns,
+                          BSONObj keys,
+                          bool unique,
+                          BatchedCommandResponse* response);
 
-    private:
-
-        std::unique_ptr<BatchWriteExecStats> _shardStats;
-    };
-
-    /**
-     * Used only for writes to the config server, config and admin databases.
-     *
-     * Note: response can be NULL if you don't care about the write statistics.
-     */
-    Status clusterCreateIndex( const std::string& ns,
-                               BSONObj keys,
-                               bool unique,
-                               BatchedCommandResponse* response );
-
-} // namespace mongo
+}  // namespace mongo

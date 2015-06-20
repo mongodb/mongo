@@ -42,184 +42,168 @@
 namespace mongo {
 namespace {
 
-    //  SERVER-14668: Remove or invert sense once MMAPv1 CLL can be default
-    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableCollectionLocking, bool, true);
-} // namespace
+//  SERVER-14668: Remove or invert sense once MMAPv1 CLL can be default
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableCollectionLocking, bool, true);
+}  // namespace
 
-    Lock::TempRelease::TempRelease(Locker* lockState)
-        : _lockState(lockState),
-          _lockSnapshot(),
-          _locksReleased(_lockState->saveLockStateAndUnlock(&_lockSnapshot)) {
+Lock::TempRelease::TempRelease(Locker* lockState)
+    : _lockState(lockState),
+      _lockSnapshot(),
+      _locksReleased(_lockState->saveLockStateAndUnlock(&_lockSnapshot)) {}
 
+Lock::TempRelease::~TempRelease() {
+    if (_locksReleased) {
+        invariant(!_lockState->isLocked());
+        _lockState->restoreLockState(_lockSnapshot);
+    }
+}
+
+Lock::GlobalLock::GlobalLock(Locker* locker)
+    : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {}
+
+Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
+    : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {
+    _lock(lockMode, timeoutMs);
+}
+
+
+void Lock::GlobalLock::_lock(LockMode lockMode, unsigned timeoutMs) {
+    if (!_locker->isBatchWriter()) {
+        _pbwm.lock(MODE_IS);
     }
 
-    Lock::TempRelease::~TempRelease() {
-        if (_locksReleased) {
-            invariant(!_lockState->isLocked());
-            _lockState->restoreLockState(_lockSnapshot);
-        }
+    _result = _locker->lockGlobalBegin(lockMode);
+    if (_result == LOCK_WAITING) {
+        _result = _locker->lockGlobalComplete(timeoutMs);
     }
 
-    Lock::GlobalLock::GlobalLock(Locker* locker)
-          : _locker(locker),
-            _result(LOCK_INVALID),
-            _pbwm(locker, resourceIdParallelBatchWriterMode) { }
+    if (_result != LOCK_OK && !_locker->isBatchWriter()) {
+        _pbwm.unlock();
+    }
+}
 
-    Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
-          : _locker(locker),
-            _result(LOCK_INVALID),
-            _pbwm(locker, resourceIdParallelBatchWriterMode) {
-        _lock(lockMode, timeoutMs);
+void Lock::GlobalLock::_unlock() {
+    if (isLocked()) {
+        _locker->unlockAll();
+        _result = LOCK_INVALID;
+    }
+}
+
+
+Lock::DBLock::DBLock(Locker* locker, StringData db, LockMode mode)
+    : _id(RESOURCE_DATABASE, db),
+      _locker(locker),
+      _mode(mode),
+      _globalLock(locker, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, UINT_MAX) {
+    massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
+
+    // Need to acquire the flush lock
+    _locker->lockMMAPV1Flush();
+
+    if (supportsDocLocking() || enableCollectionLocking) {
+        // The check for the admin db is to ensure direct writes to auth collections
+        // are serialized (see SERVER-16092).
+        if ((_id == resourceIdAdminDB) && !isSharedLockMode(_mode)) {
+            _mode = MODE_X;
+        }
+
+        invariant(LOCK_OK == _locker->lock(_id, _mode));
+    } else {
+        invariant(LOCK_OK == _locker->lock(_id, isSharedLockMode(_mode) ? MODE_S : MODE_X));
+    }
+}
+
+Lock::DBLock::~DBLock() {
+    _locker->unlock(_id);
+}
+
+void Lock::DBLock::relockWithMode(LockMode newMode) {
+    // 2PL would delay the unlocking
+    invariant(!_locker->inAWriteUnitOfWork());
+
+    // Not allowed to change global intent
+    invariant(!isSharedLockMode(_mode) || isSharedLockMode(newMode));
+
+    _locker->unlock(_id);
+    _mode = newMode;
+
+    if (supportsDocLocking() || enableCollectionLocking) {
+        invariant(LOCK_OK == _locker->lock(_id, _mode));
+    } else {
+        invariant(LOCK_OK == _locker->lock(_id, isSharedLockMode(_mode) ? MODE_S : MODE_X));
+    }
+}
+
+
+Lock::CollectionLock::CollectionLock(Locker* lockState, StringData ns, LockMode mode)
+    : _id(RESOURCE_COLLECTION, ns), _lockState(lockState) {
+    massert(28538, "need a non-empty collection name", nsIsFull(ns));
+
+    dassert(_lockState->isDbLockedForMode(nsToDatabaseSubstring(ns),
+                                          isSharedLockMode(mode) ? MODE_IS : MODE_IX));
+    if (supportsDocLocking()) {
+        _lockState->lock(_id, mode);
+    } else if (enableCollectionLocking) {
+        _lockState->lock(_id, isSharedLockMode(mode) ? MODE_S : MODE_X);
+    }
+}
+
+Lock::CollectionLock::~CollectionLock() {
+    if (supportsDocLocking() || enableCollectionLocking) {
+        _lockState->unlock(_id);
+    }
+}
+
+void Lock::CollectionLock::relockAsDatabaseExclusive(Lock::DBLock& dbLock) {
+    if (supportsDocLocking() || enableCollectionLocking) {
+        _lockState->unlock(_id);
     }
 
+    dbLock.relockWithMode(MODE_X);
 
-
-    void Lock::GlobalLock::_lock(LockMode lockMode, unsigned timeoutMs) {
-        if (!_locker->isBatchWriter()) {
-            _pbwm.lock(MODE_IS);
-        }
-
-        _result = _locker->lockGlobalBegin(lockMode);
-        if (_result == LOCK_WAITING) {
-            _result = _locker->lockGlobalComplete(timeoutMs);
-        }
-
-        if (_result != LOCK_OK && !_locker->isBatchWriter()) {
-            _pbwm.unlock();
-        }
+    if (supportsDocLocking() || enableCollectionLocking) {
+        // don't need the lock, but need something to unlock in the destructor
+        _lockState->lock(_id, MODE_IX);
     }
-
-    void Lock::GlobalLock::_unlock() {
-        if (isLocked()) {
-            _locker->unlockAll();
-            _result = LOCK_INVALID;
-        }
-    }
-
-
-    Lock::DBLock::DBLock(Locker* locker, StringData db, LockMode mode)
-        : _id(RESOURCE_DATABASE, db),
-          _locker(locker),
-          _mode(mode),
-          _globalLock(locker, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, UINT_MAX) {
-
-        massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
-
-        // Need to acquire the flush lock
-        _locker->lockMMAPV1Flush();
-
-        if (supportsDocLocking() || enableCollectionLocking) {
-            // The check for the admin db is to ensure direct writes to auth collections
-            // are serialized (see SERVER-16092).
-            if ((_id == resourceIdAdminDB) && !isSharedLockMode(_mode)) {
-                _mode = MODE_X;
-            }
-
-            invariant(LOCK_OK == _locker->lock(_id, _mode));
-        }
-        else {
-            invariant(LOCK_OK == _locker->lock(_id, isSharedLockMode(_mode) ? MODE_S : MODE_X));
-        }
-    }
-
-    Lock::DBLock::~DBLock() {
-        _locker->unlock(_id);
-    }
-
-    void Lock::DBLock::relockWithMode(LockMode newMode) {
-        // 2PL would delay the unlocking
-        invariant(!_locker->inAWriteUnitOfWork());
-
-        // Not allowed to change global intent
-        invariant(!isSharedLockMode(_mode) || isSharedLockMode(newMode));
-
-        _locker->unlock(_id);
-        _mode = newMode;
-
-        if (supportsDocLocking() || enableCollectionLocking) {
-            invariant(LOCK_OK == _locker->lock(_id, _mode));
-        }
-        else {
-            invariant(LOCK_OK == _locker->lock(_id, isSharedLockMode(_mode) ? MODE_S : MODE_X));
-        }
-    }
-
-
-    Lock::CollectionLock::CollectionLock(Locker* lockState,
-                                         StringData ns,
-                                         LockMode mode)
-        : _id(RESOURCE_COLLECTION, ns),
-          _lockState(lockState) {
-
-        massert(28538, "need a non-empty collection name", nsIsFull(ns));
-
-        dassert(_lockState->isDbLockedForMode(nsToDatabaseSubstring(ns),
-                                              isSharedLockMode(mode) ? MODE_IS : MODE_IX));
-        if (supportsDocLocking()) {
-            _lockState->lock(_id, mode);
-        }
-        else if (enableCollectionLocking) {
-            _lockState->lock(_id, isSharedLockMode(mode) ? MODE_S : MODE_X);
-        }
-    }
-
-    Lock::CollectionLock::~CollectionLock() {
-        if (supportsDocLocking() || enableCollectionLocking) {
-            _lockState->unlock(_id);
-        }
-    }
-
-    void Lock::CollectionLock::relockAsDatabaseExclusive(Lock::DBLock& dbLock) {
-        if (supportsDocLocking() || enableCollectionLocking) {
-            _lockState->unlock(_id);
-        }
-
-        dbLock.relockWithMode(MODE_X);
-
-        if (supportsDocLocking() || enableCollectionLocking) {
-            // don't need the lock, but need something to unlock in the destructor
-            _lockState->lock(_id, MODE_IX);
-        }
-    }
+}
 
 namespace {
-    stdx::mutex oplogSerialization; // for OplogIntentWriteLock
-} // namespace
+stdx::mutex oplogSerialization;  // for OplogIntentWriteLock
+}  // namespace
 
-    Lock::OplogIntentWriteLock::OplogIntentWriteLock(Locker* lockState)
-          : _lockState(lockState),
-            _serialized(false) {
-        _lockState->lock(resourceIdOplog, MODE_IX);
+Lock::OplogIntentWriteLock::OplogIntentWriteLock(Locker* lockState)
+    : _lockState(lockState), _serialized(false) {
+    _lockState->lock(resourceIdOplog, MODE_IX);
+}
+
+Lock::OplogIntentWriteLock::~OplogIntentWriteLock() {
+    if (_serialized) {
+        oplogSerialization.unlock();
     }
+    _lockState->unlock(resourceIdOplog);
+}
 
-    Lock::OplogIntentWriteLock::~OplogIntentWriteLock() {
-        if (_serialized) {
-            oplogSerialization.unlock();
-        }
-        _lockState->unlock(resourceIdOplog);
+void Lock::OplogIntentWriteLock::serializeIfNeeded() {
+    if (!supportsDocLocking() && !_serialized) {
+        oplogSerialization.lock();
+        _serialized = true;
     }
+}
 
-    void Lock::OplogIntentWriteLock::serializeIfNeeded() {
-        if (!supportsDocLocking() && !_serialized) {
-            oplogSerialization.lock();
-            _serialized = true;
-        }
+Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
+    : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X) {}
+
+void Lock::ResourceLock::lock(LockMode mode) {
+    invariant(_result == LOCK_INVALID);
+    _result = _locker->lock(_rid, mode);
+    invariant(_result == LOCK_OK);
+}
+
+void Lock::ResourceLock::unlock() {
+    if (_result == LOCK_OK) {
+        _locker->unlock(_rid);
+        _result = LOCK_INVALID;
     }
+}
 
-    Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
-          : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X) { }
-
-    void Lock::ResourceLock::lock(LockMode mode) {
-        invariant(_result == LOCK_INVALID);
-        _result = _locker->lock(_rid, mode);
-        invariant(_result == LOCK_OK);
-    }
-
-    void Lock::ResourceLock::unlock() {
-        if (_result == LOCK_OK) {
-            _locker->unlock(_rid);
-            _result = LOCK_INVALID;
-        }
-    }
-
-} // namespace mongo
+}  // namespace mongo

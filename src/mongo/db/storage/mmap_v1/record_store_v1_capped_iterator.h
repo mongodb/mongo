@@ -33,58 +33,60 @@
 
 namespace mongo {
 
-    class CappedRecordStoreV1;
+class CappedRecordStoreV1;
 
-    struct Extent;
+struct Extent;
+
+/**
+ * This class iterates over a capped collection identified by 'ns'.
+ * The collection must exist when the constructor is called.
+ */
+class CappedRecordStoreV1Iterator final : public RecordCursor {
+public:
+    CappedRecordStoreV1Iterator(OperationContext* txn,
+                                const CappedRecordStoreV1* collection,
+                                bool forward);
+
+    boost::optional<Record> next() final;
+    boost::optional<Record> seekExact(const RecordId& id) final;
+    void savePositioned() final;
+    bool restore(OperationContext* txn) final;
+    void invalidate(const RecordId& dl) final;
+    std::unique_ptr<RecordFetcher> fetcherForNext() const final;
+    std::unique_ptr<RecordFetcher> fetcherForId(const RecordId& id) const final;
+
+private:
+    void advance();
+    bool isEOF() {
+        return _curr.isNull();
+    }
 
     /**
-     * This class iterates over a capped collection identified by 'ns'.
-     * The collection must exist when the constructor is called.
+     * Internal collection navigation helper methods.
      */
-    class CappedRecordStoreV1Iterator final : public RecordCursor {
-    public:
-        CappedRecordStoreV1Iterator( OperationContext* txn,
-                                     const CappedRecordStoreV1* collection,
-                                     bool forward );
+    DiskLoc getNextCapped(const DiskLoc& dl);
+    DiskLoc prevLoop(const DiskLoc& curr);
+    DiskLoc nextLoop(const DiskLoc& prev);
 
-        boost::optional<Record> next() final;
-        boost::optional<Record> seekExact(const RecordId& id) final;
-        void savePositioned() final;
-        bool restore(OperationContext* txn) final;
-        void invalidate(const RecordId& dl) final;
-        std::unique_ptr<RecordFetcher> fetcherForNext() const final;
-        std::unique_ptr<RecordFetcher> fetcherForId(const RecordId& id) const final;
+    // some helpers - these move to RecordStore probably
+    Extent* _getExtent(const DiskLoc& loc);
+    DiskLoc _getNextRecord(const DiskLoc& loc);
+    DiskLoc _getPrevRecord(const DiskLoc& loc);
 
-    private:
-        void advance();
-        bool isEOF() { return _curr.isNull(); }
+    // transactional context for read locks. Not owned by us
+    OperationContext* _txn;
 
-        /**
-         * Internal collection navigation helper methods.
-         */
-        DiskLoc getNextCapped(const DiskLoc& dl);
-        DiskLoc prevLoop(const DiskLoc& curr);
-        DiskLoc nextLoop(const DiskLoc& prev);
+    // The collection we're iterating over.
+    const CappedRecordStoreV1* const _recordStore;
 
-        // some helpers - these move to RecordStore probably
-        Extent* _getExtent( const DiskLoc& loc );
-        DiskLoc _getNextRecord( const DiskLoc& loc );
-        DiskLoc _getPrevRecord( const DiskLoc& loc );
+    // The result returned on the next call to getNext().
+    DiskLoc _curr;
 
-        // transactional context for read locks. Not owned by us
-        OperationContext* _txn;
+    const bool _forward;
 
-        // The collection we're iterating over.
-        const CappedRecordStoreV1* const _recordStore;
-
-        // The result returned on the next call to getNext().
-        DiskLoc _curr;
-
-        const bool _forward;
-
-        // If invalidate kills the DiskLoc we need to move forward, we kill the iterator.  See the
-        // comment in the body of invalidate(...).
-        bool _killedByInvalidate = false;
-    };
+    // If invalidate kills the DiskLoc we need to move forward, we kill the iterator.  See the
+    // comment in the body of invalidate(...).
+    bool _killedByInvalidate = false;
+};
 
 }  // namespace mongo

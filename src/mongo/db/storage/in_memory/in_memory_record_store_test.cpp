@@ -37,24 +37,22 @@
 
 namespace mongo {
 
-    class InMemoryHarnessHelper : public HarnessHelper {
-    public:
-        InMemoryHarnessHelper() {
-        }
+class InMemoryHarnessHelper : public HarnessHelper {
+public:
+    InMemoryHarnessHelper() {}
 
-        virtual RecordStore* newNonCappedRecordStore() {
-            return new InMemoryRecordStore( "a.b", &data );
-        }
-
-        virtual RecoveryUnit* newRecoveryUnit() {
-            return new InMemoryRecoveryUnit();
-        }
-
-        std::shared_ptr<void> data;
-    };
-
-    HarnessHelper* newHarnessHelper() {
-        return new InMemoryHarnessHelper();
+    virtual RecordStore* newNonCappedRecordStore() {
+        return new InMemoryRecordStore("a.b", &data);
     }
 
+    virtual RecoveryUnit* newRecoveryUnit() {
+        return new InMemoryRecoveryUnit();
+    }
+
+    std::shared_ptr<void> data;
+};
+
+HarnessHelper* newHarnessHelper() {
+    return new InMemoryHarnessHelper();
+}
 }

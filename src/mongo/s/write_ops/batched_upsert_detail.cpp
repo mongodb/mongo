@@ -33,128 +33,130 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
-    const BSONField<int> BatchedUpsertDetail::index("index");
-    const BSONField<BSONObj> BatchedUpsertDetail::upsertedID("_id");
+const BSONField<int> BatchedUpsertDetail::index("index");
+const BSONField<BSONObj> BatchedUpsertDetail::upsertedID("_id");
 
-    BatchedUpsertDetail::BatchedUpsertDetail() {
-        clear();
+BatchedUpsertDetail::BatchedUpsertDetail() {
+    clear();
+}
+
+BatchedUpsertDetail::~BatchedUpsertDetail() {}
+
+bool BatchedUpsertDetail::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    BatchedUpsertDetail::~BatchedUpsertDetail() {
+    // All the mandatory fields must be present.
+    if (!_isIndexSet) {
+        *errMsg = stream() << "missing " << index.name() << " field";
+        return false;
     }
 
-    bool BatchedUpsertDetail::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
-
-        // All the mandatory fields must be present.
-        if (!_isIndexSet) {
-            *errMsg = stream() << "missing " << index.name() << " field";
-            return false;
-        }
-
-        if (!_isUpsertedIDSet) {
-            *errMsg = stream() << "missing " << upsertedID.name() << " field";
-            return false;
-        }
-
-        return true;
+    if (!_isUpsertedIDSet) {
+        *errMsg = stream() << "missing " << upsertedID.name() << " field";
+        return false;
     }
 
-    BSONObj BatchedUpsertDetail::toBSON() const {
-        BSONObjBuilder builder;
+    return true;
+}
 
-        if (_isIndexSet) builder.append(index(), _index);
+BSONObj BatchedUpsertDetail::toBSON() const {
+    BSONObjBuilder builder;
 
-        // We're using the BSONObj to store the _id value.
-        if (_isUpsertedIDSet) {
-            builder.appendAs(_upsertedID.firstElement(), upsertedID());
-        }
+    if (_isIndexSet)
+        builder.append(index(), _index);
 
-        return builder.obj();
+    // We're using the BSONObj to store the _id value.
+    if (_isUpsertedIDSet) {
+        builder.appendAs(_upsertedID.firstElement(), upsertedID());
     }
 
-    bool BatchedUpsertDetail::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+    return builder.obj();
+}
 
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
+bool BatchedUpsertDetail::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, index, &_index, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isIndexSet = fieldState == FieldParser::FIELD_SET;
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-        fieldState = FieldParser::extractID(source, upsertedID, &_upsertedID, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isUpsertedIDSet = fieldState == FieldParser::FIELD_SET;
+    FieldParser::FieldState fieldState;
+    fieldState = FieldParser::extract(source, index, &_index, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isIndexSet = fieldState == FieldParser::FIELD_SET;
 
-        return true;
-    }
+    fieldState = FieldParser::extractID(source, upsertedID, &_upsertedID, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isUpsertedIDSet = fieldState == FieldParser::FIELD_SET;
 
-    void BatchedUpsertDetail::clear() {
-        _index = 0;
-        _isIndexSet = false;
+    return true;
+}
 
-        _upsertedID = BSONObj();
-        _isUpsertedIDSet = false;
+void BatchedUpsertDetail::clear() {
+    _index = 0;
+    _isIndexSet = false;
 
-    }
+    _upsertedID = BSONObj();
+    _isUpsertedIDSet = false;
+}
 
-    void BatchedUpsertDetail::cloneTo(BatchedUpsertDetail* other) const {
-        other->clear();
+void BatchedUpsertDetail::cloneTo(BatchedUpsertDetail* other) const {
+    other->clear();
 
-        other->_index = _index;
-        other->_isIndexSet = _isIndexSet;
+    other->_index = _index;
+    other->_isIndexSet = _isIndexSet;
 
-        other->_upsertedID = _upsertedID;
-        other->_isUpsertedIDSet = _isUpsertedIDSet;
-    }
+    other->_upsertedID = _upsertedID;
+    other->_isUpsertedIDSet = _isUpsertedIDSet;
+}
 
-    std::string BatchedUpsertDetail::toString() const {
-        return "implement me";
-    }
+std::string BatchedUpsertDetail::toString() const {
+    return "implement me";
+}
 
-    void BatchedUpsertDetail::setIndex(int index) {
-        _index = index;
-        _isIndexSet = true;
-    }
+void BatchedUpsertDetail::setIndex(int index) {
+    _index = index;
+    _isIndexSet = true;
+}
 
-    void BatchedUpsertDetail::unsetIndex() {
-         _isIndexSet = false;
-     }
+void BatchedUpsertDetail::unsetIndex() {
+    _isIndexSet = false;
+}
 
-    bool BatchedUpsertDetail::isIndexSet() const {
-         return _isIndexSet;
-    }
+bool BatchedUpsertDetail::isIndexSet() const {
+    return _isIndexSet;
+}
 
-    int BatchedUpsertDetail::getIndex() const {
-        dassert(_isIndexSet);
-        return _index;
-    }
+int BatchedUpsertDetail::getIndex() const {
+    dassert(_isIndexSet);
+    return _index;
+}
 
-    void BatchedUpsertDetail::setUpsertedID(const BSONObj& upsertedID) {
-        _upsertedID = upsertedID.firstElement().wrap( "" ).getOwned();
-        _isUpsertedIDSet = true;
-    }
+void BatchedUpsertDetail::setUpsertedID(const BSONObj& upsertedID) {
+    _upsertedID = upsertedID.firstElement().wrap("").getOwned();
+    _isUpsertedIDSet = true;
+}
 
-    void BatchedUpsertDetail::unsetUpsertedID() {
-         _isUpsertedIDSet = false;
-     }
+void BatchedUpsertDetail::unsetUpsertedID() {
+    _isUpsertedIDSet = false;
+}
 
-    bool BatchedUpsertDetail::isUpsertedIDSet() const {
-         return _isUpsertedIDSet;
-    }
+bool BatchedUpsertDetail::isUpsertedIDSet() const {
+    return _isUpsertedIDSet;
+}
 
-    const BSONObj& BatchedUpsertDetail::getUpsertedID() const {
-        dassert(_isUpsertedIDSet);
-        return _upsertedID;
-    }
+const BSONObj& BatchedUpsertDetail::getUpsertedID() const {
+    dassert(_isUpsertedIDSet);
+    return _upsertedID;
+}
 
-} // namespace mongo
+}  // namespace mongo

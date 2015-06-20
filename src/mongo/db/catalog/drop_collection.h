@@ -29,15 +29,15 @@
 #include "mongo/base/status.h"
 
 namespace mongo {
-    class BSONObjBuilder;
-    class NamespaceString;
-    class OperationContext;
+class BSONObjBuilder;
+class NamespaceString;
+class OperationContext;
 
-    /**
-     * Drops the collection "collectionName" and populates "result" with statistics about what
-     * was removed.
-     */
-    Status dropCollection(OperationContext* txn,
-                          const NamespaceString& collectionName,
-                          BSONObjBuilder& result);
-} // namespace mongo
+/**
+ * Drops the collection "collectionName" and populates "result" with statistics about what
+ * was removed.
+ */
+Status dropCollection(OperationContext* txn,
+                      const NamespaceString& collectionName,
+                      BSONObjBuilder& result);
+}  // namespace mongo

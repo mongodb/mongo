@@ -44,154 +44,146 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-    class Fetcher {
-        MONGO_DISALLOW_COPYING(Fetcher);
-    public:
+class Fetcher {
+    MONGO_DISALLOW_COPYING(Fetcher);
 
-        /**
-         * Container for BSON documents extracted from cursor results.
-         */
-        typedef std::vector<BSONObj> Documents;
+public:
+    /**
+     * Container for BSON documents extracted from cursor results.
+     */
+    typedef std::vector<BSONObj> Documents;
 
-        /**
-         * Documents in current query response with cursor ID and associated namespace name.
-         * If cursor ID is zero, there are no additional batches.
-         */
-        struct QueryResponse {
-            QueryResponse() = default;
-            QueryResponse(CursorId theCursorId,
-                          const NamespaceString& theNss,
-                          Documents theDocuments);
-            CursorId cursorId = 0;
-            NamespaceString nss;
-            Documents documents;
-            // TODO: fill in with replication metadata.
-            struct OtherFields {
-                BSONObj metadata;
-            } otherFields;
-        };
-
-        using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
-
-        /**
-         * Represents next steps of fetcher.
-         */
-        enum class NextAction : int {
-            kInvalid=0,
-            kNoAction=1,
-            kGetMore=2
-        };
-
-        /**
-         * Type of a fetcher callback function.
-         */
-        typedef stdx::function<void (const StatusWith<QueryResponse>&,
-                                     NextAction*,
-                                     BSONObjBuilder*)> CallbackFn;
-
-        /**
-         * Creates Fetcher task but does not schedule it to be run by the executor.
-         *
-         * First remote command to be run by the executor will be 'cmdObj'. The results
-         * of 'cmdObj' must contain a cursor response object.
-         * See Commands::appendCursorResponseObject.
-         *
-         * Callback function 'work' will be called 1 or more times after a successful
-         * schedule() call depending on the results of the remote command.
-         *
-         * Depending on the cursor ID in the initial cursor response object, the fetcher may run
-         * subsequent getMore commands on the remote server in order to obtain a complete
-         * set of results.
-         *
-         * Failed remote commands will also cause 'work' to be invoked with the
-         * error details provided by the remote server. On failure, the fetcher will stop
-         * sending getMore requests to the remote server.
-         *
-         * If the fetcher is canceled (either by calling cancel() or shutting down the executor),
-         * 'work' will not be invoked.
-         *
-         * Fetcher uses the NextAction and BSONObjBuilder arguments to inform client via callback
-         * if a follow-up (like getMore) command will be scheduled to be run by the executor to
-         * retrieve additional results. The BSONObjBuilder pointer will be valid only if NextAction
-         * is kGetMore.
-         * Otherwise, the BSONObjBuilder pointer will be null.
-         * Also, note that the NextAction is both an input and output argument to allow
-         * the client to suggest a different action for the fetcher to take post-callback.
-         *
-         * The callback function 'work' is not allowed to call into the Fetcher instance. This
-         * behavior is undefined and may result in a deadlock.
-         */
-        Fetcher(executor::TaskExecutor* executor,
-                const HostAndPort& source,
-                const std::string& dbname,
-                const BSONObj& cmdObj,
-                const CallbackFn& work);
-
-        virtual ~Fetcher();
-
-        /**
-         * Returns diagnostic information.
-         */
-        std::string getDiagnosticString() const;
-
-        /**
-         * Returns true if a remote command has been scheduled (but not completed)
-         * with the executor.
-         */
-        bool isActive() const;
-
-        /**
-         * Schedules 'cmdObj' to be run on the remote server.
-         */
-        Status schedule();
-
-        /**
-         * Cancels remote command request.
-         * Returns immediately if fetcher is not active.
-         */
-        void cancel();
-
-        /**
-         * Waits for remote command requests to complete.
-         * Returns immediately if fetcher is not active.
-         */
-        void wait();
-
-    private:
-
-        /**
-         * Schedules remote command to be run by the executor
-         */
-        Status _schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName);
-
-        /**
-         * Callback for remote command.
-         */
-        void _callback(const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd,
-                       const char* batchFieldName);
-
-        /**
-         * Sets fetcher state to inactive and notifies waiters.
-         */
-        void _finishCallback();
-
-        // Not owned by us.
-        executor::TaskExecutor* _executor;
-
-        HostAndPort _source;
-        std::string _dbname;
-        BSONObj _cmdObj;
-        CallbackFn _work;
-
-        // Protects member data of this Fetcher.
-        mutable stdx::mutex _mutex;
-
-        mutable stdx::condition_variable _condition;
-
-        // _active is true when Fetcher is scheduled to be run by the executor.
-        bool _active;
-        // Callback handle to the scheduled remote command.
-        executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;
+    /**
+     * Documents in current query response with cursor ID and associated namespace name.
+     * If cursor ID is zero, there are no additional batches.
+     */
+    struct QueryResponse {
+        QueryResponse() = default;
+        QueryResponse(CursorId theCursorId, const NamespaceString& theNss, Documents theDocuments);
+        CursorId cursorId = 0;
+        NamespaceString nss;
+        Documents documents;
+        // TODO: fill in with replication metadata.
+        struct OtherFields {
+            BSONObj metadata;
+        } otherFields;
     };
 
-} // namespace mongo
+    using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
+
+    /**
+     * Represents next steps of fetcher.
+     */
+    enum class NextAction : int { kInvalid = 0, kNoAction = 1, kGetMore = 2 };
+
+    /**
+     * Type of a fetcher callback function.
+     */
+    typedef stdx::function<void(const StatusWith<QueryResponse>&, NextAction*, BSONObjBuilder*)>
+        CallbackFn;
+
+    /**
+     * Creates Fetcher task but does not schedule it to be run by the executor.
+     *
+     * First remote command to be run by the executor will be 'cmdObj'. The results
+     * of 'cmdObj' must contain a cursor response object.
+     * See Commands::appendCursorResponseObject.
+     *
+     * Callback function 'work' will be called 1 or more times after a successful
+     * schedule() call depending on the results of the remote command.
+     *
+     * Depending on the cursor ID in the initial cursor response object, the fetcher may run
+     * subsequent getMore commands on the remote server in order to obtain a complete
+     * set of results.
+     *
+     * Failed remote commands will also cause 'work' to be invoked with the
+     * error details provided by the remote server. On failure, the fetcher will stop
+     * sending getMore requests to the remote server.
+     *
+     * If the fetcher is canceled (either by calling cancel() or shutting down the executor),
+     * 'work' will not be invoked.
+     *
+     * Fetcher uses the NextAction and BSONObjBuilder arguments to inform client via callback
+     * if a follow-up (like getMore) command will be scheduled to be run by the executor to
+     * retrieve additional results. The BSONObjBuilder pointer will be valid only if NextAction
+     * is kGetMore.
+     * Otherwise, the BSONObjBuilder pointer will be null.
+     * Also, note that the NextAction is both an input and output argument to allow
+     * the client to suggest a different action for the fetcher to take post-callback.
+     *
+     * The callback function 'work' is not allowed to call into the Fetcher instance. This
+     * behavior is undefined and may result in a deadlock.
+     */
+    Fetcher(executor::TaskExecutor* executor,
+            const HostAndPort& source,
+            const std::string& dbname,
+            const BSONObj& cmdObj,
+            const CallbackFn& work);
+
+    virtual ~Fetcher();
+
+    /**
+     * Returns diagnostic information.
+     */
+    std::string getDiagnosticString() const;
+
+    /**
+     * Returns true if a remote command has been scheduled (but not completed)
+     * with the executor.
+     */
+    bool isActive() const;
+
+    /**
+     * Schedules 'cmdObj' to be run on the remote server.
+     */
+    Status schedule();
+
+    /**
+     * Cancels remote command request.
+     * Returns immediately if fetcher is not active.
+     */
+    void cancel();
+
+    /**
+     * Waits for remote command requests to complete.
+     * Returns immediately if fetcher is not active.
+     */
+    void wait();
+
+private:
+    /**
+     * Schedules remote command to be run by the executor
+     */
+    Status _schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName);
+
+    /**
+     * Callback for remote command.
+     */
+    void _callback(const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd,
+                   const char* batchFieldName);
+
+    /**
+     * Sets fetcher state to inactive and notifies waiters.
+     */
+    void _finishCallback();
+
+    // Not owned by us.
+    executor::TaskExecutor* _executor;
+
+    HostAndPort _source;
+    std::string _dbname;
+    BSONObj _cmdObj;
+    CallbackFn _work;
+
+    // Protects member data of this Fetcher.
+    mutable stdx::mutex _mutex;
+
+    mutable stdx::condition_variable _condition;
+
+    // _active is true when Fetcher is scheduled to be run by the executor.
+    bool _active;
+    // Callback handle to the scheduled remote command.
+    executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;
+};
+
+}  // namespace mongo

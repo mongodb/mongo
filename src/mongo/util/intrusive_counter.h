@@ -55,98 +55,107 @@ namespace mongo {
   be used.  For static objects, the implementations of addRef() and release()
   can be overridden to do nothing.
  */
-    class IntrusiveCounter {
-        MONGO_DISALLOW_COPYING(IntrusiveCounter);
-    public:
-        IntrusiveCounter() = default;
-        virtual ~IntrusiveCounter() {};
+class IntrusiveCounter {
+    MONGO_DISALLOW_COPYING(IntrusiveCounter);
 
-        // these are here for the boost intrusive_ptr<> class
-        friend inline void intrusive_ptr_add_ref(const IntrusiveCounter *pIC) {
-            pIC->addRef(); };
-        friend inline void intrusive_ptr_release(const IntrusiveCounter *pIC) {
-            pIC->release(); };
+public:
+    IntrusiveCounter() = default;
+    virtual ~IntrusiveCounter(){};
 
-        virtual void addRef() const = 0;
-        virtual void release() const = 0;
+    // these are here for the boost intrusive_ptr<> class
+    friend inline void intrusive_ptr_add_ref(const IntrusiveCounter* pIC) {
+        pIC->addRef();
+    };
+    friend inline void intrusive_ptr_release(const IntrusiveCounter* pIC) {
+        pIC->release();
     };
 
-    class IntrusiveCounterUnsigned :
-        public IntrusiveCounter {
-    public:
-        // virtuals from IntrusiveCounter
-        virtual void addRef() const;
-        virtual void release() const;
+    virtual void addRef() const = 0;
+    virtual void release() const = 0;
+};
 
-        IntrusiveCounterUnsigned();
+class IntrusiveCounterUnsigned : public IntrusiveCounter {
+public:
+    // virtuals from IntrusiveCounter
+    virtual void addRef() const;
+    virtual void release() const;
 
-    private:
-        mutable unsigned counter;
+    IntrusiveCounterUnsigned();
+
+private:
+    mutable unsigned counter;
+};
+
+/// This is an alternative base class to the above ones (will replace them eventually)
+class RefCountable {
+    MONGO_DISALLOW_COPYING(RefCountable);
+
+public:
+    /// If false you have exclusive access to this object. This is useful for implementing COW.
+    bool isShared() const {
+        // TODO: switch to unfenced read method after SERVER-6973
+        return reinterpret_cast<unsigned&>(_count) > 1;
+    }
+
+    friend void intrusive_ptr_add_ref(const RefCountable* ptr) {
+        ptr->_count.addAndFetch(1);
     };
 
-    /// This is an alternative base class to the above ones (will replace them eventually)
-    class RefCountable {
-        MONGO_DISALLOW_COPYING(RefCountable);
-    public:
-        /// If false you have exclusive access to this object. This is useful for implementing COW.
-        bool isShared() const {
-            // TODO: switch to unfenced read method after SERVER-6973
-            return reinterpret_cast<unsigned&>(_count) > 1;
+    friend void intrusive_ptr_release(const RefCountable* ptr) {
+        if (ptr->_count.subtractAndFetch(1) == 0) {
+            delete ptr;  // uses subclass destructor and operator delete
         }
-
-        friend void intrusive_ptr_add_ref(const RefCountable* ptr) {
-            ptr->_count.addAndFetch(1);
-        };
-
-        friend void intrusive_ptr_release(const RefCountable* ptr) {
-            if (ptr->_count.subtractAndFetch(1) == 0) {
-                delete ptr; // uses subclass destructor and operator delete
-            }
-        };
-
-    protected:
-        RefCountable() {}
-        virtual ~RefCountable() {}
-
-    private:
-        mutable AtomicUInt32 _count; // default initialized to 0
     };
 
-    /// This is an immutable reference-counted string
-    class RCString : public RefCountable {
-    public:
-        const char* c_str() const { return reinterpret_cast<const char*>(this) + sizeof(RCString); }
-        int size() const { return _size; }
-        StringData stringData() const { return StringData(c_str(), _size); }
+protected:
+    RefCountable() {}
+    virtual ~RefCountable() {}
 
-        static boost::intrusive_ptr<const RCString> create(StringData s);
+private:
+    mutable AtomicUInt32 _count;  // default initialized to 0
+};
 
-// MSVC: C4291: 'declaration' : no matching operator delete found; memory will not be freed if 
+/// This is an immutable reference-counted string
+class RCString : public RefCountable {
+public:
+    const char* c_str() const {
+        return reinterpret_cast<const char*>(this) + sizeof(RCString);
+    }
+    int size() const {
+        return _size;
+    }
+    StringData stringData() const {
+        return StringData(c_str(), _size);
+    }
+
+    static boost::intrusive_ptr<const RCString> create(StringData s);
+
+// MSVC: C4291: 'declaration' : no matching operator delete found; memory will not be freed if
 // initialization throws an exception
-// We simply rely on the default global placement delete since a local placement delete would be 
+// We simply rely on the default global placement delete since a local placement delete would be
 // ambiguous for some compilers
 #pragma warning(push)
-#pragma warning(disable : 4291) 
-        void operator delete (void* ptr) { free(ptr); }
+#pragma warning(disable : 4291)
+    void operator delete(void* ptr) {
+        free(ptr);
+    }
 #pragma warning(pop)
 
-    private:
-        // these can only be created by calling create()
-        RCString() {};
-        void* operator new (size_t objSize, size_t realSize) { return mongoMalloc(realSize); }
+private:
+    // these can only be created by calling create()
+    RCString(){};
+    void* operator new(size_t objSize, size_t realSize) {
+        return mongoMalloc(realSize);
+    }
 
-        int _size; // does NOT include trailing NUL byte.
-        // char[_size+1] array allocated past end of class
-    };
-
+    int _size;  // does NOT include trailing NUL byte.
+    // char[_size+1] array allocated past end of class
+};
 };
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
 namespace mongo {
 
-    inline IntrusiveCounterUnsigned::IntrusiveCounterUnsigned():
-        counter(0) {
-    }
-
+inline IntrusiveCounterUnsigned::IntrusiveCounterUnsigned() : counter(0) {}
 };

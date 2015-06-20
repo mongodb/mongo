@@ -34,26 +34,26 @@
 
 namespace mongo {
 
-    /** Keep track of elapsed time. After a set amount of time, tells you to do something. */
-    class ElapsedTracker {
-    public:
-        ElapsedTracker( int32_t hitsBetweenMarks, int32_t msBetweenMarks );
+/** Keep track of elapsed time. After a set amount of time, tells you to do something. */
+class ElapsedTracker {
+public:
+    ElapsedTracker(int32_t hitsBetweenMarks, int32_t msBetweenMarks);
 
-        /**
-         * Call this for every iteration.
-         * @return true if one of the triggers has gone off.
-         */
-        bool intervalHasElapsed();
+    /**
+     * Call this for every iteration.
+     * @return true if one of the triggers has gone off.
+     */
+    bool intervalHasElapsed();
 
-        void resetLastTime();
-        
-    private:
-        const int32_t _hitsBetweenMarks;
-        const int32_t _msBetweenMarks;
+    void resetLastTime();
 
-        int32_t _pings;
+private:
+    const int32_t _hitsBetweenMarks;
+    const int32_t _msBetweenMarks;
 
-        int64_t _last;
-    };
+    int32_t _pings;
 
-} // namespace mongo
+    int64_t _last;
+};
+
+}  // namespace mongo

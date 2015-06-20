@@ -35,31 +35,30 @@
 
 namespace mongo {
 
-    class UpdateLifecycleImpl : public UpdateLifecycle {
-        MONGO_DISALLOW_COPYING(UpdateLifecycleImpl);
+class UpdateLifecycleImpl : public UpdateLifecycle {
+    MONGO_DISALLOW_COPYING(UpdateLifecycleImpl);
 
-    public:
+public:
+    /**
+     * ignoreVersion is for shard version checking and
+     * means that version checks will not be done
+     *
+     * nsString represents the namespace for the
+     */
+    UpdateLifecycleImpl(bool ignoreVersion, const NamespaceString& nsString);
 
-        /**
-         * ignoreVersion is for shard version checking and
-         * means that version checks will not be done
-         *
-         * nsString represents the namespace for the
-         */
-        UpdateLifecycleImpl(bool ignoreVersion, const NamespaceString& nsString);
+    virtual void setCollection(Collection* collection);
 
-        virtual void setCollection(Collection* collection);
+    virtual bool canContinue() const;
 
-        virtual bool canContinue() const;
+    virtual const UpdateIndexData* getIndexKeys(OperationContext* opCtx) const;
 
-        virtual const UpdateIndexData* getIndexKeys(OperationContext* opCtx) const;
+    virtual const std::vector<FieldRef*>* getImmutableFields() const;
 
-        virtual const std::vector<FieldRef*>* getImmutableFields() const;
-
-    private:
-        Collection* _collection;
-        const NamespaceString& _nsString;
-        ChunkVersion _shardVersion;
-    };
+private:
+    Collection* _collection;
+    const NamespaceString& _nsString;
+    ChunkVersion _shardVersion;
+};
 
 } /* namespace mongo */

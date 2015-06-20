@@ -32,163 +32,172 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
-    const std::string LocksType::ConfigNS = "config.locks";
+const std::string LocksType::ConfigNS = "config.locks";
 
-    const BSONField<std::string> LocksType::name("_id");
-    const BSONField<int> LocksType::state("state");
-    const BSONField<std::string> LocksType::process("process");
-    const BSONField<OID> LocksType::lockID("ts");
-    const BSONField<std::string> LocksType::who("who");
-    const BSONField<std::string> LocksType::why("why");
-    const BSONField<Date_t> LocksType::when("when");
+const BSONField<std::string> LocksType::name("_id");
+const BSONField<int> LocksType::state("state");
+const BSONField<std::string> LocksType::process("process");
+const BSONField<OID> LocksType::lockID("ts");
+const BSONField<std::string> LocksType::who("who");
+const BSONField<std::string> LocksType::why("why");
+const BSONField<Date_t> LocksType::when("when");
 
-    LocksType::LocksType() {
-        clear();
+LocksType::LocksType() {
+    clear();
+}
+
+LocksType::~LocksType() {}
+
+bool LocksType::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    LocksType::~LocksType() {
+    // All the mandatory fields must be present.
+    if (!_isNameSet) {
+        *errMsg = stream() << "missing " << name.name() << " field";
+        return false;
+    }
+    if (!_isStateSet) {
+        *errMsg = stream() << "missing " << state.name() << " field";
+        return false;
     }
 
-    bool LocksType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
-
-        // All the mandatory fields must be present.
-        if (!_isNameSet) {
-            *errMsg = stream() << "missing " << name.name() << " field";
+    // If the lock is locked check the remaining fields
+    if (_state != UNLOCKED) {
+        if (!_isProcessSet) {
+            *errMsg = stream() << "missing " << process.name() << " field";
             return false;
         }
-        if (!_isStateSet) {
-            *errMsg = stream() << "missing " << state.name() << " field";
+
+        if (!_isLockIDSet) {
+            *errMsg = stream() << "missing " << lockID.name() << " field";
             return false;
         }
 
-        // If the lock is locked check the remaining fields
-        if (_state != UNLOCKED) {
-            if (!_isProcessSet) {
-                *errMsg = stream() << "missing " << process.name() << " field";
-                return false;
-            }
-
-            if (!_isLockIDSet) {
-                *errMsg = stream() << "missing " << lockID.name() << " field";
-                return false;
-            }
-
-            if (!_isWhoSet) {
-                *errMsg = stream() << "missing " << who.name() << " field";
-                return false;
-            }
-
-            if (!_isWhySet) {
-                *errMsg = stream() << "missing " << why.name() << " field";
-                return false;
-            }
+        if (!_isWhoSet) {
+            *errMsg = stream() << "missing " << who.name() << " field";
+            return false;
         }
 
-        return true;
+        if (!_isWhySet) {
+            *errMsg = stream() << "missing " << why.name() << " field";
+            return false;
+        }
     }
 
-    BSONObj LocksType::toBSON() const {
-        BSONObjBuilder builder;
+    return true;
+}
 
-        if (_isNameSet) builder.append(name(), _name);
-        if (_isStateSet) builder.append(state(), _state);
-        if (_isProcessSet) builder.append(process(), _process);
-        if (_isLockIDSet) builder.append(lockID(), _lockID);
-        if (_isWhoSet) builder.append(who(), _who);
-        if (_isWhySet) builder.append(why(), _why);
+BSONObj LocksType::toBSON() const {
+    BSONObjBuilder builder;
 
-        return builder.obj();
-    }
+    if (_isNameSet)
+        builder.append(name(), _name);
+    if (_isStateSet)
+        builder.append(state(), _state);
+    if (_isProcessSet)
+        builder.append(process(), _process);
+    if (_isLockIDSet)
+        builder.append(lockID(), _lockID);
+    if (_isWhoSet)
+        builder.append(who(), _who);
+    if (_isWhySet)
+        builder.append(why(), _why);
 
-    bool LocksType::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+    return builder.obj();
+}
 
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
+bool LocksType::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, name, &_name, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNameSet = fieldState == FieldParser::FIELD_SET;
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-        fieldState = FieldParser::extract(source, state, &_state, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isStateSet = fieldState == FieldParser::FIELD_SET;
+    FieldParser::FieldState fieldState;
+    fieldState = FieldParser::extract(source, name, &_name, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isNameSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, process, &_process, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isProcessSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, state, &_state, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isStateSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, lockID, &_lockID, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isLockIDSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, process, &_process, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isProcessSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, who, &_who, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWhoSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, lockID, &_lockID, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isLockIDSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, why, &_why, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWhySet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, who, &_who, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isWhoSet = fieldState == FieldParser::FIELD_SET;
 
-        return true;
-    }
+    fieldState = FieldParser::extract(source, why, &_why, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isWhySet = fieldState == FieldParser::FIELD_SET;
 
-    void LocksType::clear() {
+    return true;
+}
 
-        _name.clear();
-        _isNameSet = false;
+void LocksType::clear() {
+    _name.clear();
+    _isNameSet = false;
 
-        _state = UNLOCKED;
-        _isStateSet = false;
+    _state = UNLOCKED;
+    _isStateSet = false;
 
-        _process.clear();
-        _isProcessSet = false;
+    _process.clear();
+    _isProcessSet = false;
 
-        _lockID = OID();
-        _isLockIDSet = false;
+    _lockID = OID();
+    _isLockIDSet = false;
 
-        _who.clear();
-        _isWhoSet = false;
+    _who.clear();
+    _isWhoSet = false;
 
-        _why.clear();
-        _isWhySet = false;
+    _why.clear();
+    _isWhySet = false;
+}
 
-    }
+void LocksType::cloneTo(LocksType* other) const {
+    other->clear();
 
-    void LocksType::cloneTo(LocksType* other) const {
-        other->clear();
+    other->_name = _name;
+    other->_isNameSet = _isNameSet;
 
-        other->_name = _name;
-        other->_isNameSet = _isNameSet;
+    other->_state = _state;
+    other->_isStateSet = _isStateSet;
 
-        other->_state = _state;
-        other->_isStateSet = _isStateSet;
+    other->_process = _process;
+    other->_isProcessSet = _isProcessSet;
 
-        other->_process = _process;
-        other->_isProcessSet = _isProcessSet;
+    other->_lockID = _lockID;
+    other->_isLockIDSet = _isLockIDSet;
 
-        other->_lockID = _lockID;
-        other->_isLockIDSet = _isLockIDSet;
+    other->_who = _who;
+    other->_isWhoSet = _isWhoSet;
 
-        other->_who = _who;
-        other->_isWhoSet = _isWhoSet;
+    other->_why = _why;
+    other->_isWhySet = _isWhySet;
+}
 
-        other->_why = _why;
-        other->_isWhySet = _isWhySet;
+std::string LocksType::toString() const {
+    return toBSON().toString();
+}
 
-    }
-
-    std::string LocksType::toString() const {
-        return toBSON().toString();
-    }
-
-} // namespace mongo
+}  // namespace mongo

@@ -41,48 +41,49 @@
 namespace mongo {
 namespace logger {
 
-    // Used for testing logging framework only.
-    // TODO(schwerin): Have logger write to a different log from the global log, so that tests can
-    // redirect their global log output for examination.
-    template <typename MessageEventEncoder>
-    class LogTest : public unittest::Test {
-        friend class LogTestAppender;
+// Used for testing logging framework only.
+// TODO(schwerin): Have logger write to a different log from the global log, so that tests can
+// redirect their global log output for examination.
+template <typename MessageEventEncoder>
+class LogTest : public unittest::Test {
+    friend class LogTestAppender;
+
+public:
+    LogTest() : _severityOld(globalLogDomain()->getMinimumLogSeverity()) {
+        globalLogDomain()->clearAppenders();
+        _appenderHandle = globalLogDomain()->attachAppender(
+            MessageLogDomain::AppenderAutoPtr(new LogTestAppender(this)));
+    }
+
+    virtual ~LogTest() {
+        globalLogDomain()->detachAppender(_appenderHandle);
+        globalLogDomain()->setMinimumLoggedSeverity(_severityOld);
+    }
+
+protected:
+    std::vector<std::string> _logLines;
+    LogSeverity _severityOld;
+
+private:
+    class LogTestAppender : public MessageLogDomain::EventAppender {
     public:
-        LogTest() : _severityOld(globalLogDomain()->getMinimumLogSeverity()) {
-            globalLogDomain()->clearAppenders();
-            _appenderHandle = globalLogDomain()->attachAppender(
-                    MessageLogDomain::AppenderAutoPtr(new LogTestAppender(this)));
+        explicit LogTestAppender(LogTest* ltest) : _ltest(ltest) {}
+        virtual ~LogTestAppender() {}
+        virtual Status append(const MessageLogDomain::Event& event) {
+            std::ostringstream _os;
+            if (!_encoder.encode(event, _os))
+                return Status(ErrorCodes::LogWriteFailed, "Failed to append to LogTestAppender.");
+            _ltest->_logLines.push_back(_os.str());
+            return Status::OK();
         }
-
-        virtual ~LogTest() {
-            globalLogDomain()->detachAppender(_appenderHandle);
-            globalLogDomain()->setMinimumLoggedSeverity(_severityOld);
-        }
-
-    protected:
-        std::vector<std::string> _logLines;
-        LogSeverity _severityOld;
 
     private:
-        class LogTestAppender : public MessageLogDomain::EventAppender {
-        public:
-            explicit LogTestAppender(LogTest* ltest) : _ltest(ltest) {}
-            virtual ~LogTestAppender() {}
-            virtual Status append(const MessageLogDomain::Event& event) {
-                std::ostringstream _os;
-                if (!_encoder.encode(event, _os))
-                    return Status(ErrorCodes::LogWriteFailed, "Failed to append to LogTestAppender.");
-                _ltest->_logLines.push_back(_os.str());
-                return Status::OK();
-            }
-
-        private:
-            LogTest *_ltest;
-            MessageEventEncoder _encoder;
-        };
-
-        MessageLogDomain::AppenderHandle _appenderHandle;
+        LogTest* _ltest;
+        MessageEventEncoder _encoder;
     };
+
+    MessageLogDomain::AppenderHandle _appenderHandle;
+};
 
 }  // namespace logger
 }  // namespace mongo

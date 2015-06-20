@@ -33,7 +33,7 @@
 namespace mongo {
 
 #ifdef _WIN32
-    // Generate windows event name for shutdown signal
-    std::string getShutdownSignalName(int processId);
+// Generate windows event name for shutdown signal
+std::string getShutdownSignalName(int processId);
 #endif
 }

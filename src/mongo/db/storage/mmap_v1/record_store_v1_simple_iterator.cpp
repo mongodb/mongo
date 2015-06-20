@@ -35,100 +35,94 @@
 
 namespace mongo {
 
-    //
-    // Regular / non-capped collection traversal
-    //
+//
+// Regular / non-capped collection traversal
+//
 
-    SimpleRecordStoreV1Iterator::SimpleRecordStoreV1Iterator(OperationContext* txn,
-                                                             const SimpleRecordStoreV1* collection,
-                                                             bool forward)
-            : _txn(txn)
-            , _recordStore(collection)
-            , _forward(forward) {
+SimpleRecordStoreV1Iterator::SimpleRecordStoreV1Iterator(OperationContext* txn,
+                                                         const SimpleRecordStoreV1* collection,
+                                                         bool forward)
+    : _txn(txn), _recordStore(collection), _forward(forward) {
+    // Eagerly seek to first Record on creation since it is cheap.
+    const ExtentManager* em = _recordStore->_extentManager;
+    if (_recordStore->details()->firstExtent(txn).isNull()) {
+        // nothing in the collection
+        verify(_recordStore->details()->lastExtent(txn).isNull());
+    } else if (_forward) {
+        // Find a non-empty extent and start with the first record in it.
+        Extent* e = em->getExtent(_recordStore->details()->firstExtent(txn));
 
-        // Eagerly seek to first Record on creation since it is cheap.
-        const ExtentManager* em = _recordStore->_extentManager;
-        if ( _recordStore->details()->firstExtent(txn).isNull() ) {
-            // nothing in the collection
-            verify( _recordStore->details()->lastExtent(txn).isNull() );
+        while (e->firstRecord.isNull() && !e->xnext.isNull()) {
+            e = em->getExtent(e->xnext);
         }
-        else if (_forward) {
-            // Find a non-empty extent and start with the first record in it.
-            Extent* e = em->getExtent( _recordStore->details()->firstExtent(txn) );
 
-            while (e->firstRecord.isNull() && !e->xnext.isNull()) {
-                e = em->getExtent( e->xnext );
-            }
+        // _curr may be set to DiskLoc() here if e->lastRecord isNull but there is no
+        // valid e->xnext
+        _curr = e->firstRecord;
+    } else {
+        // Walk backwards, skipping empty extents, and use the last record in the first
+        // non-empty extent we see.
+        Extent* e = em->getExtent(_recordStore->details()->lastExtent(txn));
 
-            // _curr may be set to DiskLoc() here if e->lastRecord isNull but there is no
-            // valid e->xnext
-            _curr = e->firstRecord;
+        // TODO ELABORATE
+        // Does one of e->lastRecord.isNull(), e.firstRecord.isNull() imply the other?
+        while (e->lastRecord.isNull() && !e->xprev.isNull()) {
+            e = em->getExtent(e->xprev);
         }
-        else {
-            // Walk backwards, skipping empty extents, and use the last record in the first
-            // non-empty extent we see.
-            Extent* e = em->getExtent( _recordStore->details()->lastExtent(txn) );
 
-            // TODO ELABORATE
-            // Does one of e->lastRecord.isNull(), e.firstRecord.isNull() imply the other?
-            while (e->lastRecord.isNull() && !e->xprev.isNull()) {
-                e = em->getExtent( e->xprev );
-            }
+        // _curr may be set to DiskLoc() here if e->lastRecord isNull but there is no
+        // valid e->xprev
+        _curr = e->lastRecord;
+    }
+}
 
-            // _curr may be set to DiskLoc() here if e->lastRecord isNull but there is no
-            // valid e->xprev
-            _curr = e->lastRecord;
+boost::optional<Record> SimpleRecordStoreV1Iterator::next() {
+    if (isEOF())
+        return {};
+    auto toReturn = _curr.toRecordId();
+    advance();
+    return {{toReturn, _recordStore->RecordStore::dataFor(_txn, toReturn)}};
+}
+
+boost::optional<Record> SimpleRecordStoreV1Iterator::seekExact(const RecordId& id) {
+    _curr = DiskLoc::fromRecordId(id);
+    advance();
+    return {{id, _recordStore->RecordStore::dataFor(_txn, id)}};
+}
+
+void SimpleRecordStoreV1Iterator::advance() {
+    // Move to the next thing.
+    if (!isEOF()) {
+        if (_forward) {
+            _curr = _recordStore->getNextRecord(_txn, _curr);
+        } else {
+            _curr = _recordStore->getPrevRecord(_txn, _curr);
         }
     }
+}
 
-    boost::optional<Record> SimpleRecordStoreV1Iterator::next() {
-        if (isEOF()) return {};
-        auto toReturn = _curr.toRecordId();
+void SimpleRecordStoreV1Iterator::invalidate(const RecordId& dl) {
+    // Just move past the thing being deleted.
+    if (dl == _curr.toRecordId()) {
         advance();
-        return {{toReturn, _recordStore->RecordStore::dataFor(_txn, toReturn)}};
     }
+}
 
-    boost::optional<Record> SimpleRecordStoreV1Iterator::seekExact(const RecordId& id) {
-        _curr = DiskLoc::fromRecordId(id);
-        advance();
-        return {{id, _recordStore->RecordStore::dataFor(_txn, id)}};
-    }
+void SimpleRecordStoreV1Iterator::savePositioned() {
+    _txn = nullptr;
+}
 
-    void SimpleRecordStoreV1Iterator::advance() {
-        // Move to the next thing.
-        if (!isEOF()) {
-            if (_forward) {
-                _curr = _recordStore->getNextRecord( _txn, _curr );
-            }
-            else {
-                _curr = _recordStore->getPrevRecord( _txn, _curr );
-            }
-        }
-    }
+bool SimpleRecordStoreV1Iterator::restore(OperationContext* txn) {
+    _txn = txn;
+    // if the collection is dropped, then the cursor should be destroyed
+    return true;
+}
 
-    void SimpleRecordStoreV1Iterator::invalidate(const RecordId& dl) {
-        // Just move past the thing being deleted.
-        if (dl == _curr.toRecordId()) {
-            advance();
-        }
-    }
+std::unique_ptr<RecordFetcher> SimpleRecordStoreV1Iterator::fetcherForNext() const {
+    return _recordStore->_extentManager->recordNeedsFetch(_curr);
+}
 
-    void SimpleRecordStoreV1Iterator::savePositioned() {
-        _txn = nullptr;
-    }
-
-    bool SimpleRecordStoreV1Iterator::restore(OperationContext* txn) {
-        _txn = txn;
-        // if the collection is dropped, then the cursor should be destroyed
-        return true;
-    }
-
-    std::unique_ptr<RecordFetcher> SimpleRecordStoreV1Iterator::fetcherForNext() const {
-        return _recordStore->_extentManager->recordNeedsFetch(_curr);
-    }
-
-    std::unique_ptr<RecordFetcher> SimpleRecordStoreV1Iterator::fetcherForId(
-            const RecordId& id) const {
-        return _recordStore->_extentManager->recordNeedsFetch(DiskLoc::fromRecordId(id));
-    }
+std::unique_ptr<RecordFetcher> SimpleRecordStoreV1Iterator::fetcherForId(const RecordId& id) const {
+    return _recordStore->_extentManager->recordNeedsFetch(DiskLoc::fromRecordId(id));
+}
 }

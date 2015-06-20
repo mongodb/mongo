@@ -33,24 +33,24 @@
 
 namespace mongo {
 
-    class RemoteCommandRunnerImpl : public RemoteCommandRunner {
-    public:
-        RemoteCommandRunnerImpl(int messagingPortTags);
-        virtual ~RemoteCommandRunnerImpl();
+class RemoteCommandRunnerImpl : public RemoteCommandRunner {
+public:
+    RemoteCommandRunnerImpl(int messagingPortTags);
+    virtual ~RemoteCommandRunnerImpl();
 
-        /**
-         * Closes all underlying connections. Must be called before the destructor runs.
-         */
-        void shutdown();
+    /**
+     * Closes all underlying connections. Must be called before the destructor runs.
+     */
+    void shutdown();
 
-        virtual StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request);
+    virtual StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request);
 
-    private:
-        // The connection pool on which to send requests
-        ConnectionPool _connPool;
+private:
+    // The connection pool on which to send requests
+    ConnectionPool _connPool;
 
-        // Whether shutdown has been called
-        bool _shutDown;
-    };
+    // Whether shutdown has been called
+    bool _shutDown;
+};
 
-} // namespace mongo
+}  // namespace mongo

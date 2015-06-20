@@ -50,68 +50,61 @@
 namespace mongo {
 namespace pal {
 
-    /**
-     * strcasestr -- case-insensitive search for a substring within another string.
-     *
-     * @param haystack      ptr to C-string to search
-     * @param needle        ptr to C-string to try to find within 'haystack'
-     * @return              ptr to start of 'needle' within 'haystack' if found, NULL otherwise
-     */
-    const char* STRCASESTR_EMULATION_NAME(const char* haystack, const char* needle) {
+/**
+ * strcasestr -- case-insensitive search for a substring within another string.
+ *
+ * @param haystack      ptr to C-string to search
+ * @param needle        ptr to C-string to try to find within 'haystack'
+ * @return              ptr to start of 'needle' within 'haystack' if found, NULL otherwise
+ */
+const char* STRCASESTR_EMULATION_NAME(const char* haystack, const char* needle) {
+    std::string haystackLower(haystack);
+    std::transform(haystackLower.begin(), haystackLower.end(), haystackLower.begin(), ::tolower);
 
-        std::string haystackLower(haystack);
-        std::transform(haystackLower.begin(),
-                       haystackLower.end(),
-                       haystackLower.begin(),
-                       ::tolower);
+    std::string needleLower(needle);
+    std::transform(needleLower.begin(), needleLower.end(), needleLower.begin(), ::tolower);
 
-        std::string needleLower(needle);
-        std::transform(needleLower.begin(),
-                       needleLower.end(),
-                       needleLower.begin(),
-                       ::tolower);
-
-        // Use strstr() to find 'lowercased needle' in 'lowercased haystack'
-        // If found, use the location to compute the matching location in the original string
-        // If not found, return NULL
-        const char* haystackLowerStart = haystackLower.c_str();
-        const char* location = strstr(haystackLowerStart, needleLower.c_str());
-        return location ? (haystack + (location - haystackLowerStart)) : NULL;
-    }
+    // Use strstr() to find 'lowercased needle' in 'lowercased haystack'
+    // If found, use the location to compute the matching location in the original string
+    // If not found, return NULL
+    const char* haystackLowerStart = haystackLower.c_str();
+    const char* location = strstr(haystackLowerStart, needleLower.c_str());
+    return location ? (haystack + (location - haystackLowerStart)) : NULL;
+}
 
 #if defined(__sun)
 
-    typedef const char* (*StrCaseStrFunc)(const char* haystack, const char* needle);
-    static StrCaseStrFunc strcasestr_switcher = mongo::pal::strcasestr_emulation;
+typedef const char* (*StrCaseStrFunc)(const char* haystack, const char* needle);
+static StrCaseStrFunc strcasestr_switcher = mongo::pal::strcasestr_emulation;
 
-    const char* strcasestr(const char* haystack, const char* needle) {
-        return strcasestr_switcher(haystack, needle);
-    }
+const char* strcasestr(const char* haystack, const char* needle) {
+    return strcasestr_switcher(haystack, needle);
+}
 
-#endif // #if defined(__sun)
+#endif  // #if defined(__sun)
 
-} // namespace pal
-} // namespace mongo
+}  // namespace pal
+}  // namespace mongo
 
-#endif // #if defined(_WIN32) || defined(__sun)
+#endif  // #if defined(_WIN32) || defined(__sun)
 
 #if defined(__sun)
 
 namespace mongo {
 
-    // 'strcasestr()' on Solaris will call the emulation if the symbol is not found
-    //
-    MONGO_INITIALIZER_GENERAL(SolarisStrCaseCmp,
-                              MONGO_NO_PREREQUISITES,
-                              ("default"))(InitializerContext* context) {
-        void* functionAddress = dlsym(RTLD_DEFAULT, "strcasestr");
-        if (functionAddress != NULL) {
-            mongo::pal::strcasestr_switcher =
-                    reinterpret_cast<mongo::pal::StrCaseStrFunc>(functionAddress);
-        }
-        return Status::OK();
+// 'strcasestr()' on Solaris will call the emulation if the symbol is not found
+//
+MONGO_INITIALIZER_GENERAL(SolarisStrCaseCmp,
+                          MONGO_NO_PREREQUISITES,
+                          ("default"))(InitializerContext* context) {
+    void* functionAddress = dlsym(RTLD_DEFAULT, "strcasestr");
+    if (functionAddress != NULL) {
+        mongo::pal::strcasestr_switcher =
+            reinterpret_cast<mongo::pal::StrCaseStrFunc>(functionAddress);
     }
+    return Status::OK();
+}
 
-} // namespace mongo
+}  // namespace mongo
 
-#endif // __sun
+#endif  // __sun

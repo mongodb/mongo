@@ -40,113 +40,107 @@ namespace repl {
 
 namespace {
 
-    const std::string kCheckEmptyFieldName = "checkEmpty";
-    const std::string kConfigVersionFieldName = "configVersion";
-    const std::string kSenderHostFieldName = "from";
-    const std::string kSenderIdFieldName = "fromId";
-    const std::string kSetNameFieldName = "replSetHeartbeat";
-    const std::string kTermFieldName = "term";
+const std::string kCheckEmptyFieldName = "checkEmpty";
+const std::string kConfigVersionFieldName = "configVersion";
+const std::string kSenderHostFieldName = "from";
+const std::string kSenderIdFieldName = "fromId";
+const std::string kSetNameFieldName = "replSetHeartbeat";
+const std::string kTermFieldName = "term";
 
-    const std::string kLegalHeartbeatFieldNames[] = {
-        kCheckEmptyFieldName,
-        kConfigVersionFieldName,
-        kSenderHostFieldName,
-        kSenderIdFieldName,
-        kSetNameFieldName,
-        kTermFieldName
-    };
+const std::string kLegalHeartbeatFieldNames[] = {kCheckEmptyFieldName,
+                                                 kConfigVersionFieldName,
+                                                 kSenderHostFieldName,
+                                                 kSenderIdFieldName,
+                                                 kSetNameFieldName,
+                                                 kTermFieldName};
 
-} // namespace
+}  // namespace
 
-    Status ReplSetHeartbeatArgsV1::initialize(const BSONObj& argsObj) {
-        Status status = bsonCheckOnlyHasFields("ReplSetHeartbeatArgs",
-                                               argsObj,
-                                               kLegalHeartbeatFieldNames);
+Status ReplSetHeartbeatArgsV1::initialize(const BSONObj& argsObj) {
+    Status status =
+        bsonCheckOnlyHasFields("ReplSetHeartbeatArgs", argsObj, kLegalHeartbeatFieldNames);
+    if (!status.isOK())
+        return status;
+
+    status = bsonExtractBooleanFieldWithDefault(argsObj, kCheckEmptyFieldName, false, &_checkEmpty);
+    if (!status.isOK())
+        return status;
+
+    status = bsonExtractIntegerField(argsObj, kConfigVersionFieldName, &_configVersion);
+    if (!status.isOK())
+        return status;
+
+    status = bsonExtractIntegerFieldWithDefault(argsObj, kSenderIdFieldName, -1, &_senderId);
+    if (!status.isOK())
+        return status;
+
+    std::string hostAndPortString;
+    status = bsonExtractStringField(argsObj, kSenderHostFieldName, &hostAndPortString);
+    if (!status.isOK())
+        return status;
+    if (!hostAndPortString.empty()) {
+        status = _senderHost.initialize(hostAndPortString);
         if (!status.isOK())
             return status;
-
-        status = bsonExtractBooleanFieldWithDefault(argsObj,
-                                                    kCheckEmptyFieldName,
-                                                    false,
-                                                    &_checkEmpty);
-        if (!status.isOK())
-            return status;
-
-        status = bsonExtractIntegerField(argsObj, kConfigVersionFieldName, &_configVersion);
-        if (!status.isOK())
-            return status;
-
-        status = bsonExtractIntegerFieldWithDefault(argsObj, kSenderIdFieldName, -1, &_senderId);
-        if (!status.isOK())
-            return status;
-
-        std::string hostAndPortString;
-        status = bsonExtractStringField(argsObj, kSenderHostFieldName, &hostAndPortString);
-        if (!status.isOK())
-            return status;
-        if (!hostAndPortString.empty()) {
-            status = _senderHost.initialize(hostAndPortString);
-            if (!status.isOK())
-                return status;
-            _hasSender = true;
-        }
-
-        status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
-        if (!status.isOK())
-            return status;
-
-        status = bsonExtractStringField(argsObj, kSetNameFieldName, &_setName);
-        if (!status.isOK())
-            return status;
-
-        return Status::OK();
+        _hasSender = true;
     }
 
-    bool ReplSetHeartbeatArgsV1::isInitialized() const {
-        return _configVersion != -1 && _term != -1 && !_setName.empty();
-    }
+    status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
+    if (!status.isOK())
+        return status;
 
-    void ReplSetHeartbeatArgsV1::setConfigVersion(long long newVal) {
-        _configVersion = newVal;
-    }
+    status = bsonExtractStringField(argsObj, kSetNameFieldName, &_setName);
+    if (!status.isOK())
+        return status;
 
-    void ReplSetHeartbeatArgsV1::setSenderHost(const HostAndPort& newVal) {
-        _senderHost = newVal;
-    }
+    return Status::OK();
+}
 
-    void ReplSetHeartbeatArgsV1::setSenderId(long long newVal) {
-        _senderId = newVal;
-    }
+bool ReplSetHeartbeatArgsV1::isInitialized() const {
+    return _configVersion != -1 && _term != -1 && !_setName.empty();
+}
 
-    void ReplSetHeartbeatArgsV1::setSetName(const std::string& newVal) {
-        _setName = newVal;
-    }
+void ReplSetHeartbeatArgsV1::setConfigVersion(long long newVal) {
+    _configVersion = newVal;
+}
 
-    void ReplSetHeartbeatArgsV1::setTerm(long long newVal) {
-        _term = newVal;
-    }
+void ReplSetHeartbeatArgsV1::setSenderHost(const HostAndPort& newVal) {
+    _senderHost = newVal;
+}
 
-    void ReplSetHeartbeatArgsV1::setCheckEmpty() {
-        _checkEmpty = true;
-    }
+void ReplSetHeartbeatArgsV1::setSenderId(long long newVal) {
+    _senderId = newVal;
+}
 
-    BSONObj ReplSetHeartbeatArgsV1::toBSON() const {
-        invariant(isInitialized());
-        BSONObjBuilder builder;
-        addToBSON(&builder);
-        return builder.obj();
-    }
+void ReplSetHeartbeatArgsV1::setSetName(const std::string& newVal) {
+    _setName = newVal;
+}
 
-    void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder) const {
-        builder->append(kSetNameFieldName, _setName);
-        if (_checkEmpty) {
-            builder->append(kCheckEmptyFieldName, _checkEmpty);
-        }
-        builder->appendIntOrLL(kConfigVersionFieldName, _configVersion);
-        builder->append(kSenderHostFieldName, _hasSender ? _senderHost.toString() : "");
-        builder->appendIntOrLL(kSenderIdFieldName, _senderId);
-        builder->appendIntOrLL(kTermFieldName, _term);
+void ReplSetHeartbeatArgsV1::setTerm(long long newVal) {
+    _term = newVal;
+}
+
+void ReplSetHeartbeatArgsV1::setCheckEmpty() {
+    _checkEmpty = true;
+}
+
+BSONObj ReplSetHeartbeatArgsV1::toBSON() const {
+    invariant(isInitialized());
+    BSONObjBuilder builder;
+    addToBSON(&builder);
+    return builder.obj();
+}
+
+void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder) const {
+    builder->append(kSetNameFieldName, _setName);
+    if (_checkEmpty) {
+        builder->append(kCheckEmptyFieldName, _checkEmpty);
     }
+    builder->appendIntOrLL(kConfigVersionFieldName, _configVersion);
+    builder->append(kSenderHostFieldName, _hasSender ? _senderHost.toString() : "");
+    builder->appendIntOrLL(kSenderIdFieldName, _senderId);
+    builder->appendIntOrLL(kTermFieldName, _term);
+}
 
 }  // namespace repl
 }  // namespace mongo

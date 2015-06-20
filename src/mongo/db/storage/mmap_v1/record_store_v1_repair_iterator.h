@@ -35,63 +35,60 @@
 
 namespace mongo {
 
+/**
+ * This iterator will go over the collection twice - once going forward (first extent -> last
+ * extent) and once backwards in an attempt to salvage potentially corrupted or unreachable
+ * records. It is used by the mongodump --repair option.
+ */
+class RecordStoreV1RepairCursor final : public RecordCursor {
+public:
+    RecordStoreV1RepairCursor(OperationContext* txn, const RecordStoreV1Base* recordStore);
+
+    boost::optional<Record> next() final;
+    boost::optional<Record> seekExact(const RecordId& id) final;
+    void invalidate(const RecordId& dl);
+    void savePositioned() final {
+        _txn = nullptr;
+    }
+    bool restore(OperationContext* txn) final {
+        _txn = txn;
+        return true;
+    }
+
+    // Explicitly not supporting fetcherForNext(). The expected use case for this class is a
+    // special offline operation where there are no concurrent operations, so it would be better
+    // to take the pagefault inline with the operation.
+
+private:
+    void advance();
+
     /**
-     * This iterator will go over the collection twice - once going forward (first extent -> last
-     * extent) and once backwards in an attempt to salvage potentially corrupted or unreachable 
-     * records. It is used by the mongodump --repair option.
+     * Based on the direction of scan, finds the next valid (un-corrupted) extent in the chain
+     * and sets _currExtent to point to that.
+     *
+     * @return true if valid extent was found (_currExtent will not be null)
+     *         false otherwise and _currExtent will be null
      */
-    class RecordStoreV1RepairCursor final : public RecordCursor {
-    public:
-        RecordStoreV1RepairCursor(OperationContext* txn,
-                                    const RecordStoreV1Base* recordStore);
+    bool _advanceToNextValidExtent();
 
-        boost::optional<Record> next() final;
-        boost::optional<Record> seekExact(const RecordId& id) final;
-        void invalidate(const RecordId& dl);
-        void savePositioned() final { _txn = nullptr; }
-        bool restore(OperationContext* txn) final {
-            _txn = txn;
-            return true;
-        }
+    // transactional context for read locks. Not owned by us
+    OperationContext* _txn;
 
-        // Explicitly not supporting fetcherForNext(). The expected use case for this class is a
-        // special offline operation where there are no concurrent operations, so it would be better
-        // to take the pagefault inline with the operation.
+    // Reference to the owning RecordStore. The store must not be deleted while there are
+    // active iterators on it.
+    //
+    const RecordStoreV1Base* _recordStore;
 
-    private:
-        void advance();
+    DiskLoc _currExtent;
+    DiskLoc _currRecord;
 
-        /**
-         * Based on the direction of scan, finds the next valid (un-corrupted) extent in the chain
-         * and sets _currExtent to point to that.
-         *
-         * @return true if valid extent was found (_currExtent will not be null)
-         *         false otherwise and _currExtent will be null
-         */
-        bool _advanceToNextValidExtent();
+    enum Stage { FORWARD_SCAN = 0, BACKWARD_SCAN = 1, DONE = 2 };
 
-        // transactional context for read locks. Not owned by us
-        OperationContext* _txn;
+    Stage _stage;
 
-        // Reference to the owning RecordStore. The store must not be deleted while there are 
-        // active iterators on it.
-        //
-        const RecordStoreV1Base* _recordStore;
-
-        DiskLoc _currExtent;
-        DiskLoc _currRecord;
-
-        enum Stage {
-            FORWARD_SCAN = 0,
-            BACKWARD_SCAN = 1,
-            DONE = 2
-        };
-
-        Stage _stage;
-
-        // Used to find cycles within an extent. Cleared after each extent has been processed.
-        //
-        std::set<DiskLoc> _seenInCurrentExtent;
-    };
+    // Used to find cycles within an extent. Cleared after each extent has been processed.
+    //
+    std::set<DiskLoc> _seenInCurrentExtent;
+};
 
 }  // namespace mongo

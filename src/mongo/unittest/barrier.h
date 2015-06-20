@@ -35,33 +35,33 @@
 namespace mongo {
 namespace unittest {
 
+/**
+ * Holds internal thread counter that is set on initialization.
+ * This counter is decremented every time a thread enters countDownAndWait() and blocks.
+ * All threads are unblocked when the counter reaches zero and the counter is reset.
+ */
+class Barrier {
+    MONGO_DISALLOW_COPYING(Barrier);
+
+public:
     /**
-     * Holds internal thread counter that is set on initialization.
-     * This counter is decremented every time a thread enters countDownAndWait() and blocks.
-     * All threads are unblocked when the counter reaches zero and the counter is reset.
+     * Initializes barrier with a default thread count.
      */
-    class Barrier {
-        MONGO_DISALLOW_COPYING(Barrier);
-    public:
+    explicit Barrier(size_t threadCount);
 
-        /**
-         * Initializes barrier with a default thread count.
-         */
-        explicit Barrier(size_t threadCount);
+    /**
+     * Decrements thread counter by 1. If the thread counter is not zero, the thread blocks
+     * until the counter reaches zero.
+     */
+    void countDownAndWait();
 
-        /**
-         * Decrements thread counter by 1. If the thread counter is not zero, the thread blocks
-         * until the counter reaches zero.
-         */
-        void countDownAndWait();
+private:
+    size_t _threadCount;
+    size_t _threadsWaiting;
+    uint64_t _generation;
+    stdx::mutex _mutex;
+    stdx::condition_variable _condition;
+};
 
-    private:
-        size_t _threadCount;
-        size_t _threadsWaiting;
-        uint64_t _generation;
-        stdx::mutex _mutex;
-        stdx::condition_variable _condition;
-    };
-
-} // namespace unittest
-} // namespace mongo
+}  // namespace unittest
+}  // namespace mongo

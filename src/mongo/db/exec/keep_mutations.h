@@ -36,62 +36,64 @@
 
 namespace mongo {
 
-    /**
-     * KeepMutationsStage passes all of its child's data through until the child is EOF.
-     * It then returns all flagged elements in the WorkingSet that pass the stage's filter.
-     *
-     * This stage is used to merge results that are invalidated mid-query back into the query
-     * results when possible.  The query planner is responsible for determining when it's valid to
-     * merge these results.
-     */
-    class KeepMutationsStage : public PlanStage {
-    public:
-        KeepMutationsStage(const MatchExpression* filter, WorkingSet* ws, PlanStage* child);
-        virtual ~KeepMutationsStage();
+/**
+ * KeepMutationsStage passes all of its child's data through until the child is EOF.
+ * It then returns all flagged elements in the WorkingSet that pass the stage's filter.
+ *
+ * This stage is used to merge results that are invalidated mid-query back into the query
+ * results when possible.  The query planner is responsible for determining when it's valid to
+ * merge these results.
+ */
+class KeepMutationsStage : public PlanStage {
+public:
+    KeepMutationsStage(const MatchExpression* filter, WorkingSet* ws, PlanStage* child);
+    virtual ~KeepMutationsStage();
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual StageType stageType() const { return STAGE_KEEP_MUTATIONS; }
+    virtual StageType stageType() const {
+        return STAGE_KEEP_MUTATIONS;
+    }
 
-        virtual PlanStageStats* getStats();
+    virtual PlanStageStats* getStats();
 
-        virtual const CommonStats* getCommonStats() const;
+    virtual const CommonStats* getCommonStats() const;
 
-        virtual const SpecificStats* getSpecificStats() const;
+    virtual const SpecificStats* getSpecificStats() const;
 
-        static const char* kStageType;
+    static const char* kStageType;
 
-    private:
-        // Not owned here.
-        WorkingSet* _workingSet;
+private:
+    // Not owned here.
+    WorkingSet* _workingSet;
 
-        std::unique_ptr<PlanStage> _child;
+    std::unique_ptr<PlanStage> _child;
 
-        // Not owned here.  Should be the full query expression tree.
-        const MatchExpression* _filter;
+    // Not owned here.  Should be the full query expression tree.
+    const MatchExpression* _filter;
 
-        // We read from our child...
-        bool _doneReadingChild;
+    // We read from our child...
+    bool _doneReadingChild;
 
-        // ...until it's out of results, at which point we put any flagged results back in the query
-        // stream.
-        bool _doneReturningFlagged;
+    // ...until it's out of results, at which point we put any flagged results back in the query
+    // stream.
+    bool _doneReturningFlagged;
 
-        // Stats.
-        CommonStats _commonStats;
+    // Stats.
+    CommonStats _commonStats;
 
-        // Our copy of the working set's flagged results.
-        std::vector<WorkingSetID> _flagged;
+    // Our copy of the working set's flagged results.
+    std::vector<WorkingSetID> _flagged;
 
-        // Iterator pointing into _flagged.
-        std::vector<WorkingSetID>::const_iterator _flaggedIterator;
-    };
+    // Iterator pointing into _flagged.
+    std::vector<WorkingSetID>::const_iterator _flaggedIterator;
+};
 
 }  // namespace mongo

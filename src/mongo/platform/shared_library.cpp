@@ -32,20 +32,18 @@
 
 namespace mongo {
 
-    typedef StatusWith<void (*)()> StatusWithFunc;
+typedef StatusWith<void (*)()> StatusWithFunc;
 
-    SharedLibrary::SharedLibrary(void* handle)
-        : _handle(handle)
-    {}
+SharedLibrary::SharedLibrary(void* handle) : _handle(handle) {}
 
-    StatusWithFunc SharedLibrary::getFunction(StringData name) {
-        StatusWith<void*> s = getSymbol(name);
+StatusWithFunc SharedLibrary::getFunction(StringData name) {
+    StatusWith<void*> s = getSymbol(name);
 
-        if (!s.isOK()) {
-            return StatusWithFunc(s.getStatus());
-        }
-
-        return StatusWithFunc(reinterpret_cast<void (*)()>(s.getValue()));
+    if (!s.isOK()) {
+        return StatusWithFunc(s.getStatus());
     }
 
-} // namespace mongo
+    return StatusWithFunc(reinterpret_cast<void (*)()>(s.getValue()));
+}
+
+}  // namespace mongo

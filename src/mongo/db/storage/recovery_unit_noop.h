@@ -35,53 +35,53 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
-    class RecoveryUnitNoop : public RecoveryUnit {
-    public:
-        void beginUnitOfWork(OperationContext* opCtx) final {}
-        void commitUnitOfWork() final {
-            for (auto& change : _changes) {
-                try {
-                    change->commit();
-                }
-                catch (...) {
-                    std::terminate();
-                }
+class RecoveryUnitNoop : public RecoveryUnit {
+public:
+    void beginUnitOfWork(OperationContext* opCtx) final {}
+    void commitUnitOfWork() final {
+        for (auto& change : _changes) {
+            try {
+                change->commit();
+            } catch (...) {
+                std::terminate();
             }
-            _changes.clear();
         }
-        void abortUnitOfWork() final {
-            for (auto it = _changes.rbegin(); it != _changes.rend(); ++it) {
-                try {
-                    (*it)->rollback();
-                }
-                catch (...) {
-                    std::terminate();
-                }
+        _changes.clear();
+    }
+    void abortUnitOfWork() final {
+        for (auto it = _changes.rbegin(); it != _changes.rend(); ++it) {
+            try {
+                (*it)->rollback();
+            } catch (...) {
+                std::terminate();
             }
-            _changes.clear();
         }
+        _changes.clear();
+    }
 
-        virtual void abandonSnapshot() {}
+    virtual void abandonSnapshot() {}
 
-        virtual bool waitUntilDurable() {
-            return true;
-        }
+    virtual bool waitUntilDurable() {
+        return true;
+    }
 
-        virtual void registerChange(Change* change) {
-            _changes.push_back(std::unique_ptr<Change>(change));
-        }
+    virtual void registerChange(Change* change) {
+        _changes.push_back(std::unique_ptr<Change>(change));
+    }
 
-        virtual void* writingPtr(void* data, size_t len) {
-            return data;
-        }
-        virtual void setRollbackWritesDisabled() {}
+    virtual void* writingPtr(void* data, size_t len) {
+        return data;
+    }
+    virtual void setRollbackWritesDisabled() {}
 
-        virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
+    virtual SnapshotId getSnapshotId() const {
+        return SnapshotId();
+    }
 
-    private:
-        std::vector<std::unique_ptr<Change>> _changes;
-    };
+private:
+    std::vector<std::unique_ptr<Change>> _changes;
+};
 
 }  // namespace mongo

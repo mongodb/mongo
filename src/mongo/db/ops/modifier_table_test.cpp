@@ -35,25 +35,25 @@
 
 namespace {
 
-    using namespace mongo::modifiertable;
+using namespace mongo::modifiertable;
 
-    using mongo::ModifierInterface;
-    using std::unique_ptr;
+using mongo::ModifierInterface;
+using std::unique_ptr;
 
-    TEST(getType, Normal) {
-        ASSERT_EQUALS(getType("$set"), MOD_SET);
-        ASSERT_EQUALS(getType("$AModThatDoesn'tExist"), MOD_UNKNOWN);
-        ASSERT_EQUALS(getType("NotAModExpression"), MOD_UNKNOWN);
-    }
+TEST(getType, Normal) {
+    ASSERT_EQUALS(getType("$set"), MOD_SET);
+    ASSERT_EQUALS(getType("$AModThatDoesn'tExist"), MOD_UNKNOWN);
+    ASSERT_EQUALS(getType("NotAModExpression"), MOD_UNKNOWN);
+}
 
-    TEST(makeUpdateMod, Normal) {
-        unique_ptr<ModifierInterface> mod;
+TEST(makeUpdateMod, Normal) {
+    unique_ptr<ModifierInterface> mod;
 
-        mod.reset(makeUpdateMod(MOD_SET));
-        ASSERT_NOT_EQUALS(mod.get(), static_cast<ModifierInterface*>(0));
+    mod.reset(makeUpdateMod(MOD_SET));
+    ASSERT_NOT_EQUALS(mod.get(), static_cast<ModifierInterface*>(0));
 
-        mod.reset(makeUpdateMod(MOD_UNKNOWN));
-        ASSERT_EQUALS(mod.get(), static_cast<ModifierInterface*>(0));
-    }
+    mod.reset(makeUpdateMod(MOD_UNKNOWN));
+    ASSERT_EQUALS(mod.get(), static_cast<ModifierInterface*>(0));
+}
 
-} // unnamed namespace
+}  // unnamed namespace

@@ -37,135 +37,142 @@
 
 namespace mongo {
 
-    class MessagingPort;
-    class PiggyBackData;
+class MessagingPort;
+class PiggyBackData;
 
-    class AbstractMessagingPort {
-        MONGO_DISALLOW_COPYING(AbstractMessagingPort);
-    public:
-        AbstractMessagingPort() : tag(0), _connectionId(0) {}
-        virtual ~AbstractMessagingPort() { }
-        virtual void reply(Message& received, Message& response, MSGID responseTo) = 0; // like the reply below, but doesn't rely on received.data still being available
-        virtual void reply(Message& received, Message& response) = 0;
+class AbstractMessagingPort {
+    MONGO_DISALLOW_COPYING(AbstractMessagingPort);
 
-        virtual HostAndPort remote() const = 0;
-        virtual unsigned remotePort() const = 0;
-        virtual SockAddr remoteAddr() const = 0;
-        virtual SockAddr localAddr() const = 0;
-        
-        void setX509SubjectName(const std::string& x509SubjectName) {
-            _x509SubjectName = x509SubjectName;
-        }
+public:
+    AbstractMessagingPort() : tag(0), _connectionId(0) {}
+    virtual ~AbstractMessagingPort() {}
+    virtual void reply(
+        Message& received,
+        Message& response,
+        MSGID
+            responseTo) = 0;  // like the reply below, but doesn't rely on received.data still being available
+    virtual void reply(Message& received, Message& response) = 0;
 
-        std::string getX509SubjectName() {
-            return _x509SubjectName;
-        }
+    virtual HostAndPort remote() const = 0;
+    virtual unsigned remotePort() const = 0;
+    virtual SockAddr remoteAddr() const = 0;
+    virtual SockAddr localAddr() const = 0;
 
-        long long connectionId() const { return _connectionId; }
-        void setConnectionId( long long connectionId );
+    void setX509SubjectName(const std::string& x509SubjectName) {
+        _x509SubjectName = x509SubjectName;
+    }
 
-    public:
-        // TODO make this private with some helpers
+    std::string getX509SubjectName() {
+        return _x509SubjectName;
+    }
 
-        /* ports can be tagged with various classes.  see closeAllSockets(tag). defaults to 0. */
-        unsigned tag;
+    long long connectionId() const {
+        return _connectionId;
+    }
+    void setConnectionId(long long connectionId);
 
-    private:
-        long long _connectionId;
-        std::string _x509SubjectName;
-    };
+public:
+    // TODO make this private with some helpers
 
-    class MessagingPort : public AbstractMessagingPort {
-    public:
-        MessagingPort(int fd, const SockAddr& remote);
+    /* ports can be tagged with various classes.  see closeAllSockets(tag). defaults to 0. */
+    unsigned tag;
 
-        // in some cases the timeout will actually be 2x this value - eg we do a partial send,
-        // then the timeout fires, then we try to send again, then the timeout fires again with
-        // no data sent, then we detect that the other side is down
-        MessagingPort(double so_timeout = 0,
-                      logger::LogSeverity logLevel = logger::LogSeverity::Log() );
+private:
+    long long _connectionId;
+    std::string _x509SubjectName;
+};
 
-        MessagingPort(std::shared_ptr<Socket> socket);
+class MessagingPort : public AbstractMessagingPort {
+public:
+    MessagingPort(int fd, const SockAddr& remote);
 
-        virtual ~MessagingPort();
+    // in some cases the timeout will actually be 2x this value - eg we do a partial send,
+    // then the timeout fires, then we try to send again, then the timeout fires again with
+    // no data sent, then we detect that the other side is down
+    MessagingPort(double so_timeout = 0, logger::LogSeverity logLevel = logger::LogSeverity::Log());
 
-        void setSocketTimeout(double timeout);
+    MessagingPort(std::shared_ptr<Socket> socket);
 
-        void shutdown();
+    virtual ~MessagingPort();
 
-        /* it's assumed if you reuse a message object, that it doesn't cross MessagingPort's.
-           also, the Message data will go out of scope on the subsequent recv call.
-        */
-        bool recv(Message& m);
-        void reply(Message& received, Message& response, MSGID responseTo);
-        void reply(Message& received, Message& response);
-        bool call(Message& toSend, Message& response);
+    void setSocketTimeout(double timeout);
 
-        void say(Message& toSend, int responseTo = 0);
+    void shutdown();
 
-        /**
-         * this is used for doing 'async' queries
-         * instead of doing call( to , from )
-         * you would do
-         * say( to )
-         * recv( from )
-         * Note: if you fail to call recv and someone else uses this port,
-         *       horrible things will happen
-         */
-        bool recv( const Message& sent , Message& response );
+    /* it's assumed if you reuse a message object, that it doesn't cross MessagingPort's.
+       also, the Message data will go out of scope on the subsequent recv call.
+    */
+    bool recv(Message& m);
+    void reply(Message& received, Message& response, MSGID responseTo);
+    void reply(Message& received, Message& response);
+    bool call(Message& toSend, Message& response);
 
-        void piggyBack( Message& toSend , int responseTo = 0 );
+    void say(Message& toSend, int responseTo = 0);
 
-        unsigned remotePort() const { return psock->remotePort(); }
-        virtual HostAndPort remote() const;
-        virtual SockAddr remoteAddr() const;
-        virtual SockAddr localAddr() const;
+    /**
+     * this is used for doing 'async' queries
+     * instead of doing call( to , from )
+     * you would do
+     * say( to )
+     * recv( from )
+     * Note: if you fail to call recv and someone else uses this port,
+     *       horrible things will happen
+     */
+    bool recv(const Message& sent, Message& response);
 
-        std::shared_ptr<Socket> psock;
-                
-        void send( const char * data , int len, const char *context ) {
-            psock->send( data, len, context );
-        }
-        void send(const std::vector< std::pair< char *, int > > &data, const char *context) {
-            psock->send( data, context );
-        }
-        bool connect(SockAddr& farEnd) {
-            return psock->connect( farEnd );
-        }
+    void piggyBack(Message& toSend, int responseTo = 0);
+
+    unsigned remotePort() const {
+        return psock->remotePort();
+    }
+    virtual HostAndPort remote() const;
+    virtual SockAddr remoteAddr() const;
+    virtual SockAddr localAddr() const;
+
+    std::shared_ptr<Socket> psock;
+
+    void send(const char* data, int len, const char* context) {
+        psock->send(data, len, context);
+    }
+    void send(const std::vector<std::pair<char*, int>>& data, const char* context) {
+        psock->send(data, context);
+    }
+    bool connect(SockAddr& farEnd) {
+        return psock->connect(farEnd);
+    }
 #ifdef MONGO_CONFIG_SSL
-        /**
-         * Initiates the TLS/SSL handshake on this MessagingPort.
-         * When this function returns, further communication on this
-         * MessagingPort will be encrypted.
-         * ssl - Pointer to the global SSLManager.
-         * remoteHost - The hostname of the remote server.
-         */
-        bool secure( SSLManagerInterface* ssl, const std::string& remoteHost ) {
-            return psock->secure( ssl, remoteHost );
-        }
+    /**
+     * Initiates the TLS/SSL handshake on this MessagingPort.
+     * When this function returns, further communication on this
+     * MessagingPort will be encrypted.
+     * ssl - Pointer to the global SSLManager.
+     * remoteHost - The hostname of the remote server.
+     */
+    bool secure(SSLManagerInterface* ssl, const std::string& remoteHost) {
+        return psock->secure(ssl, remoteHost);
+    }
 #endif
 
-        bool isStillConnected() {
-            return psock->isStillConnected();
-        }
+    bool isStillConnected() {
+        return psock->isStillConnected();
+    }
 
-        uint64_t getSockCreationMicroSec() const {
-            return psock->getSockCreationMicroSec();
-        }
+    uint64_t getSockCreationMicroSec() const {
+        return psock->getSockCreationMicroSec();
+    }
 
-    private:
-        
-        PiggyBackData * piggyBackData;
+private:
+    PiggyBackData* piggyBackData;
 
-        // this is the parsed version of remote
-        // mutable because its initialized only on call to remote()
-        mutable HostAndPort _remoteParsed; 
+    // this is the parsed version of remote
+    // mutable because its initialized only on call to remote()
+    mutable HostAndPort _remoteParsed;
 
-    public:
-        static void closeAllSockets(unsigned tagMask = 0xffffffff);
+public:
+    static void closeAllSockets(unsigned tagMask = 0xffffffff);
 
-        friend class PiggyBackData;
-    };
+    friend class PiggyBackData;
+};
 
 
-} // namespace mongo
+}  // namespace mongo

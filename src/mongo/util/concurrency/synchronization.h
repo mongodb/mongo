@@ -35,87 +35,91 @@
 
 namespace mongo {
 
-    /**
-     * Type of callback functions that can be invoked when markThreadIdle() runs.
-     * These functions *must not throw*.
-     */
-    typedef void(*ThreadIdleCallback)();
+/**
+ * Type of callback functions that can be invoked when markThreadIdle() runs.
+ * These functions *must not throw*.
+ */
+typedef void (*ThreadIdleCallback)();
 
-    /**
-     * Informs the registered listener that this thread believes it may go idle for an extended
-     * period. The caller should avoid calling markThreadIdle at a high rate, as it can both be
-     * moderately costly itself and in terms of distributed overhead for subsequent malloc/free
-     * calls.
-     */
-    void markThreadIdle();
+/**
+ * Informs the registered listener that this thread believes it may go idle for an extended
+ * period. The caller should avoid calling markThreadIdle at a high rate, as it can both be
+ * moderately costly itself and in terms of distributed overhead for subsequent malloc/free
+ * calls.
+ */
+void markThreadIdle();
 
-    /**
-     * Allows for registering callbacks for when threads go idle and become active. This is used
-     * by TCMalloc to return freed memory to its central freelist at appropriate points, so it
-     * won't happen during critical sections while holding locks. Calling this is not thread-safe.
-     */
-    void registerThreadIdleCallback(ThreadIdleCallback callback);
+/**
+ * Allows for registering callbacks for when threads go idle and become active. This is used
+ * by TCMalloc to return freed memory to its central freelist at appropriate points, so it
+ * won't happen during critical sections while holding locks. Calling this is not thread-safe.
+ */
+void registerThreadIdleCallback(ThreadIdleCallback callback);
+
+/*
+ * A class to establish a synchronization point between two threads. One thread is the waiter
+ * and one is the notifier. After the notification event, both proceed normally.
+ *
+ * This class is thread-safe.
+ */
+class Notification {
+    MONGO_DISALLOW_COPYING(Notification);
+
+public:
+    Notification();
 
     /*
-     * A class to establish a synchronization point between two threads. One thread is the waiter
-     * and one is the notifier. After the notification event, both proceed normally.
-     *
-     * This class is thread-safe.
+     * Blocks until the method 'notifyOne()' is called.
      */
-    class Notification {
-        MONGO_DISALLOW_COPYING(Notification);
-    public:
-        Notification();
+    void waitToBeNotified();
 
-        /*
-         * Blocks until the method 'notifyOne()' is called.
-         */
-        void waitToBeNotified();
+    /*
+     * Notifies the waiter of '*this' that it can proceed.  Can only be called once.
+     */
+    void notifyOne();
 
-        /*
-         * Notifies the waiter of '*this' that it can proceed.  Can only be called once.
-         */
-        void notifyOne();
+private:
+    stdx::mutex _mutex;  // protects state below
+    unsigned long long lookFor;
+    unsigned long long cur;
+    stdx::condition_variable _condition;  // cond over _notified being true
+};
 
-    private:
-        stdx::mutex _mutex;          // protects state below
-        unsigned long long lookFor;
-        unsigned long long cur;
-        stdx::condition_variable _condition;  // cond over _notified being true
-    };
+/** establishes a synchronization point between threads. N threads are waits and one is notifier.
+    threadsafe.
+*/
+class NotifyAll {
+    MONGO_DISALLOW_COPYING(NotifyAll);
 
-    /** establishes a synchronization point between threads. N threads are waits and one is notifier.
-        threadsafe.
+public:
+    NotifyAll();
+
+    typedef unsigned long long When;
+
+    When now();
+
+    /** awaits the next notifyAll() call by another thread. notifications that precede this
+        call are ignored -- we are looking for a fresh event.
     */
-    class NotifyAll {
-        MONGO_DISALLOW_COPYING(NotifyAll);
-    public:
-        NotifyAll();
+    void waitFor(When);
 
-        typedef unsigned long long When;
+    /** a bit faster than waitFor( now() ) */
+    void awaitBeyondNow();
 
-        When now();
+    /** may be called multiple times. notifies all waiters */
+    void notifyAll(When);
 
-        /** awaits the next notifyAll() call by another thread. notifications that precede this
-            call are ignored -- we are looking for a fresh event.
-        */
-        void waitFor(When);
+    /** indicates how many threads are waiting for a notify. */
+    unsigned nWaiting() const {
+        return _nWaiting;
+    }
 
-        /** a bit faster than waitFor( now() ) */
-        void awaitBeyondNow();
+private:
+    stdx::mutex _mutex;
+    stdx::condition_variable _condition;
+    When _lastDone;
+    When _lastReturned;
+    unsigned _nWaiting;
+};
 
-        /** may be called multiple times. notifies all waiters */
-        void notifyAll(When);
-
-        /** indicates how many threads are waiting for a notify. */
-        unsigned nWaiting() const { return _nWaiting; }
-
-    private:
-        stdx::mutex _mutex;
-        stdx::condition_variable _condition;
-        When _lastDone;
-        When _lastReturned;
-        unsigned _nWaiting;
-    };
-
-} // namespace mongo
+}  // namespace mongo

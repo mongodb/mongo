@@ -39,340 +39,335 @@
 namespace mongo {
 namespace {
 
-    using std::unique_ptr;
-    using std::string;
-    using std::vector;
+using std::unique_ptr;
+using std::string;
+using std::vector;
 
-    template <class OnDiskFormat>
-    class BtreeBuilderInterfaceImpl final : public SortedDataBuilderInterface {
-    public:
-        BtreeBuilderInterfaceImpl(OperationContext* trans,
-                                  typename BtreeLogic<OnDiskFormat>::Builder* builder)
-            : _builder(builder), _trans(trans) { }
+template <class OnDiskFormat>
+class BtreeBuilderInterfaceImpl final : public SortedDataBuilderInterface {
+public:
+    BtreeBuilderInterfaceImpl(OperationContext* trans,
+                              typename BtreeLogic<OnDiskFormat>::Builder* builder)
+        : _builder(builder), _trans(trans) {}
 
-        Status addKey(const BSONObj& key, const RecordId& loc) {
-            return _builder->addKey(key, DiskLoc::fromRecordId(loc));
-        }
-
-    private:
-        std::unique_ptr<typename BtreeLogic<OnDiskFormat>::Builder> _builder;
-
-        // Not owned here.
-        OperationContext* _trans;
-    };
-
-    template <class OnDiskFormat>
-    class BtreeInterfaceImpl final : public SortedDataInterface {
-    public:
-        BtreeInterfaceImpl(HeadManager* headManager,
-                           RecordStore* recordStore,
-                           SavedCursorRegistry* cursorRegistry,
-                           const Ordering& ordering,
-                           const string& indexName) {
-            _btree.reset(new BtreeLogic<OnDiskFormat>(headManager,
-                                                      recordStore,
-                                                      cursorRegistry,
-                                                      ordering,
-                                                      indexName));
-        }
-
-        virtual ~BtreeInterfaceImpl() { }
-
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
-                                                           bool dupsAllowed) {
-
-            return new BtreeBuilderInterfaceImpl<OnDiskFormat>(
-                txn, _btree->newBuilder(txn, dupsAllowed));
-        }
-
-        virtual Status insert(OperationContext* txn,
-                              const BSONObj& key,
-                              const RecordId& loc,
-                              bool dupsAllowed) {
-
-            return _btree->insert(txn, key, DiskLoc::fromRecordId(loc), dupsAllowed);
-        }
-
-        virtual void unindex(OperationContext* txn,
-                             const BSONObj& key,
-                             const RecordId& loc,
-                             bool dupsAllowed) {
-
-            _btree->unindex(txn, key, DiskLoc::fromRecordId(loc));
-        }
-
-        virtual void fullValidate(OperationContext* txn, bool full, long long *numKeysOut,
-                                  BSONObjBuilder* output) const {
-            *numKeysOut = _btree->fullValidate(txn, NULL, false, false, 0);
-        }
-
-        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
-            const {
-            return false;
-        }
-
-        virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
-            return _btree->getRecordStore()->dataSize( txn );
-        }
-
-        virtual Status dupKeyCheck(OperationContext* txn,
-                                   const BSONObj& key,
-                                   const RecordId& loc) {
-            return _btree->dupKeyCheck(txn, key, DiskLoc::fromRecordId(loc));
-        }
-
-        virtual bool isEmpty(OperationContext* txn) {
-            return _btree->isEmpty(txn);
-        }
-
-        virtual Status touch(OperationContext* txn) const{
-            return _btree->touch(txn);
-        }
-
-        class Cursor final : public SortedDataInterface::Cursor {
-        public:
-            Cursor(OperationContext* txn,
-                   const BtreeLogic<OnDiskFormat>* btree,
-                   bool forward)
-                : _txn(txn),
-                  _btree(btree),
-                  _direction(forward ? 1 : -1),
-                  _ofs(0)
-            {}
-
-            boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
-                if (isEOF()) return {};
-                if (_lastMoveWasRestore) {
-                    // Return current position rather than advancing.
-                    _lastMoveWasRestore = false;
-                }
-                else {
-                    _btree->advance(_txn, &_bucket, &_ofs, _direction);
-                }
-
-                if (atEndPoint()) markEOF();
-                return curr(parts);
-            }
-
-            void setEndPosition(const BSONObj& key, bool inclusive) override {
-                if (key.isEmpty()) {
-                    // This means scan to end of index.
-                    _endState = {};
-                    return;
-                }
-
-                _endState = {{key, inclusive}};
-                seekEndCursor(); // Completes initialization of _endState.
-            }
-
-            boost::optional<IndexKeyEntry> seek(const BSONObj& key, bool inclusive,
-                                                RequestedInfo parts) override {
-                locate(key, inclusive == forward() ? RecordId::min() : RecordId::max());
-                _lastMoveWasRestore = false;
-
-                if (isEOF()) return {};
-                dassert(inclusive ? compareKeys(getKey(), key) >= 0
-                                  : compareKeys(getKey(), key) > 0);
-                return curr(parts);
-            }
-
-
-            boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
-                                                RequestedInfo parts) override {
-                bool canUseAdvanceTo = false;
-                if (!isEOF()) {
-                    int cmp = _btree->customBSONCmp(getKey(), seekPoint, _direction);
-                    
-                    // advanceTo requires that we are positioned "earlier" in the index than the
-                    // seek point, in scan order.
-                    canUseAdvanceTo = forward() ? cmp < 0 : cmp > 0;
-                }
-
-
-                if (canUseAdvanceTo) {
-                    // This takes advantage of current location.
-                    _btree->advanceTo(_txn, &_bucket, &_ofs, seekPoint, _direction);
-                }
-                else {
-                    // Start at root.
-                    _bucket = _btree->getHead(_txn);
-                    _ofs = 0;
-                    _btree->customLocate(_txn, &_bucket, &_ofs, seekPoint, _direction);
-                }
-
-                _lastMoveWasRestore = false;
-
-                if (atOrPastEndPointAfterSeeking()) markEOF();
-                return curr(parts);
-            }
-
-            void savePositioned() override {
-                _txn = nullptr;
-
-                if (!_lastMoveWasRestore) _savedEOF = isEOF();
-
-                if (!isEOF()) {
-                    _saved.bucket = _bucket;
-                    _btree->savedCursors()->registerCursor(&_saved);
-                    // Don't want to change saved position if we only moved during restore.
-                    if (!_lastMoveWasRestore) {
-                        _saved.key = getKey().getOwned();
-                        _saved.loc = getDiskLoc();
-                    }
-                }
-                // Doing nothing with end cursor since it will do full reseek on restore.
-            }
-
-            void saveUnpositioned() override {
-                _txn = nullptr;
-                // Don't leak our registration if savePositioned() was previously called.
-                if (!_saved.bucket.isNull()) _btree->savedCursors()->unregisterCursor(&_saved);
-
-                _saved.bucket = DiskLoc();
-                _savedEOF = true;
-            }
-
-            void restore(OperationContext* txn) override {
-                // guard against accidental double restore
-                invariant(!_txn);
-                _txn = txn;
-
-                // Always do a full seek on restore. We cannot use our last position since index
-                // entries may have been inserted closer to our endpoint and we would need to move
-                // over them.
-                seekEndCursor();
-
-                if (_savedEOF) {
-                    markEOF();
-                    return;
-                }
-
-                if (_btree->savedCursors()->unregisterCursor(&_saved)) {
-                    // We can use the fast restore mechanism.
-                    _btree->restorePosition(_txn, _saved.key, _saved.loc, _direction,
-                                            &_bucket, &_ofs);
-                }
-                else {
-                    // Need to find our position from the root.
-                    locate(_saved.key, _saved.loc.toRecordId());
-                }
-
-                _lastMoveWasRestore = isEOF() // We weren't EOF but now are.
-                                   || getDiskLoc() != _saved.loc
-                                   || compareKeys(getKey(), _saved.key) != 0;
-            }
-
-        private:
-            bool isEOF() const { return _bucket.isNull(); }
-            void markEOF() { _bucket = DiskLoc(); }
-
-            boost::optional<IndexKeyEntry> curr(RequestedInfo parts) {
-                if (isEOF()) return {};
-                return {{(parts & kWantKey) ? getKey() : BSONObj(),
-                         (parts & kWantLoc) ? getDiskLoc().toRecordId() : RecordId()}};
-            }
-
-            bool atEndPoint() const {
-                return _endState
-                    && _bucket == _endState->bucket
-                    && (isEOF() || _ofs == _endState->ofs);
-            }
-
-            bool atOrPastEndPointAfterSeeking() const {
-                if (!_endState) return false;
-                if (isEOF()) return true;
-               
-                int cmp = compareKeys(getKey(), _endState->key);
-                return _endState->inclusive ? cmp > 0 : cmp >= 0;
-            }
-
-            void locate(const BSONObj& key, const RecordId& loc) {
-                _btree->locate(_txn, key, DiskLoc::fromRecordId(loc), _direction, &_ofs, &_bucket);
-                if (atOrPastEndPointAfterSeeking()) markEOF();
-            }
-
-            // Returns comparison relative to direction of scan. If rhs would be seen later, returns
-            // a positive value.
-            int compareKeys(const BSONObj& lhs, const BSONObj& rhs) const {
-                int cmp = lhs.woCompare(rhs, _btree->ordering(), /*considerFieldName*/false);
-                return forward() ? cmp : -cmp;
-            }
-
-            BSONObj getKey() const { return _btree->getKey(_txn, _bucket, _ofs); }
-            DiskLoc getDiskLoc() const { return _btree->getDiskLoc(_txn, _bucket, _ofs); }
-
-            void seekEndCursor() {
-                if (!_endState) return;
-                _btree->locate(_txn,
-                               _endState->key,
-                               forward() == _endState->inclusive ? DiskLoc::max() : DiskLoc::min(),
-                               _direction,
-                               &_endState->ofs, &_endState->bucket); // pure out params.
-            }
-
-            bool forward() const { return _direction == 1; }
-
-            OperationContext* _txn; // not owned
-            const BtreeLogic<OnDiskFormat>* const _btree;
-            const int _direction;
-
-            DiskLoc _bucket;
-            int _ofs;
-            
-            struct EndState {
-                BSONObj key;
-                bool inclusive;
-                DiskLoc bucket;
-                int ofs;
-            };
-            boost::optional<EndState> _endState;
-
-            // Used by next to decide to return current position rather than moving. Should be reset
-            // to false by any operation that moves the cursor, other than subsequent save/restore
-            // pairs.
-            bool _lastMoveWasRestore = false;
-
-            // Only used by save/restore() if _bucket is non-Null.
-            bool _savedEOF = false;
-            SavedCursorRegistry::SavedCursor _saved;
-        };
-
-        virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(
-                OperationContext* txn,
-                bool isForward = true) const {
-            return stdx::make_unique<Cursor>(txn, _btree.get(), isForward);
-        }
-
-        virtual Status initAsEmpty(OperationContext* txn) {
-            return _btree->initAsEmpty(txn);
-        }
-
-    private:
-        unique_ptr<BtreeLogic<OnDiskFormat> > _btree;
-    };
-} // namespace
-
-    SortedDataInterface* getMMAPV1Interface(HeadManager* headManager,
-                                            RecordStore* recordStore,
-                                            SavedCursorRegistry* cursorRegistry,
-                                            const Ordering& ordering,
-                                            const string& indexName,
-                                            int version) {
-        if (0 == version) {
-            return new BtreeInterfaceImpl<BtreeLayoutV0>(headManager,
-                                                         recordStore,
-                                                         cursorRegistry,
-                                                         ordering,
-                                                         indexName);
-        }
-        else {
-            invariant(1 == version);
-            return new BtreeInterfaceImpl<BtreeLayoutV1>(headManager,
-                                                         recordStore,
-                                                         cursorRegistry,
-                                                         ordering,
-                                                         indexName);
-        }
+    Status addKey(const BSONObj& key, const RecordId& loc) {
+        return _builder->addKey(key, DiskLoc::fromRecordId(loc));
     }
+
+private:
+    std::unique_ptr<typename BtreeLogic<OnDiskFormat>::Builder> _builder;
+
+    // Not owned here.
+    OperationContext* _trans;
+};
+
+template <class OnDiskFormat>
+class BtreeInterfaceImpl final : public SortedDataInterface {
+public:
+    BtreeInterfaceImpl(HeadManager* headManager,
+                       RecordStore* recordStore,
+                       SavedCursorRegistry* cursorRegistry,
+                       const Ordering& ordering,
+                       const string& indexName) {
+        _btree.reset(new BtreeLogic<OnDiskFormat>(
+            headManager, recordStore, cursorRegistry, ordering, indexName));
+    }
+
+    virtual ~BtreeInterfaceImpl() {}
+
+    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
+        return new BtreeBuilderInterfaceImpl<OnDiskFormat>(txn,
+                                                           _btree->newBuilder(txn, dupsAllowed));
+    }
+
+    virtual Status insert(OperationContext* txn,
+                          const BSONObj& key,
+                          const RecordId& loc,
+                          bool dupsAllowed) {
+        return _btree->insert(txn, key, DiskLoc::fromRecordId(loc), dupsAllowed);
+    }
+
+    virtual void unindex(OperationContext* txn,
+                         const BSONObj& key,
+                         const RecordId& loc,
+                         bool dupsAllowed) {
+        _btree->unindex(txn, key, DiskLoc::fromRecordId(loc));
+    }
+
+    virtual void fullValidate(OperationContext* txn,
+                              bool full,
+                              long long* numKeysOut,
+                              BSONObjBuilder* output) const {
+        *numKeysOut = _btree->fullValidate(txn, NULL, false, false, 0);
+    }
+
+    virtual bool appendCustomStats(OperationContext* txn,
+                                   BSONObjBuilder* output,
+                                   double scale) const {
+        return false;
+    }
+
+    virtual long long getSpaceUsedBytes(OperationContext* txn) const {
+        return _btree->getRecordStore()->dataSize(txn);
+    }
+
+    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) {
+        return _btree->dupKeyCheck(txn, key, DiskLoc::fromRecordId(loc));
+    }
+
+    virtual bool isEmpty(OperationContext* txn) {
+        return _btree->isEmpty(txn);
+    }
+
+    virtual Status touch(OperationContext* txn) const {
+        return _btree->touch(txn);
+    }
+
+    class Cursor final : public SortedDataInterface::Cursor {
+    public:
+        Cursor(OperationContext* txn, const BtreeLogic<OnDiskFormat>* btree, bool forward)
+            : _txn(txn), _btree(btree), _direction(forward ? 1 : -1), _ofs(0) {}
+
+        boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
+            if (isEOF())
+                return {};
+            if (_lastMoveWasRestore) {
+                // Return current position rather than advancing.
+                _lastMoveWasRestore = false;
+            } else {
+                _btree->advance(_txn, &_bucket, &_ofs, _direction);
+            }
+
+            if (atEndPoint())
+                markEOF();
+            return curr(parts);
+        }
+
+        void setEndPosition(const BSONObj& key, bool inclusive) override {
+            if (key.isEmpty()) {
+                // This means scan to end of index.
+                _endState = {};
+                return;
+            }
+
+            _endState = {{key, inclusive}};
+            seekEndCursor();  // Completes initialization of _endState.
+        }
+
+        boost::optional<IndexKeyEntry> seek(const BSONObj& key,
+                                            bool inclusive,
+                                            RequestedInfo parts) override {
+            locate(key, inclusive == forward() ? RecordId::min() : RecordId::max());
+            _lastMoveWasRestore = false;
+
+            if (isEOF())
+                return {};
+            dassert(inclusive ? compareKeys(getKey(), key) >= 0 : compareKeys(getKey(), key) > 0);
+            return curr(parts);
+        }
+
+
+        boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
+                                            RequestedInfo parts) override {
+            bool canUseAdvanceTo = false;
+            if (!isEOF()) {
+                int cmp = _btree->customBSONCmp(getKey(), seekPoint, _direction);
+
+                // advanceTo requires that we are positioned "earlier" in the index than the
+                // seek point, in scan order.
+                canUseAdvanceTo = forward() ? cmp < 0 : cmp > 0;
+            }
+
+
+            if (canUseAdvanceTo) {
+                // This takes advantage of current location.
+                _btree->advanceTo(_txn, &_bucket, &_ofs, seekPoint, _direction);
+            } else {
+                // Start at root.
+                _bucket = _btree->getHead(_txn);
+                _ofs = 0;
+                _btree->customLocate(_txn, &_bucket, &_ofs, seekPoint, _direction);
+            }
+
+            _lastMoveWasRestore = false;
+
+            if (atOrPastEndPointAfterSeeking())
+                markEOF();
+            return curr(parts);
+        }
+
+        void savePositioned() override {
+            _txn = nullptr;
+
+            if (!_lastMoveWasRestore)
+                _savedEOF = isEOF();
+
+            if (!isEOF()) {
+                _saved.bucket = _bucket;
+                _btree->savedCursors()->registerCursor(&_saved);
+                // Don't want to change saved position if we only moved during restore.
+                if (!_lastMoveWasRestore) {
+                    _saved.key = getKey().getOwned();
+                    _saved.loc = getDiskLoc();
+                }
+            }
+            // Doing nothing with end cursor since it will do full reseek on restore.
+        }
+
+        void saveUnpositioned() override {
+            _txn = nullptr;
+            // Don't leak our registration if savePositioned() was previously called.
+            if (!_saved.bucket.isNull())
+                _btree->savedCursors()->unregisterCursor(&_saved);
+
+            _saved.bucket = DiskLoc();
+            _savedEOF = true;
+        }
+
+        void restore(OperationContext* txn) override {
+            // guard against accidental double restore
+            invariant(!_txn);
+            _txn = txn;
+
+            // Always do a full seek on restore. We cannot use our last position since index
+            // entries may have been inserted closer to our endpoint and we would need to move
+            // over them.
+            seekEndCursor();
+
+            if (_savedEOF) {
+                markEOF();
+                return;
+            }
+
+            if (_btree->savedCursors()->unregisterCursor(&_saved)) {
+                // We can use the fast restore mechanism.
+                _btree->restorePosition(_txn, _saved.key, _saved.loc, _direction, &_bucket, &_ofs);
+            } else {
+                // Need to find our position from the root.
+                locate(_saved.key, _saved.loc.toRecordId());
+            }
+
+            _lastMoveWasRestore = isEOF()  // We weren't EOF but now are.
+                || getDiskLoc() != _saved.loc || compareKeys(getKey(), _saved.key) != 0;
+        }
+
+    private:
+        bool isEOF() const {
+            return _bucket.isNull();
+        }
+        void markEOF() {
+            _bucket = DiskLoc();
+        }
+
+        boost::optional<IndexKeyEntry> curr(RequestedInfo parts) {
+            if (isEOF())
+                return {};
+            return {{(parts & kWantKey) ? getKey() : BSONObj(),
+                     (parts & kWantLoc) ? getDiskLoc().toRecordId() : RecordId()}};
+        }
+
+        bool atEndPoint() const {
+            return _endState && _bucket == _endState->bucket && (isEOF() || _ofs == _endState->ofs);
+        }
+
+        bool atOrPastEndPointAfterSeeking() const {
+            if (!_endState)
+                return false;
+            if (isEOF())
+                return true;
+
+            int cmp = compareKeys(getKey(), _endState->key);
+            return _endState->inclusive ? cmp > 0 : cmp >= 0;
+        }
+
+        void locate(const BSONObj& key, const RecordId& loc) {
+            _btree->locate(_txn, key, DiskLoc::fromRecordId(loc), _direction, &_ofs, &_bucket);
+            if (atOrPastEndPointAfterSeeking())
+                markEOF();
+        }
+
+        // Returns comparison relative to direction of scan. If rhs would be seen later, returns
+        // a positive value.
+        int compareKeys(const BSONObj& lhs, const BSONObj& rhs) const {
+            int cmp = lhs.woCompare(rhs, _btree->ordering(), /*considerFieldName*/ false);
+            return forward() ? cmp : -cmp;
+        }
+
+        BSONObj getKey() const {
+            return _btree->getKey(_txn, _bucket, _ofs);
+        }
+        DiskLoc getDiskLoc() const {
+            return _btree->getDiskLoc(_txn, _bucket, _ofs);
+        }
+
+        void seekEndCursor() {
+            if (!_endState)
+                return;
+            _btree->locate(_txn,
+                           _endState->key,
+                           forward() == _endState->inclusive ? DiskLoc::max() : DiskLoc::min(),
+                           _direction,
+                           &_endState->ofs,
+                           &_endState->bucket);  // pure out params.
+        }
+
+        bool forward() const {
+            return _direction == 1;
+        }
+
+        OperationContext* _txn;  // not owned
+        const BtreeLogic<OnDiskFormat>* const _btree;
+        const int _direction;
+
+        DiskLoc _bucket;
+        int _ofs;
+
+        struct EndState {
+            BSONObj key;
+            bool inclusive;
+            DiskLoc bucket;
+            int ofs;
+        };
+        boost::optional<EndState> _endState;
+
+        // Used by next to decide to return current position rather than moving. Should be reset
+        // to false by any operation that moves the cursor, other than subsequent save/restore
+        // pairs.
+        bool _lastMoveWasRestore = false;
+
+        // Only used by save/restore() if _bucket is non-Null.
+        bool _savedEOF = false;
+        SavedCursorRegistry::SavedCursor _saved;
+    };
+
+    virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
+                                                                   bool isForward = true) const {
+        return stdx::make_unique<Cursor>(txn, _btree.get(), isForward);
+    }
+
+    virtual Status initAsEmpty(OperationContext* txn) {
+        return _btree->initAsEmpty(txn);
+    }
+
+private:
+    unique_ptr<BtreeLogic<OnDiskFormat>> _btree;
+};
+}  // namespace
+
+SortedDataInterface* getMMAPV1Interface(HeadManager* headManager,
+                                        RecordStore* recordStore,
+                                        SavedCursorRegistry* cursorRegistry,
+                                        const Ordering& ordering,
+                                        const string& indexName,
+                                        int version) {
+    if (0 == version) {
+        return new BtreeInterfaceImpl<BtreeLayoutV0>(
+            headManager, recordStore, cursorRegistry, ordering, indexName);
+    } else {
+        invariant(1 == version);
+        return new BtreeInterfaceImpl<BtreeLayoutV1>(
+            headManager, recordStore, cursorRegistry, ordering, indexName);
+    }
+}
 
 }  // namespace mongo

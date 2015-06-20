@@ -35,97 +35,96 @@
 
 namespace mongo {
 
-    class DecorationRegistry;
+class DecorationRegistry;
 
+/**
+ * An container for decorations.
+ */
+class DecorationContainer {
+    MONGO_DISALLOW_COPYING(DecorationContainer);
+
+public:
     /**
-     * An container for decorations.
+     * Opaque descriptor of a decoration.  It is an identifier to a field on the
+     * DecorationContainer that is private to those modules that have access to the descriptor.
      */
-    class DecorationContainer {
-        MONGO_DISALLOW_COPYING(DecorationContainer);
+    class DecorationDescriptor {
     public:
-
-        /**
-         * Opaque descriptor of a decoration.  It is an identifier to a field on the
-         * DecorationContainer that is private to those modules that have access to the descriptor.
-         */
-        class DecorationDescriptor {
-        public:
-            DecorationDescriptor() = default;
-
-        private:
-            friend class DecorationContainer;
-            friend class DecorationRegistry;
-
-            explicit DecorationDescriptor(size_t index) : _index(index) {}
-
-            size_t _index;
-        };
-
-        /**
-         * Opaque description of a decoration of specified type T.  It is an identifier to a field
-         * on the DecorationContainer that is private to those modules that have access to the
-         * descriptor.
-         */
-        template <typename T>
-        class DecorationDescriptorWithType {
-        public:
-            DecorationDescriptorWithType() = default;
-
-        private:
-            friend class DecorationContainer;
-            friend class DecorationRegistry;
-
-            explicit DecorationDescriptorWithType(DecorationDescriptor raw) :
-                _raw(std::move(raw)) {}
-
-            DecorationDescriptor _raw;
-        };
-
-        /**
-         * Constructs a decorable built based on the given "registry."
-         *
-         * The registry must stay in scope for the lifetime of the DecorationContainer, and must not
-         * have any declareDecoration() calls made on it while a DecorationContainer dependent on it
-         * is in scope.
-         */
-        explicit DecorationContainer(const DecorationRegistry* registry);
-        ~DecorationContainer();
-
-        /**
-         * Gets the decorated value for the given descriptor.
-         *
-         * The descriptor must be one returned from this DecorationContainer's associated _registry.
-         */
-        void* getDecoration(DecorationDescriptor descriptor) {
-            return _decorationData.get() + descriptor._index;
-        }
-
-        /**
-         * Same as the non-const form above, but returns a const result.
-         */
-        const void* getDecoration(DecorationDescriptor descriptor) const {
-            return _decorationData.get() + descriptor._index;
-        }
-
-        /**
-         * Gets the decorated value or the given typed descriptor.
-         */
-        template <typename T>
-        T& getDecoration(DecorationDescriptorWithType<T> descriptor) {
-            return *static_cast<T*>(getDecoration(descriptor._raw));
-        }
-
-        /**
-         * Same as the non-const form above, but returns a const result.
-         */
-        template <typename T>
-        const T& getDecoration(DecorationDescriptorWithType<T> descriptor) const {
-            return *static_cast<const T*>(getDecoration(descriptor._raw));
-        }
+        DecorationDescriptor() = default;
 
     private:
-        const DecorationRegistry* const _registry;
-        const std::unique_ptr<unsigned char[]> _decorationData;
+        friend class DecorationContainer;
+        friend class DecorationRegistry;
+
+        explicit DecorationDescriptor(size_t index) : _index(index) {}
+
+        size_t _index;
     };
+
+    /**
+     * Opaque description of a decoration of specified type T.  It is an identifier to a field
+     * on the DecorationContainer that is private to those modules that have access to the
+     * descriptor.
+     */
+    template <typename T>
+    class DecorationDescriptorWithType {
+    public:
+        DecorationDescriptorWithType() = default;
+
+    private:
+        friend class DecorationContainer;
+        friend class DecorationRegistry;
+
+        explicit DecorationDescriptorWithType(DecorationDescriptor raw) : _raw(std::move(raw)) {}
+
+        DecorationDescriptor _raw;
+    };
+
+    /**
+     * Constructs a decorable built based on the given "registry."
+     *
+     * The registry must stay in scope for the lifetime of the DecorationContainer, and must not
+     * have any declareDecoration() calls made on it while a DecorationContainer dependent on it
+     * is in scope.
+     */
+    explicit DecorationContainer(const DecorationRegistry* registry);
+    ~DecorationContainer();
+
+    /**
+     * Gets the decorated value for the given descriptor.
+     *
+     * The descriptor must be one returned from this DecorationContainer's associated _registry.
+     */
+    void* getDecoration(DecorationDescriptor descriptor) {
+        return _decorationData.get() + descriptor._index;
+    }
+
+    /**
+     * Same as the non-const form above, but returns a const result.
+     */
+    const void* getDecoration(DecorationDescriptor descriptor) const {
+        return _decorationData.get() + descriptor._index;
+    }
+
+    /**
+     * Gets the decorated value or the given typed descriptor.
+     */
+    template <typename T>
+    T& getDecoration(DecorationDescriptorWithType<T> descriptor) {
+        return *static_cast<T*>(getDecoration(descriptor._raw));
+    }
+
+    /**
+     * Same as the non-const form above, but returns a const result.
+     */
+    template <typename T>
+    const T& getDecoration(DecorationDescriptorWithType<T> descriptor) const {
+        return *static_cast<const T*>(getDecoration(descriptor._raw));
+    }
+
+private:
+    const DecorationRegistry* const _registry;
+    const std::unique_ptr<unsigned char[]> _decorationData;
+};
 
 }  // namespace mongo

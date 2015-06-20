@@ -51,16 +51,16 @@ extern "C" void __gcov_flush();
 
 namespace mongo {
 
-    void quickExit(int code) {
+void quickExit(int code) {
 #ifdef MONGO_GCOV
-        __gcov_flush();
+    __gcov_flush();
 #endif
 
 #if __has_feature(address_sanitizer)
-        __lsan_do_leak_check();
+    __lsan_do_leak_check();
 #endif
 
-        ::_exit(code);
-    }
+    ::_exit(code);
+}
 
-} // namespace mongo
+}  // namespace mongo

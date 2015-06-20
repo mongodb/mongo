@@ -34,84 +34,75 @@
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
-    using boost::intrusive_ptr;
+using boost::intrusive_ptr;
 
-    void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
-        if (!merging) {
-            // non numeric types have no impact on standard deviation
-            if (!input.numeric())
-                return;
+void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
+    if (!merging) {
+        // non numeric types have no impact on standard deviation
+        if (!input.numeric())
+            return;
 
-            const double val = input.getDouble();
+        const double val = input.getDouble();
 
-            // This is an implementation of the following algorithm:
-            // http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
-            _count += 1;
-            const double delta = val - _mean;
-            _mean += delta / _count;
-            _m2 += delta * (val - _mean);
-        }
-        else {
-            // This is what getValue(true) produced below.
-            verify(input.getType() == Object);
-            const double m2 = input["m2"].getDouble();
-            const double mean = input["mean"].getDouble();
-            const long long count = input["count"].getLong();
+        // This is an implementation of the following algorithm:
+        // http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
+        _count += 1;
+        const double delta = val - _mean;
+        _mean += delta / _count;
+        _m2 += delta * (val - _mean);
+    } else {
+        // This is what getValue(true) produced below.
+        verify(input.getType() == Object);
+        const double m2 = input["m2"].getDouble();
+        const double mean = input["mean"].getDouble();
+        const long long count = input["count"].getLong();
 
-            if (count == 0)
-                return; // This partition had no data to contribute.
+        if (count == 0)
+            return;  // This partition had no data to contribute.
 
-            // This is an implementation of the following algorithm:
-            // http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
-            const double delta = mean - _mean;
-            const long long newCount = count + _count;
+        // This is an implementation of the following algorithm:
+        // http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
+        const double delta = mean - _mean;
+        const long long newCount = count + _count;
 
-            _mean = ((_count * _mean) + (count * mean)) / newCount;
-            _m2 += m2 + (delta * delta * (double(_count) * count / newCount));
-            _count = newCount;
-        }
+        _mean = ((_count * _mean) + (count * mean)) / newCount;
+        _m2 += m2 + (delta * delta * (double(_count) * count / newCount));
+        _count = newCount;
     }
+}
 
-    Value AccumulatorStdDev::getValue(bool toBeMerged) const {
-        if (!toBeMerged) {
-            const long long adjustedCount = (_isSamp ? _count - 1 : _count);
-            if (adjustedCount <= 0)
-                return Value(BSONNULL); // standard deviation not well defined in this case
+Value AccumulatorStdDev::getValue(bool toBeMerged) const {
+    if (!toBeMerged) {
+        const long long adjustedCount = (_isSamp ? _count - 1 : _count);
+        if (adjustedCount <= 0)
+            return Value(BSONNULL);  // standard deviation not well defined in this case
 
-            return Value(sqrt(_m2 / adjustedCount));
-        }
-        else {
-            return Value(DOC("m2" << _m2
-                          << "mean" << _mean
-                          << "count" << _count));
-        }
+        return Value(sqrt(_m2 / adjustedCount));
+    } else {
+        return Value(DOC("m2" << _m2 << "mean" << _mean << "count" << _count));
     }
+}
 
-    intrusive_ptr<Accumulator> AccumulatorStdDev::createSamp() {
-        return new AccumulatorStdDev(true);
-    }
+intrusive_ptr<Accumulator> AccumulatorStdDev::createSamp() {
+    return new AccumulatorStdDev(true);
+}
 
-    intrusive_ptr<Accumulator> AccumulatorStdDev::createPop() {
-        return new AccumulatorStdDev(false);
-    }
+intrusive_ptr<Accumulator> AccumulatorStdDev::createPop() {
+    return new AccumulatorStdDev(false);
+}
 
-    AccumulatorStdDev::AccumulatorStdDev(bool isSamp)
-        : _isSamp(isSamp)
-        , _count(0)
-        , _mean(0)
-        , _m2(0)
-    {
-        // This is a fixed size Accumulator so we never need to update this
-        _memUsageBytes = sizeof(*this);
-    }
+AccumulatorStdDev::AccumulatorStdDev(bool isSamp) : _isSamp(isSamp), _count(0), _mean(0), _m2(0) {
+    // This is a fixed size Accumulator so we never need to update this
+    _memUsageBytes = sizeof(*this);
+}
 
-    void AccumulatorStdDev::reset() {
-        _count = 0;
-        _mean = 0;
-        _m2 = 0;
-    }
+void AccumulatorStdDev::reset() {
+    _count = 0;
+    _mean = 0;
+    _m2 = 0;
+}
 
-    const char *AccumulatorStdDev::getOpName() const {
-        return (_isSamp ? "$stdDevSamp" : "$stdDevPop");
-    }
+const char* AccumulatorStdDev::getOpName() const {
+    return (_isSamp ? "$stdDevSamp" : "$stdDevPop");
+}
 }

@@ -39,27 +39,27 @@
 
 namespace mongo {
 
-    RemoteCommandTargeterFactoryImpl::RemoteCommandTargeterFactoryImpl() = default;
+RemoteCommandTargeterFactoryImpl::RemoteCommandTargeterFactoryImpl() = default;
 
-    RemoteCommandTargeterFactoryImpl::~RemoteCommandTargeterFactoryImpl() = default;
+RemoteCommandTargeterFactoryImpl::~RemoteCommandTargeterFactoryImpl() = default;
 
-    std::unique_ptr<RemoteCommandTargeter>
-    RemoteCommandTargeterFactoryImpl::create(const ConnectionString& connStr) {
-        switch (connStr.type()) {
+std::unique_ptr<RemoteCommandTargeter> RemoteCommandTargeterFactoryImpl::create(
+    const ConnectionString& connStr) {
+    switch (connStr.type()) {
         case ConnectionString::MASTER:
         case ConnectionString::CUSTOM:
             invariant(connStr.getServers().size() == 1);
             return stdx::make_unique<RemoteCommandTargeterStandalone>(connStr.getServers().front());
         case ConnectionString::SET:
             return stdx::make_unique<RemoteCommandTargeterRS>(connStr.getSetName(),
-                                                             connStr.getServers());
+                                                              connStr.getServers());
         case ConnectionString::INVALID:
         case ConnectionString::SYNC:
             // These connections should never be seen
             break;
-        }
-
-        MONGO_UNREACHABLE;
     }
 
-} // namespace mongo
+    MONGO_UNREACHABLE;
+}
+
+}  // namespace mongo

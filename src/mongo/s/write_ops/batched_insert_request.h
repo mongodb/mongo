@@ -39,114 +39,118 @@
 
 namespace mongo {
 
-    /**
-     * This class represents the layout and content of a batched insert runCommand,
-     * the request side.
+/**
+ * This class represents the layout and content of a batched insert runCommand,
+ * the request side.
+ */
+class BatchedInsertRequest : public BSONSerializable {
+    MONGO_DISALLOW_COPYING(BatchedInsertRequest);
+
+public:
+    //
+    // schema declarations
+    //
+
+    // Name used for the batched insert invocation.
+    static const std::string BATCHED_INSERT_REQUEST;
+
+    // Field names and types in the batched insert command type.
+    static const BSONField<std::string> collName;
+    static const BSONField<std::vector<BSONObj>> documents;
+    static const BSONField<BSONObj> writeConcern;
+    static const BSONField<bool> ordered;
+    static const BSONField<BSONObj> metadata;
+
+    //
+    // construction / destruction
+    //
+
+    BatchedInsertRequest();
+    virtual ~BatchedInsertRequest();
+
+    /** Copies all the fields present in 'this' to 'other'. */
+    void cloneTo(BatchedInsertRequest* other) const;
+
+    //
+    // bson serializable interface implementation
+    //
+
+    virtual bool isValid(std::string* errMsg) const;
+    virtual BSONObj toBSON() const;
+    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
+    virtual void clear();
+    virtual std::string toString() const;
+
+    //
+    // individual field accessors
+    //
+
+    void setCollName(StringData collName);
+    void setCollNameNS(const NamespaceString& collName);
+    const std::string& getCollName() const;
+    const NamespaceString& getCollNameNS() const;
+
+    const NamespaceString& getTargetingNSS() const;
+
+    void addToDocuments(const BSONObj& documents);
+    bool isDocumentsSet() const;
+    std::size_t sizeDocuments() const;
+    const std::vector<BSONObj>& getDocuments() const;
+    const BSONObj& getDocumentsAt(std::size_t pos) const;
+    void setDocumentAt(std::size_t pos, const BSONObj& doc);
+
+    void setWriteConcern(const BSONObj& writeConcern);
+    void unsetWriteConcern();
+    bool isWriteConcernSet() const;
+    const BSONObj& getWriteConcern() const;
+
+    void setOrdered(bool ordered);
+    void unsetOrdered();
+    bool isOrderedSet() const;
+    bool getOrdered() const;
+
+    void setShouldBypassValidation(bool newVal) {
+        _shouldBypassValidation = newVal;
+    }
+    bool shouldBypassValidation() const {
+        return _shouldBypassValidation;
+    }
+
+    /*
+     * metadata ownership will be transferred to this.
      */
-    class BatchedInsertRequest : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(BatchedInsertRequest);
-    public:
+    void setMetadata(BatchedRequestMetadata* metadata);
+    void unsetMetadata();
+    bool isMetadataSet() const;
+    BatchedRequestMetadata* getMetadata() const;
 
-        //
-        // schema declarations
-        //
+private:
+    // Convention: (M)andatory, (O)ptional
 
-        // Name used for the batched insert invocation.
-        static const std::string BATCHED_INSERT_REQUEST;
+    // (M)  collection we're inserting on
+    NamespaceString _collName;
+    bool _isCollNameSet;
 
-        // Field names and types in the batched insert command type.
-        static const BSONField<std::string> collName;
-        static const BSONField<std::vector<BSONObj> > documents;
-        static const BSONField<BSONObj> writeConcern;
-        static const BSONField<bool> ordered;
-        static const BSONField<BSONObj> metadata;
+    // (M)  array of documents to be inserted
+    std::vector<BSONObj> _documents;
+    bool _isDocumentsSet;
 
-        //
-        // construction / destruction
-        //
+    // (O)  to be issued after the batch applied
+    BSONObj _writeConcern;
+    bool _isWriteConcernSet;
 
-        BatchedInsertRequest();
-        virtual ~BatchedInsertRequest();
+    // (O)  whether batch is issued in parallel or not
+    bool _ordered;
+    bool _isOrderedSet;
 
-        /** Copies all the fields present in 'this' to 'other'. */
-        void cloneTo(BatchedInsertRequest* other) const;
+    // (O)  metadata associated with this request for internal use.
+    std::unique_ptr<BatchedRequestMetadata> _metadata;
 
-        //
-        // bson serializable interface implementation
-        //
+    // (O)  cached copied of target ns
+    NamespaceString _targetNSS;
 
-        virtual bool isValid(std::string* errMsg) const;
-        virtual BSONObj toBSON() const;
-        virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-        virtual void clear();
-        virtual std::string toString() const;
+    // (O)  should document validation be bypassed (default false)
+    bool _shouldBypassValidation;
+};
 
-        //
-        // individual field accessors
-        //
-
-        void setCollName(StringData collName);
-        void setCollNameNS(const NamespaceString& collName);
-        const std::string& getCollName() const;
-        const NamespaceString& getCollNameNS() const;
-
-        const NamespaceString& getTargetingNSS() const;
-
-        void addToDocuments(const BSONObj& documents);
-        bool isDocumentsSet() const;
-        std::size_t sizeDocuments() const;
-        const std::vector<BSONObj>& getDocuments() const;
-        const BSONObj& getDocumentsAt(std::size_t pos) const;
-        void setDocumentAt(std::size_t pos, const BSONObj& doc);
-
-        void setWriteConcern(const BSONObj& writeConcern);
-        void unsetWriteConcern();
-        bool isWriteConcernSet() const;
-        const BSONObj& getWriteConcern() const;
-
-        void setOrdered(bool ordered);
-        void unsetOrdered();
-        bool isOrderedSet() const;
-        bool getOrdered() const;
-
-        void setShouldBypassValidation(bool newVal) { _shouldBypassValidation = newVal; }
-        bool shouldBypassValidation() const { return _shouldBypassValidation; }
-
-        /*
-         * metadata ownership will be transferred to this.
-         */
-        void setMetadata(BatchedRequestMetadata* metadata);
-        void unsetMetadata();
-        bool isMetadataSet() const;
-        BatchedRequestMetadata* getMetadata() const;
-
-    private:
-        // Convention: (M)andatory, (O)ptional
-
-        // (M)  collection we're inserting on
-        NamespaceString _collName;
-        bool _isCollNameSet;
-
-        // (M)  array of documents to be inserted
-        std::vector<BSONObj> _documents;
-        bool _isDocumentsSet;
-
-        // (O)  to be issued after the batch applied
-        BSONObj _writeConcern;
-        bool _isWriteConcernSet;
-
-        // (O)  whether batch is issued in parallel or not
-        bool _ordered;
-        bool _isOrderedSet;
-
-        // (O)  metadata associated with this request for internal use.
-        std::unique_ptr<BatchedRequestMetadata> _metadata;
-
-        // (O)  cached copied of target ns
-        NamespaceString _targetNSS;
-
-        // (O)  should document validation be bypassed (default false)
-        bool _shouldBypassValidation;
-    };
-
-} // namespace mongo
+}  // namespace mongo

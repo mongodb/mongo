@@ -35,25 +35,25 @@
 
 namespace mongo {
 
-    class RecordStore;
-    class RecoveryUnit;
+class RecordStore;
+class RecoveryUnit;
 
-    class HarnessHelper {
-    public:
-        HarnessHelper() : _serviceContext(), _client(_serviceContext.makeClient("hh")) {}
-        virtual ~HarnessHelper(){}
+class HarnessHelper {
+public:
+    HarnessHelper() : _serviceContext(), _client(_serviceContext.makeClient("hh")) {}
+    virtual ~HarnessHelper() {}
 
-        virtual RecordStore* newNonCappedRecordStore() = 0;
-        virtual RecoveryUnit* newRecoveryUnit() = 0;
+    virtual RecordStore* newNonCappedRecordStore() = 0;
+    virtual RecoveryUnit* newRecoveryUnit() = 0;
 
-        virtual OperationContext* newOperationContext() {
-            return new OperationContextNoop(_client.get(), 1, newRecoveryUnit());
-        }
+    virtual OperationContext* newOperationContext() {
+        return new OperationContextNoop(_client.get(), 1, newRecoveryUnit());
+    }
 
-    private:
-        ServiceContextNoop _serviceContext;
-        ServiceContext::UniqueClient _client;
-    };
+private:
+    ServiceContextNoop _serviceContext;
+    ServiceContext::UniqueClient _client;
+};
 
-    HarnessHelper* newHarnessHelper();
+HarnessHelper* newHarnessHelper();
 }

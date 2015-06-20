@@ -41,239 +41,224 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
+
+/**
+ * Specialization of the config server fixture with helpers for the tests below.
+ */
+class ConfigUpgradeFixture : public ConfigServerFixture {
+public:
+    ConfigUpgradeFixture() : ConfigServerFixture() {}
+
+    void stopBalancer() {
+        // Note: The balancer key is needed in the update portion, for some reason related to
+        // DBDirectClient
+        DBDirectClient client(&_txn);
+        client.update(SettingsType::ConfigNS,
+                      BSON(SettingsType::key(SettingsType::BalancerDocKey)),
+                      BSON(SettingsType::key(SettingsType::BalancerDocKey)
+                           << SettingsType::balancerStopped(true)),
+                      true,
+                      false);
+    }
 
     /**
-     * Specialization of the config server fixture with helpers for the tests below.
+     * Stores a legacy { version : X } config server entry
      */
-    class ConfigUpgradeFixture: public ConfigServerFixture {
-    public:
+    void storeLegacyConfigVersion(int version) {
+        if (version == 0)
+            return;
 
-        ConfigUpgradeFixture() : ConfigServerFixture() {
+        DBDirectClient client(&_txn);
 
+        if (version == 1) {
+            ShardType shard;
+            shard.setName("test");
+            shard.setHost("$dummy:10000");
+            client.insert(ShardType::ConfigNS, shard.toBSON());
+            return;
         }
 
-        void stopBalancer() {
-            // Note: The balancer key is needed in the update portion, for some reason related to 
-            // DBDirectClient
-            DBDirectClient client(&_txn);
-            client.update(SettingsType::ConfigNS,
-                          BSON(SettingsType::key(SettingsType::BalancerDocKey)),
-                          BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
-                               SettingsType::balancerStopped(true)),
-                          true, false);
-        }
-
-        /**
-         * Stores a legacy { version : X } config server entry
-         */
-        void storeLegacyConfigVersion(int version) {
-
-            if (version == 0) return;
-
-            DBDirectClient client(&_txn);
-
-            if (version == 1) {
-                ShardType shard;
-                shard.setName("test");
-                shard.setHost("$dummy:10000");
-                client.insert(ShardType::ConfigNS, shard.toBSON());
-                return;
-            }
-
-            client.insert(VersionType::ConfigNS, BSON("_id" << 1 << "version" << version));
-        }
-
-        /**
-         * Stores a newer { version, minVersion, currentVersion, clusterId } config server entry
-         */
-        void storeConfigVersion(const VersionType& versionInfo) {
-            DBDirectClient client(&_txn);
-            client.insert(VersionType::ConfigNS, versionInfo.toBSON());
-        }
-
-        /**
-         * Stores a newer { version, minVersion, currentVersion, clusterId } config server entry.
-         *
-         * @return clusterId
-         */
-        OID storeConfigVersion(int configVersion) {
-
-            if (configVersion < CURRENT_CONFIG_VERSION) {
-                storeLegacyConfigVersion(configVersion);
-                return OID();
-            }
-
-            VersionType version;
-            version.setMinCompatibleVersion(configVersion);
-            version.setCurrentVersion(configVersion);
-
-            OID clusterId = OID::gen();
-
-            version.setClusterId(clusterId);
-
-            storeConfigVersion(version);
-            return clusterId;
-        }
-
-        /**
-         * Stores sample shard and ping information at the current version.
-         */
-        void storeShardsAndPings(int numShards, int numPings) {
-            DBDirectClient client(&_txn);
-
-            for (int i = 0; i < numShards; i++) {
-                ShardType shard;
-                shard.setName(OID::gen().toString());
-                shard.setHost((string) (str::stream() << "$dummyShard:" << (i + 1) << "0000"));
-
-                client.insert(ShardType::ConfigNS, shard.toBSON());
-            }
-
-            for (int i = 0; i < numPings; i++) {
-
-                MongosType ping;
-                ping.setName((string) (str::stream() << "$dummyMongos:" << (i + 1) << "0000"));
-                ping.setPing(jsTime());
-                ping.setMongoVersion(versionString);
-                ping.setConfigVersion(CURRENT_CONFIG_VERSION);
-
-                if (i % 2 == 0) {
-                    ping.setPing(ping.getPing() - Minutes(10));
-                }
-
-                client.insert(MongosType::ConfigNS, ping.toBSON());
-            }
-        }
-    };
-
-    //
-    // Tests for upgrading the config server between versions.
-    //
-    // In general these tests do pretty minimal validation of the config server data itself, but
-    // do ensure that the upgrade mechanism is working correctly w.r.t the config.version
-    // collection.
-    //
-
-    // Rename the fixture so that our tests have a useful name in the executable
-    typedef ConfigUpgradeFixture ConfigUpgradeTests;
-
-    TEST_F(ConfigUpgradeTests, EmptyVersion) {
-
-        //
-        // Tests detection of empty config version
-        //
-
-        // Zero version (no version doc)
-        VersionType oldVersion;
-        Status status = getConfigVersion(grid.catalogManager(), &oldVersion);
-        ASSERT(status.isOK());
-
-        ASSERT_EQUALS(oldVersion.getMinCompatibleVersion(), 0);
-        ASSERT_EQUALS(oldVersion.getCurrentVersion(), 0);
+        client.insert(VersionType::ConfigNS, BSON("_id" << 1 << "version" << version));
     }
 
-    TEST_F(ConfigUpgradeTests, ClusterIDVersion) {
+    /**
+     * Stores a newer { version, minVersion, currentVersion, clusterId } config server entry
+     */
+    void storeConfigVersion(const VersionType& versionInfo) {
+        DBDirectClient client(&_txn);
+        client.insert(VersionType::ConfigNS, versionInfo.toBSON());
+    }
 
-        //
-        // Tests detection of newer config versions
-        //
+    /**
+     * Stores a newer { version, minVersion, currentVersion, clusterId } config server entry.
+     *
+     * @return clusterId
+     */
+    OID storeConfigVersion(int configVersion) {
+        if (configVersion < CURRENT_CONFIG_VERSION) {
+            storeLegacyConfigVersion(configVersion);
+            return OID();
+        }
 
-        VersionType newVersion;
-        newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
-        newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
-        storeConfigVersion(newVersion);
-
-        newVersion.clear();
-
-        // Current Version w/o clusterId (invalid!)
-        Status status = getConfigVersion(grid.catalogManager(), &newVersion);
-        ASSERT(!status.isOK());
-
-        newVersion.clear();
+        VersionType version;
+        version.setMinCompatibleVersion(configVersion);
+        version.setCurrentVersion(configVersion);
 
         OID clusterId = OID::gen();
-        newVersion.setClusterId(clusterId);
-        newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
-        newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
 
-        clearVersion();
-        storeConfigVersion(newVersion);
+        version.setClusterId(clusterId);
 
-        newVersion.clear();
-
-        // Current version w/ clusterId (valid!)
-        status = getConfigVersion(grid.catalogManager(), &newVersion);
-        ASSERT(status.isOK());
-
-        ASSERT_EQUALS(newVersion.getMinCompatibleVersion(), MIN_COMPATIBLE_CONFIG_VERSION);
-        ASSERT_EQUALS(newVersion.getCurrentVersion(), CURRENT_CONFIG_VERSION);
-        ASSERT_EQUALS(newVersion.getClusterId(), clusterId);
+        storeConfigVersion(version);
+        return clusterId;
     }
 
-    TEST_F(ConfigUpgradeTests, InitialUpgrade) {
+    /**
+     * Stores sample shard and ping information at the current version.
+     */
+    void storeShardsAndPings(int numShards, int numPings) {
+        DBDirectClient client(&_txn);
 
-        //
-        // Tests initializing the config server to the initial version
-        //
+        for (int i = 0; i < numShards; i++) {
+            ShardType shard;
+            shard.setName(OID::gen().toString());
+            shard.setHost((string)(str::stream() << "$dummyShard:" << (i + 1) << "0000"));
 
-        // Empty version
-        VersionType versionOld;
-        VersionType version;
-        string errMsg;
-        bool result = checkAndUpgradeConfigVersion(grid.catalogManager(),
-                                                   false,
-                                                   &versionOld,
-                                                   &version,
-                                                   &errMsg);
+            client.insert(ShardType::ConfigNS, shard.toBSON());
+        }
 
-        ASSERT(result);
-        ASSERT_EQUALS(versionOld.getCurrentVersion(), 0);
-        ASSERT_EQUALS(version.getMinCompatibleVersion(), MIN_COMPATIBLE_CONFIG_VERSION);
-        ASSERT_EQUALS(version.getCurrentVersion(), CURRENT_CONFIG_VERSION);
-        ASSERT_NOT_EQUALS(version.getClusterId(), OID());
+        for (int i = 0; i < numPings; i++) {
+            MongosType ping;
+            ping.setName((string)(str::stream() << "$dummyMongos:" << (i + 1) << "0000"));
+            ping.setPing(jsTime());
+            ping.setMongoVersion(versionString);
+            ping.setConfigVersion(CURRENT_CONFIG_VERSION);
+
+            if (i % 2 == 0) {
+                ping.setPing(ping.getPing() - Minutes(10));
+            }
+
+            client.insert(MongosType::ConfigNS, ping.toBSON());
+        }
     }
+};
 
-    TEST_F(ConfigUpgradeTests, BadVersionUpgrade) {
+//
+// Tests for upgrading the config server between versions.
+//
+// In general these tests do pretty minimal validation of the config server data itself, but
+// do ensure that the upgrade mechanism is working correctly w.r.t the config.version
+// collection.
+//
 
-        //
-        // Tests that we can't upgrade from a config version we don't have an upgrade path for
-        //
+// Rename the fixture so that our tests have a useful name in the executable
+typedef ConfigUpgradeFixture ConfigUpgradeTests;
 
-        stopBalancer();
+TEST_F(ConfigUpgradeTests, EmptyVersion) {
+    //
+    // Tests detection of empty config version
+    //
 
-        storeLegacyConfigVersion(1);
+    // Zero version (no version doc)
+    VersionType oldVersion;
+    Status status = getConfigVersion(grid.catalogManager(), &oldVersion);
+    ASSERT(status.isOK());
 
-        // Default version (not upgradeable)
-        VersionType versionOld;
-        VersionType version;
-        string errMsg;
-        bool result = checkAndUpgradeConfigVersion(grid.catalogManager(),
-                                                   false,
-                                                   &versionOld,
-                                                   &version,
-                                                   &errMsg);
+    ASSERT_EQUALS(oldVersion.getMinCompatibleVersion(), 0);
+    ASSERT_EQUALS(oldVersion.getCurrentVersion(), 0);
+}
 
-        ASSERT(!result);
-    }
+TEST_F(ConfigUpgradeTests, ClusterIDVersion) {
+    //
+    // Tests detection of newer config versions
+    //
 
-    TEST_F(ConfigUpgradeTests, CheckMongoVersion) {
+    VersionType newVersion;
+    newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
+    newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
+    storeConfigVersion(newVersion);
 
-        //
-        // Tests basic detection of existing mongos and mongod versions from mongos ping
-        // and shard info.  Fuller tests require conns to multiple version mongos processes, not
-        // done here.
-        //
+    newVersion.clear();
 
-        storeShardsAndPings(5, 10); // 5 shards, 10 pings
+    // Current Version w/o clusterId (invalid!)
+    Status status = getConfigVersion(grid.catalogManager(), &newVersion);
+    ASSERT(!status.isOK());
 
-        // Our version is >= 2.2, so this works
-        Status status = checkClusterMongoVersions(grid.catalogManager(), "2.2");
-        ASSERT(status.isOK());
+    newVersion.clear();
 
-        // Our version is < 9.9, so this doesn't work (until we hit v99.99)
-        status = checkClusterMongoVersions(grid.catalogManager(), "99.99");
-        ASSERT(status.code() == ErrorCodes::RemoteValidationError);
-    }
+    OID clusterId = OID::gen();
+    newVersion.setClusterId(clusterId);
+    newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
+    newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
 
-} // end namespace
+    clearVersion();
+    storeConfigVersion(newVersion);
+
+    newVersion.clear();
+
+    // Current version w/ clusterId (valid!)
+    status = getConfigVersion(grid.catalogManager(), &newVersion);
+    ASSERT(status.isOK());
+
+    ASSERT_EQUALS(newVersion.getMinCompatibleVersion(), MIN_COMPATIBLE_CONFIG_VERSION);
+    ASSERT_EQUALS(newVersion.getCurrentVersion(), CURRENT_CONFIG_VERSION);
+    ASSERT_EQUALS(newVersion.getClusterId(), clusterId);
+}
+
+TEST_F(ConfigUpgradeTests, InitialUpgrade) {
+    //
+    // Tests initializing the config server to the initial version
+    //
+
+    // Empty version
+    VersionType versionOld;
+    VersionType version;
+    string errMsg;
+    bool result =
+        checkAndUpgradeConfigVersion(grid.catalogManager(), false, &versionOld, &version, &errMsg);
+
+    ASSERT(result);
+    ASSERT_EQUALS(versionOld.getCurrentVersion(), 0);
+    ASSERT_EQUALS(version.getMinCompatibleVersion(), MIN_COMPATIBLE_CONFIG_VERSION);
+    ASSERT_EQUALS(version.getCurrentVersion(), CURRENT_CONFIG_VERSION);
+    ASSERT_NOT_EQUALS(version.getClusterId(), OID());
+}
+
+TEST_F(ConfigUpgradeTests, BadVersionUpgrade) {
+    //
+    // Tests that we can't upgrade from a config version we don't have an upgrade path for
+    //
+
+    stopBalancer();
+
+    storeLegacyConfigVersion(1);
+
+    // Default version (not upgradeable)
+    VersionType versionOld;
+    VersionType version;
+    string errMsg;
+    bool result =
+        checkAndUpgradeConfigVersion(grid.catalogManager(), false, &versionOld, &version, &errMsg);
+
+    ASSERT(!result);
+}
+
+TEST_F(ConfigUpgradeTests, CheckMongoVersion) {
+    //
+    // Tests basic detection of existing mongos and mongod versions from mongos ping
+    // and shard info.  Fuller tests require conns to multiple version mongos processes, not
+    // done here.
+    //
+
+    storeShardsAndPings(5, 10);  // 5 shards, 10 pings
+
+    // Our version is >= 2.2, so this works
+    Status status = checkClusterMongoVersions(grid.catalogManager(), "2.2");
+    ASSERT(status.isOK());
+
+    // Our version is < 9.9, so this doesn't work (until we hit v99.99)
+    status = checkClusterMongoVersions(grid.catalogManager(), "99.99");
+    ASSERT(status.code() == ErrorCodes::RemoteValidationError);
+}
+
+}  // end namespace

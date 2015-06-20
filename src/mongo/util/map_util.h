@@ -37,9 +37,9 @@ namespace mongo {
 template <typename M, typename K, typename V>
 V mapFindWithDefault(const M& myMap, const K& key, const V& defaultValue) {
     typename M::const_iterator it = myMap.find(key);
-    if(it == myMap.end())
+    if (it == myMap.end())
         return defaultValue;
     return it->second;
 }
 
-} // end namespace
+}  // end namespace

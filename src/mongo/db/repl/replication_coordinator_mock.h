@@ -35,187 +35,176 @@
 namespace mongo {
 namespace repl {
 
-    /**
-     * A mock ReplicationCoordinator.  Currently it is extremely simple and exists solely to link
-     * into dbtests.
-     */
-    class ReplicationCoordinatorMock : public ReplicationCoordinator {
-        MONGO_DISALLOW_COPYING(ReplicationCoordinatorMock);
+/**
+ * A mock ReplicationCoordinator.  Currently it is extremely simple and exists solely to link
+ * into dbtests.
+ */
+class ReplicationCoordinatorMock : public ReplicationCoordinator {
+    MONGO_DISALLOW_COPYING(ReplicationCoordinatorMock);
 
-    public:
+public:
+    ReplicationCoordinatorMock(const ReplSettings& settings);
+    virtual ~ReplicationCoordinatorMock();
 
-        ReplicationCoordinatorMock(const ReplSettings& settings);
-        virtual ~ReplicationCoordinatorMock();
+    virtual void startReplication(OperationContext* txn);
 
-        virtual void startReplication(OperationContext* txn);
+    virtual void shutdown();
 
-        virtual void shutdown();
+    virtual const ReplSettings& getSettings() const;
 
-        virtual const ReplSettings& getSettings() const;
+    virtual bool isReplEnabled() const;
 
-        virtual bool isReplEnabled() const;
+    virtual Mode getReplicationMode() const;
 
-        virtual Mode getReplicationMode() const;
+    virtual MemberState getMemberState() const;
 
-        virtual MemberState getMemberState() const;
+    virtual bool isInPrimaryOrSecondaryState() const;
 
-        virtual bool isInPrimaryOrSecondaryState() const;
+    virtual Seconds getSlaveDelaySecs() const;
 
-        virtual Seconds getSlaveDelaySecs() const;
+    virtual void clearSyncSourceBlacklist();
 
-        virtual void clearSyncSourceBlacklist();
+    virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
+        OperationContext* txn, const OpTime& opTime, const WriteConcernOptions& writeConcern);
 
-        virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
-                OperationContext* txn,
-                const OpTime& opTime,
-                const WriteConcernOptions& writeConcern);
+    virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpForClient(
+        OperationContext* txn, const WriteConcernOptions& writeConcern);
 
-        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpForClient(
-                OperationContext* txn,
-                const WriteConcernOptions& writeConcern);
+    virtual Status stepDown(OperationContext* txn,
+                            bool force,
+                            const Milliseconds& waitTime,
+                            const Milliseconds& stepdownTime);
 
-        virtual Status stepDown(OperationContext* txn, 
-                                bool force,
-                                const Milliseconds& waitTime,
-                                const Milliseconds& stepdownTime);
+    virtual bool isMasterForReportingPurposes();
 
-        virtual bool isMasterForReportingPurposes();
+    virtual bool canAcceptWritesForDatabase(StringData dbName);
 
-        virtual bool canAcceptWritesForDatabase(StringData dbName);
+    bool canAcceptWritesFor(const NamespaceString& ns) override;
 
-        bool canAcceptWritesFor(const NamespaceString& ns) override;
+    virtual Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions& writeConcern) const;
 
-        virtual Status checkIfWriteConcernCanBeSatisfied(
-                const WriteConcernOptions& writeConcern) const;
+    virtual Status checkCanServeReadsFor(OperationContext* txn,
+                                         const NamespaceString& ns,
+                                         bool slaveOk);
 
-        virtual Status checkCanServeReadsFor(OperationContext* txn,
-                                             const NamespaceString& ns,
-                                             bool slaveOk);
+    virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
+    virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts);
 
-        virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts);
+    virtual void setMyLastOptime(const OpTime& opTime);
 
-        virtual void setMyLastOptime(const OpTime& opTime);
+    virtual void resetMyLastOptime();
 
-        virtual void resetMyLastOptime();
+    virtual void setMyHeartbeatMessage(const std::string& msg);
 
-        virtual void setMyHeartbeatMessage(const std::string& msg);
+    virtual OpTime getMyLastOptime() const;
 
-        virtual OpTime getMyLastOptime() const;
+    virtual ReadAfterOpTimeResponse waitUntilOpTime(OperationContext* txn,
+                                                    const ReadAfterOpTimeArgs& settings) override;
 
-        virtual ReadAfterOpTimeResponse waitUntilOpTime(
-                        OperationContext* txn,
-                        const ReadAfterOpTimeArgs& settings) override;
+    virtual OID getElectionId();
 
-        virtual OID getElectionId();
+    virtual OID getMyRID() const;
 
-        virtual OID getMyRID() const;
+    virtual int getMyId() const;
 
-        virtual int getMyId() const;
+    virtual bool setFollowerMode(const MemberState& newState);
 
-        virtual bool setFollowerMode(const MemberState& newState);
+    virtual bool isWaitingForApplierToDrain();
 
-        virtual bool isWaitingForApplierToDrain();
+    virtual void signalDrainComplete(OperationContext*);
 
-        virtual void signalDrainComplete(OperationContext*);
+    virtual void signalUpstreamUpdater();
 
-        virtual void signalUpstreamUpdater();
+    virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
 
-        virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+    virtual Status processReplSetGetStatus(BSONObjBuilder* result);
 
-        virtual Status processReplSetGetStatus(BSONObjBuilder* result);
+    virtual void fillIsMasterForReplSet(IsMasterResponse* result);
 
-        virtual void fillIsMasterForReplSet(IsMasterResponse* result);
+    virtual void appendSlaveInfoData(BSONObjBuilder* result);
 
-        virtual void appendSlaveInfoData(BSONObjBuilder* result);
+    virtual ReplicaSetConfig getConfig() const;
 
-        virtual ReplicaSetConfig getConfig() const;
+    virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
-        virtual void processReplSetGetConfig(BSONObjBuilder* result);
+    virtual Status setMaintenanceMode(bool activate);
 
-        virtual Status setMaintenanceMode(bool activate);
+    virtual bool getMaintenanceMode();
 
-        virtual bool getMaintenanceMode();
+    virtual Status processReplSetSyncFrom(const HostAndPort& target, BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetSyncFrom(const HostAndPort& target,
-                                              BSONObjBuilder* resultObj);
+    virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);
+    virtual Status processHeartbeat(const ReplSetHeartbeatArgs& args,
+                                    ReplSetHeartbeatResponse* response);
 
-        virtual Status processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                        ReplSetHeartbeatResponse* response);
+    virtual Status processReplSetReconfig(OperationContext* txn,
+                                          const ReplSetReconfigArgs& args,
+                                          BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetReconfig(OperationContext* txn,
-                                              const ReplSetReconfigArgs& args,
-                                              BSONObjBuilder* resultObj);
+    virtual Status processReplSetInitiate(OperationContext* txn,
+                                          const BSONObj& configObj,
+                                          BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetInitiate(OperationContext* txn,
-                                              const BSONObj& configObj,
-                                              BSONObjBuilder* resultObj);
+    virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj);
+    virtual void incrementRollbackID();
 
-        virtual void incrementRollbackID();
+    virtual Status processReplSetFresh(const ReplSetFreshArgs& args, BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetFresh(const ReplSetFreshArgs& args,
-                                           BSONObjBuilder* resultObj);
+    virtual Status processReplSetElect(const ReplSetElectArgs& args, BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetElect(const ReplSetElectArgs& args,
-                                           BSONObjBuilder* resultObj);
+    virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
+                                                long long* configVersion);
 
-        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
-                                                    long long* configVersion);
+    virtual Status processHandshake(OperationContext* txn, const HandshakeArgs& handshake);
 
-        virtual Status processHandshake(OperationContext* txn, const HandshakeArgs& handshake);
+    virtual bool buildsIndexes();
 
-        virtual bool buildsIndexes();
+    virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op);
 
-        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op);
+    virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
 
-        virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
+    virtual WriteConcernOptions getGetLastErrorDefault();
 
-        virtual WriteConcernOptions getGetLastErrorDefault();
+    virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
 
-        virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
+    virtual HostAndPort chooseNewSyncSource();
 
-        virtual HostAndPort chooseNewSyncSource();
+    virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
 
-        virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
+    virtual void resetLastOpTimeFromOplog(OperationContext* txn);
 
-        virtual void resetLastOpTimeFromOplog(OperationContext* txn);
+    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
-        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
+    virtual OpTime getLastCommittedOpTime() const;
 
-        virtual OpTime getLastCommittedOpTime() const;
+    virtual Status processReplSetRequestVotes(OperationContext* txn,
+                                              const ReplSetRequestVotesArgs& args,
+                                              ReplSetRequestVotesResponse* response);
 
-        virtual Status processReplSetRequestVotes(OperationContext* txn,
-                                                  const ReplSetRequestVotesArgs& args,
-                                                  ReplSetRequestVotesResponse* response);
+    virtual Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
+                                                       long long* responseTerm);
 
-        virtual Status processReplSetDeclareElectionWinner(
-                const ReplSetDeclareElectionWinnerArgs& args,
-                long long* responseTerm);
+    virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder);
 
-        virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder);
+    virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
+                                      ReplSetHeartbeatResponse* response);
 
-        virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
-                                          ReplSetHeartbeatResponse* response);
+    virtual bool isV1ElectionProtocol();
 
-        virtual bool isV1ElectionProtocol();
+    virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
 
-        virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
+    virtual long long getTerm();
 
-        virtual long long getTerm();
+    virtual bool updateTerm(long long term);
 
-        virtual bool updateTerm(long long term);
+private:
+    const ReplSettings _settings;
+    MemberState _memberState;
+    OpTime _myLastOpTime;
+};
 
-    private:
-
-        const ReplSettings _settings;
-        MemberState _memberState;
-        OpTime _myLastOpTime;
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

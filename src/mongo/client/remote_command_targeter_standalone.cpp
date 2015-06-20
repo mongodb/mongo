@@ -34,14 +34,12 @@
 
 namespace mongo {
 
-    RemoteCommandTargeterStandalone::RemoteCommandTargeterStandalone(
-            const HostAndPort& hostAndPort) : _hostAndPort(hostAndPort) {
+RemoteCommandTargeterStandalone::RemoteCommandTargeterStandalone(const HostAndPort& hostAndPort)
+    : _hostAndPort(hostAndPort) {}
 
-    }
+StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
+    const ReadPreferenceSetting& readPref) {
+    return _hostAndPort;
+}
 
-    StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
-                                                    const ReadPreferenceSetting& readPref) {
-        return _hostAndPort;
-    }
-
-} // namespace mongo
+}  // namespace mongo

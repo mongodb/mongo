@@ -51,197 +51,198 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
+using std::endl;
+using std::string;
 
 namespace {
-    Status rebuildIndexesOnCollection(OperationContext* txn,
-                                      DatabaseCatalogEntry* dbce,
-                                      const std::string& collectionName) {
+Status rebuildIndexesOnCollection(OperationContext* txn,
+                                  DatabaseCatalogEntry* dbce,
+                                  const std::string& collectionName) {
+    CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collectionName);
 
-        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collectionName);
+    std::vector<string> indexNames;
+    std::vector<BSONObj> indexSpecs;
+    {
+        // Fetch all indexes
+        cce->getAllIndexes(txn, &indexNames);
+        for (size_t i = 0; i < indexNames.size(); i++) {
+            const string& name = indexNames[i];
+            BSONObj spec = cce->getIndexSpec(txn, name);
+            indexSpecs.push_back(spec.removeField("v").getOwned());
 
-        std::vector<string> indexNames;
-        std::vector<BSONObj> indexSpecs;
-        {
-            // Fetch all indexes
-            cce->getAllIndexes( txn, &indexNames );
-            for ( size_t i = 0; i < indexNames.size(); i++ ) {
-                const string& name = indexNames[i];
-                BSONObj spec = cce->getIndexSpec( txn, name );
-                indexSpecs.push_back(spec.removeField("v").getOwned());
-
-                const BSONObj key = spec.getObjectField("key");
-                const Status keyStatus = validateKeyPattern(key);
-                if (!keyStatus.isOK()) {
-                    return Status(ErrorCodes::CannotCreateIndex, str::stream()
+            const BSONObj key = spec.getObjectField("key");
+            const Status keyStatus = validateKeyPattern(key);
+            if (!keyStatus.isOK()) {
+                return Status(
+                    ErrorCodes::CannotCreateIndex,
+                    str::stream()
                         << "Cannot rebuild index " << spec << ": " << keyStatus.reason()
                         << " For more info see http://dochub.mongodb.org/core/index-validation");
-                }
             }
         }
-
-        // Skip the rest if there are no indexes to rebuild.
-        if (indexSpecs.empty()) return Status::OK();
-
-        std::unique_ptr<Collection> collection;
-        std::unique_ptr<MultiIndexBlock> indexer;
-        {
-            // These steps are combined into a single WUOW to ensure there are no commits without
-            // the indexes.
-            // 1) Drop all indexes.
-            // 2) Open the Collection
-            // 3) Start the index build process.
-
-            WriteUnitOfWork wuow(txn);
-
-            { // 1
-                for ( size_t i = 0; i < indexNames.size(); i++ ) {
-                    Status s = cce->removeIndex(txn, indexNames[i]);
-                    if (!s.isOK()) return s;
-                }
-            }
-
-            // Indexes must be dropped before we open the Collection otherwise we could attempt to
-            // open a bad index and fail.
-            // TODO see if MultiIndexBlock can be made to work without a Collection.
-            const StringData ns = cce->ns().ns();
-            collection.reset(new Collection(txn, ns, cce, dbce->getRecordStore(ns), dbce));
-
-            indexer.reset(new MultiIndexBlock(txn, collection.get()));
-            Status status = indexer->init(indexSpecs);
-            if (!status.isOK()) {
-                // The WUOW will handle cleanup, so the indexer shouldn't do its own.
-                indexer->abortWithoutCleanup();
-                return status;
-            }
-
-            wuow.commit();
-        }
-
-        // Iterate all records in the collection. Delete them if they aren't valid BSON. Index them
-        // if they are.
-
-        long long numRecords = 0;
-        long long dataSize = 0;
-
-        RecordStore* rs = collection->getRecordStore();
-        auto cursor = rs->getCursor(txn);
-        while (auto record = cursor->next()) {
-            RecordId id = record->id;
-            RecordData& data = record->data;
-
-            Status status = validateBSON(data.data(), data.size());
-            if (!status.isOK()) {
-                log() << "Invalid BSON detected at " << id << ": " << status << ". Deleting.";
-                cursor->savePositioned(); // 'data' is no longer valid.
-                {
-                    WriteUnitOfWork wunit(txn);
-                    rs->deleteRecord(txn, id);
-                    wunit.commit();
-                }
-                cursor->restore(txn);
-                continue;
-            }
-
-            numRecords++;
-            dataSize += data.size();
-
-            // Now index the record.
-            // TODO SERVER-14812 add a mode that drops duplicates rather than failing
-            WriteUnitOfWork wunit(txn);
-            status = indexer->insert(data.releaseToBson(), id);
-            if (!status.isOK()) return status;
-            wunit.commit();
-        }
-
-        Status status = indexer->doneInserting();
-        if (!status.isOK()) return status;
-
-        {
-            WriteUnitOfWork wunit(txn);
-            indexer->commit();
-            rs->updateStatsAfterRepair(txn, numRecords, dataSize);
-            wunit.commit();
-        }
-
-        return Status::OK();
     }
-} // namespace
 
-    Status repairDatabase(OperationContext* txn,
-                          StorageEngine* engine,
-                          const std::string& dbName,
-                          bool preserveClonedFilesOnFailure,
-                          bool backupOriginalFiles) {
+    // Skip the rest if there are no indexes to rebuild.
+    if (indexSpecs.empty())
+        return Status::OK();
 
-        DisableDocumentValidation validationDisabler(txn);
+    std::unique_ptr<Collection> collection;
+    std::unique_ptr<MultiIndexBlock> indexer;
+    {
+        // These steps are combined into a single WUOW to ensure there are no commits without
+        // the indexes.
+        // 1) Drop all indexes.
+        // 2) Open the Collection
+        // 3) Start the index build process.
 
-        // We must hold some form of lock here
-        invariant(txn->lockState()->isLocked());
-        invariant( dbName.find( '.' ) == string::npos );
+        WriteUnitOfWork wuow(txn);
 
-        log() << "repairDatabase " << dbName << endl;
+        {  // 1
+            for (size_t i = 0; i < indexNames.size(); i++) {
+                Status s = cce->removeIndex(txn, indexNames[i]);
+                if (!s.isOK())
+                    return s;
+            }
+        }
 
-        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
+        // Indexes must be dropped before we open the Collection otherwise we could attempt to
+        // open a bad index and fail.
+        // TODO see if MultiIndexBlock can be made to work without a Collection.
+        const StringData ns = cce->ns().ns();
+        collection.reset(new Collection(txn, ns, cce, dbce->getRecordStore(ns), dbce));
 
+        indexer.reset(new MultiIndexBlock(txn, collection.get()));
+        Status status = indexer->init(indexSpecs);
+        if (!status.isOK()) {
+            // The WUOW will handle cleanup, so the indexer shouldn't do its own.
+            indexer->abortWithoutCleanup();
+            return status;
+        }
+
+        wuow.commit();
+    }
+
+    // Iterate all records in the collection. Delete them if they aren't valid BSON. Index them
+    // if they are.
+
+    long long numRecords = 0;
+    long long dataSize = 0;
+
+    RecordStore* rs = collection->getRecordStore();
+    auto cursor = rs->getCursor(txn);
+    while (auto record = cursor->next()) {
+        RecordId id = record->id;
+        RecordData& data = record->data;
+
+        Status status = validateBSON(data.data(), data.size());
+        if (!status.isOK()) {
+            log() << "Invalid BSON detected at " << id << ": " << status << ". Deleting.";
+            cursor->savePositioned();  // 'data' is no longer valid.
+            {
+                WriteUnitOfWork wunit(txn);
+                rs->deleteRecord(txn, id);
+                wunit.commit();
+            }
+            cursor->restore(txn);
+            continue;
+        }
+
+        numRecords++;
+        dataSize += data.size();
+
+        // Now index the record.
+        // TODO SERVER-14812 add a mode that drops duplicates rather than failing
+        WriteUnitOfWork wunit(txn);
+        status = indexer->insert(data.releaseToBson(), id);
+        if (!status.isOK())
+            return status;
+        wunit.commit();
+    }
+
+    Status status = indexer->doneInserting();
+    if (!status.isOK())
+        return status;
+
+    {
+        WriteUnitOfWork wunit(txn);
+        indexer->commit();
+        rs->updateStatsAfterRepair(txn, numRecords, dataSize);
+        wunit.commit();
+    }
+
+    return Status::OK();
+}
+}  // namespace
+
+Status repairDatabase(OperationContext* txn,
+                      StorageEngine* engine,
+                      const std::string& dbName,
+                      bool preserveClonedFilesOnFailure,
+                      bool backupOriginalFiles) {
+    DisableDocumentValidation validationDisabler(txn);
+
+    // We must hold some form of lock here
+    invariant(txn->lockState()->isLocked());
+    invariant(dbName.find('.') == string::npos);
+
+    log() << "repairDatabase " << dbName << endl;
+
+    BackgroundOperation::assertNoBgOpInProgForDb(dbName);
+
+    txn->checkForInterrupt();
+
+    if (engine->isMmapV1()) {
+        // MMAPv1 is a layering violation so it implements its own repairDatabase.
+        return static_cast<MMAPV1Engine*>(engine)
+            ->repairDatabase(txn, dbName, preserveClonedFilesOnFailure, backupOriginalFiles);
+    }
+
+    // These are MMAPv1 specific
+    if (preserveClonedFilesOnFailure) {
+        return Status(ErrorCodes::BadValue, "preserveClonedFilesOnFailure not supported");
+    }
+    if (backupOriginalFiles) {
+        return Status(ErrorCodes::BadValue, "backupOriginalFiles not supported");
+    }
+
+    // Close the db to invalidate all current users and caches.
+    dbHolder().close(txn, dbName);
+    // Open the db after everything finishes
+    class OpenDbInDestructor {
+    public:
+        OpenDbInDestructor(OperationContext* txn, const std::string& db) : _dbName(db), _txn(txn) {}
+        ~OpenDbInDestructor() {
+            dbHolder().openDb(_txn, _dbName);
+        }
+
+    private:
+        const std::string& _dbName;
+        OperationContext* _txn;
+    } dbOpener(txn, dbName);
+    DatabaseCatalogEntry* dbce = engine->getDatabaseCatalogEntry(txn, dbName);
+
+    std::list<std::string> colls;
+    dbce->getCollectionNamespaces(&colls);
+
+    for (std::list<std::string>::const_iterator it = colls.begin(); it != colls.end(); ++it) {
+        // Don't check for interrupt after starting to repair a collection otherwise we can
+        // leave data in an inconsistent state. Interrupting between collections is ok, however.
         txn->checkForInterrupt();
 
-        if (engine->isMmapV1()) {
-            // MMAPv1 is a layering violation so it implements its own repairDatabase.
-            return static_cast<MMAPV1Engine*>(engine)->repairDatabase(txn,
-                                                                      dbName,
-                                                                      preserveClonedFilesOnFailure,
-                                                                      backupOriginalFiles);
-        }
+        log() << "Repairing collection " << *it;
 
-        // These are MMAPv1 specific
-        if ( preserveClonedFilesOnFailure ) {
-            return Status( ErrorCodes::BadValue, "preserveClonedFilesOnFailure not supported" );
-        }
-        if ( backupOriginalFiles ) {
-            return Status( ErrorCodes::BadValue, "backupOriginalFiles not supported" );
-        }
+        Status status = engine->repairRecordStore(txn, *it);
+        if (!status.isOK())
+            return status;
 
-        // Close the db to invalidate all current users and caches.
-        dbHolder().close(txn, dbName);
-        // Open the db after everything finishes
-        class OpenDbInDestructor {
-        public:
-            OpenDbInDestructor(OperationContext* txn, const std::string& db) :
-                  _dbName(db)
-                , _txn(txn)
-            {}
-            ~OpenDbInDestructor() {
-                dbHolder().openDb(_txn, _dbName);
-            }
-        private:
-            const std::string& _dbName;
-            OperationContext* _txn;
-        } dbOpener(txn, dbName);
-        DatabaseCatalogEntry* dbce = engine->getDatabaseCatalogEntry(txn, dbName);
+        status = rebuildIndexesOnCollection(txn, dbce, *it);
+        if (!status.isOK())
+            return status;
 
-        std::list<std::string> colls;
-        dbce->getCollectionNamespaces(&colls);
-
-        for (std::list<std::string>::const_iterator it = colls.begin(); it != colls.end(); ++it) {
-            // Don't check for interrupt after starting to repair a collection otherwise we can
-            // leave data in an inconsistent state. Interrupting between collections is ok, however.
-            txn->checkForInterrupt();
-
-            log() << "Repairing collection " << *it;
-
-            Status status = engine->repairRecordStore(txn, *it);
-            if (!status.isOK()) return status;
-
-            status = rebuildIndexesOnCollection(txn, dbce, *it);
-            if (!status.isOK()) return status;
-
-            // TODO: uncomment once SERVER-16869
-            // engine->flushAllFiles(true);
-        }
-
-        return Status::OK();
+        // TODO: uncomment once SERVER-16869
+        // engine->flushAllFiles(true);
     }
-}
 
+    return Status::OK();
+}
+}

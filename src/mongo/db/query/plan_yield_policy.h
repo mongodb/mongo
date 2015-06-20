@@ -34,64 +34,67 @@
 
 namespace mongo {
 
-    class RecordFetcher;
+class RecordFetcher;
 
-    class PlanYieldPolicy {
-    public:
-        /**
-         * If policy == WRITE_CONFLICT_RETRY_ONLY, shouldYield will only return true after
-         * forceYield has been called, and yield will only abandonSnapshot without releasing any
-         * locks.
-         */
-        PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy);
+class PlanYieldPolicy {
+public:
+    /**
+     * If policy == WRITE_CONFLICT_RETRY_ONLY, shouldYield will only return true after
+     * forceYield has been called, and yield will only abandonSnapshot without releasing any
+     * locks.
+     */
+    PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy);
 
-        /**
-         * Used by YIELD_AUTO plan executors in order to check whether it is time to yield.
-         * PlanExecutors give up their locks periodically in order to be fair to other
-         * threads.
-         */
-        bool shouldYield();
+    /**
+     * Used by YIELD_AUTO plan executors in order to check whether it is time to yield.
+     * PlanExecutors give up their locks periodically in order to be fair to other
+     * threads.
+     */
+    bool shouldYield();
 
-        /**
-         * Resets the yield timer so that we wait for a while before yielding again.
-         */
-        void resetTimer();
+    /**
+     * Resets the yield timer so that we wait for a while before yielding again.
+     */
+    void resetTimer();
 
-        /**
-         * Used to cause a plan executor to give up locks and go to sleep. The PlanExecutor
-         * must *not* be in saved state. Handles calls to save/restore state internally.
-         *
-         * If 'fetcher' is non-NULL, then we are yielding because the storage engine told us
-         * that we will page fault on this record. We use 'fetcher' to retrieve the record
-         * after we give up our locks.
-         *
-         * Returns true if the executor was restored successfully and is still alive. Returns false
-         * if the executor got killed during yield.
-         */
-        bool yield(RecordFetcher* fetcher = NULL);
+    /**
+     * Used to cause a plan executor to give up locks and go to sleep. The PlanExecutor
+     * must *not* be in saved state. Handles calls to save/restore state internally.
+     *
+     * If 'fetcher' is non-NULL, then we are yielding because the storage engine told us
+     * that we will page fault on this record. We use 'fetcher' to retrieve the record
+     * after we give up our locks.
+     *
+     * Returns true if the executor was restored successfully and is still alive. Returns false
+     * if the executor got killed during yield.
+     */
+    bool yield(RecordFetcher* fetcher = NULL);
 
-        /**
-         * All calls to shouldYield will return true until the next call to yield.
-         */
-        void forceYield() {
-            dassert(allowedToYield());
-            _forceYield = true;
-        }
+    /**
+     * All calls to shouldYield will return true until the next call to yield.
+     */
+    void forceYield() {
+        dassert(allowedToYield());
+        _forceYield = true;
+    }
 
-        bool allowedToYield() const { return _policy != PlanExecutor::YIELD_MANUAL; }
+    bool allowedToYield() const {
+        return _policy != PlanExecutor::YIELD_MANUAL;
+    }
 
-        void setPolicy(PlanExecutor::YieldPolicy policy) { _policy = policy; }
+    void setPolicy(PlanExecutor::YieldPolicy policy) {
+        _policy = policy;
+    }
 
-    private:
-        PlanExecutor::YieldPolicy _policy;
+private:
+    PlanExecutor::YieldPolicy _policy;
 
-        bool _forceYield;
-        ElapsedTracker _elapsedTracker;
+    bool _forceYield;
+    ElapsedTracker _elapsedTracker;
 
-        // The plan executor which this yield policy is responsible for yielding. Must
-        // not outlive the plan executor.
-        PlanExecutor* const _planYielding;
-    };
+    // The plan executor which this yield policy is responsible for yielding. Must
+    // not outlive the plan executor.
+    PlanExecutor* const _planYielding;
+};
 
-} // namespace mongo
-
+}  // namespace mongo

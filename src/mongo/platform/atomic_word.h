@@ -34,135 +34,133 @@
 
 namespace mongo {
 
+/**
+ * Implementation of the AtomicWord interface in terms of the C++11 Atomics.
+ */
+template <typename _WordType>
+class AtomicWord {
+public:
     /**
-     * Implementation of the AtomicWord interface in terms of the C++11 Atomics.
+     * Underlying value type.
      */
-    template <typename _WordType>
-    class AtomicWord {
+    typedef _WordType WordType;
 
-    public:
-        /**
-         * Underlying value type.
-         */
-        typedef _WordType WordType;
+    /**
+     * Construct a new word with the given initial value.
+     */
+    explicit AtomicWord(WordType value = WordType(0)) : _value(value) {}
 
-        /**
-         * Construct a new word with the given initial value.
-         */
-        explicit AtomicWord(WordType value=WordType(0)) : _value(value) {}
+    /**
+     * Gets the current value of this AtomicWord.
+     *
+     * Has acquire and release semantics.
+     */
+    WordType load() const {
+        return _value.load();
+    }
 
-        /**
-         * Gets the current value of this AtomicWord.
-         *
-         * Has acquire and release semantics.
-         */
-        WordType load() const {
-            return _value.load();
-        }
+    /**
+     * Gets the current value of this AtomicWord.
+     *
+     * Has relaxed semantics.
+     */
+    WordType loadRelaxed() const {
+        return _value.load(std::memory_order_relaxed);
+    }
 
-        /**
-         * Gets the current value of this AtomicWord.
-         *
-         * Has relaxed semantics.
-         */
-        WordType loadRelaxed() const {
-            return _value.load(std::memory_order_relaxed);
-        }
+    /**
+     * Sets the value of this AtomicWord to "newValue".
+     *
+     * Has acquire and release semantics.
+     */
+    void store(WordType newValue) {
+        return _value.store(newValue);
+    }
 
-        /**
-         * Sets the value of this AtomicWord to "newValue".
-         *
-         * Has acquire and release semantics.
-         */
-        void store(WordType newValue) {
-            return _value.store(newValue);
-        }
+    /**
+     * Atomically swaps the current value of this with "newValue".
+     *
+     * Returns the old value.
+     *
+     * Has acquire and release semantics.
+     */
+    WordType swap(WordType newValue) {
+        return _value.exchange(newValue);
+    }
 
-        /**
-         * Atomically swaps the current value of this with "newValue".
-         *
-         * Returns the old value.
-         *
-         * Has acquire and release semantics.
-         */
-        WordType swap(WordType newValue) {
-            return _value.exchange(newValue);
-        }
+    /**
+     * Atomic compare and swap.
+     *
+     * If this value equals "expected", sets this to "newValue".
+     * Always returns the original of this.
+     *
+     * Has acquire and release semantics.
+     */
+    WordType compareAndSwap(WordType expected, WordType newValue) {
+        // NOTE: Subtle: compare_exchange mutates its first argument.
+        _value.compare_exchange_strong(expected, newValue);
+        return expected;
+    }
 
-        /**
-         * Atomic compare and swap.
-         *
-         * If this value equals "expected", sets this to "newValue".
-         * Always returns the original of this.
-         *
-         * Has acquire and release semantics.
-         */
-        WordType compareAndSwap(WordType expected, WordType newValue) {
-            // NOTE: Subtle: compare_exchange mutates its first argument.
-            _value.compare_exchange_strong(expected, newValue);
-            return expected;
-        }
+    /**
+     * Get the current value of this, add "increment" and store it, atomically.
+     *
+     * Returns the value of this before incrementing.
+     *
+     * Has acquire and release semantics.
+     */
+    WordType fetchAndAdd(WordType increment) {
+        return _value.fetch_add(increment);
+    }
 
-        /**
-         * Get the current value of this, add "increment" and store it, atomically.
-         *
-         * Returns the value of this before incrementing.
-         *
-         * Has acquire and release semantics.
-         */
-        WordType fetchAndAdd(WordType increment) {
-            return _value.fetch_add(increment);
-        }
+    /**
+     * Get the current value of this, subtract "decrement" and store it, atomically.
+     *
+     * Returns the value of this before decrementing.
+     *
+     * Has acquire and release semantics.
+     */
+    WordType fetchAndSubtract(WordType decrement) {
+        return _value.fetch_sub(decrement);
+    }
 
-        /**
-         * Get the current value of this, subtract "decrement" and store it, atomically.
-         *
-         * Returns the value of this before decrementing.
-         *
-         * Has acquire and release semantics.
-         */
-        WordType fetchAndSubtract(WordType decrement) {
-            return _value.fetch_sub(decrement);
-        }
+    /**
+     * Get the current value of this, add "increment" and store it, atomically.
+     *
+     * Returns the value of this after incrementing.
+     *
+     * Has acquire and release semantics.
+     */
+    WordType addAndFetch(WordType increment) {
+        return fetchAndAdd(increment) + increment;
+    }
 
-        /**
-         * Get the current value of this, add "increment" and store it, atomically.
-         *
-         * Returns the value of this after incrementing.
-         *
-         * Has acquire and release semantics.
-         */
-        WordType addAndFetch(WordType increment) {
-            return fetchAndAdd(increment) + increment;
-        }
+    /**
+     * Get the current value of this, subtract "decrement" and store it, atomically.
+     *
+     * Returns the value of this after decrementing.
+     *
+     * Has acquire and release semantics.
+     */
+    WordType subtractAndFetch(WordType decrement) {
+        return fetchAndSubtract(decrement) - decrement;
+    }
 
-        /**
-         * Get the current value of this, subtract "decrement" and store it, atomically.
-         *
-         * Returns the value of this after decrementing.
-         *
-         * Has acquire and release semantics.
-         */
-        WordType subtractAndFetch(WordType decrement) {
-            return fetchAndSubtract(decrement) - decrement;
-        }
+private:
+    std::atomic<WordType> _value;
+};
 
-    private:
-        std::atomic<WordType> _value;
-    };
+#define _ATOMIC_WORD_DECLARE(NAME, WTYPE)                       \
+    typedef class AtomicWord<WTYPE> NAME;                       \
+    namespace {                                                 \
+    BOOST_STATIC_ASSERT(sizeof(NAME) == sizeof(WTYPE));         \
+    BOOST_STATIC_ASSERT(std::is_standard_layout<WTYPE>::value); \
+    }  // namespace
 
-#define _ATOMIC_WORD_DECLARE(NAME, WTYPE)                               \
-    typedef class AtomicWord<WTYPE> NAME;                               \
-    namespace {                                                         \
-        BOOST_STATIC_ASSERT(sizeof(NAME) == sizeof(WTYPE));             \
-        BOOST_STATIC_ASSERT(std::is_standard_layout<WTYPE>::value);     \
-    } // namespace
-
-    _ATOMIC_WORD_DECLARE(AtomicUInt32, unsigned);
-    _ATOMIC_WORD_DECLARE(AtomicUInt64, unsigned long long);
-    _ATOMIC_WORD_DECLARE(AtomicInt32, int);
-    _ATOMIC_WORD_DECLARE(AtomicInt64, long long);
+_ATOMIC_WORD_DECLARE(AtomicUInt32, unsigned);
+_ATOMIC_WORD_DECLARE(AtomicUInt64, unsigned long long);
+_ATOMIC_WORD_DECLARE(AtomicInt32, int);
+_ATOMIC_WORD_DECLARE(AtomicInt64, long long);
 #undef _ATOMIC_WORD_DECLARE
 
-} // namespace mongo
-
+}  // namespace mongo

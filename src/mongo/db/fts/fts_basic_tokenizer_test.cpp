@@ -33,53 +33,51 @@
 namespace mongo {
 namespace fts {
 
-    std::vector<std::string> tokenizeString(const char* str, const char* language) {
-        StatusWithFTSLanguage swl = FTSLanguage::make(language, TEXT_INDEX_VERSION_2);
-        ASSERT_OK(swl);
+std::vector<std::string> tokenizeString(const char* str, const char* language) {
+    StatusWithFTSLanguage swl = FTSLanguage::make(language, TEXT_INDEX_VERSION_2);
+    ASSERT_OK(swl);
 
-        std::unique_ptr<FTSTokenizer> tokenizer(swl.getValue()->createTokenizer());
+    std::unique_ptr<FTSTokenizer> tokenizer(swl.getValue()->createTokenizer());
 
-        tokenizer->reset(str, FTSTokenizer::None);
+    tokenizer->reset(str, FTSTokenizer::None);
 
-        std::vector<std::string> terms;
+    std::vector<std::string> terms;
 
-        while (tokenizer->moveNext()) {
-            terms.push_back(tokenizer->get().toString());
-        }
-
-        return terms;
+    while (tokenizer->moveNext()) {
+        terms.push_back(tokenizer->get().toString());
     }
 
-    // Ensure punctuation is filtered out of the indexed document
-    // and the 's is not separated
-    TEST(FtsBasicTokenizer, English) {
-        std::vector<std::string> terms = tokenizeString("Do you see Mark's dog running?",
-                "english");
+    return terms;
+}
 
-        ASSERT_EQUALS(6U, terms.size());
-        ASSERT_EQUALS("do", terms[0]);
-        ASSERT_EQUALS("you", terms[1]);
-        ASSERT_EQUALS("see", terms[2]);
-        ASSERT_EQUALS("mark", terms[3]);
-        ASSERT_EQUALS("dog", terms[4]);
-        ASSERT_EQUALS("run", terms[5]);
-    }
+// Ensure punctuation is filtered out of the indexed document
+// and the 's is not separated
+TEST(FtsBasicTokenizer, English) {
+    std::vector<std::string> terms = tokenizeString("Do you see Mark's dog running?", "english");
 
-    // Ensure punctuation is filtered out of the indexed document
-    // and the 's is separated
-    TEST(FtsBasicTokenizer, French) {
-        std::vector<std::string> terms = tokenizeString("Do you see Mark's dog running?",
-                "french");
+    ASSERT_EQUALS(6U, terms.size());
+    ASSERT_EQUALS("do", terms[0]);
+    ASSERT_EQUALS("you", terms[1]);
+    ASSERT_EQUALS("see", terms[2]);
+    ASSERT_EQUALS("mark", terms[3]);
+    ASSERT_EQUALS("dog", terms[4]);
+    ASSERT_EQUALS("run", terms[5]);
+}
 
-        ASSERT_EQUALS(7U, terms.size());
-        ASSERT_EQUALS("do", terms[0]);
-        ASSERT_EQUALS("you", terms[1]);
-        ASSERT_EQUALS("se", terms[2]);
-        ASSERT_EQUALS("mark", terms[3]);
-        ASSERT_EQUALS("s", terms[4]);
-        ASSERT_EQUALS("dog", terms[5]);
-        ASSERT_EQUALS("running", terms[6]);
-    }
+// Ensure punctuation is filtered out of the indexed document
+// and the 's is separated
+TEST(FtsBasicTokenizer, French) {
+    std::vector<std::string> terms = tokenizeString("Do you see Mark's dog running?", "french");
 
-} // namespace fts
-} // namespace mongo
+    ASSERT_EQUALS(7U, terms.size());
+    ASSERT_EQUALS("do", terms[0]);
+    ASSERT_EQUALS("you", terms[1]);
+    ASSERT_EQUALS("se", terms[2]);
+    ASSERT_EQUALS("mark", terms[3]);
+    ASSERT_EQUALS("s", terms[4]);
+    ASSERT_EQUALS("dog", terms[5]);
+    ASSERT_EQUALS("running", terms[6]);
+}
+
+}  // namespace fts
+}  // namespace mongo

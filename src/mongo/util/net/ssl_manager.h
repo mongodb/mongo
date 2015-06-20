@@ -42,117 +42,115 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
-#endif // #ifdef MONGO_CONFIG_SSL
+#endif  // #ifdef MONGO_CONFIG_SSL
 
 namespace mongo {
-    /*
-     * @return the SSL version std::string prefixed with prefix and suffixed with suffix
-     */
-    const std::string getSSLVersion(const std::string &prefix, const std::string &suffix); 
+/*
+ * @return the SSL version std::string prefixed with prefix and suffixed with suffix
+ */
+const std::string getSSLVersion(const std::string& prefix, const std::string& suffix);
 }
 
 #ifdef MONGO_CONFIG_SSL
 namespace mongo {
-    struct SSLParams;
+struct SSLParams;
 
-    class SSLConnection {
-    public:
-        SSL* ssl;
-        BIO* networkBIO;
-        BIO* internalBIO;
-        Socket* socket;
+class SSLConnection {
+public:
+    SSL* ssl;
+    BIO* networkBIO;
+    BIO* internalBIO;
+    Socket* socket;
 
-        SSLConnection(SSL_CTX* ctx, Socket* sock, const char* initialBytes, int len); 
+    SSLConnection(SSL_CTX* ctx, Socket* sock, const char* initialBytes, int len);
 
-        ~SSLConnection();
-    };
+    ~SSLConnection();
+};
 
-    struct SSLConfiguration {
-        SSLConfiguration() :
-            serverSubjectName(""), clientSubjectName(""),
-            hasCA(false) {}
-        SSLConfiguration(const std::string& serverSubjectName,
-                         const std::string& clientSubjectName,
-                         const Date_t& serverCertificateExpirationDate,
-                         bool hasCA) :
-            serverSubjectName(serverSubjectName),
-            clientSubjectName(clientSubjectName),
-            serverCertificateExpirationDate(serverCertificateExpirationDate),
-            hasCA(hasCA) {}
+struct SSLConfiguration {
+    SSLConfiguration() : serverSubjectName(""), clientSubjectName(""), hasCA(false) {}
+    SSLConfiguration(const std::string& serverSubjectName,
+                     const std::string& clientSubjectName,
+                     const Date_t& serverCertificateExpirationDate,
+                     bool hasCA)
+        : serverSubjectName(serverSubjectName),
+          clientSubjectName(clientSubjectName),
+          serverCertificateExpirationDate(serverCertificateExpirationDate),
+          hasCA(hasCA) {}
 
-        BSONObj getServerStatusBSON() const;
-        std::string serverSubjectName;
-        std::string clientSubjectName;
-        Date_t serverCertificateExpirationDate;
-        bool hasCA;
-    };
+    BSONObj getServerStatusBSON() const;
+    std::string serverSubjectName;
+    std::string clientSubjectName;
+    Date_t serverCertificateExpirationDate;
+    bool hasCA;
+};
 
-    class SSLManagerInterface {
-    public:
-        static std::unique_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
+class SSLManagerInterface {
+public:
+    static std::unique_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
 
-        virtual ~SSLManagerInterface();
+    virtual ~SSLManagerInterface();
 
-        /**
-         * Initiates a TLS connection.
-         * Throws SocketException on failure.
-         * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
-         */
-        virtual SSLConnection* connect(Socket* socket) = 0;
+    /**
+     * Initiates a TLS connection.
+     * Throws SocketException on failure.
+     * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
+     */
+    virtual SSLConnection* connect(Socket* socket) = 0;
 
-        /**
-         * Waits for the other side to initiate a TLS connection.
-         * Throws SocketException on failure.
-         * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
-         */
-        virtual SSLConnection* accept(Socket* socket, const char* initialBytes, int len) = 0;
+    /**
+     * Waits for the other side to initiate a TLS connection.
+     * Throws SocketException on failure.
+     * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
+     */
+    virtual SSLConnection* accept(Socket* socket, const char* initialBytes, int len) = 0;
 
-        /**
-         * Fetches a peer certificate and validates it if it exists
-         * Throws SocketException on failure
-         * @return a std::string containing the certificate's subject name.
-         */
-        virtual std::string parseAndValidatePeerCertificate(const SSLConnection* conn, 
-                                                    const std::string& remoteHost) = 0;
+    /**
+     * Fetches a peer certificate and validates it if it exists
+     * Throws SocketException on failure
+     * @return a std::string containing the certificate's subject name.
+     */
+    virtual std::string parseAndValidatePeerCertificate(const SSLConnection* conn,
+                                                        const std::string& remoteHost) = 0;
 
-        /**
-         * Cleans up SSL thread local memory; use at thread exit
-         * to avoid memory leaks
-         */
-        virtual void cleanupThreadLocals() = 0;
+    /**
+     * Cleans up SSL thread local memory; use at thread exit
+     * to avoid memory leaks
+     */
+    virtual void cleanupThreadLocals() = 0;
 
-        /**
-         * Gets the SSLConfiguration containing all information about the current SSL setup
-         * @return the SSLConfiguration
-         */
-         virtual const SSLConfiguration& getSSLConfiguration() const = 0;
+    /**
+     * Gets the SSLConfiguration containing all information about the current SSL setup
+     * @return the SSLConfiguration
+     */
+    virtual const SSLConfiguration& getSSLConfiguration() const = 0;
 
-        /**
-        * Fetches the error text for an error code, in a thread-safe manner.
-        */
-        static std::string getSSLErrorMessage(int code);
- 
-        /**
-         * ssl.h wrappers 
-         */
-        virtual int SSL_read(SSLConnection* conn, void* buf, int num) = 0;
+    /**
+    * Fetches the error text for an error code, in a thread-safe manner.
+    */
+    static std::string getSSLErrorMessage(int code);
 
-        virtual int SSL_write(SSLConnection* conn, const void* buf, int num) = 0;
+    /**
+     * ssl.h wrappers
+     */
+    virtual int SSL_read(SSLConnection* conn, void* buf, int num) = 0;
 
-        virtual unsigned long ERR_get_error() = 0;
+    virtual int SSL_write(SSLConnection* conn, const void* buf, int num) = 0;
 
-        virtual char* ERR_error_string(unsigned long e, char* buf) = 0;
+    virtual unsigned long ERR_get_error() = 0;
 
-        virtual int SSL_get_error(const SSLConnection* conn, int ret) = 0;
+    virtual char* ERR_error_string(unsigned long e, char* buf) = 0;
 
-        virtual int SSL_shutdown(SSLConnection* conn) = 0;
+    virtual int SSL_get_error(const SSLConnection* conn, int ret) = 0;
 
-        virtual void SSL_free(SSLConnection* conn) = 0;
-    };
+    virtual int SSL_shutdown(SSLConnection* conn) = 0;
 
-    // Access SSL functions through this instance.
-    SSLManagerInterface* getSSLManager();
+    virtual void SSL_free(SSLConnection* conn) = 0;
+};
 
-    extern bool isSSLServer;
+// Access SSL functions through this instance.
+SSLManagerInterface* getSSLManager();
+
+extern bool isSSLServer;
 }
-#endif // #ifdef MONGO_CONFIG_SSL
+#endif  // #ifdef MONGO_CONFIG_SSL

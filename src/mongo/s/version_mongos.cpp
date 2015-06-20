@@ -42,23 +42,21 @@
 
 namespace mongo {
 
-    void printShardingVersionInfo( bool out ) {
-        if ( out ) {
-            std::cout << "MongoS version " << versionString << " starting: pid=" <<
-                ProcessId::getCurrent() << " port=" << serverGlobalParams.port <<
-                ( sizeof(int*) == 4 ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() <<
-                " (--help for usage)" << std::endl;
-            DEV std::cout << "DEBUG build" << std::endl;
-            std::cout << "git version: " << gitVersion() << std::endl;
-            std::cout << openSSLVersion("OpenSSL version: ") << std::endl;
-        }
-        else {
-            log() << "MongoS version " << versionString << " starting: pid=" <<
-                ProcessId::getCurrent() << " port=" << serverGlobalParams.port <<
-                ( sizeof( int* ) == 4 ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() <<
-                " (--help for usage)" << std::endl;
-            DEV log() << "DEBUG build" << std::endl;
-            logProcessDetails();
-        }
+void printShardingVersionInfo(bool out) {
+    if (out) {
+        std::cout << "MongoS version " << versionString
+                  << " starting: pid=" << ProcessId::getCurrent()
+                  << " port=" << serverGlobalParams.port << (sizeof(int*) == 4 ? " 32" : " 64")
+                  << "-bit host=" << getHostNameCached() << " (--help for usage)" << std::endl;
+        DEV std::cout << "DEBUG build" << std::endl;
+        std::cout << "git version: " << gitVersion() << std::endl;
+        std::cout << openSSLVersion("OpenSSL version: ") << std::endl;
+    } else {
+        log() << "MongoS version " << versionString << " starting: pid=" << ProcessId::getCurrent()
+              << " port=" << serverGlobalParams.port << (sizeof(int*) == 4 ? " 32" : " 64")
+              << "-bit host=" << getHostNameCached() << " (--help for usage)" << std::endl;
+        DEV log() << "DEBUG build" << std::endl;
+        logProcessDetails();
     }
-} // namespace mongo
+}
+}  // namespace mongo

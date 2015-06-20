@@ -35,8 +35,8 @@
 
 namespace mongo {
 
-    extern OID serverID;
+extern OID serverID;
 
-    // from request.cpp
-    void processRequest(Message& m, MessagingPort& p);
+// from request.cpp
+void processRequest(Message& m, MessagingPort& p);
 }

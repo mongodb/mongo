@@ -47,216 +47,201 @@
 
 namespace mongo {
 
-    using std::endl;
+using std::endl;
 
 namespace {
 
-    void data_file_check(void *_mb) {
-        if (sizeof(char *) == 4) {
-            uassert(10084,
-                    "can't map file memory - mongo requires 64 bit build for larger datasets",
-                    _mb != NULL);
-        }
-        else {
-            uassert(10085, "can't map file memory", _mb != NULL);
+void data_file_check(void* _mb) {
+    if (sizeof(char*) == 4) {
+        uassert(10084,
+                "can't map file memory - mongo requires 64 bit build for larger datasets",
+                _mb != NULL);
+    } else {
+        uassert(10085, "can't map file memory", _mb != NULL);
+    }
+}
+
+}  // namespace
+
+
+BOOST_STATIC_ASSERT(DataFileHeader::HeaderSize == 8192);
+BOOST_STATIC_ASSERT(sizeof(static_cast<DataFileHeader*>(NULL)->data) == 4);
+BOOST_STATIC_ASSERT(sizeof(DataFileHeader) - sizeof(static_cast<DataFileHeader*>(NULL)->data) ==
+                    DataFileHeader::HeaderSize);
+
+
+int DataFile::maxSize() {
+    if (sizeof(int*) == 4) {
+        return 512 * 1024 * 1024;
+    } else if (mmapv1GlobalOptions.smallfiles) {
+        return 0x7ff00000 >> 2;
+    } else {
+        return 0x7ff00000;
+    }
+}
+
+NOINLINE_DECL void DataFile::badOfs(int ofs) const {
+    msgasserted(13440,
+                str::stream() << "bad offset:" << ofs << " accessing file: " << mmf.filename()
+                              << ". See http://dochub.mongodb.org/core/data-recovery");
+}
+
+int DataFile::_defaultSize() const {
+    int size;
+
+    if (_fileNo <= 4) {
+        size = (64 * 1024 * 1024) << _fileNo;
+    } else {
+        size = 0x7ff00000;
+    }
+
+    if (mmapv1GlobalOptions.smallfiles) {
+        size = size >> 2;
+    }
+
+    return size;
+}
+
+/** @return true if found and opened. if uninitialized (prealloc only) does not open. */
+Status DataFile::openExisting(const char* filename) {
+    invariant(_mb == 0);
+
+    if (!boost::filesystem::exists(filename)) {
+        return Status(ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist");
+    }
+
+    if (!mmf.open(filename, false)) {
+        return Status(ErrorCodes::InternalError, "DataFile::openExisting - mmf.open failed");
+    }
+
+    // The mapped view of the file should never be NULL if the open call above succeeded.
+    _mb = mmf.getView();
+    invariant(_mb);
+
+    const uint64_t sz = mmf.length();
+    invariant(sz <= 0x7fffffff);
+    invariant(sz % 4096 == 0);
+
+    if (sz < 64 * 1024 * 1024 && !mmapv1GlobalOptions.smallfiles) {
+        if (sz >= 16 * 1024 * 1024 && sz % (1024 * 1024) == 0) {
+            log() << "info openExisting file size " << sz
+                  << " but mmapv1GlobalOptions.smallfiles=false: " << filename << endl;
+        } else {
+            log() << "openExisting size " << sz << " less than minimum file size expectation "
+                  << filename << endl;
+            verify(false);
         }
     }
 
-} // namespace
+    data_file_check(_mb);
+    return Status::OK();
+}
 
+void DataFile::open(OperationContext* txn,
+                    const char* filename,
+                    int minSize,
+                    bool preallocateOnly) {
+    long size = _defaultSize();
 
-    BOOST_STATIC_ASSERT(DataFileHeader::HeaderSize == 8192);
-    BOOST_STATIC_ASSERT(sizeof(static_cast<DataFileHeader*>(NULL)->data) == 4);
-    BOOST_STATIC_ASSERT(
-        sizeof(DataFileHeader) - sizeof(static_cast<DataFileHeader*>(NULL)->data)
-                == DataFileHeader::HeaderSize);
-
-
-    int DataFile::maxSize() {
-        if ( sizeof( int* ) == 4 ) {
-            return 512 * 1024 * 1024;
-        }
-        else if (mmapv1GlobalOptions.smallfiles) {
-            return 0x7ff00000 >> 2;
-        }
-        else {
-            return 0x7ff00000;
-        }
-    }
-
-    NOINLINE_DECL void DataFile::badOfs(int ofs) const {
-        msgasserted(13440, str::stream()  << "bad offset:" << ofs
-                    << " accessing file: " << mmf.filename()
-                    << ". See http://dochub.mongodb.org/core/data-recovery");
-    }
-
-    int DataFile::_defaultSize() const {
-        int size;
-
-        if (_fileNo <= 4) {
-            size = (64 * 1024 * 1024) << _fileNo;
-        }
-        else {
-            size = 0x7ff00000;
-        }
-
-        if (mmapv1GlobalOptions.smallfiles) {
-            size = size >> 2;
-        }
-
-        return size;
-    }
-
-    /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-    Status DataFile::openExisting(const char *filename) {
-        invariant(_mb == 0);
-
-        if (!boost::filesystem::exists(filename)) {
-            return Status(ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist");
-        }
-
-        if (!mmf.open(filename, false)) {
-            return Status(ErrorCodes::InternalError, "DataFile::openExisting - mmf.open failed");
-        }
-
-        // The mapped view of the file should never be NULL if the open call above succeeded.
-        _mb = mmf.getView();
-        invariant(_mb);
-
-        const uint64_t sz = mmf.length();
-        invariant(sz <= 0x7fffffff);
-        invariant(sz % 4096 == 0);
-
-        if (sz < 64*1024*1024 && !mmapv1GlobalOptions.smallfiles) {
-            if( sz >= 16*1024*1024 && sz % (1024*1024) == 0 ) {
-                log() << "info openExisting file size " << sz
-                      << " but mmapv1GlobalOptions.smallfiles=false: "
-                      << filename << endl;
-            }
-            else {
-                log() << "openExisting size " << sz << " less than minimum file size expectation "
-                      << filename << endl;
-                verify(false);
-            }
-        }
-
-        data_file_check(_mb);
-        return Status::OK();
-    }
-
-    void DataFile::open( OperationContext* txn,
-                         const char *filename,
-                         int minSize,
-                         bool preallocateOnly ) {
-
-        long size = _defaultSize();
-
-        while (size < minSize) {
-            if (size < maxSize() / 2) {
-                size *= 2;
-            }
-            else {
-                size = maxSize();
-                break;
-            }
-        }
-
-        if (size > maxSize()) {
+    while (size < minSize) {
+        if (size < maxSize() / 2) {
+            size *= 2;
+        } else {
             size = maxSize();
-        }
-
-        invariant(size >= 64 * 1024 * 1024 || mmapv1GlobalOptions.smallfiles);
-        invariant( size % 4096 == 0 );
-
-        if ( preallocateOnly ) {
-            if (mmapv1GlobalOptions.prealloc) {
-                FileAllocator::get()->requestAllocation( filename, size );
-            }
-            return;
-        }
-
-        {
-            invariant(_mb == 0);
-            unsigned long long sz = size;
-            if (mmf.create(filename, sz, false)) {
-                _mb = mmf.getView();
-            }
-
-            invariant(sz <= 0x7fffffff);
-            size = (int)sz;
-        }
-
-        data_file_check(_mb);
-        header()->init(txn, _fileNo, size, filename);
-    }
-
-    void DataFile::flush( bool sync ) {
-        mmf.flush( sync );
-    }
-
-    DiskLoc DataFile::allocExtentArea( OperationContext* txn, int size ) {
-        // The header would be NULL if file open failed. However, if file open failed we should
-        // never be entering here.
-        invariant(header());
-        invariant(size <= header()->unusedLength);
-
-        int offset = header()->unused.getOfs();
-
-        DataFileHeader *h = header();
-        *txn->recoveryUnit()->writing(&h->unused) = DiskLoc(_fileNo, offset + size);
-        txn->recoveryUnit()->writingInt(h->unusedLength) = h->unusedLength - size;
-
-        return DiskLoc(_fileNo, offset);
-    }
-
-    // -------------------------------------------------------------------------------
-
-    void DataFileHeader::init(OperationContext* txn,
-                              int fileno,
-                              int filelength,
-                              const char* filename) {
-
-        if (uninitialized()) {
-            DEV log() << "datafileheader::init initializing " << filename << " n:" << fileno << endl;
-
-            massert(13640,
-                    str::stream() << "DataFileHeader looks corrupt at file open filelength:"
-                                  << filelength << " fileno:" << fileno,
-                    filelength > 32768);
-
-            // The writes done in this function must not be rolled back. If the containing
-            // UnitOfWork rolls back it should roll back to the state *after* these writes. This
-            // will leave the file empty, but available for future use. That is why we go directly
-            // to the global dur dirty list rather than going through the RecoveryUnit.
-            getDur().createdFile(filename, filelength);
-
-            typedef std::pair<void*, unsigned> Intent;
-            std::vector<Intent> intent;
-            intent.push_back(std::make_pair(this, sizeof(DataFileHeader)));
-            privateViews.makeWritable(this, sizeof(DataFileHeader));
-            getDur().declareWriteIntents(intent);
-
-            fileLength = filelength;
-            version = DataFileVersion::defaultForNewFiles();
-            unused.set(fileno, HeaderSize);
-            unusedLength = fileLength - HeaderSize - 16;
-            freeListStart.Null();
-            freeListEnd.Null();
-        }
-        else {
-            checkUpgrade(txn);
+            break;
         }
     }
 
-    void DataFileHeader::checkUpgrade(OperationContext* txn) {
-        if ( freeListStart == DiskLoc(0, 0) ) {
-            // we are upgrading from 2.4 to 2.6
-            invariant(freeListEnd == DiskLoc(0, 0)); // both start and end should be (0,0) or real
-            WriteUnitOfWork wunit(txn);
-            *txn->recoveryUnit()->writing( &freeListStart ) = DiskLoc();
-            *txn->recoveryUnit()->writing( &freeListEnd ) = DiskLoc();
-            wunit.commit();
-        }
+    if (size > maxSize()) {
+        size = maxSize();
     }
 
+    invariant(size >= 64 * 1024 * 1024 || mmapv1GlobalOptions.smallfiles);
+    invariant(size % 4096 == 0);
+
+    if (preallocateOnly) {
+        if (mmapv1GlobalOptions.prealloc) {
+            FileAllocator::get()->requestAllocation(filename, size);
+        }
+        return;
+    }
+
+    {
+        invariant(_mb == 0);
+        unsigned long long sz = size;
+        if (mmf.create(filename, sz, false)) {
+            _mb = mmf.getView();
+        }
+
+        invariant(sz <= 0x7fffffff);
+        size = (int)sz;
+    }
+
+    data_file_check(_mb);
+    header()->init(txn, _fileNo, size, filename);
+}
+
+void DataFile::flush(bool sync) {
+    mmf.flush(sync);
+}
+
+DiskLoc DataFile::allocExtentArea(OperationContext* txn, int size) {
+    // The header would be NULL if file open failed. However, if file open failed we should
+    // never be entering here.
+    invariant(header());
+    invariant(size <= header()->unusedLength);
+
+    int offset = header()->unused.getOfs();
+
+    DataFileHeader* h = header();
+    *txn->recoveryUnit()->writing(&h->unused) = DiskLoc(_fileNo, offset + size);
+    txn->recoveryUnit()->writingInt(h->unusedLength) = h->unusedLength - size;
+
+    return DiskLoc(_fileNo, offset);
+}
+
+// -------------------------------------------------------------------------------
+
+void DataFileHeader::init(OperationContext* txn, int fileno, int filelength, const char* filename) {
+    if (uninitialized()) {
+        DEV log() << "datafileheader::init initializing " << filename << " n:" << fileno << endl;
+
+        massert(13640,
+                str::stream() << "DataFileHeader looks corrupt at file open filelength:"
+                              << filelength << " fileno:" << fileno,
+                filelength > 32768);
+
+        // The writes done in this function must not be rolled back. If the containing
+        // UnitOfWork rolls back it should roll back to the state *after* these writes. This
+        // will leave the file empty, but available for future use. That is why we go directly
+        // to the global dur dirty list rather than going through the RecoveryUnit.
+        getDur().createdFile(filename, filelength);
+
+        typedef std::pair<void*, unsigned> Intent;
+        std::vector<Intent> intent;
+        intent.push_back(std::make_pair(this, sizeof(DataFileHeader)));
+        privateViews.makeWritable(this, sizeof(DataFileHeader));
+        getDur().declareWriteIntents(intent);
+
+        fileLength = filelength;
+        version = DataFileVersion::defaultForNewFiles();
+        unused.set(fileno, HeaderSize);
+        unusedLength = fileLength - HeaderSize - 16;
+        freeListStart.Null();
+        freeListEnd.Null();
+    } else {
+        checkUpgrade(txn);
+    }
+}
+
+void DataFileHeader::checkUpgrade(OperationContext* txn) {
+    if (freeListStart == DiskLoc(0, 0)) {
+        // we are upgrading from 2.4 to 2.6
+        invariant(freeListEnd == DiskLoc(0, 0));  // both start and end should be (0,0) or real
+        WriteUnitOfWork wunit(txn);
+        *txn->recoveryUnit()->writing(&freeListStart) = DiskLoc();
+        *txn->recoveryUnit()->writing(&freeListEnd) = DiskLoc();
+        wunit.commit();
+    }
+}
 }

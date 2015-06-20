@@ -31,13 +31,11 @@
 #include "mongo/base/status.h"
 
 namespace mongo {
-    class BSONObj;
-    class OperationContext;
+class BSONObj;
+class OperationContext;
 
-    /**
-     * Creates a collection as described in "cmdObj" on the database "dbName".
-     */
-    Status createCollection(OperationContext* txn,
-                            const std::string& dbName,
-                            const BSONObj& cmdObj);
-} // namespace mongo
+/**
+ * Creates a collection as described in "cmdObj" on the database "dbName".
+ */
+Status createCollection(OperationContext* txn, const std::string& dbName, const BSONObj& cmdObj);
+}  // namespace mongo

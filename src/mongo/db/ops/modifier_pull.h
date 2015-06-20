@@ -36,52 +36,49 @@
 
 namespace mongo {
 
-    class MatchExpression;
+class MatchExpression;
 
-    class ModifierPull : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(ModifierPull);
+class ModifierPull : public ModifierInterface {
+    MONGO_DISALLOW_COPYING(ModifierPull);
 
-    public:
-        ModifierPull();
-        virtual ~ModifierPull();
+public:
+    ModifierPull();
+    virtual ~ModifierPull();
 
-        /** Evaluates the array items to be removed and the match expression. */
-        virtual Status init(const BSONElement& modExpr, const Options& opts,
-                            bool* positional = NULL);
+    /** Evaluates the array items to be removed and the match expression. */
+    virtual Status init(const BSONElement& modExpr, const Options& opts, bool* positional = NULL);
 
-        /** Decides which portion of the array items will be removed from the provided element */
-        virtual Status prepare(mutablebson::Element root,
-                               StringData matchedField,
-                               ExecInfo* execInfo);
+    /** Decides which portion of the array items will be removed from the provided element */
+    virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
-        /** Updates the Element used in prepare with the effects of the $pull operation. */
-        virtual Status apply() const;
+    /** Updates the Element used in prepare with the effects of the $pull operation. */
+    virtual Status apply() const;
 
-        /** Converts the effects of this $pull into one or more equivalent $unset operations. */
-        virtual Status log(LogBuilder* logBuilder) const;
+    /** Converts the effects of this $pull into one or more equivalent $unset operations. */
+    virtual Status log(LogBuilder* logBuilder) const;
 
-    private:
-        bool isMatch(mutablebson::ConstElement element);
+private:
+    bool isMatch(mutablebson::ConstElement element);
 
-        // Access to each component of fieldName that's the target of this mod.
-        FieldRef _fieldRef;
+    // Access to each component of fieldName that's the target of this mod.
+    FieldRef _fieldRef;
 
-        // 0 or index for $-positional in _fieldRef.
-        size_t _posDollar;
+    // 0 or index for $-positional in _fieldRef.
+    size_t _posDollar;
 
-        // If we aren't using a matcher, we just keep modExpr as _exprElt and use that to match
-        // with woCompare.
-        BSONElement _exprElt;
+    // If we aren't using a matcher, we just keep modExpr as _exprElt and use that to match
+    // with woCompare.
+    BSONElement _exprElt;
 
-        // If we are using a matcher, we need to keep around a BSONObj for it.
-        BSONObj _exprObj;
+    // If we are using a matcher, we need to keep around a BSONObj for it.
+    BSONObj _exprObj;
 
-        // If we are using the matcher, this is the match expression we built around _exprObj.
-        std::unique_ptr<MatchExpression> _matchExpr;
-        bool _matcherOnPrimitive;
+    // If we are using the matcher, this is the match expression we built around _exprObj.
+    std::unique_ptr<MatchExpression> _matchExpr;
+    bool _matcherOnPrimitive;
 
-        struct PreparedState;
-        std::unique_ptr<PreparedState> _preparedState;
-    };
+    struct PreparedState;
+    std::unique_ptr<PreparedState> _preparedState;
+};
 
-} // namespace mongo
+}  // namespace mongo

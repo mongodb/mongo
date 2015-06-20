@@ -40,34 +40,33 @@
 
 namespace mongo {
 
-    void Message::send( MessagingPort &p, const char *context ) {
-        if ( empty() ) {
-            return;
-        }
-        if ( _buf != 0 ) {
-            p.send( _buf, MsgData::ConstView(_buf).getLen(), context );
-        }
-        else {
-            p.send( _data, context );
-        }
+void Message::send(MessagingPort& p, const char* context) {
+    if (empty()) {
+        return;
     }
-
-    AtomicWord<MSGID> NextMsgId;
-
-    /*struct MsgStart {
-        MsgStart() {
-            NextMsgId = (((unsigned) time(0)) << 16) ^ curTimeMillis();
-            verify(MsgDataHeaderSize == 16);
-        }
-    } msgstart;*/
-
-    MSGID nextMessageId() {
-        return NextMsgId.fetchAndAdd(1);
+    if (_buf != 0) {
+        p.send(_buf, MsgData::ConstView(_buf).getLen(), context);
+    } else {
+        p.send(_data, context);
     }
+}
 
-    bool doesOpGetAResponse( int op ) {
-        return op == dbQuery || op == dbGetMore;
+AtomicWord<MSGID> NextMsgId;
+
+/*struct MsgStart {
+    MsgStart() {
+        NextMsgId = (((unsigned) time(0)) << 16) ^ curTimeMillis();
+        verify(MsgDataHeaderSize == 16);
     }
+} msgstart;*/
+
+MSGID nextMessageId() {
+    return NextMsgId.fetchAndAdd(1);
+}
+
+bool doesOpGetAResponse(int op) {
+    return op == dbQuery || op == dbGetMore;
+}
 
 
-} // namespace mongo
+}  // namespace mongo

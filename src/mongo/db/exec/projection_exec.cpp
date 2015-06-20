@@ -36,433 +36,405 @@
 
 namespace mongo {
 
-    using std::max;
-    using std::string;
+using std::max;
+using std::string;
 
-    ProjectionExec::ProjectionExec()
-        : _include(true),
-          _special(false),
-          _includeID(true),
-          _skip(0),
-          _limit(-1),
-          _arrayOpType(ARRAY_OP_NORMAL),
-          _hasNonSimple(false),
-          _hasDottedField(false),
-          _queryExpression(NULL),
-          _hasReturnKey(false) { }
+ProjectionExec::ProjectionExec()
+    : _include(true),
+      _special(false),
+      _includeID(true),
+      _skip(0),
+      _limit(-1),
+      _arrayOpType(ARRAY_OP_NORMAL),
+      _hasNonSimple(false),
+      _hasDottedField(false),
+      _queryExpression(NULL),
+      _hasReturnKey(false) {}
 
 
-    ProjectionExec::ProjectionExec(const BSONObj& spec, 
-                                   const MatchExpression* queryExpression,
-                                   const MatchExpressionParser::WhereCallback& whereCallback)
-        : _include(true),
-          _special(false),
-          _source(spec),
-          _includeID(true),
-          _skip(0),
-          _limit(-1),
-          _arrayOpType(ARRAY_OP_NORMAL),
-          _hasNonSimple(false),
-          _hasDottedField(false),
-          _queryExpression(queryExpression),
-          _hasReturnKey(false) {
+ProjectionExec::ProjectionExec(const BSONObj& spec,
+                               const MatchExpression* queryExpression,
+                               const MatchExpressionParser::WhereCallback& whereCallback)
+    : _include(true),
+      _special(false),
+      _source(spec),
+      _includeID(true),
+      _skip(0),
+      _limit(-1),
+      _arrayOpType(ARRAY_OP_NORMAL),
+      _hasNonSimple(false),
+      _hasDottedField(false),
+      _queryExpression(queryExpression),
+      _hasReturnKey(false) {
+    // Are we including or excluding fields?
+    // -1 when we haven't initialized it.
+    // 1 when we're including
+    // 0 when we're excluding.
+    int include_exclude = -1;
 
-        // Are we including or excluding fields?
-        // -1 when we haven't initialized it.
-        // 1 when we're including
-        // 0 when we're excluding.
-        int include_exclude = -1;
+    BSONObjIterator it(_source);
+    while (it.more()) {
+        BSONElement e = it.next();
 
-        BSONObjIterator it(_source);
-        while (it.more()) {
-            BSONElement e = it.next();
+        if (!e.isNumber() && !e.isBoolean()) {
+            _hasNonSimple = true;
+        }
 
-            if (!e.isNumber() && !e.isBoolean()) {
-                _hasNonSimple = true;
-            }
+        if (Object == e.type()) {
+            BSONObj obj = e.embeddedObject();
+            verify(1 == obj.nFields());
 
-            if (Object == e.type()) {
-                BSONObj obj = e.embeddedObject();
-                verify(1 == obj.nFields());
-
-                BSONElement e2 = obj.firstElement();
-                if (mongoutils::str::equals(e2.fieldName(), "$slice")) {
-                    if (e2.isNumber()) {
-                        int i = e2.numberInt();
-                        if (i < 0) {
-                            add(e.fieldName(), i, -i); // limit is now positive
-                        }
-                        else {
-                            add(e.fieldName(), 0, i);
-                        }
+            BSONElement e2 = obj.firstElement();
+            if (mongoutils::str::equals(e2.fieldName(), "$slice")) {
+                if (e2.isNumber()) {
+                    int i = e2.numberInt();
+                    if (i < 0) {
+                        add(e.fieldName(), i, -i);  // limit is now positive
+                    } else {
+                        add(e.fieldName(), 0, i);
                     }
-                    else {
-                        verify(e2.type() == Array);
-                        BSONObj arr = e2.embeddedObject();
-                        verify(2 == arr.nFields());
+                } else {
+                    verify(e2.type() == Array);
+                    BSONObj arr = e2.embeddedObject();
+                    verify(2 == arr.nFields());
 
-                        BSONObjIterator it(arr);
-                        int skip = it.next().numberInt();
-                        int limit = it.next().numberInt();
+                    BSONObjIterator it(arr);
+                    int skip = it.next().numberInt();
+                    int limit = it.next().numberInt();
 
-                        verify(limit > 0);
+                    verify(limit > 0);
 
-                        add(e.fieldName(), skip, limit);
-                    }
+                    add(e.fieldName(), skip, limit);
                 }
-                else if (mongoutils::str::equals(e2.fieldName(), "$elemMatch")) {
-                    _arrayOpType = ARRAY_OP_ELEM_MATCH;
+            } else if (mongoutils::str::equals(e2.fieldName(), "$elemMatch")) {
+                _arrayOpType = ARRAY_OP_ELEM_MATCH;
 
-                    // Create a MatchExpression for the elemMatch.
-                    BSONObj elemMatchObj = e.wrap();
-                    verify(elemMatchObj.isOwned());
-                    _elemMatchObjs.push_back(elemMatchObj);
-                    StatusWithMatchExpression swme = MatchExpressionParser::parse(elemMatchObj, 
-                                                                                  whereCallback);
-                    verify(swme.isOK());
-                    // And store it in _matchers.
-                    _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()]
-                        = swme.getValue();
+                // Create a MatchExpression for the elemMatch.
+                BSONObj elemMatchObj = e.wrap();
+                verify(elemMatchObj.isOwned());
+                _elemMatchObjs.push_back(elemMatchObj);
+                StatusWithMatchExpression swme =
+                    MatchExpressionParser::parse(elemMatchObj, whereCallback);
+                verify(swme.isOK());
+                // And store it in _matchers.
+                _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] = swme.getValue();
 
-                    add(e.fieldName(), true);
-                }
-                else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
-                    verify(String == e2.type());
-                    if (e2.valuestr() == LiteParsedQuery::metaTextScore) {
-                        _meta[e.fieldName()] = META_TEXT_SCORE;
-                    }
-                    else if (e2.valuestr() == LiteParsedQuery::metaRecordId) {
-                        _meta[e.fieldName()] = META_RECORDID;
-                    }
-                    else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
-                        _meta[e.fieldName()] = META_GEONEAR_POINT;
-                    }
-                    else if (e2.valuestr() == LiteParsedQuery::metaGeoNearDistance) {
-                        _meta[e.fieldName()] = META_GEONEAR_DIST;
-                    }
-                    else if (e2.valuestr() == LiteParsedQuery::metaIndexKey) {
-                        _hasReturnKey = true;
-                        // The index key clobbers everything so just stop parsing here.
-                        return;
-                    }
-                    else {
-                        // This shouldn't happen, should be caught by parsing.
-                        verify(0);
-                    }
-                }
-                else {
+                add(e.fieldName(), true);
+            } else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
+                verify(String == e2.type());
+                if (e2.valuestr() == LiteParsedQuery::metaTextScore) {
+                    _meta[e.fieldName()] = META_TEXT_SCORE;
+                } else if (e2.valuestr() == LiteParsedQuery::metaRecordId) {
+                    _meta[e.fieldName()] = META_RECORDID;
+                } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
+                    _meta[e.fieldName()] = META_GEONEAR_POINT;
+                } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearDistance) {
+                    _meta[e.fieldName()] = META_GEONEAR_DIST;
+                } else if (e2.valuestr() == LiteParsedQuery::metaIndexKey) {
+                    _hasReturnKey = true;
+                    // The index key clobbers everything so just stop parsing here.
+                    return;
+                } else {
+                    // This shouldn't happen, should be caught by parsing.
                     verify(0);
                 }
+            } else {
+                verify(0);
             }
-            else if (mongoutils::str::equals(e.fieldName(), "_id") && !e.trueValue()) {
-                _includeID = false;
-            }
-            else {
-                add(e.fieldName(), e.trueValue());
+        } else if (mongoutils::str::equals(e.fieldName(), "_id") && !e.trueValue()) {
+            _includeID = false;
+        } else {
+            add(e.fieldName(), e.trueValue());
 
-                // Projections of dotted fields aren't covered.
-                if (mongoutils::str::contains(e.fieldName(), '.')) {
-                    _hasDottedField = true;
-                }
-
-                // Validate input.
-                if (include_exclude == -1) {
-                    // If we haven't specified an include/exclude, initialize include_exclude.
-                    // We expect further include/excludes to match it.
-                    include_exclude = e.trueValue();
-                    _include = !e.trueValue();
-                }
+            // Projections of dotted fields aren't covered.
+            if (mongoutils::str::contains(e.fieldName(), '.')) {
+                _hasDottedField = true;
             }
 
-            if (mongoutils::str::contains(e.fieldName(), ".$")) {
-                _arrayOpType = ARRAY_OP_POSITIONAL;
+            // Validate input.
+            if (include_exclude == -1) {
+                // If we haven't specified an include/exclude, initialize include_exclude.
+                // We expect further include/excludes to match it.
+                include_exclude = e.trueValue();
+                _include = !e.trueValue();
             }
+        }
+
+        if (mongoutils::str::contains(e.fieldName(), ".$")) {
+            _arrayOpType = ARRAY_OP_POSITIONAL;
         }
     }
+}
 
-    ProjectionExec::~ProjectionExec() {
-        for (FieldMap::const_iterator it = _fields.begin(); it != _fields.end(); ++it) {
-            delete it->second;
-        }
-
-        for (Matchers::const_iterator it = _matchers.begin(); it != _matchers.end(); ++it) {
-            delete it->second;
-        }
+ProjectionExec::~ProjectionExec() {
+    for (FieldMap::const_iterator it = _fields.begin(); it != _fields.end(); ++it) {
+        delete it->second;
     }
 
-    void ProjectionExec::add(const string& field, bool include) {
-        if (field.empty()) { // this is the field the user referred to
-            _include = include;
-        }
-        else {
-            _include = !include;
-
-            const size_t dot = field.find('.');
-            const string subfield = field.substr(0,dot);
-            const string rest = (dot == string::npos ? "" : field.substr(dot + 1, string::npos));
-
-            ProjectionExec*& fm = _fields[subfield.c_str()];
-
-            if (NULL == fm) {
-                fm = new ProjectionExec();
-            }
-
-            fm->add(rest, include);
-        }
+    for (Matchers::const_iterator it = _matchers.begin(); it != _matchers.end(); ++it) {
+        delete it->second;
     }
+}
 
-    void ProjectionExec::add(const string& field, int skip, int limit) {
-        _special = true; // can't include or exclude whole object
+void ProjectionExec::add(const string& field, bool include) {
+    if (field.empty()) {  // this is the field the user referred to
+        _include = include;
+    } else {
+        _include = !include;
 
-        if (field.empty()) { // this is the field the user referred to
-            _skip = skip;
-            _limit = limit;
+        const size_t dot = field.find('.');
+        const string subfield = field.substr(0, dot);
+        const string rest = (dot == string::npos ? "" : field.substr(dot + 1, string::npos));
+
+        ProjectionExec*& fm = _fields[subfield.c_str()];
+
+        if (NULL == fm) {
+            fm = new ProjectionExec();
         }
-        else {
-            const size_t dot = field.find('.');
-            const string subfield = field.substr(0,dot);
-            const string rest = (dot == string::npos ? "" : field.substr(dot + 1, string::npos));
 
-            ProjectionExec*& fm = _fields[subfield.c_str()];
-
-            if (NULL == fm) {
-                fm = new ProjectionExec();
-            }
-
-            fm->add(rest, skip, limit);
-        }
+        fm->add(rest, include);
     }
+}
 
-    //
-    // Execution
-    //
+void ProjectionExec::add(const string& field, int skip, int limit) {
+    _special = true;  // can't include or exclude whole object
 
-    Status ProjectionExec::transform(WorkingSetMember* member) const {
-        if (_hasReturnKey) {
-            BSONObj keyObj;
+    if (field.empty()) {  // this is the field the user referred to
+        _skip = skip;
+        _limit = limit;
+    } else {
+        const size_t dot = field.find('.');
+        const string subfield = field.substr(0, dot);
+        const string rest = (dot == string::npos ? "" : field.substr(dot + 1, string::npos));
 
-            if (member->hasComputed(WSM_INDEX_KEY)) {
-                const IndexKeyComputedData* key
-                    = static_cast<const IndexKeyComputedData*>(member->getComputed(WSM_INDEX_KEY));
-                keyObj = key->getKey();
-            }
+        ProjectionExec*& fm = _fields[subfield.c_str()];
 
-            member->state = WorkingSetMember::OWNED_OBJ;
-            member->obj = Snapshotted<BSONObj>(SnapshotId(), keyObj);
-            member->keyData.clear();
-            member->loc = RecordId();
-            return Status::OK();
+        if (NULL == fm) {
+            fm = new ProjectionExec();
         }
 
-        BSONObjBuilder bob;
-        if (member->hasObj()) {
-            MatchDetails matchDetails;
+        fm->add(rest, skip, limit);
+    }
+}
 
-            // If it's a positional projection we need a MatchDetails.
-            if (transformRequiresDetails()) {
-                matchDetails.requestElemMatchKey();
-                verify(NULL != _queryExpression);
-                verify(_queryExpression->matchesBSON(member->obj.value(), &matchDetails));
-            }
+//
+// Execution
+//
 
-            Status projStatus = transform(member->obj.value(), &bob, &matchDetails);
-            if (!projStatus.isOK()) {
-                return projStatus;
-            }
-        }
-        else {
-            verify(!requiresDocument());
-            // Go field by field.
-            if (_includeID) {
-                BSONElement elt;
-                // Sometimes the _id field doesn't exist...
-                if (member->getFieldDotted("_id", &elt) && !elt.eoo()) {
-                    bob.appendAs(elt, "_id");
-                }
-            }
+Status ProjectionExec::transform(WorkingSetMember* member) const {
+    if (_hasReturnKey) {
+        BSONObj keyObj;
 
-            BSONObjIterator it(_source);
-            while (it.more()) {
-                BSONElement specElt = it.next();
-                if (mongoutils::str::equals("_id", specElt.fieldName())) {
-                    continue;
-                }
-
-                BSONElement keyElt;
-                // We can project a field that doesn't exist.  We just ignore it.
-                if (member->getFieldDotted(specElt.fieldName(), &keyElt) && !keyElt.eoo()) {
-                    bob.appendAs(keyElt, specElt.fieldName());
-                }
-            }
+        if (member->hasComputed(WSM_INDEX_KEY)) {
+            const IndexKeyComputedData* key =
+                static_cast<const IndexKeyComputedData*>(member->getComputed(WSM_INDEX_KEY));
+            keyObj = key->getKey();
         }
 
-        for (MetaMap::const_iterator it = _meta.begin(); it != _meta.end(); ++it) {
-            if (META_GEONEAR_DIST == it->second) {
-                if (member->hasComputed(WSM_COMPUTED_GEO_DISTANCE)) {
-                    const GeoDistanceComputedData* dist
-                        = static_cast<const GeoDistanceComputedData*>(
-                                member->getComputed(WSM_COMPUTED_GEO_DISTANCE));
-                    bob.append(it->first, dist->getDist());
-                }
-                else {
-                    return Status(ErrorCodes::InternalError,
-                                  "near loc dist requested but no data available");
-                }
-            }
-            else if (META_GEONEAR_POINT == it->second) {
-                if (member->hasComputed(WSM_GEO_NEAR_POINT)) {
-                    const GeoNearPointComputedData* point
-                        = static_cast<const GeoNearPointComputedData*>(
-                                member->getComputed(WSM_GEO_NEAR_POINT));
-                    BSONObj ptObj = point->getPoint();
-                    if (ptObj.couldBeArray()) {
-                        bob.appendArray(it->first, ptObj);
-                    }
-                    else {
-                        bob.append(it->first, ptObj);
-                    }
-                }
-                else {
-                    return Status(ErrorCodes::InternalError,
-                                  "near loc proj requested but no data available");
-                }
-            }
-            else if (META_TEXT_SCORE == it->second) {
-                if (member->hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
-                    const TextScoreComputedData* score
-                        = static_cast<const TextScoreComputedData*>(
-                                member->getComputed(WSM_COMPUTED_TEXT_SCORE));
-                    bob.append(it->first, score->getScore());
-                }
-                else {
-                    bob.append(it->first, 0.0);
-                }
-            }
-            else if (META_RECORDID == it->second) {
-                bob.append(it->first, static_cast<long long>(member->loc.repr()));
-            }
-        }
-
-        BSONObj newObj = bob.obj();
         member->state = WorkingSetMember::OWNED_OBJ;
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), newObj);
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), keyObj);
         member->keyData.clear();
         member->loc = RecordId();
-
         return Status::OK();
     }
 
-    Status ProjectionExec::transform(const BSONObj& in, BSONObj* out) const {
-        // If it's a positional projection we need a MatchDetails.
+    BSONObjBuilder bob;
+    if (member->hasObj()) {
         MatchDetails matchDetails;
+
+        // If it's a positional projection we need a MatchDetails.
         if (transformRequiresDetails()) {
             matchDetails.requestElemMatchKey();
             verify(NULL != _queryExpression);
-            verify(_queryExpression->matchesBSON(in, &matchDetails));
+            verify(_queryExpression->matchesBSON(member->obj.value(), &matchDetails));
         }
 
-        BSONObjBuilder bob;
-        Status s = transform(in, &bob, &matchDetails);
-        if (!s.isOK()) {
-            return s;
+        Status projStatus = transform(member->obj.value(), &bob, &matchDetails);
+        if (!projStatus.isOK()) {
+            return projStatus;
         }
-        *out = bob.obj();
-        return Status::OK();
+    } else {
+        verify(!requiresDocument());
+        // Go field by field.
+        if (_includeID) {
+            BSONElement elt;
+            // Sometimes the _id field doesn't exist...
+            if (member->getFieldDotted("_id", &elt) && !elt.eoo()) {
+                bob.appendAs(elt, "_id");
+            }
+        }
+
+        BSONObjIterator it(_source);
+        while (it.more()) {
+            BSONElement specElt = it.next();
+            if (mongoutils::str::equals("_id", specElt.fieldName())) {
+                continue;
+            }
+
+            BSONElement keyElt;
+            // We can project a field that doesn't exist.  We just ignore it.
+            if (member->getFieldDotted(specElt.fieldName(), &keyElt) && !keyElt.eoo()) {
+                bob.appendAs(keyElt, specElt.fieldName());
+            }
+        }
     }
 
-    Status ProjectionExec::transform(const BSONObj& in,
-                                     BSONObjBuilder* bob,
-                                     const MatchDetails* details) const {
-
-        const ArrayOpType& arrayOpType = _arrayOpType;
-
-        BSONObjIterator it(in);
-        while (it.more()) {
-            BSONElement elt = it.next();
-
-            // Case 1: _id
-            if (mongoutils::str::equals("_id", elt.fieldName())) {
-                if (_includeID) {
-                    bob->append(elt);
-                }
-                continue;
+    for (MetaMap::const_iterator it = _meta.begin(); it != _meta.end(); ++it) {
+        if (META_GEONEAR_DIST == it->second) {
+            if (member->hasComputed(WSM_COMPUTED_GEO_DISTANCE)) {
+                const GeoDistanceComputedData* dist = static_cast<const GeoDistanceComputedData*>(
+                    member->getComputed(WSM_COMPUTED_GEO_DISTANCE));
+                bob.append(it->first, dist->getDist());
+            } else {
+                return Status(ErrorCodes::InternalError,
+                              "near loc dist requested but no data available");
             }
-
-            // Case 2: no array projection for this field.
-            Matchers::const_iterator matcher = _matchers.find(elt.fieldName());
-            if (_matchers.end() == matcher) {
-                Status s = append(bob, elt, details, arrayOpType);
-                if (!s.isOK()) {
-                    return s;
+        } else if (META_GEONEAR_POINT == it->second) {
+            if (member->hasComputed(WSM_GEO_NEAR_POINT)) {
+                const GeoNearPointComputedData* point =
+                    static_cast<const GeoNearPointComputedData*>(
+                        member->getComputed(WSM_GEO_NEAR_POINT));
+                BSONObj ptObj = point->getPoint();
+                if (ptObj.couldBeArray()) {
+                    bob.appendArray(it->first, ptObj);
+                } else {
+                    bob.append(it->first, ptObj);
                 }
-                continue;
+            } else {
+                return Status(ErrorCodes::InternalError,
+                              "near loc proj requested but no data available");
             }
+        } else if (META_TEXT_SCORE == it->second) {
+            if (member->hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
+                const TextScoreComputedData* score = static_cast<const TextScoreComputedData*>(
+                    member->getComputed(WSM_COMPUTED_TEXT_SCORE));
+                bob.append(it->first, score->getScore());
+            } else {
+                bob.append(it->first, 0.0);
+            }
+        } else if (META_RECORDID == it->second) {
+            bob.append(it->first, static_cast<long long>(member->loc.repr()));
+        }
+    }
 
-            // Case 3: field has array projection with $elemMatch specified.
-            if (ARRAY_OP_ELEM_MATCH != arrayOpType) {
+    BSONObj newObj = bob.obj();
+    member->state = WorkingSetMember::OWNED_OBJ;
+    member->obj = Snapshotted<BSONObj>(SnapshotId(), newObj);
+    member->keyData.clear();
+    member->loc = RecordId();
+
+    return Status::OK();
+}
+
+Status ProjectionExec::transform(const BSONObj& in, BSONObj* out) const {
+    // If it's a positional projection we need a MatchDetails.
+    MatchDetails matchDetails;
+    if (transformRequiresDetails()) {
+        matchDetails.requestElemMatchKey();
+        verify(NULL != _queryExpression);
+        verify(_queryExpression->matchesBSON(in, &matchDetails));
+    }
+
+    BSONObjBuilder bob;
+    Status s = transform(in, &bob, &matchDetails);
+    if (!s.isOK()) {
+        return s;
+    }
+    *out = bob.obj();
+    return Status::OK();
+}
+
+Status ProjectionExec::transform(const BSONObj& in,
+                                 BSONObjBuilder* bob,
+                                 const MatchDetails* details) const {
+    const ArrayOpType& arrayOpType = _arrayOpType;
+
+    BSONObjIterator it(in);
+    while (it.more()) {
+        BSONElement elt = it.next();
+
+        // Case 1: _id
+        if (mongoutils::str::equals("_id", elt.fieldName())) {
+            if (_includeID) {
+                bob->append(elt);
+            }
+            continue;
+        }
+
+        // Case 2: no array projection for this field.
+        Matchers::const_iterator matcher = _matchers.find(elt.fieldName());
+        if (_matchers.end() == matcher) {
+            Status s = append(bob, elt, details, arrayOpType);
+            if (!s.isOK()) {
+                return s;
+            }
+            continue;
+        }
+
+        // Case 3: field has array projection with $elemMatch specified.
+        if (ARRAY_OP_ELEM_MATCH != arrayOpType) {
+            return Status(ErrorCodes::BadValue, "Matchers are only supported for $elemMatch");
+        }
+
+        MatchDetails arrayDetails;
+        arrayDetails.requestElemMatchKey();
+
+        if (matcher->second->matchesBSON(in, &arrayDetails)) {
+            FieldMap::const_iterator fieldIt = _fields.find(elt.fieldName());
+            if (_fields.end() == fieldIt) {
                 return Status(ErrorCodes::BadValue,
-                             "Matchers are only supported for $elemMatch");
+                              "$elemMatch specified, but projection field not found.");
             }
 
-            MatchDetails arrayDetails;
-            arrayDetails.requestElemMatchKey();
+            BSONArrayBuilder arrBuilder;
+            BSONObjBuilder subBob;
 
-            if (matcher->second->matchesBSON(in, &arrayDetails)) {
-                FieldMap::const_iterator fieldIt = _fields.find(elt.fieldName());
-                if (_fields.end() == fieldIt) {
-                    return Status(ErrorCodes::BadValue,
-                                  "$elemMatch specified, but projection field not found.");
-                }
+            if (in.getField(elt.fieldName()).eoo()) {
+                return Status(ErrorCodes::InternalError,
+                              "$elemMatch called on document element with eoo");
+            }
 
-                BSONArrayBuilder arrBuilder;
-                BSONObjBuilder subBob;
+            if (in.getField(elt.fieldName()).Obj().getField(arrayDetails.elemMatchKey()).eoo()) {
+                return Status(ErrorCodes::InternalError,
+                              "$elemMatch called on array element with eoo");
+            }
 
-                if (in.getField(elt.fieldName()).eoo()) {
-                    return Status(ErrorCodes::InternalError,
-                                  "$elemMatch called on document element with eoo");
-                }
-
-                if (in.getField(elt.fieldName()).Obj().getField(arrayDetails.elemMatchKey()).eoo()) {
-                    return Status(ErrorCodes::InternalError,
-                                  "$elemMatch called on array element with eoo");
-                }
-
-                arrBuilder.append(
-                    in.getField(elt.fieldName()).Obj().getField(arrayDetails.elemMatchKey()));
-                subBob.appendArray(matcher->first, arrBuilder.arr());
-                Status status = append(bob, subBob.done().firstElement(), details, arrayOpType);
-                if (!status.isOK()) {
-                    return status;
-                }
+            arrBuilder.append(
+                in.getField(elt.fieldName()).Obj().getField(arrayDetails.elemMatchKey()));
+            subBob.appendArray(matcher->first, arrBuilder.arr());
+            Status status = append(bob, subBob.done().firstElement(), details, arrayOpType);
+            if (!status.isOK()) {
+                return status;
             }
         }
-
-        return Status::OK();
     }
 
-    void ProjectionExec::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool nested) const {
-        int skip  = nested ?  0 : _skip;
-        int limit = nested ? -1 : _limit;
+    return Status::OK();
+}
 
-        if (skip < 0) {
-            skip = max(0, skip + array.nFields());
+void ProjectionExec::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool nested) const {
+    int skip = nested ? 0 : _skip;
+    int limit = nested ? -1 : _limit;
+
+    if (skip < 0) {
+        skip = max(0, skip + array.nFields());
+    }
+
+    int index = 0;
+    BSONObjIterator it(array);
+    while (it.more()) {
+        BSONElement elt = it.next();
+
+        if (skip) {
+            skip--;
+            continue;
         }
 
-        int index = 0;
-        BSONObjIterator it(array);
-        while (it.more()) {
-            BSONElement elt = it.next();
+        if (limit != -1 && (limit-- == 0)) {
+            break;
+        }
 
-            if (skip) {
-                skip--;
-                continue;
-            }
-
-            if (limit != -1 && (limit-- == 0)) {
-                break;
-            }
-
-            switch(elt.type()) {
+        switch (elt.type()) {
             case Array: {
                 BSONObjBuilder subBob;
                 appendArray(&subBob, elt.embeddedObject(), true);
@@ -482,76 +454,70 @@ namespace mongo {
                 if (_include) {
                     bob->appendAs(elt, bob->numStr(index++));
                 }
-            }
         }
     }
+}
 
-    Status ProjectionExec::append(BSONObjBuilder* bob,
-                                  const BSONElement& elt,
-                                  const MatchDetails* details,
-                                  const ArrayOpType arrayOpType) const {
-
-
-        // Skip if the field name matches a computed $meta field.
-        // $meta projection fields can exist at the top level of
-        // the result document and the field names cannot be dotted.
-        if (_meta.find(elt.fieldName()) != _meta.end()) {
-            return Status::OK();
-        }
-
-        FieldMap::const_iterator field = _fields.find(elt.fieldName());
-        if (field == _fields.end()) {
-            if (_include) {
-                bob->append(elt);
-            }
-            return Status::OK();
-        }
-
-        ProjectionExec& subfm = *field->second;
-        if ((subfm._fields.empty() && !subfm._special)
-            || !(elt.type() == Object || elt.type() == Array)) {
-            // field map empty, or element is not an array/object
-            if (subfm._include) {
-                bob->append(elt);
-            }
-        }
-        else if (elt.type() == Object) {
-            BSONObjBuilder subBob;
-            BSONObjIterator it(elt.embeddedObject());
-            while (it.more()) {
-                subfm.append(&subBob, it.next(), details, arrayOpType);
-            }
-            bob->append(elt.fieldName(), subBob.obj());
-        }
-        else {
-            // Array
-            BSONObjBuilder matchedBuilder;
-            if (details && arrayOpType == ARRAY_OP_POSITIONAL) {
-                // $ positional operator specified
-                if (!details->hasElemMatchKey()) {
-                    mongoutils::str::stream error;
-                    error << "positional operator (" << elt.fieldName()
-                          << ".$) requires corresponding field"
-                          << " in query specifier";
-                    return Status(ErrorCodes::BadValue, error);
-                }
-
-                if (elt.embeddedObject()[details->elemMatchKey()].eoo()) {
-                    return Status(ErrorCodes::BadValue,
-                                  "positional operator element mismatch");
-                }
-
-                // append as the first and only element in the projected array
-                matchedBuilder.appendAs( elt.embeddedObject()[details->elemMatchKey()], "0" );
-            }
-            else {
-                // append exact array; no subarray matcher specified
-                subfm.appendArray(&matchedBuilder, elt.embeddedObject());
-            }
-            bob->appendArray(elt.fieldName(), matchedBuilder.obj());
-        }
-
+Status ProjectionExec::append(BSONObjBuilder* bob,
+                              const BSONElement& elt,
+                              const MatchDetails* details,
+                              const ArrayOpType arrayOpType) const {
+    // Skip if the field name matches a computed $meta field.
+    // $meta projection fields can exist at the top level of
+    // the result document and the field names cannot be dotted.
+    if (_meta.find(elt.fieldName()) != _meta.end()) {
         return Status::OK();
     }
+
+    FieldMap::const_iterator field = _fields.find(elt.fieldName());
+    if (field == _fields.end()) {
+        if (_include) {
+            bob->append(elt);
+        }
+        return Status::OK();
+    }
+
+    ProjectionExec& subfm = *field->second;
+    if ((subfm._fields.empty() && !subfm._special) ||
+        !(elt.type() == Object || elt.type() == Array)) {
+        // field map empty, or element is not an array/object
+        if (subfm._include) {
+            bob->append(elt);
+        }
+    } else if (elt.type() == Object) {
+        BSONObjBuilder subBob;
+        BSONObjIterator it(elt.embeddedObject());
+        while (it.more()) {
+            subfm.append(&subBob, it.next(), details, arrayOpType);
+        }
+        bob->append(elt.fieldName(), subBob.obj());
+    } else {
+        // Array
+        BSONObjBuilder matchedBuilder;
+        if (details && arrayOpType == ARRAY_OP_POSITIONAL) {
+            // $ positional operator specified
+            if (!details->hasElemMatchKey()) {
+                mongoutils::str::stream error;
+                error << "positional operator (" << elt.fieldName()
+                      << ".$) requires corresponding field"
+                      << " in query specifier";
+                return Status(ErrorCodes::BadValue, error);
+            }
+
+            if (elt.embeddedObject()[details->elemMatchKey()].eoo()) {
+                return Status(ErrorCodes::BadValue, "positional operator element mismatch");
+            }
+
+            // append as the first and only element in the projected array
+            matchedBuilder.appendAs(elt.embeddedObject()[details->elemMatchKey()], "0");
+        } else {
+            // append exact array; no subarray matcher specified
+            subfm.appendArray(&matchedBuilder, elt.embeddedObject());
+        }
+        bob->appendArray(elt.fieldName(), matchedBuilder.obj());
+    }
+
+    return Status::OK();
+}
 
 }  // namespace mongo

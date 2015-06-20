@@ -36,36 +36,35 @@
 namespace mongo {
 namespace repl {
 
-    class CmdReplSetDeclareElectionWinner : public ReplSetCommand {
-    public:
-        CmdReplSetDeclareElectionWinner() : ReplSetCommand("replSetDeclareElectionWinner") { }
-    private:
-        bool run(OperationContext* txn,
-                 const std::string&,
-                 BSONObj& cmdObj,
-                 int,
-                 std::string& errmsg,
-                 BSONObjBuilder& result) final {
+class CmdReplSetDeclareElectionWinner : public ReplSetCommand {
+public:
+    CmdReplSetDeclareElectionWinner() : ReplSetCommand("replSetDeclareElectionWinner") {}
 
-            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-
-            ReplSetDeclareElectionWinnerArgs parsedArgs;
-            status = parsedArgs.initialize(cmdObj);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-
-            long long responseTerm = -1;
-            status = getGlobalReplicationCoordinator()->processReplSetDeclareElectionWinner(
-                    parsedArgs,
-                    &responseTerm);
-            result.append("term", responseTerm);
+private:
+    bool run(OperationContext* txn,
+             const std::string&,
+             BSONObj& cmdObj,
+             int,
+             std::string& errmsg,
+             BSONObjBuilder& result) final {
+        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-    } cmdReplSetDeclareElectionWinner;
 
-} // namespace repl
-} // namespace mongo
+        ReplSetDeclareElectionWinnerArgs parsedArgs;
+        status = parsedArgs.initialize(cmdObj);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
+        }
+
+        long long responseTerm = -1;
+        status = getGlobalReplicationCoordinator()->processReplSetDeclareElectionWinner(
+            parsedArgs, &responseTerm);
+        result.append("term", responseTerm);
+        return appendCommandStatus(result, status);
+    }
+} cmdReplSetDeclareElectionWinner;
+
+}  // namespace repl
+}  // namespace mongo

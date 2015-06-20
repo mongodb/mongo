@@ -35,49 +35,45 @@
 namespace mongo {
 namespace logger {
 
-    RotatableFileManager::RotatableFileManager() {}
+RotatableFileManager::RotatableFileManager() {}
 
-    RotatableFileManager::~RotatableFileManager() {
-        for (WriterByNameMap::iterator iter = _writers.begin(); iter != _writers.end(); ++iter) {
-            delete iter->second;
+RotatableFileManager::~RotatableFileManager() {
+    for (WriterByNameMap::iterator iter = _writers.begin(); iter != _writers.end(); ++iter) {
+        delete iter->second;
+    }
+}
+
+StatusWithRotatableFileWriter RotatableFileManager::openFile(const std::string& fileName,
+                                                             bool append) {
+    if (_writers.count(fileName) > 0) {
+        return StatusWithRotatableFileWriter(ErrorCodes::FileAlreadyOpen,
+                                             "File \"" + fileName + "\" already opened.");
+    }
+    std::unique_ptr<RotatableFileWriter> writer(new RotatableFileWriter);
+    RotatableFileWriter::Use writerUse(writer.get());
+    Status status = writerUse.setFileName(fileName, append);
+    if (!status.isOK())
+        return StatusWithRotatableFileWriter(status);
+    _writers.insert(std::make_pair(fileName, writer.get()));
+    return StatusWith<RotatableFileWriter*>(writer.release());
+}
+
+RotatableFileWriter* RotatableFileManager::getFile(const std::string& name) {
+    return mapFindWithDefault(_writers, name, static_cast<RotatableFileWriter*>(NULL));
+}
+
+RotatableFileManager::FileNameStatusPairVector RotatableFileManager::rotateAll(
+    bool renameFiles, const std::string& renameTargetSuffix) {
+    FileNameStatusPairVector badStatuses;
+    for (WriterByNameMap::const_iterator iter = _writers.begin(); iter != _writers.end(); ++iter) {
+        Status status = RotatableFileWriter::Use(iter->second)
+                            .rotate(renameFiles, iter->first + renameTargetSuffix);
+        if (!status.isOK()) {
+            badStatuses.push_back(std::make_pair(iter->first, status));
         }
     }
-
-    StatusWithRotatableFileWriter RotatableFileManager::openFile(const std::string& fileName,
-                                                                 bool append) {
-        if (_writers.count(fileName) > 0) {
-            return StatusWithRotatableFileWriter(ErrorCodes::FileAlreadyOpen,
-                                                 "File \"" + fileName + "\" already opened.");
-        }
-        std::unique_ptr<RotatableFileWriter> writer(new RotatableFileWriter);
-        RotatableFileWriter::Use writerUse(writer.get());
-        Status status = writerUse.setFileName(fileName, append);
-        if (!status.isOK())
-            return StatusWithRotatableFileWriter(status);
-        _writers.insert(std::make_pair(fileName, writer.get()));
-        return StatusWith<RotatableFileWriter*>(writer.release());
-    }
-
-    RotatableFileWriter* RotatableFileManager::getFile(const std::string& name) {
-        return mapFindWithDefault(_writers, name, static_cast<RotatableFileWriter*>(NULL));
-    }
-
-    RotatableFileManager::FileNameStatusPairVector RotatableFileManager::rotateAll(
-            bool renameFiles, const std::string& renameTargetSuffix) {
-
-        FileNameStatusPairVector badStatuses;
-        for (WriterByNameMap::const_iterator iter = _writers.begin();
-             iter != _writers.end(); ++iter) {
-
-            Status status = RotatableFileWriter::Use(iter->second).rotate(
-                    renameFiles,
-                    iter->first + renameTargetSuffix);
-            if (!status.isOK()) {
-                badStatuses.push_back(std::make_pair(iter->first, status));
-            }
-        }
-        return badStatuses;
-    }
+    return badStatuses;
+}
 
 }  // namespace logger
 }  // namespace mongo

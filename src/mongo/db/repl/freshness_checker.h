@@ -38,127 +38,128 @@
 
 namespace mongo {
 
-    class Status;
+class Status;
 
 namespace repl {
 
-    class ReplicaSetConfig;
-    class ScatterGatherRunner;
+class ReplicaSetConfig;
+class ScatterGatherRunner;
 
-    class FreshnessChecker {
-        MONGO_DISALLOW_COPYING(FreshnessChecker);
+class FreshnessChecker {
+    MONGO_DISALLOW_COPYING(FreshnessChecker);
+
+public:
+    enum ElectionAbortReason {
+        None = 0,
+        FresherNodeFound,  // Freshness check found fresher node
+        FreshnessTie,  // Freshness check resulted in one or more nodes with our lastAppliedOpTime
+        QuorumUnavailable,  // Not enough up voters
+        QuorumUnreachable   // Too many failed voter responses
+    };
+
+    class Algorithm : public ScatterGatherAlgorithm {
     public:
-        enum ElectionAbortReason {
-            None = 0,
-            FresherNodeFound, // Freshness check found fresher node
-            FreshnessTie, // Freshness check resulted in one or more nodes with our lastAppliedOpTime
-            QuorumUnavailable, // Not enough up voters
-            QuorumUnreachable // Too many failed voter responses
-        };
-
-        class Algorithm : public ScatterGatherAlgorithm {
-        public:
-            Algorithm(Timestamp lastOpTimeApplied,
-                      const ReplicaSetConfig& rsConfig,
-                      int selfIndex,
-                      const std::vector<HostAndPort>& targets);
-            virtual ~Algorithm();
-            virtual std::vector<RemoteCommandRequest> getRequests() const;
-            virtual void processResponse(
-                    const RemoteCommandRequest& request,
-                    const ResponseStatus& response);
-            virtual bool hasReceivedSufficientResponses() const;
-            ElectionAbortReason shouldAbortElection() const;
-
-        private:
-            // Returns true if the number of failed votes is over _losableVotes()
-            bool hadTooManyFailedVoterResponses() const;
-
-            // Returns true if the member, by host and port, has a vote.
-            bool _isVotingMember(const HostAndPort host) const;
-
-            // Number of responses received so far.
-            int _responsesProcessed;
-
-            // Number of failed voter responses so far.
-            int _failedVoterResponses;
-
-            // Last Timestamp applied by the caller; used in the Fresh command 
-            const Timestamp _lastOpTimeApplied;
-
-            // Config to use for this check
-            const ReplicaSetConfig _rsConfig;
-
-            // Our index position in _rsConfig
-            const int _selfIndex;
-
-            // The UP members we are checking
-            const std::vector<HostAndPort> _targets;
-
-            // Number of voting targets
-            int _votingTargets;
-
-            // Number of voting nodes which can error
-            int _losableVoters;
-
-            // 1 if I have a vote, otherwise 0
-            int _myVote;
-
-            // Reason to abort, start with None
-            ElectionAbortReason _abortReason;
-
-        };
-
-        FreshnessChecker();
-        virtual ~FreshnessChecker();
-
-        /**
-         * Begins the process of sending replSetFresh commands to all non-DOWN nodes
-         * in currentConfig, with the intention of determining whether the current node
-         * is freshest.
-         * evh can be used to schedule a callback when the process is complete.
-         * This function must be run in the executor, as it must be synchronous with the command
-         * callbacks that it schedules.
-         * If this function returns Status::OK(), evh is then guaranteed to be signaled.
-         **/
-        StatusWith<ReplicationExecutor::EventHandle> start(
-            ReplicationExecutor* executor,
-            const Timestamp& lastOpTimeApplied,
-            const ReplicaSetConfig& currentConfig,
-            int selfIndex,
-            const std::vector<HostAndPort>& targets,
-            const stdx::function<void ()>& onCompletion = stdx::function<void ()>());
-
-        /**
-         * Informs the freshness checker to cancel further processing.  The "executor"
-         * argument must point to the same executor passed to "start()".
-         *
-         * Like start(), this method must run in the executor context.
-         */
-        void cancel(ReplicationExecutor* executor);
-
-        /**
-         * Returns true if cancel() was called on this instance.
-         */
-        bool isCanceled() const { return _isCanceled; }
-
-        /**
-         * 'None' if the election should continue, otherwise the reason to abort
-         */
+        Algorithm(Timestamp lastOpTimeApplied,
+                  const ReplicaSetConfig& rsConfig,
+                  int selfIndex,
+                  const std::vector<HostAndPort>& targets);
+        virtual ~Algorithm();
+        virtual std::vector<RemoteCommandRequest> getRequests() const;
+        virtual void processResponse(const RemoteCommandRequest& request,
+                                     const ResponseStatus& response);
+        virtual bool hasReceivedSufficientResponses() const;
         ElectionAbortReason shouldAbortElection() const;
 
-        /**
-         * Returns the config version supplied in the config when start() was called.
-         * Useful for determining if the the config version has changed.
-         */
-        long long getOriginalConfigVersion() const;
-
     private:
-        std::unique_ptr<Algorithm> _algorithm;
-        std::unique_ptr<ScatterGatherRunner> _runner;
-        long long _originalConfigVersion;
-        bool _isCanceled;
+        // Returns true if the number of failed votes is over _losableVotes()
+        bool hadTooManyFailedVoterResponses() const;
+
+        // Returns true if the member, by host and port, has a vote.
+        bool _isVotingMember(const HostAndPort host) const;
+
+        // Number of responses received so far.
+        int _responsesProcessed;
+
+        // Number of failed voter responses so far.
+        int _failedVoterResponses;
+
+        // Last Timestamp applied by the caller; used in the Fresh command
+        const Timestamp _lastOpTimeApplied;
+
+        // Config to use for this check
+        const ReplicaSetConfig _rsConfig;
+
+        // Our index position in _rsConfig
+        const int _selfIndex;
+
+        // The UP members we are checking
+        const std::vector<HostAndPort> _targets;
+
+        // Number of voting targets
+        int _votingTargets;
+
+        // Number of voting nodes which can error
+        int _losableVoters;
+
+        // 1 if I have a vote, otherwise 0
+        int _myVote;
+
+        // Reason to abort, start with None
+        ElectionAbortReason _abortReason;
     };
+
+    FreshnessChecker();
+    virtual ~FreshnessChecker();
+
+    /**
+     * Begins the process of sending replSetFresh commands to all non-DOWN nodes
+     * in currentConfig, with the intention of determining whether the current node
+     * is freshest.
+     * evh can be used to schedule a callback when the process is complete.
+     * This function must be run in the executor, as it must be synchronous with the command
+     * callbacks that it schedules.
+     * If this function returns Status::OK(), evh is then guaranteed to be signaled.
+     **/
+    StatusWith<ReplicationExecutor::EventHandle> start(
+        ReplicationExecutor* executor,
+        const Timestamp& lastOpTimeApplied,
+        const ReplicaSetConfig& currentConfig,
+        int selfIndex,
+        const std::vector<HostAndPort>& targets,
+        const stdx::function<void()>& onCompletion = stdx::function<void()>());
+
+    /**
+     * Informs the freshness checker to cancel further processing.  The "executor"
+     * argument must point to the same executor passed to "start()".
+     *
+     * Like start(), this method must run in the executor context.
+     */
+    void cancel(ReplicationExecutor* executor);
+
+    /**
+     * Returns true if cancel() was called on this instance.
+     */
+    bool isCanceled() const {
+        return _isCanceled;
+    }
+
+    /**
+     * 'None' if the election should continue, otherwise the reason to abort
+     */
+    ElectionAbortReason shouldAbortElection() const;
+
+    /**
+     * Returns the config version supplied in the config when start() was called.
+     * Useful for determining if the the config version has changed.
+     */
+    long long getOriginalConfigVersion() const;
+
+private:
+    std::unique_ptr<Algorithm> _algorithm;
+    std::unique_ptr<ScatterGatherRunner> _runner;
+    long long _originalConfigVersion;
+    bool _isCanceled;
+};
 
 }  // namespace repl
 }  // namespace mongo

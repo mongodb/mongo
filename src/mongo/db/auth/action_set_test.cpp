@@ -36,125 +36,125 @@
 namespace mongo {
 namespace {
 
-    TEST(ActionSetTest, ParseActionSetFromString) {
-        ActionSet result;
-        ASSERT_OK(ActionSet::parseActionSetFromString("find,insert,update,remove", &result));
-        ASSERT_TRUE(result.contains(ActionType::find));
-        ASSERT_TRUE(result.contains(ActionType::insert));
-        ASSERT_TRUE(result.contains(ActionType::update));
-        ASSERT_TRUE(result.contains(ActionType::remove));
+TEST(ActionSetTest, ParseActionSetFromString) {
+    ActionSet result;
+    ASSERT_OK(ActionSet::parseActionSetFromString("find,insert,update,remove", &result));
+    ASSERT_TRUE(result.contains(ActionType::find));
+    ASSERT_TRUE(result.contains(ActionType::insert));
+    ASSERT_TRUE(result.contains(ActionType::update));
+    ASSERT_TRUE(result.contains(ActionType::remove));
 
-        // Order of the strings doesn't matter
-        ASSERT_OK(ActionSet::parseActionSetFromString("update,find,remove,insert", &result));
-        ASSERT_TRUE(result.contains(ActionType::find));
-        ASSERT_TRUE(result.contains(ActionType::insert));
-        ASSERT_TRUE(result.contains(ActionType::update));
-        ASSERT_TRUE(result.contains(ActionType::remove));
+    // Order of the strings doesn't matter
+    ASSERT_OK(ActionSet::parseActionSetFromString("update,find,remove,insert", &result));
+    ASSERT_TRUE(result.contains(ActionType::find));
+    ASSERT_TRUE(result.contains(ActionType::insert));
+    ASSERT_TRUE(result.contains(ActionType::update));
+    ASSERT_TRUE(result.contains(ActionType::remove));
 
-        ASSERT_OK(ActionSet::parseActionSetFromString("find", &result));
+    ASSERT_OK(ActionSet::parseActionSetFromString("find", &result));
 
-        ASSERT_TRUE(result.contains(ActionType::find));
-        ASSERT_FALSE(result.contains(ActionType::insert));
-        ASSERT_FALSE(result.contains(ActionType::update));
-        ASSERT_FALSE(result.contains(ActionType::remove));
+    ASSERT_TRUE(result.contains(ActionType::find));
+    ASSERT_FALSE(result.contains(ActionType::insert));
+    ASSERT_FALSE(result.contains(ActionType::update));
+    ASSERT_FALSE(result.contains(ActionType::remove));
 
-        ASSERT_OK(ActionSet::parseActionSetFromString("", &result));
+    ASSERT_OK(ActionSet::parseActionSetFromString("", &result));
 
-        ASSERT_FALSE(result.contains(ActionType::find));
-        ASSERT_FALSE(result.contains(ActionType::insert));
-        ASSERT_FALSE(result.contains(ActionType::update));
-        ASSERT_FALSE(result.contains(ActionType::remove));
+    ASSERT_FALSE(result.contains(ActionType::find));
+    ASSERT_FALSE(result.contains(ActionType::insert));
+    ASSERT_FALSE(result.contains(ActionType::update));
+    ASSERT_FALSE(result.contains(ActionType::remove));
 
-        ASSERT_EQUALS(ErrorCodes::FailedToParse,
-                      ActionSet::parseActionSetFromString("INVALID INPUT", &result).code());
-    }
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  ActionSet::parseActionSetFromString("INVALID INPUT", &result).code());
+}
 
-    TEST(ActionSetTest, ToString) {
-        ActionSet actionSet;
+TEST(ActionSetTest, ToString) {
+    ActionSet actionSet;
 
-        ASSERT_EQUALS("", actionSet.toString());
-        actionSet.addAction(ActionType::find);
-        ASSERT_EQUALS("find", actionSet.toString());
-        actionSet.addAction(ActionType::insert);
-        ASSERT_EQUALS("find,insert", actionSet.toString());
-        actionSet.addAction(ActionType::update);
-        ASSERT_EQUALS("find,insert,update", actionSet.toString());
-        actionSet.addAction(ActionType::remove);
-        ASSERT_EQUALS("find,insert,remove,update", actionSet.toString());
+    ASSERT_EQUALS("", actionSet.toString());
+    actionSet.addAction(ActionType::find);
+    ASSERT_EQUALS("find", actionSet.toString());
+    actionSet.addAction(ActionType::insert);
+    ASSERT_EQUALS("find,insert", actionSet.toString());
+    actionSet.addAction(ActionType::update);
+    ASSERT_EQUALS("find,insert,update", actionSet.toString());
+    actionSet.addAction(ActionType::remove);
+    ASSERT_EQUALS("find,insert,remove,update", actionSet.toString());
 
-        // Now make sure adding actions in a different order doesn't change anything.
-        ActionSet actionSet2;
-        ASSERT_EQUALS("", actionSet2.toString());
-        actionSet2.addAction(ActionType::insert);
-        ASSERT_EQUALS("insert", actionSet2.toString());
-        actionSet2.addAction(ActionType::remove);
-        ASSERT_EQUALS("insert,remove", actionSet2.toString());
-        actionSet2.addAction(ActionType::find);
-        ASSERT_EQUALS("find,insert,remove", actionSet2.toString());
-        actionSet2.addAction(ActionType::update);
-        ASSERT_EQUALS("find,insert,remove,update", actionSet2.toString());
-    }
+    // Now make sure adding actions in a different order doesn't change anything.
+    ActionSet actionSet2;
+    ASSERT_EQUALS("", actionSet2.toString());
+    actionSet2.addAction(ActionType::insert);
+    ASSERT_EQUALS("insert", actionSet2.toString());
+    actionSet2.addAction(ActionType::remove);
+    ASSERT_EQUALS("insert,remove", actionSet2.toString());
+    actionSet2.addAction(ActionType::find);
+    ASSERT_EQUALS("find,insert,remove", actionSet2.toString());
+    actionSet2.addAction(ActionType::update);
+    ASSERT_EQUALS("find,insert,remove,update", actionSet2.toString());
+}
 
-    TEST(ActionSetTest, IsSupersetOf) {
-        ActionSet set1, set2, set3;
-        ASSERT_OK(ActionSet::parseActionSetFromString("find,update,insert", &set1));
-        ASSERT_OK(ActionSet::parseActionSetFromString("find,update,remove", &set2));
-        ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &set3));
+TEST(ActionSetTest, IsSupersetOf) {
+    ActionSet set1, set2, set3;
+    ASSERT_OK(ActionSet::parseActionSetFromString("find,update,insert", &set1));
+    ASSERT_OK(ActionSet::parseActionSetFromString("find,update,remove", &set2));
+    ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &set3));
 
-        ASSERT_FALSE(set1.isSupersetOf(set2));
-        ASSERT_TRUE(set1.isSupersetOf(set3));
+    ASSERT_FALSE(set1.isSupersetOf(set2));
+    ASSERT_TRUE(set1.isSupersetOf(set3));
 
-        ASSERT_FALSE(set2.isSupersetOf(set1));
-        ASSERT_TRUE(set2.isSupersetOf(set3));
+    ASSERT_FALSE(set2.isSupersetOf(set1));
+    ASSERT_TRUE(set2.isSupersetOf(set3));
 
-        ASSERT_FALSE(set3.isSupersetOf(set1));
-        ASSERT_FALSE(set3.isSupersetOf(set2));
-    }
+    ASSERT_FALSE(set3.isSupersetOf(set1));
+    ASSERT_FALSE(set3.isSupersetOf(set2));
+}
 
-    TEST(ActionSetTest, anyAction) {
-        ActionSet set;
+TEST(ActionSetTest, anyAction) {
+    ActionSet set;
 
-        ASSERT_OK(ActionSet::parseActionSetFromString("anyAction", &set));
-        ASSERT_TRUE(set.contains(ActionType::find));
-        ASSERT_TRUE(set.contains(ActionType::insert));
-        ASSERT_TRUE(set.contains(ActionType::anyAction));
+    ASSERT_OK(ActionSet::parseActionSetFromString("anyAction", &set));
+    ASSERT_TRUE(set.contains(ActionType::find));
+    ASSERT_TRUE(set.contains(ActionType::insert));
+    ASSERT_TRUE(set.contains(ActionType::anyAction));
 
-        set.removeAllActions();
-        set.addAllActions();
-        ASSERT_TRUE(set.contains(ActionType::find));
-        ASSERT_TRUE(set.contains(ActionType::insert));
-        ASSERT_TRUE(set.contains(ActionType::anyAction));
+    set.removeAllActions();
+    set.addAllActions();
+    ASSERT_TRUE(set.contains(ActionType::find));
+    ASSERT_TRUE(set.contains(ActionType::insert));
+    ASSERT_TRUE(set.contains(ActionType::anyAction));
 
-        set.removeAllActions();
-        set.addAction(ActionType::anyAction);
-        ASSERT_TRUE(set.contains(ActionType::find));
-        ASSERT_TRUE(set.contains(ActionType::insert));
-        ASSERT_TRUE(set.contains(ActionType::anyAction));
+    set.removeAllActions();
+    set.addAction(ActionType::anyAction);
+    ASSERT_TRUE(set.contains(ActionType::find));
+    ASSERT_TRUE(set.contains(ActionType::insert));
+    ASSERT_TRUE(set.contains(ActionType::anyAction));
 
-        set.removeAction(ActionType::find);
-        ASSERT_FALSE(set.contains(ActionType::find));
-        ASSERT_TRUE(set.contains(ActionType::insert));
-        ASSERT_FALSE(set.contains(ActionType::anyAction));
+    set.removeAction(ActionType::find);
+    ASSERT_FALSE(set.contains(ActionType::find));
+    ASSERT_TRUE(set.contains(ActionType::insert));
+    ASSERT_FALSE(set.contains(ActionType::anyAction));
 
-        set.addAction(ActionType::find);
-        ASSERT_TRUE(set.contains(ActionType::find));
-        ASSERT_TRUE(set.contains(ActionType::insert));
-        ASSERT_FALSE(set.contains(ActionType::anyAction));
+    set.addAction(ActionType::find);
+    ASSERT_TRUE(set.contains(ActionType::find));
+    ASSERT_TRUE(set.contains(ActionType::insert));
+    ASSERT_FALSE(set.contains(ActionType::anyAction));
 
-        set.addAction(ActionType::anyAction);
-        ASSERT_TRUE(set.contains(ActionType::find));
-        ASSERT_TRUE(set.contains(ActionType::insert));
-        ASSERT_TRUE(set.contains(ActionType::anyAction));
+    set.addAction(ActionType::anyAction);
+    ASSERT_TRUE(set.contains(ActionType::find));
+    ASSERT_TRUE(set.contains(ActionType::insert));
+    ASSERT_TRUE(set.contains(ActionType::anyAction));
 
-        ASSERT_EQUALS("anyAction", set.toString());
+    ASSERT_EQUALS("anyAction", set.toString());
 
-        set.removeAction(ActionType::anyAction);
-        ASSERT_TRUE(set.contains(ActionType::find));
-        ASSERT_TRUE(set.contains(ActionType::insert));
-        ASSERT_FALSE(set.contains(ActionType::anyAction));
+    set.removeAction(ActionType::anyAction);
+    ASSERT_TRUE(set.contains(ActionType::find));
+    ASSERT_TRUE(set.contains(ActionType::insert));
+    ASSERT_FALSE(set.contains(ActionType::anyAction));
 
-        ASSERT_NOT_EQUALS("anyAction", set.toString());
-    }
+    ASSERT_NOT_EQUALS("anyAction", set.toString());
+}
 
 }  // namespace
 }  // namespace mongo

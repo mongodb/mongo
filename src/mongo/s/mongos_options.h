@@ -36,54 +36,52 @@
 
 namespace mongo {
 
-    namespace optionenvironment {
-        class OptionSection;
-        class Environment;
-    } // namespace optionenvironment
+namespace optionenvironment {
+class OptionSection;
+class Environment;
+}  // namespace optionenvironment
 
-    namespace moe = mongo::optionenvironment;
+namespace moe = mongo::optionenvironment;
 
-    struct MongosGlobalParams {
-        ConnectionString configdbs;
-        bool upgrade;
+struct MongosGlobalParams {
+    ConnectionString configdbs;
+    bool upgrade;
 
-        MongosGlobalParams() :
-            upgrade(false)
-        { }
-    };
+    MongosGlobalParams() : upgrade(false) {}
+};
 
-    extern MongosGlobalParams mongosGlobalParams;
+extern MongosGlobalParams mongosGlobalParams;
 
-    Status addMongosOptions(moe::OptionSection* options);
+Status addMongosOptions(moe::OptionSection* options);
 
-    void printMongosHelp(const moe::OptionSection& options);
+void printMongosHelp(const moe::OptionSection& options);
 
-    /**
-     * Handle options that should come before validation, such as "help".
-     *
-     * Returns false if an option was found that implies we should prematurely exit with success.
-     */
-    bool handlePreValidationMongosOptions(const moe::Environment& params,
-                                            const std::vector<std::string>& args);
+/**
+ * Handle options that should come before validation, such as "help".
+ *
+ * Returns false if an option was found that implies we should prematurely exit with success.
+ */
+bool handlePreValidationMongosOptions(const moe::Environment& params,
+                                      const std::vector<std::string>& args);
 
-    /**
-     * Handle custom validation of mongos options that can not currently be done by using
-     * Constraints in the Environment.  See the "validate" function in the Environment class for
-     * more details.
-     */
-    Status validateMongosOptions(const moe::Environment& params);
+/**
+ * Handle custom validation of mongos options that can not currently be done by using
+ * Constraints in the Environment.  See the "validate" function in the Environment class for
+ * more details.
+ */
+Status validateMongosOptions(const moe::Environment& params);
 
-    /**
-     * Canonicalize mongos options for the given environment.
-     *
-     * For example, the options "dur", "nodur", "journal", "nojournal", and
-     * "storage.journaling.enabled" should all be merged into "storage.journaling.enabled".
-     */
-    Status canonicalizeMongosOptions(moe::Environment* params);
+/**
+ * Canonicalize mongos options for the given environment.
+ *
+ * For example, the options "dur", "nodur", "journal", "nojournal", and
+ * "storage.journaling.enabled" should all be merged into "storage.journaling.enabled".
+ */
+Status canonicalizeMongosOptions(moe::Environment* params);
 
-    Status storeMongosOptions(const moe::Environment& params, const std::vector<std::string>& args);
+Status storeMongosOptions(const moe::Environment& params, const std::vector<std::string>& args);
 
-    // This function should eventually go away, but needs to be here now because the sorter and
-    // the version manager must know at runtime which binary it is in.
-    bool isMongos();
+// This function should eventually go away, but needs to be here now because the sorter and
+// the version manager must know at runtime which binary it is in.
+bool isMongos();
 }

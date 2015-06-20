@@ -38,27 +38,24 @@
 
 namespace mongo {
 
-    class InMemoryHarnessHelper final : public HarnessHelper {
-    public:
-        InMemoryHarnessHelper()
-            : _order( Ordering::make( BSONObj() ) ) {
-        }
+class InMemoryHarnessHelper final : public HarnessHelper {
+public:
+    InMemoryHarnessHelper() : _order(Ordering::make(BSONObj())) {}
 
-        std::unique_ptr<SortedDataInterface> newSortedDataInterface( bool unique ) final {
-            return std::unique_ptr<SortedDataInterface>(getInMemoryBtreeImpl(_order, &_data));
-        }
-
-        std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-            return stdx::make_unique<InMemoryRecoveryUnit>();
-        }
-
-    private:
-        std::shared_ptr<void> _data; // used by InMemoryBtreeImpl
-        Ordering _order;
-    };
-
-    std::unique_ptr<HarnessHelper> newHarnessHelper() {
-        return stdx::make_unique<InMemoryHarnessHelper>();
+    std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) final {
+        return std::unique_ptr<SortedDataInterface>(getInMemoryBtreeImpl(_order, &_data));
     }
 
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
+        return stdx::make_unique<InMemoryRecoveryUnit>();
+    }
+
+private:
+    std::shared_ptr<void> _data;  // used by InMemoryBtreeImpl
+    Ordering _order;
+};
+
+std::unique_ptr<HarnessHelper> newHarnessHelper() {
+    return stdx::make_unique<InMemoryHarnessHelper>();
+}
 }

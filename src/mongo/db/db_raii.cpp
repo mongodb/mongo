@@ -38,177 +38,157 @@
 
 namespace mongo {
 
-    AutoGetDb::AutoGetDb(OperationContext* txn, StringData ns, LockMode mode)
-            : _dbLock(txn->lockState(), ns, mode),
-              _db(dbHolder().get(txn, ns)) {
+AutoGetDb::AutoGetDb(OperationContext* txn, StringData ns, LockMode mode)
+    : _dbLock(txn->lockState(), ns, mode), _db(dbHolder().get(txn, ns)) {}
 
-    }
-
-    AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn,
-                                         StringData ns,
-                                         LockMode mode)
-            :  _transaction(txn, MODE_IX),
-               _dbLock(txn->lockState(), ns, mode),
-              _db(dbHolder().get(txn, ns)) {
-        invariant(mode == MODE_IX || mode == MODE_X);
-        _justCreated = false;
-        // If the database didn't exist, relock in MODE_X
-        if (_db == NULL) {
-            if (mode != MODE_X) {
-                _dbLock.relockWithMode(MODE_X);
-            }
-            _db = dbHolder().openDb(txn, ns);
-            _justCreated = true;
+AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockMode mode)
+    : _transaction(txn, MODE_IX),
+      _dbLock(txn->lockState(), ns, mode),
+      _db(dbHolder().get(txn, ns)) {
+    invariant(mode == MODE_IX || mode == MODE_X);
+    _justCreated = false;
+    // If the database didn't exist, relock in MODE_X
+    if (_db == NULL) {
+        if (mode != MODE_X) {
+            _dbLock.relockWithMode(MODE_X);
         }
+        _db = dbHolder().openDb(txn, ns);
+        _justCreated = true;
     }
+}
 
-    AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
-                                                       const std::string& ns)
-            : _txn(txn),
-              _transaction(txn, MODE_IS),
-              _db(_txn, nsToDatabaseSubstring(ns), MODE_IS),
-              _collLock(_txn->lockState(), ns, MODE_IS),
-              _coll(NULL) {
+AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn, const std::string& ns)
+    : _txn(txn),
+      _transaction(txn, MODE_IS),
+      _db(_txn, nsToDatabaseSubstring(ns), MODE_IS),
+      _collLock(_txn->lockState(), ns, MODE_IS),
+      _coll(NULL) {
+    _init(ns, nsToCollectionSubstring(ns));
+}
 
-        _init(ns, nsToCollectionSubstring(ns));
-    }
+AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
+                                                   const NamespaceString& nss)
+    : _txn(txn),
+      _transaction(txn, MODE_IS),
+      _db(_txn, nss.db(), MODE_IS),
+      _collLock(_txn->lockState(), nss.toString(), MODE_IS),
+      _coll(NULL) {
+    _init(nss.toString(), nss.coll());
+}
 
-    AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
-                                                       const NamespaceString& nss)
-            : _txn(txn),
-              _transaction(txn, MODE_IS),
-              _db(_txn, nss.db(), MODE_IS),
-              _collLock(_txn->lockState(), nss.toString(), MODE_IS),
-              _coll(NULL) {
+void AutoGetCollectionForRead::_init(const std::string& ns, StringData coll) {
+    massert(28535, "need a non-empty collection name", !coll.empty());
 
-        _init(nss.toString(), nss.coll());
-    }
+    // We have both the DB and collection locked, which the prerequisite to do a stable shard
+    // version check.
+    ensureShardVersionOKOrThrow(_txn->getClient(), ns);
 
-    void AutoGetCollectionForRead::_init(const std::string& ns, StringData coll) {
-        massert(28535, "need a non-empty collection name", !coll.empty());
+    auto curOp = CurOp::get(_txn);
+    stdx::lock_guard<Client> lk(*_txn->getClient());
+    // TODO: OldClientContext legacy, needs to be removed
+    curOp->ensureStarted();
+    curOp->setNS_inlock(ns);
 
-        // We have both the DB and collection locked, which the prerequisite to do a stable shard
-        // version check.
-        ensureShardVersionOKOrThrow(_txn->getClient(), ns);
-
-        auto curOp = CurOp::get(_txn);
-        stdx::lock_guard<Client> lk(*_txn->getClient());
+    // At this point, we are locked in shared mode for the database by the DB lock in the
+    // constructor, so it is safe to load the DB pointer.
+    if (_db.getDb()) {
         // TODO: OldClientContext legacy, needs to be removed
-        curOp->ensureStarted();
-        curOp->setNS_inlock(ns);
+        curOp->enter_inlock(ns.c_str(), _db.getDb()->getProfilingLevel());
 
-        // At this point, we are locked in shared mode for the database by the DB lock in the
-        // constructor, so it is safe to load the DB pointer.
-        if (_db.getDb()) {
-            // TODO: OldClientContext legacy, needs to be removed
-            curOp->enter_inlock(ns.c_str(), _db.getDb()->getProfilingLevel());
-
-            _coll = _db.getDb()->getCollection(ns);
-        }
+        _coll = _db.getDb()->getCollection(ns);
     }
+}
 
-    AutoGetCollectionForRead::~AutoGetCollectionForRead() {
-        // Report time spent in read lock
-        auto currentOp = CurOp::get(_txn);
-        Top::get(_txn->getClient()->getServiceContext()).record(
-                currentOp->getNS(),
+AutoGetCollectionForRead::~AutoGetCollectionForRead() {
+    // Report time spent in read lock
+    auto currentOp = CurOp::get(_txn);
+    Top::get(_txn->getClient()->getServiceContext())
+        .record(currentOp->getNS(),
                 currentOp->getOp(),
                 -1,  // "read locked"
                 _timer.micros(),
                 currentOp->isCommand());
+}
+
+
+OldClientContext::OldClientContext(OperationContext* txn, const std::string& ns, Database* db)
+    : _justCreated(false), _doVersion(true), _ns(ns), _db(db), _txn(txn) {}
+
+OldClientContext::OldClientContext(OperationContext* txn,
+                                   const std::string& ns,
+                                   Database* db,
+                                   bool justCreated)
+    : _justCreated(justCreated), _doVersion(true), _ns(ns), _db(db), _txn(txn) {
+    _finishInit();
+}
+
+OldClientContext::OldClientContext(OperationContext* txn,
+                                   const std::string& ns,
+                                   bool doVersion)
+    : _justCreated(false),  // set for real in finishInit
+      _doVersion(doVersion),
+      _ns(ns),
+      _db(NULL),
+      _txn(txn) {
+    _finishInit();
+}
+
+void OldClientContext::_finishInit() {
+    _db = dbHolder().get(_txn, _ns);
+    if (_db) {
+        _justCreated = false;
+    } else {
+        invariant(_txn->lockState()->isDbLockedForMode(nsToDatabaseSubstring(_ns), MODE_X));
+        _db = dbHolder().openDb(_txn, _ns, &_justCreated);
+        invariant(_db);
     }
 
-
-    OldClientContext::OldClientContext(OperationContext* txn, const std::string& ns, Database * db)
-        : _justCreated(false),
-          _doVersion(true),
-          _ns(ns),
-          _db(db),
-          _txn(txn) {
+    if (_doVersion) {
+        _checkNotStale();
     }
 
-    OldClientContext::OldClientContext(OperationContext* txn,
-                                       const std::string& ns,
-                                       Database* db,
-                                       bool justCreated)
-        : _justCreated(justCreated),
-          _doVersion(true),
-          _ns(ns),
-          _db(db),
-          _txn(txn) {
-        _finishInit();
-    }
+    stdx::lock_guard<Client> lk(*_txn->getClient());
+    CurOp::get(_txn)->enter_inlock(_ns.c_str(), _db->getProfilingLevel());
+}
 
-    OldClientContext::OldClientContext(OperationContext* txn,
-                                       const std::string& ns,
-                                       bool doVersion)
-        : _justCreated(false), // set for real in finishInit
-          _doVersion(doVersion),
-          _ns(ns),
-          _db(NULL),
-          _txn(txn) {
-
-        _finishInit();
-    }
-
-    void OldClientContext::_finishInit() {
-        _db = dbHolder().get(_txn, _ns);
-        if (_db) {
-            _justCreated = false;
-        }
-        else {
-            invariant(_txn->lockState()->isDbLockedForMode(nsToDatabaseSubstring(_ns), MODE_X));
-            _db = dbHolder().openDb(_txn, _ns, &_justCreated);
-            invariant(_db);
-        }
-
-        if (_doVersion) {
-            _checkNotStale();
-        }
-
-        stdx::lock_guard<Client> lk(*_txn->getClient());
-        CurOp::get(_txn)->enter_inlock(_ns.c_str(), _db->getProfilingLevel());
-    }
-
-    void OldClientContext::_checkNotStale() const {
-        switch (CurOp::get(_txn)->getOp()) {
-        case dbGetMore: // getMore is special and should be handled elsewhere.
-        case dbUpdate:  // update & delete check shard version in instance.cpp, so don't check
-        case dbDelete:  // here as well.
+void OldClientContext::_checkNotStale() const {
+    switch (CurOp::get(_txn)->getOp()) {
+        case dbGetMore:  // getMore is special and should be handled elsewhere.
+        case dbUpdate:   // update & delete check shard version in instance.cpp, so don't check
+        case dbDelete:   // here as well.
             break;
         default:
             ensureShardVersionOKOrThrow(_txn->getClient(), _ns);
-        }
     }
+}
 
-    OldClientContext::~OldClientContext() {
-        // Lock must still be held
-        invariant(_txn->lockState()->isLocked());
+OldClientContext::~OldClientContext() {
+    // Lock must still be held
+    invariant(_txn->lockState()->isLocked());
 
-        auto currentOp = CurOp::get(_txn);
-        Top::get(_txn->getClient()->getServiceContext()).record(
-                currentOp->getNS(),
+    auto currentOp = CurOp::get(_txn);
+    Top::get(_txn->getClient()->getServiceContext())
+        .record(currentOp->getNS(),
                 currentOp->getOp(),
                 _txn->lockState()->isWriteLocked() ? 1 : -1,
                 _timer.micros(),
                 currentOp->isCommand());
+}
+
+
+OldClientWriteContext::OldClientWriteContext(OperationContext* opCtx, const std::string& ns)
+    : _txn(opCtx),
+      _nss(ns),
+      _autodb(opCtx, _nss.db(), MODE_IX),
+      _collk(opCtx->lockState(), ns, MODE_IX),
+      _c(opCtx, ns, _autodb.getDb(), _autodb.justCreated()) {
+    _collection = _c.db()->getCollection(ns);
+    if (!_collection && !_autodb.justCreated()) {
+        // relock database in MODE_X to allow collection creation
+        _collk.relockAsDatabaseExclusive(_autodb.lock());
+        Database* db = dbHolder().get(_txn, ns);
+        invariant(db == _c.db());
     }
-
-
-
-    OldClientWriteContext::OldClientWriteContext(OperationContext* opCtx, const std::string& ns)
-        : _txn(opCtx),
-          _nss(ns),
-          _autodb(opCtx, _nss.db(), MODE_IX),
-          _collk(opCtx->lockState(), ns, MODE_IX),
-          _c(opCtx, ns, _autodb.getDb(), _autodb.justCreated()) {
-        _collection = _c.db()->getCollection(ns);
-        if (!_collection && !_autodb.justCreated()) {
-            // relock database in MODE_X to allow collection creation
-            _collk.relockAsDatabaseExclusive(_autodb.lock());
-            Database* db = dbHolder().get(_txn, ns);
-            invariant(db == _c.db());
-        }
-    }
+}
 
 }  // namespace mongo

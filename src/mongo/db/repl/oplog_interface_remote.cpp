@@ -39,51 +39,46 @@ namespace repl {
 
 namespace {
 
-    class OplogIteratorRemote : public OplogInterface::Iterator {
-    public:
+class OplogIteratorRemote : public OplogInterface::Iterator {
+public:
+    OplogIteratorRemote(std::unique_ptr<DBClientCursor> cursor);
+    StatusWith<Value> next() override;
 
-        OplogIteratorRemote(std::unique_ptr<DBClientCursor> cursor);
-        StatusWith<Value> next() override;
+private:
+    std::unique_ptr<DBClientCursor> _cursor;
+};
 
-    private:
+OplogIteratorRemote::OplogIteratorRemote(std::unique_ptr<DBClientCursor> cursor)
+    : _cursor(std::move(cursor)) {}
 
-        std::unique_ptr<DBClientCursor> _cursor;
-
-    };
-
-    OplogIteratorRemote::OplogIteratorRemote(std::unique_ptr<DBClientCursor> cursor)
-        : _cursor(std::move(cursor)) { }
-
-    StatusWith<OplogInterface::Iterator::Value> OplogIteratorRemote::next() {
-        if (!_cursor.get()) {
-            return StatusWith<Value>(ErrorCodes::NamespaceNotFound, "no cursor for remote oplog");
-        }
-        if (!_cursor->more()) {
-            return StatusWith<Value>(ErrorCodes::NoSuchKey, "no more operations in remote oplog");
-        }
-        return StatusWith<Value>(std::make_pair(_cursor->nextSafe(), RecordId()));
+StatusWith<OplogInterface::Iterator::Value> OplogIteratorRemote::next() {
+    if (!_cursor.get()) {
+        return StatusWith<Value>(ErrorCodes::NamespaceNotFound, "no cursor for remote oplog");
     }
-
-} // namespace
-
-    OplogInterfaceRemote::OplogInterfaceRemote(DBClientConnection* conn,
-                                               const std::string& collectionName)
-        : _conn(conn),
-          _collectionName(collectionName) {
-
-        invariant(conn);
+    if (!_cursor->more()) {
+        return StatusWith<Value>(ErrorCodes::NoSuchKey, "no more operations in remote oplog");
     }
+    return StatusWith<Value>(std::make_pair(_cursor->nextSafe(), RecordId()));
+}
 
-    std::string OplogInterfaceRemote::toString() const {
-        return _conn->toString();
-    }
+}  // namespace
 
-    std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() const {
-        const Query query = Query().sort(BSON("$natural" << -1));
-        const BSONObj fields = BSON("ts" << 1 << "h" << 1);
-        return std::unique_ptr<OplogInterface::Iterator>(
-            new OplogIteratorRemote(_conn->query(_collectionName, query, 0, 0, &fields, 0, 0)));
-    }
+OplogInterfaceRemote::OplogInterfaceRemote(DBClientConnection* conn,
+                                           const std::string& collectionName)
+    : _conn(conn), _collectionName(collectionName) {
+    invariant(conn);
+}
 
-} // namespace repl
-} // namespace mongo
+std::string OplogInterfaceRemote::toString() const {
+    return _conn->toString();
+}
+
+std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() const {
+    const Query query = Query().sort(BSON("$natural" << -1));
+    const BSONObj fields = BSON("ts" << 1 << "h" << 1);
+    return std::unique_ptr<OplogInterface::Iterator>(
+        new OplogIteratorRemote(_conn->query(_collectionName, query, 0, 0, &fields, 0, 0)));
+}
+
+}  // namespace repl
+}  // namespace mongo

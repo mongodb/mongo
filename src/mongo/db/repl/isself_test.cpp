@@ -40,45 +40,41 @@ namespace repl {
 
 namespace {
 
-    using std::string;
+using std::string;
 
-    TEST(IsSelf, DetectsSameHostIPv4) {
+TEST(IsSelf, DetectsSameHostIPv4) {
 #if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
-        bool wasEnabled = IPv6Enabled();
-        enableIPv6(false);
-        ON_BLOCK_EXIT(enableIPv6, wasEnabled);
-        // first we get the addrs bound on this host
-        const std::vector<std::string> addrs = getBoundAddrs(false);
-        // Fastpath should agree with the result of getBoundAddrs
-        // since it uses it...
-        for (std::vector<string>::const_iterator it = addrs.begin();
-             it != addrs.end(); ++it) {
-
-            ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port)));
-        }
-#else
-        ASSERT(true);
-#endif
+    bool wasEnabled = IPv6Enabled();
+    enableIPv6(false);
+    ON_BLOCK_EXIT(enableIPv6, wasEnabled);
+    // first we get the addrs bound on this host
+    const std::vector<std::string> addrs = getBoundAddrs(false);
+    // Fastpath should agree with the result of getBoundAddrs
+    // since it uses it...
+    for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
+        ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port)));
     }
+#else
+    ASSERT(true);
+#endif
+}
 
-    TEST(IsSelf, DetectsSameHostIPv6) {
+TEST(IsSelf, DetectsSameHostIPv6) {
 #if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
-        bool wasEnabled = IPv6Enabled();
-        enableIPv6(true);
-        ON_BLOCK_EXIT(enableIPv6, wasEnabled);
-        // first we get the addrs bound on this host
-        const std::vector<std::string> addrs = getBoundAddrs(true);
-        // Fastpath should agree with the result of getBoundAddrs
-        // since it uses it...
-        for (std::vector<string>::const_iterator it = addrs.begin();
-             it != addrs.end(); ++it) {
-
-            ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port)));
-        }
-#else
-        ASSERT(true);
-#endif
+    bool wasEnabled = IPv6Enabled();
+    enableIPv6(true);
+    ON_BLOCK_EXIT(enableIPv6, wasEnabled);
+    // first we get the addrs bound on this host
+    const std::vector<std::string> addrs = getBoundAddrs(true);
+    // Fastpath should agree with the result of getBoundAddrs
+    // since it uses it...
+    for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
+        ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port)));
     }
+#else
+    ASSERT(true);
+#endif
+}
 
 }  // namespace
 

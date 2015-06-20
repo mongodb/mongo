@@ -48,114 +48,115 @@
 
 namespace mongo {
 
-    class CurrentOpCommand : public Command {
-    public:
+class CurrentOpCommand : public Command {
+public:
+    CurrentOpCommand() : Command("currentOp") {}
 
-        CurrentOpCommand() : Command("currentOp") {}
+    bool isWriteCommandForConfigServer() const final {
+        return false;
+    }
 
-        bool isWriteCommandForConfigServer() const final { return false; }
+    bool slaveOk() const final {
+        return true;
+    }
 
-        bool slaveOk() const final { return true; }
+    bool adminOnly() const final {
+        return true;
+    }
 
-        bool adminOnly() const final { return true; }
+    Status checkAuthForCommand(ClientBasic* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(), ActionType::inprog);
+        return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
 
-        Status checkAuthForCommand(ClientBasic* client,
-                                   const std::string& dbname,
-                                   const BSONObj& cmdObj) final {
+    bool run(OperationContext* txn,
+             const std::string& db,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& result) final {
+        const bool includeAll = cmdObj["$all"].trueValue();
 
-            bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                                    ResourcePattern::forClusterResource(),
-                                    ActionType::inprog);
-            return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
+        // Filter the output
+        BSONObj filter;
+        {
+            BSONObjBuilder b;
+            BSONObjIterator i(cmdObj);
+            invariant(i.more());
+            i.next();  // skip {currentOp: 1} which is required to be the first element
+            while (i.more()) {
+                BSONElement e = i.next();
+                if (str::equals("$all", e.fieldName())) {
+                    continue;
+                }
+
+                b.append(e);
+            }
+            filter = b.obj();
         }
 
-        bool run(OperationContext* txn,
-                 const std::string& db,
-                 BSONObj& cmdObj,
-                 int options,
-                 std::string& errmsg,
-                 BSONObjBuilder& result) final {
+        const WhereCallbackReal whereCallback(txn, db);
+        const Matcher matcher(filter, whereCallback);
 
-            const bool includeAll = cmdObj["$all"].trueValue();
+        BSONArrayBuilder inprogBuilder(result.subarrayStart("inprog"));
 
-            // Filter the output
-            BSONObj filter;
-            {
-                BSONObjBuilder b;
-                BSONObjIterator i(cmdObj);
-                invariant(i.more());
-                i.next(); // skip {currentOp: 1} which is required to be the first element
-                while (i.more()) {
-                    BSONElement e = i.next();
-                    if (str::equals("$all", e.fieldName())) {
-                        continue;
-                    }
+        for (ServiceContext::LockedClientsCursor cursor(txn->getClient()->getServiceContext());
+             Client* client = cursor.next();) {
+            invariant(client);
 
-                    b.append(e);
-                }
-                filter = b.obj();
+            stdx::lock_guard<Client> lk(*client);
+            const OperationContext* opCtx = client->getOperationContext();
+
+            if (!includeAll) {
+                // Skip over inactive connections.
+                if (!opCtx)
+                    continue;
             }
 
-            const WhereCallbackReal whereCallback(txn, db);
-            const Matcher matcher(filter, whereCallback);
+            BSONObjBuilder infoBuilder;
 
-            BSONArrayBuilder inprogBuilder(result.subarrayStart("inprog"));
+            // The client information
+            client->reportState(infoBuilder);
 
-            for (ServiceContext::LockedClientsCursor cursor(txn->getClient()->getServiceContext());
-                 Client* client = cursor.next();) {
-
-                invariant(client);
-
-                stdx::lock_guard<Client> lk(*client);
-                const OperationContext* opCtx = client->getOperationContext();
-
-                if (!includeAll) {
-                    // Skip over inactive connections.
-                    if (!opCtx)
-                        continue;
+            // Operation context specific information
+            infoBuilder.appendBool("active", static_cast<bool>(opCtx));
+            if (opCtx) {
+                infoBuilder.append("opid", opCtx->getOpID());
+                if (opCtx->isKillPending()) {
+                    infoBuilder.append("killPending", true);
                 }
 
-                BSONObjBuilder infoBuilder;
+                CurOp::get(opCtx)->reportState(&infoBuilder);
 
-                // The client information
-                client->reportState(infoBuilder);
-
-                // Operation context specific information
-                infoBuilder.appendBool("active", static_cast<bool>(opCtx));
-                if (opCtx) {
-                    infoBuilder.append("opid", opCtx->getOpID());
-                    if (opCtx->isKillPending()) {
-                        infoBuilder.append("killPending", true);
-                    }
-
-                    CurOp::get(opCtx)->reportState(&infoBuilder);
-
-                    // LockState
-                    Locker::LockerInfo lockerInfo;
-                    opCtx->lockState()->getLockerInfo(&lockerInfo);
-                    fillLockerInfo(lockerInfo, infoBuilder);
-                }
-
-                infoBuilder.done();
-
-                const BSONObj info = infoBuilder.obj();
-
-                if (includeAll || matcher.matches(info)) {
-                    inprogBuilder.append(info);
-                }
+                // LockState
+                Locker::LockerInfo lockerInfo;
+                opCtx->lockState()->getLockerInfo(&lockerInfo);
+                fillLockerInfo(lockerInfo, infoBuilder);
             }
 
-            inprogBuilder.done();
+            infoBuilder.done();
 
-            if (lockedForWriting()) {
-                result.append("fsyncLock", true);
-                result.append("info",
-                              "use db.fsyncUnlock() to terminate the fsync write/snapshot lock");
+            const BSONObj info = infoBuilder.obj();
+
+            if (includeAll || matcher.matches(info)) {
+                inprogBuilder.append(info);
             }
-
-            return true;
         }
 
-    } currentOpCommand;
+        inprogBuilder.done();
+
+        if (lockedForWriting()) {
+            result.append("fsyncLock", true);
+            result.append("info",
+                          "use db.fsyncUnlock() to terminate the fsync write/snapshot lock");
+        }
+
+        return true;
+    }
+
+} currentOpCommand;
 
 }  // namespace mongo

@@ -36,52 +36,50 @@
 
 namespace mongo {
 
-    int NamespaceHashTable::_find(const Namespace& k, bool& found) const {
-        found = false;
-        int h = k.hash();
-        int i = h % n;
-        int start = i;
-        int chain = 0;
-        int firstNonUsed = -1;
-        while ( 1 ) {
-            if ( !_nodes(i).inUse() ) {
-                if ( firstNonUsed < 0 )
-                    firstNonUsed = i;
-            }
-
-            if ( _nodes(i).hash == h && _nodes(i).key == k ) {
-                if ( chain >= 200 )
-                    log() << "warning: hashtable " << _name << " long chain " << std::endl;
-                found = true;
-                return i;
-            }
-            chain++;
-            i = (i+1) % n;
-            if ( i == start ) {
-                // shouldn't get here / defensive for infinite loops
-                log() << "error: hashtable " << _name << " is full n:" << n << std::endl;
-                return -1;
-            }
-            if( chain >= maxChain ) {
-                if ( firstNonUsed >= 0 )
-                    return firstNonUsed;
-                log() << "error: hashtable " << _name << " max chain reached:" << maxChain << std::endl;
-                return -1;
-            }
-        }
-    }
-
-    /* buf must be all zeroes on initialization. */
-    NamespaceHashTable::NamespaceHashTable(void* buf, int buflen, const char* name)
-        : _name(name),
-          _buf(buf) {
-
-        n = buflen / sizeof(Node);
-        if ((n & 1) == 0) {
-            n--;
+int NamespaceHashTable::_find(const Namespace& k, bool& found) const {
+    found = false;
+    int h = k.hash();
+    int i = h % n;
+    int start = i;
+    int chain = 0;
+    int firstNonUsed = -1;
+    while (1) {
+        if (!_nodes(i).inUse()) {
+            if (firstNonUsed < 0)
+                firstNonUsed = i;
         }
 
-        maxChain = (int)(n * 0.05);
+        if (_nodes(i).hash == h && _nodes(i).key == k) {
+            if (chain >= 200)
+                log() << "warning: hashtable " << _name << " long chain " << std::endl;
+            found = true;
+            return i;
+        }
+        chain++;
+        i = (i + 1) % n;
+        if (i == start) {
+            // shouldn't get here / defensive for infinite loops
+            log() << "error: hashtable " << _name << " is full n:" << n << std::endl;
+            return -1;
+        }
+        if (chain >= maxChain) {
+            if (firstNonUsed >= 0)
+                return firstNonUsed;
+            log() << "error: hashtable " << _name << " max chain reached:" << maxChain << std::endl;
+            return -1;
+        }
     }
+}
+
+/* buf must be all zeroes on initialization. */
+NamespaceHashTable::NamespaceHashTable(void* buf, int buflen, const char* name)
+    : _name(name), _buf(buf) {
+    n = buflen / sizeof(Node);
+    if ((n & 1) == 0) {
+        n--;
+    }
+
+    maxChain = (int)(n * 0.05);
+}
 
 }  // namespace mongo

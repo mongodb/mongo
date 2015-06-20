@@ -38,50 +38,51 @@
 namespace mongo {
 namespace {
 
-    class CmdGetShardMap : public Command {
-    public:
-        CmdGetShardMap() : Command("getShardMap") { }
+class CmdGetShardMap : public Command {
+public:
+    CmdGetShardMap() : Command("getShardMap") {}
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual void help(std::stringstream& help) const {
+        help << "lists the set of shards known to this instance";
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::getShardMap);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        // MongoD instances do not know that they are part of a sharded cluster until they
+        // receive a setShardVersion command and that's when the catalog manager and the shard
+        // registry get initialized.
+        if (grid.shardRegistry()) {
+            grid.shardRegistry()->toBSON(&result);
         }
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+        return true;
+    }
 
-        virtual void help(std::stringstream& help) const {
-            help << "lists the set of shards known to this instance";
-        }
+} getShardMapCmd;
 
-        virtual bool adminOnly() const { return true; }
-
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::getShardMap);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
-
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
-
-            // MongoD instances do not know that they are part of a sharded cluster until they
-            // receive a setShardVersion command and that's when the catalog manager and the shard
-            // registry get initialized.
-            if (grid.shardRegistry()) {
-                grid.shardRegistry()->toBSON(&result);
-            }
-
-            return true;
-        }
-
-    } getShardMapCmd;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

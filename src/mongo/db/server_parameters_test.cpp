@@ -35,55 +35,55 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::vector;
+using std::string;
+using std::vector;
 
-    TEST( ServerParameters, Simple1 ) {
-        int f = 5;
-        ExportedServerParameter<int> ff( NULL, "ff", &f, true, true );
-        ASSERT_EQUALS( "ff" , ff.name() );
-        ASSERT_EQUALS( 5, ff.get() );
+TEST(ServerParameters, Simple1) {
+    int f = 5;
+    ExportedServerParameter<int> ff(NULL, "ff", &f, true, true);
+    ASSERT_EQUALS("ff", ff.name());
+    ASSERT_EQUALS(5, ff.get());
 
-        ff.set( 6 );
-        ASSERT_EQUALS( 6, ff.get() );
-        ASSERT_EQUALS( 6, f );
+    ff.set(6);
+    ASSERT_EQUALS(6, ff.get());
+    ASSERT_EQUALS(6, f);
 
-        ff.set( BSON( "x" << 7 ).firstElement() );
-        ASSERT_EQUALS( 7, ff.get() );
-        ASSERT_EQUALS( 7, f );
+    ff.set(BSON("x" << 7).firstElement());
+    ASSERT_EQUALS(7, ff.get());
+    ASSERT_EQUALS(7, f);
 
-        ff.setFromString( "8" );
-        ASSERT_EQUALS( 8, ff.get() );
-        ASSERT_EQUALS( 8, f );
+    ff.setFromString("8");
+    ASSERT_EQUALS(8, ff.get());
+    ASSERT_EQUALS(8, f);
+}
 
-    }
+TEST(ServerParameters, Vector1) {
+    vector<string> v;
 
-    TEST( ServerParameters, Vector1 ) {
-        vector<string> v;
+    ExportedServerParameter<vector<string>> vv(NULL, "vv", &v, true, true);
 
-        ExportedServerParameter< vector<string> > vv( NULL, "vv", &v, true, true );
+    BSONObj x = BSON("x" << BSON_ARRAY("a"
+                                       << "b"
+                                       << "c"));
+    vv.set(x.firstElement());
 
-        BSONObj x = BSON( "x" << BSON_ARRAY( "a" << "b" << "c" ) );
-        vv.set( x.firstElement() );
+    ASSERT_EQUALS(3U, v.size());
+    ASSERT_EQUALS("a", v[0]);
+    ASSERT_EQUALS("b", v[1]);
+    ASSERT_EQUALS("c", v[2]);
 
-        ASSERT_EQUALS( 3U, v.size() );
-        ASSERT_EQUALS( "a", v[0] );
-        ASSERT_EQUALS( "b", v[1] );
-        ASSERT_EQUALS( "c", v[2] );
+    BSONObjBuilder b;
 
-        BSONObjBuilder b;
+    OperationContextNoop txn;
+    vv.append(&txn, b, vv.name());
 
-        OperationContextNoop txn;
-        vv.append(&txn, b, vv.name());
-
-        BSONObj y = b.obj();
-        ASSERT( x.firstElement().woCompare( y.firstElement(), false ) == 0 );
+    BSONObj y = b.obj();
+    ASSERT(x.firstElement().woCompare(y.firstElement(), false) == 0);
 
 
-        vv.setFromString( "d,e" );
-        ASSERT_EQUALS( 2U, v.size() );
-        ASSERT_EQUALS( "d", v[0] );
-        ASSERT_EQUALS( "e", v[1] );
-    }
-
+    vv.setFromString("d,e");
+    ASSERT_EQUALS(2U, v.size());
+    ASSERT_EQUALS("d", v[0]);
+    ASSERT_EQUALS("e", v[1]);
+}
 }

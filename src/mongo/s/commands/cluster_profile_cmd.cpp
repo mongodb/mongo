@@ -33,43 +33,41 @@
 namespace mongo {
 namespace {
 
-    class ProfileCmd : public Command {
-    public:
-        ProfileCmd() : Command("profile", false) { }
+class ProfileCmd : public Command {
+public:
+    ProfileCmd() : Command("profile", false) {}
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+    virtual bool slaveOk() const {
+        return true;
+    }
 
-        virtual bool adminOnly() const {
-            return false;
-        }
+    virtual bool adminOnly() const {
+        return false;
+    }
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
-        }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::enableProfiler);
+        out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+    }
 
-            ActionSet actions;
-            actions.addAction(ActionType::enableProfiler);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-        }
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        errmsg = "profile currently not supported via mongos";
+        return false;
+    }
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
+} profileCmd;
 
-            errmsg = "profile currently not supported via mongos";
-            return false;
-        }
-
-    } profileCmd;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

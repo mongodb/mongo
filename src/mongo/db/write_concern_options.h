@@ -33,83 +33,77 @@
 
 namespace mongo {
 
-    class Status;
+class Status;
 
-    struct WriteConcernOptions {
-    public:
+struct WriteConcernOptions {
+public:
+    enum SyncMode { NONE, FSYNC, JOURNAL };
 
-        enum SyncMode { NONE, FSYNC, JOURNAL };
+    static const int kNoTimeout = 0;
+    static const int kNoWaiting = -1;
 
-        static const int kNoTimeout = 0;
-        static const int kNoWaiting = -1;
+    static const BSONObj Default;
+    static const BSONObj Acknowledged;
+    static const BSONObj Unacknowledged;
+    static const BSONObj Majority;
 
-        static const BSONObj Default;
-        static const BSONObj Acknowledged;
-        static const BSONObj Unacknowledged;
-        static const BSONObj Majority;
+    static const char kMajority[];  // = "majority"
 
-        static const char kMajority[]; // = "majority"
+    WriteConcernOptions() {
+        reset();
+    }
 
-        WriteConcernOptions() { reset(); }
+    WriteConcernOptions(int numNodes, SyncMode sync, int timeout);
 
-        WriteConcernOptions(int numNodes,
-                            SyncMode sync,
-                            int timeout);
+    WriteConcernOptions(const std::string& mode, SyncMode sync, int timeout);
 
-        WriteConcernOptions(const std::string& mode,
-                            SyncMode sync,
-                            int timeout);
+    Status parse(const BSONObj& obj);
 
-        Status parse( const BSONObj& obj );
+    /**
+     * Extracts the write concern settings from the BSONObj. The BSON object should have
+     * the format:
+     *
+     * {
+     *     ...
+     *     secondaryThrottle: <bool>, // optional
+     *     _secondaryThrottle: <bool>, // optional
+     *     writeConcern: <BSONObj> // optional
+     * }
+     *
+     * Note: secondaryThrottle takes precedence over _secondaryThrottle.
+     *
+     * Also sets output parameter rawWriteConcernObj if the writeCocnern field exists.
+     *
+     * Returns OK if the parse was successful. Also returns ErrorCodes::WriteConcernNotDefined
+     * when secondary throttle is true but write concern was not specified.
+     */
+    Status parseSecondaryThrottle(const BSONObj& doc, BSONObj* rawWriteConcernObj);
 
-        /**
-         * Extracts the write concern settings from the BSONObj. The BSON object should have
-         * the format:
-         *
-         * {
-         *     ...
-         *     secondaryThrottle: <bool>, // optional
-         *     _secondaryThrottle: <bool>, // optional
-         *     writeConcern: <BSONObj> // optional
-         * }
-         *
-         * Note: secondaryThrottle takes precedence over _secondaryThrottle.
-         *
-         * Also sets output parameter rawWriteConcernObj if the writeCocnern field exists.
-         *
-         * Returns OK if the parse was successful. Also returns ErrorCodes::WriteConcernNotDefined
-         * when secondary throttle is true but write concern was not specified.
-         */
-        Status parseSecondaryThrottle(const BSONObj& doc,
-                                      BSONObj* rawWriteConcernObj);
+    /**
+     * Return true if the server needs to wait for other secondary nodes to satisfy this
+     * write concern setting. Errs on the false positive for non-empty wMode.
+     */
+    bool shouldWaitForOtherNodes() const;
 
-        /**
-         * Return true if the server needs to wait for other secondary nodes to satisfy this
-         * write concern setting. Errs on the false positive for non-empty wMode.
-         */
-        bool shouldWaitForOtherNodes() const;
+    void reset() {
+        syncMode = NONE;
+        wNumNodes = 0;
+        wMode = "";
+        wTimeout = 0;
+    }
 
-        void reset() {
-            syncMode = NONE;
-            wNumNodes = 0;
-            wMode = "";
-            wTimeout = 0;
-        }
+    // Returns the BSON representation of this object.
+    // Warning: does not return the same object passed on the last parse() call.
+    BSONObj toBSON() const;
 
-        // Returns the BSON representation of this object.
-        // Warning: does not return the same object passed on the last parse() call.
-        BSONObj toBSON() const;
+    SyncMode syncMode;
 
-        SyncMode syncMode;
+    // The w parameter for this write concern. The wMode represents the string format and
+    // takes precedence over the numeric format wNumNodes.
+    int wNumNodes;
+    std::string wMode;
 
-        // The w parameter for this write concern. The wMode represents the string format and
-        // takes precedence over the numeric format wNumNodes.
-        int wNumNodes;
-        std::string wMode;
-
-        // Timeout in milliseconds.
-        int wTimeout;
-    };
-
+    // Timeout in milliseconds.
+    int wTimeout;
+};
 }
-

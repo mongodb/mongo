@@ -41,173 +41,169 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::map;
-    using std::string;
-    using std::vector;
+using std::unique_ptr;
+using std::map;
+using std::string;
+using std::vector;
 
 namespace {
 
-    class ListDatabasesCmd : public Command {
-    public:
-        ListDatabasesCmd() : Command("listDatabases", true, "listdatabases") { }
+class ListDatabasesCmd : public Command {
+public:
+    ListDatabasesCmd() : Command("listDatabases", true, "listdatabases") {}
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+    virtual bool slaveOk() const {
+        return true;
+    }
 
-        virtual bool slaveOverrideOk() const {
-            return true;
-        }
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
 
-        virtual bool adminOnly() const {
-            return true;
-        }
+    virtual bool adminOnly() const {
+        return true;
+    }
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
-        }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual void help(std::stringstream& help) const {
-            help << "list databases in a cluster";
-        }
+    virtual void help(std::stringstream& help) const {
+        help << "list databases in a cluster";
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::listDatabases);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::listDatabases);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname_unused,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname_unused,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        map<string, long long> sizes;
+        map<string, unique_ptr<BSONObjBuilder>> dbShardInfo;
 
-            map<string, long long> sizes;
-            map<string, unique_ptr<BSONObjBuilder> > dbShardInfo;
+        vector<ShardId> shardIds;
+        grid.shardRegistry()->getAllShardIds(&shardIds);
 
-            vector<ShardId> shardIds;
-            grid.shardRegistry()->getAllShardIds(&shardIds);
-
-            for (const ShardId& shardId : shardIds) {
-                const auto s = grid.shardRegistry()->getShard(shardId);
-                if (!s) {
-                    continue;
-                }
-
-                BSONObj x = s->runCommand("admin", "listDatabases");
-
-                BSONObjIterator j(x["databases"].Obj());
-                while (j.more()) {
-                    BSONObj dbObj = j.next().Obj();
-
-                    const string name = dbObj["name"].String();
-                    const long long size = dbObj["sizeOnDisk"].numberLong();
-
-                    long long& totalSize = sizes[name];
-                    if (size == 1) {
-                        if (totalSize <= 1) {
-                            totalSize = 1;
-                        }
-                    }
-                    else {
-                        totalSize += size;
-                    }
-
-                    unique_ptr<BSONObjBuilder>& bb = dbShardInfo[name];
-                    if (!bb.get()) {
-                        bb.reset(new BSONObjBuilder());
-                    }
-
-                    bb->appendNumber(s->getId(), size);
-                }
-
+        for (const ShardId& shardId : shardIds) {
+            const auto s = grid.shardRegistry()->getShard(shardId);
+            if (!s) {
+                continue;
             }
 
-            long long totalSize = 0;
+            BSONObj x = s->runCommand("admin", "listDatabases");
 
-            BSONArrayBuilder bb(result.subarrayStart("databases"));
-            for (map<string, long long>::iterator i = sizes.begin(); i != sizes.end(); ++i) {
-                const string name = i->first;
+            BSONObjIterator j(x["databases"].Obj());
+            while (j.more()) {
+                BSONObj dbObj = j.next().Obj();
 
-                if (name == "local") {
-                    // We don't return local, since all shards have their own independent local
-                    continue;
-                }
+                const string name = dbObj["name"].String();
+                const long long size = dbObj["sizeOnDisk"].numberLong();
 
-                if (name == "config" || name == "admin") {
-                    // Always get this from the config servers
-                    continue;
-                }
-
-                long long size = i->second;
-                totalSize += size;
-
-                BSONObjBuilder temp;
-                temp.append("name", name);
-                temp.appendNumber("sizeOnDisk", size);
-                temp.appendBool("empty", size == 1);
-                temp.append("shards", dbShardInfo[name]->obj());
-
-                bb.append(temp.obj());
-            }
-
-            // Obtain the cached config shard
-            const auto configShard = grid.shardRegistry()->getShard("config");
-
-            {
-                // get config db from the config servers (first one)
-                BSONObj x;
-                if (configShard->runCommand("config", "dbstats", x)) {
-                    BSONObjBuilder b;
-                    b.append("name", "config");
-                    b.appendBool("empty", false);
-                    if (x["fileSize"].type())
-                        b.appendAs(x["fileSize"], "sizeOnDisk");
-                    else
-                        b.append("sizeOnDisk", 1);
-                    bb.append(b.obj());
-                }
-                else {
-                    bb.append(BSON("name" << "config"));
-                }
-            }
-
-            {
-                // get admin db from the config servers (first one)
-                BSONObj x;
-                if (configShard->runCommand("admin", "dbstats", x)) {
-                    BSONObjBuilder b;
-                    b.append("name", "admin");
-                    b.appendBool("empty", false);
-
-                    if (x["fileSize"].type()) {
-                        b.appendAs(x["fileSize"], "sizeOnDisk");
+                long long& totalSize = sizes[name];
+                if (size == 1) {
+                    if (totalSize <= 1) {
+                        totalSize = 1;
                     }
-                    else {
-                        b.append("sizeOnDisk", 1);
-                    }
+                } else {
+                    totalSize += size;
+                }
 
-                    bb.append(b.obj());
+                unique_ptr<BSONObjBuilder>& bb = dbShardInfo[name];
+                if (!bb.get()) {
+                    bb.reset(new BSONObjBuilder());
                 }
-                else {
-                    bb.append(BSON("name" << "admin"));
-                }
+
+                bb->appendNumber(s->getId(), size);
             }
-
-            bb.done();
-
-            result.appendNumber("totalSize", totalSize);
-            result.appendNumber("totalSizeMb", totalSize / (1024 * 1024));
-
-            return 1;
         }
 
-    } cmdListDatabases;
+        long long totalSize = 0;
 
-} // namespace
-} // namespace mongo
+        BSONArrayBuilder bb(result.subarrayStart("databases"));
+        for (map<string, long long>::iterator i = sizes.begin(); i != sizes.end(); ++i) {
+            const string name = i->first;
+
+            if (name == "local") {
+                // We don't return local, since all shards have their own independent local
+                continue;
+            }
+
+            if (name == "config" || name == "admin") {
+                // Always get this from the config servers
+                continue;
+            }
+
+            long long size = i->second;
+            totalSize += size;
+
+            BSONObjBuilder temp;
+            temp.append("name", name);
+            temp.appendNumber("sizeOnDisk", size);
+            temp.appendBool("empty", size == 1);
+            temp.append("shards", dbShardInfo[name]->obj());
+
+            bb.append(temp.obj());
+        }
+
+        // Obtain the cached config shard
+        const auto configShard = grid.shardRegistry()->getShard("config");
+
+        {
+            // get config db from the config servers (first one)
+            BSONObj x;
+            if (configShard->runCommand("config", "dbstats", x)) {
+                BSONObjBuilder b;
+                b.append("name", "config");
+                b.appendBool("empty", false);
+                if (x["fileSize"].type())
+                    b.appendAs(x["fileSize"], "sizeOnDisk");
+                else
+                    b.append("sizeOnDisk", 1);
+                bb.append(b.obj());
+            } else {
+                bb.append(BSON("name"
+                               << "config"));
+            }
+        }
+
+        {
+            // get admin db from the config servers (first one)
+            BSONObj x;
+            if (configShard->runCommand("admin", "dbstats", x)) {
+                BSONObjBuilder b;
+                b.append("name", "admin");
+                b.appendBool("empty", false);
+
+                if (x["fileSize"].type()) {
+                    b.appendAs(x["fileSize"], "sizeOnDisk");
+                } else {
+                    b.append("sizeOnDisk", 1);
+                }
+
+                bb.append(b.obj());
+            } else {
+                bb.append(BSON("name"
+                               << "admin"));
+            }
+        }
+
+        bb.done();
+
+        result.appendNumber("totalSize", totalSize);
+        result.appendNumber("totalSizeMb", totalSize / (1024 * 1024));
+
+        return 1;
+    }
+
+} cmdListDatabases;
+
+}  // namespace
+}  // namespace mongo

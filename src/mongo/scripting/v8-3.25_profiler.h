@@ -36,23 +36,23 @@
 
 namespace mongo {
 
-    /** Collect CPU Profiling data from v8. */
-    class V8CpuProfiler {
-    public:
-        /** Start the CPU profiler */
-        void start(v8::Isolate* isolate, const StringData name);
+/** Collect CPU Profiling data from v8. */
+class V8CpuProfiler {
+public:
+    /** Start the CPU profiler */
+    void start(v8::Isolate* isolate, const StringData name);
 
-        /** Stop the CPU profiler */
-        void stop(v8::Isolate* isolate, const StringData name);
+    /** Stop the CPU profiler */
+    void stop(v8::Isolate* isolate, const StringData name);
 
-        /** Get the current cpu profile */
-        const BSONArray fetch(const StringData name);
-    private:
-        void traverseDepthFirst(const v8::CpuProfileNode* cpuProfileNode,
-                                BSONArrayBuilder& arrayBuilder);
+    /** Get the current cpu profile */
+    const BSONArray fetch(const StringData name);
 
-        typedef std::map<std::string, const v8::CpuProfile*> CpuProfileMap;
-        CpuProfileMap _cpuProfiles;
-    };
+private:
+    void traverseDepthFirst(const v8::CpuProfileNode* cpuProfileNode,
+                            BSONArrayBuilder& arrayBuilder);
 
+    typedef std::map<std::string, const v8::CpuProfile*> CpuProfileMap;
+    CpuProfileMap _cpuProfiles;
+};
 }

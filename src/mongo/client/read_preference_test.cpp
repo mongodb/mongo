@@ -34,72 +34,83 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    void checkParse(const BSONObj& rpsObj, const ReadPreferenceSetting& expected) {
-        const auto swRps = ReadPreferenceSetting::fromBSON(rpsObj);
-        ASSERT_OK(swRps.getStatus());
-        const auto rps = swRps.getValue();
-        ASSERT_TRUE(rps.equals(expected));
-    }
+void checkParse(const BSONObj& rpsObj, const ReadPreferenceSetting& expected) {
+    const auto swRps = ReadPreferenceSetting::fromBSON(rpsObj);
+    ASSERT_OK(swRps.getStatus());
+    const auto rps = swRps.getValue();
+    ASSERT_TRUE(rps.equals(expected));
+}
 
-    TEST(ReadPreferenceSetting, ParseValid) {
+TEST(ReadPreferenceSetting, ParseValid) {
+    checkParse(BSON("mode"
+                    << "primary"),
+               ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
 
-        checkParse(BSON("mode" << "primary"),
-                   ReadPreferenceSetting(ReadPreference::PrimaryOnly,
-                                         TagSet::primaryOnly()));
+    // Check that primary with wildcard tags is accepted for backwards compatibility, but
+    // that the tags are parsed as the empty TagSet.
+    checkParse(BSON("mode"
+                    << "primary"
+                    << "tags" << BSON_ARRAY(BSONObj())),
+               ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
 
-        // Check that primary with wildcard tags is accepted for backwards compatibility, but
-        // that the tags are parsed as the empty TagSet.
-        checkParse(BSON("mode" << "primary" <<
-                        "tags" << BSON_ARRAY(BSONObj())),
-                   ReadPreferenceSetting(ReadPreference::PrimaryOnly,
-                                         TagSet::primaryOnly()));
+    checkParse(BSON("mode"
+                    << "secondaryPreferred"
+                    << "tags" << BSON_ARRAY(BSON("dc"
+                                                 << "ny"))),
+               ReadPreferenceSetting(ReadPreference::SecondaryPreferred,
+                                     TagSet(BSON_ARRAY(BSON("dc"
+                                                            << "ny")))));
+}
 
-        checkParse(BSON("mode" << "secondaryPreferred" <<
-                        "tags" << BSON_ARRAY(BSON("dc" << "ny"))),
-                   ReadPreferenceSetting(ReadPreference::SecondaryPreferred,
-                                         TagSet(BSON_ARRAY(BSON("dc" << "ny")))));
-    }
+void checkParseFails(const BSONObj& rpsObj) {
+    auto swRps = ReadPreferenceSetting::fromBSON(rpsObj);
+    ASSERT_NOT_OK(swRps.getStatus());
+}
 
-    void checkParseFails(const BSONObj& rpsObj) {
-        auto swRps = ReadPreferenceSetting::fromBSON(rpsObj);
-        ASSERT_NOT_OK(swRps.getStatus());
-    }
+TEST(ReadPreferenceSetting, ParseInvalid) {
+    // mode primary can not have tags
+    checkParseFails(BSON("mode"
+                         << "primary"
+                         << "tags" << BSON_ARRAY(BSON("foo"
+                                                      << "bar"))));
+    // bad mode
+    checkParseFails(BSON("mode"
+                         << "khalesi"));
 
-    TEST(ReadPreferenceSetting, ParseInvalid) {
-        // mode primary can not have tags
-        checkParseFails(BSON("mode" << "primary" <<
-                           "tags" << BSON_ARRAY(BSON("foo" << "bar"))));
-        // bad mode
-        checkParseFails(BSON("mode" << "khalesi"));
+    // no mode
+    checkParseFails(BSON("foo"
+                         << "bar"));
 
-        // no mode
-        checkParseFails(BSON("foo" << "bar"));
+    // tags not an array
+    checkParseFails(BSON("mode"
+                         << "nearest"
+                         << "tags"
+                         << "bad"));
+}
 
-        // tags not an array
-        checkParseFails(BSON("mode" << "nearest" <<
-                             "tags" << "bad"));
-    }
+void checkRoundtrip(const ReadPreferenceSetting& rps) {
+    auto parsed = ReadPreferenceSetting::fromBSON(rps.toBSON());
+    ASSERT_OK(parsed.getStatus());
+    ASSERT_TRUE(parsed.getValue().equals(rps));
+}
 
-    void checkRoundtrip(const ReadPreferenceSetting& rps) {
-        auto parsed = ReadPreferenceSetting::fromBSON(rps.toBSON());
-        ASSERT_OK(parsed.getStatus());
-        ASSERT_TRUE(parsed.getValue().equals(rps));
-    }
+TEST(ReadPreferenceSetting, Roundtrip) {
+    checkRoundtrip(ReadPreferenceSetting(ReadPreference::Nearest,
+                                         TagSet(BSON_ARRAY(BSON("dc"
+                                                                << "ca")
+                                                           << BSON("foo"
+                                                                   << "bar")))));
+    checkRoundtrip(ReadPreferenceSetting());
 
-    TEST(ReadPreferenceSetting, Roundtrip) {
-        checkRoundtrip(ReadPreferenceSetting(ReadPreference::Nearest,
-                                             TagSet(BSON_ARRAY(BSON("dc" << "ca") <<
-                                                               BSON("foo" << "bar")))));
-        checkRoundtrip(ReadPreferenceSetting());
+    checkRoundtrip(ReadPreferenceSetting(ReadPreference::PrimaryPreferred, TagSet()));
 
-        checkRoundtrip(ReadPreferenceSetting(ReadPreference::PrimaryPreferred,
-                                             TagSet()));
-
-        checkRoundtrip(ReadPreferenceSetting(ReadPreference::SecondaryOnly,
-                                             TagSet(BSON_ARRAY(BSON("dc" << "ca" <<
-                                                                    "rack" << "bar")))));
-    }
+    checkRoundtrip(ReadPreferenceSetting(ReadPreference::SecondaryOnly,
+                                         TagSet(BSON_ARRAY(BSON("dc"
+                                                                << "ca"
+                                                                << "rack"
+                                                                << "bar")))));
+}
 
 }  // namespace

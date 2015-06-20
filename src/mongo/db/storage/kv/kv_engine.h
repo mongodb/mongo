@@ -39,103 +39,100 @@
 
 namespace mongo {
 
-    class IndexDescriptor;
-    class OperationContext;
-    class RecordStore;
-    class RecoveryUnit;
-    class SortedDataInterface;
+class IndexDescriptor;
+class OperationContext;
+class RecordStore;
+class RecoveryUnit;
+class SortedDataInterface;
 
-    class KVEngine {
-    public:
+class KVEngine {
+public:
+    virtual RecoveryUnit* newRecoveryUnit() = 0;
 
-        virtual RecoveryUnit* newRecoveryUnit() = 0;
+    // ---------
 
-        // ---------
+    /**
+     * Caller takes ownership
+     * Having multiple out for the same ns is a rules violation;
+     * Calling on a non-created ident is invalid and may crash.
+     */
+    virtual RecordStore* getRecordStore(OperationContext* opCtx,
+                                        StringData ns,
+                                        StringData ident,
+                                        const CollectionOptions& options) = 0;
 
-        /**
-         * Caller takes ownership
-         * Having multiple out for the same ns is a rules violation;
-         * Calling on a non-created ident is invalid and may crash.
-         */
-        virtual RecordStore* getRecordStore( OperationContext* opCtx,
-                                             StringData ns,
+    virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
+                                                        StringData ident,
+                                                        const IndexDescriptor* desc) = 0;
+
+    //
+    // The create and drop methods on KVEngine are not transactional. Transactional semantics
+    // are provided by the KVStorageEngine code that calls these. For example, drop will be
+    // called if a create is rolled back. A higher-level drop operation will only propagate to a
+    // drop call on the KVEngine once the WUOW commits. Therefore drops will never be rolled
+    // back and it is safe to immediately reclaim storage.
+    //
+
+    virtual Status createRecordStore(OperationContext* opCtx,
+                                     StringData ns,
+                                     StringData ident,
+                                     const CollectionOptions& options) = 0;
+
+    virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
-                                             const CollectionOptions& options ) = 0;
+                                             const IndexDescriptor* desc) = 0;
 
-        virtual SortedDataInterface* getSortedDataInterface( OperationContext* opCtx,
-                                                             StringData ident,
-                                                             const IndexDescriptor* desc ) = 0;
+    virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) = 0;
 
-        //
-        // The create and drop methods on KVEngine are not transactional. Transactional semantics
-        // are provided by the KVStorageEngine code that calls these. For example, drop will be
-        // called if a create is rolled back. A higher-level drop operation will only propagate to a
-        // drop call on the KVEngine once the WUOW commits. Therefore drops will never be rolled
-        // back and it is safe to immediately reclaim storage.
-        //
+    virtual Status repairIdent(OperationContext* opCtx, StringData ident) = 0;
 
-        virtual Status createRecordStore( OperationContext* opCtx,
-                                          StringData ns,
-                                          StringData ident,
-                                          const CollectionOptions& options ) = 0;
+    virtual Status dropIdent(OperationContext* opCtx, StringData ident) = 0;
 
-        virtual Status createSortedDataInterface( OperationContext* opCtx,
-                                                  StringData ident,
-                                                  const IndexDescriptor* desc ) = 0;
+    // optional
+    virtual int flushAllFiles(bool sync) {
+        return 0;
+    }
 
-        virtual int64_t getIdentSize( OperationContext* opCtx,
-                                      StringData ident ) = 0;
+    virtual bool isDurable() const = 0;
 
-        virtual Status repairIdent( OperationContext* opCtx,
-                                    StringData ident ) = 0;
+    /**
+     * This must not change over the lifetime of the engine.
+     */
+    virtual bool supportsDocLocking() const = 0;
 
-        virtual Status dropIdent( OperationContext* opCtx,
-                                  StringData ident ) = 0;
+    /**
+     * Returns true if storage engine supports --directoryperdb.
+     * See:
+     *     http://docs.mongodb.org/manual/reference/program/mongod/#cmdoption--directoryperdb
+     */
+    virtual bool supportsDirectoryPerDB() const = 0;
 
-        // optional
-        virtual int flushAllFiles( bool sync ) { return 0; }
+    virtual Status okToRename(OperationContext* opCtx,
+                              StringData fromNS,
+                              StringData toNS,
+                              StringData ident,
+                              const RecordStore* originalRecordStore) const {
+        return Status::OK();
+    }
 
-        virtual bool isDurable() const = 0;
+    virtual bool hasIdent(OperationContext* opCtx, StringData ident) const = 0;
 
-        /**
-         * This must not change over the lifetime of the engine.
-         */
-        virtual bool supportsDocLocking() const = 0;
+    virtual std::vector<std::string> getAllIdents(OperationContext* opCtx) const = 0;
 
-        /**
-         * Returns true if storage engine supports --directoryperdb.
-         * See:
-         *     http://docs.mongodb.org/manual/reference/program/mongod/#cmdoption--directoryperdb
-         */
-        virtual bool supportsDirectoryPerDB() const = 0;
+    /**
+     * This method will be called before there is a clean shutdown.  Storage engines should
+     * override this method if they have clean-up to do that is different from unclean shutdown.
+     * MongoDB will not call into the storage subsystem after calling this function.
+     *
+     * There is intentionally no uncleanShutdown().
+     */
+    virtual void cleanShutdown() = 0;
 
-        virtual Status okToRename( OperationContext* opCtx,
-                                   StringData fromNS,
-                                   StringData toNS,
-                                   StringData ident,
-                                   const RecordStore* originalRecordStore ) const {
-            return Status::OK();
-        }
-
-        virtual bool hasIdent(OperationContext* opCtx, StringData ident) const = 0;
-
-        virtual std::vector<std::string> getAllIdents( OperationContext* opCtx ) const = 0;
-
-        /**
-         * This method will be called before there is a clean shutdown.  Storage engines should
-         * override this method if they have clean-up to do that is different from unclean shutdown.
-         * MongoDB will not call into the storage subsystem after calling this function.
-         *
-         * There is intentionally no uncleanShutdown().
-         */
-        virtual void cleanShutdown() = 0;
-
-        /**
-         * The destructor will never be called from mongod, but may be called from tests.
-         * Engines may assume that this will only be called in the case of clean shutdown, even if
-         * cleanShutdown() hasn't been called.
-         */
-        virtual ~KVEngine() {}
-    };
-
+    /**
+     * The destructor will never be called from mongod, but may be called from tests.
+     * Engines may assume that this will only be called in the case of clean shutdown, even if
+     * cleanShutdown() hasn't been called.
+     */
+    virtual ~KVEngine() {}
+};
 }

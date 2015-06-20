@@ -45,81 +45,76 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
-    using std::unique_ptr;
+using std::endl;
+using std::string;
+using std::unique_ptr;
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
-    // Custom field used in upgrade state to determine if/where we failed on last upgrade
-    const BSONField<bool> inCriticalSectionField("inCriticalSection", false);
+// Custom field used in upgrade state to determine if/where we failed on last upgrade
+const BSONField<bool> inCriticalSectionField("inCriticalSection", false);
 
 
-    Status preUpgradeCheck(CatalogManager* catalogManager,
-                           const VersionType& lastVersionInfo,
-                           string minMongosVersion) {
+Status preUpgradeCheck(CatalogManager* catalogManager,
+                       const VersionType& lastVersionInfo,
+                       string minMongosVersion) {
+    if (lastVersionInfo.isUpgradeIdSet() && lastVersionInfo.getUpgradeId().isSet()) {
+        //
+        // Another upgrade failed, so cleanup may be necessary
+        //
 
-        if (lastVersionInfo.isUpgradeIdSet() && lastVersionInfo.getUpgradeId().isSet()) {
-            //
-            // Another upgrade failed, so cleanup may be necessary
-            //
+        BSONObj lastUpgradeState = lastVersionInfo.getUpgradeState();
 
-            BSONObj lastUpgradeState = lastVersionInfo.getUpgradeState();
-
-            bool inCriticalSection;
-            string errMsg;
-            if (!FieldParser::extract(lastUpgradeState,
-                                      inCriticalSectionField,
-                                      &inCriticalSection,
-                                      &errMsg)) {
-                return Status(ErrorCodes::FailedToParse, causedBy(errMsg));
-            }
-
-            if (inCriticalSection) {
-                // Note: custom message must be supplied by caller
-                return Status(ErrorCodes::ManualInterventionRequired, "");
-            }
+        bool inCriticalSection;
+        string errMsg;
+        if (!FieldParser::extract(
+                lastUpgradeState, inCriticalSectionField, &inCriticalSection, &errMsg)) {
+            return Status(ErrorCodes::FailedToParse, causedBy(errMsg));
         }
 
-        //
-        // Check the versions of other mongo processes in the cluster before upgrade.
-        // We can't upgrade if there are active pre-v2.4 processes in the cluster
-        //
-        return checkClusterMongoVersions(catalogManager, string(minMongosVersion));
-    }
-
-    Status commitConfigUpgrade(CatalogManager* catalogManager,
-                               int currentVersion,
-                               int minCompatibleVersion,
-                               int newVersion) {
-
-        // Note: DO NOT CLEAR the config version unless bumping the minCompatibleVersion,
-        // we want to save the excludes that were set.
-
-        BSONObjBuilder setObj;
-        setObj << VersionType::minCompatibleVersion(minCompatibleVersion);
-        setObj << VersionType::currentVersion(newVersion);
-
-        BSONObjBuilder unsetObj;
-        unsetObj.append(VersionType::upgradeId(), 1);
-        unsetObj.append(VersionType::upgradeState(), 1);
-        unsetObj.append("version", 1); // remove deprecated field, no longer supported >= v3.0.
-
-        Status result = catalogManager->update(
-                                VersionType::ConfigNS,
-                                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
-                                BSON("$set" << setObj.done() << "$unset" << unsetObj.done()),
-                                false,
-                                false,
-                                NULL);
-        if (!result.isOK()) {
-            return Status(result.code(),
-                          str::stream() << "could not write new version info "
-                                        << " and exit critical upgrade section: "
-                                        << result.reason());
+        if (inCriticalSection) {
+            // Note: custom message must be supplied by caller
+            return Status(ErrorCodes::ManualInterventionRequired, "");
         }
-
-        return result;
     }
 
-} // namespace mongo
+    //
+    // Check the versions of other mongo processes in the cluster before upgrade.
+    // We can't upgrade if there are active pre-v2.4 processes in the cluster
+    //
+    return checkClusterMongoVersions(catalogManager, string(minMongosVersion));
+}
+
+Status commitConfigUpgrade(CatalogManager* catalogManager,
+                           int currentVersion,
+                           int minCompatibleVersion,
+                           int newVersion) {
+    // Note: DO NOT CLEAR the config version unless bumping the minCompatibleVersion,
+    // we want to save the excludes that were set.
+
+    BSONObjBuilder setObj;
+    setObj << VersionType::minCompatibleVersion(minCompatibleVersion);
+    setObj << VersionType::currentVersion(newVersion);
+
+    BSONObjBuilder unsetObj;
+    unsetObj.append(VersionType::upgradeId(), 1);
+    unsetObj.append(VersionType::upgradeState(), 1);
+    unsetObj.append("version", 1);  // remove deprecated field, no longer supported >= v3.0.
+
+    Status result =
+        catalogManager->update(VersionType::ConfigNS,
+                               BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                               BSON("$set" << setObj.done() << "$unset" << unsetObj.done()),
+                               false,
+                               false,
+                               NULL);
+    if (!result.isOK()) {
+        return Status(result.code(),
+                      str::stream() << "could not write new version info "
+                                    << " and exit critical upgrade section: " << result.reason());
+    }
+
+    return result;
+}
+
+}  // namespace mongo

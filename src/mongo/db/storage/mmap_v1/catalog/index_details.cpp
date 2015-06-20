@@ -32,9 +32,8 @@
 
 namespace mongo {
 
-    void IndexDetails::_reset() {
-        head.setInvalid();
-        info.setInvalid();
-    }
-
+void IndexDetails::_reset() {
+    head.setInvalid();
+    info.setInvalid();
+}
 }

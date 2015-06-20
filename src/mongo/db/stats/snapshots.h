@@ -41,76 +41,76 @@
  */
 namespace mongo {
 
-    class SnapshotThread;
+class SnapshotThread;
 
-    /**
-     * stores a point in time snapshot
-     * i.e. all counters at a given time
-     */
-    class SnapshotData {
-        void takeSnapshot();
+/**
+ * stores a point in time snapshot
+ * i.e. all counters at a given time
+ */
+class SnapshotData {
+    void takeSnapshot();
 
-        unsigned long long _created;
-        Top::UsageMap _usage;
+    unsigned long long _created;
+    Top::UsageMap _usage;
 
-        friend class SnapshotThread;
-        friend class SnapshotDelta;
-        friend class Snapshots;
-    };
+    friend class SnapshotThread;
+    friend class SnapshotDelta;
+    friend class Snapshots;
+};
 
-    /**
-     * contains performance information for a time period
-     */
-    class SnapshotDelta {
-    public:
-        SnapshotDelta( const SnapshotData& older , const SnapshotData& newer );
+/**
+ * contains performance information for a time period
+ */
+class SnapshotDelta {
+public:
+    SnapshotDelta(const SnapshotData& older, const SnapshotData& newer);
 
-        unsigned long long elapsed() const {
-            return _elapsed;
-        }
+    unsigned long long elapsed() const {
+        return _elapsed;
+    }
 
-        Top::UsageMap collectionUsageDiff();
+    Top::UsageMap collectionUsageDiff();
 
-    private:
-        const SnapshotData& _older;
-        const SnapshotData& _newer;
+private:
+    const SnapshotData& _older;
+    const SnapshotData& _newer;
 
-        unsigned long long _elapsed;
-    };
+    unsigned long long _elapsed;
+};
 
-    struct SnapshotDiff {
-        Top::UsageMap usageDiff;
-        unsigned long long timeElapsed;
+struct SnapshotDiff {
+    Top::UsageMap usageDiff;
+    unsigned long long timeElapsed;
 
-        SnapshotDiff() = default;
-        SnapshotDiff(Top::UsageMap map, unsigned long long elapsed)
-            : usageDiff(std::move(map)), timeElapsed(elapsed) {}
-    };
+    SnapshotDiff() = default;
+    SnapshotDiff(Top::UsageMap map, unsigned long long elapsed)
+        : usageDiff(std::move(map)), timeElapsed(elapsed) {}
+};
 
-    class Snapshots {
-    public:
-        Snapshots();
+class Snapshots {
+public:
+    Snapshots();
 
-        const SnapshotData* takeSnapshot();
+    const SnapshotData* takeSnapshot();
 
-        StatusWith<SnapshotDiff> computeDelta();
+    StatusWith<SnapshotDiff> computeDelta();
 
-    private:
-        stdx::mutex _lock;
-        static const int kNumSnapshots = 2;
-        SnapshotData _snapshots[kNumSnapshots];
-        int _loc;
-        int _stored;
-    };
+private:
+    stdx::mutex _lock;
+    static const int kNumSnapshots = 2;
+    SnapshotData _snapshots[kNumSnapshots];
+    int _loc;
+    int _stored;
+};
 
-    class SnapshotThread : public BackgroundJob {
-    public:
-        virtual std::string name() const { return "snapshot"; }
-        void run();
-    };
+class SnapshotThread : public BackgroundJob {
+public:
+    virtual std::string name() const {
+        return "snapshot";
+    }
+    void run();
+};
 
-    extern Snapshots statsSnapshots;
-    extern SnapshotThread snapshotThread;
-
-
+extern Snapshots statsSnapshots;
+extern SnapshotThread snapshotThread;
 }

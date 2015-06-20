@@ -29,82 +29,78 @@
 
 namespace mongo {
 
-    inline Status Status::OK() {
-        return Status();
-    }
+inline Status Status::OK() {
+    return Status();
+}
 
-    inline Status::Status(const Status& other)
-        : _error(other._error) {
-        ref(_error);
-    }
+inline Status::Status(const Status& other) : _error(other._error) {
+    ref(_error);
+}
 
-    inline Status& Status::operator=(const Status& other) {
-        ref(other._error);
-        unref(_error);
-        _error = other._error;
-        return *this;
-    }
+inline Status& Status::operator=(const Status& other) {
+    ref(other._error);
+    unref(_error);
+    _error = other._error;
+    return *this;
+}
 
-    inline Status::Status(Status&& other) BOOST_NOEXCEPT
-        : _error(other._error) {
-        other._error = nullptr;
-    }
+inline Status::Status(Status&& other) BOOST_NOEXCEPT : _error(other._error) {
+    other._error = nullptr;
+}
 
-    inline Status& Status::operator=(Status&& other) BOOST_NOEXCEPT {
-        unref(_error);
-        _error = other._error;
-        other._error = nullptr;
-        return *this;
-    }
+inline Status& Status::operator=(Status&& other) BOOST_NOEXCEPT {
+    unref(_error);
+    _error = other._error;
+    other._error = nullptr;
+    return *this;
+}
 
-    inline Status::~Status() {
-        unref(_error);
-    }
+inline Status::~Status() {
+    unref(_error);
+}
 
-    inline bool Status::isOK() const {
-        return code() == ErrorCodes::OK;
-    }
+inline bool Status::isOK() const {
+    return code() == ErrorCodes::OK;
+}
 
-    inline ErrorCodes::Error Status::code() const {
-        return _error ? _error->code : ErrorCodes::OK;
-    }
+inline ErrorCodes::Error Status::code() const {
+    return _error ? _error->code : ErrorCodes::OK;
+}
 
-    inline std::string Status::codeString() const {
-        return ErrorCodes::errorString(code());
-    }
+inline std::string Status::codeString() const {
+    return ErrorCodes::errorString(code());
+}
 
-    inline std::string Status::reason() const {
-        return _error ? _error->reason : std::string();
-    }
+inline std::string Status::reason() const {
+    return _error ? _error->reason : std::string();
+}
 
-    inline int Status::location() const {
-        return _error ? _error->location : 0;
-    }
+inline int Status::location() const {
+    return _error ? _error->location : 0;
+}
 
-    inline AtomicUInt32::WordType Status::refCount() const {
-        return _error ? _error->refs.load() : 0;
-    }
+inline AtomicUInt32::WordType Status::refCount() const {
+    return _error ? _error->refs.load() : 0;
+}
 
-    inline Status::Status()
-        : _error(NULL) {
-    }
+inline Status::Status() : _error(NULL) {}
 
-    inline void Status::ref(ErrorInfo* error) {
-        if (error)
-            error->refs.fetchAndAdd(1);
-    }
+inline void Status::ref(ErrorInfo* error) {
+    if (error)
+        error->refs.fetchAndAdd(1);
+}
 
-    inline void Status::unref(ErrorInfo* error) {
-        if (error && (error->refs.subtractAndFetch(1) == 0))
-            delete error;
-    }
+inline void Status::unref(ErrorInfo* error) {
+    if (error && (error->refs.subtractAndFetch(1) == 0))
+        delete error;
+}
 
-    inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs) {
-        return rhs == lhs;
-    }
+inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs) {
+    return rhs == lhs;
+}
 
-    inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs) {
-        return rhs != lhs;
-    }
+inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs) {
+    return rhs != lhs;
+}
 
-} // namespace mongo
+}  // namespace mongo

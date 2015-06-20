@@ -34,181 +34,179 @@
 namespace mongo {
 namespace {
 
-    std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
-        StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
-        if (!status.isOK()) {
-            FAIL(str::stream() << "failed to parse query: " << obj.toString()
-                               << ". Reason: " << status.getStatus().toString());
-        }
-        return std::unique_ptr<MatchExpression>(status.getValue());
+std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
+    StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+    if (!status.isOK()) {
+        FAIL(str::stream() << "failed to parse query: " << obj.toString()
+                           << ". Reason: " << status.getStatus().toString());
     }
+    return std::unique_ptr<MatchExpression>(status.getValue());
+}
 
-    // Test sparse index discriminators for a simple sparse index.
-    TEST(PlanCacheIndexabilityTest, SparseIndexSimple) {
-        PlanCacheIndexabilityState state;
-        state.updateDiscriminators({IndexEntry(BSON("a" << 1),
-                                               false, // multikey
-                                               true, // sparse
-                                               false, // unique
-                                               "", // name
-                                               nullptr, // filterExpr
-                                               BSONObj())});
+// Test sparse index discriminators for a simple sparse index.
+TEST(PlanCacheIndexabilityTest, SparseIndexSimple) {
+    PlanCacheIndexabilityState state;
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                           false,    // multikey
+                                           true,     // sparse
+                                           false,    // unique
+                                           "",       // name
+                                           nullptr,  // filterExpr
+                                           BSONObj())});
 
+    const IndexabilityDiscriminators& discriminators = state.getDiscriminators("a");
+    ASSERT_EQ(1U, discriminators.size());
+
+    const IndexabilityDiscriminator& disc = discriminators[0];
+    ASSERT_EQ(true, disc(parseMatchExpression(BSON("a" << 1)).get()));
+    ASSERT_EQ(false, disc(parseMatchExpression(BSON("a" << BSONNULL)).get()));
+    ASSERT_EQ(true, disc(parseMatchExpression(BSON("a" << BSON("$in" << BSON_ARRAY(1)))).get()));
+    ASSERT_EQ(false,
+              disc(parseMatchExpression(BSON("a" << BSON("$in" << BSON_ARRAY(BSONNULL)))).get()));
+}
+
+// Test sparse index discriminators for a compound sparse index.
+TEST(PlanCacheIndexabilityTest, SparseIndexCompound) {
+    PlanCacheIndexabilityState state;
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1 << "b" << 1),
+                                           false,    // multikey
+                                           true,     // sparse
+                                           false,    // unique
+                                           "",       // name
+                                           nullptr,  // filterExpr
+                                           BSONObj())});
+
+    {
         const IndexabilityDiscriminators& discriminators = state.getDiscriminators("a");
         ASSERT_EQ(1U, discriminators.size());
 
         const IndexabilityDiscriminator& disc = discriminators[0];
         ASSERT_EQ(true, disc(parseMatchExpression(BSON("a" << 1)).get()));
         ASSERT_EQ(false, disc(parseMatchExpression(BSON("a" << BSONNULL)).get()));
-        ASSERT_EQ(true,
-                  disc(parseMatchExpression(BSON("a" << BSON("$in" << BSON_ARRAY(1)))).get()));
-        ASSERT_EQ(false,
-                  disc(parseMatchExpression(BSON("a" <<
-                                                 BSON("$in" << BSON_ARRAY(BSONNULL)))).get()));
     }
 
-    // Test sparse index discriminators for a compound sparse index.
-    TEST(PlanCacheIndexabilityTest, SparseIndexCompound) {
-        PlanCacheIndexabilityState state;
-        state.updateDiscriminators({IndexEntry(BSON("a" << 1 << "b" << 1),
-                                               false, // multikey
-                                               true, // sparse
-                                               false, // unique
-                                               "", // name
-                                               nullptr, // filterExpr
-                                               BSONObj())});
+    {
+        const IndexabilityDiscriminators& discriminators = state.getDiscriminators("b");
+        ASSERT_EQ(1U, discriminators.size());
 
-        {
-            const IndexabilityDiscriminators& discriminators = state.getDiscriminators("a");
-            ASSERT_EQ(1U, discriminators.size());
-
-            const IndexabilityDiscriminator& disc = discriminators[0];
-            ASSERT_EQ(true, disc(parseMatchExpression(BSON("a" << 1)).get()));
-            ASSERT_EQ(false, disc(parseMatchExpression(BSON("a" << BSONNULL)).get()));
-        }
-
-        {
-            const IndexabilityDiscriminators& discriminators = state.getDiscriminators("b");
-            ASSERT_EQ(1U, discriminators.size());
-
-            const IndexabilityDiscriminator& disc = discriminators[0];
-            ASSERT_EQ(true, disc(parseMatchExpression(BSON("b" << 1)).get()));
-            ASSERT_EQ(false, disc(parseMatchExpression(BSON("b" << BSONNULL)).get()));
-        }
+        const IndexabilityDiscriminator& disc = discriminators[0];
+        ASSERT_EQ(true, disc(parseMatchExpression(BSON("b" << 1)).get()));
+        ASSERT_EQ(false, disc(parseMatchExpression(BSON("b" << BSONNULL)).get()));
     }
+}
 
-    // Test partial index discriminators for an index with a simple filter.
-    TEST(PlanCacheIndexabilityTest, PartialIndexSimple) {
-        BSONObj filterObj = BSON("f" << BSON("$gt" << 0));
-        std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
-        PlanCacheIndexabilityState state;
-        state.updateDiscriminators({IndexEntry(BSON("a" << 1),
-                                               false, // multikey
-                                               false, // sparse
-                                               false, // unique
-                                               "", // name
-                                               filterExpr.get(),
-                                               BSONObj())});
+// Test partial index discriminators for an index with a simple filter.
+TEST(PlanCacheIndexabilityTest, PartialIndexSimple) {
+    BSONObj filterObj = BSON("f" << BSON("$gt" << 0));
+    std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
+    PlanCacheIndexabilityState state;
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                           false,  // multikey
+                                           false,  // sparse
+                                           false,  // unique
+                                           "",     // name
+                                           filterExpr.get(),
+                                           BSONObj())});
 
+    const IndexabilityDiscriminators& discriminators = state.getDiscriminators("f");
+    ASSERT_EQ(1U, discriminators.size());
+
+    const IndexabilityDiscriminator& disc = discriminators[0];
+    ASSERT_EQ(false, disc(parseMatchExpression(BSON("f" << BSON("$gt" << -5))).get()));
+    ASSERT_EQ(true, disc(parseMatchExpression(BSON("f" << BSON("$gt" << 5))).get()));
+
+    ASSERT(state.getDiscriminators("a").empty());
+}
+
+// Test partial index discriminators for an index where the filter expression is an AND.
+TEST(PlanCacheIndexabilityTest, PartialIndexAnd) {
+    BSONObj filterObj = BSON("f" << 1 << "g" << 1);
+    std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
+    PlanCacheIndexabilityState state;
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                           false,  // multikey
+                                           false,  // sparse
+                                           false,  // unique
+                                           "",     // name
+                                           filterExpr.get(),
+                                           BSONObj())});
+
+    {
         const IndexabilityDiscriminators& discriminators = state.getDiscriminators("f");
         ASSERT_EQ(1U, discriminators.size());
 
         const IndexabilityDiscriminator& disc = discriminators[0];
-        ASSERT_EQ(false, disc(parseMatchExpression(BSON("f" << BSON("$gt" << -5))).get()));
-        ASSERT_EQ(true, disc(parseMatchExpression(BSON("f" << BSON("$gt" << 5))).get()));
-
-        ASSERT(state.getDiscriminators("a").empty());
+        ASSERT_EQ(false, disc(parseMatchExpression(BSON("f" << 0)).get()));
+        ASSERT_EQ(true, disc(parseMatchExpression(BSON("f" << 1)).get()));
     }
 
-    // Test partial index discriminators for an index where the filter expression is an AND.
-    TEST(PlanCacheIndexabilityTest, PartialIndexAnd) {
-        BSONObj filterObj = BSON("f" << 1 << "g" << 1);
-        std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
-        PlanCacheIndexabilityState state;
-        state.updateDiscriminators({IndexEntry(BSON("a" << 1),
-                                               false, // multikey
-                                               false, // sparse
-                                               false, // unique
-                                               "", // name
-                                               filterExpr.get(),
-                                               BSONObj())});
+    {
+        const IndexabilityDiscriminators& discriminators = state.getDiscriminators("g");
+        ASSERT_EQ(1U, discriminators.size());
 
-        {
-            const IndexabilityDiscriminators& discriminators = state.getDiscriminators("f");
-            ASSERT_EQ(1U, discriminators.size());
-
-            const IndexabilityDiscriminator& disc = discriminators[0];
-            ASSERT_EQ(false, disc(parseMatchExpression(BSON("f" << 0)).get()));
-            ASSERT_EQ(true, disc(parseMatchExpression(BSON("f" << 1)).get()));
-        }
-
-        {
-            const IndexabilityDiscriminators& discriminators = state.getDiscriminators("g");
-            ASSERT_EQ(1U, discriminators.size());
-
-            const IndexabilityDiscriminator& disc = discriminators[0];
-            ASSERT_EQ(false, disc(parseMatchExpression(BSON("g" << 0)).get()));
-            ASSERT_EQ(true, disc(parseMatchExpression(BSON("g" << 1)).get()));
-        }
-
-        ASSERT(state.getDiscriminators("a").empty());
+        const IndexabilityDiscriminator& disc = discriminators[0];
+        ASSERT_EQ(false, disc(parseMatchExpression(BSON("g" << 0)).get()));
+        ASSERT_EQ(true, disc(parseMatchExpression(BSON("g" << 1)).get()));
     }
 
-    // Test partial index discriminators where there are multiple partial indexes.
-    TEST(PlanCacheIndexabilityTest, MultiplePartialIndexes) {
-        BSONObj filterObj1 = BSON("f" << 1);
-        std::unique_ptr<MatchExpression> filterExpr1(parseMatchExpression(filterObj1));
+    ASSERT(state.getDiscriminators("a").empty());
+}
 
-        BSONObj filterObj2 = BSON("f" << 2);
-        std::unique_ptr<MatchExpression> filterExpr2(parseMatchExpression(filterObj2));
+// Test partial index discriminators where there are multiple partial indexes.
+TEST(PlanCacheIndexabilityTest, MultiplePartialIndexes) {
+    BSONObj filterObj1 = BSON("f" << 1);
+    std::unique_ptr<MatchExpression> filterExpr1(parseMatchExpression(filterObj1));
 
-        PlanCacheIndexabilityState state;
-        state.updateDiscriminators({IndexEntry(BSON("a" << 1),
-                                               false, // multikey
-                                               false, // sparse
-                                               false, // unique
-                                               "", // name
-                                               filterExpr1.get(),
-                                               BSONObj()),
-                                    IndexEntry(BSON("b" << 1),
-                                               false, // multikey
-                                               false, // sparse
-                                               false, // unique
-                                               "", // name
-                                               filterExpr2.get(),
-                                               BSONObj())});
+    BSONObj filterObj2 = BSON("f" << 2);
+    std::unique_ptr<MatchExpression> filterExpr2(parseMatchExpression(filterObj2));
 
-        const IndexabilityDiscriminators& discriminators = state.getDiscriminators("f");
-        ASSERT_EQ(2U, discriminators.size());
+    PlanCacheIndexabilityState state;
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                           false,  // multikey
+                                           false,  // sparse
+                                           false,  // unique
+                                           "",     // name
+                                           filterExpr1.get(),
+                                           BSONObj()),
+                                IndexEntry(BSON("b" << 1),
+                                           false,  // multikey
+                                           false,  // sparse
+                                           false,  // unique
+                                           "",     // name
+                                           filterExpr2.get(),
+                                           BSONObj())});
 
-        const IndexabilityDiscriminator& disc1 = discriminators[0];
-        const IndexabilityDiscriminator& disc2 = discriminators[1];
+    const IndexabilityDiscriminators& discriminators = state.getDiscriminators("f");
+    ASSERT_EQ(2U, discriminators.size());
 
-        ASSERT_EQ(false, disc1(parseMatchExpression(BSON("f" << 0)).get()));
-        ASSERT_EQ(false, disc1(parseMatchExpression(BSON("f" << 0)).get()));
+    const IndexabilityDiscriminator& disc1 = discriminators[0];
+    const IndexabilityDiscriminator& disc2 = discriminators[1];
 
-        ASSERT_NOT_EQUALS(disc1(parseMatchExpression(BSON("f" << 1)).get()),
-                          disc2(parseMatchExpression(BSON("f" << 1)).get()));
+    ASSERT_EQ(false, disc1(parseMatchExpression(BSON("f" << 0)).get()));
+    ASSERT_EQ(false, disc1(parseMatchExpression(BSON("f" << 0)).get()));
 
-        ASSERT_NOT_EQUALS(disc1(parseMatchExpression(BSON("f" << 2)).get()),
-                          disc2(parseMatchExpression(BSON("f" << 2)).get()));
+    ASSERT_NOT_EQUALS(disc1(parseMatchExpression(BSON("f" << 1)).get()),
+                      disc2(parseMatchExpression(BSON("f" << 1)).get()));
 
-        ASSERT(state.getDiscriminators("a").empty());
-        ASSERT(state.getDiscriminators("b").empty());
-    }
+    ASSERT_NOT_EQUALS(disc1(parseMatchExpression(BSON("f" << 2)).get()),
+                      disc2(parseMatchExpression(BSON("f" << 2)).get()));
 
-    // Test that no discriminators are generated for a regular index.
-    TEST(PlanCacheIndexabilityTest, IndexNeitherSparseNorPartial) {
-        PlanCacheIndexabilityState state;
-        state.updateDiscriminators({IndexEntry(BSON("a" << 1),
-                                               false, // multikey
-                                               false, // sparse
-                                               false, // unique
-                                               "", // name
-                                               nullptr,
-                                               BSONObj())});
-        ASSERT(state.getDiscriminators("a").empty());
-    }
+    ASSERT(state.getDiscriminators("a").empty());
+    ASSERT(state.getDiscriminators("b").empty());
+}
+
+// Test that no discriminators are generated for a regular index.
+TEST(PlanCacheIndexabilityTest, IndexNeitherSparseNorPartial) {
+    PlanCacheIndexabilityState state;
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                           false,  // multikey
+                                           false,  // sparse
+                                           false,  // unique
+                                           "",     // name
+                                           nullptr,
+                                           BSONObj())});
+    ASSERT(state.getDiscriminators("a").empty());
+}
 
 }  // namespace
 }  // namespace mongo

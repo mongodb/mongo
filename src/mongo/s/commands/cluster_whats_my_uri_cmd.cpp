@@ -35,41 +35,39 @@
 namespace mongo {
 namespace {
 
-    class WhatsMyUriCmd : public Command {
-    public:
-        WhatsMyUriCmd() : Command("whatsmyuri") { }
+class WhatsMyUriCmd : public Command {
+public:
+    WhatsMyUriCmd() : Command("whatsmyuri") {}
 
-        virtual bool slaveOk() const {
-            return true;
-        }
+    virtual bool slaveOk() const {
+        return true;
+    }
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
-        }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual void help(std::stringstream &help) const {
-            help << "{whatsmyuri:1}";
-        }
+    virtual void help(std::stringstream& help) const {
+        help << "{whatsmyuri:1}";
+    }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        // No auth required
+    }
 
-            // No auth required
-        }
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
+        result << "you" << cc().getRemote().toString();
+        return true;
+    }
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result) {
+} whatsMyUriCmd;
 
-            result << "you" << cc().getRemote().toString();
-            return true;
-        }
-
-    } whatsMyUriCmd;
-
-} // namespace
-} // namespace mongo
+}  // namespace
+}  // namespace mongo

@@ -32,42 +32,42 @@
 
 namespace {
 
-    using std::string;
-    using mongo::BSONObj;
-    using mongo::LockpingsType;
-    using mongo::Date_t;
+using std::string;
+using mongo::BSONObj;
+using mongo::LockpingsType;
+using mongo::Date_t;
 
-    TEST(Validity, MissingFields) {
-        LockpingsType lockPing;
-        BSONObj objNoProcess = BSON(LockpingsType::ping(Date_t::now()));
-        string errMsg;
-        ASSERT(lockPing.parseBSON(objNoProcess, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(lockPing.isValid(NULL));
+TEST(Validity, MissingFields) {
+    LockpingsType lockPing;
+    BSONObj objNoProcess = BSON(LockpingsType::ping(Date_t::now()));
+    string errMsg;
+    ASSERT(lockPing.parseBSON(objNoProcess, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(lockPing.isValid(NULL));
 
-        BSONObj objNoPing = BSON(LockpingsType::process("host.local:27017:1352918870:16807"));
-        ASSERT(lockPing.parseBSON(objNoPing, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(lockPing.isValid(NULL));
-    }
+    BSONObj objNoPing = BSON(LockpingsType::process("host.local:27017:1352918870:16807"));
+    ASSERT(lockPing.parseBSON(objNoPing, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(lockPing.isValid(NULL));
+}
 
-    TEST(Validity, Valid) {
-        LockpingsType lockPing;
-        BSONObj obj = BSON(LockpingsType::process("host.local:27017:1352918870:16807") <<
-                           LockpingsType::ping(Date_t::fromMillisSinceEpoch(1)));
-        string errMsg;
-        ASSERT(lockPing.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_TRUE(lockPing.isValid(NULL));
-        ASSERT_EQUALS(lockPing.getProcess(), "host.local:27017:1352918870:16807");
-        ASSERT_EQUALS(lockPing.getPing(), Date_t::fromMillisSinceEpoch(1));
-    }
+TEST(Validity, Valid) {
+    LockpingsType lockPing;
+    BSONObj obj = BSON(LockpingsType::process("host.local:27017:1352918870:16807")
+                       << LockpingsType::ping(Date_t::fromMillisSinceEpoch(1)));
+    string errMsg;
+    ASSERT(lockPing.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_TRUE(lockPing.isValid(NULL));
+    ASSERT_EQUALS(lockPing.getProcess(), "host.local:27017:1352918870:16807");
+    ASSERT_EQUALS(lockPing.getPing(), Date_t::fromMillisSinceEpoch(1));
+}
 
-    TEST(Validity, BadType) {
-        LockpingsType lockPing;
-        BSONObj obj = BSON(LockpingsType::process() << 0);
-        string errMsg;
-        ASSERT((!lockPing.parseBSON(obj, &errMsg)) && (errMsg != ""));
-    }
+TEST(Validity, BadType) {
+    LockpingsType lockPing;
+    BSONObj obj = BSON(LockpingsType::process() << 0);
+    string errMsg;
+    ASSERT((!lockPing.parseBSON(obj, &errMsg)) && (errMsg != ""));
+}
 
-} // unnamed namespace
+}  // unnamed namespace

@@ -29,18 +29,18 @@
 #include "mongo/base/status.h"
 
 namespace mongo {
-    class NamespaceString;
-    class OperationContext;
+class NamespaceString;
+class OperationContext;
 
-    /**
-     * Renames the collection "source" to "target" and drops the existing collection named "target"
-     * iff "dropTarget" is true. "stayTemp" indicates whether a collection should maintain its
-     * temporariness.
-     */
-    Status renameCollection(OperationContext* txn,
-                            const NamespaceString& source,
-                            const NamespaceString& target,
-                            bool dropTarget,
-                            bool stayTemp);
+/**
+ * Renames the collection "source" to "target" and drops the existing collection named "target"
+ * iff "dropTarget" is true. "stayTemp" indicates whether a collection should maintain its
+ * temporariness.
+ */
+Status renameCollection(OperationContext* txn,
+                        const NamespaceString& source,
+                        const NamespaceString& target,
+                        bool dropTarget,
+                        bool stayTemp);
 
-} // namespace mongo
+}  // namespace mongo

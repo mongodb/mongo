@@ -33,146 +33,137 @@
 
 namespace mongo {
 
-    using boost::intrusive_ptr;
-    using std::make_pair;
-    using std::string;
-    using std::vector;
+using boost::intrusive_ptr;
+using std::make_pair;
+using std::string;
+using std::vector;
 
-    const char DocumentSourceMergeCursors::name[] = "$mergeCursors";
+const char DocumentSourceMergeCursors::name[] = "$mergeCursors";
 
-    const char* DocumentSourceMergeCursors::getSourceName() const {
-        return name;
+const char* DocumentSourceMergeCursors::getSourceName() const {
+    return name;
+}
+
+void DocumentSourceMergeCursors::setSource(DocumentSource* pSource) {
+    /* this doesn't take a source */
+    verify(false);
+}
+
+DocumentSourceMergeCursors::DocumentSourceMergeCursors(
+    const CursorIds& cursorIds, const intrusive_ptr<ExpressionContext>& pExpCtx)
+    : DocumentSource(pExpCtx), _cursorIds(cursorIds), _unstarted(true) {}
+
+intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
+    const CursorIds& cursorIds, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    return new DocumentSourceMergeCursors(cursorIds, pExpCtx);
+}
+
+intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    massert(17026,
+            string("Expected an Array, but got a ") + typeName(elem.type()),
+            elem.type() == Array);
+
+    CursorIds cursorIds;
+    BSONObj array = elem.embeddedObject();
+    BSONForEach(cursor, array) {
+        massert(17027,
+                string("Expected an Object, but got a ") + typeName(cursor.type()),
+                cursor.type() == Object);
+
+        cursorIds.push_back(
+            make_pair(ConnectionString(HostAndPort(cursor["host"].String())), cursor["id"].Long()));
     }
 
-    void DocumentSourceMergeCursors::setSource(DocumentSource *pSource) {
-        /* this doesn't take a source */
-        verify(false);
+    return new DocumentSourceMergeCursors(cursorIds, pExpCtx);
+}
+
+Value DocumentSourceMergeCursors::serialize(bool explain) const {
+    vector<Value> cursors;
+    for (size_t i = 0; i < _cursorIds.size(); i++) {
+        cursors.push_back(Value(
+            DOC("host" << Value(_cursorIds[i].first.toString()) << "id" << _cursorIds[i].second)));
+    }
+    return Value(DOC(getSourceName() << Value(cursors)));
+}
+
+DocumentSourceMergeCursors::CursorAndConnection::CursorAndConnection(ConnectionString host,
+                                                                     NamespaceString ns,
+                                                                     CursorId id)
+    : connection(host), cursor(connection.get(), ns, id, 0, 0) {}
+
+vector<DBClientCursor*> DocumentSourceMergeCursors::getCursors() {
+    verify(_unstarted);
+    start();
+    vector<DBClientCursor*> out;
+    for (Cursors::const_iterator it = _cursors.begin(); it != _cursors.end(); ++it) {
+        out.push_back(&((*it)->cursor));
     }
 
-    DocumentSourceMergeCursors::DocumentSourceMergeCursors(
-            const CursorIds& cursorIds,
-            const intrusive_ptr<ExpressionContext> &pExpCtx)
-        : DocumentSource(pExpCtx)
-        , _cursorIds(cursorIds)
-        , _unstarted(true)
-    {}
+    return out;
+}
 
-    intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
-            const CursorIds& cursorIds,
-            const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        return new DocumentSourceMergeCursors(cursorIds, pExpCtx);
+void DocumentSourceMergeCursors::start() {
+    _unstarted = false;
+
+    // open each cursor and send message asking for a batch
+    for (CursorIds::const_iterator it = _cursorIds.begin(); it != _cursorIds.end(); ++it) {
+        _cursors.push_back(
+            std::make_shared<CursorAndConnection>(it->first, pExpCtx->ns, it->second));
+        verify(_cursors.back()->connection->lazySupported());
+        _cursors.back()->cursor.initLazy();  // shouldn't block
     }
 
-    intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
-            BSONElement elem,
-            const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    // wait for all cursors to return a batch
+    // TODO need a way to keep cursors alive if some take longer than 10 minutes.
+    for (Cursors::const_iterator it = _cursors.begin(); it != _cursors.end(); ++it) {
+        bool retry = false;
+        bool ok = (*it)->cursor.initLazyFinish(retry);  // blocks here for first batch
 
-        massert(17026, string("Expected an Array, but got a ") + typeName(elem.type()),
-                elem.type() == Array);
-
-        CursorIds cursorIds;
-        BSONObj array = elem.embeddedObject();
-        BSONForEach(cursor, array) {
-            massert(17027, string("Expected an Object, but got a ") + typeName(cursor.type()),
-                    cursor.type() == Object);
-
-            cursorIds.push_back(make_pair(ConnectionString(HostAndPort(cursor["host"].String())),
-                                          cursor["id"].Long()));
-        }
-        
-        return new DocumentSourceMergeCursors(cursorIds, pExpCtx);
+        uassert(
+            17028, "error reading response from " + _cursors.back()->connection->toString(), ok);
+        verify(!retry);
     }
 
-    Value DocumentSourceMergeCursors::serialize(bool explain) const {
-        vector<Value> cursors;
-        for (size_t i = 0; i < _cursorIds.size(); i++) {
-            cursors.push_back(Value(DOC("host" << Value(_cursorIds[i].first.toString())
-                                     << "id" << _cursorIds[i].second)));
-        }
-        return Value(DOC(getSourceName() << Value(cursors)));
+    _currentCursor = _cursors.begin();
+}
+
+Document DocumentSourceMergeCursors::nextSafeFrom(DBClientCursor* cursor) {
+    const BSONObj next = cursor->next();
+    if (next.hasField("$err")) {
+        const int code = next.hasField("code") ? next["code"].numberInt() : 17029;
+        uasserted(code,
+                  str::stream() << "Received error in response from " << cursor->originalHost()
+                                << ": " << next);
     }
+    return Document::fromBsonWithMetaData(next);
+}
 
-    DocumentSourceMergeCursors::CursorAndConnection::CursorAndConnection(
-            ConnectionString host,
-            NamespaceString ns,
-            CursorId id)
-        : connection(host)
-        , cursor(connection.get(), ns, id, 0, 0)
-    {}
-
-    vector<DBClientCursor*> DocumentSourceMergeCursors::getCursors() {
-        verify(_unstarted);
+boost::optional<Document> DocumentSourceMergeCursors::getNext() {
+    if (_unstarted)
         start();
-        vector<DBClientCursor*> out;
-        for (Cursors::const_iterator it = _cursors.begin(); it !=_cursors.end(); ++it) {
-            out.push_back(&((*it)->cursor));
-        }
 
-        return out;
-    }
-
-    void DocumentSourceMergeCursors::start() {
-        _unstarted = false;
-
-        // open each cursor and send message asking for a batch
-        for (CursorIds::const_iterator it = _cursorIds.begin(); it !=_cursorIds.end(); ++it) {
-            _cursors.push_back(std::make_shared<CursorAndConnection>(
-                        it->first, pExpCtx->ns, it->second));
-            verify(_cursors.back()->connection->lazySupported());
-            _cursors.back()->cursor.initLazy(); // shouldn't block
-        }
-
-        // wait for all cursors to return a batch
-        // TODO need a way to keep cursors alive if some take longer than 10 minutes.
-        for (Cursors::const_iterator it = _cursors.begin(); it !=_cursors.end(); ++it) {
-            bool retry = false;
-            bool ok = (*it)->cursor.initLazyFinish(retry); // blocks here for first batch
-
-            uassert(17028,
-                    "error reading response from " + _cursors.back()->connection->toString(),
-                    ok);
-            verify(!retry);
-        }
-
+    // purge eof cursors and release their connections
+    while (!_cursors.empty() && !(*_currentCursor)->cursor.more()) {
+        (*_currentCursor)->connection.done();
+        _cursors.erase(_currentCursor);
         _currentCursor = _cursors.begin();
     }
 
-    Document DocumentSourceMergeCursors::nextSafeFrom(DBClientCursor* cursor) {
-        const BSONObj next = cursor->next();
-        if (next.hasField("$err")) {
-            const int code = next.hasField("code") ? next["code"].numberInt() : 17029;
-            uasserted(code, str::stream() << "Received error in response from "
-                                          << cursor->originalHost()
-                                          << ": " << next);
-        }
-        return Document::fromBsonWithMetaData(next);
-    }
+    if (_cursors.empty())
+        return boost::none;
 
-    boost::optional<Document> DocumentSourceMergeCursors::getNext() {
-        if (_unstarted)
-            start();
+    const Document next = nextSafeFrom(&((*_currentCursor)->cursor));
 
-        // purge eof cursors and release their connections
-        while (!_cursors.empty() && !(*_currentCursor)->cursor.more()) {
-            (*_currentCursor)->connection.done();
-            _cursors.erase(_currentCursor);
-            _currentCursor = _cursors.begin();
-        }
+    // advance _currentCursor, wrapping if needed
+    if (++_currentCursor == _cursors.end())
+        _currentCursor = _cursors.begin();
 
-        if (_cursors.empty())
-            return boost::none;
+    return next;
+}
 
-        const Document next = nextSafeFrom(&((*_currentCursor)->cursor));
-
-        // advance _currentCursor, wrapping if needed
-        if (++_currentCursor == _cursors.end())
-            _currentCursor = _cursors.begin();
-
-        return next;
-    }
-
-    void DocumentSourceMergeCursors::dispose() {
-        _cursors.clear();
-        _currentCursor = _cursors.end();
-    }
+void DocumentSourceMergeCursors::dispose() {
+    _cursors.clear();
+    _currentCursor = _cursors.end();
+}
 }

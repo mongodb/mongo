@@ -34,16 +34,16 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(ConnectionString, EqualitySync) {
-        ConnectionString cs(ConnectionString::SYNC, "a,b,c", "");
+TEST(ConnectionString, EqualitySync) {
+    ConnectionString cs(ConnectionString::SYNC, "a,b,c", "");
 
-        ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "a,b,c", "")));
-        ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "c,b,a", "")));
-        ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "c,a,b", "")));
+    ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "a,b,c", "")));
+    ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "c,b,a", "")));
+    ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "c,a,b", "")));
 
-        ASSERT(!cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "d,a,b", "")));
-    }
+    ASSERT(!cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "d,a,b", "")));
+}
 
-} // namespace
+}  // namespace

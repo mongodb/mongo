@@ -33,23 +33,25 @@
 
 namespace mongo {
 
-    class InMemoryKVHarnessHelper : public KVHarnessHelper {
-    public:
-        InMemoryKVHarnessHelper() : _engine( new InMemoryEngine()) {}
+class InMemoryKVHarnessHelper : public KVHarnessHelper {
+public:
+    InMemoryKVHarnessHelper() : _engine(new InMemoryEngine()) {}
 
-        virtual KVEngine* restartEngine() {
-            // Intentionally not restarting since the in-memory storage engine
-            // does not persist data across restarts
-            return _engine.get();
-        }
-
-        virtual KVEngine* getEngine() { return _engine.get(); }
-
-    private:
-        std::unique_ptr<InMemoryEngine> _engine;
-    };
-
-    KVHarnessHelper* KVHarnessHelper::create() {
-        return new InMemoryKVHarnessHelper();
+    virtual KVEngine* restartEngine() {
+        // Intentionally not restarting since the in-memory storage engine
+        // does not persist data across restarts
+        return _engine.get();
     }
+
+    virtual KVEngine* getEngine() {
+        return _engine.get();
+    }
+
+private:
+    std::unique_ptr<InMemoryEngine> _engine;
+};
+
+KVHarnessHelper* KVHarnessHelper::create() {
+    return new InMemoryKVHarnessHelper();
+}
 }

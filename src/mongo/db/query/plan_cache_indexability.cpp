@@ -41,67 +41,61 @@
 
 namespace mongo {
 
-    void PlanCacheIndexabilityState::processSparseIndex(const BSONObj& keyPattern) {
-        for (BSONElement elem : keyPattern) {
-            _pathDiscriminatorsMap[elem.fieldNameStringData()].push_back(
-                [] (const MatchExpression* queryExpr) {
-                    if (queryExpr->matchType() == MatchExpression::EQ) {
-                        const auto* queryExprEquality =
-                            static_cast<const EqualityMatchExpression*>(queryExpr);
-                        return !queryExprEquality->getData().isNull();
-                    }
-                    else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
-                        const auto* queryExprIn =
-                            static_cast<const InMatchExpression*>(queryExpr);
-                        return !queryExprIn->getData().hasNull();
-                    }
-                    else {
-                        return true;
-                    }
+void PlanCacheIndexabilityState::processSparseIndex(const BSONObj& keyPattern) {
+    for (BSONElement elem : keyPattern) {
+        _pathDiscriminatorsMap[elem.fieldNameStringData()].push_back(
+            [](const MatchExpression* queryExpr) {
+                if (queryExpr->matchType() == MatchExpression::EQ) {
+                    const auto* queryExprEquality =
+                        static_cast<const EqualityMatchExpression*>(queryExpr);
+                    return !queryExprEquality->getData().isNull();
+                } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
+                    const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
+                    return !queryExprIn->getData().hasNull();
+                } else {
+                    return true;
                 }
-            );
-        }
+            });
     }
+}
 
-    void PlanCacheIndexabilityState::processPartialIndex(const MatchExpression* filterExpr) {
-        invariant(filterExpr);
-        for (size_t i = 0; i < filterExpr->numChildren(); ++i) {
-            processPartialIndex(filterExpr->getChild(i));
-        }
-        if (!filterExpr->isLogical()) {
-            _pathDiscriminatorsMap[filterExpr->path()].push_back(
-                [filterExpr] (const MatchExpression* queryExpr) {
-                    return expression::isSubsetOf(queryExpr, filterExpr);
-                }
-            );
-        }
+void PlanCacheIndexabilityState::processPartialIndex(const MatchExpression* filterExpr) {
+    invariant(filterExpr);
+    for (size_t i = 0; i < filterExpr->numChildren(); ++i) {
+        processPartialIndex(filterExpr->getChild(i));
     }
+    if (!filterExpr->isLogical()) {
+        _pathDiscriminatorsMap[filterExpr->path()].push_back(
+            [filterExpr](const MatchExpression* queryExpr) {
+                return expression::isSubsetOf(queryExpr, filterExpr);
+            });
+    }
+}
 
 namespace {
-    const IndexabilityDiscriminators emptyDiscriminators;
+const IndexabilityDiscriminators emptyDiscriminators;
 }  // namespace
 
-    const IndexabilityDiscriminators& PlanCacheIndexabilityState::getDiscriminators(
-            StringData path) const {
-        PathDiscriminatorsMap::const_iterator it = _pathDiscriminatorsMap.find(path);
-        if (it == _pathDiscriminatorsMap.end()) {
-            return emptyDiscriminators;
-        }
-        return it->second;
+const IndexabilityDiscriminators& PlanCacheIndexabilityState::getDiscriminators(
+    StringData path) const {
+    PathDiscriminatorsMap::const_iterator it = _pathDiscriminatorsMap.find(path);
+    if (it == _pathDiscriminatorsMap.end()) {
+        return emptyDiscriminators;
     }
+    return it->second;
+}
 
-    void PlanCacheIndexabilityState::updateDiscriminators(
-            const std::vector<IndexEntry>& indexEntries) {
-        _pathDiscriminatorsMap = PathDiscriminatorsMap();
+void PlanCacheIndexabilityState::updateDiscriminators(const std::vector<IndexEntry>& indexEntries) {
+    _pathDiscriminatorsMap = PathDiscriminatorsMap();
 
-        for (const IndexEntry& idx : indexEntries) {
-            if (idx.sparse) {
-                processSparseIndex(idx.keyPattern);
-            }
-            if (idx.filterExpr) {
-                processPartialIndex(idx.filterExpr);
-            }
+    for (const IndexEntry& idx : indexEntries) {
+        if (idx.sparse) {
+            processSparseIndex(idx.keyPattern);
+        }
+        if (idx.filterExpr) {
+            processPartialIndex(idx.filterExpr);
         }
     }
+}
 
 }  // namespace mongo

@@ -43,136 +43,146 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        extern const double MAX_WEIGHT;
-        extern const double MAX_WORD_WEIGHT;
-        extern const double DEFAULT_WEIGHT;
+extern const double MAX_WEIGHT;
+extern const double MAX_WORD_WEIGHT;
+extern const double DEFAULT_WEIGHT;
 
-        typedef std::map<std::string,double> Weights; // TODO cool map
-        typedef unordered_map<std::string,double> TermFrequencyMap;
+typedef std::map<std::string, double> Weights;  // TODO cool map
+typedef unordered_map<std::string, double> TermFrequencyMap;
 
-        struct ScoreHelperStruct {
-            ScoreHelperStruct()
-                : freq(0), count(0), exp(0){
-            }
-            double freq;
-            double count;
-            double exp;
-        };
-        typedef unordered_map<std::string,ScoreHelperStruct> ScoreHelperMap;
+struct ScoreHelperStruct {
+    ScoreHelperStruct() : freq(0), count(0), exp(0) {}
+    double freq;
+    double count;
+    double exp;
+};
+typedef unordered_map<std::string, ScoreHelperStruct> ScoreHelperMap;
 
-        class FTSSpec {
+class FTSSpec {
+    struct Tools {
+        Tools(const FTSLanguage& _language, const Stemmer* _stemmer, const StopWords* _stopwords)
+            : language(_language), stemmer(_stemmer), stopwords(_stopwords) {}
 
-            struct Tools {
-                Tools( const FTSLanguage& _language,
-                       const Stemmer* _stemmer,
-                       const StopWords* _stopwords )
-                    : language( _language )
-                    , stemmer( _stemmer )
-                    , stopwords( _stopwords ) {}
+        const FTSLanguage& language;
+        const Stemmer* stemmer;
+        const StopWords* stopwords;
+    };
 
-                const FTSLanguage& language;
-                const Stemmer* stemmer;
-                const StopWords* stopwords;
-            };
+public:
+    FTSSpec(const BSONObj& indexInfo);
 
-        public:
-            FTSSpec( const BSONObj& indexInfo );
-
-            bool wildcard() const { return _wildcard; }
-            const FTSLanguage& defaultLanguage() const { return *_defaultLanguage; }
-            const std::string& languageOverrideField() const { return _languageOverrideField; }
-
-            size_t numExtraBefore() const { return _extraBefore.size(); }
-            const std::string& extraBefore( unsigned i ) const { return _extraBefore[i]; }
-
-            size_t numExtraAfter() const { return _extraAfter.size(); }
-            const std::string& extraAfter( unsigned i ) const { return _extraAfter[i]; }
-
-            /**
-             * Calculates term/score pairs for a BSONObj as applied to this spec.
-             * @arg obj  document to traverse; can be a subdocument or array
-             * @arg term_freqs  output parameter to store (term,score) results
-             */
-            void scoreDocument( const BSONObj& obj, TermFrequencyMap* term_freqs ) const;
-
-            /**
-             * given a query, pulls out the pieces (in order) that go in the index first
-             */
-            Status getIndexPrefix( const BSONObj& filter, BSONObj* out ) const;
-
-            const Weights& weights() const { return _weights; }
-            static BSONObj fixSpec( const BSONObj& spec );
-
-            /**
-             * Returns text index version.
-             */
-            TextIndexVersion getTextIndexVersion() const { return _textIndexVersion; }
-
-        private:
-            //
-            // Helper methods.  Invoked for TEXT_INDEX_VERSION_2 spec objects only.
-            //
-
-            /**
-             * Calculate the term scores for 'raw' and update 'term_freqs' with the result.  Parses
-             * 'raw' using 'tools', and weights term scores based on 'weight'.
-             */
-            void _scoreStringV2( FTSTokenizer* tokenizer,
-                                 StringData raw,
-                                 TermFrequencyMap* term_freqs,
-                                 double weight ) const;
-
-        public:
-            /**
-             * Get the language override for the given BSON doc.  If no language override is
-             * specified, returns currentLanguage.
-             */
-            const FTSLanguage* _getLanguageToUseV2( const BSONObj& userDoc,
-                                                    const FTSLanguage* currentLanguage ) const;
-
-        private:
-            //
-            // Deprecated helper methods.  Invoked for TEXT_INDEX_VERSION_1 spec objects only.
-            //
-
-            void _scoreStringV1( const Tools& tools,
-                                 StringData raw,
-                                 TermFrequencyMap* docScores,
-                                 double weight ) const;
-
-            bool _weightV1( StringData field, double* out ) const;
-
-            void _scoreRecurseV1( const Tools& tools,
-                                  const BSONObj& obj,
-                                  TermFrequencyMap* term_freqs ) const;
-
-            void _scoreDocumentV1( const BSONObj& obj, TermFrequencyMap* term_freqs ) const;
-
-            const FTSLanguage& _getLanguageToUseV1( const BSONObj& userDoc ) const;
-
-            static BSONObj _fixSpecV1( const BSONObj& spec );
-
-            //
-            // Instance variables.
-            //
-
-            TextIndexVersion _textIndexVersion;
-
-            const FTSLanguage* _defaultLanguage;
-            std::string _languageOverrideField;
-            bool _wildcard;
-
-            // mapping : fieldname -> weight
-            Weights _weights;
-
-            // Prefix compound key - used to partition search index
-            std::vector<std::string> _extraBefore;
-
-            // Suffix compound key - used for covering index behavior
-            std::vector<std::string> _extraAfter;
-        };
-
+    bool wildcard() const {
+        return _wildcard;
     }
+    const FTSLanguage& defaultLanguage() const {
+        return *_defaultLanguage;
+    }
+    const std::string& languageOverrideField() const {
+        return _languageOverrideField;
+    }
+
+    size_t numExtraBefore() const {
+        return _extraBefore.size();
+    }
+    const std::string& extraBefore(unsigned i) const {
+        return _extraBefore[i];
+    }
+
+    size_t numExtraAfter() const {
+        return _extraAfter.size();
+    }
+    const std::string& extraAfter(unsigned i) const {
+        return _extraAfter[i];
+    }
+
+    /**
+     * Calculates term/score pairs for a BSONObj as applied to this spec.
+     * @arg obj  document to traverse; can be a subdocument or array
+     * @arg term_freqs  output parameter to store (term,score) results
+     */
+    void scoreDocument(const BSONObj& obj, TermFrequencyMap* term_freqs) const;
+
+    /**
+     * given a query, pulls out the pieces (in order) that go in the index first
+     */
+    Status getIndexPrefix(const BSONObj& filter, BSONObj* out) const;
+
+    const Weights& weights() const {
+        return _weights;
+    }
+    static BSONObj fixSpec(const BSONObj& spec);
+
+    /**
+     * Returns text index version.
+     */
+    TextIndexVersion getTextIndexVersion() const {
+        return _textIndexVersion;
+    }
+
+private:
+    //
+    // Helper methods.  Invoked for TEXT_INDEX_VERSION_2 spec objects only.
+    //
+
+    /**
+     * Calculate the term scores for 'raw' and update 'term_freqs' with the result.  Parses
+     * 'raw' using 'tools', and weights term scores based on 'weight'.
+     */
+    void _scoreStringV2(FTSTokenizer* tokenizer,
+                        StringData raw,
+                        TermFrequencyMap* term_freqs,
+                        double weight) const;
+
+public:
+    /**
+     * Get the language override for the given BSON doc.  If no language override is
+     * specified, returns currentLanguage.
+     */
+    const FTSLanguage* _getLanguageToUseV2(const BSONObj& userDoc,
+                                           const FTSLanguage* currentLanguage) const;
+
+private:
+    //
+    // Deprecated helper methods.  Invoked for TEXT_INDEX_VERSION_1 spec objects only.
+    //
+
+    void _scoreStringV1(const Tools& tools,
+                        StringData raw,
+                        TermFrequencyMap* docScores,
+                        double weight) const;
+
+    bool _weightV1(StringData field, double* out) const;
+
+    void _scoreRecurseV1(const Tools& tools,
+                         const BSONObj& obj,
+                         TermFrequencyMap* term_freqs) const;
+
+    void _scoreDocumentV1(const BSONObj& obj, TermFrequencyMap* term_freqs) const;
+
+    const FTSLanguage& _getLanguageToUseV1(const BSONObj& userDoc) const;
+
+    static BSONObj _fixSpecV1(const BSONObj& spec);
+
+    //
+    // Instance variables.
+    //
+
+    TextIndexVersion _textIndexVersion;
+
+    const FTSLanguage* _defaultLanguage;
+    std::string _languageOverrideField;
+    bool _wildcard;
+
+    // mapping : fieldname -> weight
+    Weights _weights;
+
+    // Prefix compound key - used to partition search index
+    std::vector<std::string> _extraBefore;
+
+    // Suffix compound key - used for covering index behavior
+    std::vector<std::string> _extraAfter;
+};
+}
 }

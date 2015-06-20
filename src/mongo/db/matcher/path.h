@@ -38,132 +38,152 @@
 
 namespace mongo {
 
-    class ElementPath {
+class ElementPath {
+public:
+    Status init(StringData path);
+
+    void setTraverseNonleafArrays(bool b) {
+        _shouldTraverseNonleafArrays = b;
+    }
+    void setTraverseLeafArray(bool b) {
+        _shouldTraverseLeafArray = b;
+    }
+
+    const FieldRef& fieldRef() const {
+        return _fieldRef;
+    }
+    bool shouldTraverseNonleafArrays() const {
+        return _shouldTraverseNonleafArrays;
+    }
+    bool shouldTraverseLeafArray() const {
+        return _shouldTraverseLeafArray;
+    }
+
+private:
+    FieldRef _fieldRef;
+    bool _shouldTraverseNonleafArrays;
+    bool _shouldTraverseLeafArray;
+};
+
+class ElementIterator {
+public:
+    class Context {
     public:
-        Status init( StringData path );
+        void reset();
 
-        void setTraverseNonleafArrays( bool b ) { _shouldTraverseNonleafArrays = b; }
-        void setTraverseLeafArray( bool b ) { _shouldTraverseLeafArray = b; }
+        void reset(BSONElement element, BSONElement arrayOffset, bool outerArray);
 
-        const FieldRef& fieldRef() const { return _fieldRef; }
-        bool shouldTraverseNonleafArrays() const { return _shouldTraverseNonleafArrays; }
-        bool shouldTraverseLeafArray() const { return _shouldTraverseLeafArray; }
-
-    private:
-        FieldRef _fieldRef;
-        bool _shouldTraverseNonleafArrays;
-        bool _shouldTraverseLeafArray;
-    };
-
-    class ElementIterator {
-    public:
-        class Context {
-        public:
-
-            void reset();
-
-            void reset( BSONElement element, BSONElement arrayOffset, bool outerArray );
-
-            void setArrayOffset( BSONElement e ) { _arrayOffset = e; }
-
-            BSONElement element() const { return _element; }
-            BSONElement arrayOffset() const { return _arrayOffset; }
-            bool outerArray() const { return _outerArray; }
-
-        private:
-            BSONElement _element;
-            BSONElement _arrayOffset;
-            bool _outerArray;
-        };
-
-        virtual ~ElementIterator();
-
-        virtual bool more() = 0;
-        virtual Context next() = 0;
-
-    };
-
-    // ---------------------------------------------------------------
-
-    class SingleElementElementIterator : public ElementIterator {
-    public:
-        explicit SingleElementElementIterator( BSONElement e )
-            : _seen( false ) {
-            _element.reset( e, BSONElement(), false );
+        void setArrayOffset(BSONElement e) {
+            _arrayOffset = e;
         }
-        virtual ~SingleElementElementIterator(){}
 
-        virtual bool more() { return !_seen; }
-        virtual Context next() { _seen = true; return _element; }
-
-    private:
-        bool _seen;
-        ElementIterator::Context _element;
-    };
-
-    class SimpleArrayElementIterator : public ElementIterator {
-    public:
-        SimpleArrayElementIterator( const BSONElement& theArray, bool returnArrayLast );
-
-        virtual bool more();
-        virtual Context next();
+        BSONElement element() const {
+            return _element;
+        }
+        BSONElement arrayOffset() const {
+            return _arrayOffset;
+        }
+        bool outerArray() const {
+            return _outerArray;
+        }
 
     private:
-        BSONElement _theArray;
-        bool _returnArrayLast;
-        BSONObjIterator _iterator;
+        BSONElement _element;
+        BSONElement _arrayOffset;
+        bool _outerArray;
     };
 
-    class BSONElementIterator : public ElementIterator {
-    public:
-        BSONElementIterator();
-        BSONElementIterator( const ElementPath* path, const BSONObj& context );
+    virtual ~ElementIterator();
 
-        virtual ~BSONElementIterator();
+    virtual bool more() = 0;
+    virtual Context next() = 0;
+};
 
-        void reset( const ElementPath* path, const BSONObj& context );
+// ---------------------------------------------------------------
+
+class SingleElementElementIterator : public ElementIterator {
+public:
+    explicit SingleElementElementIterator(BSONElement e) : _seen(false) {
+        _element.reset(e, BSONElement(), false);
+    }
+    virtual ~SingleElementElementIterator() {}
+
+    virtual bool more() {
+        return !_seen;
+    }
+    virtual Context next() {
+        _seen = true;
+        return _element;
+    }
+
+private:
+    bool _seen;
+    ElementIterator::Context _element;
+};
+
+class SimpleArrayElementIterator : public ElementIterator {
+public:
+    SimpleArrayElementIterator(const BSONElement& theArray, bool returnArrayLast);
+
+    virtual bool more();
+    virtual Context next();
+
+private:
+    BSONElement _theArray;
+    bool _returnArrayLast;
+    BSONObjIterator _iterator;
+};
+
+class BSONElementIterator : public ElementIterator {
+public:
+    BSONElementIterator();
+    BSONElementIterator(const ElementPath* path, const BSONObj& context);
+
+    virtual ~BSONElementIterator();
+
+    void reset(const ElementPath* path, const BSONObj& context);
+
+    bool more();
+    Context next();
+
+private:
+    /**
+     * Helper for more().  Recurs on _subCursor (which traverses the remainder of a path through
+     * subdocuments of an array).
+     */
+    bool subCursorHasMore();
+
+    const ElementPath* _path;
+    BSONObj _context;
+
+    enum State { BEGIN, IN_ARRAY, DONE } _state;
+    Context _next;
+
+    struct ArrayIterationState {
+        void reset(const FieldRef& ref, int start);
+        void startIterator(BSONElement theArray);
 
         bool more();
-        Context next();
+        BSONElement next();
 
-    private:
-        /**
-         * Helper for more().  Recurs on _subCursor (which traverses the remainder of a path through
-         * subdocuments of an array).
-         */
-        bool subCursorHasMore();
+        bool isArrayOffsetMatch(StringData fieldName) const;
+        bool nextEntireRest() const {
+            return nextPieceOfPath.size() == restOfPath.size();
+        }
 
-        const ElementPath* _path;
-        BSONObj _context;
+        std::string restOfPath;
+        bool hasMore;
+        StringData nextPieceOfPath;
+        bool nextPieceOfPathIsNumber;
 
-        enum State { BEGIN, IN_ARRAY, DONE } _state;
-        Context _next;
-
-        struct ArrayIterationState {
-
-            void reset( const FieldRef& ref, int start );
-            void startIterator( BSONElement theArray );
-
-            bool more();
-            BSONElement next();
-
-            bool isArrayOffsetMatch( StringData fieldName ) const;
-            bool nextEntireRest() const { return nextPieceOfPath.size() == restOfPath.size(); }
-
-            std::string restOfPath;
-            bool hasMore;
-            StringData nextPieceOfPath;
-            bool nextPieceOfPathIsNumber;
-
-            BSONElement _theArray;
-            BSONElement _current;
-            std::unique_ptr<BSONObjIterator> _iterator;
-        };
-
-        ArrayIterationState _arrayIterationState;
-
-        std::unique_ptr<ElementIterator> _subCursor;
-        std::unique_ptr<ElementPath> _subCursorPath;
+        BSONElement _theArray;
+        BSONElement _current;
+        std::unique_ptr<BSONObjIterator> _iterator;
     };
 
+    ArrayIterationState _arrayIterationState;
+
+    std::unique_ptr<ElementIterator> _subCursor;
+    std::unique_ptr<ElementPath> _subCursorPath;
+};
 }

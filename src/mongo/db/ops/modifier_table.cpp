@@ -49,96 +49,93 @@
 
 namespace mongo {
 
-    using std::make_pair;
-    using std::string;
+using std::make_pair;
+using std::string;
 
 namespace modifiertable {
 
-    namespace {
+namespace {
 
-        struct ModifierEntry {
-            string name;
-            ModifierType type;
+struct ModifierEntry {
+    string name;
+    ModifierType type;
 
-            ModifierEntry(StringData name, ModifierType type)
-                : name(name.toString())
-                , type(type) {
-            }
-        };
+    ModifierEntry(StringData name, ModifierType type) : name(name.toString()), type(type) {}
+};
 
-        typedef unordered_map<StringData, ModifierEntry*, StringData::Hasher> NameMap;
+typedef unordered_map<StringData, ModifierEntry*, StringData::Hasher> NameMap;
 
-        NameMap* MODIFIER_NAME_MAP;
+NameMap* MODIFIER_NAME_MAP;
 
-        void init(NameMap* nameMap) {
-            ModifierEntry* entryAddToSet = new ModifierEntry("$addToSet", MOD_ADD_TO_SET);
-            nameMap->insert(make_pair(StringData(entryAddToSet->name), entryAddToSet));
+void init(NameMap* nameMap) {
+    ModifierEntry* entryAddToSet = new ModifierEntry("$addToSet", MOD_ADD_TO_SET);
+    nameMap->insert(make_pair(StringData(entryAddToSet->name), entryAddToSet));
 
-            ModifierEntry* entryBit = new ModifierEntry("$bit", MOD_BIT);
-            nameMap->insert(make_pair(StringData(entryBit->name), entryBit));
+    ModifierEntry* entryBit = new ModifierEntry("$bit", MOD_BIT);
+    nameMap->insert(make_pair(StringData(entryBit->name), entryBit));
 
-            ModifierEntry* entryCurrentDate = new ModifierEntry("$currentDate", MOD_CURRENTDATE);
-            nameMap->insert(make_pair(StringData(entryCurrentDate->name), entryCurrentDate));
+    ModifierEntry* entryCurrentDate = new ModifierEntry("$currentDate", MOD_CURRENTDATE);
+    nameMap->insert(make_pair(StringData(entryCurrentDate->name), entryCurrentDate));
 
-            ModifierEntry* entryInc = new ModifierEntry("$inc", MOD_INC);
-            nameMap->insert(make_pair(StringData(entryInc->name), entryInc));
+    ModifierEntry* entryInc = new ModifierEntry("$inc", MOD_INC);
+    nameMap->insert(make_pair(StringData(entryInc->name), entryInc));
 
-            ModifierEntry* entryMax = new ModifierEntry("$max", MOD_MAX);
-            nameMap->insert(make_pair(StringData(entryMax->name), entryMax));
+    ModifierEntry* entryMax = new ModifierEntry("$max", MOD_MAX);
+    nameMap->insert(make_pair(StringData(entryMax->name), entryMax));
 
-            ModifierEntry* entryMin = new ModifierEntry("$min", MOD_MIN);
-            nameMap->insert(make_pair(StringData(entryMin->name), entryMin));
+    ModifierEntry* entryMin = new ModifierEntry("$min", MOD_MIN);
+    nameMap->insert(make_pair(StringData(entryMin->name), entryMin));
 
-            ModifierEntry* entryMul = new ModifierEntry("$mul", MOD_MUL);
-            nameMap->insert(make_pair(StringData(entryMul->name), entryMul));
+    ModifierEntry* entryMul = new ModifierEntry("$mul", MOD_MUL);
+    nameMap->insert(make_pair(StringData(entryMul->name), entryMul));
 
-            ModifierEntry* entryPop = new ModifierEntry("$pop", MOD_POP);
-            nameMap->insert(make_pair(StringData(entryPop->name), entryPop));
+    ModifierEntry* entryPop = new ModifierEntry("$pop", MOD_POP);
+    nameMap->insert(make_pair(StringData(entryPop->name), entryPop));
 
-            ModifierEntry* entryPull = new ModifierEntry("$pull", MOD_PULL);
-            nameMap->insert(make_pair(StringData(entryPull->name), entryPull));
+    ModifierEntry* entryPull = new ModifierEntry("$pull", MOD_PULL);
+    nameMap->insert(make_pair(StringData(entryPull->name), entryPull));
 
-            ModifierEntry* entryPullAll = new ModifierEntry("$pullAll", MOD_PULL_ALL);
-            nameMap->insert(make_pair(StringData(entryPullAll->name), entryPullAll));
+    ModifierEntry* entryPullAll = new ModifierEntry("$pullAll", MOD_PULL_ALL);
+    nameMap->insert(make_pair(StringData(entryPullAll->name), entryPullAll));
 
-            ModifierEntry* entryPush = new ModifierEntry("$push", MOD_PUSH);
-            nameMap->insert(make_pair(StringData(entryPush->name), entryPush));
+    ModifierEntry* entryPush = new ModifierEntry("$push", MOD_PUSH);
+    nameMap->insert(make_pair(StringData(entryPush->name), entryPush));
 
-            ModifierEntry* entryPushAll = new ModifierEntry("$pushAll", MOD_PUSH_ALL);
-            nameMap->insert(make_pair(StringData(entryPushAll->name), entryPushAll));
+    ModifierEntry* entryPushAll = new ModifierEntry("$pushAll", MOD_PUSH_ALL);
+    nameMap->insert(make_pair(StringData(entryPushAll->name), entryPushAll));
 
-            ModifierEntry* entrySet = new ModifierEntry("$set", MOD_SET);
-            nameMap->insert(make_pair(StringData(entrySet->name), entrySet));
+    ModifierEntry* entrySet = new ModifierEntry("$set", MOD_SET);
+    nameMap->insert(make_pair(StringData(entrySet->name), entrySet));
 
-            ModifierEntry* entrySetOnInsert = new ModifierEntry("$setOnInsert", MOD_SET_ON_INSERT);
-            nameMap->insert(make_pair(StringData(entrySetOnInsert->name), entrySetOnInsert));
+    ModifierEntry* entrySetOnInsert = new ModifierEntry("$setOnInsert", MOD_SET_ON_INSERT);
+    nameMap->insert(make_pair(StringData(entrySetOnInsert->name), entrySetOnInsert));
 
-            ModifierEntry* entryRename = new ModifierEntry("$rename", MOD_RENAME);
-            nameMap->insert(make_pair(StringData(entryRename->name), entryRename));
+    ModifierEntry* entryRename = new ModifierEntry("$rename", MOD_RENAME);
+    nameMap->insert(make_pair(StringData(entryRename->name), entryRename));
 
-            ModifierEntry* entryUnset = new ModifierEntry("$unset", MOD_UNSET);
-            nameMap->insert(make_pair(StringData(entryUnset->name), entryUnset));
-        }
+    ModifierEntry* entryUnset = new ModifierEntry("$unset", MOD_UNSET);
+    nameMap->insert(make_pair(StringData(entryUnset->name), entryUnset));
+}
 
-    } // unnamed namespace
+}  // unnamed namespace
 
-    MONGO_INITIALIZER(ModifierTable)(InitializerContext* context) {
-        MODIFIER_NAME_MAP = new NameMap;
-        init(MODIFIER_NAME_MAP);
+MONGO_INITIALIZER(ModifierTable)(InitializerContext* context) {
+    MODIFIER_NAME_MAP = new NameMap;
+    init(MODIFIER_NAME_MAP);
 
-        return Status::OK();
+    return Status::OK();
+}
+
+ModifierType getType(StringData typeStr) {
+    NameMap::const_iterator it = MODIFIER_NAME_MAP->find(typeStr);
+    if (it == MODIFIER_NAME_MAP->end()) {
+        return MOD_UNKNOWN;
     }
+    return it->second->type;
+}
 
-    ModifierType getType(StringData typeStr) {
-        NameMap::const_iterator it = MODIFIER_NAME_MAP->find(typeStr);
-        if (it == MODIFIER_NAME_MAP->end()) {
-            return MOD_UNKNOWN;
-        }
-        return it->second->type;
-    }
-
-    ModifierInterface* makeUpdateMod(ModifierType modType) {
-        switch (modType) {
+ModifierInterface* makeUpdateMod(ModifierType modType) {
+    switch (modType) {
         case MOD_ADD_TO_SET:
             return new ModifierAddToSet;
         case MOD_BIT:
@@ -173,8 +170,8 @@ namespace modifiertable {
             return new ModifierUnset;
         default:
             return NULL;
-        }
     }
+}
 
-} // namespace modifiertable
-} // namespace mongo
+}  // namespace modifiertable
+}  // namespace mongo

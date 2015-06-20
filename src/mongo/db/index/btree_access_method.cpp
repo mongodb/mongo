@@ -36,36 +36,33 @@
 
 namespace mongo {
 
-    using std::vector;
+using std::vector;
 
-    // Standard Btree implementation below.
-    BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree )
-        : IndexAccessMethod(btreeState, btree) {
+// Standard Btree implementation below.
+BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
+    : IndexAccessMethod(btreeState, btree) {
+    // The key generation wants these values.
+    vector<const char*> fieldNames;
+    vector<BSONElement> fixed;
 
-        // The key generation wants these values.
-        vector<const char*> fieldNames;
-        vector<BSONElement> fixed;
-
-        BSONObjIterator it(_descriptor->keyPattern());
-        while (it.more()) {
-            BSONElement elt = it.next();
-            fieldNames.push_back(elt.fieldName());
-            fixed.push_back(BSONElement());
-        }
-
-        if (0 == _descriptor->version()) {
-            _keyGenerator.reset(new BtreeKeyGeneratorV0(fieldNames, fixed,
-                _descriptor->isSparse()));
-        } else if (1 == _descriptor->version()) {
-            _keyGenerator.reset(new BtreeKeyGeneratorV1(fieldNames, fixed,
-                _descriptor->isSparse()));
-        } else {
-            massert(16745, "Invalid index version for key generation.", false );
-        }
+    BSONObjIterator it(_descriptor->keyPattern());
+    while (it.more()) {
+        BSONElement elt = it.next();
+        fieldNames.push_back(elt.fieldName());
+        fixed.push_back(BSONElement());
     }
 
-    void BtreeAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
-        _keyGenerator->getKeys(obj, keys);
+    if (0 == _descriptor->version()) {
+        _keyGenerator.reset(new BtreeKeyGeneratorV0(fieldNames, fixed, _descriptor->isSparse()));
+    } else if (1 == _descriptor->version()) {
+        _keyGenerator.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, _descriptor->isSparse()));
+    } else {
+        massert(16745, "Invalid index version for key generation.", false);
     }
+}
+
+void BtreeAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
+    _keyGenerator->getKeys(obj, keys);
+}
 
 }  // namespace mongo

@@ -36,50 +36,46 @@
 
 namespace mongo {
 
-    class LogBuilder;
+class LogBuilder;
 
-    class ModifierAddToSet : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(ModifierAddToSet);
+class ModifierAddToSet : public ModifierInterface {
+    MONGO_DISALLOW_COPYING(ModifierAddToSet);
 
-    public:
+public:
+    ModifierAddToSet();
+    virtual ~ModifierAddToSet();
 
-        ModifierAddToSet();
-        virtual ~ModifierAddToSet();
+    /** Goes over the array item(s) that are going to be set- unioned and converts them
+     *  internally to a mutable bson. Both single and $each forms are supported. Returns OK
+     *  if the item(s) are valid otherwise returns a status describing the error.
+     */
+    virtual Status init(const BSONElement& modExpr, const Options& opts, bool* positional = NULL);
 
-        /** Goes over the array item(s) that are going to be set- unioned and converts them
-         *  internally to a mutable bson. Both single and $each forms are supported. Returns OK
-         *  if the item(s) are valid otherwise returns a status describing the error.
-         */
-        virtual Status init(const BSONElement& modExpr, const Options& opts,
-                            bool* positional = NULL);
+    /** Decides which portion of the array items that are going to be set-unioned to root's
+     *  document and fills in 'execInfo' accordingly. Returns OK if the document has a
+     *  valid array to set-union to, othwise returns a status describing the error.
+     */
+    virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
-        /** Decides which portion of the array items that are going to be set-unioned to root's
-         *  document and fills in 'execInfo' accordingly. Returns OK if the document has a
-         *  valid array to set-union to, othwise returns a status describing the error.
-         */
-        virtual Status prepare(mutablebson::Element root,
-                               StringData matchedField,
-                               ExecInfo* execInfo);
+    /** Updates the Element used in prepare with the effects of the $addToSet operation. */
+    virtual Status apply() const;
 
-        /** Updates the Element used in prepare with the effects of the $addToSet operation. */
-        virtual Status apply() const;
+    /** Converts the effects of this $addToSet into one or more equivalent $set operations. */
+    virtual Status log(LogBuilder* logBuilder) const;
 
-        /** Converts the effects of this $addToSet into one or more equivalent $set operations. */
-        virtual Status log(LogBuilder* logBuilder) const;
+private:
+    // Access to each component of fieldName that's the target of this mod.
+    FieldRef _fieldRef;
 
-    private:
-        // Access to each component of fieldName that's the target of this mod.
-        FieldRef _fieldRef;
+    // 0 or index for $-positional in _fieldRef.
+    size_t _posDollar;
 
-        // 0 or index for $-positional in _fieldRef.
-        size_t _posDollar;
+    // Array of values to be set-union'ed onto target.
+    mutablebson::Document _valDoc;
+    mutablebson::Element _val;
 
-        // Array of values to be set-union'ed onto target.
-        mutablebson::Document _valDoc;
-        mutablebson::Element _val;
+    struct PreparedState;
+    std::unique_ptr<PreparedState> _preparedState;
+};
 
-        struct PreparedState;
-        std::unique_ptr<PreparedState> _preparedState;
-    };
-
-} // namespace mongo
+}  // namespace mongo

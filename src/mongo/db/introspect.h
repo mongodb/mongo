@@ -32,17 +32,17 @@
 
 namespace mongo {
 
-    class Database;
-    class OperationContext;
+class Database;
+class OperationContext;
 
-    /**
-     * Invoked when database profile is enabled.
-     */
-    void profile(OperationContext* txn, int op);
+/**
+ * Invoked when database profile is enabled.
+ */
+void profile(OperationContext* txn, int op);
 
-    /**
-     * Pre-creates the profile collection for the specified database.
-     */
-    Status createProfileCollection(OperationContext* txn, Database *db);
+/**
+ * Pre-creates the profile collection for the specified database.
+ */
+Status createProfileCollection(OperationContext* txn, Database* db);
 
-} // namespace mongo
+}  // namespace mongo

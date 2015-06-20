@@ -33,127 +33,126 @@
 
 namespace mongo {
 
-    class MmapV1RecordHeader;
+class MmapV1RecordHeader;
 
-    /**
-     * Used to implement likelyInPhysicalMemory() for the MMAP v1 storage engine. Since
-     * MMAP v1 holds exclusive collection-level locks, it should yield the locks during a
-     * page fault. The RecordAccessTracker is used to guess at which records are in memory,
-     * so that a yield can be requested unless we're sure that the record has been
-     * recently accessed.
-     */
-    class RecordAccessTracker {
-        MONGO_DISALLOW_COPYING(RecordAccessTracker);
-    public:
-        RecordAccessTracker();
+/**
+ * Used to implement likelyInPhysicalMemory() for the MMAP v1 storage engine. Since
+ * MMAP v1 holds exclusive collection-level locks, it should yield the locks during a
+ * page fault. The RecordAccessTracker is used to guess at which records are in memory,
+ * so that a yield can be requested unless we're sure that the record has been
+ * recently accessed.
+ */
+class RecordAccessTracker {
+    MONGO_DISALLOW_COPYING(RecordAccessTracker);
 
-        enum Constants {
-            SliceSize = 1024,
-            MaxChain = 20, // intentionally very low
-            NumSlices = 10,
-            RotateTimeSecs = 90,
-            BigHashSize = 128
-        };
+public:
+    RecordAccessTracker();
 
-        /**
-         * Informs this record access tracker that 'record' has been accessed.
-         */
-        void markAccessed(const void* record);
-
-        /**
-         * @return whether or not 'record' has been marked as accessed recently. A return value
-         * of true means that 'record' is likely in physical memory.
-         *
-         * Also has the side effect of marking 'record' as accessed.
-         */
-        bool checkAccessedAndMark(const void* record);
-
-        /**
-         * Clears out any history of record accesses.
-         */
-        void reset();
-
-        //
-        // For testing.
-        //
-
-        /**
-         * The accessedRecently() implementation falls back to making a system call if it
-         * appears that the record is not in physical memory. Use this method to disable
-         * the fallback for testing.
-         */
-        void disableSystemBlockInMemCheck();
-
-    private:
-        enum State {
-            In, Out, Unk
-        };
-
-        struct Entry {
-            size_t region;
-            unsigned long long value;
-        };
-
-        /**
-         * simple hash map for region -> status
-         * this constitutes a single region of time
-         * it does chaining, but very short chains
-         */
-        class Slice {
-        public:
-            Slice();
-
-            void reset();
-
-            State get(int regionHash, size_t region, short offset);
-
-            /**
-             * @return true if added, false if full
-             */
-            bool put(int regionHash, size_t region, short offset);
-
-            time_t lastReset() const;
-
-        private:
-            Entry* _get(int start, size_t region, bool add);
-
-            Entry _data[SliceSize];
-            time_t _lastReset;
-        };
-
-        /**
-         * this contains many slices of times
-         * the idea you put mem status in the current time slice
-         * and then after a certain period of time, it rolls off so we check again
-         */
-        class Rolling {
-        public:
-            Rolling();
-
-            /**
-             * After this call, we assume the page is in RAM.
-             *
-             * @param doHalf if this is a known good access, want to put in first half.
-             *
-             * @return whether we know the page is in RAM
-             */
-            bool access(size_t region, short offset, bool doHalf);
-
-        private:
-            void _rotate();
-
-            int _curSlice;
-            long long _lastRotate;
-            Slice _slices[NumSlices];
-
-            SimpleMutex _lock;
-        };
-
-        // Should this record tracker fallback to making a system call?
-        bool _blockSupported;
-
-        // An array of Rolling instances for tracking record accesses.
-        std::unique_ptr<Rolling[]> _rollingTable;
+    enum Constants {
+        SliceSize = 1024,
+        MaxChain = 20,  // intentionally very low
+        NumSlices = 10,
+        RotateTimeSecs = 90,
+        BigHashSize = 128
     };
 
-} // namespace
+    /**
+     * Informs this record access tracker that 'record' has been accessed.
+     */
+    void markAccessed(const void* record);
+
+    /**
+     * @return whether or not 'record' has been marked as accessed recently. A return value
+     * of true means that 'record' is likely in physical memory.
+     *
+     * Also has the side effect of marking 'record' as accessed.
+     */
+    bool checkAccessedAndMark(const void* record);
+
+    /**
+     * Clears out any history of record accesses.
+     */
+    void reset();
+
+    //
+    // For testing.
+    //
+
+    /**
+     * The accessedRecently() implementation falls back to making a system call if it
+     * appears that the record is not in physical memory. Use this method to disable
+     * the fallback for testing.
+     */
+    void disableSystemBlockInMemCheck();
+
+private:
+    enum State { In, Out, Unk };
+
+    struct Entry {
+        size_t region;
+        unsigned long long value;
+    };
+
+    /**
+     * simple hash map for region -> status
+     * this constitutes a single region of time
+     * it does chaining, but very short chains
+     */
+    class Slice {
+    public:
+        Slice();
+
+        void reset();
+
+        State get(int regionHash, size_t region, short offset);
+
+        /**
+         * @return true if added, false if full
+         */
+        bool put(int regionHash, size_t region, short offset);
+
+        time_t lastReset() const;
+
+    private:
+        Entry* _get(int start, size_t region, bool add);
+
+        Entry _data[SliceSize];
+        time_t _lastReset;
+    };
+
+    /**
+     * this contains many slices of times
+     * the idea you put mem status in the current time slice
+     * and then after a certain period of time, it rolls off so we check again
+     */
+    class Rolling {
+    public:
+        Rolling();
+
+        /**
+         * After this call, we assume the page is in RAM.
+         *
+         * @param doHalf if this is a known good access, want to put in first half.
+         *
+         * @return whether we know the page is in RAM
+         */
+        bool access(size_t region, short offset, bool doHalf);
+
+    private:
+        void _rotate();
+
+        int _curSlice;
+        long long _lastRotate;
+        Slice _slices[NumSlices];
+
+        SimpleMutex _lock;
+    };
+
+    // Should this record tracker fallback to making a system call?
+    bool _blockSupported;
+
+    // An array of Rolling instances for tracking record accesses.
+    std::unique_ptr<Rolling[]> _rollingTable;
+};
+
+}  // namespace

@@ -32,64 +32,72 @@
 
 namespace mongo {
 
-    class Status;
+class Status;
 
 namespace repl {
 
+/**
+ * Arguments to the handshake command.
+ */
+class HandshakeArgs {
+public:
+    HandshakeArgs();
+
     /**
-     * Arguments to the handshake command.
+     * Initializes this HandshakeArgs from the contents of args.
      */
-    class HandshakeArgs {
-    public:
-        HandshakeArgs();
+    Status initialize(const BSONObj& argsObj);
 
-        /**
-         * Initializes this HandshakeArgs from the contents of args.
-         */
-        Status initialize(const BSONObj& argsObj);
+    /**
+     * Returns true if all required fields have been initialized.
+     */
+    bool isInitialized() const;
 
-        /**
-         * Returns true if all required fields have been initialized.
-         */
-        bool isInitialized() const;
+    /**
+     * Gets the _id of the sender in their ReplSetConfig.
+     */
+    long long getMemberId() const {
+        return _memberId;
+    }
 
-        /**
-         * Gets the _id of the sender in their ReplSetConfig.
-         */
-        long long getMemberId() const { return _memberId; }
+    /**
+     * Gets the unique identifier of the sender, which is used to track replication progress.
+     */
+    OID getRid() const {
+        return _rid;
+    }
 
-        /**
-         * Gets the unique identifier of the sender, which is used to track replication progress.
-         */
-        OID getRid() const { return _rid; }
-
-        /**
-         * The below methods check whether or not value in the method name has been set.
-         */
-        bool hasRid() { return _hasRid; };
-        bool hasMemberId() { return _hasMemberId; };
-
-        /**
-         * The below methods set the value in the method name to 'newVal'.
-         */
-        void setRid(const OID& newVal);
-        void setMemberId(long long newVal);
-
-        /**
-         * Returns a BSONified version of the object.
-         * Should only be called if the mandatory fields have been set.
-         * Optional fields are only included if they have been set.
-         */
-        BSONObj toBSON() const;
-
-    private:
-        bool _hasRid;
-        bool _hasMemberId;
-
-        // look at the body of the isInitialized() function to see which fields are mandatory
-        OID _rid;
-        long long _memberId;
+    /**
+     * The below methods check whether or not value in the method name has been set.
+     */
+    bool hasRid() {
+        return _hasRid;
+    };
+    bool hasMemberId() {
+        return _hasMemberId;
     };
 
-} // namespace repl
-} // namespace mongo
+    /**
+     * The below methods set the value in the method name to 'newVal'.
+     */
+    void setRid(const OID& newVal);
+    void setMemberId(long long newVal);
+
+    /**
+     * Returns a BSONified version of the object.
+     * Should only be called if the mandatory fields have been set.
+     * Optional fields are only included if they have been set.
+     */
+    BSONObj toBSON() const;
+
+private:
+    bool _hasRid;
+    bool _hasMemberId;
+
+    // look at the body of the isInitialized() function to see which fields are mandatory
+    OID _rid;
+    long long _memberId;
+};
+
+}  // namespace repl
+}  // namespace mongo

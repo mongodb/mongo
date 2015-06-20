@@ -32,31 +32,31 @@
 
 namespace mongo {
 
-    /**
-     * Sets up handlers for signals and other events like terminate and new_handler.
-     *
-     * This must be called very early in main, before runGlobalInitializers().
-     *
-     * installControlCHandler - true means the program would like to setup its on Control-C handler
-     *                        - used by command line tools
-     */
-    void setupSignalHandlers(bool installControlCHandler);
+/**
+ * Sets up handlers for signals and other events like terminate and new_handler.
+ *
+ * This must be called very early in main, before runGlobalInitializers().
+ *
+ * installControlCHandler - true means the program would like to setup its on Control-C handler
+ *                        - used by command line tools
+ */
+void setupSignalHandlers(bool installControlCHandler);
 
-    /**
-     * Starts the thread to handle asynchronous signals.
-     *
-     * This must be the first thread started from the main thread. Call this immediately after
-     * initializeServerGlobalState().
-     */
-    void startSignalProcessingThread();
+/**
+ * Starts the thread to handle asynchronous signals.
+ *
+ * This must be the first thread started from the main thread. Call this immediately after
+ * initializeServerGlobalState().
+ */
+void startSignalProcessingThread();
 
-    /*
-     * Uninstall the Control-C handler
-     *
-     * Windows Only
-     * Used by nt services to remove the Control-C handler after the system knows it is running
-     * as a service, and not as a console program.
-     */
-    void removeControlCHandler();
+/*
+ * Uninstall the Control-C handler
+ *
+ * Windows Only
+ * Used by nt services to remove the Control-C handler after the system knows it is running
+ * as a service, and not as a console program.
+ */
+void removeControlCHandler();
 
-} // namespace mongo
+}  // namespace mongo

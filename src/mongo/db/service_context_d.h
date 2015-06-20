@@ -35,98 +35,95 @@
 
 namespace mongo {
 
-    class Client;
-    class StorageEngineLockFile;
+class Client;
+class StorageEngineLockFile;
 
-    class ServiceContextMongoD final : public ServiceContext {
-    public:
-        typedef std::map<std::string, const StorageEngine::Factory*> FactoryMap;
+class ServiceContextMongoD final : public ServiceContext {
+public:
+    typedef std::map<std::string, const StorageEngine::Factory*> FactoryMap;
 
-        ServiceContextMongoD();
+    ServiceContextMongoD();
 
-        ~ServiceContextMongoD();
+    ~ServiceContextMongoD();
 
-        StorageEngine* getGlobalStorageEngine() override;
+    StorageEngine* getGlobalStorageEngine() override;
 
-        void initializeGlobalStorageEngine() override;
+    void initializeGlobalStorageEngine() override;
 
-        void shutdownGlobalStorageEngineCleanly() override;
+    void shutdownGlobalStorageEngineCleanly() override;
 
-        void registerStorageEngine(const std::string& name,
-                                   const StorageEngine::Factory* factory) override;
+    void registerStorageEngine(const std::string& name,
+                               const StorageEngine::Factory* factory) override;
 
-        bool isRegisteredStorageEngine(const std::string& name) override;
+    bool isRegisteredStorageEngine(const std::string& name) override;
 
-        StorageFactoriesIterator* makeStorageFactoriesIterator() override;
+    StorageFactoriesIterator* makeStorageFactoriesIterator() override;
 
-        void setKillAllOperations() override;
+    void setKillAllOperations() override;
 
-        void unsetKillAllOperations() override;
+    void unsetKillAllOperations() override;
 
-        bool getKillAllOperations() override;
+    bool getKillAllOperations() override;
 
-        bool killOperation(unsigned int opId) override;
+    bool killOperation(unsigned int opId) override;
 
-        void killAllUserOperations(const OperationContext* txn) override;
+    void killAllUserOperations(const OperationContext* txn) override;
 
-        void registerKillOpListener(KillOpListenerInterface* listener) override;
+    void registerKillOpListener(KillOpListenerInterface* listener) override;
 
-        void setOpObserver(std::unique_ptr<OpObserver> opObserver) override;
+    void setOpObserver(std::unique_ptr<OpObserver> opObserver) override;
 
-        OpObserver* getOpObserver() override;
+    OpObserver* getOpObserver() override;
 
-    private:
+private:
+    std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
 
-        std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
+    /**
+     * Kills the active operation on "client" if that operation is associated with operation id
+     * "opId".
+     *
+     * Returns true if an operation was killed.
+     *
+     * Must only be called by a thread owning both this service context's mutex and the
+     * client's.
+     */
+    bool _killOperationsAssociatedWithClientAndOpId_inlock(Client* client, unsigned int opId);
 
-        /**
-         * Kills the active operation on "client" if that operation is associated with operation id
-         * "opId".
-         *
-         * Returns true if an operation was killed.
-         *
-         * Must only be called by a thread owning both this service context's mutex and the
-         * client's.
-         */
-        bool _killOperationsAssociatedWithClientAndOpId_inlock(Client* client, unsigned int opId);
+    /**
+     * Kills the given operation.
+     *
+     * Caller must own the service context's _mutex.
+     */
+    void _killOperation_inlock(OperationContext* opCtx);
 
-        /**
-         * Kills the given operation.
-         *
-         * Caller must own the service context's _mutex.
-         */
-        void _killOperation_inlock(OperationContext* opCtx);
+    bool _globalKill;
 
-        bool _globalKill;
+    // protected by parent class's _mutex
+    std::vector<KillOpListenerInterface*> _killOpListeners;
 
-        // protected by parent class's _mutex
-        std::vector<KillOpListenerInterface*> _killOpListeners;
+    std::unique_ptr<StorageEngineLockFile> _lockFile;
 
-        std::unique_ptr<StorageEngineLockFile> _lockFile;
+    // logically owned here, but never deleted by anyone.
+    StorageEngine* _storageEngine;
 
-        // logically owned here, but never deleted by anyone.
-        StorageEngine* _storageEngine;
+    // logically owned here.
+    std::unique_ptr<OpObserver> _opObserver;
 
-        // logically owned here.
-        std::unique_ptr<OpObserver> _opObserver;
+    // All possible storage engines are registered here through MONGO_INIT.
+    FactoryMap _storageFactories;
+};
 
-        // All possible storage engines are registered here through MONGO_INIT.
-        FactoryMap _storageFactories;
-    };
+class StorageFactoriesIteratorMongoD : public StorageFactoriesIterator {
+public:
+    typedef ServiceContextMongoD::FactoryMap::const_iterator FactoryMapIterator;
+    StorageFactoriesIteratorMongoD(const FactoryMapIterator& begin, const FactoryMapIterator& end);
 
-    class StorageFactoriesIteratorMongoD : public StorageFactoriesIterator {
-    public:
+    virtual bool more() const;
+    virtual const StorageEngine::Factory* next();
 
-        typedef ServiceContextMongoD::FactoryMap::const_iterator FactoryMapIterator;
-        StorageFactoriesIteratorMongoD(const FactoryMapIterator& begin,
-                                       const FactoryMapIterator& end);
-
-        virtual bool more() const;
-        virtual const StorageEngine::Factory* next();
-
-    private:
-        FactoryMapIterator _curr;
-        FactoryMapIterator _end;
-    };
+private:
+    FactoryMapIterator _curr;
+    FactoryMapIterator _end;
+};
 
 }  // namespace mongo

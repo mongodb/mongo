@@ -38,37 +38,36 @@
 
 namespace mongo {
 
-    Timestamp Timestamp::max() {
-        unsigned int t = static_cast<unsigned int>(std::numeric_limits<int32_t>::max());
-        unsigned int i = std::numeric_limits<uint32_t>::max();
-        return Timestamp(t, i);
-    }
+Timestamp Timestamp::max() {
+    unsigned int t = static_cast<unsigned int>(std::numeric_limits<int32_t>::max());
+    unsigned int i = std::numeric_limits<uint32_t>::max();
+    return Timestamp(t, i);
+}
 
-    void Timestamp::append(BufBuilder& builder, const StringData& fieldName) const {
-	// No endian conversions needed, since we store in-memory representation
-	// in little endian format, regardless of target endian.
-	builder.appendNum( static_cast<char>(bsonTimestamp) );
-	builder.appendStr( fieldName );
-	builder.appendNum( asULL() );
-    }
+void Timestamp::append(BufBuilder& builder, const StringData& fieldName) const {
+    // No endian conversions needed, since we store in-memory representation
+    // in little endian format, regardless of target endian.
+    builder.appendNum(static_cast<char>(bsonTimestamp));
+    builder.appendStr(fieldName);
+    builder.appendNum(asULL());
+}
 
-    std::string Timestamp::toStringLong() const {
-        std::stringstream ss;
-        ss << time_t_to_String_short(secs) << ' ';
-        ss << std::hex << secs << ':' << i;
-        return ss.str();
-    }
+std::string Timestamp::toStringLong() const {
+    std::stringstream ss;
+    ss << time_t_to_String_short(secs) << ' ';
+    ss << std::hex << secs << ':' << i;
+    return ss.str();
+}
 
-    std::string Timestamp::toStringPretty() const {
-        std::stringstream ss;
-        ss << time_t_to_String_short(secs) << ':' << std::hex << i;
-        return ss.str();
-    }
+std::string Timestamp::toStringPretty() const {
+    std::stringstream ss;
+    ss << time_t_to_String_short(secs) << ':' << std::hex << i;
+    return ss.str();
+}
 
-    std::string Timestamp::toString() const {
-        std::stringstream ss;
-        ss << std::hex << secs << ':' << i;
-        return ss.str();
-    }
-
+std::string Timestamp::toString() const {
+    std::stringstream ss;
+    ss << std::hex << secs << ':' << i;
+    return ss.str();
+}
 }

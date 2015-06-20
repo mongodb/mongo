@@ -42,118 +42,120 @@
 
 namespace mongo {
 
-    class PlanYieldPolicy;
+class PlanYieldPolicy;
+
+/**
+ * This stage outputs its mainChild, and possibly its backup child
+ * and also updates the cache.
+ *
+ * Preconditions: Valid RecordId.
+ *
+ */
+class CachedPlanStage : public PlanStage {
+public:
+    CachedPlanStage(OperationContext* txn,
+                    Collection* collection,
+                    WorkingSet* ws,
+                    CanonicalQuery* cq,
+                    const QueryPlannerParams& params,
+                    size_t decisionWorks,
+                    PlanStage* root);
+
+    virtual bool isEOF();
+
+    virtual StageState work(WorkingSetID* out);
+
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_CACHED_PLAN;
+    }
+
+    virtual PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats() const;
+
+    virtual const SpecificStats* getSpecificStats() const;
+
+    static const char* kStageType;
 
     /**
-     * This stage outputs its mainChild, and possibly its backup child
-     * and also updates the cache.
+     * Runs the cached plan for a trial period, yielding during the trial period according to
+     * 'yieldPolicy'.
      *
-     * Preconditions: Valid RecordId.
-     *
+     * Feedback from the trial period is passed to the plan cache. If the performance is lower
+     * than expected, the old plan is evicted and a new plan is selected from scratch (again
+     * yielding according to 'yieldPolicy'). Otherwise, the cached plan is run.
      */
-    class CachedPlanStage : public PlanStage {
-    public:
-        CachedPlanStage(OperationContext* txn,
-                        Collection* collection,
-                        WorkingSet* ws,
-                        CanonicalQuery* cq,
-                        const QueryPlannerParams& params,
-                        size_t decisionWorks,
-                        PlanStage* root);
+    Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
 
-        virtual bool isEOF();
+private:
+    /**
+     * Passes stats from the trial period run of the cached plan to the plan cache.
+     *
+     * If the plan cache entry is deleted before we get a chance to update it, then this
+     * is a no-op.
+     */
+    void updatePlanCache();
 
-        virtual StageState work(WorkingSetID* out);
+    /**
+     * Uses the QueryPlanner and the MultiPlanStage to re-generate candidate plans for this
+     * query and select a new winner.
+     *
+     * We fallback to a new plan if updatePlanCache() tells us that the performance was worse
+     * than anticipated during the trial period.
+     *
+     * We only write the result of re-planning to the plan cache if 'shouldCache' is true.
+     */
+    Status replan(PlanYieldPolicy* yieldPolicy, bool shouldCache);
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    /**
+     * May yield during the cached plan stage's trial period or replanning phases.
+     *
+     * Returns a non-OK status if the plan was killed during a yield.
+     */
+    Status tryYield(PlanYieldPolicy* yieldPolicy);
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    // Not owned.
+    OperationContext* _txn;
 
-        virtual StageType stageType() const { return STAGE_CACHED_PLAN; }
+    // Not owned. Must be non-null.
+    Collection* _collection;
 
-        virtual PlanStageStats* getStats();
+    // Not owned.
+    WorkingSet* _ws;
 
-        virtual const CommonStats* getCommonStats() const;
+    // Not owned.
+    CanonicalQuery* _canonicalQuery;
 
-        virtual const SpecificStats* getSpecificStats() const;
+    QueryPlannerParams _plannerParams;
 
-        static const char* kStageType;
+    // The number of work cycles taken to decide on a winning plan when the plan was first
+    // cached.
+    size_t _decisionWorks;
 
-        /**
-         * Runs the cached plan for a trial period, yielding during the trial period according to
-         * 'yieldPolicy'.
-         *
-         * Feedback from the trial period is passed to the plan cache. If the performance is lower
-         * than expected, the old plan is evicted and a new plan is selected from scratch (again
-         * yielding according to 'yieldPolicy'). Otherwise, the cached plan is run.
-         */
-        Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
+    // If we fall back to re-planning the query, and there is just one resulting query solution,
+    // that solution is owned here.
+    std::unique_ptr<QuerySolution> _replannedQs;
 
-    private:
-        /**
-         * Passes stats from the trial period run of the cached plan to the plan cache.
-         *
-         * If the plan cache entry is deleted before we get a chance to update it, then this
-         * is a no-op.
-         */
-        void updatePlanCache();
+    std::unique_ptr<PlanStage> _root;
 
-        /**
-         * Uses the QueryPlanner and the MultiPlanStage to re-generate candidate plans for this
-         * query and select a new winner.
-         *
-         * We fallback to a new plan if updatePlanCache() tells us that the performance was worse
-         * than anticipated during the trial period.
-         *
-         * We only write the result of re-planning to the plan cache if 'shouldCache' is true.
-         */
-        Status replan(PlanYieldPolicy* yieldPolicy, bool shouldCache);
+    // Any results produced during trial period execution are kept here.
+    std::list<WorkingSetID> _results;
 
-        /**
-         * May yield during the cached plan stage's trial period or replanning phases.
-         *
-         * Returns a non-OK status if the plan was killed during a yield.
-         */
-        Status tryYield(PlanYieldPolicy* yieldPolicy);
+    // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
+    // to use to pull the record into memory. We take ownership of the RecordFetcher here,
+    // deleting it after we've had a chance to do the fetch. For timing-based yields, we
+    // just pass a NULL fetcher.
+    std::unique_ptr<RecordFetcher> _fetcher;
 
-        // Not owned.
-        OperationContext* _txn;
-
-        // Not owned. Must be non-null.
-        Collection* _collection;
-
-        // Not owned.
-        WorkingSet* _ws;
-
-        // Not owned.
-        CanonicalQuery* _canonicalQuery;
-
-        QueryPlannerParams _plannerParams;
-
-        // The number of work cycles taken to decide on a winning plan when the plan was first
-        // cached.
-        size_t _decisionWorks;
-
-        // If we fall back to re-planning the query, and there is just one resulting query solution,
-        // that solution is owned here.
-        std::unique_ptr<QuerySolution> _replannedQs;
-
-        std::unique_ptr<PlanStage> _root;
-
-        // Any results produced during trial period execution are kept here.
-        std::list<WorkingSetID> _results;
-
-        // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
-        // to use to pull the record into memory. We take ownership of the RecordFetcher here,
-        // deleting it after we've had a chance to do the fetch. For timing-based yields, we
-        // just pass a NULL fetcher.
-        std::unique_ptr<RecordFetcher> _fetcher;
-
-        // Stats
-        CommonStats _commonStats;
-        CachedPlanStats _specificStats;
-    };
+    // Stats
+    CommonStats _commonStats;
+    CachedPlanStats _specificStats;
+};
 
 }  // namespace mongo

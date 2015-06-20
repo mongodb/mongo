@@ -33,27 +33,27 @@
 
 namespace mongo {
 
+/**
+ * Mock tick source with millisecond resolution that doesn't gives a fixed tick count
+ * until the advance method is called.
+ */
+class TickSourceMock final : public TickSource {
+public:
+    TickSource::Tick getTicks() override;
+
+    TickSource::Tick getTicksPerSecond() override;
+
     /**
-     * Mock tick source with millisecond resolution that doesn't gives a fixed tick count
-     * until the advance method is called.
+     * Advance the ticks by the given amount of milliseconds.
      */
-    class TickSourceMock final : public TickSource {
-    public:
-        TickSource::Tick getTicks() override;
+    void advance(const stdx::chrono::milliseconds& ms);
 
-        TickSource::Tick getTicksPerSecond() override;
+    /**
+     * Resets the tick count to the give value.
+     */
+    void reset(TickSource::Tick tick);
 
-        /**
-         * Advance the ticks by the given amount of milliseconds.
-         */
-        void advance(const stdx::chrono::milliseconds& ms);
-
-        /**
-         * Resets the tick count to the give value.
-         */
-        void reset(TickSource::Tick tick);
-
-    private:
-        TickSource::Tick _currentTicks = 0;
-    };
-} // namespace mongo
+private:
+    TickSource::Tick _currentTicks = 0;
+};
+}  // namespace mongo

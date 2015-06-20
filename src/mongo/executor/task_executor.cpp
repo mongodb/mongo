@@ -33,63 +33,53 @@
 namespace mongo {
 namespace executor {
 
-    TaskExecutor::TaskExecutor() = default;
-    TaskExecutor::~TaskExecutor() = default;
+TaskExecutor::TaskExecutor() = default;
+TaskExecutor::~TaskExecutor() = default;
 
-    TaskExecutor::CallbackState::CallbackState() = default;
-    TaskExecutor::CallbackState::~CallbackState() = default;
+TaskExecutor::CallbackState::CallbackState() = default;
+TaskExecutor::CallbackState::~CallbackState() = default;
 
-    TaskExecutor::CallbackHandle::CallbackHandle() = default;
-    TaskExecutor::CallbackHandle::CallbackHandle(std::shared_ptr<CallbackState> callback) :
-            _callback(std::move(callback)) {}
+TaskExecutor::CallbackHandle::CallbackHandle() = default;
+TaskExecutor::CallbackHandle::CallbackHandle(std::shared_ptr<CallbackState> callback)
+    : _callback(std::move(callback)) {}
 
-    TaskExecutor::EventState::EventState() = default;
-    TaskExecutor::EventState::~EventState() = default;
+TaskExecutor::EventState::EventState() = default;
+TaskExecutor::EventState::~EventState() = default;
 
-    TaskExecutor::EventHandle::EventHandle() = default;
-    TaskExecutor::EventHandle::EventHandle(std::shared_ptr<EventState> event) :
-            _event(std::move(event)) {}
+TaskExecutor::EventHandle::EventHandle() = default;
+TaskExecutor::EventHandle::EventHandle(std::shared_ptr<EventState> event)
+    : _event(std::move(event)) {}
 
-    TaskExecutor::CallbackArgs::CallbackArgs(TaskExecutor* theExecutor,
-                                             const CallbackHandle& theHandle,
-                                             const Status& theStatus,
-                                             OperationContext* theTxn) :
-        executor(theExecutor),
-        myHandle(theHandle),
-        status(theStatus),
-        txn(theTxn) {
-    }
+TaskExecutor::CallbackArgs::CallbackArgs(TaskExecutor* theExecutor,
+                                         const CallbackHandle& theHandle,
+                                         const Status& theStatus,
+                                         OperationContext* theTxn)
+    : executor(theExecutor), myHandle(theHandle), status(theStatus), txn(theTxn) {}
 
 
-    TaskExecutor::RemoteCommandCallbackArgs::RemoteCommandCallbackArgs(
-            TaskExecutor* theExecutor,
-            const CallbackHandle& theHandle,
-            const RemoteCommandRequest& theRequest,
-            const ResponseStatus& theResponse) :
-        executor(theExecutor),
-        myHandle(theHandle),
-        request(theRequest),
-        response(theResponse) {
-    }
+TaskExecutor::RemoteCommandCallbackArgs::RemoteCommandCallbackArgs(
+    TaskExecutor* theExecutor,
+    const CallbackHandle& theHandle,
+    const RemoteCommandRequest& theRequest,
+    const ResponseStatus& theResponse)
+    : executor(theExecutor), myHandle(theHandle), request(theRequest), response(theResponse) {}
 
-    TaskExecutor::CallbackState* TaskExecutor::getCallbackFromHandle(
-            const CallbackHandle& cbHandle) {
-        return cbHandle.getCallback();
-    }
+TaskExecutor::CallbackState* TaskExecutor::getCallbackFromHandle(const CallbackHandle& cbHandle) {
+    return cbHandle.getCallback();
+}
 
-    TaskExecutor::EventState* TaskExecutor::getEventFromHandle(const EventHandle& eventHandle) {
-        return eventHandle.getEvent();
-    }
+TaskExecutor::EventState* TaskExecutor::getEventFromHandle(const EventHandle& eventHandle) {
+    return eventHandle.getEvent();
+}
 
-    void TaskExecutor::setEventForHandle(EventHandle* eventHandle,
-                                        std::shared_ptr<EventState> event) {
-        eventHandle->setEvent(std::move(event));
-    }
+void TaskExecutor::setEventForHandle(EventHandle* eventHandle, std::shared_ptr<EventState> event) {
+    eventHandle->setEvent(std::move(event));
+}
 
-    void TaskExecutor::setCallbackForHandle(CallbackHandle* cbHandle,
-                                           std::shared_ptr<CallbackState> callback) {
-        cbHandle->setCallback(std::move(callback));
-    }
+void TaskExecutor::setCallbackForHandle(CallbackHandle* cbHandle,
+                                        std::shared_ptr<CallbackState> callback) {
+    cbHandle->setCallback(std::move(callback));
+}
 
-} // namespace executor
-} // namespace mongo
+}  // namespace executor
+}  // namespace mongo

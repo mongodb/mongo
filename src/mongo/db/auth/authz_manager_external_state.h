@@ -41,105 +41,101 @@
 
 namespace mongo {
 
-    class AuthorizationManager;
-    class AuthzSessionExternalState;
-    class OperationContext;
+class AuthorizationManager;
+class AuthzSessionExternalState;
+class OperationContext;
+
+/**
+ * Public interface for a class that encapsulates all the information related to system
+ * state not stored in AuthorizationManager.  This is primarily to make AuthorizationManager
+ * easier to test as well as to allow different implementations for mongos and mongod.
+ */
+class AuthzManagerExternalState {
+    MONGO_DISALLOW_COPYING(AuthzManagerExternalState);
+
+public:
+    static stdx::function<std::unique_ptr<AuthzManagerExternalState>()> create;
+
+    virtual ~AuthzManagerExternalState();
 
     /**
-     * Public interface for a class that encapsulates all the information related to system
-     * state not stored in AuthorizationManager.  This is primarily to make AuthorizationManager
-     * easier to test as well as to allow different implementations for mongos and mongod.
+     * Initializes the external state object.  Must be called after construction and before
+     * calling other methods.  Object may not be used after this method returns something other
+     * than Status::OK().
      */
-    class AuthzManagerExternalState {
-        MONGO_DISALLOW_COPYING(AuthzManagerExternalState);
+    virtual Status initialize(OperationContext* txn) = 0;
 
-    public:
+    /**
+     * Creates an external state manipulator for an AuthorizationSession whose
+     * AuthorizationManager uses this object as its own external state manipulator.
+     */
+    virtual std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
+        AuthorizationManager* authzManager) = 0;
 
-        static stdx::function<std::unique_ptr<AuthzManagerExternalState>()> create;
+    /**
+     * Retrieves the schema version of the persistent data describing users and roles.
+     * Will leave *outVersion unmodified on non-OK status return values.
+     */
+    virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion) = 0;
 
-        virtual ~AuthzManagerExternalState();
+    /**
+     * Writes into "result" a document describing the named user and returns Status::OK().  The
+     * description includes the user credentials, if present, the user's role membership and
+     * delegation information, a full list of the user's privileges, and a full list of the
+     * user's roles, including those roles held implicitly through other roles (indirect roles).
+     * In the event that some of this information is inconsistent, the document will contain a
+     * "warnings" array, with std::string messages describing inconsistencies.
+     *
+     * If the user does not exist, returns ErrorCodes::UserNotFound.
+     */
+    virtual Status getUserDescription(OperationContext* txn,
+                                      const UserName& userName,
+                                      BSONObj* result) = 0;
 
-        /**
-         * Initializes the external state object.  Must be called after construction and before
-         * calling other methods.  Object may not be used after this method returns something other
-         * than Status::OK().
-         */
-        virtual Status initialize(OperationContext* txn) = 0;
+    /**
+     * Writes into "result" a document describing the named role and returns Status::OK().  The
+     * description includes the roles in which the named role has membership and a full list of
+     * the roles of which the named role is a member, including those roles memberships held
+     * implicitly through other roles (indirect roles). If "showPrivileges" is true, then the
+     * description documents will also include a full list of the role's privileges.
+     * In the event that some of this information is inconsistent, the document will contain a
+     * "warnings" array, with std::string messages describing inconsistencies.
+     *
+     * If the role does not exist, returns ErrorCodes::RoleNotFound.
+     */
+    virtual Status getRoleDescription(const RoleName& roleName,
+                                      bool showPrivileges,
+                                      BSONObj* result) = 0;
 
-        /**
-         * Creates an external state manipulator for an AuthorizationSession whose
-         * AuthorizationManager uses this object as its own external state manipulator.
-         */
-        virtual std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
-                AuthorizationManager* authzManager) = 0;
+    /**
+     * Writes into "result" documents describing the roles that are defined on the given
+     * database. Each role description document includes the other roles in which the role has
+     * membership and a full list of the roles of which the named role is a member,
+     * including those roles memberships held implicitly through other roles (indirect roles).
+     * If showPrivileges is true, then the description documents will also include a full list
+     * of the role's privileges.  If showBuiltinRoles is true, then the result array will
+     * contain description documents for all the builtin roles for the given database, if it
+     * is false the result will just include user defined roles.
+     * In the event that some of the information in a given role description is inconsistent,
+     * the document will contain a "warnings" array, with std::string messages describing
+     * inconsistencies.
+     */
+    virtual Status getRoleDescriptionsForDB(const std::string dbname,
+                                            bool showPrivileges,
+                                            bool showBuiltinRoles,
+                                            std::vector<BSONObj>* result) = 0;
 
-        /**
-         * Retrieves the schema version of the persistent data describing users and roles.
-         * Will leave *outVersion unmodified on non-OK status return values.
-         */
-        virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion) = 0;
+    /**
+     * Returns true if there exists at least one privilege document in the system.
+     */
+    virtual bool hasAnyPrivilegeDocuments(OperationContext* txn) = 0;
 
-        /**
-         * Writes into "result" a document describing the named user and returns Status::OK().  The
-         * description includes the user credentials, if present, the user's role membership and
-         * delegation information, a full list of the user's privileges, and a full list of the
-         * user's roles, including those roles held implicitly through other roles (indirect roles).
-         * In the event that some of this information is inconsistent, the document will contain a
-         * "warnings" array, with std::string messages describing inconsistencies.
-         *
-         * If the user does not exist, returns ErrorCodes::UserNotFound.
-         */
-        virtual Status getUserDescription(
-                            OperationContext* txn, const UserName& userName, BSONObj* result) = 0;
-
-        /**
-         * Writes into "result" a document describing the named role and returns Status::OK().  The
-         * description includes the roles in which the named role has membership and a full list of
-         * the roles of which the named role is a member, including those roles memberships held
-         * implicitly through other roles (indirect roles). If "showPrivileges" is true, then the
-         * description documents will also include a full list of the role's privileges.
-         * In the event that some of this information is inconsistent, the document will contain a
-         * "warnings" array, with std::string messages describing inconsistencies.
-         *
-         * If the role does not exist, returns ErrorCodes::RoleNotFound.
-         */
-        virtual Status getRoleDescription(const RoleName& roleName,
-                                          bool showPrivileges,
-                                          BSONObj* result) = 0;
-
-        /**
-         * Writes into "result" documents describing the roles that are defined on the given
-         * database. Each role description document includes the other roles in which the role has
-         * membership and a full list of the roles of which the named role is a member,
-         * including those roles memberships held implicitly through other roles (indirect roles).
-         * If showPrivileges is true, then the description documents will also include a full list
-         * of the role's privileges.  If showBuiltinRoles is true, then the result array will
-         * contain description documents for all the builtin roles for the given database, if it
-         * is false the result will just include user defined roles.
-         * In the event that some of the information in a given role description is inconsistent,
-         * the document will contain a "warnings" array, with std::string messages describing
-         * inconsistencies.
-         */
-        virtual Status getRoleDescriptionsForDB(const std::string dbname,
-                                                bool showPrivileges,
-                                                bool showBuiltinRoles,
-                                                std::vector<BSONObj>* result) = 0;
-
-        /**
-         * Returns true if there exists at least one privilege document in the system.
-         */
-        virtual bool hasAnyPrivilegeDocuments(OperationContext* txn) = 0;
-
-        virtual void logOp(
-                OperationContext* txn,
-                const char* op,
-                const char* ns,
-                const BSONObj& o,
-                BSONObj* o2) {}
+    virtual void logOp(
+        OperationContext* txn, const char* op, const char* ns, const BSONObj& o, BSONObj* o2) {}
 
 
-    protected:
-        AuthzManagerExternalState(); // This class should never be instantiated directly.
-    };
+protected:
+    AuthzManagerExternalState();  // This class should never be instantiated directly.
+};
 
-} // namespace mongo
+}  // namespace mongo

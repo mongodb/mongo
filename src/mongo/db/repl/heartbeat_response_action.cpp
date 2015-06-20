@@ -33,41 +33,41 @@
 namespace mongo {
 namespace repl {
 
-    HeartbeatResponseAction HeartbeatResponseAction::makeNoAction() {
-        return HeartbeatResponseAction();
-    }
+HeartbeatResponseAction HeartbeatResponseAction::makeNoAction() {
+    return HeartbeatResponseAction();
+}
 
-    HeartbeatResponseAction HeartbeatResponseAction::makeReconfigAction() {
-        HeartbeatResponseAction result;
-        result._action = Reconfig;
-        return result;
-    }
+HeartbeatResponseAction HeartbeatResponseAction::makeReconfigAction() {
+    HeartbeatResponseAction result;
+    result._action = Reconfig;
+    return result;
+}
 
-    HeartbeatResponseAction HeartbeatResponseAction::makeElectAction() {
-        HeartbeatResponseAction result;
-        result._action = StartElection;
-        return result;
-    }
+HeartbeatResponseAction HeartbeatResponseAction::makeElectAction() {
+    HeartbeatResponseAction result;
+    result._action = StartElection;
+    return result;
+}
 
-    HeartbeatResponseAction HeartbeatResponseAction::makeStepDownSelfAction(int primaryIndex) {
-        HeartbeatResponseAction result;
-        result._action = StepDownSelf;
-        result._primaryIndex = primaryIndex;
-        return result;
-    }
+HeartbeatResponseAction HeartbeatResponseAction::makeStepDownSelfAction(int primaryIndex) {
+    HeartbeatResponseAction result;
+    result._action = StepDownSelf;
+    result._primaryIndex = primaryIndex;
+    return result;
+}
 
-    HeartbeatResponseAction HeartbeatResponseAction::makeStepDownRemoteAction(int primaryIndex) {
-        HeartbeatResponseAction result;
-        result._action = StepDownRemotePrimary;
-        result._primaryIndex = primaryIndex;
-        return result;
-    }
+HeartbeatResponseAction HeartbeatResponseAction::makeStepDownRemoteAction(int primaryIndex) {
+    HeartbeatResponseAction result;
+    result._action = StepDownRemotePrimary;
+    result._primaryIndex = primaryIndex;
+    return result;
+}
 
-    HeartbeatResponseAction::HeartbeatResponseAction() : _action(NoAction), _primaryIndex(-1) {}
+HeartbeatResponseAction::HeartbeatResponseAction() : _action(NoAction), _primaryIndex(-1) {}
 
-    void HeartbeatResponseAction::setNextHeartbeatStartDate(Date_t when) {
-        _nextHeartbeatStartDate = when;
-    }
+void HeartbeatResponseAction::setNextHeartbeatStartDate(Date_t when) {
+    _nextHeartbeatStartDate = when;
+}
 
 }  // namespace repl
 }  // namespace mongo

@@ -36,65 +36,70 @@
 
 namespace mongo {
 
-    class SimpleRecordStoreV1Cursor;
+class SimpleRecordStoreV1Cursor;
 
-    // used by index and original collections
-    class SimpleRecordStoreV1 : public RecordStoreV1Base {
-    public:
-        SimpleRecordStoreV1( OperationContext* txn,
-                             StringData ns,
-                             RecordStoreV1MetaData* details,
-                             ExtentManager* em,
-                             bool isSystemIndexes );
+// used by index and original collections
+class SimpleRecordStoreV1 : public RecordStoreV1Base {
+public:
+    SimpleRecordStoreV1(OperationContext* txn,
+                        StringData ns,
+                        RecordStoreV1MetaData* details,
+                        ExtentManager* em,
+                        bool isSystemIndexes);
 
-        virtual ~SimpleRecordStoreV1();
+    virtual ~SimpleRecordStoreV1();
 
-        const char* name() const { return "SimpleRecordStoreV1"; }
+    const char* name() const {
+        return "SimpleRecordStoreV1";
+    }
 
-        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
+    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
 
-        std::vector<std::unique_ptr<RecordCursor>> getManyCursors(
-            OperationContext* txn) const final;
+    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const final;
 
-        virtual Status truncate(OperationContext* txn);
+    virtual Status truncate(OperationContext* txn);
 
-        virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
-            invariant(!"cappedTruncateAfter not supported");
-        }
+    virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
+        invariant(!"cappedTruncateAfter not supported");
+    }
 
-        virtual bool compactSupported() const { return true; }
-        virtual bool compactsInPlace() const { return false; }
-        virtual Status compact( OperationContext* txn,
-                                RecordStoreCompactAdaptor* adaptor,
-                                const CompactOptions* options,
-                                CompactStats* stats );
+    virtual bool compactSupported() const {
+        return true;
+    }
+    virtual bool compactsInPlace() const {
+        return false;
+    }
+    virtual Status compact(OperationContext* txn,
+                           RecordStoreCompactAdaptor* adaptor,
+                           const CompactOptions* options,
+                           CompactStats* stats);
 
-    protected:
-        virtual bool isCapped() const { return false; }
-        virtual bool shouldPadInserts() const {
-            return !_details->isUserFlagSet(CollectionOptions::Flag_NoPadding);
-        }
+protected:
+    virtual bool isCapped() const {
+        return false;
+    }
+    virtual bool shouldPadInserts() const {
+        return !_details->isUserFlagSet(CollectionOptions::Flag_NoPadding);
+    }
 
-        virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
-                                                 int lengthWithHeaders,
-                                                 bool enforceQuota );
+    virtual StatusWith<DiskLoc> allocRecord(OperationContext* txn,
+                                            int lengthWithHeaders,
+                                            bool enforceQuota);
 
-        virtual void addDeletedRec(OperationContext* txn,
-                                   const DiskLoc& dloc);
-    private:
-        DiskLoc _allocFromExistingExtents( OperationContext* txn,
-                                           int lengthWithHeaders );
+    virtual void addDeletedRec(OperationContext* txn, const DiskLoc& dloc);
 
-        void _compactExtent(OperationContext* txn,
-                            const DiskLoc diskloc,
-                            int extentNumber,
-                            RecordStoreCompactAdaptor* adaptor,
-                            const CompactOptions* compactOptions,
-                            CompactStats* stats );
+private:
+    DiskLoc _allocFromExistingExtents(OperationContext* txn, int lengthWithHeaders);
 
-        bool _normalCollection;
+    void _compactExtent(OperationContext* txn,
+                        const DiskLoc diskloc,
+                        int extentNumber,
+                        RecordStoreCompactAdaptor* adaptor,
+                        const CompactOptions* compactOptions,
+                        CompactStats* stats);
 
-        friend class SimpleRecordStoreV1Iterator;
-    };
+    bool _normalCollection;
 
+    friend class SimpleRecordStoreV1Iterator;
+};
 }

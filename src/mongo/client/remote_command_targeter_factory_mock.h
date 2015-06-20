@@ -32,15 +32,15 @@
 
 namespace mongo {
 
-    /**
-     * Factory which instantiates mock remote command targeters. Used for unit-testing.
-     */
-    class RemoteCommandTargeterFactoryMock final : public RemoteCommandTargeterFactory {
-    public:
-        RemoteCommandTargeterFactoryMock();
-        ~RemoteCommandTargeterFactoryMock();
+/**
+ * Factory which instantiates mock remote command targeters. Used for unit-testing.
+ */
+class RemoteCommandTargeterFactoryMock final : public RemoteCommandTargeterFactory {
+public:
+    RemoteCommandTargeterFactoryMock();
+    ~RemoteCommandTargeterFactoryMock();
 
-        std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) override;
-    };
+    std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) override;
+};
 
-} // namespace mongo
+}  // namespace mongo

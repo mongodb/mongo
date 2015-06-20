@@ -36,79 +36,76 @@
 
 namespace mongo {
 
-    int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& results) {
-        int commonErrCode = -1;
-        for (std::vector<Strategy::CommandResult>::const_iterator it = results.begin();
-             it != results.end();
-             ++it) {
+int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& results) {
+    int commonErrCode = -1;
+    for (std::vector<Strategy::CommandResult>::const_iterator it = results.begin();
+         it != results.end();
+         ++it) {
+        // Only look at shards with errors.
+        if (!it->result["ok"].trueValue()) {
+            int errCode = it->result["code"].numberInt();
 
-            // Only look at shards with errors.
-            if (!it->result["ok"].trueValue()) {
-                int errCode = it->result["code"].numberInt();
-
-                if (commonErrCode == -1) {
-                    commonErrCode = errCode;
-                }
-                else if (commonErrCode != errCode) {
-                    // At least two shards with errors disagree on the error code
-                    commonErrCode = 0;
-                }
+            if (commonErrCode == -1) {
+                commonErrCode = errCode;
+            } else if (commonErrCode != errCode) {
+                // At least two shards with errors disagree on the error code
+                commonErrCode = 0;
             }
         }
-
-        // If no error encountered or shards with errors disagree on the error code, return 0
-        if (commonErrCode == -1 || commonErrCode == 0) {
-            return 0;
-        }
-
-        // Otherwise, shards with errors agree on the error code; return that code
-        return commonErrCode;
     }
 
-    bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns) {
-        invariant(!status.isOK());
-
-        if (status == ErrorCodes::DatabaseNotFound) {
-            // Old style reply
-            result << "result" << BSONArray();
-
-            // New (command) style reply
-            appendCursorResponseObject(0LL, ns, BSONArray(), &result);
-
-            return true;
-        }
-
-        return Command::appendCommandStatus(result, status);
+    // If no error encountered or shards with errors disagree on the error code, return 0
+    if (commonErrCode == -1 || commonErrCode == 0) {
+        return 0;
     }
 
-    Status storePossibleCursor(const std::string& server, const BSONObj& cmdResult) {
-        if (cmdResult["ok"].trueValue() && cmdResult.hasField("cursor")) {
-            BSONElement cursorIdElt = cmdResult.getFieldDotted("cursor.id");
+    // Otherwise, shards with errors agree on the error code; return that code
+    return commonErrCode;
+}
 
-            if (cursorIdElt.type() != mongo::NumberLong) {
+bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns) {
+    invariant(!status.isOK());
+
+    if (status == ErrorCodes::DatabaseNotFound) {
+        // Old style reply
+        result << "result" << BSONArray();
+
+        // New (command) style reply
+        appendCursorResponseObject(0LL, ns, BSONArray(), &result);
+
+        return true;
+    }
+
+    return Command::appendCommandStatus(result, status);
+}
+
+Status storePossibleCursor(const std::string& server, const BSONObj& cmdResult) {
+    if (cmdResult["ok"].trueValue() && cmdResult.hasField("cursor")) {
+        BSONElement cursorIdElt = cmdResult.getFieldDotted("cursor.id");
+
+        if (cursorIdElt.type() != mongo::NumberLong) {
+            return Status(ErrorCodes::TypeMismatch,
+                          str::stream() << "expected \"cursor.id\" field from shard "
+                                        << "response to have NumberLong type, instead "
+                                        << "got: " << typeName(cursorIdElt.type()));
+        }
+
+        const long long cursorId = cursorIdElt.Long();
+        if (cursorId != 0) {
+            BSONElement cursorNsElt = cmdResult.getFieldDotted("cursor.ns");
+            if (cursorNsElt.type() != mongo::String) {
                 return Status(ErrorCodes::TypeMismatch,
-                                str::stream() << "expected \"cursor.id\" field from shard "
-                                              << "response to have NumberLong type, instead "
-                                              << "got: " << typeName(cursorIdElt.type()));
+                              str::stream() << "expected \"cursor.ns\" field from "
+                                            << "shard response to have String type, "
+                                            << "instead got: " << typeName(cursorNsElt.type()));
             }
 
-            const long long cursorId = cursorIdElt.Long();
-            if (cursorId != 0) {
-                BSONElement cursorNsElt = cmdResult.getFieldDotted("cursor.ns");
-                if (cursorNsElt.type() != mongo::String) {
-                    return Status(ErrorCodes::TypeMismatch,
-                                    str::stream() << "expected \"cursor.ns\" field from "
-                                                  << "shard response to have String type, "
-                                                  << "instead got: "
-                                                  << typeName(cursorNsElt.type()));
-                }
-
-                const std::string cursorNs = cursorNsElt.String();
-                cursorCache.storeRef(server, cursorId, cursorNs);
-            }
+            const std::string cursorNs = cursorNsElt.String();
+            cursorCache.storeRef(server, cursorId, cursorNs);
         }
-
-        return Status::OK();
     }
 
-} // namespace mongo
+    return Status::OK();
+}
+
+}  // namespace mongo

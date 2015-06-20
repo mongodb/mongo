@@ -38,53 +38,52 @@
 
 namespace mongo {
 
-    class Principal;
-    class OperationContext;
+class Principal;
+class OperationContext;
 
-    /**
-     * Public interface for a class that encapsulates all the session information related to system
-     * state not stored in AuthorizationSession.  This is primarily to make AuthorizationSession
-     * easier to test as well as to allow different implementations in mongos and mongod.
-     */
-    class AuthzSessionExternalState {
-        MONGO_DISALLOW_COPYING(AuthzSessionExternalState);
+/**
+ * Public interface for a class that encapsulates all the session information related to system
+ * state not stored in AuthorizationSession.  This is primarily to make AuthorizationSession
+ * easier to test as well as to allow different implementations in mongos and mongod.
+ */
+class AuthzSessionExternalState {
+    MONGO_DISALLOW_COPYING(AuthzSessionExternalState);
 
-    public:
+public:
+    virtual ~AuthzSessionExternalState();
 
-        virtual ~AuthzSessionExternalState();
+    AuthorizationManager& getAuthorizationManager();
 
-        AuthorizationManager& getAuthorizationManager();
+    // Returns true if this connection should be treated as if it has full access to do
+    // anything, regardless of the current auth state.  Currently the reasons why this could be
+    // are that auth isn't enabled or the connection is a "god" connection.
+    virtual bool shouldIgnoreAuthChecks() const = 0;
 
-        // Returns true if this connection should be treated as if it has full access to do
-        // anything, regardless of the current auth state.  Currently the reasons why this could be
-        // are that auth isn't enabled or the connection is a "god" connection.
-        virtual bool shouldIgnoreAuthChecks() const = 0;
+    // Returns true if this connection should be treated as a localhost connection with no
+    // admin authentication users created. This condition is used to allow the creation of
+    // the first user on a server with authorization enabled.
+    // NOTE: _checkShouldAllowLocalhost MUST be called at least once before any call to
+    // shouldAllowLocalhost or we could ignore auth checks incorrectly.
+    virtual bool shouldAllowLocalhost() const = 0;
 
-        // Returns true if this connection should be treated as a localhost connection with no
-        // admin authentication users created. This condition is used to allow the creation of
-        // the first user on a server with authorization enabled.
-        // NOTE: _checkShouldAllowLocalhost MUST be called at least once before any call to
-        // shouldAllowLocalhost or we could ignore auth checks incorrectly.
-        virtual bool shouldAllowLocalhost() const = 0;
+    // Returns true if this connection should allow extra server configuration actions under
+    // the localhost exception. This condition is used to allow special privileges on arbiters.
+    // See SERVER-5479 for details on when this may be removed.
+    virtual bool serverIsArbiter() const = 0;
 
-        // Returns true if this connection should allow extra server configuration actions under
-        // the localhost exception. This condition is used to allow special privileges on arbiters.
-        // See SERVER-5479 for details on when this may be removed.
-        virtual bool serverIsArbiter() const = 0;
+    // Should be called at the beginning of every new request.  This performs the checks
+    // necessary to determine if localhost connections should be given full access.
+    virtual void startRequest(OperationContext* txn) = 0;
 
-        // Should be called at the beginning of every new request.  This performs the checks
-        // necessary to determine if localhost connections should be given full access.
-        virtual void startRequest(OperationContext* txn) = 0;
+protected:
+    // This class should never be instantiated directly.
+    AuthzSessionExternalState(AuthorizationManager* authzManager);
 
-    protected:
-        // This class should never be instantiated directly.
-        AuthzSessionExternalState(AuthorizationManager* authzManager);
+    // Pointer to the authorization manager associated with the authorization session
+    // that owns this object.
+    //
+    // TODO(schwerin): Eliminate this back pointer.
+    AuthorizationManager* _authzManager;
+};
 
-        // Pointer to the authorization manager associated with the authorization session
-        // that owns this object.
-        //
-        // TODO(schwerin): Eliminate this back pointer.
-        AuthorizationManager* _authzManager;
-    };
-
-} // namespace mongo
+}  // namespace mongo

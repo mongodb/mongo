@@ -37,63 +37,63 @@
 namespace mongo {
 namespace rpc {
 
-    /**
-     * Bit flags representing support for a particular RPC protocol.
-     * This is just an internal representation, and is never transmitted over the wire. It should
-     * never be used for any other feature detection in favor of max/min wire version.
-     *
-     * A new protocol must be added as the highest order bit flag so that it is prioritized in
-     * negotiation.
-     */
-    enum class Protocol : std::uint64_t {
-
-        /**
-         * The pre-3.2 OP_QUERY on db.$cmd protocol
-         */
-        kOpQuery = 1 << 0,
-
-        /**
-         * The post-3.2 OP_COMMAND protocol.
-         */
-        kOpCommandV1 = 1 << 1,
-    };
+/**
+ * Bit flags representing support for a particular RPC protocol.
+ * This is just an internal representation, and is never transmitted over the wire. It should
+ * never be used for any other feature detection in favor of max/min wire version.
+ *
+ * A new protocol must be added as the highest order bit flag so that it is prioritized in
+ * negotiation.
+ */
+enum class Protocol : std::uint64_t {
 
     /**
-     * Bitfield representing a set of supported RPC protocols.
+     * The pre-3.2 OP_QUERY on db.$cmd protocol
      */
-    using ProtocolSet = std::underlying_type<Protocol>::type;
+    kOpQuery = 1 << 0,
+
+    /**
+     * The post-3.2 OP_COMMAND protocol.
+     */
+    kOpCommandV1 = 1 << 1,
+};
+
+/**
+ * Bitfield representing a set of supported RPC protocols.
+ */
+using ProtocolSet = std::underlying_type<Protocol>::type;
 
 /**
  * This namespace contains predefined bitfields for common levels of protocol support.
  */
 namespace supports {
 
-    const ProtocolSet kNone = ProtocolSet{0};
-    const ProtocolSet kOpQueryOnly = static_cast<ProtocolSet>(Protocol::kOpQuery);
-    const ProtocolSet kOpCommandOnly = static_cast<ProtocolSet>(Protocol::kOpCommandV1);
-    const ProtocolSet kAll = kOpQueryOnly | kOpCommandOnly;
+const ProtocolSet kNone = ProtocolSet{0};
+const ProtocolSet kOpQueryOnly = static_cast<ProtocolSet>(Protocol::kOpQuery);
+const ProtocolSet kOpCommandOnly = static_cast<ProtocolSet>(Protocol::kOpCommandV1);
+const ProtocolSet kAll = kOpQueryOnly | kOpCommandOnly;
 
 }  // namespace supports
 
-    /**
-     * Returns the newest protocol supported by two parties.
-     */
-    StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd);
+/**
+ * Returns the newest protocol supported by two parties.
+ */
+StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd);
 
-    /**
-     * Converts a ProtocolSet to a string. Currently only the predefined ProtocolSets in the
-     * 'supports' namespace are supported.
-     *
-     * This intentionally does not conform to the STL 'to_string' convention so that it will
-     * not conflict with the to_string overload for uint64_t.
-     */
-    StatusWith<StringData> toString(ProtocolSet protocols);
+/**
+ * Converts a ProtocolSet to a string. Currently only the predefined ProtocolSets in the
+ * 'supports' namespace are supported.
+ *
+ * This intentionally does not conform to the STL 'to_string' convention so that it will
+ * not conflict with the to_string overload for uint64_t.
+ */
+StatusWith<StringData> toString(ProtocolSet protocols);
 
-    /**
-     * Parses a ProtocolSet from a string. Currently only the predefined ProtocolSets in the
-     * 'supports' namespace are supported
-     */
-    StatusWith<ProtocolSet> parseProtocolSet(StringData repr);
+/**
+ * Parses a ProtocolSet from a string. Currently only the predefined ProtocolSets in the
+ * 'supports' namespace are supported
+ */
+StatusWith<ProtocolSet> parseProtocolSet(StringData repr);
 
 }  // namespace rpc
 }  // namespace mongo

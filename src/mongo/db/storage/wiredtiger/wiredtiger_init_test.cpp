@@ -40,125 +40,122 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    class WiredTigerFactoryTest : public mongo::unittest::Test {
-    private:
-        virtual void setUp() {
-            ServiceContext* globalEnv = getGlobalServiceContext();
-            ASSERT_TRUE(globalEnv);
-            ASSERT_TRUE(getGlobalServiceContext()->isRegisteredStorageEngine(kWiredTigerEngineName));
-            std::unique_ptr<StorageFactoriesIterator> sfi(getGlobalServiceContext()->
-                                                            makeStorageFactoriesIterator());
-            ASSERT_TRUE(sfi);
-            bool found = false;
-            while (sfi->more()) {
-                const StorageEngine::Factory* currentFactory = sfi->next();
-                if (currentFactory->getCanonicalName() == kWiredTigerEngineName) {
-                    found = true;
-                    factory = currentFactory;
-                    break;
-                }
+class WiredTigerFactoryTest : public mongo::unittest::Test {
+private:
+    virtual void setUp() {
+        ServiceContext* globalEnv = getGlobalServiceContext();
+        ASSERT_TRUE(globalEnv);
+        ASSERT_TRUE(getGlobalServiceContext()->isRegisteredStorageEngine(kWiredTigerEngineName));
+        std::unique_ptr<StorageFactoriesIterator> sfi(
+            getGlobalServiceContext()->makeStorageFactoriesIterator());
+        ASSERT_TRUE(sfi);
+        bool found = false;
+        while (sfi->more()) {
+            const StorageEngine::Factory* currentFactory = sfi->next();
+            if (currentFactory->getCanonicalName() == kWiredTigerEngineName) {
                 found = true;
+                factory = currentFactory;
+                break;
             }
-            ASSERT_TRUE(found);
-            _oldOptions = wiredTigerGlobalOptions;
+            found = true;
         }
-
-        virtual void tearDown() {
-            wiredTigerGlobalOptions = _oldOptions;
-            factory = NULL;
-        }
-
-        WiredTigerGlobalOptions _oldOptions;
-
-    protected:
-        const StorageEngine::Factory* factory;
-    };
-
-    void _testValidateMetadata(const StorageEngine::Factory* factory,
-                               const BSONObj& metadataOptions,
-                               bool directoryPerDB,
-                               bool directoryForIndexes,
-                               ErrorCodes::Error expectedCode) {
-        // It is fine to specify an invalid data directory for the metadata
-        // as long as we do not invoke read() or write().
-        StorageEngineMetadata metadata("no_such_directory");
-        metadata.setStorageEngineOptions(metadataOptions);
-
-        StorageGlobalParams storageOptions;
-        storageOptions.directoryperdb = directoryPerDB;
-        wiredTigerGlobalOptions.directoryForIndexes = directoryForIndexes;
-
-        Status status = factory->validateMetadata(metadata, storageOptions);
-        if (expectedCode != status.code()) {
-            FAIL(str::stream()
-                << "Unexpected StorageEngine::Factory::validateMetadata result. Expected: "
-                << ErrorCodes::errorString(expectedCode) << " but got "
-                << status.toString()
-                << " instead. metadataOptions: " << metadataOptions
-                << "; directoryPerDB: " << directoryPerDB
-                << "; directoryForIndexes: " << directoryForIndexes);
-        }
+        ASSERT_TRUE(found);
+        _oldOptions = wiredTigerGlobalOptions;
     }
 
-    // Do not validate fields that are not present in metadata.
-    TEST_F(WiredTigerFactoryTest, ValidateMetadataEmptyOptions) {
-        _testValidateMetadata(factory, BSONObj(), false, false, ErrorCodes::OK);
-        _testValidateMetadata(factory, BSONObj(), false, true, ErrorCodes::OK);
-        _testValidateMetadata(factory, BSONObj(), true, false, ErrorCodes::OK);
-        _testValidateMetadata(factory, BSONObj(), false, false, ErrorCodes::OK);
+    virtual void tearDown() {
+        wiredTigerGlobalOptions = _oldOptions;
+        factory = NULL;
     }
 
-    TEST_F(WiredTigerFactoryTest, ValidateMetadataDirectoryPerDB) {
-        _testValidateMetadata(factory, fromjson("{directoryPerDB: 123}"), false, false,
-                              ErrorCodes::FailedToParse);
-        _testValidateMetadata(factory, fromjson("{directoryPerDB: false}"), false, false,
-                              ErrorCodes::OK);
-        _testValidateMetadata(factory, fromjson("{directoryPerDB: false}"), true, false,
-                              ErrorCodes::InvalidOptions);
-        _testValidateMetadata(factory, fromjson("{directoryPerDB: true}"), false, false,
-                              ErrorCodes::InvalidOptions);
-        _testValidateMetadata(factory, fromjson("{directoryPerDB: true}"), true, false,
-                              ErrorCodes::OK);
+    WiredTigerGlobalOptions _oldOptions;
+
+protected:
+    const StorageEngine::Factory* factory;
+};
+
+void _testValidateMetadata(const StorageEngine::Factory* factory,
+                           const BSONObj& metadataOptions,
+                           bool directoryPerDB,
+                           bool directoryForIndexes,
+                           ErrorCodes::Error expectedCode) {
+    // It is fine to specify an invalid data directory for the metadata
+    // as long as we do not invoke read() or write().
+    StorageEngineMetadata metadata("no_such_directory");
+    metadata.setStorageEngineOptions(metadataOptions);
+
+    StorageGlobalParams storageOptions;
+    storageOptions.directoryperdb = directoryPerDB;
+    wiredTigerGlobalOptions.directoryForIndexes = directoryForIndexes;
+
+    Status status = factory->validateMetadata(metadata, storageOptions);
+    if (expectedCode != status.code()) {
+        FAIL(str::stream()
+             << "Unexpected StorageEngine::Factory::validateMetadata result. Expected: "
+             << ErrorCodes::errorString(expectedCode) << " but got " << status.toString()
+             << " instead. metadataOptions: " << metadataOptions << "; directoryPerDB: "
+             << directoryPerDB << "; directoryForIndexes: " << directoryForIndexes);
     }
+}
 
-    TEST_F(WiredTigerFactoryTest, ValidateMetadataDirectoryForIndexes) {
-        _testValidateMetadata(factory, fromjson("{directoryForIndexes: 123}"), false, false,
-                              ErrorCodes::FailedToParse);
-        _testValidateMetadata(factory, fromjson("{directoryForIndexes: false}"), false, false,
-                              ErrorCodes::OK);
-        _testValidateMetadata(factory, fromjson("{directoryForIndexes: false}"), false, true,
-                              ErrorCodes::InvalidOptions);
-        _testValidateMetadata(factory, fromjson("{directoryForIndexes: true}"), false, false,
-                              ErrorCodes::InvalidOptions);
-        _testValidateMetadata(factory, fromjson("{directoryForIndexes: true}"), true, true,
-                              ErrorCodes::OK);
-    }
+// Do not validate fields that are not present in metadata.
+TEST_F(WiredTigerFactoryTest, ValidateMetadataEmptyOptions) {
+    _testValidateMetadata(factory, BSONObj(), false, false, ErrorCodes::OK);
+    _testValidateMetadata(factory, BSONObj(), false, true, ErrorCodes::OK);
+    _testValidateMetadata(factory, BSONObj(), true, false, ErrorCodes::OK);
+    _testValidateMetadata(factory, BSONObj(), false, false, ErrorCodes::OK);
+}
 
-    void _testCreateMetadataOptions(const StorageEngine::Factory* factory,
-                                    bool directoryPerDB,
-                                    bool directoryForIndexes) {
-        StorageGlobalParams storageOptions;
-        storageOptions.directoryperdb = directoryPerDB;
-        wiredTigerGlobalOptions.directoryForIndexes = directoryForIndexes;
+TEST_F(WiredTigerFactoryTest, ValidateMetadataDirectoryPerDB) {
+    _testValidateMetadata(
+        factory, fromjson("{directoryPerDB: 123}"), false, false, ErrorCodes::FailedToParse);
+    _testValidateMetadata(
+        factory, fromjson("{directoryPerDB: false}"), false, false, ErrorCodes::OK);
+    _testValidateMetadata(
+        factory, fromjson("{directoryPerDB: false}"), true, false, ErrorCodes::InvalidOptions);
+    _testValidateMetadata(
+        factory, fromjson("{directoryPerDB: true}"), false, false, ErrorCodes::InvalidOptions);
+    _testValidateMetadata(factory, fromjson("{directoryPerDB: true}"), true, false, ErrorCodes::OK);
+}
 
-        BSONObj metadataOptions = factory->createMetadataOptions(storageOptions);
+TEST_F(WiredTigerFactoryTest, ValidateMetadataDirectoryForIndexes) {
+    _testValidateMetadata(
+        factory, fromjson("{directoryForIndexes: 123}"), false, false, ErrorCodes::FailedToParse);
+    _testValidateMetadata(
+        factory, fromjson("{directoryForIndexes: false}"), false, false, ErrorCodes::OK);
+    _testValidateMetadata(
+        factory, fromjson("{directoryForIndexes: false}"), false, true, ErrorCodes::InvalidOptions);
+    _testValidateMetadata(
+        factory, fromjson("{directoryForIndexes: true}"), false, false, ErrorCodes::InvalidOptions);
+    _testValidateMetadata(
+        factory, fromjson("{directoryForIndexes: true}"), true, true, ErrorCodes::OK);
+}
 
-        BSONElement directoryPerDBElement = metadataOptions.getField("directoryPerDB");
-        ASSERT_TRUE(directoryPerDBElement.isBoolean());
-        ASSERT_EQUALS(directoryPerDB, directoryPerDBElement.boolean());
+void _testCreateMetadataOptions(const StorageEngine::Factory* factory,
+                                bool directoryPerDB,
+                                bool directoryForIndexes) {
+    StorageGlobalParams storageOptions;
+    storageOptions.directoryperdb = directoryPerDB;
+    wiredTigerGlobalOptions.directoryForIndexes = directoryForIndexes;
 
-        BSONElement directoryForIndexesElement = metadataOptions.getField("directoryForIndexes");
-        ASSERT_TRUE(directoryForIndexesElement.isBoolean());
-        ASSERT_EQUALS(directoryForIndexes, directoryForIndexesElement.boolean());
-    }
+    BSONObj metadataOptions = factory->createMetadataOptions(storageOptions);
 
-    TEST_F(WiredTigerFactoryTest, CreateMetadataOptions) {
-        _testCreateMetadataOptions(factory, false, false);
-        _testCreateMetadataOptions(factory, false, true);
-        _testCreateMetadataOptions(factory, true, false);
-        _testCreateMetadataOptions(factory, true, true);
-    }
+    BSONElement directoryPerDBElement = metadataOptions.getField("directoryPerDB");
+    ASSERT_TRUE(directoryPerDBElement.isBoolean());
+    ASSERT_EQUALS(directoryPerDB, directoryPerDBElement.boolean());
+
+    BSONElement directoryForIndexesElement = metadataOptions.getField("directoryForIndexes");
+    ASSERT_TRUE(directoryForIndexesElement.isBoolean());
+    ASSERT_EQUALS(directoryForIndexes, directoryForIndexesElement.boolean());
+}
+
+TEST_F(WiredTigerFactoryTest, CreateMetadataOptions) {
+    _testCreateMetadataOptions(factory, false, false);
+    _testCreateMetadataOptions(factory, false, true);
+    _testCreateMetadataOptions(factory, true, false);
+    _testCreateMetadataOptions(factory, true, true);
+}
 
 }  // namespace

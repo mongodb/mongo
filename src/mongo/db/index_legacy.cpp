@@ -37,49 +37,49 @@
 
 namespace mongo {
 
-    // static
-    BSONObj IndexLegacy::adjustIndexSpecObject(const BSONObj& obj) {
-        string pluginName = IndexNames::findPluginName(obj.getObjectField("key"));
+// static
+BSONObj IndexLegacy::adjustIndexSpecObject(const BSONObj& obj) {
+    string pluginName = IndexNames::findPluginName(obj.getObjectField("key"));
 
-        if (IndexNames::TEXT == pluginName) {
-            return fts::FTSSpec::fixSpec(obj);
-        }
-
-        if (IndexNames::GEO_2DSPHERE == pluginName) {
-            return S2AccessMethod::fixSpec(obj);
-        }
-
-        return obj;
+    if (IndexNames::TEXT == pluginName) {
+        return fts::FTSSpec::fixSpec(obj);
     }
 
-    // static
-    BSONObj IndexLegacy::getMissingField(OperationContext* txn,
-                                         Collection* collection,
-                                         const BSONObj& infoObj) {
-        BSONObj keyPattern = infoObj.getObjectField( "key" );
-        string accessMethodName;
-        if ( collection )
-            accessMethodName = collection->getIndexCatalog()->getAccessMethodName(txn, keyPattern);
-        else
-            accessMethodName = IndexNames::findPluginName(keyPattern);
-
-        if (IndexNames::HASHED == accessMethodName ) {
-            int hashVersion = infoObj["hashVersion"].numberInt();
-            HashSeed seed = infoObj["seed"].numberInt();
-
-            // Explicit null valued fields and missing fields are both represented in hashed indexes
-            // using the hash value of the null BSONElement.  This is partly for historical reasons
-            // (hash of null was used in the initial release of hashed indexes and changing would
-            // alter the data format).  Additionally, in certain places the hashed index code and
-            // the index bound calculation code assume null and missing are indexed identically.
-            BSONObj nullObj = BSON("" << BSONNULL);
-            return BSON("" << ExpressionKeysPrivate::makeSingleHashKey(nullObj.firstElement(), seed, hashVersion));
-        }
-        else {
-            BSONObjBuilder b;
-            b.appendNull("");
-            return b.obj();
-        }
+    if (IndexNames::GEO_2DSPHERE == pluginName) {
+        return S2AccessMethod::fixSpec(obj);
     }
+
+    return obj;
+}
+
+// static
+BSONObj IndexLegacy::getMissingField(OperationContext* txn,
+                                     Collection* collection,
+                                     const BSONObj& infoObj) {
+    BSONObj keyPattern = infoObj.getObjectField("key");
+    string accessMethodName;
+    if (collection)
+        accessMethodName = collection->getIndexCatalog()->getAccessMethodName(txn, keyPattern);
+    else
+        accessMethodName = IndexNames::findPluginName(keyPattern);
+
+    if (IndexNames::HASHED == accessMethodName) {
+        int hashVersion = infoObj["hashVersion"].numberInt();
+        HashSeed seed = infoObj["seed"].numberInt();
+
+        // Explicit null valued fields and missing fields are both represented in hashed indexes
+        // using the hash value of the null BSONElement.  This is partly for historical reasons
+        // (hash of null was used in the initial release of hashed indexes and changing would
+        // alter the data format).  Additionally, in certain places the hashed index code and
+        // the index bound calculation code assume null and missing are indexed identically.
+        BSONObj nullObj = BSON("" << BSONNULL);
+        return BSON("" << ExpressionKeysPrivate::makeSingleHashKey(
+                        nullObj.firstElement(), seed, hashVersion));
+    } else {
+        BSONObjBuilder b;
+        b.appendNull("");
+        return b.obj();
+    }
+}
 
 }  // namespace mongo

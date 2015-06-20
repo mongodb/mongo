@@ -34,90 +34,94 @@
 
 namespace mongo {
 
+/**
+ * Timestamp: A combination of a count of seconds since the POSIX epoch plus an ordinal value.
+ */
+class Timestamp {
+public:
+    // Maximum Timestamp value.
+    static Timestamp max();
+
     /**
-     * Timestamp: A combination of a count of seconds since the POSIX epoch plus an ordinal value.
+     * DEPRECATED Constructor that builds a Timestamp from a Date_t by using the
+     * high-order 4 bytes of "date" for the "secs" field and the low-order 4 bytes
+     * for the "i" field.
      */
-    class Timestamp {
-    public:
-        // Maximum Timestamp value.
-        static Timestamp max();
+    explicit Timestamp(Date_t date) : Timestamp(date.toULL()) {}
 
-        /**
-         * DEPRECATED Constructor that builds a Timestamp from a Date_t by using the
-         * high-order 4 bytes of "date" for the "secs" field and the low-order 4 bytes
-         * for the "i" field.
-         */
-        explicit Timestamp(Date_t date) : Timestamp(date.toULL()) {}
+    /**
+     * DEPRECATED Constructor that builds a Timestamp from a 64-bit unsigned integer by using
+     * the high-order 4 bytes of "v" for the "secs" field and the low-order 4 bytes for the "i"
+     * field.
+     */
+    explicit Timestamp(unsigned long long v) : Timestamp(v >> 32, v) {}
 
-        /**
-         * DEPRECATED Constructor that builds a Timestamp from a 64-bit unsigned integer by using
-         * the high-order 4 bytes of "v" for the "secs" field and the low-order 4 bytes for the "i"
-         * field.
-         */
-        explicit Timestamp(unsigned long long v) : Timestamp(v >> 32, v) {}
+    Timestamp(Seconds s, unsigned increment) : Timestamp(s.count(), increment) {}
 
-        Timestamp(Seconds s, unsigned increment) : Timestamp(s.count(), increment) {}
+    Timestamp(unsigned a, unsigned b) : i(b), secs(a) {
+        dassert(secs <= static_cast<unsigned>(std::numeric_limits<int>::max()));
+    }
 
-        Timestamp(unsigned a, unsigned b) : i(b), secs(a) {
-            dassert(secs <= static_cast<unsigned>(std::numeric_limits<int>::max()));
-        }
+    Timestamp() = default;
 
-        Timestamp() = default;
+    unsigned getSecs() const {
+        return secs;
+    }
 
-        unsigned getSecs() const {
-            return secs;
-        }
+    unsigned getInc() const {
+        return i;
+    }
 
-        unsigned getInc() const {
-            return i;
-        }
+    unsigned long long asULL() const {
+        unsigned long long result = secs;
+        result <<= 32;
+        result |= i;
+        return result;
+    }
+    long long asLL() const {
+        return static_cast<long long>(asULL());
+    }
 
-        unsigned long long asULL() const {
-            unsigned long long result = secs;
-            result <<= 32;
-            result |= i;
-            return result;
-        }
-        long long asLL() const {
-            return static_cast<long long>(asULL());
-        }
+    bool isNull() const {
+        return secs == 0;
+    }
 
-        bool isNull() const { return secs == 0; }
+    std::string toStringLong() const;
 
-        std::string toStringLong() const;
+    std::string toStringPretty() const;
 
-        std::string toStringPretty() const;
+    std::string toString() const;
 
-        std::string toString() const;
+    bool operator==(const Timestamp& r) const {
+        return tie() == r.tie();
+    }
+    bool operator!=(const Timestamp& r) const {
+        return tie() != r.tie();
+    }
+    bool operator<(const Timestamp& r) const {
+        return tie() < r.tie();
+    }
+    bool operator<=(const Timestamp& r) const {
+        return tie() <= r.tie();
+    }
+    bool operator>(const Timestamp& r) const {
+        return tie() > r.tie();
+    }
+    bool operator>=(const Timestamp& r) const {
+        return tie() >= r.tie();
+    }
 
-        bool operator==(const Timestamp& r) const {
-            return tie() == r.tie();
-        }
-        bool operator!=(const Timestamp& r) const {
-            return tie() != r.tie();
-        }
-        bool operator<(const Timestamp& r) const {
-            return tie() < r.tie();
-        }
-        bool operator<=(const Timestamp& r) const {
-            return tie() <= r.tie();
-        }
-        bool operator>(const Timestamp& r) const {
-            return tie() > r.tie();
-        }
-        bool operator>=(const Timestamp& r) const {
-            return tie() >= r.tie();
-        }
+    // Append the BSON representation of this Timestamp to the given BufBuilder with the given
+    // name. This lives here because Timestamp manages its own serialization format.
+    void append(BufBuilder& builder, const StringData& fieldName) const;
 
-        // Append the BSON representation of this Timestamp to the given BufBuilder with the given
-        // name. This lives here because Timestamp manages its own serialization format.
-        void append(BufBuilder& builder, const StringData& fieldName) const;
+private:
+    std::tuple<unsigned, unsigned> tie() const {
+        return std::tie(secs, i);
+    }
 
-    private:
-        std::tuple<unsigned, unsigned> tie() const { return std::tie(secs, i); }
+    unsigned i = 0;
+    unsigned secs = 0;
+};
 
-        unsigned i = 0;
-        unsigned secs = 0;
-    };
-
-} // namespace mongo
+}  // namespace mongo

@@ -32,35 +32,34 @@
 
 namespace mongo {
 
+/**
+ * This class implements the deleter methods to be used for a shard.
+ */
+struct RangeDeleterDBEnv : public RangeDeleterEnv {
     /**
-     * This class implements the deleter methods to be used for a shard.
+     * Deletes the documents from the given range synchronously.
+     *
+     * The keyPattern will be used to determine the right index to use to perform
+     * the deletion and it can be a prefix of an existing index. Caller is responsible
+     * of making sure that both min and max is a prefix of keyPattern.
+     *
+     * Note that secondaryThrottle will be ignored if current process is not part
+     * of a replica set.
+     *
+     * docsDeleted would contain the number of docs deleted if the deletion was successful.
+     *
+     * Does not throw Exceptions.
      */
-    struct RangeDeleterDBEnv : public RangeDeleterEnv {
+    virtual bool deleteRange(OperationContext* txn,
+                             const RangeDeleteEntry& taskDetails,
+                             long long int* deletedDocs,
+                             std::string* errMsg);
 
-        /**
-         * Deletes the documents from the given range synchronously.
-         *
-         * The keyPattern will be used to determine the right index to use to perform
-         * the deletion and it can be a prefix of an existing index. Caller is responsible
-         * of making sure that both min and max is a prefix of keyPattern.
-         *
-         * Note that secondaryThrottle will be ignored if current process is not part
-         * of a replica set.
-         *
-         * docsDeleted would contain the number of docs deleted if the deletion was successful.
-         *
-         * Does not throw Exceptions.
-         */
-        virtual bool deleteRange(OperationContext* txn,
-                                 const RangeDeleteEntry& taskDetails,
-                                 long long int* deletedDocs,
-                                 std::string* errMsg);
-
-        /**
-         * Gets the list of open cursors on a given namespace.
-         */
-        virtual void getCursorIds(OperationContext* txn,
-                                  StringData ns,
-                                  std::set<CursorId>* openCursors);
-    };
+    /**
+     * Gets the list of open cursors on a given namespace.
+     */
+    virtual void getCursorIds(OperationContext* txn,
+                              StringData ns,
+                              std::set<CursorId>* openCursors);
+};
 }

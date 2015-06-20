@@ -37,85 +37,85 @@
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
+/**
+ * Registry for storing mock servers and can create mock connections to these
+ * servers.
+ */
+class MockConnRegistry {
+public:
     /**
-     * Registry for storing mock servers and can create mock connections to these
-     * servers.
+     * Initializes the static instance.
      */
-    class MockConnRegistry {
+    static Status init();
+
+    /**
+     * @return the singleton registry. If this needs to be called before main(),
+     *     then the initializer method should depend on "MockConnRegistry".
+     */
+    static MockConnRegistry* get();
+
+    /**
+     * Adds a server to this registry.
+     *
+     * @param server the server to add. Caller is responsible for disposing
+     *     the server.
+     */
+    void addServer(MockRemoteDBServer* server);
+
+    /**
+     * Removes the server from this registry.
+     *
+     * @param hostName the host name of the server to remove.
+     *
+     * @return true if the server is in the registry and was removed.
+     */
+    bool removeServer(const std::string& hostName);
+
+    /**
+     * Clears the registry.
+     */
+    void clear();
+
+    /**
+     * @return a new mocked connection to a server with the given hostName.
+     */
+    MockDBClientConnection* connect(const std::string& hostName);
+
+    /**
+     * @return the hook that can be used with ConnectionString.
+     */
+    ConnectionString::ConnectionHook* getConnStrHook();
+
+private:
+    class MockConnHook : public ConnectionString::ConnectionHook {
     public:
         /**
-         * Initializes the static instance.
-         */
-        static Status init();
-
-        /**
-         * @return the singleton registry. If this needs to be called before main(),
-         *     then the initializer method should depend on "MockConnRegistry".
-         */
-        static MockConnRegistry* get();
-
-        /**
-         * Adds a server to this registry.
+         * Creates a new connection hook for the ConnectionString class that
+         * can create mock connections to mock replica set members using their
+         * pseudo host names.
          *
-         * @param server the server to add. Caller is responsible for disposing
-         *     the server.
+         * @param replSet the mock replica set. Caller is responsible for managing
+         *     replSet and making sure that it lives longer than this object.
          */
-        void addServer(MockRemoteDBServer* server);
+        MockConnHook(MockConnRegistry* registry);
+        ~MockConnHook();
 
-        /**
-         * Removes the server from this registry.
-         *
-         * @param hostName the host name of the server to remove.
-         *
-         * @return true if the server is in the registry and was removed.
-         */
-        bool removeServer(const std::string& hostName);
-
-        /**
-         * Clears the registry.
-         */
-        void clear();
-
-        /**
-         * @return a new mocked connection to a server with the given hostName.
-         */
-        MockDBClientConnection* connect(const std::string& hostName);
-
-        /**
-         * @return the hook that can be used with ConnectionString.
-         */
-        ConnectionString::ConnectionHook* getConnStrHook();
+        mongo::DBClientBase* connect(const mongo::ConnectionString& connString,
+                                     std::string& errmsg,
+                                     double socketTimeout);
 
     private:
-        class MockConnHook: public ConnectionString::ConnectionHook {
-        public:
-            /**
-             * Creates a new connection hook for the ConnectionString class that
-             * can create mock connections to mock replica set members using their
-             * pseudo host names.
-             *
-             * @param replSet the mock replica set. Caller is responsible for managing
-             *     replSet and making sure that it lives longer than this object.
-             */
-            MockConnHook(MockConnRegistry* registry);
-            ~MockConnHook();
-
-            mongo::DBClientBase* connect(
-                    const mongo::ConnectionString& connString,
-                    std::string& errmsg, double socketTimeout);
-
-        private:
-            MockConnRegistry* _registry;
-        };
-
-        MockConnRegistry();
-
-        static std::unique_ptr<MockConnRegistry> _instance;
-
-        MockConnHook _mockConnStrHook;
-
-        // protects _registry
-        stdx::mutex _registryMutex;
-        unordered_map<std::string, MockRemoteDBServer*> _registry;
+        MockConnRegistry* _registry;
     };
+
+    MockConnRegistry();
+
+    static std::unique_ptr<MockConnRegistry> _instance;
+
+    MockConnHook _mockConnStrHook;
+
+    // protects _registry
+    stdx::mutex _registryMutex;
+    unordered_map<std::string, MockRemoteDBServer*> _registry;
+};
 }

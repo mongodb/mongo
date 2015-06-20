@@ -36,150 +36,141 @@
 
 namespace mongo {
 
-    using boost::intrusive_ptr;
-    using std::string;
-    using std::vector;
+using boost::intrusive_ptr;
+using std::string;
+using std::vector;
 
-    /** Helper class to unwind array from a single document. */
-    class DocumentSourceUnwind::Unwinder {
-    public:
-        /** @param unwindPath is the field path to the array to unwind. */
-        Unwinder(const FieldPath& unwindPath);
-        /** Reset the unwinder to unwind a new document. */
-        void resetDocument(const Document& document);
+/** Helper class to unwind array from a single document. */
+class DocumentSourceUnwind::Unwinder {
+public:
+    /** @param unwindPath is the field path to the array to unwind. */
+    Unwinder(const FieldPath& unwindPath);
+    /** Reset the unwinder to unwind a new document. */
+    void resetDocument(const Document& document);
 
-        /**
-         * @return the next document unwound from the document provided to resetDocument(), using
-         * the current value in the array located at the provided unwindPath.
-         *
-         * Returns boost::none if the array is exhausted.
-         */
-        boost::optional<Document> getNext();
+    /**
+     * @return the next document unwound from the document provided to resetDocument(), using
+     * the current value in the array located at the provided unwindPath.
+     *
+     * Returns boost::none if the array is exhausted.
+     */
+    boost::optional<Document> getNext();
 
-    private:
-        // Path to the array to unwind.
-        const FieldPath _unwindPath;
+private:
+    // Path to the array to unwind.
+    const FieldPath _unwindPath;
 
-        Value _inputArray;
-        MutableDocument _output;
+    Value _inputArray;
+    MutableDocument _output;
 
-        // Document indexes of the field path components.
-        vector<Position> _unwindPathFieldIndexes;
-        // Index into the _inputArray to return next.
-        size_t _index;
-    };
+    // Document indexes of the field path components.
+    vector<Position> _unwindPathFieldIndexes;
+    // Index into the _inputArray to return next.
+    size_t _index;
+};
 
-    DocumentSourceUnwind::Unwinder::Unwinder(const FieldPath& unwindPath):
-        _unwindPath(unwindPath) {
+DocumentSourceUnwind::Unwinder::Unwinder(const FieldPath& unwindPath) : _unwindPath(unwindPath) {}
+
+void DocumentSourceUnwind::Unwinder::resetDocument(const Document& document) {
+    // Reset document specific attributes.
+    _inputArray = Value();
+    _output.reset(document);
+    _unwindPathFieldIndexes.clear();
+    _index = 0;
+
+    Value pathValue = document.getNestedField(_unwindPath, &_unwindPathFieldIndexes);
+    if (pathValue.nullish()) {
+        // The path does not exist or is null.
+        return;
     }
 
-    void DocumentSourceUnwind::Unwinder::resetDocument(const Document& document) {
+    _inputArray = pathValue;
+}
 
-        // Reset document specific attributes.
-        _inputArray = Value();
-        _output.reset(document);
-        _unwindPathFieldIndexes.clear();
-        _index = 0;
+boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
+    if (_inputArray.missing())
+        return boost::none;
 
-        Value pathValue = document.getNestedField(_unwindPath, &_unwindPathFieldIndexes);
-        if (pathValue.nullish()) {
-            // The path does not exist or is null.
-            return;
-        }
+    // If needed, this will automatically clone all the documents along the
+    // field path so that the end values are not shared across documents
+    // that have come out of this pipeline operator.  This is a partial deep
+    // clone. Because the value at the end will be replaced, everything
+    // along the path leading to that will be replaced in order not to share
+    // that change with any other clones (or the original).
 
-        _inputArray = pathValue;
-    }
-
-    boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
-        if (_inputArray.missing())
+    if (_inputArray.getType() == Array) {
+        if (_index == _inputArray.getArrayLength())
             return boost::none;
+        _output.setNestedField(_unwindPathFieldIndexes, _inputArray[_index]);
+    } else if (_index > 0) {
+        return boost::none;
+    } else {
+        //_output.setNestedField(_unwindPathFieldIndexes, _inputArray);
+    }
+    _index++;
+    return _output.peek();
+}
 
-        // If needed, this will automatically clone all the documents along the
-        // field path so that the end values are not shared across documents
-        // that have come out of this pipeline operator.  This is a partial deep
-        // clone. Because the value at the end will be replaced, everything
-        // along the path leading to that will be replaced in order not to share
-        // that change with any other clones (or the original).
+const char DocumentSourceUnwind::unwindName[] = "$unwind";
 
-        if (_inputArray.getType() == Array) {
-            if (_index == _inputArray.getArrayLength())
-                return boost::none;
-            _output.setNestedField(_unwindPathFieldIndexes, _inputArray[_index]);
-        }
-        else if (_index > 0) {
-            return boost::none;
-        }
-        else {
-            //_output.setNestedField(_unwindPathFieldIndexes, _inputArray);
-        }
-        _index++;
-        return _output.peek();
+DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext>& pExpCtx)
+    : DocumentSource(pExpCtx) {}
+
+const char* DocumentSourceUnwind::getSourceName() const {
+    return unwindName;
+}
+
+boost::optional<Document> DocumentSourceUnwind::getNext() {
+    pExpCtx->checkForInterrupt();
+
+    boost::optional<Document> out = _unwinder->getNext();
+    while (!out) {
+        // No more elements in array currently being unwound. This will loop if the input
+        // document is missing the unwind field or has an empty array.
+        boost::optional<Document> input = pSource->getNext();
+        if (!input)
+            return boost::none;  // input exhausted
+
+        // Try to extract an output document from the new input document.
+        _unwinder->resetDocument(*input);
+        out = _unwinder->getNext();
     }
 
-    const char DocumentSourceUnwind::unwindName[] = "$unwind";
+    return out;
+}
 
-    DocumentSourceUnwind::DocumentSourceUnwind(
-        const intrusive_ptr<ExpressionContext> &pExpCtx):
-        DocumentSource(pExpCtx) {
-    }
+Value DocumentSourceUnwind::serialize(bool explain) const {
+    verify(_unwindPath);
+    return Value(DOC(getSourceName() << _unwindPath->getPath(true)));
+}
 
-    const char *DocumentSourceUnwind::getSourceName() const {
-        return unwindName;
-    }
+DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {
+    deps->fields.insert(_unwindPath->getPath(false));
+    return SEE_NEXT;
+}
 
-    boost::optional<Document> DocumentSourceUnwind::getNext() {
-        pExpCtx->checkForInterrupt();
+void DocumentSourceUnwind::unwindPath(const FieldPath& fieldPath) {
+    // Can't set more than one unwind path.
+    uassert(15979, str::stream() << unwindName << "can't unwind more than one path", !_unwindPath);
+    // Record the unwind path.
+    _unwindPath.reset(new FieldPath(fieldPath));
+    _unwinder.reset(new Unwinder(fieldPath));
+}
 
-        boost::optional<Document> out = _unwinder->getNext();
-        while (!out) {
-            // No more elements in array currently being unwound. This will loop if the input
-            // document is missing the unwind field or has an empty array.
-            boost::optional<Document> input = pSource->getNext();
-            if (!input)
-                return boost::none; // input exhausted
+intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    /*
+      The value of $unwind should just be a field path.
+     */
+    uassert(15981,
+            str::stream() << "the " << unwindName << " field path must be specified as a string",
+            elem.type() == String);
 
-            // Try to extract an output document from the new input document.
-            _unwinder->resetDocument(*input);
-            out = _unwinder->getNext();
-        }
+    string prefixedPathString(elem.str());
+    string pathString(Expression::removeFieldPrefix(prefixedPathString));
+    intrusive_ptr<DocumentSourceUnwind> pUnwind(new DocumentSourceUnwind(pExpCtx));
+    pUnwind->unwindPath(FieldPath(pathString));
 
-        return out;
-    }
-
-    Value DocumentSourceUnwind::serialize(bool explain) const {
-        verify(_unwindPath);
-        return Value(DOC(getSourceName() << _unwindPath->getPath(true)));
-    }
-
-    DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {
-        deps->fields.insert(_unwindPath->getPath(false));
-        return SEE_NEXT;
-    }
-
-    void DocumentSourceUnwind::unwindPath(const FieldPath &fieldPath) {
-        // Can't set more than one unwind path.
-        uassert(15979, str::stream() << unwindName << "can't unwind more than one path",
-                !_unwindPath);
-        // Record the unwind path.
-        _unwindPath.reset(new FieldPath(fieldPath));
-        _unwinder.reset(new Unwinder(fieldPath));
-    }
-
-    intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
-            BSONElement elem,
-            const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        /*
-          The value of $unwind should just be a field path.
-         */
-        uassert(15981, str::stream() << "the " << unwindName <<
-                " field path must be specified as a string",
-                elem.type() == String);
-
-        string prefixedPathString(elem.str());
-        string pathString(Expression::removeFieldPrefix(prefixedPathString));
-        intrusive_ptr<DocumentSourceUnwind> pUnwind(new DocumentSourceUnwind(pExpCtx));
-        pUnwind->unwindPath(FieldPath(pathString));
-
-        return pUnwind;
-    }
+    return pUnwind;
+}
 }

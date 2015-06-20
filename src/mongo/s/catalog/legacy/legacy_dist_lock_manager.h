@@ -41,46 +41,43 @@
 
 namespace mongo {
 
-    class DistributedLock;
+class DistributedLock;
 
-    class LegacyDistLockManager: public DistLockManager {
-    public:
-        explicit LegacyDistLockManager(ConnectionString configServer);
+class LegacyDistLockManager : public DistLockManager {
+public:
+    explicit LegacyDistLockManager(ConnectionString configServer);
 
-        virtual ~LegacyDistLockManager() = default;
+    virtual ~LegacyDistLockManager() = default;
 
-        virtual void startUp() override;
-        virtual void shutDown() override;
+    virtual void startUp() override;
+    virtual void shutDown() override;
 
-        virtual StatusWith<DistLockManager::ScopedDistLock> lock(
-                StringData name,
-                StringData whyMessage,
-                stdx::chrono::milliseconds waitFor,
-                stdx::chrono::milliseconds lockTryInterval) override;
+    virtual StatusWith<DistLockManager::ScopedDistLock> lock(
+        StringData name,
+        StringData whyMessage,
+        stdx::chrono::milliseconds waitFor,
+        stdx::chrono::milliseconds lockTryInterval) override;
 
-        // For testing only.
-        void enablePinger(bool enable);
+    // For testing only.
+    void enablePinger(bool enable);
 
-    protected:
+protected:
+    virtual void unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT override;
 
-        virtual void unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT override;
+    virtual Status checkStatus(const DistLockHandle& lockHandle) override;
 
-        virtual Status checkStatus(const DistLockHandle& lockHandle) override;
+private:
+    const ConnectionString _configServer;
 
-    private:
+    stdx::mutex _mutex;
+    stdx::condition_variable _noLocksCV;
+    std::map<DistLockHandle, std::unique_ptr<DistributedLock>> _lockMap;
 
-        const ConnectionString _configServer;
+    std::unique_ptr<LegacyDistLockPinger> _pinger;
 
-        stdx::mutex _mutex;
-        stdx::condition_variable _noLocksCV;
-        std::map<DistLockHandle, std::unique_ptr<DistributedLock>> _lockMap;
+    bool _isStopped;
 
-        std::unique_ptr<LegacyDistLockPinger> _pinger;
-
-        bool _isStopped;
-
-        // For testing only.
-        bool _pingerEnabled;
-    };
-
+    // For testing only.
+    bool _pingerEnabled;
+};
 }

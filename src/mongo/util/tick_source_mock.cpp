@@ -31,23 +31,23 @@
 namespace mongo {
 
 namespace {
-    const TickSource::Tick kTicksPerSecond = 1000;
-} // unnamed namespace
+const TickSource::Tick kTicksPerSecond = 1000;
+}  // unnamed namespace
 
-    TickSource::Tick TickSourceMock::getTicks() {
-        return _currentTicks;
-    }
+TickSource::Tick TickSourceMock::getTicks() {
+    return _currentTicks;
+}
 
-    TickSource::Tick TickSourceMock::getTicksPerSecond() {
-        return kTicksPerSecond;
-    }
+TickSource::Tick TickSourceMock::getTicksPerSecond() {
+    return kTicksPerSecond;
+}
 
-    void TickSourceMock::advance(const stdx::chrono::milliseconds& ms) {
-        _currentTicks += ms.count();
-    }
+void TickSourceMock::advance(const stdx::chrono::milliseconds& ms) {
+    _currentTicks += ms.count();
+}
 
-    void TickSourceMock::reset(TickSource::Tick tick) {
-        _currentTicks = std::move(tick);
-    }
+void TickSourceMock::reset(TickSource::Tick tick) {
+    _currentTicks = std::move(tick);
+}
 
-} // namespace mongo
+}  // namespace mongo

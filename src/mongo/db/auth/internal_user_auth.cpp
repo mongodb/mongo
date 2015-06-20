@@ -39,78 +39,78 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-    namespace mmb = mongo::mutablebson;
+namespace mmb = mongo::mutablebson;
 
-    // not guarded by the authParams mutex never changed in
-    // multi-threaded operation
-    static bool authParamsSet = false;
+// not guarded by the authParams mutex never changed in
+// multi-threaded operation
+static bool authParamsSet = false;
 
-    // Store default authentication parameters for internal authentication to cluster members,
-    // guarded by the authParams mutex
-    static BSONObj authParams;
+// Store default authentication parameters for internal authentication to cluster members,
+// guarded by the authParams mutex
+static BSONObj authParams;
 
-    static stdx::mutex authParamMutex;
+static stdx::mutex authParamMutex;
 
-    bool isInternalAuthSet() {
-       return authParamsSet;
+bool isInternalAuthSet() {
+    return authParamsSet;
+}
+
+void setInternalUserAuthParams(const BSONObj& authParamsIn) {
+    if (!isInternalAuthSet()) {
+        authParamsSet = true;
+    }
+    stdx::lock_guard<stdx::mutex> lk(authParamMutex);
+
+    if (authParamsIn["mechanism"].String() != "SCRAM-SHA-1") {
+        authParams = authParamsIn.copy();
+        return;
     }
 
-    void setInternalUserAuthParams(const BSONObj& authParamsIn) {
-        if (!isInternalAuthSet()) {
-            authParamsSet = true;
-        }
-        stdx::lock_guard<stdx::mutex> lk(authParamMutex);
+    // Create authParams for legacy MONGODB-CR authentication for 2.6/3.0 mixed
+    // mode if applicable.
+    mmb::Document fallback(authParamsIn);
+    fallback.root().findFirstChildNamed("mechanism").setValueString("MONGODB-CR");
 
-        if (authParamsIn["mechanism"].String() != "SCRAM-SHA-1") {
-            authParams = authParamsIn.copy();
-            return;
-        }
+    mmb::Document doc(authParamsIn);
+    mmb::Element fallbackEl = doc.makeElementObject("fallbackParams");
+    fallbackEl.setValueObject(fallback.getObject());
+    doc.root().pushBack(fallbackEl);
+    authParams = doc.getObject().copy();
+}
 
-        // Create authParams for legacy MONGODB-CR authentication for 2.6/3.0 mixed
-        // mode if applicable.
-        mmb::Document fallback(authParamsIn);
-        fallback.root().findFirstChildNamed("mechanism").setValueString("MONGODB-CR");
-
-        mmb::Document doc(authParamsIn);
-        mmb::Element fallbackEl = doc.makeElementObject("fallbackParams");
-        fallbackEl.setValueObject(fallback.getObject());
-        doc.root().pushBack(fallbackEl);
-        authParams = doc.getObject().copy();
+BSONObj getInternalUserAuthParamsWithFallback() {
+    if (!authParamsSet) {
+        return BSONObj();
     }
 
-    BSONObj getInternalUserAuthParamsWithFallback() {
-        if (!authParamsSet) {
-            return BSONObj();
-        }
+    stdx::lock_guard<stdx::mutex> lk(authParamMutex);
+    return authParams.copy();
+}
 
-        stdx::lock_guard<stdx::mutex> lk(authParamMutex);
-        return authParams.copy();
+BSONObj getFallbackAuthParams(BSONObj params) {
+    if (params["fallbackParams"].type() != Object) {
+        return BSONObj();
+    }
+    return params["fallbackParams"].Obj();
+}
+
+bool authenticateInternalUser(DBClientWithCommands* conn) {
+    if (!isInternalAuthSet()) {
+        if (!serverGlobalParams.quiet) {
+            log() << "ERROR: No authentication parameters set for internal user";
+        }
+        return false;
     }
 
-    BSONObj getFallbackAuthParams(BSONObj params) {
-        if (params["fallbackParams"].type() != Object) {
-            return BSONObj();
+    try {
+        conn->auth(getInternalUserAuthParamsWithFallback());
+        return true;
+    } catch (const UserException& ex) {
+        if (!serverGlobalParams.quiet) {
+            log() << "can't authenticate to " << conn->toString()
+                  << " as internal user, error: " << ex.what();
         }
-        return params["fallbackParams"].Obj();
+        return false;
     }
-
-    bool authenticateInternalUser(DBClientWithCommands* conn) {
-        if (!isInternalAuthSet()) {
-            if (!serverGlobalParams.quiet) {
-                log() << "ERROR: No authentication parameters set for internal user";
-            }
-            return false;
-        }
-
-        try {
-            conn->auth(getInternalUserAuthParamsWithFallback());
-            return true;
-        } catch(const UserException& ex) {
-            if (!serverGlobalParams.quiet) {
-                log() << "can't authenticate to " << conn->toString()
-                      << " as internal user, error: "<< ex.what();
-            }
-            return false;
-        }
-    }
-} // namespace mongo
+}
+}  // namespace mongo

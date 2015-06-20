@@ -34,72 +34,74 @@
 
 namespace mongo {
 
+/**
+ * Stage used by the count command. This stage sits at the root of a plan tree
+ * and counts the number of results returned by its child stage.
+ *
+ * This should not be confused with the CountScan stage. CountScan is a special
+ * index access stage which can optimize index access for count operations in
+ * some cases. On the other hand, *every* count op has a CountStage at its root.
+ *
+ * Only returns NEED_TIME until hitting EOF. The count result can be obtained by examining
+ * the specific stats.
+ */
+class CountStage : public PlanStage {
+public:
+    CountStage(OperationContext* txn,
+               Collection* collection,
+               const CountRequest& request,
+               WorkingSet* ws,
+               PlanStage* child);
+
+    virtual ~CountStage();
+
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
+
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_COUNT;
+    }
+
+    PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats() const;
+
+    virtual const SpecificStats* getSpecificStats() const;
+
+    static const char* kStageType;
+
+private:
     /**
-     * Stage used by the count command. This stage sits at the root of a plan tree
-     * and counts the number of results returned by its child stage.
-     *
-     * This should not be confused with the CountScan stage. CountScan is a special
-     * index access stage which can optimize index access for count operations in
-     * some cases. On the other hand, *every* count op has a CountStage at its root.
-     *
-     * Only returns NEED_TIME until hitting EOF. The count result can be obtained by examining
-     * the specific stats.
+     * Computes the count in the case of an empty query, applying the skip and
+     * limit if necessary. The result is stored in '_specificStats'.
      */
-    class CountStage : public PlanStage {
-    public:
-        CountStage(OperationContext* txn,
-                   Collection* collection,
-                   const CountRequest& request,
-                   WorkingSet* ws,
-                   PlanStage* child);
+    void trivialCount();
 
-        virtual ~CountStage();
+    // Transactional context for read locks. Not owned by us.
+    OperationContext* _txn;
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+    // The collection over which we are counting.
+    Collection* _collection;
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    CountRequest _request;
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    // The number of documents that we still need to skip.
+    long long _leftToSkip;
 
-        virtual StageType stageType() const { return STAGE_COUNT; }
+    // The working set used to pass intermediate results between stages. Not owned
+    // by us.
+    WorkingSet* _ws;
 
-        PlanStageStats* getStats();
+    std::unique_ptr<PlanStage> _child;
 
-        virtual const CommonStats* getCommonStats() const;
-
-        virtual const SpecificStats* getSpecificStats() const;
-
-        static const char* kStageType;
-
-    private:
-        /**
-         * Computes the count in the case of an empty query, applying the skip and
-         * limit if necessary. The result is stored in '_specificStats'.
-         */
-        void trivialCount();
-
-        // Transactional context for read locks. Not owned by us.
-        OperationContext* _txn;
-
-        // The collection over which we are counting.
-        Collection* _collection;
-
-        CountRequest _request;
-
-        // The number of documents that we still need to skip.
-        long long _leftToSkip;
-
-        // The working set used to pass intermediate results between stages. Not owned
-        // by us.
-        WorkingSet* _ws;
-
-        std::unique_ptr<PlanStage> _child;
-
-        CommonStats _commonStats;
-        CountStats _specificStats;
-    };
+    CommonStats _commonStats;
+    CountStats _specificStats;
+};
 
 }  // namespace mongo

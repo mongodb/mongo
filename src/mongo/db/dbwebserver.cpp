@@ -66,316 +66,269 @@
 
 namespace mongo {
 
-    using std::map;
-    using std::stringstream;
-    using std::vector;
+using std::map;
+using std::stringstream;
+using std::vector;
 
-    using namespace html;
+using namespace html;
 
 namespace {
 
-    void doUnlockedStuff(stringstream& ss) {
-        // This is in the header already ss << "port:      " << port << '\n'
-        ss << "<pre>";
-        ss << mongodVersion() << '\n';
-        ss << "git hash: " << gitVersion() << '\n';
-        ss << openSSLVersion("OpenSSL version: ", "\n");
-        ss << "uptime: " << time(0) - serverGlobalParams.started << " seconds\n";
-        ss << "</pre>";
+void doUnlockedStuff(stringstream& ss) {
+    // This is in the header already ss << "port:      " << port << '\n'
+    ss << "<pre>";
+    ss << mongodVersion() << '\n';
+    ss << "git hash: " << gitVersion() << '\n';
+    ss << openSSLVersion("OpenSSL version: ", "\n");
+    ss << "uptime: " << time(0) - serverGlobalParams.started << " seconds\n";
+    ss << "</pre>";
+}
+
+
+bool prisort(const Prioritizable* a, const Prioritizable* b) {
+    return a->priority() < b->priority();
+}
+
+
+struct Timing {
+    Timing() {
+        start = timeLocked = 0;
+    }
+    unsigned long long start, timeLocked;
+};
+
+
+class LogPlugin : public WebStatusPlugin {
+public:
+    LogPlugin() : WebStatusPlugin("Log", 100), _log(0) {
+        _log = RamLog::get("global");
     }
 
+    virtual void init() {}
 
-    bool prisort(const Prioritizable* a, const Prioritizable* b) {
-        return a->priority() < b->priority();
+    virtual void run(OperationContext* txn, stringstream& ss) {
+        _log->toHTML(ss);
+    }
+    RamLog* _log;
+};
+
+
+class FavIconHandler : public DbWebHandler {
+public:
+    FavIconHandler() : DbWebHandler("favicon.ico", 0, false) {}
+
+    virtual void handle(OperationContext* txn,
+                        const char* rq,
+                        const std::string& url,
+                        BSONObj params,
+                        string& responseMsg,
+                        int& responseCode,
+                        vector<string>& headers,
+                        const SockAddr& from) {
+        responseCode = 404;
+        headers.push_back("Content-Type: text/plain;charset=utf-8");
+        responseMsg = "no favicon\n";
     }
 
-
-    struct Timing {
-        Timing() {
-            start = timeLocked = 0;
-        }
-        unsigned long long start, timeLocked;
-    };
+} faviconHandler;
 
 
-    class LogPlugin : public WebStatusPlugin {
-    public:
-        LogPlugin() : WebStatusPlugin("Log", 100), _log(0) {
-            _log = RamLog::get("global");
-        }
+class StatusHandler : public DbWebHandler {
+public:
+    StatusHandler() : DbWebHandler("_status", 1, false) {}
 
-        virtual void init() {}
+    virtual void handle(OperationContext* txn,
+                        const char* rq,
+                        const std::string& url,
+                        BSONObj params,
+                        string& responseMsg,
+                        int& responseCode,
+                        vector<string>& headers,
+                        const SockAddr& from) {
+        headers.push_back("Content-Type: application/json;charset=utf-8");
+        responseCode = 200;
 
-        virtual void run(OperationContext* txn, stringstream& ss) {
-            _log->toHTML(ss);
-        }
-        RamLog * _log;
-    };
-
-
-    class FavIconHandler : public DbWebHandler {
-    public:
-        FavIconHandler() : DbWebHandler("favicon.ico", 0, false) {}
-
-        virtual void handle(OperationContext* txn,
-            const char *rq, const std::string& url, BSONObj params,
-            string& responseMsg, int& responseCode,
-            vector<string>& headers, const SockAddr &from) {
-            responseCode = 404;
-            headers.push_back("Content-Type: text/plain;charset=utf-8");
-            responseMsg = "no favicon\n";
+        static vector<string> commands;
+        if (commands.size() == 0) {
+            commands.push_back("serverStatus");
+            commands.push_back("buildinfo");
         }
 
-    } faviconHandler;
+        BSONObjBuilder buf(1024);
 
+        for (unsigned i = 0; i < commands.size(); i++) {
+            string cmd = commands[i];
 
-    class StatusHandler : public DbWebHandler {
-    public:
-        StatusHandler() : DbWebHandler("_status", 1, false) {}
-
-        virtual void handle(OperationContext* txn,
-            const char *rq, const std::string& url, BSONObj params,
-            string& responseMsg, int& responseCode,
-            vector<string>& headers, const SockAddr &from) {
-            headers.push_back("Content-Type: application/json;charset=utf-8");
-            responseCode = 200;
-
-            static vector<string> commands;
-            if (commands.size() == 0) {
-                commands.push_back("serverStatus");
-                commands.push_back("buildinfo");
-            }
-
-            BSONObjBuilder buf(1024);
-
-            for (unsigned i = 0; i<commands.size(); i++) {
-                string cmd = commands[i];
-
-                Command * c = Command::findCommand(cmd);
-                verify(c);
-
-                BSONObj co;
-                {
-                    BSONObjBuilder b;
-                    b.append(cmd, 1);
-
-                    if (cmd == "serverStatus" && params["repl"].type()) {
-                        b.append("repl", atoi(params["repl"].valuestr()));
-                    }
-
-                    co = b.obj();
-                }
-
-                string errmsg;
-
-                BSONObjBuilder sub;
-                if (!c->run(txn, "admin.$cmd", co, 0, errmsg, sub))
-                    buf.append(cmd, errmsg);
-                else
-                    buf.append(cmd, sub.obj());
-            }
-
-            responseMsg = buf.obj().jsonString();
-        }
-
-    } statusHandler;
-
-
-    class CommandListHandler : public DbWebHandler {
-    public:
-        CommandListHandler() : DbWebHandler("_commands", 1, true) {}
-
-        virtual void handle(OperationContext* txn,
-            const char *rq, const std::string& url, BSONObj params,
-            string& responseMsg, int& responseCode,
-            vector<string>& headers, const SockAddr &from) {
-            headers.push_back("Content-Type: text/html;charset=utf-8");
-            responseCode = 200;
-
-            stringstream ss;
-            ss << start("Commands List");
-            ss << p(a("/", "back", "Home"));
-            ss << p("<b>MongoDB List of "
-                    "<a href=\"http://dochub.mongodb.org/core/commands\">Commands</a>"
-                    "</b>\n");
-
-            const Command::CommandMap* m = Command::commandsByBestName();
-            ss << "S:slave-ok  R:read-lock  W:write-lock  A:admin-only<br>\n";
-            ss << table();
-            ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
-            for (Command::CommandMap::const_iterator i = m->begin(); i != m->end(); ++i) {
-                i->second->htmlHelp(ss);
-            }
-            ss << _table() << _end();
-
-            responseMsg = ss.str();
-        }
-    } commandListHandler;
-
-
-    class CommandsHandler : public DbWebHandler {
-    public:
-        CommandsHandler() : DbWebHandler("DUMMY COMMANDS", 2, true) {}
-
-        bool _cmd(const string& url, string& cmd, bool& text, bo params) const {
-            cmd = str::after(url, '/');
-            text = params["text"].boolean();
-            return true;
-        }
-
-        Command * _cmd(const string& cmd) const {
-            const Command::CommandMap* m = Command::webCommands();
-            if (!m)
-                return 0;
-
-            Command::CommandMap::const_iterator i = m->find(cmd);
-            if (i == m->end())
-                return 0;
-
-            return i->second;
-        }
-
-        virtual bool handles(const string& url) const {
-            string cmd;
-            bool text;
-            if (!_cmd(url, cmd, text, bo()))
-                return false;
-            return _cmd(cmd) != 0;
-        }
-
-        virtual void handle(OperationContext* txn,
-            const char *rq, const std::string& url, BSONObj params,
-            string& responseMsg, int& responseCode,
-            vector<string>& headers, const SockAddr &from) {
-            string cmd;
-            bool text = false;
-            verify(_cmd(url, cmd, text, params));
-            Command * c = _cmd(cmd);
+            Command* c = Command::findCommand(cmd);
             verify(c);
 
-            BSONObj cmdObj = BSON(cmd << 1);
-
-            rpc::CommandRequestBuilder requestBuilder{};
-
-            requestBuilder.setDatabase("admin")
-                          .setCommandName(cmd)
-                          .setMetadata(rpc::makeEmptyMetadata())
-                          .setCommandArgs(cmdObj);
-
-            auto cmdRequestMsg = requestBuilder.done();
-            rpc::CommandRequest cmdRequest{cmdRequestMsg.get()};
-            rpc::CommandReplyBuilder cmdReplyBuilder{};
-
-            Command::execCommand(txn, c, cmdRequest, &cmdReplyBuilder);
-
-            auto cmdReplyMsg = cmdReplyBuilder.done();
-            rpc::CommandReply cmdReply{cmdReplyMsg.get()};
-
-            responseCode = 200;
-
-            string j = cmdReply.getCommandReply().jsonString(Strict, text);
-            responseMsg = j;
-
-            if (text) {
-                headers.push_back("Content-Type: text/plain;charset=utf-8");
-                responseMsg += '\n';
-            }
-            else {
-                headers.push_back("Content-Type: application/json;charset=utf-8");
-            }
-
-        }
-
-    } commandsHandler;
-
-
-    MONGO_INITIALIZER(WebStatusLogPlugin)(InitializerContext*) {
-        if (serverGlobalParams.isHttpInterfaceEnabled) {
-            new LogPlugin;
-        }
-        return Status::OK();
-    }
-
-} // namespace
-
-
-    DbWebServer::DbWebServer(const string& ip, int port, AdminAccess* webUsers)
-            : MiniWebServer("admin web console", ip, port),
-              _webUsers(webUsers) {
-
-            WebStatusPlugin::initAll();
-    }
-
-    void DbWebServer::doRequest(const char *rq,
-                                string url,
-                                string& responseMsg,
-                                int& responseCode,
-                                vector<string>& headers,
-                                const SockAddr &from) {
-
-        Client* client = &cc();
-        auto txn = client->makeOperationContext();
-
-        if (url.size() > 1) {
-
-            if (!_allowed(txn.get(), rq, headers, from)) {
-                responseCode = 401;
-                headers.push_back("Content-Type: text/plain;charset=utf-8");
-                responseMsg = "not allowed\n";
-                return;
-            }
-
+            BSONObj co;
             {
-                BSONObj params;
-                const size_t pos = url.find("?");
-                if (pos != string::npos) {
-                    MiniWebServer::parseParams(params, url.substr(pos + 1));
-                    url = url.substr(0, pos);
+                BSONObjBuilder b;
+                b.append(cmd, 1);
+
+                if (cmd == "serverStatus" && params["repl"].type()) {
+                    b.append("repl", atoi(params["repl"].valuestr()));
                 }
 
-                DbWebHandler * handler = DbWebHandler::findHandler(url);
-                if (handler) {
-                    if (handler->requiresREST(url) && !serverGlobalParams.rest) {
-                        _rejectREST(responseMsg, responseCode, headers);
-                    }
-                    else {
-                        const string callback = params.getStringField("jsonp");
-
-                        uassert(13453,
-                                "server not started with --jsonp",
-                                callback.empty() || serverGlobalParams.jsonp);
-
-                        handler->handle(txn.get(),
-                                        rq,
-                                        url,
-                                        params,
-                                        responseMsg,
-                                        responseCode,
-                                        headers,
-                                        from);
-
-                        if (responseCode == 200 && !callback.empty()) {
-                            responseMsg = callback + '(' + responseMsg + ')';
-                        }
-                    }
-
-                    return;
-                }
+                co = b.obj();
             }
 
-            if (!serverGlobalParams.rest) {
-                _rejectREST(responseMsg, responseCode, headers);
-                return;
-            }
+            string errmsg;
 
-            responseCode = 404;
-            headers.push_back("Content-Type: text/html;charset=utf-8");
-            responseMsg = "<html><body>unknown url</body></html>\n";
-            return;
+            BSONObjBuilder sub;
+            if (!c->run(txn, "admin.$cmd", co, 0, errmsg, sub))
+                buf.append(cmd, errmsg);
+            else
+                buf.append(cmd, sub.obj());
         }
 
-        // generate home page
+        responseMsg = buf.obj().jsonString();
+    }
 
+} statusHandler;
+
+
+class CommandListHandler : public DbWebHandler {
+public:
+    CommandListHandler() : DbWebHandler("_commands", 1, true) {}
+
+    virtual void handle(OperationContext* txn,
+                        const char* rq,
+                        const std::string& url,
+                        BSONObj params,
+                        string& responseMsg,
+                        int& responseCode,
+                        vector<string>& headers,
+                        const SockAddr& from) {
+        headers.push_back("Content-Type: text/html;charset=utf-8");
+        responseCode = 200;
+
+        stringstream ss;
+        ss << start("Commands List");
+        ss << p(a("/", "back", "Home"));
+        ss << p(
+            "<b>MongoDB List of "
+            "<a href=\"http://dochub.mongodb.org/core/commands\">Commands</a>"
+            "</b>\n");
+
+        const Command::CommandMap* m = Command::commandsByBestName();
+        ss << "S:slave-ok  R:read-lock  W:write-lock  A:admin-only<br>\n";
+        ss << table();
+        ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
+        for (Command::CommandMap::const_iterator i = m->begin(); i != m->end(); ++i) {
+            i->second->htmlHelp(ss);
+        }
+        ss << _table() << _end();
+
+        responseMsg = ss.str();
+    }
+} commandListHandler;
+
+
+class CommandsHandler : public DbWebHandler {
+public:
+    CommandsHandler() : DbWebHandler("DUMMY COMMANDS", 2, true) {}
+
+    bool _cmd(const string& url, string& cmd, bool& text, bo params) const {
+        cmd = str::after(url, '/');
+        text = params["text"].boolean();
+        return true;
+    }
+
+    Command* _cmd(const string& cmd) const {
+        const Command::CommandMap* m = Command::webCommands();
+        if (!m)
+            return 0;
+
+        Command::CommandMap::const_iterator i = m->find(cmd);
+        if (i == m->end())
+            return 0;
+
+        return i->second;
+    }
+
+    virtual bool handles(const string& url) const {
+        string cmd;
+        bool text;
+        if (!_cmd(url, cmd, text, bo()))
+            return false;
+        return _cmd(cmd) != 0;
+    }
+
+    virtual void handle(OperationContext* txn,
+                        const char* rq,
+                        const std::string& url,
+                        BSONObj params,
+                        string& responseMsg,
+                        int& responseCode,
+                        vector<string>& headers,
+                        const SockAddr& from) {
+        string cmd;
+        bool text = false;
+        verify(_cmd(url, cmd, text, params));
+        Command* c = _cmd(cmd);
+        verify(c);
+
+        BSONObj cmdObj = BSON(cmd << 1);
+
+        rpc::CommandRequestBuilder requestBuilder{};
+
+        requestBuilder.setDatabase("admin")
+            .setCommandName(cmd)
+            .setMetadata(rpc::makeEmptyMetadata())
+            .setCommandArgs(cmdObj);
+
+        auto cmdRequestMsg = requestBuilder.done();
+        rpc::CommandRequest cmdRequest{cmdRequestMsg.get()};
+        rpc::CommandReplyBuilder cmdReplyBuilder{};
+
+        Command::execCommand(txn, c, cmdRequest, &cmdReplyBuilder);
+
+        auto cmdReplyMsg = cmdReplyBuilder.done();
+        rpc::CommandReply cmdReply{cmdReplyMsg.get()};
+
+        responseCode = 200;
+
+        string j = cmdReply.getCommandReply().jsonString(Strict, text);
+        responseMsg = j;
+
+        if (text) {
+            headers.push_back("Content-Type: text/plain;charset=utf-8");
+            responseMsg += '\n';
+        } else {
+            headers.push_back("Content-Type: application/json;charset=utf-8");
+        }
+    }
+
+} commandsHandler;
+
+
+MONGO_INITIALIZER(WebStatusLogPlugin)(InitializerContext*) {
+    if (serverGlobalParams.isHttpInterfaceEnabled) {
+        new LogPlugin;
+    }
+    return Status::OK();
+}
+
+}  // namespace
+
+
+DbWebServer::DbWebServer(const string& ip, int port, AdminAccess* webUsers)
+    : MiniWebServer("admin web console", ip, port), _webUsers(webUsers) {
+    WebStatusPlugin::initAll();
+}
+
+void DbWebServer::doRequest(const char* rq,
+                            string url,
+                            string& responseMsg,
+                            int& responseCode,
+                            vector<string>& headers,
+                            const SockAddr& from) {
+    Client* client = &cc();
+    auto txn = client->makeOperationContext();
+
+    if (url.size() > 1) {
         if (!_allowed(txn.get(), rq, headers, from)) {
             responseCode = 401;
             headers.push_back("Content-Type: text/plain;charset=utf-8");
@@ -383,231 +336,276 @@ namespace {
             return;
         }
 
-        responseCode = 200;
-        stringstream ss;
-        string dbname;
         {
-            stringstream z;
-            z << serverGlobalParams.binaryName << ' ' << prettyHostName();
-            dbname = z.str();
-        }
+            BSONObj params;
+            const size_t pos = url.find("?");
+            if (pos != string::npos) {
+                MiniWebServer::parseParams(params, url.substr(pos + 1));
+                url = url.substr(0, pos);
+            }
 
-        ss << start(dbname) << h2(dbname);
-        ss << "<p><a href=\"/_commands\">List all commands</a> | \n";
-        ss << "<a href=\"/_replSet\">Replica set status</a></p>\n";
+            DbWebHandler* handler = DbWebHandler::findHandler(url);
+            if (handler) {
+                if (handler->requiresREST(url) && !serverGlobalParams.rest) {
+                    _rejectREST(responseMsg, responseCode, headers);
+                } else {
+                    const string callback = params.getStringField("jsonp");
 
-        {
-            const Command::CommandMap* m = Command::webCommands();
-            if (m) {
-                ss << a("",
-                        "These read-only context-less commands can be executed from the web "
-                        "interface. Results are json format, unless ?text=1 is appended in which "
-                        "case the result is output as text for easier human viewing",
-                        "Commands")
-                   << ": ";
+                    uassert(13453,
+                            "server not started with --jsonp",
+                            callback.empty() || serverGlobalParams.jsonp);
 
-                for (Command::CommandMap::const_iterator i = m->begin(); i != m->end(); ++i) {
-                    stringstream h;
-                    i->second->help(h);
+                    handler->handle(
+                        txn.get(), rq, url, params, responseMsg, responseCode, headers, from);
 
-                    const string help = h.str();
-                    ss << "<a href=\"/" << i->first << "?text=1\"";
-                    if (help != "no help defined") {
-                        ss << " title=\"" << help << '"';
+                    if (responseCode == 200 && !callback.empty()) {
+                        responseMsg = callback + '(' + responseMsg + ')';
                     }
-
-                    ss << ">" << i->first << "</a> ";
                 }
-                ss << '\n';
+
+                return;
             }
         }
 
-        ss << '\n';
+        if (!serverGlobalParams.rest) {
+            _rejectREST(responseMsg, responseCode, headers);
+            return;
+        }
 
-        doUnlockedStuff(ss);
-
-        WebStatusPlugin::runAll(txn.get(), ss);
-
-        ss << "</body></html>\n";
-        responseMsg = ss.str();
+        responseCode = 404;
         headers.push_back("Content-Type: text/html;charset=utf-8");
+        responseMsg = "<html><body>unknown url</body></html>\n";
+        return;
     }
 
-    bool DbWebServer::_allowed(OperationContext* txn,
-                               const char * rq,
-                               vector<string>& headers,
-                               const SockAddr &from) {
+    // generate home page
 
-        AuthorizationSession* authSess = AuthorizationSession::get(txn->getClient());
-        if (!authSess->getAuthorizationManager().isAuthEnabled()) {
-            return true;
-        }
-
-        if (from.isLocalHost() && !_webUsers->haveAdminUsers(txn)) {
-            authSess->grantInternalAuthorization();
-            return true;
-        }
-
-        string auth = getHeader(rq, "Authorization");
-
-        if (auth.size() > 0 && auth.find("Digest ") == 0) {
-            auth = auth.substr(7) + ", ";
-
-            map<string, string> parms;
-            pcrecpp::StringPiece input(auth);
-
-            string name, val;
-            pcrecpp::RE re("(\\w+)=\"?(.*?)\"?,\\s*");
-            while (re.Consume(&input, &name, &val)) {
-                parms[name] = val;
-            }
-
-            // Only users in the admin DB are visible by the webserver
-            UserName userName(parms["username"], "admin");
-            User* user;
-            AuthorizationManager& authzManager = authSess->getAuthorizationManager();
-            Status status = authzManager.acquireUser(txn, userName, &user);
-            if (!status.isOK()) {
-                if (status.code() != ErrorCodes::UserNotFound) {
-                    uasserted(17051, status.reason());
-                }
-            }
-            else {
-                uassert(17090,
-                        "External users don't have a password",
-                        !user->getCredentials().isExternal);
-
-                string ha1 = user->getCredentials().password;
-                authzManager.releaseUser(user);
-                if (ha1.empty()) {
-                    return false;
-                }
-
-                const string ha2 = md5simpledigest((string)"GET" + ":" + parms["uri"]);
-
-                stringstream r;
-                r << ha1 << ':' << parms["nonce"];
-                if (parms["nc"].size() && parms["cnonce"].size() && parms["qop"].size()) {
-                    r << ':';
-                    r << parms["nc"];
-                    r << ':';
-                    r << parms["cnonce"];
-                    r << ':';
-                    r << parms["qop"];
-                }
-                r << ':';
-                r << ha2;
-
-                const string r1 = md5simpledigest(r.str());
-
-                if (r1 == parms["response"]) {
-                    Status status = authSess->addAndAuthorizeUser(txn, userName);
-                    uassertStatusOK(status);
-                    return true;
-                }
-            }
-        }
-
-        stringstream authHeader;
-        authHeader << "WWW-Authenticate: "
-                   << "Digest realm=\"mongo\", "
-                   << "nonce=\"abc\", "
-                   << "algorithm=MD5, qop=\"auth\" ";
-
-        headers.push_back(authHeader.str());
-        return 0;
-    }
-
-    void DbWebServer::_rejectREST(string& responseMsg, int& responseCode, vector<string>& headers) {
-        responseCode = 403;
-        stringstream ss;
-        ss << "REST is not enabled.  use --rest to turn on.\n";
-        ss << "check that port " << _port << " is secured for the network too.\n";
-        responseMsg = ss.str();
+    if (!_allowed(txn.get(), rq, headers, from)) {
+        responseCode = 401;
         headers.push_back("Content-Type: text/plain;charset=utf-8");
+        responseMsg = "not allowed\n";
+        return;
     }
 
-
-    // -- status framework ---
-    WebStatusPlugin::WebStatusPlugin( const string& secionName , double priority , const string& subheader )
-        : Prioritizable(priority), _name( secionName ) , _subHeading( subheader ) {
-        if ( ! _plugins )
-            _plugins = new vector<WebStatusPlugin*>();
-        _plugins->push_back( this );
+    responseCode = 200;
+    stringstream ss;
+    string dbname;
+    {
+        stringstream z;
+        z << serverGlobalParams.binaryName << ' ' << prettyHostName();
+        dbname = z.str();
     }
 
-    void WebStatusPlugin::initAll() {
-        if ( ! _plugins )
-            return;
+    ss << start(dbname) << h2(dbname);
+    ss << "<p><a href=\"/_commands\">List all commands</a> | \n";
+    ss << "<a href=\"/_replSet\">Replica set status</a></p>\n";
 
-        sort( _plugins->begin(), _plugins->end() , prisort );
+    {
+        const Command::CommandMap* m = Command::webCommands();
+        if (m) {
+            ss << a("",
+                    "These read-only context-less commands can be executed from the web "
+                    "interface. Results are json format, unless ?text=1 is appended in which "
+                    "case the result is output as text for easier human viewing",
+                    "Commands") << ": ";
 
-        for ( unsigned i=0; i<_plugins->size(); i++ )
-            (*_plugins)[i]->init();
-    }
+            for (Command::CommandMap::const_iterator i = m->begin(); i != m->end(); ++i) {
+                stringstream h;
+                i->second->help(h);
 
-    void WebStatusPlugin::runAll(OperationContext* txn, stringstream& ss) {
-        if ( ! _plugins )
-            return;
+                const string help = h.str();
+                ss << "<a href=\"/" << i->first << "?text=1\"";
+                if (help != "no help defined") {
+                    ss << " title=\"" << help << '"';
+                }
 
-        for ( unsigned i=0; i<_plugins->size(); i++ ) {
-            WebStatusPlugin * p = (*_plugins)[i];
-            ss << "<hr>\n"
-               << "<b>" << p->_name << "</b>";
-
-            ss << " " << p->_subHeading;
-
-            ss << "<br>\n";
-
-            p->run(txn, ss);
-        }
-
-    }
-
-    vector<WebStatusPlugin*> * WebStatusPlugin::_plugins = 0;
-
-
-    DbWebHandler::DbWebHandler( const string& name , double priority , bool requiresREST )
-        : Prioritizable(priority), _name(name) , _requiresREST(requiresREST) {
-
-        {
-            // setup strings
-            _defaultUrl = "/";
-            _defaultUrl += name;
-
-            stringstream ss;
-            ss << name << " priority: " << priority << " rest: " << requiresREST;
-            _toString = ss.str();
-        }
-
-        {
-            // add to handler list
-            if ( ! _handlers )
-                _handlers = new vector<DbWebHandler*>();
-            _handlers->push_back( this );
-            sort( _handlers->begin() , _handlers->end() , prisort );
+                ss << ">" << i->first << "</a> ";
+            }
+            ss << '\n';
         }
     }
 
-    DbWebHandler * DbWebHandler::findHandler( const string& url ) {
-        if ( ! _handlers )
-            return 0;
+    ss << '\n';
 
-        for ( unsigned i=0; i<_handlers->size(); i++ ) {
-            DbWebHandler * h = (*_handlers)[i];
-            if ( h->handles( url ) )
-                return h;
+    doUnlockedStuff(ss);
+
+    WebStatusPlugin::runAll(txn.get(), ss);
+
+    ss << "</body></html>\n";
+    responseMsg = ss.str();
+    headers.push_back("Content-Type: text/html;charset=utf-8");
+}
+
+bool DbWebServer::_allowed(OperationContext* txn,
+                           const char* rq,
+                           vector<string>& headers,
+                           const SockAddr& from) {
+    AuthorizationSession* authSess = AuthorizationSession::get(txn->getClient());
+    if (!authSess->getAuthorizationManager().isAuthEnabled()) {
+        return true;
+    }
+
+    if (from.isLocalHost() && !_webUsers->haveAdminUsers(txn)) {
+        authSess->grantInternalAuthorization();
+        return true;
+    }
+
+    string auth = getHeader(rq, "Authorization");
+
+    if (auth.size() > 0 && auth.find("Digest ") == 0) {
+        auth = auth.substr(7) + ", ";
+
+        map<string, string> parms;
+        pcrecpp::StringPiece input(auth);
+
+        string name, val;
+        pcrecpp::RE re("(\\w+)=\"?(.*?)\"?,\\s*");
+        while (re.Consume(&input, &name, &val)) {
+            parms[name] = val;
         }
 
+        // Only users in the admin DB are visible by the webserver
+        UserName userName(parms["username"], "admin");
+        User* user;
+        AuthorizationManager& authzManager = authSess->getAuthorizationManager();
+        Status status = authzManager.acquireUser(txn, userName, &user);
+        if (!status.isOK()) {
+            if (status.code() != ErrorCodes::UserNotFound) {
+                uasserted(17051, status.reason());
+            }
+        } else {
+            uassert(
+                17090, "External users don't have a password", !user->getCredentials().isExternal);
+
+            string ha1 = user->getCredentials().password;
+            authzManager.releaseUser(user);
+            if (ha1.empty()) {
+                return false;
+            }
+
+            const string ha2 = md5simpledigest((string) "GET" + ":" + parms["uri"]);
+
+            stringstream r;
+            r << ha1 << ':' << parms["nonce"];
+            if (parms["nc"].size() && parms["cnonce"].size() && parms["qop"].size()) {
+                r << ':';
+                r << parms["nc"];
+                r << ':';
+                r << parms["cnonce"];
+                r << ':';
+                r << parms["qop"];
+            }
+            r << ':';
+            r << ha2;
+
+            const string r1 = md5simpledigest(r.str());
+
+            if (r1 == parms["response"]) {
+                Status status = authSess->addAndAuthorizeUser(txn, userName);
+                uassertStatusOK(status);
+                return true;
+            }
+        }
+    }
+
+    stringstream authHeader;
+    authHeader << "WWW-Authenticate: "
+               << "Digest realm=\"mongo\", "
+               << "nonce=\"abc\", "
+               << "algorithm=MD5, qop=\"auth\" ";
+
+    headers.push_back(authHeader.str());
+    return 0;
+}
+
+void DbWebServer::_rejectREST(string& responseMsg, int& responseCode, vector<string>& headers) {
+    responseCode = 403;
+    stringstream ss;
+    ss << "REST is not enabled.  use --rest to turn on.\n";
+    ss << "check that port " << _port << " is secured for the network too.\n";
+    responseMsg = ss.str();
+    headers.push_back("Content-Type: text/plain;charset=utf-8");
+}
+
+
+// -- status framework ---
+WebStatusPlugin::WebStatusPlugin(const string& secionName, double priority, const string& subheader)
+    : Prioritizable(priority), _name(secionName), _subHeading(subheader) {
+    if (!_plugins)
+        _plugins = new vector<WebStatusPlugin*>();
+    _plugins->push_back(this);
+}
+
+void WebStatusPlugin::initAll() {
+    if (!_plugins)
+        return;
+
+    sort(_plugins->begin(), _plugins->end(), prisort);
+
+    for (unsigned i = 0; i < _plugins->size(); i++)
+        (*_plugins)[i]->init();
+}
+
+void WebStatusPlugin::runAll(OperationContext* txn, stringstream& ss) {
+    if (!_plugins)
+        return;
+
+    for (unsigned i = 0; i < _plugins->size(); i++) {
+        WebStatusPlugin* p = (*_plugins)[i];
+        ss << "<hr>\n"
+           << "<b>" << p->_name << "</b>";
+
+        ss << " " << p->_subHeading;
+
+        ss << "<br>\n";
+
+        p->run(txn, ss);
+    }
+}
+
+vector<WebStatusPlugin*>* WebStatusPlugin::_plugins = 0;
+
+
+DbWebHandler::DbWebHandler(const string& name, double priority, bool requiresREST)
+    : Prioritizable(priority), _name(name), _requiresREST(requiresREST) {
+    {
+        // setup strings
+        _defaultUrl = "/";
+        _defaultUrl += name;
+
+        stringstream ss;
+        ss << name << " priority: " << priority << " rest: " << requiresREST;
+        _toString = ss.str();
+    }
+
+    {
+        // add to handler list
+        if (!_handlers)
+            _handlers = new vector<DbWebHandler*>();
+        _handlers->push_back(this);
+        sort(_handlers->begin(), _handlers->end(), prisort);
+    }
+}
+
+DbWebHandler* DbWebHandler::findHandler(const string& url) {
+    if (!_handlers)
         return 0;
+
+    for (unsigned i = 0; i < _handlers->size(); i++) {
+        DbWebHandler* h = (*_handlers)[i];
+        if (h->handles(url))
+            return h;
     }
 
-    vector<DbWebHandler*> * DbWebHandler::_handlers = 0;
+    return 0;
+}
 
-    void webServerListenThread(std::shared_ptr<DbWebServer> dbWebServer) {
-        Client::initThread("websvr");
+vector<DbWebHandler*>* DbWebHandler::_handlers = 0;
 
-        dbWebServer->initAndListen();
-    }
+void webServerListenThread(std::shared_ptr<DbWebServer> dbWebServer) {
+    Client::initThread("websvr");
 
-} // namespace mongo
+    dbWebServer->initAndListen();
+}
+
+}  // namespace mongo

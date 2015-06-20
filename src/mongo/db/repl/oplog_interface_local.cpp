@@ -41,67 +41,57 @@ namespace repl {
 
 namespace {
 
-    class OplogIteratorLocal : public OplogInterface::Iterator {
-    public:
+class OplogIteratorLocal : public OplogInterface::Iterator {
+public:
+    OplogIteratorLocal(OperationContext* txn, const std::string& collectionName);
 
-        OplogIteratorLocal(OperationContext* txn,
-                           const std::string& collectionName);
+    StatusWith<Value> next() override;
 
-        StatusWith<Value> next() override;
+private:
+    ScopedTransaction _transaction;
+    Lock::DBLock _dbLock;
+    Lock::CollectionLock _collectionLock;
+    OldClientContext _ctx;
+    std::unique_ptr<PlanExecutor> _exec;
+};
 
-    private:
+OplogIteratorLocal::OplogIteratorLocal(OperationContext* txn, const std::string& collectionName)
+    : _transaction(txn, MODE_IS),
+      _dbLock(txn->lockState(), nsToDatabase(collectionName), MODE_IS),
+      _collectionLock(txn->lockState(), collectionName, MODE_S),
+      _ctx(txn, collectionName),
+      _exec(InternalPlanner::collectionScan(txn,
+                                            collectionName,
+                                            _ctx.db()->getCollection(collectionName),
+                                            InternalPlanner::BACKWARD)) {}
 
-        ScopedTransaction _transaction;
-        Lock::DBLock _dbLock;
-        Lock::CollectionLock _collectionLock;
-        OldClientContext _ctx;
-        std::unique_ptr<PlanExecutor> _exec;
+StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {
+    BSONObj obj;
+    RecordId recordId;
 
-    };
-
-    OplogIteratorLocal::OplogIteratorLocal(OperationContext* txn,
-                                           const std::string& collectionName)
-        : _transaction(txn, MODE_IS),
-          _dbLock(txn->lockState(), nsToDatabase(collectionName), MODE_IS),
-          _collectionLock(txn->lockState(), collectionName, MODE_S),
-          _ctx(txn, collectionName),
-          _exec(InternalPlanner::collectionScan(txn,
-                                                collectionName,
-                                                _ctx.db()->getCollection(collectionName),
-                                                InternalPlanner::BACKWARD)) { }
-
-    StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {
-        BSONObj obj;
-        RecordId recordId;
-
-        if (PlanExecutor::ADVANCED != _exec->getNext(&obj, &recordId)) {
-            return StatusWith<Value>(ErrorCodes::NoSuchKey, "no more operations in local oplog");
-        }
-        return StatusWith<Value>(std::make_pair(obj, recordId));
+    if (PlanExecutor::ADVANCED != _exec->getNext(&obj, &recordId)) {
+        return StatusWith<Value>(ErrorCodes::NoSuchKey, "no more operations in local oplog");
     }
+    return StatusWith<Value>(std::make_pair(obj, recordId));
+}
 
-} // namespace
+}  // namespace
 
-    OplogInterfaceLocal::OplogInterfaceLocal(OperationContext* txn,
-                                             const std::string& collectionName)
-        : _txn(txn),
-          _collectionName(collectionName) {
+OplogInterfaceLocal::OplogInterfaceLocal(OperationContext* txn, const std::string& collectionName)
+    : _txn(txn), _collectionName(collectionName) {
+    invariant(txn);
+    invariant(!collectionName.empty());
+}
 
-        invariant(txn);
-        invariant(!collectionName.empty());
-    }
+std::string OplogInterfaceLocal::toString() const {
+    return str::stream() << "LocalOplogInterface: "
+                            "operation context: " << _txn->getNS() << "/" << _txn->getOpID()
+                         << "; collection: " << _collectionName;
+}
 
-    std::string OplogInterfaceLocal::toString() const {
-        return str::stream() <<
-            "LocalOplogInterface: "
-            "operation context: " << _txn->getNS() << "/" << _txn->getOpID() <<
-            "; collection: " << _collectionName;
-    }
+std::unique_ptr<OplogInterface::Iterator> OplogInterfaceLocal::makeIterator() const {
+    return std::unique_ptr<OplogInterface::Iterator>(new OplogIteratorLocal(_txn, _collectionName));
+}
 
-    std::unique_ptr<OplogInterface::Iterator> OplogInterfaceLocal::makeIterator() const {
-        return std::unique_ptr<OplogInterface::Iterator>(
-            new OplogIteratorLocal(_txn, _collectionName));
-    }
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

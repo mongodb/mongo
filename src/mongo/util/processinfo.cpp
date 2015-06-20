@@ -43,47 +43,45 @@ using namespace std;
 
 namespace mongo {
 
-    class PidFileWiper {
-    public:
-        ~PidFileWiper() {
-            if (path.empty()) {
-                return;
-            }
-
-            ofstream out( path.c_str() , ios_base::out );
-            out.close();
+class PidFileWiper {
+public:
+    ~PidFileWiper() {
+        if (path.empty()) {
+            return;
         }
 
-        bool write( const string& p ) {
-            path = p;
-            ofstream out( path.c_str() , ios_base::out );
-            out << ProcessId::getCurrent() << endl;
-            return out.good();
-        }
-
-        string path;
-    } pidFileWiper;
-
-    bool writePidFile( const string& path ) {
-        bool e = pidFileWiper.write( path );
-        if (!e) {
-            log() << "ERROR: Cannot write pid file to " << path
-                  << ": "<< strerror(errno);
-        }
-        return e;
+        ofstream out(path.c_str(), ios_base::out);
+        out.close();
     }
 
-    ProcessInfo::SystemInfo* ProcessInfo::systemInfo = NULL;
-
-    void ProcessInfo::initializeSystemInfo() {
-        if (systemInfo == NULL) {
-            systemInfo = new SystemInfo();
-        }
+    bool write(const string& p) {
+        path = p;
+        ofstream out(path.c_str(), ios_base::out);
+        out << ProcessId::getCurrent() << endl;
+        return out.good();
     }
 
-    MONGO_INITIALIZER(SystemInfo)(InitializerContext* context) {
-        ProcessInfo::initializeSystemInfo();
-        return Status::OK();
-    }
+    string path;
+} pidFileWiper;
 
+bool writePidFile(const string& path) {
+    bool e = pidFileWiper.write(path);
+    if (!e) {
+        log() << "ERROR: Cannot write pid file to " << path << ": " << strerror(errno);
+    }
+    return e;
+}
+
+ProcessInfo::SystemInfo* ProcessInfo::systemInfo = NULL;
+
+void ProcessInfo::initializeSystemInfo() {
+    if (systemInfo == NULL) {
+        systemInfo = new SystemInfo();
+    }
+}
+
+MONGO_INITIALIZER(SystemInfo)(InitializerContext* context) {
+    ProcessInfo::initializeSystemInfo();
+    return Status::OK();
+}
 }

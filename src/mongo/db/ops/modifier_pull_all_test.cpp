@@ -42,209 +42,206 @@
 
 namespace {
 
-    using mongo::BSONObj;
-    using mongo::LogBuilder;
-    using mongo::ModifierPullAll;
-    using mongo::ModifierInterface;
-    using mongo::NumberInt;
-    using mongo::Status;
-    using mongo::StringData;
-    using mongo::fromjson;
-    using mongo::mutablebson::ConstElement;
-    using mongo::mutablebson::Document;
-    using mongo::mutablebson::Element;
+using mongo::BSONObj;
+using mongo::LogBuilder;
+using mongo::ModifierPullAll;
+using mongo::ModifierInterface;
+using mongo::NumberInt;
+using mongo::Status;
+using mongo::StringData;
+using mongo::fromjson;
+using mongo::mutablebson::ConstElement;
+using mongo::mutablebson::Document;
+using mongo::mutablebson::Element;
 
-    /** Helper to build and manipulate the mod. */
-    class Mod {
-    public:
-        Mod() : _mod() {}
+/** Helper to build and manipulate the mod. */
+class Mod {
+public:
+    Mod() : _mod() {}
 
-        explicit Mod(BSONObj modObj)
-            : _modObj(modObj)
-            , _mod() {
-            ASSERT_OK(_mod.init(_modObj["$pullAll"].embeddedObject().firstElement(),
-                                ModifierInterface::Options::normal()));
-        }
-
-        Status prepare(Element root,
-                       StringData matchedField,
-                       ModifierInterface::ExecInfo* execInfo) {
-            return _mod.prepare(root, matchedField, execInfo);
-        }
-
-        Status apply() const {
-            return _mod.apply();
-        }
-
-        Status log(LogBuilder* logBuilder) const {
-            return _mod.log(logBuilder);
-        }
-
-        ModifierPullAll& mod() { return _mod; }
-
-    private:
-        BSONObj _modObj;
-        ModifierPullAll _mod;
-    };
-
-    TEST(Init, BadThings) {
-        BSONObj modObj;
-        ModifierPullAll mod;
-
-        modObj = fromjson("{$pullAll: {a:1}}");
-        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
-
-        modObj = fromjson("{$pullAll: {a:'test'}}");
-        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
-
-        modObj = fromjson("{$pullAll: {a:{}}}");
-        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
-
-        modObj = fromjson("{$pullAll: {a:true}}");
-        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
-
+    explicit Mod(BSONObj modObj) : _modObj(modObj), _mod() {
+        ASSERT_OK(_mod.init(_modObj["$pullAll"].embeddedObject().firstElement(),
+                            ModifierInterface::Options::normal()));
     }
 
-    TEST(PrepareApply, SimpleNumber) {
-        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : { a : [1] } }"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{ a : ['a', {r:1, b:2}] }"), doc);
+    Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
+        return _mod.prepare(root, matchedField, execInfo);
     }
 
-    TEST(PrepareApply, MissingElement) {
-        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : { a : ['r'] } }"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_TRUE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{ a : [1, 'a', {r:1, b:2}] }"), doc);
+    Status apply() const {
+        return _mod.apply();
     }
 
-    TEST(PrepareApply, TwoElements) {
-        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : { a : [1, 'a'] } }"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{ a : [{r:1, b:2}] }"), doc);
+    Status log(LogBuilder* logBuilder) const {
+        return _mod.log(logBuilder);
     }
 
-    TEST(EmptyResult, RemoveEverythingOutOfOrder) {
-        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : {a : [ {r:1, b:2}, 1, 'a' ] }}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
-
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
+    ModifierPullAll& mod() {
+        return _mod;
     }
 
-    TEST(EmptyResult, RemoveEverythingInOrder) {
-        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : { a : [1, 'a', {r:1, b:2} ] } }"));
+private:
+    BSONObj _modObj;
+    ModifierPullAll _mod;
+};
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
+TEST(Init, BadThings) {
+    BSONObj modObj;
+    ModifierPullAll mod;
 
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
+    modObj = fromjson("{$pullAll: {a:1}}");
+    ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
-    }
+    modObj = fromjson("{$pullAll: {a:'test'}}");
+    ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
 
-    TEST(EmptyResult, RemoveEverythingAndThenSome) {
-        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : { a : [2,3,1,'r', {r:1, b:2}, 'a' ] } }"));
+    modObj = fromjson("{$pullAll: {a:{}}}");
+    ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
+    modObj = fromjson("{$pullAll: {a:true}}");
+    ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
+}
 
-        ASSERT_OK(mod.apply());
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
+TEST(PrepareApply, SimpleNumber) {
+    Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+    Mod mod(fromjson("{ $pullAll : { a : [1] } }"));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
 
-    TEST(PrepareLog, MissingPullValue) {
-        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : { a : [2] } }"));
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : ['a', {r:1, b:2}] }"), doc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
+TEST(PrepareApply, MissingElement) {
+    Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+    Mod mod(fromjson("{ $pullAll : { a : ['r'] } }"));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{ $set : { a : [1, 'a', {r:1, b:2}] } }"), logDoc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
 
-    TEST(PrepareLog, MissingPath) {
-        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : { b : [1] } }"));
+    ASSERT_OK(mod.apply());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : [1, 'a', {r:1, b:2}] }"), doc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
+TEST(PrepareApply, TwoElements) {
+    Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+    Mod mod(fromjson("{ $pullAll : { a : [1, 'a'] } }"));
 
-        Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
-        ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{ $unset : { b : true } }"), logDoc);
-    }
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
 
-    TEST(Prepare, MissingArrayElementPath) {
-        Document doc(fromjson("{ a : [1, 2] }"));
-        Mod mod(fromjson("{ $pullAll : { 'a.2' : [1] } }"));
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : [{r:1, b:2}] }"), doc);
+}
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.noOp);
-    }
+TEST(EmptyResult, RemoveEverythingOutOfOrder) {
+    Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+    Mod mod(fromjson("{ $pullAll : {a : [ {r:1, b:2}, 1, 'a' ] }}"));
 
-    TEST(Prepare, FromArrayElementPath) {
-        Document doc(fromjson("{ a : [1, 2] }"));
-        Mod mod(fromjson("{ $pullAll : { 'a.0' : [1] } }"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
 
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_NOT_OK(mod.prepare(doc.root(), "", &execInfo));
-    }
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
 
-} // namespace
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
+}
+
+TEST(EmptyResult, RemoveEverythingInOrder) {
+    Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+    Mod mod(fromjson("{ $pullAll : { a : [1, 'a', {r:1, b:2} ] } }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
+}
+
+TEST(EmptyResult, RemoveEverythingAndThenSome) {
+    Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+    Mod mod(fromjson("{ $pullAll : { a : [2,3,1,'r', {r:1, b:2}, 'a' ] } }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
+}
+
+TEST(PrepareLog, MissingPullValue) {
+    Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+    Mod mod(fromjson("{ $pullAll : { a : [2] } }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : [1, 'a', {r:1, b:2}] } }"), logDoc);
+}
+
+TEST(PrepareLog, MissingPath) {
+    Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+    Mod mod(fromjson("{ $pullAll : { b : [1] } }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $unset : { b : true } }"), logDoc);
+}
+
+TEST(Prepare, MissingArrayElementPath) {
+    Document doc(fromjson("{ a : [1, 2] }"));
+    Mod mod(fromjson("{ $pullAll : { 'a.2' : [1] } }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_TRUE(execInfo.noOp);
+}
+
+TEST(Prepare, FromArrayElementPath) {
+    Document doc(fromjson("{ a : [1, 2] }"));
+    Mod mod(fromjson("{ $pullAll : { 'a.0' : [1] } }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_NOT_OK(mod.prepare(doc.root(), "", &execInfo));
+}
+
+}  // namespace

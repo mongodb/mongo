@@ -58,103 +58,106 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
+using std::string;
+using std::stringstream;
 
-    class ApplyOpsCmd : public Command {
-    public:
-        virtual bool slaveOk() const { return false; }
-        virtual bool isWriteCommandForConfigServer() const { return true; }
+class ApplyOpsCmd : public Command {
+public:
+    virtual bool slaveOk() const {
+        return false;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return true;
+    }
 
-        ApplyOpsCmd() : Command( "applyOps" ) {}
-        virtual void help( stringstream &help ) const {
-            help << "internal (sharding)\n{ applyOps : [ ] , preCondition : [ { ns : ... , q : ... , res : ... } ] }";
+    ApplyOpsCmd() : Command("applyOps") {}
+    virtual void help(stringstream& help) const {
+        help << "internal (sharding)\n{ applyOps : [ ] , preCondition : [ { ns : ... , q : ... , "
+                "res : ... } ] }";
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        // applyOps can do pretty much anything, so require all privileges.
+        RoleGraph::generateUniversalPrivileges(out);
+    }
+    virtual bool run(OperationContext* txn,
+                     const string& dbname,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
+        boost::optional<DisableDocumentValidation> maybeDisableValidation;
+        if (shouldBypassDocumentValidationForCommand(cmdObj))
+            maybeDisableValidation.emplace(txn);
+
+        if (cmdObj.firstElement().type() != Array) {
+            errmsg = "ops has to be an array";
+            return false;
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // applyOps can do pretty much anything, so require all privileges.
-            RoleGraph::generateUniversalPrivileges(out);
-        }
-        virtual bool run(OperationContext* txn,
-                         const string& dbname,
-                         BSONObj& cmdObj,
-                         int,
-                         string& errmsg,
-                         BSONObjBuilder& result) {
-            boost::optional<DisableDocumentValidation> maybeDisableValidation;
-            if (shouldBypassDocumentValidationForCommand(cmdObj))
-                maybeDisableValidation.emplace(txn);
 
-            if ( cmdObj.firstElement().type() != Array ) {
-                errmsg = "ops has to be an array";
-                return false;
-            }
+        BSONObj ops = cmdObj.firstElement().Obj();
 
-            BSONObj ops = cmdObj.firstElement().Obj();
-
-            {
-                // check input
-                BSONObjIterator i( ops );
-                while ( i.more() ) {
-                    BSONElement e = i.next();
-                    if (!_checkOperation(e, errmsg)) {
-                        return false;
-                    }
+        {
+            // check input
+            BSONObjIterator i(ops);
+            while (i.more()) {
+                BSONElement e = i.next();
+                if (!_checkOperation(e, errmsg)) {
+                    return false;
                 }
             }
-
-            return appendCommandStatus(result, applyOps(txn, dbname, cmdObj, &result));
         }
 
-    private:
-        /**
-         * Returns true if 'e' contains a valid operation.
-         */
-        bool _checkOperation(const BSONElement& e, string& errmsg) {
-            if (e.type() != Object) {
-                errmsg = str::stream() << "op not an object: " << e.fieldName();
-                return false;
-            }
-            BSONObj obj = e.Obj();
-            // op - operation type
-            BSONElement opElement = obj.getField("op");
-            if (opElement.eoo()) {
-                errmsg = str::stream() << "op does not contain required \"op\" field: "
-                                       << e.fieldName();
-                return false;
-            }
-            if (opElement.type() != mongo::String) {
-                errmsg = str::stream() << "\"op\" field is not a string: " << e.fieldName();
-                return false;
-            }
-            // operation type -- see logOp() comments for types
-            const char *opType = opElement.valuestrsafe();
-            if (*opType == '\0') {
-                errmsg = str::stream() << "\"op\" field value cannot be empty: " << e.fieldName();
-                return false;
-            }
+        return appendCommandStatus(result, applyOps(txn, dbname, cmdObj, &result));
+    }
 
-            // ns - namespace
-            // Only operations of type 'n' are allowed to have an empty namespace.
-            BSONElement nsElement = obj.getField("ns");
-            if (nsElement.eoo()) {
-                errmsg = str::stream() << "op does not contain required \"ns\" field: "
-                                       << e.fieldName();
-                return false;
-            }
-            if (nsElement.type() != mongo::String) {
-                errmsg = str::stream() << "\"ns\" field is not a string: " << e.fieldName();
-                return false;
-            }
-            if (*opType != 'n' && nsElement.String().empty()) {
-                errmsg = str::stream()
-                    << "\"ns\" field value cannot be empty when op type is not 'n': "
-                    << e.fieldName();
-                return false;
-            }
-            return true;
+private:
+    /**
+     * Returns true if 'e' contains a valid operation.
+     */
+    bool _checkOperation(const BSONElement& e, string& errmsg) {
+        if (e.type() != Object) {
+            errmsg = str::stream() << "op not an object: " << e.fieldName();
+            return false;
         }
-    } applyOpsCmd;
+        BSONObj obj = e.Obj();
+        // op - operation type
+        BSONElement opElement = obj.getField("op");
+        if (opElement.eoo()) {
+            errmsg = str::stream()
+                << "op does not contain required \"op\" field: " << e.fieldName();
+            return false;
+        }
+        if (opElement.type() != mongo::String) {
+            errmsg = str::stream() << "\"op\" field is not a string: " << e.fieldName();
+            return false;
+        }
+        // operation type -- see logOp() comments for types
+        const char* opType = opElement.valuestrsafe();
+        if (*opType == '\0') {
+            errmsg = str::stream() << "\"op\" field value cannot be empty: " << e.fieldName();
+            return false;
+        }
 
+        // ns - namespace
+        // Only operations of type 'n' are allowed to have an empty namespace.
+        BSONElement nsElement = obj.getField("ns");
+        if (nsElement.eoo()) {
+            errmsg = str::stream()
+                << "op does not contain required \"ns\" field: " << e.fieldName();
+            return false;
+        }
+        if (nsElement.type() != mongo::String) {
+            errmsg = str::stream() << "\"ns\" field is not a string: " << e.fieldName();
+            return false;
+        }
+        if (*opType != 'n' && nsElement.String().empty()) {
+            errmsg = str::stream()
+                << "\"ns\" field value cannot be empty when op type is not 'n': " << e.fieldName();
+            return false;
+        }
+        return true;
+    }
+} applyOpsCmd;
 }

@@ -45,146 +45,152 @@ namespace mongo {
 
 namespace {
 
-    const std::string kLockFileBasename = "mongod.lock";
+const std::string kLockFileBasename = "mongod.lock";
 
-    Status _truncateFile(HANDLE handle) {
-        invariant(handle != INVALID_HANDLE_VALUE);
+Status _truncateFile(HANDLE handle) {
+    invariant(handle != INVALID_HANDLE_VALUE);
 
-        LARGE_INTEGER largeint;
-        largeint.QuadPart = 0;
-        if (::SetFilePointerEx(handle, largeint, NULL, FILE_BEGIN) == FALSE) {
-            int errorcode = GetLastError();
-            return Status(ErrorCodes::FileStreamFailed, str::stream()
-                << "Unable to truncate lock file (SetFilePointerEx failed) "
-                << errnoWithDescription(errorcode));
-        }
-
-        if (::SetEndOfFile(handle) == FALSE) {
-            int errorcode = GetLastError();
-            return Status(ErrorCodes::FileStreamFailed, str::stream()
-                << "Unable to truncate lock file (SetEndOfFile failed) "
-                << errnoWithDescription(errorcode));
-        }
-
-        return Status::OK();
+    LARGE_INTEGER largeint;
+    largeint.QuadPart = 0;
+    if (::SetFilePointerEx(handle, largeint, NULL, FILE_BEGIN) == FALSE) {
+        int errorcode = GetLastError();
+        return Status(ErrorCodes::FileStreamFailed,
+                      str::stream() << "Unable to truncate lock file (SetFilePointerEx failed) "
+                                    << errnoWithDescription(errorcode));
     }
+
+    if (::SetEndOfFile(handle) == FALSE) {
+        int errorcode = GetLastError();
+        return Status(ErrorCodes::FileStreamFailed,
+                      str::stream() << "Unable to truncate lock file (SetEndOfFile failed) "
+                                    << errnoWithDescription(errorcode));
+    }
+
+    return Status::OK();
+}
 
 }  // namespace
 
-    class StorageEngineLockFile::LockFileHandle {
-    public:
-        LockFileHandle() : _handle(INVALID_HANDLE_VALUE) { }
-        bool isValid() const { return _handle != INVALID_HANDLE_VALUE; }
-        void clear() { _handle = INVALID_HANDLE_VALUE; }
-        HANDLE _handle;
-    };
+class StorageEngineLockFile::LockFileHandle {
+public:
+    LockFileHandle() : _handle(INVALID_HANDLE_VALUE) {}
+    bool isValid() const {
+        return _handle != INVALID_HANDLE_VALUE;
+    }
+    void clear() {
+        _handle = INVALID_HANDLE_VALUE;
+    }
+    HANDLE _handle;
+};
 
-    StorageEngineLockFile::StorageEngineLockFile(const std::string& dbpath)
-        : _dbpath(dbpath),
-          _filespec((boost::filesystem::path(_dbpath) / kLockFileBasename).string()),
-          _uncleanShutdown(boost::filesystem::exists(_filespec) &&
-                           boost::filesystem::file_size(_filespec) > 0),
-          _lockFileHandle(new LockFileHandle()) {
+StorageEngineLockFile::StorageEngineLockFile(const std::string& dbpath)
+    : _dbpath(dbpath),
+      _filespec((boost::filesystem::path(_dbpath) / kLockFileBasename).string()),
+      _uncleanShutdown(boost::filesystem::exists(_filespec) &&
+                       boost::filesystem::file_size(_filespec) > 0),
+      _lockFileHandle(new LockFileHandle()) {}
+
+StorageEngineLockFile::~StorageEngineLockFile() {}
+
+std::string StorageEngineLockFile::getFilespec() const {
+    return _filespec;
+}
+
+bool StorageEngineLockFile::createdByUncleanShutdown() const {
+    return _uncleanShutdown;
+}
+
+Status StorageEngineLockFile::open() {
+    try {
+        if (!boost::filesystem::exists(_dbpath)) {
+            return Status(ErrorCodes::NonExistentPath,
+                          str::stream() << "Data directory " << _dbpath << " not found.");
+        }
+    } catch (const std::exception& ex) {
+        return Status(ErrorCodes::UnknownError,
+                      str::stream() << "Unable to check existence of data directory " << _dbpath
+                                    << ": " << ex.what());
     }
 
-    StorageEngineLockFile::~StorageEngineLockFile() { }
+    HANDLE lockFileHandle = CreateFileA(_filespec.c_str(),
+                                        GENERIC_READ | GENERIC_WRITE,
+                                        0 /* do not allow anyone else access */,
+                                        NULL,
+                                        OPEN_ALWAYS /* success if fh can open */,
+                                        0,
+                                        NULL);
 
-    std::string StorageEngineLockFile::getFilespec() const {
-        return _filespec;
+    if (lockFileHandle == INVALID_HANDLE_VALUE) {
+        int errorcode = GetLastError();
+        return Status(ErrorCodes::DBPathInUse,
+                      str::stream() << "Unable to create/open lock file: " << _filespec << ' '
+                                    << errnoWithDescription(errorcode)
+                                    << ". Is a mongod instance already running?");
+    }
+    _lockFileHandle->_handle = lockFileHandle;
+    return Status::OK();
+}
+
+void StorageEngineLockFile::close() {
+    if (!_lockFileHandle->isValid()) {
+        return;
+    }
+    CloseHandle(_lockFileHandle->_handle);
+    _lockFileHandle->clear();
+}
+
+Status StorageEngineLockFile::writePid() {
+    if (!_lockFileHandle->isValid()) {
+        return Status(ErrorCodes::FileNotOpen,
+                      str::stream() << "Unable to write process ID to " << _filespec
+                                    << " because file has not been opened.");
     }
 
-    bool StorageEngineLockFile::createdByUncleanShutdown() const {
-        return _uncleanShutdown;
+    Status status = _truncateFile(_lockFileHandle->_handle);
+    if (!status.isOK()) {
+        return status;
     }
 
-    Status StorageEngineLockFile::open() {
-        try {
-            if (!boost::filesystem::exists(_dbpath)) {
-                return Status(ErrorCodes::NonExistentPath, str::stream()
-                    << "Data directory " << _dbpath << " not found.");
-            }
-        }
-        catch (const std::exception& ex) {
-            return Status(ErrorCodes::UnknownError, str::stream()
-                << "Unable to check existence of data directory "
-                << _dbpath << ": " << ex.what());
-        }
-
-        HANDLE lockFileHandle = CreateFileA(_filespec.c_str(), GENERIC_READ | GENERIC_WRITE,
-            0 /* do not allow anyone else access */, NULL,
-            OPEN_ALWAYS /* success if fh can open */, 0, NULL);
-
-        if (lockFileHandle == INVALID_HANDLE_VALUE) {
-            int errorcode = GetLastError();
-            return Status(ErrorCodes::DBPathInUse, str::stream()
-                << "Unable to create/open lock file: " << _filespec << ' '
-                << errnoWithDescription(errorcode)
-                << ". Is a mongod instance already running?");
-        }
-        _lockFileHandle->_handle = lockFileHandle;
-        return Status::OK();
+    ProcessId pid = ProcessId::getCurrent();
+    std::stringstream ss;
+    ss << pid << std::endl;
+    std::string pidStr = ss.str();
+    DWORD bytesWritten = 0;
+    if (::WriteFile(_lockFileHandle->_handle,
+                    static_cast<LPCVOID>(pidStr.c_str()),
+                    static_cast<DWORD>(pidStr.size()),
+                    &bytesWritten,
+                    NULL) == FALSE) {
+        int errorcode = GetLastError();
+        return Status(ErrorCodes::FileStreamFailed,
+                      str::stream() << "Unable to write process id " << pid.toString()
+                                    << " to file: " << _filespec << ' '
+                                    << errnoWithDescription(errorcode));
+    } else if (bytesWritten == 0) {
+        return Status(ErrorCodes::FileStreamFailed,
+                      str::stream() << "Unable to write process id " << pid.toString()
+                                    << " to file: " << _filespec << " no data written.");
     }
 
-    void StorageEngineLockFile::close() {
-        if (!_lockFileHandle->isValid()) {
-            return;
-        }
-        CloseHandle(_lockFileHandle->_handle);
-        _lockFileHandle->clear();
+    ::FlushFileBuffers(_lockFileHandle->_handle);
+
+    return Status::OK();
+}
+
+void StorageEngineLockFile::clearPidAndUnlock() {
+    if (!_lockFileHandle->isValid()) {
+        return;
     }
-
-    Status StorageEngineLockFile::writePid() {
-        if (!_lockFileHandle->isValid()) {
-            return Status(ErrorCodes::FileNotOpen, str::stream()
-                << "Unable to write process ID to " << _filespec
-                << " because file has not been opened.");
-        }
-
-        Status status = _truncateFile(_lockFileHandle->_handle);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        ProcessId pid = ProcessId::getCurrent();
-        std::stringstream ss;
-        ss << pid << std::endl;
-        std::string pidStr = ss.str();
-        DWORD bytesWritten = 0;
-        if (::WriteFile(_lockFileHandle->_handle,
-                        static_cast<LPCVOID>(pidStr.c_str()),
-                        static_cast<DWORD>(pidStr.size()),
-                        &bytesWritten,
-                        NULL) == FALSE) {
-            int errorcode = GetLastError();
-            return Status(ErrorCodes::FileStreamFailed, str::stream()
-                << "Unable to write process id " << pid.toString() << " to file: "
-                << _filespec << ' ' << errnoWithDescription(errorcode));
-        }
-        else if (bytesWritten == 0) {
-            return Status(ErrorCodes::FileStreamFailed, str::stream()
-                << "Unable to write process id " << pid.toString() << " to file: "
-                << _filespec << " no data written.");
-        }
-
-        ::FlushFileBuffers(_lockFileHandle->_handle);
-
-        return Status::OK();
+    log() << "shutdown: removing fs lock...";
+    // This ought to be an unlink(), but Eliot says the last
+    // time that was attempted, there was a race condition
+    // with acquirePathLock().
+    Status status = _truncateFile(_lockFileHandle->_handle);
+    if (!status.isOK()) {
+        log() << "couldn't remove fs lock " << status.toString();
     }
-
-    void StorageEngineLockFile::clearPidAndUnlock() {
-        if (!_lockFileHandle->isValid()) {
-            return;
-        }
-        log() << "shutdown: removing fs lock...";
-        // This ought to be an unlink(), but Eliot says the last
-        // time that was attempted, there was a race condition
-        // with acquirePathLock().
-        Status status = _truncateFile(_lockFileHandle->_handle);
-        if (!status.isOK()) {
-            log() << "couldn't remove fs lock " << status.toString();
-        }
-        CloseHandle(_lockFileHandle->_handle);
-        _lockFileHandle->clear();
-    }
+    CloseHandle(_lockFileHandle->_handle);
+    _lockFileHandle->clear();
+}
 
 }  // namespace mongo

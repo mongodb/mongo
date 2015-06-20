@@ -35,214 +35,243 @@
 
 namespace mongo {
 
+/**
+ * This class represents the layout and contents of documents contained in the
+ * config.changelog collection. All manipulation of documents coming from that
+ * collection should be done with this class.
+ *
+ * Usage Example:
+ *
+ *     // Contact the config. 'conn' has been obtained before.
+ *     DBClientBase* conn;
+ *     BSONObj query = QUERY(ChangelogType::exampleField("exampleFieldName"));
+ *     exampleDoc = conn->findOne(ChangelogType::ConfigNS, query);
+ *
+ *     // Process the response.
+ *     ChangelogType exampleType;
+ *     std::string errMsg;
+ *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+ *         // Can't use 'exampleType'. Take action.
+ *     }
+ *     // use 'exampleType'
+ *
+ */
+class ChangelogType {
+    MONGO_DISALLOW_COPYING(ChangelogType);
+
+public:
+    //
+    // schema declarations
+    //
+
+    // Name of the changelog collection in the config server.
+    static const std::string ConfigNS;
+
+    // Field names and types in the changelog collection type.
+    static const BSONField<std::string> changeID;
+    static const BSONField<std::string> server;
+    static const BSONField<std::string> clientAddr;
+    static const BSONField<Date_t> time;
+    static const BSONField<std::string> what;
+    static const BSONField<std::string> ns;
+    static const BSONField<BSONObj> details;
+
+    //
+    // changelog type methods
+    //
+
+    ChangelogType();
+    ~ChangelogType();
+
     /**
-     * This class represents the layout and contents of documents contained in the
-     * config.changelog collection. All manipulation of documents coming from that
-     * collection should be done with this class.
-     *
-     * Usage Example:
-     *
-     *     // Contact the config. 'conn' has been obtained before.
-     *     DBClientBase* conn;
-     *     BSONObj query = QUERY(ChangelogType::exampleField("exampleFieldName"));
-     *     exampleDoc = conn->findOne(ChangelogType::ConfigNS, query);
-     *
-     *     // Process the response.
-     *     ChangelogType exampleType;
-     *     std::string errMsg;
-     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
-     *         // Can't use 'exampleType'. Take action.
-     *     }
-     *     // use 'exampleType'
-     *
+     * Returns true if all the mandatory fields are present and have valid
+     * representations. Otherwise returns false and fills in the optional 'errMsg' string.
      */
-    class ChangelogType {
-        MONGO_DISALLOW_COPYING(ChangelogType);
-    public:
+    bool isValid(std::string* errMsg) const;
 
-        //
-        // schema declarations
-        //
+    /**
+     * Returns the BSON representation of the entry.
+     */
+    BSONObj toBSON() const;
 
-        // Name of the changelog collection in the config server.
-        static const std::string ConfigNS;
+    /**
+     * Clears and populates the internal state using the 'source' BSON object if the
+     * latter contains valid values. Otherwise sets errMsg and returns false.
+     */
+    bool parseBSON(const BSONObj& source, std::string* errMsg);
 
-        // Field names and types in the changelog collection type.
-        static const BSONField<std::string> changeID;
-        static const BSONField<std::string> server;
-        static const BSONField<std::string> clientAddr;
-        static const BSONField<Date_t> time;
-        static const BSONField<std::string> what;
-        static const BSONField<std::string> ns;
-        static const BSONField<BSONObj> details;
+    /**
+     * Clears the internal state.
+     */
+    void clear();
 
-        //
-        // changelog type methods
-        //
+    /**
+     * Copies all the fields present in 'this' to 'other'.
+     */
+    void cloneTo(ChangelogType* other) const;
 
-        ChangelogType();
-        ~ChangelogType();
+    /**
+     * Returns a std::string representation of the current internal state.
+     */
+    std::string toString() const;
 
-        /**
-         * Returns true if all the mandatory fields are present and have valid
-         * representations. Otherwise returns false and fills in the optional 'errMsg' string.
-         */
-        bool isValid(std::string* errMsg) const;
+    //
+    // individual field accessors
+    //
 
-        /**
-         * Returns the BSON representation of the entry.
-         */
-        BSONObj toBSON() const;
+    // Mandatory Fields
+    void setChangeID(StringData changeID) {
+        _changeID = changeID.toString();
+        _isChangeIDSet = true;
+    }
 
-        /**
-         * Clears and populates the internal state using the 'source' BSON object if the
-         * latter contains valid values. Otherwise sets errMsg and returns false.
-         */
-        bool parseBSON(const BSONObj& source, std::string* errMsg);
+    void unsetChangeID() {
+        _isChangeIDSet = false;
+    }
 
-        /**
-         * Clears the internal state.
-         */
-        void clear();
+    bool isChangeIDSet() const {
+        return _isChangeIDSet;
+    }
 
-        /**
-         * Copies all the fields present in 'this' to 'other'.
-         */
-        void cloneTo(ChangelogType* other) const;
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string& getChangeID() const {
+        dassert(_isChangeIDSet);
+        return _changeID;
+    }
 
-        /**
-         * Returns a std::string representation of the current internal state.
-         */
-        std::string toString() const;
+    void setServer(StringData server) {
+        _server = server.toString();
+        _isServerSet = true;
+    }
 
-        //
-        // individual field accessors
-        //
+    void unsetServer() {
+        _isServerSet = false;
+    }
 
-        // Mandatory Fields
-        void setChangeID(StringData changeID) {
-            _changeID = changeID.toString();
-            _isChangeIDSet = true;
-        }
+    bool isServerSet() const {
+        return _isServerSet;
+    }
 
-        void unsetChangeID() { _isChangeIDSet = false; }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string& getServer() const {
+        dassert(_isServerSet);
+        return _server;
+    }
 
-        bool isChangeIDSet() const { return _isChangeIDSet; }
+    void setClientAddr(StringData clientAddr) {
+        _clientAddr = clientAddr.toString();
+        _isClientAddrSet = true;
+    }
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getChangeID() const {
-            dassert(_isChangeIDSet);
-            return _changeID;
-        }
+    void unsetClientAddr() {
+        _isClientAddrSet = false;
+    }
 
-        void setServer(StringData server) {
-            _server = server.toString();
-            _isServerSet = true;
-        }
+    bool isClientAddrSet() const {
+        return _isClientAddrSet;
+    }
 
-        void unsetServer() { _isServerSet = false; }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string& getClientAddr() const {
+        dassert(_isClientAddrSet);
+        return _clientAddr;
+    }
 
-        bool isServerSet() const { return _isServerSet; }
+    void setTime(const Date_t time) {
+        _time = time;
+        _isTimeSet = true;
+    }
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getServer() const {
-            dassert(_isServerSet);
-            return _server;
-        }
+    void unsetTime() {
+        _isTimeSet = false;
+    }
 
-        void setClientAddr(StringData clientAddr) {
-            _clientAddr = clientAddr.toString();
-            _isClientAddrSet = true;
-        }
+    bool isTimeSet() const {
+        return _isTimeSet;
+    }
 
-        void unsetClientAddr() { _isClientAddrSet = false; }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const Date_t getTime() const {
+        dassert(_isTimeSet);
+        return _time;
+    }
 
-        bool isClientAddrSet() const { return _isClientAddrSet; }
+    void setWhat(StringData what) {
+        _what = what.toString();
+        _isWhatSet = true;
+    }
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getClientAddr() const {
-            dassert(_isClientAddrSet);
-            return _clientAddr;
-        }
+    void unsetWhat() {
+        _isWhatSet = false;
+    }
 
-        void setTime(const Date_t time) {
-            _time = time;
-            _isTimeSet = true;
-        }
+    bool isWhatSet() const {
+        return _isWhatSet;
+    }
 
-        void unsetTime() { _isTimeSet = false; }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string& getWhat() const {
+        dassert(_isWhatSet);
+        return _what;
+    }
 
-        bool isTimeSet() const { return _isTimeSet; }
+    void setNS(StringData ns) {
+        _ns = ns.toString();
+        _isNsSet = true;
+    }
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const Date_t getTime() const {
-            dassert(_isTimeSet);
-            return _time;
-        }
+    void unsetNS() {
+        _isNsSet = false;
+    }
 
-        void setWhat(StringData what) {
-            _what = what.toString();
-            _isWhatSet = true;
-        }
+    bool isNSSet() const {
+        return _isNsSet;
+    }
 
-        void unsetWhat() { _isWhatSet = false; }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string& getNS() const {
+        dassert(_isNsSet);
+        return _ns;
+    }
 
-        bool isWhatSet() const { return _isWhatSet; }
+    void setDetails(const BSONObj& details) {
+        _details = details.getOwned();
+        _isDetailsSet = true;
+    }
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getWhat() const {
-            dassert(_isWhatSet);
-            return _what;
-        }
+    void unsetDetails() {
+        _isDetailsSet = false;
+    }
 
-        void setNS(StringData ns) {
-            _ns = ns.toString();
-            _isNsSet = true;
-        }
+    bool isDetailsSet() const {
+        return _isDetailsSet;
+    }
 
-        void unsetNS() { _isNsSet = false; }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const BSONObj getDetails() const {
+        dassert(_isDetailsSet);
+        return _details;
+    }
 
-        bool isNSSet() const { return _isNsSet; }
+    // Optional Fields
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getNS() const {
-            dassert(_isNsSet);
-            return _ns;
-        }
+private:
+    // Convention: (M)andatory, (O)ptional, (S)pecial rule.
+    std::string _changeID;  // (M)  id for this change "<hostname>-<current_time>-<increment>"
+    bool _isChangeIDSet;
+    std::string
+        _server;  // (M)  hostname of server that we are making the change on.  Does not include port.
+    bool _isServerSet;
+    std::string _clientAddr;  // (M)  hostname:port of the client that made this change
+    bool _isClientAddrSet;
+    Date_t _time;  // (M)  time this change was made
+    bool _isTimeSet;
+    std::string _what;  // (M)  description of the change
+    bool _isWhatSet;
+    std::string _ns;  // (M)  database or collection this change applies to
+    bool _isNsSet;
+    BSONObj _details;  // (M)  A BSONObj containing extra information about some operations
+    bool _isDetailsSet;
+};
 
-        void setDetails(const BSONObj& details) {
-            _details = details.getOwned();
-            _isDetailsSet = true;
-        }
-
-        void unsetDetails() { _isDetailsSet = false; }
-
-        bool isDetailsSet() const { return _isDetailsSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const BSONObj getDetails() const {
-            dassert(_isDetailsSet);
-            return _details;
-        }
-
-        // Optional Fields
-
-    private:
-        // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _changeID;     // (M)  id for this change "<hostname>-<current_time>-<increment>"
-        bool _isChangeIDSet;
-        std::string _server;     // (M)  hostname of server that we are making the change on.  Does not include port.
-        bool _isServerSet;
-        std::string _clientAddr;     // (M)  hostname:port of the client that made this change
-        bool _isClientAddrSet;
-        Date_t _time;     // (M)  time this change was made
-        bool _isTimeSet;
-        std::string _what;     // (M)  description of the change
-        bool _isWhatSet;
-        std::string _ns;     // (M)  database or collection this change applies to
-        bool _isNsSet;
-        BSONObj _details;     // (M)  A BSONObj containing extra information about some operations
-        bool _isDetailsSet;
-    };
-
-} // namespace mongo
+}  // namespace mongo

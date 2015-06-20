@@ -33,43 +33,41 @@
 
 namespace mongo {
 
-    class LockerForTests : public LockerImpl<false> {
-    public:
-        explicit LockerForTests(LockMode globalLockMode) {
-            lockGlobal(globalLockMode);
-        }
+class LockerForTests : public LockerImpl<false> {
+public:
+    explicit LockerForTests(LockMode globalLockMode) {
+        lockGlobal(globalLockMode);
+    }
 
-        ~LockerForTests() {
-            unlockAll();
-        }
-    };
-
-
-    class TrackingLockGrantNotification : public LockGrantNotification {
-    public:
-        TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {
-
-        }
-
-        virtual void notify(ResourceId resId, LockResult result) {
-            numNotifies++;
-            lastResId = resId;
-            lastResult = result;
-        }
-
-    public:
-        int numNotifies;
-
-        ResourceId lastResId;
-        LockResult lastResult;
-    };
+    ~LockerForTests() {
+        unlockAll();
+    }
+};
 
 
-    struct LockRequestCombo : public LockRequest, TrackingLockGrantNotification {
-    public:
-        explicit LockRequestCombo (Locker* locker) {
-            initNew(locker, this);
-        }
-    };
+class TrackingLockGrantNotification : public LockGrantNotification {
+public:
+    TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {}
 
-} // namespace mongo
+    virtual void notify(ResourceId resId, LockResult result) {
+        numNotifies++;
+        lastResId = resId;
+        lastResult = result;
+    }
+
+public:
+    int numNotifies;
+
+    ResourceId lastResId;
+    LockResult lastResult;
+};
+
+
+struct LockRequestCombo : public LockRequest, TrackingLockGrantNotification {
+public:
+    explicit LockRequestCombo(Locker* locker) {
+        initNew(locker, this);
+    }
+};
+
+}  // namespace mongo

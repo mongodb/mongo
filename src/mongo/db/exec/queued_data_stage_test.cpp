@@ -38,70 +38,70 @@ using namespace mongo;
 
 namespace {
 
-    using std::unique_ptr;
+using std::unique_ptr;
 
-    //
-    // Basic test that we get out valid stats objects.
-    //
-    TEST(QueuedDataStageTest, getValidStats) {
-        WorkingSet ws;
-        unique_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
-        const CommonStats* commonStats = mock->getCommonStats();
-        ASSERT_EQUALS(commonStats->works, static_cast<size_t>(0));
-        const SpecificStats* specificStats = mock->getSpecificStats();
-        ASSERT(specificStats);
-        unique_ptr<PlanStageStats> allStats(mock->getStats());
-        ASSERT_EQUALS(allStats->stageType, mock->stageType());
-    }
+//
+// Basic test that we get out valid stats objects.
+//
+TEST(QueuedDataStageTest, getValidStats) {
+    WorkingSet ws;
+    unique_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
+    const CommonStats* commonStats = mock->getCommonStats();
+    ASSERT_EQUALS(commonStats->works, static_cast<size_t>(0));
+    const SpecificStats* specificStats = mock->getSpecificStats();
+    ASSERT(specificStats);
+    unique_ptr<PlanStageStats> allStats(mock->getStats());
+    ASSERT_EQUALS(allStats->stageType, mock->stageType());
+}
 
-    //
-    // Test that our stats are updated as we perform operations.
-    //
-    TEST(QueuedDataStageTest, validateStats) {
-        WorkingSet ws;
-        WorkingSetID wsID;
-        unique_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
+//
+// Test that our stats are updated as we perform operations.
+//
+TEST(QueuedDataStageTest, validateStats) {
+    WorkingSet ws;
+    WorkingSetID wsID;
+    unique_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
 
-        // make sure that we're at all zero
-        const CommonStats* stats = mock->getCommonStats();
-        ASSERT_EQUALS(stats->yields, 0U);
-        ASSERT_EQUALS(stats->unyields, 0U);
-        ASSERT_EQUALS(stats->invalidates, 0U);
-        ASSERT_EQUALS(stats->works, 0U);
-        ASSERT_EQUALS(stats->needTime, 0U);
-        ASSERT_EQUALS(stats->advanced, 0U);
-        ASSERT_FALSE(stats->isEOF);
+    // make sure that we're at all zero
+    const CommonStats* stats = mock->getCommonStats();
+    ASSERT_EQUALS(stats->yields, 0U);
+    ASSERT_EQUALS(stats->unyields, 0U);
+    ASSERT_EQUALS(stats->invalidates, 0U);
+    ASSERT_EQUALS(stats->works, 0U);
+    ASSERT_EQUALS(stats->needTime, 0U);
+    ASSERT_EQUALS(stats->advanced, 0U);
+    ASSERT_FALSE(stats->isEOF);
 
-        // 'perform' some operations, validate stats
-        // needTime
-        mock->pushBack(PlanStage::NEED_TIME);
-        mock->work(&wsID);
-        ASSERT_EQUALS(stats->works, 1U);
-        ASSERT_EQUALS(stats->needTime, 1U);
+    // 'perform' some operations, validate stats
+    // needTime
+    mock->pushBack(PlanStage::NEED_TIME);
+    mock->work(&wsID);
+    ASSERT_EQUALS(stats->works, 1U);
+    ASSERT_EQUALS(stats->needTime, 1U);
 
-        // advanced, with pushed data
-        const WorkingSetMember member;
-        mock->pushBack(member);
-        mock->work(&wsID);
-        ASSERT_EQUALS(stats->works, 2U);
-        ASSERT_EQUALS(stats->advanced, 1U);
+    // advanced, with pushed data
+    const WorkingSetMember member;
+    mock->pushBack(member);
+    mock->work(&wsID);
+    ASSERT_EQUALS(stats->works, 2U);
+    ASSERT_EQUALS(stats->advanced, 1U);
 
-        // yields
-        mock->saveState();
-        ASSERT_EQUALS(stats->yields, 1U);
+    // yields
+    mock->saveState();
+    ASSERT_EQUALS(stats->yields, 1U);
 
-        // unyields
-        mock->restoreState(NULL);
-        ASSERT_EQUALS(stats->unyields, 1U);
+    // unyields
+    mock->restoreState(NULL);
+    ASSERT_EQUALS(stats->unyields, 1U);
 
-        // invalidates
-        const RecordId dl(0, 0);
-        mock->invalidate(NULL, dl, INVALIDATION_MUTATION);
-        ASSERT_EQUALS(stats->invalidates, 1U);
+    // invalidates
+    const RecordId dl(0, 0);
+    mock->invalidate(NULL, dl, INVALIDATION_MUTATION);
+    ASSERT_EQUALS(stats->invalidates, 1U);
 
-        // and now we are d1U, but must trigger EOF with getStats()
-        ASSERT_FALSE(stats->isEOF);
-        unique_ptr<PlanStageStats> allStats(mock->getStats());
-        ASSERT_TRUE(stats->isEOF);
-    }
+    // and now we are d1U, but must trigger EOF with getStats()
+    ASSERT_FALSE(stats->isEOF);
+    unique_ptr<PlanStageStats> allStats(mock->getStats());
+    ASSERT_TRUE(stats->isEOF);
+}
 }

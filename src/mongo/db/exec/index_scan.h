@@ -41,145 +41,143 @@
 
 namespace mongo {
 
-    class IndexAccessMethod;
-    class IndexDescriptor;
-    class WorkingSet;
+class IndexAccessMethod;
+class IndexDescriptor;
+class WorkingSet;
 
-    struct IndexScanParams {
-        IndexScanParams() : descriptor(NULL),
-                            direction(1),
-                            doNotDedup(false),
-                            maxScan(0),
-                            addKeyMetadata(false) { }
+struct IndexScanParams {
+    IndexScanParams()
+        : descriptor(NULL), direction(1), doNotDedup(false), maxScan(0), addKeyMetadata(false) {}
 
-        const IndexDescriptor* descriptor;
+    const IndexDescriptor* descriptor;
 
-        IndexBounds bounds;
+    IndexBounds bounds;
 
-        int direction;
+    int direction;
 
-        bool doNotDedup;
+    bool doNotDedup;
 
-        // How many keys will we look at?
-        size_t maxScan;
+    // How many keys will we look at?
+    size_t maxScan;
 
-        // Do we want to add the key as metadata?
-        bool addKeyMetadata;
-    };
+    // Do we want to add the key as metadata?
+    bool addKeyMetadata;
+};
 
+/**
+ * Stage scans over an index from startKey to endKey, returning results that pass the provided
+ * filter.  Internally dedups on RecordId.
+ *
+ * Sub-stage preconditions: None.  Is a leaf and consumes no stage data.
+ */
+class IndexScan : public PlanStage {
+public:
     /**
-     * Stage scans over an index from startKey to endKey, returning results that pass the provided
-     * filter.  Internally dedups on RecordId.
-     *
-     * Sub-stage preconditions: None.  Is a leaf and consumes no stage data.
+     * Keeps track of what this index scan is currently doing so that it
+     * can do the right thing on the next call to work().
      */
-    class IndexScan : public PlanStage {
-    public:
+    enum ScanState {
+        // Need to initialize the underlying index traversal machinery.
+        INITIALIZING,
 
-        /**
-         * Keeps track of what this index scan is currently doing so that it
-         * can do the right thing on the next call to work().
-         */
-        enum ScanState {
-            // Need to initialize the underlying index traversal machinery.
-            INITIALIZING,
+        // Skipping keys as directed by the _checker.
+        NEED_SEEK,
 
-            // Skipping keys as directed by the _checker.
-            NEED_SEEK,
+        // Retrieving the next key, and applying the filter if necessary.
+        GETTING_NEXT,
 
-            // Retrieving the next key, and applying the filter if necessary.
-            GETTING_NEXT,
-
-            // The index scan is finished.
-            HIT_END
-        };
-
-        IndexScan(OperationContext* txn,
-                  const IndexScanParams& params,
-                  WorkingSet* workingSet,
-                  const MatchExpression* filter);
-
-        virtual ~IndexScan() { }
-
-        virtual StageState work(WorkingSetID* out);
-        virtual bool isEOF();
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-        virtual std::vector<PlanStage*> getChildren() const;
-
-        virtual StageType stageType() const { return STAGE_IXSCAN; }
-
-        virtual PlanStageStats* getStats();
-
-        virtual const CommonStats* getCommonStats() const;
-
-        virtual const SpecificStats* getSpecificStats() const;
-
-        static const char* kStageType;
-
-    private:
-        /**
-         * Initialize the underlying index Cursor, returning first result if any.
-         */
-        boost::optional<IndexKeyEntry> initIndexScan();
-
-        // transactional context for read locks. Not owned by us
-        OperationContext* _txn;
-
-        // The WorkingSet we fill with results.  Not owned by us.
-        WorkingSet* const _workingSet;
-
-        // Index access.
-        const IndexAccessMethod* const _iam; // owned by Collection -> IndexCatalog
-        std::unique_ptr<SortedDataInterface::Cursor> _indexCursor;
-        const BSONObj _keyPattern;
-
-        // Keeps track of what work we need to do next.
-        ScanState _scanState;
-
-        // Contains expressions only over fields in the index key.  We assume this is built
-        // correctly by whomever creates this class.
-        // The filter is not owned by us.
-        const MatchExpression* const _filter;
-
-        // Could our index have duplicates?  If so, we use _returned to dedup.
-        bool _shouldDedup;
-        unordered_set<RecordId, RecordId::Hasher> _returned;
-
-        const bool _forward;
-        const IndexScanParams _params;
-
-        // Stats
-        CommonStats _commonStats;
-        IndexScanStats _specificStats;
-
-        //
-        // This class employs one of two different algorithms for determining when the index scan
-        // has reached the end:
-        //
-
-        //
-        // 1) If the index scan is not a single contiguous interval, then we use an
-        //    IndexBoundsChecker to determine which keys to return and when to stop scanning.
-        //    In this case, _checker will be non-NULL.
-        //
-
-        std::unique_ptr<IndexBoundsChecker> _checker;
-        IndexSeekPoint _seekPoint;
-
-        //
-        // 2) If the index scan is a single contiguous interval, then the scan can execute faster by
-        //    letting the index cursor tell us when it hits the end, rather than repeatedly doing
-        //    BSON compares against scanned keys. In this case _checker will be NULL.
-        //
-
-        // The key that the index cursor should stop on/after.
-        BSONObj _endKey;
-
-        // Is the end key included in the range?
-        bool _endKeyInclusive;
+        // The index scan is finished.
+        HIT_END
     };
+
+    IndexScan(OperationContext* txn,
+              const IndexScanParams& params,
+              WorkingSet* workingSet,
+              const MatchExpression* filter);
+
+    virtual ~IndexScan() {}
+
+    virtual StageState work(WorkingSetID* out);
+    virtual bool isEOF();
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_IXSCAN;
+    }
+
+    virtual PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats() const;
+
+    virtual const SpecificStats* getSpecificStats() const;
+
+    static const char* kStageType;
+
+private:
+    /**
+     * Initialize the underlying index Cursor, returning first result if any.
+     */
+    boost::optional<IndexKeyEntry> initIndexScan();
+
+    // transactional context for read locks. Not owned by us
+    OperationContext* _txn;
+
+    // The WorkingSet we fill with results.  Not owned by us.
+    WorkingSet* const _workingSet;
+
+    // Index access.
+    const IndexAccessMethod* const _iam;  // owned by Collection -> IndexCatalog
+    std::unique_ptr<SortedDataInterface::Cursor> _indexCursor;
+    const BSONObj _keyPattern;
+
+    // Keeps track of what work we need to do next.
+    ScanState _scanState;
+
+    // Contains expressions only over fields in the index key.  We assume this is built
+    // correctly by whomever creates this class.
+    // The filter is not owned by us.
+    const MatchExpression* const _filter;
+
+    // Could our index have duplicates?  If so, we use _returned to dedup.
+    bool _shouldDedup;
+    unordered_set<RecordId, RecordId::Hasher> _returned;
+
+    const bool _forward;
+    const IndexScanParams _params;
+
+    // Stats
+    CommonStats _commonStats;
+    IndexScanStats _specificStats;
+
+    //
+    // This class employs one of two different algorithms for determining when the index scan
+    // has reached the end:
+    //
+
+    //
+    // 1) If the index scan is not a single contiguous interval, then we use an
+    //    IndexBoundsChecker to determine which keys to return and when to stop scanning.
+    //    In this case, _checker will be non-NULL.
+    //
+
+    std::unique_ptr<IndexBoundsChecker> _checker;
+    IndexSeekPoint _seekPoint;
+
+    //
+    // 2) If the index scan is a single contiguous interval, then the scan can execute faster by
+    //    letting the index cursor tell us when it hits the end, rather than repeatedly doing
+    //    BSON compares against scanned keys. In this case _checker will be NULL.
+    //
+
+    // The key that the index cursor should stop on/after.
+    BSONObj _endKey;
+
+    // Is the end key included in the range?
+    bool _endKeyInclusive;
+};
 
 }  // namespace mongo

@@ -36,56 +36,57 @@
 
 namespace mongo {
 
-    class ServerStatusMetric {
-    public:
-        /**
-         * @param name is a dotted path of a counter name
-         *             if name starts with . its treated as a path from the serverStatus root
-         *             otherwise it will live under the "counters" namespace
-         *             so foo.bar would be serverStatus().counters.foo.bar
-         */
-        ServerStatusMetric(const std::string& name);
-        virtual ~ServerStatusMetric(){}
-
-        std::string getMetricName() const { return _name; }
-
-        virtual void appendAtLeaf( BSONObjBuilder& b ) const = 0;
-
-    protected:
-        static std::string _parseLeafName( const std::string& name );
-
-        const std::string _name;
-        const std::string _leafName;
-    };
-
+class ServerStatusMetric {
+public:
     /**
-     * usage
-     *
-     * declared once
-     *    Counter counter;
-     *    ServerStatusMetricField myAwesomeCounterDisplay( "path.to.counter", &counter );
-     *
-     * call
-     *    counter.hit();
-     *
-     * will show up in db.serverStatus().metrics.path.to.counter
+     * @param name is a dotted path of a counter name
+     *             if name starts with . its treated as a path from the serverStatus root
+     *             otherwise it will live under the "counters" namespace
+     *             so foo.bar would be serverStatus().counters.foo.bar
      */
-    template< typename T >
-    class ServerStatusMetricField : public ServerStatusMetric {
-    public:
-        ServerStatusMetricField( const std::string& name, const T* t )
-            : ServerStatusMetric(name), _t(t) {
-        }
+    ServerStatusMetric(const std::string& name);
+    virtual ~ServerStatusMetric() {}
 
-        const T* get() { return _t; }
+    std::string getMetricName() const {
+        return _name;
+    }
 
-        virtual void appendAtLeaf( BSONObjBuilder& b ) const {
-            b.append( _leafName, *_t );
-        }
+    virtual void appendAtLeaf(BSONObjBuilder& b) const = 0;
 
-    private:
-        const T* _t;
-    };
+protected:
+    static std::string _parseLeafName(const std::string& name);
 
+    const std::string _name;
+    const std::string _leafName;
+};
+
+/**
+ * usage
+ *
+ * declared once
+ *    Counter counter;
+ *    ServerStatusMetricField myAwesomeCounterDisplay( "path.to.counter", &counter );
+ *
+ * call
+ *    counter.hit();
+ *
+ * will show up in db.serverStatus().metrics.path.to.counter
+ */
+template <typename T>
+class ServerStatusMetricField : public ServerStatusMetric {
+public:
+    ServerStatusMetricField(const std::string& name, const T* t)
+        : ServerStatusMetric(name), _t(t) {}
+
+    const T* get() {
+        return _t;
+    }
+
+    virtual void appendAtLeaf(BSONObjBuilder& b) const {
+        b.append(_leafName, *_t);
+    }
+
+private:
+    const T* _t;
+};
 }
-

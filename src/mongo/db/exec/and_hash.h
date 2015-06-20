@@ -38,106 +38,106 @@
 
 namespace mongo {
 
+/**
+ * Reads from N children, each of which must have a valid RecordId.  Uses a hash table to
+ * intersect the outputs of the N children, and outputs the intersection.
+ *
+ * Preconditions: Valid RecordId.  More than one child.
+ *
+ * Any RecordId that we keep a reference to that is invalidated before we are able to return it
+ * is fetched and added to the WorkingSet as "flagged for further review."  Because this stage
+ * operates with RecordIds, we are unable to evaluate the AND for the invalidated RecordId, and it
+ * must be fully matched later.
+ */
+class AndHashStage : public PlanStage {
+public:
+    AndHashStage(WorkingSet* ws, const Collection* collection);
+
     /**
-     * Reads from N children, each of which must have a valid RecordId.  Uses a hash table to
-     * intersect the outputs of the N children, and outputs the intersection.
-     *
-     * Preconditions: Valid RecordId.  More than one child.
-     *
-     * Any RecordId that we keep a reference to that is invalidated before we are able to return it
-     * is fetched and added to the WorkingSet as "flagged for further review."  Because this stage
-     * operates with RecordIds, we are unable to evaluate the AND for the invalidated RecordId, and it
-     * must be fully matched later.
+     * For testing only. Allows tests to set memory usage threshold.
      */
-    class AndHashStage : public PlanStage {
-    public:
-        AndHashStage(WorkingSet* ws, const Collection* collection);
+    AndHashStage(WorkingSet* ws, const Collection* collection, size_t maxMemUsage);
 
-        /**
-         * For testing only. Allows tests to set memory usage threshold.
-         */
-        AndHashStage(WorkingSet* ws,
-                     const Collection* collection,
-                     size_t maxMemUsage);
+    virtual ~AndHashStage();
 
-        virtual ~AndHashStage();
+    void addChild(PlanStage* child);
 
-        void addChild(PlanStage* child);
+    /**
+     * Returns memory usage.
+     * For testing only.
+     */
+    size_t getMemUsage() const;
 
-        /**
-         * Returns memory usage.
-         * For testing only.
-         */
-        size_t getMemUsage() const;
+    virtual StageState work(WorkingSetID* out);
+    virtual bool isEOF();
 
-        virtual StageState work(WorkingSetID* out);
-        virtual bool isEOF();
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    virtual StageType stageType() const {
+        return STAGE_AND_HASH;
+    }
 
-        virtual StageType stageType() const { return STAGE_AND_HASH; }
+    virtual PlanStageStats* getStats();
 
-        virtual PlanStageStats* getStats();
+    virtual const CommonStats* getCommonStats() const;
 
-        virtual const CommonStats* getCommonStats() const;
+    virtual const SpecificStats* getSpecificStats() const;
 
-        virtual const SpecificStats* getSpecificStats() const;
+    static const char* kStageType;
 
-        static const char* kStageType;
+private:
+    static const size_t kLookAheadWorks;
 
-    private:
-        static const size_t kLookAheadWorks;
+    StageState readFirstChild(WorkingSetID* out);
+    StageState hashOtherChildren(WorkingSetID* out);
+    StageState workChild(size_t childNo, WorkingSetID* out);
 
-        StageState readFirstChild(WorkingSetID* out);
-        StageState hashOtherChildren(WorkingSetID* out);
-        StageState workChild(size_t childNo, WorkingSetID* out);
+    // Not owned by us.
+    const Collection* _collection;
 
-        // Not owned by us.
-        const Collection* _collection;
+    // Not owned by us.
+    WorkingSet* _ws;
 
-        // Not owned by us.
-        WorkingSet* _ws;
+    // The stages we read from.  Owned by us.
+    std::vector<PlanStage*> _children;
 
-        // The stages we read from.  Owned by us.
-        std::vector<PlanStage*> _children;
+    // We want to see if any of our children are EOF immediately.  This requires working them a
+    // few times to see if they hit EOF or if they produce a result.  If they produce a result,
+    // we place that result here.
+    std::vector<WorkingSetID> _lookAheadResults;
 
-        // We want to see if any of our children are EOF immediately.  This requires working them a
-        // few times to see if they hit EOF or if they produce a result.  If they produce a result,
-        // we place that result here.
-        std::vector<WorkingSetID> _lookAheadResults;
+    // _dataMap is filled out by the first child and probed by subsequent children.  This is the
+    // hash table that we create by intersecting _children and probe with the last child.
+    typedef unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
+    DataMap _dataMap;
 
-        // _dataMap is filled out by the first child and probed by subsequent children.  This is the
-        // hash table that we create by intersecting _children and probe with the last child.
-        typedef unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
-        DataMap _dataMap;
+    // Keeps track of what elements from _dataMap subsequent children have seen.
+    // Only used while _hashingChildren.
+    typedef unordered_set<RecordId, RecordId::Hasher> SeenMap;
+    SeenMap _seenMap;
 
-        // Keeps track of what elements from _dataMap subsequent children have seen.
-        // Only used while _hashingChildren.
-        typedef unordered_set<RecordId, RecordId::Hasher> SeenMap;
-        SeenMap _seenMap;
+    // True if we're still intersecting _children[0..._children.size()-1].
+    bool _hashingChildren;
 
-        // True if we're still intersecting _children[0..._children.size()-1].
-        bool _hashingChildren;
+    // Which child are we currently working on?
+    size_t _currentChild;
 
-        // Which child are we currently working on?
-        size_t _currentChild;
+    // Stats
+    CommonStats _commonStats;
+    AndHashStats _specificStats;
 
-        // Stats
-        CommonStats _commonStats;
-        AndHashStats _specificStats;
+    // The usage in bytes of all buffered data that we're holding.
+    // Memory usage is calculated from keys held in _dataMap only.
+    // For simplicity, results in _lookAheadResults do not count towards the limit.
+    size_t _memUsage;
 
-        // The usage in bytes of all buffered data that we're holding.
-        // Memory usage is calculated from keys held in _dataMap only.
-        // For simplicity, results in _lookAheadResults do not count towards the limit.
-        size_t _memUsage;
-
-        // Upper limit for buffered data memory usage.
-        // Defaults to 32 MB (See kMaxBytes in and_hash.cpp).
-        size_t _maxMemUsage;
-    };
+    // Upper limit for buffered data memory usage.
+    // Defaults to 32 MB (See kMaxBytes in and_hash.cpp).
+    size_t _maxMemUsage;
+};
 
 }  // namespace mongo

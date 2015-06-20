@@ -32,52 +32,53 @@
 #include "mongo/rpc/protocol.h"
 
 namespace mongo {
-    class BSONObj;
-    class Message;
+class BSONObj;
+class Message;
 
 namespace rpc {
-    class DocumentRange;
+class DocumentRange;
+
+/**
+ * An immutable view of an RPC Reply.
+ */
+class ReplyInterface {
+    MONGO_DISALLOW_COPYING(ReplyInterface);
+
+public:
+    virtual ~ReplyInterface() = default;
 
     /**
-     * An immutable view of an RPC Reply.
+     * Accessor for the metadata object. Metadata is generally used for information
+     * that is independent of any specific command, e.g. auditing information.
      */
-    class ReplyInterface {
-        MONGO_DISALLOW_COPYING(ReplyInterface);
-    public:
-        virtual ~ReplyInterface() = default;
+    virtual const BSONObj& getMetadata() const = 0;
 
-        /**
-         * Accessor for the metadata object. Metadata is generally used for information
-         * that is independent of any specific command, e.g. auditing information.
-         */
-        virtual const BSONObj& getMetadata() const = 0;
+    /**
+     * The result of executing the command.
+     */
+    virtual const BSONObj& getCommandReply() const = 0;
 
-        /**
-         * The result of executing the command.
-         */
-        virtual const BSONObj& getCommandReply() const = 0;
+    /**
+     * A variable number of BSON documents returned by the command. It is valid for the
+     * returned range to be empty.
+     *
+     * Example usage:
+     *
+     * for (auto&& doc : reply.getOutputDocs()) {
+     *    ... do stuff with doc
+     * }
+     */
+    virtual DocumentRange getOutputDocs() const = 0;
 
-        /**
-         * A variable number of BSON documents returned by the command. It is valid for the
-         * returned range to be empty.
-         *
-         * Example usage:
-         *
-         * for (auto&& doc : reply.getOutputDocs()) {
-         *    ... do stuff with doc
-         * }
-         */
-        virtual DocumentRange getOutputDocs() const = 0;
+    /**
+     * Gets the protocol used to deserialize this reply. This should be used for validity
+     * checks only - runtime behavior changes should be implemented with polymorphism.
+     */
+    virtual Protocol getProtocol() const = 0;
 
-        /**
-         * Gets the protocol used to deserialize this reply. This should be used for validity
-         * checks only - runtime behavior changes should be implemented with polymorphism.
-         */
-        virtual Protocol getProtocol() const = 0;
-
-    protected:
-        ReplyInterface() = default;
-    };
+protected:
+    ReplyInterface() = default;
+};
 
 }  // namespace rpc
 }  // namespace mongo

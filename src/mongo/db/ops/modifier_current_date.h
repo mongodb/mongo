@@ -37,53 +37,48 @@
 
 namespace mongo {
 
-    class LogBuilder;
+class LogBuilder;
 
-    class ModifierCurrentDate : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(ModifierCurrentDate);
+class ModifierCurrentDate : public ModifierInterface {
+    MONGO_DISALLOW_COPYING(ModifierCurrentDate);
 
-    public:
+public:
+    ModifierCurrentDate();
+    virtual ~ModifierCurrentDate();
 
-        ModifierCurrentDate();
-        virtual ~ModifierCurrentDate();
+    /**
+     * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming
+     * from a $currentDate mod such as
+     * {$currentDate: {<fieldname: true/{$type: "date/timestamp"}}.
+     * init() extracts the field name and the value to be
+     * assigned to it from 'modExpr'. It returns OK if successful or a status describing
+     * the error.
+     */
+    virtual Status init(const BSONElement& modExpr, const Options& opts, bool* positional = NULL);
 
-        /**
-         * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming
-         * from a $currentDate mod such as
-         * {$currentDate: {<fieldname: true/{$type: "date/timestamp"}}.
-         * init() extracts the field name and the value to be
-         * assigned to it from 'modExpr'. It returns OK if successful or a status describing
-         * the error.
-         */
-        virtual Status init(const BSONElement& modExpr, const Options& opts,
-                            bool* positional = NULL);
+    /** Evaluates the validity of applying $currentDate.
+     */
+    virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
-        /** Evaluates the validity of applying $currentDate.
-         */
-        virtual Status prepare(mutablebson::Element root,
-                               StringData matchedField,
-                               ExecInfo* execInfo);
+    /** Updates the node passed in prepare with the results from prepare */
+    virtual Status apply() const;
 
-        /** Updates the node passed in prepare with the results from prepare */
-        virtual Status apply() const;
+    /** Converts the result into a $set */
+    virtual Status log(LogBuilder* logBuilder) const;
 
-        /** Converts the result into a $set */
-        virtual Status log(LogBuilder* logBuilder) const;
+private:
+    // Access to each component of fieldName that's the target of this mod.
+    FieldRef _updatePath;
 
-    private:
+    // 0 or index for $-positional in _updatePath.
+    size_t _pathReplacementPosition;
 
-        // Access to each component of fieldName that's the target of this mod.
-        FieldRef _updatePath;
+    // Is the final type being added a Date or Timestamp?
+    bool _typeIsDate;
 
-        // 0 or index for $-positional in _updatePath.
-        size_t _pathReplacementPosition;
+    // State which changes with each call of the mod.
+    struct PreparedState;
+    std::unique_ptr<PreparedState> _preparedState;
+};
 
-        // Is the final type being added a Date or Timestamp?
-        bool _typeIsDate;
-
-        // State which changes with each call of the mod.
-        struct PreparedState;
-        std::unique_ptr<PreparedState> _preparedState;
-    };
-
-} // namespace mongo
+}  // namespace mongo

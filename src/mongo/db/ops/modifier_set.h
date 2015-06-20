@@ -38,77 +38,71 @@
 
 namespace mongo {
 
-    class LogBuilder;
+class LogBuilder;
 
-    class ModifierSet : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(ModifierSet);
+class ModifierSet : public ModifierInterface {
+    MONGO_DISALLOW_COPYING(ModifierSet);
 
-    public:
+public:
+    enum ModifierSetMode { SET_NORMAL, SET_ON_INSERT };
+    explicit ModifierSet(ModifierSetMode mode = SET_NORMAL);
 
-        enum ModifierSetMode { SET_NORMAL, SET_ON_INSERT };
-        explicit ModifierSet(ModifierSetMode mode = SET_NORMAL);
+    //
+    // Modifier interface implementation
+    //
 
-        //
-        // Modifier interface implementation
-        //
+    virtual ~ModifierSet();
 
-        virtual ~ModifierSet();
+    /**
+     * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $set mod such as
+     * {$set: {<fieldname: <value>}}. init() extracts the field name and the value to be
+     * assigned to it from 'modExpr'. It returns OK if successful or a status describing
+     * the error.
+     */
+    virtual Status init(const BSONElement& modExpr, const Options& opts, bool* positional = NULL);
 
-        /**
-         * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $set mod such as
-         * {$set: {<fieldname: <value>}}. init() extracts the field name and the value to be
-         * assigned to it from 'modExpr'. It returns OK if successful or a status describing
-         * the error.
-         */
-        virtual Status init(const BSONElement& modExpr, const Options& opts,
-                            bool* positional = NULL);
+    /**
+     * Looks up the field name in the sub-tree rooted at 'root', and binds, if necessary,
+     * the '$' field part using the 'matchedfield' number. prepare() returns OK and
+     * fills in 'execInfo' with information of whether this mod is a no-op on 'root' and
+     * whether it is an in-place candidate. Otherwise, returns a status describing the
+     * error.
+     */
+    virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
-        /**
-         * Looks up the field name in the sub-tree rooted at 'root', and binds, if necessary,
-         * the '$' field part using the 'matchedfield' number. prepare() returns OK and
-         * fills in 'execInfo' with information of whether this mod is a no-op on 'root' and
-         * whether it is an in-place candidate. Otherwise, returns a status describing the
-         * error.
-         */
-        virtual Status prepare(mutablebson::Element root,
-                               StringData matchedField,
-                               ExecInfo* execInfo);
+    /**
+     * Applies the prepared mod over the element 'root' specified in the prepare()
+     * call. Returns OK if successful or a status describing the error.
+     */
+    virtual Status apply() const;
 
-        /**
-         * Applies the prepared mod over the element 'root' specified in the prepare()
-         * call. Returns OK if successful or a status describing the error.
-         */
-        virtual Status apply() const;
+    /**
+     * Adds a log entry to logRoot corresponding to the operation applied here. Returns OK
+     * if successful or a status describing the error.
+     */
+    virtual Status log(LogBuilder* logBuilder) const;
 
-        /**
-         * Adds a log entry to logRoot corresponding to the operation applied here. Returns OK
-         * if successful or a status describing the error.
-         */
-        virtual Status log(LogBuilder* logBuilder) const;
+private:
+    // Access to each component of fieldName that's the target of this mod.
+    FieldRef _fieldRef;
 
-    private:
+    // 0 or index for $-positional in _fieldRef.
+    size_t _posDollar;
 
-        // Access to each component of fieldName that's the target of this mod.
-        FieldRef _fieldRef;
+    // If on 'on insert' mode, We'd like to apply this mod only if we're in a upsert.
+    const ModifierSetMode _setMode;
 
-        // 0 or index for $-positional in _fieldRef.
-        size_t _posDollar;
+    // Element of the $set expression.
+    BSONElement _val;
 
-        // If on 'on insert' mode, We'd like to apply this mod only if we're in a upsert.
-        const ModifierSetMode _setMode;
+    // See the class comments in modifier_interface.h
+    ModifierInterface::Options _modOptions;
 
-        // Element of the $set expression.
-        BSONElement _val;
+    // The instance of the field in the provided doc. This state is valid after a
+    // prepare() was issued and until a log() is issued. The document this mod is
+    // being prepared against must be live throughout all the calls.
+    struct PreparedState;
+    std::unique_ptr<PreparedState> _preparedState;
+};
 
-        // See the class comments in modifier_interface.h
-        ModifierInterface::Options _modOptions;
-
-        // The instance of the field in the provided doc. This state is valid after a
-        // prepare() was issued and until a log() is issued. The document this mod is
-        // being prepared against must be live throughout all the calls.
-        struct PreparedState;
-        std::unique_ptr<PreparedState> _preparedState;
-
-    };
-
-} // namespace mongo
+}  // namespace mongo

@@ -29,18 +29,18 @@
 #include "mongo/base/status.h"
 
 namespace mongo {
-    class BSONObj;
-    class BSONObjBuilder;
-    class NamespaceString;
-    class OperationContext;
+class BSONObj;
+class BSONObjBuilder;
+class NamespaceString;
+class OperationContext;
 
-    /**
-     * Drops the index from collection "ns" that matches the "idxDescriptor" and populates 
-     * "result" with some statistics about the dropped index.
-     */
-    Status dropIndexes(OperationContext* txn,
-                       const NamespaceString& ns,
-                       const BSONObj& idxDescriptor,
-                       BSONObjBuilder* result);
+/**
+ * Drops the index from collection "ns" that matches the "idxDescriptor" and populates
+ * "result" with some statistics about the dropped index.
+ */
+Status dropIndexes(OperationContext* txn,
+                   const NamespaceString& ns,
+                   const BSONObj& idxDescriptor,
+                   BSONObjBuilder* result);
 
-} // namespace mongo
+}  // namespace mongo

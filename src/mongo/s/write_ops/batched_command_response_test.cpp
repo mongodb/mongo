@@ -37,51 +37,42 @@
 
 namespace {
 
-    using mongo::BSONArray;
-    using mongo::BSONObj;
-    using mongo::BatchedCommandResponse;
-    using mongo::WriteErrorDetail;
-    using mongo::WCErrorDetail;
-    using mongo::Date_t;
-    using std::string;
+using mongo::BSONArray;
+using mongo::BSONObj;
+using mongo::BatchedCommandResponse;
+using mongo::WriteErrorDetail;
+using mongo::WCErrorDetail;
+using mongo::Date_t;
+using std::string;
 
-    TEST(RoundTrip, Normal) {
+TEST(RoundTrip, Normal) {
+    BSONArray writeErrorsArray = BSON_ARRAY(
+        BSON(WriteErrorDetail::index(0) << WriteErrorDetail::errCode(-2)
+                                        << WriteErrorDetail::errInfo(BSON("more info" << 1))
+                                        << WriteErrorDetail::errMessage("index 0 failed"))
+        << BSON(WriteErrorDetail::index(1) << WriteErrorDetail::errCode(-3)
+                                           << WriteErrorDetail::errInfo(BSON("more info" << 1))
+                                           << WriteErrorDetail::errMessage("index 1 failed too")));
 
-        BSONArray writeErrorsArray =
-            BSON_ARRAY(
-                BSON(WriteErrorDetail::index(0) <<
-                     WriteErrorDetail::errCode(-2) <<
-                     WriteErrorDetail::errInfo(BSON("more info" << 1)) <<
-                     WriteErrorDetail::errMessage("index 0 failed")
-                    ) <<
-                BSON(WriteErrorDetail::index(1) <<
-                     WriteErrorDetail::errCode(-3) <<
-                     WriteErrorDetail::errInfo(BSON("more info" << 1)) <<
-                     WriteErrorDetail::errMessage("index 1 failed too")
-                    )
-                );
+    BSONObj writeConcernError(BSON(WCErrorDetail::errCode(8)
+                                   << WCErrorDetail::errInfo(BSON("a" << 1))
+                                   << WCErrorDetail::errMessage("norepl")));
 
-        BSONObj writeConcernError(
-                BSON(WCErrorDetail::errCode(8) <<
-                     WCErrorDetail::errInfo(BSON("a" << 1)) <<
-                     WCErrorDetail::errMessage("norepl")));
+    BSONObj origResponseObj = BSON(
+        BatchedCommandResponse::ok(false)
+        << BatchedCommandResponse::errCode(-1)
+        << BatchedCommandResponse::errMessage("this batch didn't work")
+        << BatchedCommandResponse::n(0) << BatchedCommandResponse::lastOp(mongo::Timestamp(1ULL))
+        << BatchedCommandResponse::writeErrors() << writeErrorsArray
+        << BatchedCommandResponse::writeConcernError() << writeConcernError);
 
-        BSONObj origResponseObj =
-            BSON(BatchedCommandResponse::ok(false) <<
-                 BatchedCommandResponse::errCode(-1) <<
-                 BatchedCommandResponse::errMessage("this batch didn't work") <<
-                 BatchedCommandResponse::n(0) <<
-                 BatchedCommandResponse::lastOp(mongo::Timestamp(1ULL)) <<
-                 BatchedCommandResponse::writeErrors() << writeErrorsArray <<
-                 BatchedCommandResponse::writeConcernError() << writeConcernError);
+    string errMsg;
+    BatchedCommandResponse response;
+    bool ok = response.parseBSON(origResponseObj, &errMsg);
+    ASSERT_TRUE(ok);
 
-        string errMsg;
-        BatchedCommandResponse response;
-        bool ok = response.parseBSON(origResponseObj, &errMsg);
-        ASSERT_TRUE(ok);
+    BSONObj genResponseObj = response.toBSON();
+    ASSERT_EQUALS(0, genResponseObj.woCompare(origResponseObj));
+}
 
-        BSONObj genResponseObj = response.toBSON();
-        ASSERT_EQUALS(0, genResponseObj.woCompare(origResponseObj));
-    }
-
-} // unnamed namespace
+}  // unnamed namespace

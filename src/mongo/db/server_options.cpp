@@ -29,12 +29,12 @@
 
 namespace mongo {
 
-    /**
-     * This struct represents global configuration data for the server.  These options get set from
-     * the command line and are used inline in the code.  Note that much shared code uses this
-     * struct, which is why it is here in its own file rather than in the same file as the code that
-     * sets it via the command line, which would pull in more dependencies.
-     */
-    ServerGlobalParams serverGlobalParams;
+/**
+ * This struct represents global configuration data for the server.  These options get set from
+ * the command line and are used inline in the code.  Note that much shared code uses this
+ * struct, which is why it is here in its own file rather than in the same file as the code that
+ * sets it via the command line, which would pull in more dependencies.
+ */
+ServerGlobalParams serverGlobalParams;
 
-} // namespace mongo
+}  // namespace mongo

@@ -37,64 +37,57 @@
 
 namespace mongo {
 
-    class LogBuilder;
+class LogBuilder;
 
-    class ModifierInc : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(ModifierInc);
+class ModifierInc : public ModifierInterface {
+    MONGO_DISALLOW_COPYING(ModifierInc);
 
-    public:
+public:
+    // TODO: This is a shortcut to implementing $mul by hijacking $inc. In the near future,
+    // we should consider either pulling $mul into its own operator, or creating a general
+    // purpose "numeric binary op" operator. Potentially, that operator could also subsume
+    // $bit (thought there are some subtleties, like that $bit can have multiple
+    // operations, and doing so with arbirary math operations introduces potential
+    // associativity difficulties). At the very least, if this mechanism is retained, then
+    // this class should be renamed at some point away from ModifierInc.
+    enum ModifierIncMode { MODE_INC, MODE_MUL };
 
-        // TODO: This is a shortcut to implementing $mul by hijacking $inc. In the near future,
-        // we should consider either pulling $mul into its own operator, or creating a general
-        // purpose "numeric binary op" operator. Potentially, that operator could also subsume
-        // $bit (thought there are some subtleties, like that $bit can have multiple
-        // operations, and doing so with arbirary math operations introduces potential
-        // associativity difficulties). At the very least, if this mechanism is retained, then
-        // this class should be renamed at some point away from ModifierInc.
-        enum ModifierIncMode {
-            MODE_INC,
-            MODE_MUL
-        };
+    ModifierInc(ModifierIncMode mode = MODE_INC);
+    virtual ~ModifierInc();
 
-        ModifierInc(ModifierIncMode mode = MODE_INC);
-        virtual ~ModifierInc();
+    /**
+     * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $inc mod such as
+     * {$inc: {<fieldname: <value>}}. init() extracts the field name and the value to be
+     * assigned to it from 'modExpr'. It returns OK if successful or a status describing
+     * the error.
+     */
+    virtual Status init(const BSONElement& modExpr, const Options& opts, bool* positional = NULL);
 
-        /**
-         * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $inc mod such as
-         * {$inc: {<fieldname: <value>}}. init() extracts the field name and the value to be
-         * assigned to it from 'modExpr'. It returns OK if successful or a status describing
-         * the error.
-         */
-        virtual Status init(const BSONElement& modExpr, const Options& opts,
-                            bool* positional = NULL);
+    /** Evaluates the validity of applying $inc to the identified node, and computes
+     *  effects, handling upcasting and overflow as necessary.
+     */
+    virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
-        /** Evaluates the validity of applying $inc to the identified node, and computes
-         *  effects, handling upcasting and overflow as necessary.
-         */
-        virtual Status prepare(mutablebson::Element root,
-                               StringData matchedField,
-                               ExecInfo* execInfo);
+    /** Updates the node passed in prepare with the results of the $inc */
+    virtual Status apply() const;
 
-        /** Updates the node passed in prepare with the results of the $inc */
-        virtual Status apply() const;
+    /** Converts the result of the $inc into an equivalent $set under logRoot */
+    virtual Status log(LogBuilder* logBuilder) const;
 
-        /** Converts the result of the $inc into an equivalent $set under logRoot */
-        virtual Status log(LogBuilder* logBuilder) const;
+private:
+    const ModifierIncMode _mode;
 
-    private:
-        const ModifierIncMode _mode;
+    // Access to each component of fieldName that's the target of this mod.
+    FieldRef _fieldRef;
 
-        // Access to each component of fieldName that's the target of this mod.
-        FieldRef _fieldRef;
+    // 0 or index for $-positional in _fieldRef.
+    size_t _posDollar;
 
-        // 0 or index for $-positional in _fieldRef.
-        size_t _posDollar;
+    // Element of the $set expression.
+    SafeNum _val;
 
-        // Element of the $set expression.
-        SafeNum _val;
+    struct PreparedState;
+    std::unique_ptr<PreparedState> _preparedState;
+};
 
-        struct PreparedState;
-        std::unique_ptr<PreparedState> _preparedState;
-    };
-
-} // namespace mongo
+}  // namespace mongo
