@@ -1116,20 +1116,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * are holding it locked.
 	 */
 	if (ret == 0 && !LF_ISSET(WT_SPLIT_EXCLUSIVE) &&
-	    !F_ISSET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN) &&
-	    __split_should_deepen(session, parent_ref)) {
-		/*
-		 * XXX
-		 * Temporary hack to avoid a bug where the root page is split
-		 * even when it's no longer doing any good.
-		 */
-		uint64_t __a, __b;
-		__a = parent->memory_footprint;
+	    __split_should_deepen(session, parent_ref))
 		ret = __split_deepen(session, parent);
-		__b = parent->memory_footprint;
-		if (__b * 2 >= __a)
-			F_SET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN);
-	}
 
 err:	if (!complete)
 		for (i = 0; i < parent_entries; ++i) {
