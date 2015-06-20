@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <string.h>  // strlen
 #include <string>
 #include <vector>
@@ -39,7 +40,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 class BSONObj;

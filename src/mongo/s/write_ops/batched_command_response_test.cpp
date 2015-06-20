@@ -28,11 +28,11 @@
 
 #include "mongo/s/write_ops/batched_command_response.h"
 
+#include <cstdint>
 #include <string>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/s/write_ops/write_error_detail.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

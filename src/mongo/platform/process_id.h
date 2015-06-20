@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <iosfwd>
 #include <string>
 
@@ -34,7 +35,6 @@
 #include <unistd.h>
 #endif
 
-#include "mongo/platform/cstdint.h"
 #include "mongo/platform/hash_namespace.h"
 
 namespace mongo {

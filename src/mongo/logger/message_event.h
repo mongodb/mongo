@@ -27,10 +27,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/string_data.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

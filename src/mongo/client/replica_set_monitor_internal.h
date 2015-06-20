@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <deque>
 #include <set>
 #include <string>
@@ -42,7 +43,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/net/hostandport.h"

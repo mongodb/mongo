@@ -29,6 +29,7 @@
 #include "mongo/db/ops/modifier_push.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <vector>
 
@@ -41,7 +42,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/log_builder.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 

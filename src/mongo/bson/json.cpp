@@ -29,10 +29,10 @@
 
 #include "mongo/bson/json.h"
 
+#include <cstdint>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/platform/strtoll.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"

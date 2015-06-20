@@ -28,12 +28,12 @@
 
 #pragma once
 
+#include <cstdint>
 #include <stdlib.h>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 

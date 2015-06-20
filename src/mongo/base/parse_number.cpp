@@ -31,11 +31,10 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstdint>
 #include <cstdlib>
 #include <limits>
 #include <string>
-
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 

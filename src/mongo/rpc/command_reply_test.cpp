@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <cstdint>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -35,7 +36,6 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/rpc/command_reply.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"

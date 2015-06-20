@@ -30,10 +30,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 

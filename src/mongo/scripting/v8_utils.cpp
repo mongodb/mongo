@@ -31,12 +31,12 @@
 
 #include "mongo/scripting/v8_utils.h"
 
+#include <cstdint>
 #include <iostream>
 #include <map>
 #include <sstream>
 #include <vector>
 
-#include "mongo/platform/cstdint.h"
 #include "mongo/scripting/engine_v8.h"
 #include "mongo/scripting/v8_db.h"
 #include "mongo/stdx/condition_variable.h"

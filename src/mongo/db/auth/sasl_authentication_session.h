@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -36,7 +37,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {

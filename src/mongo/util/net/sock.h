@@ -44,6 +44,7 @@
 
 #endif  // not _WIN32
 
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -52,7 +53,6 @@
 #include "mongo/config.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

@@ -27,10 +27,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/safe_num.h"
 
 namespace mongo {

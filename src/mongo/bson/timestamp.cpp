@@ -28,12 +28,12 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 
+#include <cstdint>
 #include <ctime>
 #include <iostream>
 #include <limits>
 #include <sstream>
 
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

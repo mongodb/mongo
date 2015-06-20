@@ -28,6 +28,8 @@
 
 #include "mongo/db/ops/modifier_rename.h"
 
+#include <cstdint>
+
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/algorithm.h"
@@ -36,7 +38,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/log_builder.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
