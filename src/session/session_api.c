@@ -488,6 +488,57 @@ err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __session_rename --
+ *	WT_SESSION->reset method.
+ */
+static int
+__session_reset(WT_SESSION *wt_session, const char *config)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, reset, config, cfg);
+
+	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
+		WT_ERR_MSG(session, EINVAL, "transaction in progress");
+
+	WT_TRET(__wt_session_reset_cursors(session));
+
+	WT_ASSERT(session, session->ncursors == 0);
+
+	/*
+	 * Also release any pinned transaction ID from a non-transactional
+	 * operation.
+	 */
+	if (conn->txn_global.states != NULL)
+		__wt_txn_release_snapshot(session);
+
+	/* Discard session cache. */
+	__wt_session_close_cache(session);
+
+	/* Close all tables. */
+	WT_TRET(__wt_schema_close_tables(session));
+
+	/* Discard scratch buffers, error memory. */
+	__wt_scr_discard(session);
+	__wt_buf_free(session, &session->err);
+
+	/* Free transaction information. */
+	__wt_txn_destroy(session);
+
+	/* Confirm we're not holding any hazard pointers. */
+	__wt_hazard_close(session);
+
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+
+/*
  * __session_compact --
  *	WT_SESSION->compact method.
  */
@@ -1110,6 +1161,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		__session_drop,
 		__session_log_printf,
 		__session_rename,
+		__session_reset,
 		__session_salvage,
 		__session_truncate,
 		__session_upgrade,

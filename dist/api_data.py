@@ -797,6 +797,7 @@ methods = {
 ]),
 
 'WT_SESSION.rename' : Method([]),
+'WT_SESSION.reset' : Method([]),
 'WT_SESSION.salvage' : Method([
     Config('force', 'false', r'''
         force salvage even of files that do not appear to be WiredTiger
