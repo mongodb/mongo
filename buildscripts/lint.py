@@ -42,6 +42,7 @@ def run_lint( paths, nudgeOn=False ):
     nudge.append( '-readability/fn_size' ) # errors found: 1
     nudge.append( '-readability/function' ) # errors found: 49
     nudge.append( '-readability/inheritance' ) # errors found: 7
+    nudge.append( '-readability/multiline_comment' ) # errors found: 1
     later.append( '-readability/namespace' ) # errors found: 876
     later.append( '-readability/streams' ) # errors found: 72
     later.append( '-readability/todo' ) # errors found: 309
