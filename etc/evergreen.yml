@@ -3337,6 +3337,7 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
+  - name: lint
   - name: audit
   - name: audit_WT
   - name: jsCore_auth
