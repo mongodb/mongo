@@ -1,12 +1,3 @@
-/** @file perftests.cpp.cpp : unit tests relating to performance
-
-          The idea herein is tests that run fast and can be part of the normal CI suite.  So no
-          tests herein that take a long time to run.  Obviously we need those too, but they will be
-          separate.
-
-          These tests use DBDirectClient; they are a bit white-boxish.
-*/
-
 /**
  *    Copyright (C) 2008 10gen Inc.
  *
@@ -34,6 +25,15 @@
  *    delete this exception statement from all source files in the program,
  *    then also delete it in the license file.
  */
+
+/** @file perftests.cpp.cpp : unit tests relating to performance
+
+          The idea herein is tests that run fast and can be part of the normal CI suite.  So no
+          tests herein that take a long time to run.  Obviously we need those too, but they will be
+          separate.
+
+          These tests use DBDirectClient; they are a bit white-boxish.
+*/
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
