@@ -97,7 +97,15 @@ public:
     CursorId registerCursor(ClientCursor* cc);
     void deregisterCursor(ClientCursor* cc);
 
-    bool eraseCursor(OperationContext* txn, CursorId id, bool checkAuth);
+    /**
+     * Returns an OK status if the cursor was successfully erased.
+     *
+     * Returns error code CursorNotFound if the cursor id is not owned by this manager. Returns
+     * error code OperationFailed if attempting to erase a pinned cursor.
+     *
+     * If 'shouldAudit' is true, will perform audit logging.
+     */
+    Status eraseCursor(OperationContext* txn, CursorId id, bool shouldAudit);
 
     /**
      * Returns true if the space of cursor ids that cursor manager is responsible for includes

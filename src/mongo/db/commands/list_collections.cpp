@@ -167,7 +167,7 @@ public:
 
         std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name;
         dassert(NamespaceString(cursorNamespace).isValid());
-        dassert(NamespaceString(cursorNamespace).isListCollectionsGetMore());
+        dassert(NamespaceString(cursorNamespace).isListCollectionsCursorNS());
 
         PlanExecutor* rawExec;
         Status makeStatus = PlanExecutor::make(txn,

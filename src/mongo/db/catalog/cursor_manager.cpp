@@ -213,7 +213,12 @@ bool GlobalCursorIdCache::eraseCursor(OperationContext* txn, CursorId id, bool c
 
     // If this cursor is owned by the global cursor manager, ask it to erase the cursor for us.
     if (globalCursorManager->ownsCursorId(id)) {
-        return globalCursorManager->eraseCursor(txn, id, checkAuth);
+        Status eraseStatus = globalCursorManager->eraseCursor(txn, id, checkAuth);
+        massert(28697,
+                eraseStatus.reason(),
+                eraseStatus.code() == ErrorCodes::OK ||
+                    eraseStatus.code() == ErrorCodes::CursorNotFound);
+        return eraseStatus.isOK();
     }
 
     // If not, then the cursor must be owned by a collection.  Erase the cursor under the
@@ -225,7 +230,13 @@ bool GlobalCursorIdCache::eraseCursor(OperationContext* txn, CursorId id, bool c
             audit::logKillCursorsAuthzCheck(txn->getClient(), nss, id, ErrorCodes::CursorNotFound);
         return false;
     }
-    return collection->getCursorManager()->eraseCursor(txn, id, checkAuth);
+
+    Status eraseStatus = collection->getCursorManager()->eraseCursor(txn, id, checkAuth);
+    massert(16089,
+            eraseStatus.reason(),
+            eraseStatus.code() == ErrorCodes::OK ||
+                eraseStatus.code() == ErrorCodes::CursorNotFound);
+    return eraseStatus.isOK();
 }
 
 std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int millisSinceLastCall) {
@@ -495,27 +506,35 @@ void CursorManager::deregisterCursor(ClientCursor* cc) {
     _deregisterCursor_inlock(cc);
 }
 
-bool CursorManager::eraseCursor(OperationContext* txn, CursorId id, bool checkAuth) {
+Status CursorManager::eraseCursor(OperationContext* txn, CursorId id, bool shouldAudit) {
     stdx::lock_guard<SimpleMutex> lk(_mutex);
 
     CursorMap::iterator it = _cursors.find(id);
     if (it == _cursors.end()) {
-        if (checkAuth)
+        if (shouldAudit) {
             audit::logKillCursorsAuthzCheck(txn->getClient(), _nss, id, ErrorCodes::CursorNotFound);
-        return false;
+        }
+        return {ErrorCodes::CursorNotFound, str::stream() << "Cursor id not found: " << id};
     }
 
     ClientCursor* cursor = it->second;
 
-    if (checkAuth)
-        audit::logKillCursorsAuthzCheck(txn->getClient(), _nss, id, ErrorCodes::OK);
+    if (cursor->isPinned()) {
+        if (shouldAudit) {
+            audit::logKillCursorsAuthzCheck(
+                txn->getClient(), _nss, id, ErrorCodes::OperationFailed);
+        }
+        return {ErrorCodes::OperationFailed, str::stream() << "Cannot kill pinned cursor: " << id};
+    }
 
-    massert(16089, str::stream() << "Cannot kill active cursor " << id, !cursor->isPinned());
+    if (shouldAudit) {
+        audit::logKillCursorsAuthzCheck(txn->getClient(), _nss, id, ErrorCodes::OK);
+    }
 
     cursor->kill();
     _deregisterCursor_inlock(cursor);
     delete cursor;
-    return true;
+    return Status::OK();
 }
 
 void CursorManager::_deregisterCursor_inlock(ClientCursor* cc) {

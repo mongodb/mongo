@@ -1478,6 +1478,46 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "killCursors",
+            command: {killCursors: "foo", cursors: [NumberLong("123")]},
+            skipSharded: true, // TODO enable when killCursors command is implemented on mongos
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {
+                        read: 1,
+                        readAnyDatabase: 1,
+                        readWrite: 1,
+                        readWriteAnyDatabase: 1,
+                        dbOwner: 1,
+                        hostManager: 1,
+                        clusterAdmin: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "foo"}, actions: ["killCursors"] }
+                    ],
+                    expectFail: true
+                },
+                {
+                    runOnDb: secondDbName,
+                    roles: {
+                        readAnyDatabase: 1,
+                        readWriteAnyDatabase: 1,
+                        hostManager: 1,
+                        clusterAdmin: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        { resource: {db: secondDbName, collection: "foo"}, actions: ["killCursors"] }
+                    ],
+                    expectFail: true
+                }
+            ]
+        },
+        {
             testname: "killOp", // standalone version
             command: {killOp: 1, op: 123},
             skipSharded: true,

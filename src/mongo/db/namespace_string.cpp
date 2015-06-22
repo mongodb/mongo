@@ -83,22 +83,22 @@ bool legalClientSystemNS(StringData ns, bool write) {
     return false;
 }
 
-bool NamespaceString::isListCollectionsGetMore() const {
+bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == StringData("$cmd.listCollections", StringData::LiteralTag());
 }
 
 namespace {
-const StringData listIndexesGetMoreNSPrefix("$cmd.listIndexes.", StringData::LiteralTag());
+const StringData listIndexesCursorNSPrefix("$cmd.listIndexes.", StringData::LiteralTag());
 }  // namespace
 
-bool NamespaceString::isListIndexesGetMore() const {
-    return coll().size() > listIndexesGetMoreNSPrefix.size() &&
-        coll().startsWith(listIndexesGetMoreNSPrefix);
+bool NamespaceString::isListIndexesCursorNS() const {
+    return coll().size() > listIndexesCursorNSPrefix.size() &&
+        coll().startsWith(listIndexesCursorNSPrefix);
 }
 
-NamespaceString NamespaceString::getTargetNSForListIndexesGetMore() const {
-    dassert(isListIndexesGetMore());
-    return NamespaceString(db(), coll().substr(listIndexesGetMoreNSPrefix.size()));
+NamespaceString NamespaceString::getTargetNSForListIndexes() const {
+    dassert(isListIndexesCursorNS());
+    return NamespaceString(db(), coll().substr(listIndexesCursorNSPrefix.size()));
 }
 
 string NamespaceString::escapeDbName(const StringData dbname) {

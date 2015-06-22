@@ -532,6 +532,7 @@ serverOnlyFiles = [
     "commands/group.cpp",
     "commands/index_filter_commands.cpp",
     "commands/kill_op.cpp",
+    "commands/killcursors_cmd.cpp",
     "commands/list_collections.cpp",
     "commands/list_databases.cpp",
     "commands/list_indexes.cpp",

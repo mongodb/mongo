@@ -192,7 +192,7 @@ Status AuthorizationSession::checkAuthForQuery(const NamespaceString& ns, const 
 Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns, long long cursorID) {
     // "ns" can be in one of three formats: "listCollections" format, "listIndexes" format, and
     // normal format.
-    if (ns.isListCollectionsGetMore()) {
+    if (ns.isListCollectionsCursorNS()) {
         // "ns" is of the form "<db>.$cmd.listCollections".  Check if we can perform the
         // listCollections action on the database resource for "<db>".
         if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
@@ -201,10 +201,10 @@ Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns, long
                           str::stream() << "not authorized for listCollections getMore on "
                                         << ns.ns());
         }
-    } else if (ns.isListIndexesGetMore()) {
+    } else if (ns.isListIndexesCursorNS()) {
         // "ns" is of the form "<db>.$cmd.listIndexes.<coll>".  Check if we can perform the
         // listIndexes action on the "<db>.<coll>" namespace.
-        NamespaceString targetNS = ns.getTargetNSForListIndexesGetMore();
+        NamespaceString targetNS = ns.getTargetNSForListIndexes();
         if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::listIndexes)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized for listIndexes getMore on " << ns.ns());
@@ -275,15 +275,15 @@ Status AuthorizationSession::checkAuthForDelete(const NamespaceString& ns, const
 Status AuthorizationSession::checkAuthForKillCursors(const NamespaceString& ns,
                                                      long long cursorID) {
     // See implementation comments in checkAuthForGetMore().  This method looks very similar.
-    if (ns.isListCollectionsGetMore()) {
+    if (ns.isListCollectionsCursorNS()) {
         if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
                                               ActionType::killCursors)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized to kill listCollections cursor on "
                                         << ns.ns());
         }
-    } else if (ns.isListIndexesGetMore()) {
-        NamespaceString targetNS = ns.getTargetNSForListIndexesGetMore();
+    } else if (ns.isListIndexesCursorNS()) {
+        NamespaceString targetNS = ns.getTargetNSForListIndexes();
         if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::killCursors)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized to kill listIndexes cursor on "

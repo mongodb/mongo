@@ -88,39 +88,39 @@ TEST(NamespaceStringTest, DatabaseValidNames) {
     ASSERT(NamespaceString::normal("local.oplog.$main"));
 }
 
-TEST(NamespaceStringTest, ListCollectionsGetMore) {
-    ASSERT(NamespaceString("test.$cmd.listCollections").isListCollectionsGetMore());
+TEST(NamespaceStringTest, ListCollectionsCursorNS) {
+    ASSERT(NamespaceString("test.$cmd.listCollections").isListCollectionsCursorNS());
 
-    ASSERT(!NamespaceString("test.foo").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.foo.$cmd.listCollections").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.$cmd.").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.$cmd.foo.").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listCollections.").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes.foo").isListCollectionsGetMore());
+    ASSERT(!NamespaceString("test.foo").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.foo.$cmd.listCollections").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.foo.").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listCollections.").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listIndexes").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listIndexes.foo").isListCollectionsCursorNS());
 }
 
-TEST(NamespaceStringTest, ListIndexesGetMore) {
+TEST(NamespaceStringTest, ListIndexesCursorNS) {
     NamespaceString ns1("test.$cmd.listIndexes.f");
-    ASSERT(ns1.isListIndexesGetMore());
-    ASSERT("test.f" == ns1.getTargetNSForListIndexesGetMore().ns());
+    ASSERT(ns1.isListIndexesCursorNS());
+    ASSERT("test.f" == ns1.getTargetNSForListIndexes().ns());
 
     NamespaceString ns2("test.$cmd.listIndexes.foo");
-    ASSERT(ns2.isListIndexesGetMore());
-    ASSERT("test.foo" == ns2.getTargetNSForListIndexesGetMore().ns());
+    ASSERT(ns2.isListIndexesCursorNS());
+    ASSERT("test.foo" == ns2.getTargetNSForListIndexes().ns());
 
     NamespaceString ns3("test.$cmd.listIndexes.foo.bar");
-    ASSERT(ns3.isListIndexesGetMore());
-    ASSERT("test.foo.bar" == ns3.getTargetNSForListIndexesGetMore().ns());
+    ASSERT(ns3.isListIndexesCursorNS());
+    ASSERT("test.foo.bar" == ns3.getTargetNSForListIndexes().ns());
 
-    ASSERT(!NamespaceString("test.foo").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.foo.$cmd.listIndexes").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.foo.").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes.").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listCollections").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listCollections.foo").isListIndexesGetMore());
+    ASSERT(!NamespaceString("test.foo").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.foo.$cmd.listIndexes").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.foo.").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listIndexes").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listIndexes.").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listCollections").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listCollections.foo").isListIndexesCursorNS());
 }
 
 TEST(NamespaceStringTest, CollectionComponentValidNames) {

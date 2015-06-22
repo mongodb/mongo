@@ -1669,7 +1669,7 @@ public:
         {
             OldClientWriteContext ctx(&_txn, ns());
             ClientCursorPin pinCursor(ctx.db()->getCollection(ns())->getCursorManager(), cursorId);
-            string expectedAssertion = str::stream() << "Cannot kill active cursor " << cursorId;
+            string expectedAssertion = str::stream() << "Cannot kill pinned cursor: " << cursorId;
             ASSERT_THROWS_WHAT(CursorManager::eraseCursorGlobal(&_txn, cursorId),
                                MsgAssertionException,
                                expectedAssertion);

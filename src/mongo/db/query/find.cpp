@@ -32,7 +32,6 @@
 
 #include "mongo/db/query/find.h"
 
-
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -57,6 +56,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -266,8 +266,10 @@ QueryResult::View getMore(OperationContext* txn,
     // or none of the getMore, or part of the getMore.  The three cases in detail:
     //
     // 1) Normal cursor: we lock with "ctx" and hold it for the whole getMore.
-    // 2) Cursor owned by global cursor manager: we don't lock anything.  These cursors don't
-    //    own any collection state.
+    // 2) Cursor owned by global cursor manager: we don't lock anything.  These cursors don't own
+    //    any collection state. These cursors are generated either by the listCollections or
+    //    listIndexes commands, as these special cursor-generating commands operate over catalog
+    //    data rather than targeting the data within a collection.
     // 3) Agg cursor: we lock with "ctx", then release, then relock with "unpinDBLock" and
     //    "unpinCollLock".  This is because agg cursors handle locking internally (hence the
     //    release), but the pin and unpin of the cursor must occur under the collection lock.
@@ -283,11 +285,13 @@ QueryResult::View getMore(OperationContext* txn,
     unique_ptr<Lock::CollectionLock> unpinCollLock;
 
     CursorManager* cursorManager;
-    CursorManager* globalCursorManager = CursorManager::getGlobalCursorManager();
-    if (globalCursorManager->ownsCursorId(cursorid)) {
-        cursorManager = globalCursorManager;
+    if (nss.isListIndexesCursorNS() || nss.isListCollectionsCursorNS()) {
+        // List collections and list indexes are special cursor-generating commands whose
+        // cursors are managed globally, as they operate over catalog data rather than targeting
+        // the data within a collection.
+        cursorManager = CursorManager::getGlobalCursorManager();
     } else {
-        ctx.reset(new AutoGetCollectionForRead(txn, nss));
+        ctx = stdx::make_unique<AutoGetCollectionForRead>(txn, nss);
         Collection* collection = ctx->getCollection();
         uassert(17356, "collection dropped between getMore calls", collection);
         cursorManager = collection->getCursorManager();

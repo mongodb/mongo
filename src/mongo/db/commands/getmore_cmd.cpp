@@ -52,6 +52,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -144,7 +145,9 @@ public:
         //
         // 1) Normal cursor: we lock with "ctx" and hold it for the whole getMore.
         // 2) Cursor owned by global cursor manager: we don't lock anything.  These cursors
-        //    don't own any collection state.
+        //    don't own any collection state. These cursors are generated either by the
+        //    listCollections or listIndexes commands, as these special cursor-generating commands
+        //    operate over catalog data rather than targeting the data within a collection.
         // 3) Agg cursor: we lock with "ctx", then release, then relock with "unpinDBLock" and
         //    "unpinCollLock".  This is because agg cursors handle locking internally (hence the
         //    release), but the pin and unpin of the cursor must occur under the collection
@@ -160,11 +163,10 @@ public:
         std::unique_ptr<Lock::CollectionLock> unpinCollLock;
 
         CursorManager* cursorManager;
-        CursorManager* globalCursorManager = CursorManager::getGlobalCursorManager();
-        if (globalCursorManager->ownsCursorId(request.cursorid)) {
-            cursorManager = globalCursorManager;
+        if (request.nss.isListIndexesCursorNS() || request.nss.isListCollectionsCursorNS()) {
+            cursorManager = CursorManager::getGlobalCursorManager();
         } else {
-            ctx.reset(new AutoGetCollectionForRead(txn, request.nss));
+            ctx = stdx::make_unique<AutoGetCollectionForRead>(txn, request.nss);
             Collection* collection = ctx->getCollection();
             if (!collection) {
                 return appendCommandStatus(result,
