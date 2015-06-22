@@ -1164,15 +1164,19 @@ Status CatalogManagerLegacy::getDatabasesForShard(const string& shardName, vecto
     return Status::OK();
 }
 
-Status CatalogManagerLegacy::getChunks(const Query& query,
-                                       int nToReturn,
+Status CatalogManagerLegacy::getChunks(const BSONObj& query,
+                                       const BSONObj& sort,
+                                       boost::optional<int> limit,
                                        vector<ChunkType>* chunks) {
     chunks->clear();
 
     try {
         ScopedDbConnection conn(_configServerConnectionString, 30.0);
+
+        const Query queryWithSort(Query(query).sort(sort));
+
         std::unique_ptr<DBClientCursor> cursor(
-            _safeCursor(conn->query(ChunkType::ConfigNS, query, nToReturn)));
+            _safeCursor(conn->query(ChunkType::ConfigNS, queryWithSort, limit.get_value_or(0))));
         if (!cursor.get()) {
             conn.done();
             return Status(ErrorCodes::HostUnreachable, "unable to open chunk cursor");

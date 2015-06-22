@@ -32,7 +32,6 @@
 
 #include "mongo/s/chunk_diff.h"
 
-
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -121,7 +120,8 @@ int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(CatalogManager* c
 
     try {
         std::vector<ChunkType> chunks;
-        uassertStatusOK(catalogManager->getChunks(diffQuery, 0, &chunks));
+        uassertStatusOK(catalogManager->getChunks(
+            diffQuery.getFilter(), diffQuery.getSort(), boost::none, &chunks));
 
         return calculateConfigDiff(chunks);
     } catch (DBException& e) {

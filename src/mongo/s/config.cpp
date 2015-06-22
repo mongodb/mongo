@@ -300,9 +300,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(const string& ns,
     vector<ChunkType> newestChunk;
     if (oldVersion.isSet() && !forceReload) {
         uassertStatusOK(grid.catalogManager()->getChunks(
-            Query(BSON(ChunkType::ns(ns))).sort(ChunkType::DEPRECATED_lastmod(), -1),
-            1,
-            &newestChunk));
+            BSON(ChunkType::ns(ns)), BSON(ChunkType::DEPRECATED_lastmod() << -1), 1, &newestChunk));
 
         if (!newestChunk.empty()) {
             invariant(newestChunk.size() == 1);

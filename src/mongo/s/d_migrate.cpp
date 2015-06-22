@@ -40,7 +40,6 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
-#include "mongo/client/dbclientcursor.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -1674,7 +1673,8 @@ public:
                 try {
                     std::vector<ChunkType> newestChunk;
                     Status status = grid.catalogManager()->getChunks(
-                        Query(BSON(ChunkType::ns(ns))).sort(ChunkType::DEPRECATED_lastmod(), -1),
+                        BSON(ChunkType::ns(ns)),
+                        BSON(ChunkType::DEPRECATED_lastmod() << -1),
                         1,
                         &newestChunk);
                     uassertStatusOK(status);

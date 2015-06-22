@@ -116,6 +116,7 @@ public:
     StatusWith<std::vector<BSONObj>> exhaustiveFind(const HostAndPort& host,
                                                     const NamespaceString& nss,
                                                     const BSONObj& query,
+                                                    const BSONObj& sort,
                                                     boost::optional<int> limit);
 
     /**

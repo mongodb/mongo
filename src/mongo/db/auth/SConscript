@@ -65,6 +65,7 @@ env.Library('authorization_manager_mock_init',
             ],
             LIBDEPS=[
                 'authcore',
+                'authmocks',
                 '$BUILD_DIR/mongo/db/service_context',
             ])
 

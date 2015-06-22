@@ -131,10 +131,10 @@ public:
                 break;
             case ShardDrainingStatus::ONGOING: {
                 vector<ChunkType> chunks;
-                Status status =
-                    grid.catalogManager()->getChunks(Query(BSON(ChunkType::shard(s->getId()))),
-                                                     0,  // return all
-                                                     &chunks);
+                Status status = grid.catalogManager()->getChunks(BSON(ChunkType::shard(s->getId())),
+                                                                 BSONObj(),
+                                                                 boost::none,  // return all
+                                                                 &chunks);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }

@@ -182,8 +182,8 @@ StatusWith<DatabaseType> CatalogManagerReplicaSet::getDatabase(const std::string
     auto findStatus = grid.shardRegistry()->exhaustiveFind(readHost.getValue(),
                                                            NamespaceString(DatabaseType::ConfigNS),
                                                            BSON(DatabaseType::name(dbName)),
+                                                           BSONObj(),
                                                            1);
-
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -230,8 +230,8 @@ StatusWith<CollectionType> CatalogManagerReplicaSet::getCollection(const std::st
         grid.shardRegistry()->exhaustiveFind(readHostStatus.getValue(),
                                              NamespaceString(CollectionType::ConfigNS),
                                              BSON(CollectionType::fullNs(collNs)),
+                                             BSONObj(),
                                              1);
-
     if (!statusFind.isOK()) {
         return statusFind.getStatus();
     }
@@ -266,8 +266,8 @@ Status CatalogManagerReplicaSet::getCollections(const std::string* dbName,
         grid.shardRegistry()->exhaustiveFind(readHost.getValue(),
                                              NamespaceString(CollectionType::ConfigNS),
                                              b.obj(),
+                                             BSONObj(),
                                              boost::none);  // no limit
-
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -332,8 +332,8 @@ StatusWith<SettingsType> CatalogManagerReplicaSet::getGlobalSettings(const strin
     auto findStatus = grid.shardRegistry()->exhaustiveFind(readHost.getValue(),
                                                            NamespaceString(SettingsType::ConfigNS),
                                                            BSON(SettingsType::key(key)),
+                                                           BSONObj(),
                                                            1);
-
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -373,6 +373,7 @@ Status CatalogManagerReplicaSet::getDatabasesForShard(const string& shardName,
     auto findStatus = grid.shardRegistry()->exhaustiveFind(readHost.getValue(),
                                                            NamespaceString(DatabaseType::ConfigNS),
                                                            BSON(DatabaseType::primary(shardName)),
+                                                           BSONObj(),
                                                            boost::none);  // no limit
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
@@ -392,8 +393,9 @@ Status CatalogManagerReplicaSet::getDatabasesForShard(const string& shardName,
     return Status::OK();
 }
 
-Status CatalogManagerReplicaSet::getChunks(const Query& query,
-                                           int nToReturn,
+Status CatalogManagerReplicaSet::getChunks(const BSONObj& query,
+                                           const BSONObj& sort,
+                                           boost::optional<int> limit,
                                            vector<ChunkType>* chunks) {
     chunks->clear();
 
@@ -403,10 +405,8 @@ Status CatalogManagerReplicaSet::getChunks(const Query& query,
         return readHostStatus.getStatus();
     }
 
-    auto findStatus = grid.shardRegistry()->exhaustiveFind(readHostStatus.getValue(),
-                                                           NamespaceString(ChunkType::ConfigNS),
-                                                           query.obj,
-                                                           boost::none);  // no limit
+    auto findStatus = grid.shardRegistry()->exhaustiveFind(
+        readHostStatus.getValue(), NamespaceString(ChunkType::ConfigNS), query, sort, limit);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -437,11 +437,10 @@ Status CatalogManagerReplicaSet::getTagsForCollection(const std::string& collect
         return readHostStatus.getStatus();
     }
 
-    const Query query = Query(BSON(TagsType::ns(collectionNs))).sort(TagsType::min());
-
     auto findStatus = grid.shardRegistry()->exhaustiveFind(readHostStatus.getValue(),
                                                            NamespaceString(TagsType::ConfigNS),
-                                                           query.obj,
+                                                           BSON(TagsType::ns(collectionNs)),
+                                                           BSON(TagsType::min() << 1),
                                                            boost::none);  // no limit
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
@@ -473,7 +472,7 @@ StatusWith<string> CatalogManagerReplicaSet::getTagForChunk(const std::string& c
         BSON(TagsType::ns(collectionNs) << TagsType::min() << BSON("$lte" << chunk.getMin())
                                         << TagsType::max() << BSON("$gte" << chunk.getMax()));
     auto findStatus = grid.shardRegistry()->exhaustiveFind(
-        readHostStatus.getValue(), NamespaceString(TagsType::ConfigNS), query, 1);
+        readHostStatus.getValue(), NamespaceString(TagsType::ConfigNS), query, BSONObj(), 1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -505,6 +504,7 @@ Status CatalogManagerReplicaSet::getAllShards(vector<ShardType>* shards) {
     auto findStatus = grid.shardRegistry()->exhaustiveFind(readHost.getValue(),
                                                            NamespaceString(ShardType::ConfigNS),
                                                            BSONObj(),     // no query filter
+                                                           BSONObj(),     // no sort
                                                            boost::none);  // no limit
     if (!findStatus.isOK()) {
         return findStatus.getStatus();

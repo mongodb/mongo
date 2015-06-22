@@ -351,8 +351,9 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
         }
 
         std::vector<ChunkType> allNsChunks;
-        grid.catalogManager()->getChunks(Query(BSON(ChunkType::ns(ns))).sort(ChunkType::min()),
-                                         0,  // all chunks
+        grid.catalogManager()->getChunks(BSON(ChunkType::ns(ns)),
+                                         BSON(ChunkType::min() << 1),
+                                         boost::none,  // all chunks
                                          &allNsChunks);
 
         set<BSONObj> allChunkMinimums;

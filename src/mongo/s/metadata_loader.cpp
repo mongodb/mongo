@@ -169,7 +169,9 @@ Status MetadataLoader::initChunks(CatalogManager* catalogManager,
 
     try {
         std::vector<ChunkType> chunks;
-        Status status = catalogManager->getChunks(differ.configDiffQuery(), 0, &chunks);
+        Query diffQuery = differ.configDiffQuery();
+        Status status = catalogManager->getChunks(
+            diffQuery.getFilter(), diffQuery.getSort(), boost::none, &chunks);
         if (!status.isOK()) {
             if (status == ErrorCodes::HostUnreachable) {
                 // Make our metadata invalid

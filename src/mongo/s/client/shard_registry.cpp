@@ -246,6 +246,7 @@ shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const ShardId& shardId) {
 StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort& host,
                                                                const NamespaceString& nss,
                                                                const BSONObj& query,
+                                                               const BSONObj& sort,
                                                                boost::optional<int> limit) {
     // If for some reason the callback never gets invoked, we will return this status
     Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
@@ -269,8 +270,8 @@ StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort
         status = Status::OK();
     };
 
-    unique_ptr<LiteParsedQuery> findCmd(fassertStatusOK(
-        28688, LiteParsedQuery::makeAsFindCmd(nss, query, BSONObj(), std::move(limit))));
+    unique_ptr<LiteParsedQuery> findCmd(
+        fassertStatusOK(28688, LiteParsedQuery::makeAsFindCmd(nss, query, sort, std::move(limit))));
 
     QueryFetcher fetcher(_executor.get(), host, nss, findCmd->asFindCommand(), fetcherCallback);
 
@@ -300,7 +301,6 @@ StatusWith<BSONObj> ShardRegistry::runCommand(const HostAndPort& host,
                                          [&responseStatus](const RemoteCommandCallbackArgs& args) {
                                              responseStatus = args.response;
                                          });
-
     if (!callStatus.isOK()) {
         return callStatus.getStatus();
     }

@@ -33,7 +33,6 @@
 #include <chrono>
 #include <future>
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/lite_parsed_query.h"
@@ -94,6 +93,8 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
         // Ensure the query is correct
         ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(CollectionType::fullNs(expectedColl.getNs())));
+        ASSERT_EQ(query->getSort(), BSONObj());
+        ASSERT_EQ(query->getLimit().get(), 1);
 
         return vector<BSONObj>{expectedColl.toBSON()};
     });
@@ -143,6 +144,8 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseExisting) {
 
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name(expectedDb.getName())));
+        ASSERT_EQ(query->getSort(), BSONObj());
+        ASSERT_EQ(query->getLimit().get(), 1);
 
         return vector<BSONObj>{expectedDb.toBSON()};
     });
@@ -372,6 +375,8 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsValid) {
 
         ASSERT_EQ(query->ns(), ShardType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSONObj());
+        ASSERT_EQ(query->getSort(), BSONObj());
+        ASSERT_FALSE(query->getLimit().is_initialized());
 
         return vector<BSONObj>{s1.toBSON(), s2.toBSON(), s3.toBSON()};
     });
@@ -394,20 +399,12 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsWithInvalidShard) {
                             vector<ShardType> shards;
                             Status status = catalogManager()->getAllShards(&shards);
 
-                            ASSERT_NOT_OK(status);
+                            ASSERT_EQ(ErrorCodes::FailedToParse, status);
                             ASSERT_EQ(0U, shards.size());
                         });
 
     onFindCommand([](const RemoteCommandRequest& request) {
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
-
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
-
-        ASSERT_EQ(query->ns(), ShardType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSONObj());
-
-        // valid ShardType
+        // Valid ShardType
         ShardType s1;
         s1.setName("shard0001");
         s1.setHost("ShardHost");
@@ -421,7 +418,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsWithInvalidShard) {
     future.get();
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNS) {
+TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSWithSortAndLimit) {
     RemoteCommandTargeterMock* targeter =
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
@@ -446,7 +443,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNS) {
 
     ChunkVersion queryChunkVersion({1, 2, oid});
 
-    const Query chunksQuery(
+    const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
              << ChunkType::DEPRECATED_lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
@@ -455,7 +452,8 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNS) {
                         [this, &chunksQuery] {
                             vector<ChunkType> chunks;
 
-                            ASSERT_OK(catalogManager()->getChunks(chunksQuery, 0, &chunks));
+                            ASSERT_OK(catalogManager()->getChunks(
+                                chunksQuery, BSON(ChunkType::version() << -1), 1, &chunks));
                             ASSERT_EQ(2U, chunks.size());
 
                             return chunks;
@@ -468,7 +466,9 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNS) {
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), chunksQuery.getFilter());
+        ASSERT_EQ(query->getFilter(), chunksQuery);
+        ASSERT_EQ(query->getSort(), BSON(ChunkType::version() << -1));
+        ASSERT_EQ(query->getLimit().get(), 1);
 
         return vector<BSONObj>{chunkA.toBSON(), chunkB.toBSON()};
     });
@@ -478,28 +478,42 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNS) {
     ASSERT_EQ(chunkB.toBSON(), chunks[1].toBSON());
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSNoChunks) {
+TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSNoSortNoLimit) {
     RemoteCommandTargeterMock* targeter =
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkVersion queryChunkVersion({1, 2, OID::gen()});
 
-    const Query chunksQuery(
+    const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
              << ChunkType::DEPRECATED_lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
-    auto future = async(std::launch::async,
-                        [this, &chunksQuery] {
-                            vector<ChunkType> chunks;
+    auto future = async(
+        std::launch::async,
+        [this, &chunksQuery] {
+            vector<ChunkType> chunks;
 
-                            ASSERT_OK(catalogManager()->getChunks(chunksQuery, 0, &chunks));
-                            ASSERT_EQ(0U, chunks.size());
-                        });
+            ASSERT_OK(catalogManager()->getChunks(chunksQuery, BSONObj(), boost::none, &chunks));
+            ASSERT_EQ(0U, chunks.size());
 
-    onFindCommand(
-        [&chunksQuery](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+            return chunks;
+        });
+
+    onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
+
+        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
+        ASSERT_EQ(query->getFilter(), chunksQuery);
+        ASSERT_EQ(query->getSort(), BSONObj());
+        ASSERT_FALSE(query->getLimit().is_initialized());
+
+        return vector<BSONObj>{};
+    });
 
     future.get();
 }
@@ -511,7 +525,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
 
     ChunkVersion queryChunkVersion({1, 2, OID::gen()});
 
-    const Query chunksQuery(
+    const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
              << ChunkType::DEPRECATED_lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
@@ -519,7 +533,8 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
     auto future = async(std::launch::async,
                         [this, &chunksQuery] {
                             vector<ChunkType> chunks;
-                            Status status = catalogManager()->getChunks(chunksQuery, 0, &chunks);
+                            Status status = catalogManager()->getChunks(
+                                chunksQuery, BSONObj(), boost::none, &chunks);
 
                             ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
                             ASSERT_EQ(0U, chunks.size());
@@ -937,6 +952,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsNoDb) {
 
         ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSONObj());
+        ASSERT_EQ(query->getSort(), BSONObj());
 
         return vector<BSONObj>{coll1.toBSON(), coll2.toBSON(), coll3.toBSON()};
     });
@@ -1079,6 +1095,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardValid) {
 
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::primary(dbt1.getPrimary())));
+        ASSERT_EQ(query->getSort(), BSONObj());
 
         return vector<BSONObj>{dbt1.toBSON(), dbt2.toBSON()};
     });
@@ -1105,17 +1122,9 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardInvalidDoc) {
                         });
 
     onFindCommand([](const RemoteCommandRequest& request) {
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
-
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
-
-        ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
-
         DatabaseType dbt1;
         dbt1.setName("db1");
         dbt1.setPrimary("shard0000");
-        ASSERT_EQ(query->getFilter(), BSON(DatabaseType::primary(dbt1.getPrimary())));
 
         return vector<BSONObj>{
             dbt1.toBSON(),
@@ -1161,6 +1170,8 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollection) {
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), TagsType::ConfigNS);
+        ASSERT_EQ(query->getFilter(), BSON(TagsType::ns("TestDB.TestColl")));
+        ASSERT_EQ(query->getSort(), BSON(TagsType::min() << 1));
 
         return vector<BSONObj>{tagA.toBSON(), tagB.toBSON()};
     });
