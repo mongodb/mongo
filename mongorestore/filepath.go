@@ -105,13 +105,12 @@ func (f *realMetadataFile) Open() (err error) {
 // from standard input
 type stdinFile struct {
 	io.Reader
-	intent *intents.Intent
+	errorWriter
 }
 
 // Open is part of the intents.file interface. stdinFile needs to have Open called on it before
 // Read can be called on it.
 func (f *stdinFile) Open() error {
-	f.Reader = os.Stdin
 	return nil
 }
 
@@ -119,12 +118,6 @@ func (f *stdinFile) Open() error {
 func (f *stdinFile) Close() error {
 	f.Reader = nil
 	return nil
-}
-
-// Write is part of the intents.file interface. Nobody should be writing to stdinFiles,
-// could probably justifiably panic here.
-func (f *stdinFile) Write(p []byte) (n int, err error) {
-	return 0, fmt.Errorf("can't write to standard output")
 }
 
 // getInfoFromFilename pulls the base collection name and FileType from a given file.
@@ -311,16 +304,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 					if skip {
 						continue
 					}
-					if restore.useStdin {
-						intent = &intents.Intent{
-							DB:       db,
-							C:        collection,
-							BSONPath: "-",
-						}
-						intent.BSONFile = &stdinFile{intent: intent}
-					} else {
-						intent.BSONFile = &realBSONFile{intent: intent, gzip: restore.InputOptions.Gzip}
-					}
+					intent.BSONFile = &realBSONFile{intent: intent, gzip: restore.InputOptions.Gzip}
 				}
 				log.Logf(log.Info, "found collection %v bson to restore", intent.Namespace())
 				restore.manager.Put(intent)
@@ -352,6 +336,21 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 	return nil
 }
 
+// CreateStdinIntentForCollection builds an intent for the given database and collection name
+// that is to be read from standard input
+func (restore *MongoRestore) CreateStdinIntentForCollection(db string, collection string) error {
+	log.Logf(log.DebugLow, "reading collection %v for database %v from standard input",
+		collection, db)
+	intent := &intents.Intent{
+		DB:       db,
+		C:        collection,
+		BSONPath: "-",
+	}
+	intent.BSONFile = &stdinFile{Reader: restore.stdin}
+	restore.manager.Put(intent)
+	return nil
+}
+
 // CreateIntentForCollection builds an intent for the given database and collection name
 // along with a path to a .bson collection file. It searches the file's parent directory
 // for a matching metadata file.
@@ -359,22 +358,8 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 // This method is not called by CreateIntentsForDB,
 // it is only used in the case where --db and --collection flags are set.
 func (restore *MongoRestore) CreateIntentForCollection(db string, collection string, dir archive.DirLike) error {
-
 	log.Logf(log.DebugLow, "reading collection %v for database %v from %v",
 		collection, db, dir.Path())
-
-	// avoid actual file handling if we are using stdin
-	if restore.useStdin {
-		intent := &intents.Intent{
-			DB:       db,
-			C:        collection,
-			BSONPath: "-",
-		}
-		intent.BSONFile = &stdinFile{intent: intent}
-		restore.manager.Put(intent)
-		return nil
-	}
-
 	// first make sure the bson file exists and is valid
 	_, err := dir.Stat()
 	if err != nil {

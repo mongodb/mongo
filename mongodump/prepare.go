@@ -168,28 +168,21 @@ func (f *realMetadataFile) Open() (err error) {
 // stdoutFile implements the intents.file interface. stdoutFiles are used when single collections
 // are written directly (non-archive-mode) to standard out, via "--dir -"
 type stdoutFile struct {
-	*os.File
-	intent *intents.Intent
+	io.Writer
+	errorReader
 }
 
 // Open is part of the intents.file interface.
 func (f *stdoutFile) Open() error {
-	f.File = os.Stdout
 	return nil
 }
 
 // Close is part of the intents.file interface. While we could actually close os.Stdout here,
-// that's actually a bad idea. Unsetting f.File here will cause future writes to fail, but that
-// shouldn't happen anyway.
+// that's actually a bad idea. Unsetting f.File here will cause future Writes to fail, which
+// is all we want.
 func (f *stdoutFile) Close() error {
-	f.File = nil
+	f.Writer = nil
 	return nil
-}
-
-// Read is part of the intents.file interface. Nobody should be reading from stdoutFiles,
-// could probably justifiably panic here.
-func (f *stdoutFile) Read(p []byte) (n int, err error) {
-	return 0, fmt.Errorf("can't read from standard output")
 }
 
 // shouldSkipCollection returns true when a collection name is excluded
@@ -232,39 +225,36 @@ func checkStringForPathSeparator(s string, c *rune) bool {
 }
 
 // NewIntent creates a bare intent without populating the options.
-func (dump *MongoDump) NewIntent(dbName, colName string, stdout bool) (*intents.Intent, error) {
+func (dump *MongoDump) NewIntent(dbName, colName string) (*intents.Intent, error) {
 	intent := &intents.Intent{
 		DB:       dbName,
 		C:        colName,
 		BSONPath: dump.outputPath(dbName, colName) + ".bson",
 	}
 
-	// add stdout flags if we're using stdout
-	if dump.useStdout {
-		intent.BSONFile = &stdoutFile{intent: intent}
-		intent.MetadataFile = &stdoutFile{intent: intent}
-	}
-
-	if dump.OutputOptions.Archive != "" {
-		intent.BSONFile = &archive.MuxIn{Intent: intent, Mux: dump.archive.Mux}
+	if dump.OutputOptions.Out == "-" {
+		intent.BSONFile = &stdoutFile{Writer: dump.stdout}
 	} else {
-		var c rune
-		if checkStringForPathSeparator(colName, &c) || checkStringForPathSeparator(dbName, &c) {
-			return nil, fmt.Errorf(`"%v.%v" contains a path separator '%c' `+
-				`and can't be dumped to the filesystem`, dbName, colName, c)
-		}
-		intent.BSONFile = &realBSONFile{intent: intent, gzip: dump.OutputOptions.Gzip}
-	}
-
-	if !intent.IsSystemIndexes() {
-		intent.MetadataPath = dump.outputPath(dbName, colName+".metadata.json")
 		if dump.OutputOptions.Archive != "" {
-			intent.MetadataFile = &archive.MetadataFile{
-				Intent: intent,
-				Buffer: &bytes.Buffer{},
-			}
+			intent.BSONFile = &archive.MuxIn{Intent: intent, Mux: dump.archive.Mux}
 		} else {
-			intent.MetadataFile = &realMetadataFile{intent: intent, gzip: dump.OutputOptions.Gzip}
+			var c rune
+			if checkStringForPathSeparator(colName, &c) || checkStringForPathSeparator(dbName, &c) {
+				return nil, fmt.Errorf(`"%v.%v" contains a path separator '%c' `+
+					`and can't be dumped to the filesystem`, dbName, colName, c)
+			}
+			intent.BSONFile = &realBSONFile{intent: intent, gzip: dump.OutputOptions.Gzip}
+		}
+		if !intent.IsSystemIndexes() {
+			intent.MetadataPath = dump.outputPath(dbName, colName+".metadata.json")
+			if dump.OutputOptions.Archive != "" {
+				intent.MetadataFile = &archive.MetadataFile{
+					Intent: intent,
+					Buffer: &bytes.Buffer{},
+				}
+			} else {
+				intent.MetadataFile = &realMetadataFile{intent: intent, gzip: dump.OutputOptions.Gzip}
+			}
 		}
 	}
 
@@ -351,7 +341,7 @@ func (dump *MongoDump) CreateCollectionIntent(dbName, colName string) error {
 		return nil
 	}
 
-	intent, err := dump.NewIntent(dbName, colName, dump.useStdout)
+	intent, err := dump.NewIntent(dbName, colName)
 	if err != nil {
 		return err
 	}
@@ -390,7 +380,7 @@ func (dump *MongoDump) createIntentFromOptions(dbName string, ci *collectionInfo
 		log.Logf(log.DebugLow, "skipping dump of %v.%v, it is excluded", dbName, ci.Name)
 		return nil
 	}
-	intent, err := dump.NewIntent(dbName, ci.Name, dump.useStdout)
+	intent, err := dump.NewIntent(dbName, ci.Name)
 	if err != nil {
 		return err
 	}

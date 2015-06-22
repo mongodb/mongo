@@ -41,7 +41,6 @@ type MongoDump struct {
 	// useful internals that we don't directly expose as options
 	sessionProvider *db.SessionProvider
 	manager         *intents.Manager
-	useStdout       bool
 	query           bson.M
 	oplogCollection string
 	oplogStart      bson.MongoTimestamp
@@ -51,6 +50,8 @@ type MongoDump struct {
 	progressManager *progress.Manager
 	// channel on which to notify if/when a termination signal is received
 	termChan chan struct{}
+	// the value of stdout gets initizlied to os.Stdout if it's unset
+	stdout io.Writer
 }
 
 // ValidateOptions checks for any incompatible sets of options.
@@ -80,6 +81,8 @@ func (dump *MongoDump) ValidateOptions() error {
 		return fmt.Errorf("cannot run a query with --repair enabled")
 	case dump.OutputOptions.Out != "" && dump.OutputOptions.Archive != "":
 		return fmt.Errorf("--out not allowed when --archive is specified")
+	case dump.OutputOptions.Out == "-" && dump.OutputOptions.Gzip:
+		return fmt.Errorf("compression can't be used when dumping a single collection to standard output")
 	}
 	return nil
 }
@@ -89,6 +92,9 @@ func (dump *MongoDump) Init() error {
 	err := dump.ValidateOptions()
 	if err != nil {
 		return fmt.Errorf("bad option: %v", err)
+	}
+	if dump.stdout == nil {
+		dump.stdout = os.Stdout
 	}
 	dump.sessionProvider, err = db.NewSessionProvider(*dump.ToolOptions)
 	if err != nil {
@@ -435,7 +441,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 
 	}
 
-	if dump.useStdout {
+	if dump.OutputOptions.Out == "-" {
 		log.Logf(log.Always, "writing %v to stdout", intent.Namespace())
 		return dump.dumpQueryToWriter(findQuery, intent)
 	}
@@ -681,7 +687,7 @@ func (wwc *wrappedWriteCloser) Close() error {
 
 func (dump *MongoDump) getArchiveOut() (out io.WriteCloser, err error) {
 	if dump.OutputOptions.Archive == "-" {
-		out = &nopCloseWriter{os.Stdout}
+		out = &nopCloseWriter{dump.stdout}
 	} else {
 		targetStat, err := os.Stat(dump.OutputOptions.Archive)
 		if err == nil && targetStat.IsDir() {

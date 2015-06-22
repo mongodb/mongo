@@ -44,7 +44,6 @@ type MongoRestore struct {
 
 	objCheck         bool
 	oplogLimit       bson.MongoTimestamp
-	useStdin         bool
 	isMongos         bool
 	useWriteCommands bool
 	authVersions     authVersionPair
@@ -60,6 +59,9 @@ type MongoRestore struct {
 
 	// channel on which to notify if/when a termination signal is received
 	termChan chan struct{}
+
+	// for testing. If set, this value will be used instead of os.Stdin
+	stdin io.Reader
 }
 
 type collectionIndexes map[string][]IndexDocument
@@ -148,7 +150,6 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 
 	// a single dash signals reading from stdin
 	if restore.TargetDirectory == "-" {
-		restore.useStdin = true
 		if restore.InputOptions.Archive != "" {
 			return fmt.Errorf(
 				"cannot restore from \"-\" when --archive is specified")
@@ -156,6 +157,9 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		if restore.ToolOptions.Collection == "" {
 			return fmt.Errorf("cannot restore from stdin without a specified collection")
 		}
+	}
+	if restore.stdin == nil {
+		restore.stdin = os.Stdin
 	}
 
 	return nil
@@ -190,14 +194,14 @@ func (restore *MongoRestore) Restore() error {
 		if err != nil {
 			return err
 		}
-	} else {
+	} else if restore.TargetDirectory != "-" {
 		if restore.TargetDirectory == "" {
 			restore.TargetDirectory = "dump"
 			log.Log(log.Always, "using default 'dump' directory")
 		}
 		target, err = newActualPath(restore.TargetDirectory)
 		if err != nil {
-			return err
+			return fmt.Errorf("can't create ActualPath object from path %v: %v", restore.TargetDirectory, err)
 		}
 		// handle cases where the user passes in a file instead of a directory
 		if !target.IsDir() {
@@ -258,6 +262,12 @@ func (restore *MongoRestore) Restore() error {
 			"",
 			target,
 			false,
+		)
+	case restore.ToolOptions.DB != "" && restore.ToolOptions.Collection != "" && restore.TargetDirectory == "-":
+		log.Logf(log.Always, "setting up a collection to be read from standard input")
+		err = restore.CreateStdinIntentForCollection(
+			restore.ToolOptions.DB,
+			restore.ToolOptions.Collection,
 		)
 	case restore.ToolOptions.DB != "" && restore.ToolOptions.Collection != "":
 		log.Logf(log.Always, "checking for collection data in %v", target.Path())
@@ -399,7 +409,7 @@ func (wrc *wrappedReadCloser) Close() error {
 
 func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
 	if restore.InputOptions.Archive == "-" {
-		rc = ioutil.NopCloser(os.Stdin)
+		rc = ioutil.NopCloser(restore.stdin)
 	} else {
 		targetStat, err := os.Stat(restore.InputOptions.Archive)
 		if err != nil {

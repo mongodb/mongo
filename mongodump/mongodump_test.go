@@ -1,6 +1,7 @@
 package mongodump
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
@@ -380,6 +381,28 @@ func TestMongoDumpBSON(t *testing.T) {
 
 					Reset(func() {
 						So(os.RemoveAll(dumpDir), ShouldBeNil)
+					})
+
+				})
+
+				Convey("it dumps to standard output", func() {
+					md.OutputOptions.Out = "-"
+					stdoutBuf := &bytes.Buffer{}
+					md.stdout = stdoutBuf
+					err = md.Dump()
+					So(err, ShouldBeNil)
+					var count int
+					bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(ioutil.NopCloser(stdoutBuf)))
+					defer bsonSource.Close()
+
+					var result bson.Raw
+					for bsonSource.Next(&result) {
+						count++
+					}
+					So(bsonSource.Err(), ShouldBeNil)
+					So(count, ShouldEqual, 10) //The 0th collection has 10 documents
+
+					Reset(func() {
 					})
 
 				})
