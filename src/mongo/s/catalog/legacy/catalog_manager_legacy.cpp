@@ -1522,7 +1522,7 @@ size_t CatalogManagerLegacy::_getShardCount(const BSONObj& query) const {
     return shardCount;
 }
 
-DistLockManager* CatalogManagerLegacy::getDistLockManager() {
+DistLockManager* CatalogManagerLegacy::getDistLockManager() const {
     invariant(_distLockManager);
     return _distLockManager.get();
 }

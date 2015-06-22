@@ -345,7 +345,14 @@ public:
     virtual void writeConfigServerDirect(const BatchedCommandRequest& request,
                                          BatchedCommandResponse* response) = 0;
 
-    virtual DistLockManager* getDistLockManager() = 0;
+    /**
+     * Obtains a reference to the distributed lock manager instance to use for synchronizing
+     * system-wide changes.
+     *
+     * The returned reference is valid only as long as the catalog manager is valid and should not
+     * be cached.
+     */
+    virtual DistLockManager* getDistLockManager() const = 0;
 
     /**
      * Directly inserts a document in the specified namespace on the config server (only the

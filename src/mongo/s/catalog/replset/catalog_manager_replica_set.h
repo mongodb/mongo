@@ -131,7 +131,7 @@ public:
     void writeConfigServerDirect(const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
 
-    DistLockManager* getDistLockManager() override;
+    DistLockManager* getDistLockManager() const override;
 
 private:
     /**

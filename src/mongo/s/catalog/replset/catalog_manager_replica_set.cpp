@@ -510,7 +510,7 @@ Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(const BSONArray& update
     return notYetImplemented;
 }
 
-DistLockManager* CatalogManagerReplicaSet::getDistLockManager() {
+DistLockManager* CatalogManagerReplicaSet::getDistLockManager() const {
     invariant(_distLockManager);
     return _distLockManager.get();
 }
