@@ -330,9 +330,8 @@ TEST(LiteParsedQueryTest, MakeFindCmdNoLimit) {
 }
 
 TEST(LiteParsedQueryTest, MakeFindCmdBadLimit) {
-    auto status =
-        LiteParsedQuery::makeAsFindCmd(NamespaceString("test.ns"), BSON("x" << 1), BSONObj(), 0)
-            .getStatus();
+    auto status = LiteParsedQuery::makeAsFindCmd(
+                      NamespaceString("test.ns"), BSON("x" << 1), BSONObj(), 0).getStatus();
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
 }
