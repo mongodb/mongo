@@ -6,7 +6,7 @@ soonCount = function( count ) {
     assert.soon( function() { 
 //                print( "check count" );
 //                print( "count: " + s.getDB( baseName ).z.find().count() + ", expected: " + count );
-                return s.getDB( baseName ).a.find().count() == count; 
+                return s.getDB( baseName ).a.find().itcount() == count;
                 } );
 }
 

@@ -3,7 +3,7 @@
 soonCountAtLeast = function( db, coll, count ) {
     assert.soon( function() { 
 //                print( "count: " + s.getDB( db )[ coll ].find().count() );
-                return s.getDB( db )[ coll ].find().count() >= count; 
+                return s.getDB( db )[ coll ].find().itcount() >= count;
                 } );    
 }
 
