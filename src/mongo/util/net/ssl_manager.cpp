@@ -146,6 +146,14 @@ void _ssl_locking_callback(int mode, int type, const char* file, int line) {
     SSLThreadInfo::get()->lock_callback(mode, type, file, line);
 }
 
+// We only want to free SSL_CTX objects if they have been populated. OpenSSL seems to perform this
+// check before freeing them, but because it does not document this, we should protect ourselves.
+void _free_ssl_context(SSL_CTX* ctx) {
+    if (ctx != nullptr) {
+        SSL_CTX_free(ctx);
+    }
+}
+
 AtomicUInt32 SSLThreadInfo::_next;
 std::vector<std::unique_ptr<stdx::recursive_mutex>> SSLThreadInfo::_mutex;
 boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
@@ -154,14 +162,13 @@ boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
 
 SimpleMutex sslManagerMtx;
 SSLManagerInterface* theSSLManager = NULL;
+using UniqueSSLContext = std::unique_ptr<SSL_CTX, decltype(&_free_ssl_context)>;
 static const int BUFFER_SIZE = 8 * 1024;
 static const int DATE_LEN = 128;
 
 class SSLManager : public SSLManagerInterface {
 public:
     explicit SSLManager(const SSLParams& params, bool isServer);
-
-    virtual ~SSLManager();
 
     virtual SSLConnection* connect(Socket* socket);
 
@@ -191,8 +198,8 @@ public:
     virtual void SSL_free(SSLConnection* conn);
 
 private:
-    SSL_CTX* _serverContext;  // SSL context for incoming connections
-    SSL_CTX* _clientContext;  // SSL context for outgoing connections
+    UniqueSSLContext _serverContext;  // SSL context for incoming connections
+    UniqueSSLContext _clientContext;  // SSL context for outgoing connections
     std::string _password;
     bool _weakValidation;
     bool _allowInvalidCertificates;
@@ -214,7 +221,7 @@ private:
     /*
      * Init the SSL context using parameters provided in params.
      */
-    bool _initSSLContext(SSL_CTX** context, const SSLParams& params);
+    bool _initSSLContext(UniqueSSLContext* context, const SSLParams& params);
 
     /*
      * Converts time from OpenSSL return value to unsigned long long
@@ -400,8 +407,8 @@ BSONObj SSLConfiguration::getServerStatusBSON() const {
 SSLManagerInterface::~SSLManagerInterface() {}
 
 SSLManager::SSLManager(const SSLParams& params, bool isServer)
-    : _serverContext(NULL),
-      _clientContext(NULL),
+    : _serverContext(nullptr, _free_ssl_context),
+      _clientContext(nullptr, _free_ssl_context),
       _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
@@ -439,15 +446,6 @@ SSLManager::SSLManager(const SSLParams& params, bool isServer)
 
         static CertificateExpirationMonitor task =
             CertificateExpirationMonitor(_sslConfiguration.serverCertificateExpirationDate);
-    }
-}
-
-SSLManager::~SSLManager() {
-    if (NULL != _serverContext) {
-        SSL_CTX_free(_serverContext);
-    }
-    if (NULL != _clientContext) {
-        SSL_CTX_free(_clientContext);
     }
 }
 
@@ -513,8 +511,8 @@ void SSLManager::SSL_free(SSLConnection* conn) {
     return ::SSL_free(conn->ssl);
 }
 
-bool SSLManager::_initSSLContext(SSL_CTX** context, const SSLParams& params) {
-    *context = SSL_CTX_new(SSLv23_method());
+bool SSLManager::_initSSLContext(UniqueSSLContext* contextPtr, const SSLParams& params) {
+    UniqueSSLContext context(SSL_CTX_new(SSLv23_method()), _free_ssl_context);
     massert(15864,
             mongoutils::str::stream()
                 << "can't create SSL Context: " << getSSLErrorMessage(ERR_get_error()),
@@ -537,7 +535,7 @@ bool SSLManager::_initSSLContext(SSL_CTX** context, const SSLParams& params) {
             }
         }
     }
-    SSL_CTX_set_options(*context, supportedProtocols);
+    SSL_CTX_set_options(context.get(), supportedProtocols);
 
     // HIGH - Enable strong ciphers
     // !EXPORT - Disable export ciphers (40/56 bit)
@@ -553,47 +551,49 @@ bool SSLManager::_initSSLContext(SSL_CTX** context, const SSLParams& params) {
     massert(28615,
             mongoutils::str::stream()
                 << "can't set supported cipher suites: " << getSSLErrorMessage(ERR_get_error()),
-            SSL_CTX_set_cipher_list(*context, cipherConfig.c_str()));
+            SSL_CTX_set_cipher_list(context.get(), cipherConfig.c_str()));
 
     // If renegotiation is needed, don't return from recv() or send() until it's successful.
     // Note: this is for blocking sockets only.
-    SSL_CTX_set_mode(*context, SSL_MODE_AUTO_RETRY);
+    SSL_CTX_set_mode(context.get(), SSL_MODE_AUTO_RETRY);
 
     massert(28607,
             mongoutils::str::stream()
                 << "can't store ssl session id context: " << getSSLErrorMessage(ERR_get_error()),
-            SSL_CTX_set_session_id_context(*context,
-                                           static_cast<unsigned char*>(static_cast<void*>(context)),
-                                           sizeof(*context)));
+            SSL_CTX_set_session_id_context(
+                context.get(),
+                static_cast<unsigned char*>(static_cast<void*>(contextPtr)),
+                sizeof(*contextPtr)));
 
     // Use the clusterfile for internal outgoing SSL connections if specified
-    if (context == &_clientContext && !params.sslClusterFile.empty()) {
+    if (contextPtr == &_clientContext && !params.sslClusterFile.empty()) {
         EVP_set_pw_prompt("Enter cluster certificate passphrase");
-        if (!_setupPEM(*context, params.sslClusterFile, params.sslClusterPassword)) {
+        if (!_setupPEM(context.get(), params.sslClusterFile, params.sslClusterPassword)) {
             return false;
         }
     }
     // Use the pemfile for everything else
     else if (!params.sslPEMKeyFile.empty()) {
         EVP_set_pw_prompt("Enter PEM passphrase");
-        if (!_setupPEM(*context, params.sslPEMKeyFile, params.sslPEMKeyPassword)) {
+        if (!_setupPEM(context.get(), params.sslPEMKeyFile, params.sslPEMKeyPassword)) {
             return false;
         }
     }
 
     if (!params.sslCAFile.empty()) {
         // Set up certificate validation with a certificate authority
-        if (!_setupCA(*context, params.sslCAFile)) {
+        if (!_setupCA(context.get(), params.sslCAFile)) {
             return false;
         }
     }
 
     if (!params.sslCRLFile.empty()) {
-        if (!_setupCRL(*context, params.sslCRLFile)) {
+        if (!_setupCRL(context.get(), params.sslCRLFile)) {
             return false;
         }
     }
 
+    *contextPtr = std::move(context);
     return true;
 }
 
@@ -823,7 +823,7 @@ bool SSLManager::_doneWithSSLOp(SSLConnection* conn, int status) {
 
 SSLConnection* SSLManager::connect(Socket* socket) {
     std::unique_ptr<SSLConnection> sslConn =
-        stdx::make_unique<SSLConnection>(_clientContext, socket, (const char*)NULL, 0);
+        stdx::make_unique<SSLConnection>(_clientContext.get(), socket, (const char*)NULL, 0);
 
     int ret;
     do {
@@ -838,7 +838,7 @@ SSLConnection* SSLManager::connect(Socket* socket) {
 
 SSLConnection* SSLManager::accept(Socket* socket, const char* initialBytes, int len) {
     std::unique_ptr<SSLConnection> sslConn =
-        stdx::make_unique<SSLConnection>(_serverContext, socket, initialBytes, len);
+        stdx::make_unique<SSLConnection>(_serverContext.get(), socket, initialBytes, len);
 
     int ret;
     do {
