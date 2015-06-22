@@ -180,7 +180,7 @@ void goingAwaySoon() {
 
 void ProgramOutputMultiplexer::appendLine(int port, ProcessId pid, const char* line) {
     stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
-    uassert(28689, "program is terminating", !mongo::dbexitCalled);
+    uassert(28695, "program is terminating", !mongo::dbexitCalled);
     stringstream buf;
     if (port > 0)
         buf << " m" << port << "| " << line;
