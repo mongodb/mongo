@@ -36,12 +36,12 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_runner.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_locks.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
@@ -139,9 +139,9 @@ StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
 }  // unnamed namespace
 
 DistLockCatalogImpl::DistLockCatalogImpl(RemoteCommandTargeter* targeter,
-                                         RemoteCommandRunner* executor,
+                                         ShardRegistry* shardRegistry,
                                          Milliseconds writeConcernTimeout)
-    : _cmdRunner(executor),
+    : _client(shardRegistry),
       _targeter(targeter),
       _writeConcern(WriteConcernOptions(WriteConcernOptions::kMajority,
                                         WriteConcernOptions::JOURNAL,
@@ -169,15 +169,14 @@ Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
     request.setUpsert(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON()));
+    auto resultStatus =
+        _client->runCommand(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
 
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
+    BSONObj responseObj(resultStatus.getValue());
 
     auto cmdStatus = getStatusFromCommandResult(responseObj);
 
@@ -214,15 +213,14 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
     request.setShouldReturnNew(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON()));
+    auto resultStatus =
+        _client->runCommand(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
 
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
+    BSONObj responseObj(resultStatus.getValue());
 
     auto cmdStatus = getStatusFromCommandResult(responseObj);
 
@@ -278,15 +276,14 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
     request.setShouldReturnNew(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON()));
+    auto resultStatus =
+        _client->runCommand(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
 
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
+    BSONObj responseObj(resultStatus.getValue());
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj);
     if (!findAndModifyStatus.isOK()) {
@@ -321,15 +318,14 @@ Status DistLockCatalogImpl::unlock(const OID& lockSessionID) {
         BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON()));
+    auto resultStatus =
+        _client->runCommand(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
 
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
+    BSONObj responseObj(resultStatus.getValue());
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj).getStatus();
 
@@ -350,15 +346,14 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
         return targetStatus.getStatus();
     }
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), "admin", BSON("serverStatus" << 1)));
+    auto resultStatus =
+        _client->runCommand(targetStatus.getValue(), "admin", BSON("serverStatus" << 1));
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
 
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
+    BSONObj responseObj(resultStatus.getValue());
 
     auto cmdStatus = getStatusFromCommandResult(responseObj);
 
@@ -402,15 +397,14 @@ Status DistLockCatalogImpl::stopPing(StringData processId) {
         FindAndModifyRequest::makeRemove(_lockPingNS, BSON(LockpingsType::process() << processId));
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON()));
+    auto resultStatus =
+        _client->runCommand(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
 
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
+    BSONObj responseObj(resultStatus.getValue());
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj);
     return findAndModifyStatus.getStatus();

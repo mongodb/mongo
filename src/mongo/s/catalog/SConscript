@@ -44,6 +44,17 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='catalog_manager_mock',
+    source=[
+        'catalog_manager_mock.cpp',
+    ],
+    LIBDEPS=[
+        'catalog_manager',
+        'dist_lock_manager_mock',
+    ]
+)
+
 env.CppUnitTest(
     target='catalog_types_test',
     source=[
@@ -82,22 +93,30 @@ env.Library(
 )
 
 env.Library(
-    target='dist_lock_catalog',
+    target='dist_lock_catalog_interface',
+    source=[
+        'dist_lock_catalog.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='dist_lock_catalog_impl',
     source=[
         'dist_lock_catalog_impl.cpp',
-        'dist_lock_catalog.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/client/remote_command_runner',
         '$BUILD_DIR/mongo/client/remote_command_targeter',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/s/base',
-        '$BUILD_DIR/mongo/s/batch_write_types',
+        '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/util/net/hostandport',
+        'dist_lock_catalog_interface',
     ],
 )
 
@@ -107,9 +126,14 @@ env.CppUnitTest(
         'dist_lock_catalog_impl_test.cpp',
     ],
     LIBDEPS=[
-        'dist_lock_catalog',
+        'catalog_manager_mock',
+        'dist_lock_catalog_impl',
         '$BUILD_DIR/mongo/client/remote_command_runner_mock',
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/executor/network_test_env',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/mongoscore',
     ]
 )
 
@@ -119,7 +143,9 @@ env.Library(
         'dist_lock_catalog_mock.cpp',
     ],
     LIBDEPS=[
-        'dist_lock_catalog',
+        'catalog_types',
+        'dist_lock_catalog_interface',
+        '$BUILD_DIR/mongo/s/base',
     ]
 )
 

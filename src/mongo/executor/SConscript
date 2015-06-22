@@ -27,3 +27,12 @@ env.Library('network_interface_mock',
             LIBDEPS=[
                 'network_interface',
             ])
+
+env.Library(target='network_test_env',
+            source=['network_test_env.cpp',],
+            LIBDEPS=[
+                'network_interface_mock',
+                '$BUILD_DIR/mongo/db/coredb',
+                '$BUILD_DIR/mongo/db/repl/replication_executor',
+            ])
+

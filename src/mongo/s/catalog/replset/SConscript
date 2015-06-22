@@ -8,7 +8,7 @@ env.Library(
         'replset_dist_lock_manager.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_interface',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager'
     ],
 )
@@ -51,10 +51,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/client/remote_command_runner_mock',
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/coredb',
-        '$BUILD_DIR/mongo/db/repl/replication_executor',
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/executor/network_interface_mock',
+        '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',

@@ -32,7 +32,6 @@
 #include <thread>
 #include <vector>
 
-#include "mongo/executor/network_test_env.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,45 +46,55 @@ class ShardRegistry;
 template <typename T>
 class StatusWith;
 
+namespace repl {
+class ReplicationExecutor;
+}  // namespace repl
+
 namespace executor {
 
 class NetworkInterfaceMock;
 
-}  // namespace executor
-
 /**
- * Sets up the mocked out objects for testing the replica-set backed catalog manager.
+ * A network infrastructure for testing.
  */
-class CatalogManagerReplSetTestFixture : public mongo::unittest::Test {
+class NetworkTestEnv {
 public:
-    CatalogManagerReplSetTestFixture();
-    ~CatalogManagerReplSetTestFixture();
+    using OnCommandFunction = std::function<StatusWith<BSONObj>(const RemoteCommandRequest&)>;
 
-protected:
-    CatalogManagerReplicaSet* catalogManager() const;
+    using OnFindCommandFunction =
+        std::function<StatusWith<std::vector<BSONObj>>(const RemoteCommandRequest&)>;
 
-    ShardRegistry* shardRegistry() const;
-
-    RemoteCommandRunnerMock* commandRunner() const;
-
-    executor::NetworkInterfaceMock* network() const;
-
-    DistLockManagerMock* distLock() const;
+    /**
+     * Create a new environment based on the given network.
+     */
+    NetworkTestEnv(NetworkInterfaceMock* network);
 
     /**
      * Blocking methods, which receive one message from the network and respond using the
      * responses returned from the input function. This is a syntactic sugar for simple,
      * single request + response or find tests.
      */
-    void onCommand(executor::NetworkTestEnv::OnCommandFunction func);
-    void onFindCommand(executor::NetworkTestEnv::OnFindCommandFunction func);
+    void onCommand(OnCommandFunction func);
+    void onFindCommand(OnFindCommandFunction func);
 
-    void setUp() override;
+    /**
+     * Starts the executor thread that will process the network tasks.
+     */
+    void startUp(repl::ReplicationExecutor* executor);
 
-    void tearDown() override;
+    /**
+     * Joins the executor thread.
+     */
+    void shutDown();
 
-    executor::NetworkInterfaceMock* _mockNetwork;
-    std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
+private:
+    // Mocked out network under the task executor.
+    NetworkInterfaceMock* _mockNetwork;
+
+    // Thread used to execute the task executor's loop. This thread will be busy until the
+    // shutdown is called on the shard registry's task executor.
+    stdx::thread _executorThread;
 };
 
+}  // namespace executor
 }  // namespace mongo
