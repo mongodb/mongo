@@ -488,7 +488,7 @@ err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
- * __session_rename --
+ * __session_reset --
  *	WT_SESSION->reset method.
  */
 static int
@@ -536,7 +536,6 @@ __session_reset(WT_SESSION *wt_session, const char *config)
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
-
 
 /*
  * __session_compact --
