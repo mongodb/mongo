@@ -139,10 +139,10 @@
 /* Compile read-write barrier */
 #define	WT_BARRIER() __asm__ volatile("" ::: "memory")
 
+#if defined(x86_64) || defined(__x86_64__)
 /* Pause instruction to prevent excess processor bus usage */
 #define	WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
 
-#if defined(x86_64) || defined(__x86_64__)
 #define	WT_FULL_BARRIER() do {						\
 	__asm__ volatile ("mfence" ::: "memory");			\
 } while (0)
@@ -154,8 +154,17 @@
 } while (0)
 
 #elif defined(i386) || defined(__i386__)
+#define	WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
 #define	WT_FULL_BARRIER() do {						\
 	__asm__ volatile ("lock; addl $0, 0(%%esp)" ::: "memory");	\
+} while (0)
+#define	WT_READ_BARRIER()	WT_FULL_BARRIER()
+#define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
+
+#elif defined(__PPC64__) || defined(PPC64)
+#define	WT_PAUSE()	__asm__ volatile("ori 0,0,0" ::: "memory")
+#define	WT_FULL_BARRIER()	do {
+	__asm__ volatile ("sync" ::: "memory");			\
 } while (0)
 #define	WT_READ_BARRIER()	WT_FULL_BARRIER()
 #define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
