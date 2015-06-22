@@ -891,8 +891,6 @@ StatusWith<CollectionType> CatalogManagerLegacy::getCollection(const std::string
 
 Status CatalogManagerLegacy::getCollections(const std::string* dbName,
                                             std::vector<CollectionType>* collections) {
-    collections->clear();
-
     BSONObjBuilder b;
     if (dbName) {
         invariant(!dbName->empty());
@@ -908,13 +906,17 @@ Status CatalogManagerLegacy::getCollections(const std::string* dbName,
     while (cursor->more()) {
         const BSONObj collObj = cursor->next();
 
-        auto status = CollectionType::fromBSON(collObj);
-        if (!status.isOK()) {
+        const auto collectionResult = CollectionType::fromBSON(collObj);
+        if (!collectionResult.isOK()) {
             conn.done();
-            return status.getStatus();
+            collections->clear();
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "error while parsing " << CollectionType::ConfigNS
+                                        << " document: " << collObj << " : "
+                                        << collectionResult.getStatus().toString());
         }
 
-        collections->push_back(status.getValue());
+        collections->push_back(collectionResult.getValue());
     }
 
     conn.done();

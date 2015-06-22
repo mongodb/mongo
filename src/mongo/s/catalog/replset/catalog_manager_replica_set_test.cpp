@@ -905,5 +905,164 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
     future.get();
 }
 
+TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsNoDb) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    CollectionType coll1;
+    coll1.setNs(NamespaceString{"test.system.indexes"});
+    coll1.setUpdatedAt(network()->now());
+    coll1.setUnique(true);
+    coll1.setEpoch(OID::gen());
+    coll1.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    ASSERT_OK(coll1.validate());
+
+    CollectionType coll2;
+    coll2.setNs(NamespaceString{"test.coll1"});
+    coll2.setUpdatedAt(network()->now());
+    coll2.setUnique(false);
+    coll2.setEpoch(OID::gen());
+    coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    ASSERT_OK(coll2.validate());
+
+    CollectionType coll3;
+    coll3.setNs(NamespaceString{"anotherdb.coll1"});
+    coll3.setUpdatedAt(network()->now());
+    coll3.setUnique(false);
+    coll3.setEpoch(OID::gen());
+    coll3.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    ASSERT_OK(coll3.validate());
+
+    auto future = async(std::launch::async,
+                        [this] {
+                            vector<CollectionType> collections;
+
+                            const auto status =
+                                catalogManager()->getCollections(nullptr, &collections);
+
+                            ASSERT_OK(status);
+                            return collections;
+                        });
+
+    onFindCommand([coll1, coll2, coll3](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), CollectionType::ConfigNS);
+
+        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
+        ASSERT_EQ(query->getFilter(), BSONObj());
+
+        return vector<BSONObj>{coll1.toBSON(), coll2.toBSON(), coll3.toBSON()};
+    });
+
+    const auto& actualColls = future.get();
+    ASSERT_EQ(3U, actualColls.size());
+    ASSERT_EQ(coll1.toBSON(), actualColls[0].toBSON());
+    ASSERT_EQ(coll2.toBSON(), actualColls[1].toBSON());
+    ASSERT_EQ(coll3.toBSON(), actualColls[2].toBSON());
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsWithDb) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    CollectionType coll1;
+    coll1.setNs(NamespaceString{"test.system.indexes"});
+    coll1.setUpdatedAt(network()->now());
+    coll1.setUnique(true);
+    coll1.setEpoch(OID::gen());
+    coll1.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+
+    CollectionType coll2;
+    coll2.setNs(NamespaceString{"test.coll1"});
+    coll2.setUpdatedAt(network()->now());
+    coll2.setUnique(false);
+    coll2.setEpoch(OID::gen());
+    coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+
+    auto future = async(std::launch::async,
+                        [this] {
+                            string dbName = "test";
+                            vector<CollectionType> collections;
+
+                            const auto status =
+                                catalogManager()->getCollections(&dbName, &collections);
+
+                            ASSERT_OK(status);
+                            return collections;
+                        });
+
+    onFindCommand([coll1, coll2](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), CollectionType::ConfigNS);
+
+        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
+        {
+            BSONObjBuilder b;
+            b.appendRegex(CollectionType::fullNs(), "^test\\.");
+            ASSERT_EQ(query->getFilter(), b.obj());
+        }
+
+        return vector<BSONObj>{coll1.toBSON(), coll2.toBSON()};
+    });
+
+    const auto& actualColls = future.get();
+    ASSERT_EQ(2U, actualColls.size());
+    ASSERT_EQ(coll1.toBSON(), actualColls[0].toBSON());
+    ASSERT_EQ(coll2.toBSON(), actualColls[1].toBSON());
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsInvalidCollectionType) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    auto future = async(std::launch::async,
+                        [this] {
+                            string dbName = "test";
+                            vector<CollectionType> collections;
+
+                            const auto status =
+                                catalogManager()->getCollections(&dbName, &collections);
+
+                            ASSERT_EQ(ErrorCodes::FailedToParse, status);
+                            ASSERT_EQ(0U, collections.size());
+                        });
+
+    CollectionType validColl;
+    validColl.setNs(NamespaceString{"test.system.indexes"});
+    validColl.setUpdatedAt(network()->now());
+    validColl.setUnique(true);
+    validColl.setEpoch(OID::gen());
+    validColl.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    ASSERT_OK(validColl.validate());
+
+    onFindCommand([validColl](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), CollectionType::ConfigNS);
+
+        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
+        {
+            BSONObjBuilder b;
+            b.appendRegex(CollectionType::fullNs(), "^test\\.");
+            ASSERT_EQ(query->getFilter(), b.obj());
+        }
+
+        return vector<BSONObj>{
+            validColl.toBSON(),
+            BSONObj()  // empty document is invalid
+        };
+    });
+
+    future.get();
+}
+
 }  // namespace
 }  // namespace mongo

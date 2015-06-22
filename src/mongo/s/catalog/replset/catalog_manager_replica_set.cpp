@@ -248,7 +248,43 @@ StatusWith<CollectionType> CatalogManagerReplicaSet::getCollection(const std::st
 
 Status CatalogManagerReplicaSet::getCollections(const std::string* dbName,
                                                 std::vector<CollectionType>* collections) {
-    return notYetImplemented;
+    BSONObjBuilder b;
+    if (dbName) {
+        invariant(!dbName->empty());
+        b.appendRegex(CollectionType::fullNs(),
+                      string(str::stream() << "^" << pcrecpp::RE::QuoteMeta(*dbName) << "\\."));
+    }
+
+    auto configShard = grid.shardRegistry()->getShard("config");
+    auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
+    if (!readHost.isOK()) {
+        return readHost.getStatus();
+    }
+
+    auto findStatus =
+        grid.shardRegistry()->exhaustiveFind(readHost.getValue(),
+                                             NamespaceString(CollectionType::ConfigNS),
+                                             b.obj(),
+                                             boost::none);  // no limit
+
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    for (const BSONObj& obj : findStatus.getValue()) {
+        const auto collectionResult = CollectionType::fromBSON(obj);
+        if (!collectionResult.isOK()) {
+            collections->clear();
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "error while parsing " << CollectionType::ConfigNS
+                                  << " document: " << obj << " : "
+                                  << collectionResult.getStatus().toString()};
+        }
+
+        collections->push_back(collectionResult.getValue());
+    }
+
+    return Status::OK();
 }
 
 Status CatalogManagerReplicaSet::dropCollection(const std::string& collectionNs) {
