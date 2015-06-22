@@ -1225,5 +1225,127 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionInvalidTag) {
     future.get();
 }
 
+TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkOneTagFound) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    ChunkType chunk;
+    chunk.setName("chunk0000");
+    chunk.setNS("test.coll");
+    chunk.setMin(BSON("a" << 1));
+    chunk.setMax(BSON("a" << 100));
+    chunk.setVersion({1, 2, OID::gen()});
+    chunk.setShard("shard0000");
+    ASSERT_OK(chunk.validate());
+
+    auto future = async(
+        std::launch::async,
+        [this, chunk] { return assertGet(catalogManager()->getTagForChunk("test.coll", chunk)); });
+
+    onFindCommand([chunk](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), TagsType::ConfigNS);
+
+        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(query->ns(), TagsType::ConfigNS);
+        ASSERT_EQ(query->getFilter(),
+                  BSON(TagsType::ns(chunk.getNS())
+                       << TagsType::min() << BSON("$lte" << chunk.getMin()) << TagsType::max()
+                       << BSON("$gte" << chunk.getMax())));
+
+        TagsType tt;
+        tt.setNS("test.coll");
+        tt.setTag("tag");
+        tt.setMinKey(BSON("a" << 1));
+        tt.setMaxKey(BSON("a" << 100));
+
+        return vector<BSONObj>{tt.toBSON()};
+    });
+
+    const string& tagStr = future.get();
+    ASSERT_EQ("tag", tagStr);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkNoTagFound) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    ChunkType chunk;
+    chunk.setName("chunk0000");
+    chunk.setNS("test.coll");
+    chunk.setMin(BSON("a" << 1));
+    chunk.setMax(BSON("a" << 100));
+    chunk.setVersion({1, 2, OID::gen()});
+    chunk.setShard("shard0000");
+    ASSERT_OK(chunk.validate());
+
+    auto future = async(
+        std::launch::async,
+        [this, chunk] { return assertGet(catalogManager()->getTagForChunk("test.coll", chunk)); });
+
+    onFindCommand([chunk](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), TagsType::ConfigNS);
+
+        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(query->ns(), TagsType::ConfigNS);
+        ASSERT_EQ(query->getFilter(),
+                  BSON(TagsType::ns(chunk.getNS())
+                       << TagsType::min() << BSON("$lte" << chunk.getMin()) << TagsType::max()
+                       << BSON("$gte" << chunk.getMax())));
+
+        return vector<BSONObj>{};
+    });
+
+    const string& tagStr = future.get();
+    ASSERT_EQ("", tagStr);  // empty string returned when tag document not found
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkInvalidTagDoc) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    ChunkType chunk;
+    chunk.setName("chunk0000");
+    chunk.setNS("test.coll");
+    chunk.setMin(BSON("a" << 1));
+    chunk.setMax(BSON("a" << 100));
+    chunk.setVersion({1, 2, OID::gen()});
+    chunk.setShard("shard0000");
+    ASSERT_OK(chunk.validate());
+
+    auto future = async(std::launch::async,
+                        [this, chunk] {
+                            const auto tagResult =
+                                catalogManager()->getTagForChunk("test.coll", chunk);
+
+                            ASSERT_EQ(ErrorCodes::FailedToParse, tagResult.getStatus());
+                        });
+
+    onFindCommand([chunk](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), TagsType::ConfigNS);
+
+        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(query->ns(), TagsType::ConfigNS);
+        ASSERT_EQ(query->getFilter(),
+                  BSON(TagsType::ns(chunk.getNS())
+                       << TagsType::min() << BSON("$lte" << chunk.getMin()) << TagsType::max()
+                       << BSON("$gte" << chunk.getMax())));
+
+        // Return a tag document missing the min key
+        return vector<BSONObj>{BSON(TagsType::ns("test.mycol") << TagsType::tag("tag")
+                                                               << TagsType::max(BSON("a" << 20)))};
+    });
+
+    future.get();
+}
+
 }  // namespace
 }  // namespace mongo

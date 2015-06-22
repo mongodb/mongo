@@ -463,7 +463,36 @@ Status CatalogManagerReplicaSet::getTagsForCollection(const std::string& collect
 
 StatusWith<string> CatalogManagerReplicaSet::getTagForChunk(const std::string& collectionNs,
                                                             const ChunkType& chunk) {
-    return notYetImplemented;
+    auto configShard = grid.shardRegistry()->getShard("config");
+    auto readHostStatus = configShard->getTargeter()->findHost(kConfigReadSelector);
+    if (!readHostStatus.isOK()) {
+        return readHostStatus.getStatus();
+    }
+
+    BSONObj query =
+        BSON(TagsType::ns(collectionNs) << TagsType::min() << BSON("$lte" << chunk.getMin())
+                                        << TagsType::max() << BSON("$gte" << chunk.getMax()));
+    auto findStatus = grid.shardRegistry()->exhaustiveFind(
+        readHostStatus.getValue(), NamespaceString(TagsType::ConfigNS), query, 1);
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    const auto& docs = findStatus.getValue();
+    if (docs.empty()) {
+        return string{};
+    }
+
+    invariant(docs.size() == 1);
+    BSONObj tagsDoc = docs.front();
+
+    const auto tagsResult = TagsType::fromBSON(tagsDoc);
+    if (!tagsResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                stream() << "error while parsing " << TagsType::ConfigNS << " document: " << tagsDoc
+                         << " : " << tagsResult.getStatus().toString()};
+    }
+    return tagsResult.getValue().getTag();
 }
 
 Status CatalogManagerReplicaSet::getAllShards(vector<ShardType>* shards) {
