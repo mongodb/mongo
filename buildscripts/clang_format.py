@@ -18,6 +18,7 @@ import shutil
 import string
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import time
@@ -129,6 +130,20 @@ def get_tar_path(version, tar_path):
         version=version,
         tar_path=tar_path)
 
+def extract_clang_format(tar_path):
+    # Extract just the clang-format binary
+    # On OSX, we shell out to tar because tarfile doesn't support xz compression
+    if sys.platform == 'darwin':
+         subprocess.call(['tar', '-xzf', tar_path, '*clang-format*'])
+    # Otherwise we use tarfile because some versions of tar don't support wildcards without
+    # a special flag
+    else:
+        tarfp = tarfile.open(tar_path)
+        for name in tarfp.getnames():
+            if name.endswith('clang-format'):
+                tarfp.extract(name)
+        tarfp.close()
+
 def get_clang_format_from_llvm(llvm_distro, tar_path, dest_file):
     """Download clang-format from llvm.org, unpack the tarball,
     and put clang-format in the specified place
@@ -144,8 +159,7 @@ def get_clang_format_from_llvm(llvm_distro, tar_path, dest_file):
             url, temp_tar_file))
     urllib.urlretrieve(url, temp_tar_file)
 
-    # Extract just clang format file
-    subprocess.call(['tar', 'zxvf', temp_tar_file, '*clang-format*'])
+    extract_clang_format(temp_tar_file)
 
     # Destination Path
     shutil.move(get_tar_path(CLANG_FORMAT_VERSION, tar_path), dest_file)
@@ -164,8 +178,7 @@ def get_clang_format_from_linux_cache(dest_file):
             url, temp_tar_file))
     urllib.urlretrieve(url, temp_tar_file)
 
-    # Extract just clang format file
-    subprocess.call(['tar', 'zxvf', temp_tar_file, '*clang-format*'])
+    extract_clang_format(temp_tar_file)
 
     # Destination Path
     shutil.move("llvm/Release/bin/clang-format", dest_file)
