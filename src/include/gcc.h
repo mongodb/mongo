@@ -164,7 +164,7 @@
 #elif defined(__PPC64__) || defined(PPC64)
 #define	WT_PAUSE()	__asm__ volatile("ori 0,0,0" ::: "memory")
 #define	WT_FULL_BARRIER()	do {
-	__asm__ volatile ("sync" ::: "memory");			\
+	__asm__ volatile ("sync" ::: "memory");				\
 } while (0)
 #define	WT_READ_BARRIER()	WT_FULL_BARRIER()
 #define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
