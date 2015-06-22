@@ -2025,7 +2025,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             break;
         case kActionWinElection: {
             stdx::unique_lock<stdx::mutex> lk(_mutex);
-            _electionId = OID::gen();
+            _electionId = OID(_topCoord->getTerm());
             _topCoord->processWinElection(_electionId, getNextGlobalTimestamp());
             _isWaitingForDrainToComplete = true;
             const PostMemberStateUpdateAction nextAction =

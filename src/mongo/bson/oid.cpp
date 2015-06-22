@@ -138,6 +138,12 @@ void OID::init() {
     setIncrement(Increment::next());
 }
 
+void OID::init(int64_t term) {
+    // each set* method handles endianness
+    setTimestamp(time(0));
+    _view().write<BigEndian<int64_t>>(term, kInstanceUniqueOffset);
+}
+
 void OID::init(const std::string& s) {
     verify(s.size() == 24);
     const char* p = s.c_str();
