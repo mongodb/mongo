@@ -79,6 +79,7 @@ public:
      */
     static StatusWith<std::unique_ptr<LiteParsedQuery>> makeAsFindCmd(const NamespaceString& ns,
                                                                       const BSONObj& query,
+                                                                      const BSONObj& sort,
                                                                       boost::optional<int> limit);
 
     /**

@@ -269,8 +269,8 @@ StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort
         status = Status::OK();
     };
 
-    unique_ptr<LiteParsedQuery> findCmd(
-        fassertStatusOK(28688, LiteParsedQuery::makeAsFindCmd(nss, query, std::move(limit))));
+    unique_ptr<LiteParsedQuery> findCmd(fassertStatusOK(
+        28688, LiteParsedQuery::makeAsFindCmd(nss, query, BSONObj(), std::move(limit))));
 
     QueryFetcher fetcher(_executor.get(), host, nss, findCmd->asFindCommand(), fetcherCallback);
 

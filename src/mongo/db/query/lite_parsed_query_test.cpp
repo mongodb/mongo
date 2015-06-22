@@ -254,7 +254,8 @@ TEST(LiteParsedQueryTest, ForbidMetaSortOnFieldWithoutMetaProject) {
 }
 
 TEST(LiteParsedQueryTest, MakeFindCmd) {
-    auto result = LiteParsedQuery::makeAsFindCmd(NamespaceString("test.ns"), BSON("x" << 1), 2);
+    auto result = LiteParsedQuery::makeAsFindCmd(
+        NamespaceString("test.ns"), BSON("x" << 1), BSON("y" << -1), 2);
     ASSERT_OK(result.getStatus());
 
     auto&& lpq = result.getValue();
@@ -263,7 +264,7 @@ TEST(LiteParsedQueryTest, MakeFindCmd) {
     ASSERT_EQUALS(2, lpq->getLimit());
 
     ASSERT_EQUALS(BSONObj(), lpq->getProj());
-    ASSERT_EQUALS(BSONObj(), lpq->getSort());
+    ASSERT_EQUALS(BSON("y" << -1), lpq->getSort());
     ASSERT_EQUALS(BSONObj(), lpq->getHint());
     ASSERT_EQUALS(BSONObj(), lpq->getMin());
     ASSERT_EQUALS(BSONObj(), lpq->getMax());
@@ -291,8 +292,8 @@ TEST(LiteParsedQueryTest, MakeFindCmd) {
 }
 
 TEST(LiteParsedQueryTest, MakeFindCmdNoLimit) {
-    auto result =
-        LiteParsedQuery::makeAsFindCmd(NamespaceString("test.ns"), BSON("x" << 1), boost::none);
+    auto result = LiteParsedQuery::makeAsFindCmd(
+        NamespaceString("test.ns"), BSON("x" << 1), BSONObj(), boost::none);
     ASSERT_OK(result.getStatus());
 
     auto&& lpq = result.getValue();
@@ -330,7 +331,8 @@ TEST(LiteParsedQueryTest, MakeFindCmdNoLimit) {
 
 TEST(LiteParsedQueryTest, MakeFindCmdBadLimit) {
     auto status =
-        LiteParsedQuery::makeAsFindCmd(NamespaceString("test.ns"), BSON("x" << 1), 0).getStatus();
+        LiteParsedQuery::makeAsFindCmd(NamespaceString("test.ns"), BSON("x" << 1), BSONObj(), 0)
+            .getStatus();
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
 }

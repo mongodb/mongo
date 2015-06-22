@@ -381,12 +381,14 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsOpQuery(const str
 // static
 StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(const NamespaceString& ns,
                                                                        const BSONObj& query,
+                                                                       const BSONObj& sort,
                                                                        boost::optional<int> limit) {
     unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
 
     pq->_fromCommand = true;
     pq->_ns = ns.ns();
     pq->_filter = query.getOwned();
+    pq->_sort = sort.getOwned();
 
     if (limit) {
         if (limit <= 0) {
