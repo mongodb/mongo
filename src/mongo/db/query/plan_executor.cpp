@@ -383,7 +383,7 @@ PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* o
             bool hasRequestedData = true;
 
             if (NULL != objOut) {
-                if (WorkingSetMember::LOC_AND_IDX == member->state) {
+                if (WorkingSetMember::LOC_AND_IDX == member->getState()) {
                     if (1 != member->keyData.size()) {
                         _workingSet->free(id);
                         hasRequestedData = false;

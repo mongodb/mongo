@@ -111,18 +111,22 @@ public:
 
         // Mock data.
         {
-            WorkingSetMember mockMember;
-            mockMember.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-            mockMember.loc = *locs.begin();
-            mockMember.obj = coll->docFor(&_txn, mockMember.loc);
+            WorkingSetID id = ws.allocate();
+            WorkingSetMember* mockMember = ws.get(id);
+            mockMember->loc = *locs.begin();
+            mockMember->obj = coll->docFor(&_txn, mockMember->loc);
+            ws.transitionToLocAndObj(id);
             // Points into our DB.
-            mockStage->pushBack(mockMember);
-
-            mockMember.state = WorkingSetMember::OWNED_OBJ;
-            mockMember.loc = RecordId();
-            mockMember.obj = Snapshotted<BSONObj>(SnapshotId(), BSON("foo" << 6));
-            ASSERT_TRUE(mockMember.obj.value().isOwned());
-            mockStage->pushBack(mockMember);
+            mockStage->pushBack(id);
+        }
+        {
+            WorkingSetID id = ws.allocate();
+            WorkingSetMember* mockMember = ws.get(id);
+            mockMember->loc = RecordId();
+            mockMember->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("foo" << 6));
+            mockMember->transitionToOwnedObj();
+            ASSERT_TRUE(mockMember->obj.value().isOwned());
+            mockStage->pushBack(id);
         }
 
         unique_ptr<FetchStage> fetchStage(
@@ -173,14 +177,15 @@ public:
 
         // Mock data.
         {
-            WorkingSetMember mockMember;
-            mockMember.state = WorkingSetMember::LOC_AND_IDX;
-            mockMember.loc = *locs.begin();
+            WorkingSetID id = ws.allocate();
+            WorkingSetMember* mockMember = ws.get(id);
+            mockMember->loc = *locs.begin();
+            ws.transitionToLocAndIdx(id);
 
             // State is loc and index, shouldn't be able to get the foo data inside.
             BSONElement elt;
-            ASSERT_FALSE(mockMember.getFieldDotted("foo", &elt));
-            mockStage->pushBack(mockMember);
+            ASSERT_FALSE(mockMember->getFieldDotted("foo", &elt));
+            mockStage->pushBack(id);
         }
 
         // Make the filter.

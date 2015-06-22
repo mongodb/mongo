@@ -126,8 +126,8 @@ public:
         for (size_t i = 0; i < 10; ++i) {
             WorkingSetID id = ws.allocate();
             WorkingSetMember* member = ws.get(id);
-            member->state = WorkingSetMember::OWNED_OBJ;
             member->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << 2));
+            member->transitionToOwnedObj();
             ws.flagForReview(id);
         }
 
@@ -195,8 +195,8 @@ public:
         for (size_t i = 0; i < 50; ++i) {
             WorkingSetID id = ws.allocate();
             WorkingSetMember* member = ws.get(id);
-            member->state = WorkingSetMember::OWNED_OBJ;
             member->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << 1));
+            member->transitionToOwnedObj();
             ws.flagForReview(id);
             expectedResultIds.insert(id);
         }
@@ -220,8 +220,8 @@ public:
         while (ws.getFlagged().size() <= rehashSize) {
             WorkingSetID id = ws.allocate();
             WorkingSetMember* member = ws.get(id);
-            member->state = WorkingSetMember::OWNED_OBJ;
             member->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << 1));
+            member->transitionToOwnedObj();
             ws.flagForReview(id);
         }
         while ((id = getNextResult(keep.get())) != WorkingSet::INVALID_ID) {

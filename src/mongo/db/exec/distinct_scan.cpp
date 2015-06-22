@@ -115,7 +115,7 @@ PlanStage::StageState DistinctScan::work(WorkingSetID* out) {
             WorkingSetMember* member = _workingSet->get(id);
             member->loc = kv->loc;
             member->keyData.push_back(IndexKeyDatum(_descriptor->keyPattern(), kv->key, _iam));
-            member->state = WorkingSetMember::LOC_AND_IDX;
+            _workingSet->transitionToLocAndIdx(id);
 
             *out = id;
             ++_commonStats.advanced;

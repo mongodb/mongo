@@ -85,11 +85,11 @@ void testTransform(const char* specStr,
 
     // Create working set member.
     WorkingSetMember wsm;
-    wsm.state = WorkingSetMember::OWNED_OBJ;
     wsm.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson(objStr));
     if (data) {
         wsm.addComputed(data);
     }
+    wsm.transitionToOwnedObj();
 
     // Transform object
     Status status = exec.transform(&wsm);

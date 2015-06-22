@@ -308,7 +308,7 @@ PlanStage::StageState TextStage::returnResults(WorkingSetID* out) {
 
     WorkingSetMember* wsm = _ws->get(textRecordData.wsid);
     try {
-        if (!WorkingSetCommon::fetchIfUnfetched(_txn, wsm, _recordCursor)) {
+        if (!WorkingSetCommon::fetchIfUnfetched(_txn, _ws, textRecordData.wsid, _recordCursor)) {
             _scoreIterator++;
             _ws->free(textRecordData.wsid);
             _commonStats.needTime++;
@@ -340,16 +340,23 @@ public:
     TextMatchableDocument(OperationContext* txn,
                           const BSONObj& keyPattern,
                           const BSONObj& key,
-                          WorkingSetMember* wsm,
+                          WorkingSet* ws,
+                          WorkingSetID id,
                           unowned_ptr<RecordCursor> recordCursor)
-        : _txn(txn), _recordCursor(recordCursor), _keyPattern(keyPattern), _key(key), _wsm(wsm) {}
+        : _txn(txn),
+          _recordCursor(recordCursor),
+          _keyPattern(keyPattern),
+          _key(key),
+          _ws(ws),
+          _id(id) {}
 
     BSONObj toBSON() const {
         return getObj();
     }
 
     virtual ElementIterator* allocateIterator(const ElementPath* path) const {
-        if (!_wsm->hasObj()) {
+        WorkingSetMember* member = _ws->get(_id);
+        if (!member->hasObj()) {
             // Try to look in the key.
             BSONObjIterator keyPatternIt(_keyPattern);
             BSONObjIterator keyDataIt(_key);
@@ -382,24 +389,26 @@ public:
 
 private:
     BSONObj getObj() const {
-        if (!WorkingSetCommon::fetchIfUnfetched(_txn, _wsm, _recordCursor))
+        if (!WorkingSetCommon::fetchIfUnfetched(_txn, _ws, _id, _recordCursor))
             throw DocumentDeletedException();
 
+        WorkingSetMember* member = _ws->get(_id);
         // Make it owned since we are buffering results.
-        _wsm->obj.setValue(_wsm->obj.value().getOwned());
-        return _wsm->obj.value();
+        member->obj.setValue(member->obj.value().getOwned());
+        return member->obj.value();
     }
 
     OperationContext* _txn;
     unowned_ptr<RecordCursor> _recordCursor;
     BSONObj _keyPattern;
     BSONObj _key;
-    WorkingSetMember* _wsm;
+    WorkingSet* _ws;
+    WorkingSetID _id;
 };
 
 PlanStage::StageState TextStage::addTerm(WorkingSetID wsid, WorkingSetID* out) {
     WorkingSetMember* wsm = _ws->get(wsid);
-    invariant(wsm->state == WorkingSetMember::LOC_AND_IDX);
+    invariant(wsm->getState() == WorkingSetMember::LOC_AND_IDX);
     invariant(1 == wsm->keyData.size());
     const IndexKeyDatum newKeyData = wsm->keyData.back();  // copy to keep it around.
 
@@ -417,7 +426,7 @@ PlanStage::StageState TextStage::addTerm(WorkingSetID wsid, WorkingSetID* out) {
             bool wasDeleted = false;
             try {
                 TextMatchableDocument tdoc(
-                    _txn, newKeyData.indexKeyPattern, newKeyData.keyData, wsm, _recordCursor);
+                    _txn, newKeyData.indexKeyPattern, newKeyData.keyData, _ws, wsid, _recordCursor);
                 shouldKeep = _filter->matches(&tdoc);
             } catch (const WriteConflictException& wce) {
                 _idRetrying = wsid;

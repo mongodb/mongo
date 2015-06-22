@@ -65,7 +65,7 @@ WorkingSetID WorkingSet::allocate() {
     return id;
 }
 
-void WorkingSet::free(const WorkingSetID& i) {
+void WorkingSet::free(WorkingSetID i) {
     MemberHolder& holder = _data[i];
     verify(i < _data.size());            // ID has been allocated.
     verify(holder.nextFreeOrSelf == i);  // ID currently in use.
@@ -76,9 +76,9 @@ void WorkingSet::free(const WorkingSetID& i) {
     _freeList = i;
 }
 
-void WorkingSet::flagForReview(const WorkingSetID& i) {
+void WorkingSet::flagForReview(WorkingSetID i) {
     WorkingSetMember* member = get(i);
-    verify(WorkingSetMember::OWNED_OBJ == member->state);
+    verify(WorkingSetMember::OWNED_OBJ == member->_state);
     _flagged.insert(i);
 }
 
@@ -102,76 +102,42 @@ void WorkingSet::clear() {
     _freeList = INVALID_ID;
 
     _flagged.clear();
+    _yieldSensitiveIds.clear();
 }
 
-//
-// Iteration
-//
+void WorkingSet::transitionToLocAndIdx(WorkingSetID id) {
+    WorkingSetMember* member = get(id);
+    member->_state = WorkingSetMember::LOC_AND_IDX;
+    _yieldSensitiveIds.push_back(id);
+}
 
-WorkingSet::iterator::iterator(WorkingSet* ws, size_t index) : _ws(ws), _index(index) {
-    // If we're currently not pointing at an allocated member, then we have
-    // to advance to the first one, unless we're already at the end.
-    if (_index < _ws->_data.size() && isFree()) {
-        advance();
+void WorkingSet::transitionToLocAndObj(WorkingSetID id) {
+    WorkingSetMember* member = get(id);
+    member->_state = WorkingSetMember::LOC_AND_OBJ;
+
+    // If 'obj' is owned, then it doesn't need to made owned in preparation for yield.
+    if (!member->obj.value().isOwned()) {
+        _yieldSensitiveIds.push_back(id);
     }
 }
 
-void WorkingSet::iterator::advance() {
-    // Move forward at least once in the data list.
-    _index++;
-
-    // While we haven't hit the end and the current member is not in use. (Skips ahead until
-    // we find the next allocated member.)
-    while (_index < _ws->_data.size() && isFree()) {
-        _index++;
-    }
+void WorkingSet::transitionToOwnedObj(WorkingSetID id) {
+    WorkingSetMember* member = get(id);
+    member->transitionToOwnedObj();
 }
 
-bool WorkingSet::iterator::isFree() const {
-    return _ws->_data[_index].nextFreeOrSelf != _index;
-}
-
-void WorkingSet::iterator::free() {
-    dassert(!isFree());
-    _ws->free(_index);
-}
-
-void WorkingSet::iterator::operator++() {
-    dassert(_index < _ws->_data.size());
-    advance();
-}
-
-bool WorkingSet::iterator::operator==(const WorkingSet::iterator& other) const {
-    return (_index == other._index);
-}
-
-bool WorkingSet::iterator::operator!=(const WorkingSet::iterator& other) const {
-    return (_index != other._index);
-}
-
-WorkingSetMember& WorkingSet::iterator::operator*() {
-    dassert(_index < _ws->_data.size() && !isFree());
-    return *_ws->_data[_index].member;
-}
-
-WorkingSetMember* WorkingSet::iterator::operator->() {
-    dassert(_index < _ws->_data.size() && !isFree());
-    return _ws->_data[_index].member;
-}
-
-WorkingSet::iterator WorkingSet::begin() {
-    return WorkingSet::iterator(this, 0);
-}
-
-WorkingSet::iterator WorkingSet::end() {
-    return WorkingSet::iterator(this, _data.size());
+std::vector<WorkingSetID> WorkingSet::getAndClearYieldSensitiveIds() {
+    std::vector<WorkingSetID> out;
+    // Clear '_yieldSensitiveIds' by swapping it into the set to be returned.
+    _yieldSensitiveIds.swap(out);
+    return out;
 }
 
 //
 // WorkingSetMember
 //
 
-WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID), isSuspicious(false) {}
+WorkingSetMember::WorkingSetMember() {}
 
 WorkingSetMember::~WorkingSetMember() {}
 
@@ -182,23 +148,36 @@ void WorkingSetMember::clear() {
 
     keyData.clear();
     obj.reset();
-    state = WorkingSetMember::INVALID;
+    _state = WorkingSetMember::INVALID;
 }
 
+WorkingSetMember::MemberState WorkingSetMember::getState() const {
+    return _state;
+}
+
+void WorkingSetMember::transitionToOwnedObj() {
+    invariant(obj.value().isOwned());
+    _state = OWNED_OBJ;
+}
+
+
 bool WorkingSetMember::hasLoc() const {
-    return state == LOC_AND_IDX || state == LOC_AND_UNOWNED_OBJ || state == LOC_AND_OWNED_OBJ;
+    return _state == LOC_AND_IDX || _state == LOC_AND_OBJ;
 }
 
 bool WorkingSetMember::hasObj() const {
-    return hasOwnedObj() || hasUnownedObj();
+    return _state == OWNED_OBJ || _state == LOC_AND_OBJ;
 }
 
 bool WorkingSetMember::hasOwnedObj() const {
-    return state == OWNED_OBJ || state == LOC_AND_OWNED_OBJ;
+    return _state == OWNED_OBJ || (_state == LOC_AND_OBJ && obj.value().isOwned());
 }
 
-bool WorkingSetMember::hasUnownedObj() const {
-    return state == LOC_AND_UNOWNED_OBJ;
+void WorkingSetMember::makeObjOwned() {
+    invariant(_state == LOC_AND_OBJ);
+    if (!obj.value().isOwned()) {
+        obj.setValue(obj.value().getOwned());
+    }
 }
 
 bool WorkingSetMember::hasComputed(const WorkingSetComputedDataType type) const {

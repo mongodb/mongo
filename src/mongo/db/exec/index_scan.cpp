@@ -216,7 +216,7 @@ PlanStage::StageState IndexScan::work(WorkingSetID* out) {
     WorkingSetMember* member = _workingSet->get(id);
     member->loc = kv->loc;
     member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, _iam));
-    member->state = WorkingSetMember::LOC_AND_IDX;
+    _workingSet->transitionToLocAndIdx(id);
 
     if (_params.addKeyMetadata) {
         BSONObjBuilder bob;

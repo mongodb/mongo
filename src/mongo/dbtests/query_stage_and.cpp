@@ -235,7 +235,7 @@ public:
         // Expect to find the right value of foo in the flagged item.
         WorkingSetMember* member = ws.get(*flagged.begin());
         ASSERT_TRUE(NULL != member);
-        ASSERT_EQUALS(WorkingSetMember::OWNED_OBJ, member->state);
+        ASSERT_EQUALS(WorkingSetMember::OWNED_OBJ, member->getState());
         BSONElement elt;
         ASSERT_TRUE(member->getFieldDotted("foo", &elt));
         ASSERT_EQUALS(15, elt.numberInt());
@@ -885,11 +885,12 @@ public:
 
             std::unique_ptr<QueuedDataStage> childStage1 = stdx::make_unique<QueuedDataStage>(&ws);
             {
-                WorkingSetMember wsm;
-                wsm.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-                wsm.loc = RecordId(1);
-                wsm.obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
-                childStage1->pushBack(wsm);
+                WorkingSetID id = ws.allocate();
+                WorkingSetMember* wsm = ws.get(id);
+                wsm->loc = RecordId(1);
+                wsm->obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                ws.transitionToLocAndObj(id);
+                childStage1->pushBack(id);
             }
 
             std::unique_ptr<QueuedDataStage> childStage2 = stdx::make_unique<QueuedDataStage>(&ws);
@@ -919,21 +920,23 @@ public:
             std::unique_ptr<QueuedDataStage> childStage1 = stdx::make_unique<QueuedDataStage>(&ws);
 
             {
-                WorkingSetMember wsm;
-                wsm.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-                wsm.loc = RecordId(1);
-                wsm.obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
-                childStage1->pushBack(wsm);
+                WorkingSetID id = ws.allocate();
+                WorkingSetMember* wsm = ws.get(id);
+                wsm->loc = RecordId(1);
+                wsm->obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                ws.transitionToLocAndObj(id);
+                childStage1->pushBack(id);
             }
             childStage1->pushBack(PlanStage::DEAD);
 
             std::unique_ptr<QueuedDataStage> childStage2 = stdx::make_unique<QueuedDataStage>(&ws);
             {
-                WorkingSetMember wsm;
-                wsm.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-                wsm.loc = RecordId(2);
-                wsm.obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
-                childStage2->pushBack(wsm);
+                WorkingSetID id = ws.allocate();
+                WorkingSetMember* wsm = ws.get(id);
+                wsm->loc = RecordId(2);
+                wsm->obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                ws.transitionToLocAndObj(id);
+                childStage2->pushBack(id);
             }
 
             andHashStage->addChild(childStage1.release());
@@ -958,20 +961,22 @@ public:
 
             std::unique_ptr<QueuedDataStage> childStage1 = stdx::make_unique<QueuedDataStage>(&ws);
             {
-                WorkingSetMember wsm;
-                wsm.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-                wsm.loc = RecordId(1);
-                wsm.obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
-                childStage1->pushBack(wsm);
+                WorkingSetID id = ws.allocate();
+                WorkingSetMember* wsm = ws.get(id);
+                wsm->loc = RecordId(1);
+                wsm->obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                ws.transitionToLocAndObj(id);
+                childStage1->pushBack(id);
             }
 
             std::unique_ptr<QueuedDataStage> childStage2 = stdx::make_unique<QueuedDataStage>(&ws);
             {
-                WorkingSetMember wsm;
-                wsm.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-                wsm.loc = RecordId(2);
-                wsm.obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
-                childStage2->pushBack(wsm);
+                WorkingSetID id = ws.allocate();
+                WorkingSetMember* wsm = ws.get(id);
+                wsm->loc = RecordId(2);
+                wsm->obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                ws.transitionToLocAndObj(id);
+                childStage2->pushBack(id);
             }
             childStage2->pushBack(PlanStage::DEAD);
 
@@ -1056,7 +1061,7 @@ public:
         // Make sure the nuked obj is actually in the flagged data.
         ASSERT_EQUALS(ws.getFlagged().size(), size_t(1));
         WorkingSetMember* member = ws.get(*ws.getFlagged().begin());
-        ASSERT_EQUALS(WorkingSetMember::OWNED_OBJ, member->state);
+        ASSERT_EQUALS(WorkingSetMember::OWNED_OBJ, member->getState());
         BSONElement elt;
         ASSERT_TRUE(member->getFieldDotted("foo", &elt));
         ASSERT_EQUALS(1, elt.numberInt());

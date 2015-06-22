@@ -79,7 +79,7 @@ public:
     /**
      * We feed a mix of (key, unowned, owned) data to the sort stage.
      */
-    void insertVarietyOfObjects(QueuedDataStage* ms, Collection* coll) {
+    void insertVarietyOfObjects(WorkingSet* ws, QueuedDataStage* ms, Collection* coll) {
         set<RecordId> locs;
         getLocs(&locs, coll);
 
@@ -89,11 +89,12 @@ public:
             ASSERT_FALSE(it == locs.end());
 
             // Insert some owned obj data.
-            WorkingSetMember member;
-            member.loc = *it;
-            member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-            member.obj = coll->docFor(&_txn, *it);
-            ms->pushBack(member);
+            WorkingSetID id = ws->allocate();
+            WorkingSetMember* member = ws->get(id);
+            member->loc = *it;
+            member->obj = coll->docFor(&_txn, *it);
+            ws->transitionToLocAndObj(id);
+            ms->pushBack(id);
         }
     }
 
@@ -105,7 +106,7 @@ public:
         // Build the mock scan stage which feeds the data.
         unique_ptr<WorkingSet> ws(new WorkingSet());
         unique_ptr<QueuedDataStage> ms(new QueuedDataStage(ws.get()));
-        insertVarietyOfObjects(ms.get(), coll);
+        insertVarietyOfObjects(ws.get(), ms.get(), coll);
 
         SortStageParams params;
         params.collection = coll;
@@ -140,7 +141,7 @@ public:
         QueuedDataStage* ms = new QueuedDataStage(ws.get());
 
         // Insert a mix of the various types of data.
-        insertVarietyOfObjects(ms, coll);
+        insertVarietyOfObjects(ws.get(), ms, coll);
 
         SortStageParams params;
         params.collection = coll;
@@ -516,15 +517,21 @@ public:
         QueuedDataStage* ms = new QueuedDataStage(ws.get());
 
         for (int i = 0; i < numObj(); ++i) {
-            WorkingSetMember member;
-            member.state = WorkingSetMember::OWNED_OBJ;
-
-            member.obj = Snapshotted<BSONObj>(
-                SnapshotId(), fromjson("{a: [1,2,3], b:[1,2,3], c:[1,2,3], d:[1,2,3,4]}"));
-            ms->pushBack(member);
-
-            member.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson("{a:1, b:1, c:1}"));
-            ms->pushBack(member);
+            {
+                WorkingSetID id = ws->allocate();
+                WorkingSetMember* member = ws->get(id);
+                member->obj = Snapshotted<BSONObj>(
+                    SnapshotId(), fromjson("{a: [1,2,3], b:[1,2,3], c:[1,2,3], d:[1,2,3,4]}"));
+                member->transitionToOwnedObj();
+                ms->pushBack(id);
+            }
+            {
+                WorkingSetID id = ws->allocate();
+                WorkingSetMember* member = ws->get(id);
+                member->obj = Snapshotted<BSONObj>(SnapshotId(), fromjson("{a:1, b:1, c:1}"));
+                member->transitionToOwnedObj();
+                ms->pushBack(id);
+            }
         }
 
         SortStageParams params;

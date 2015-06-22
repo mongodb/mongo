@@ -67,12 +67,6 @@ CollectionScan::CollectionScan(OperationContext* txn,
       _commonStats(kStageType) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
-
-    // We pre-allocate a WSM and use it to pass up fetch requests. This should never be used
-    // for anything other than passing up NEED_YIELD. We use the loc and owned obj state, but
-    // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
-    WorkingSetMember* member = _workingSet->get(_wsidForFetch);
-    member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
 }
 
 PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
@@ -166,7 +160,7 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
     WorkingSetMember* member = _workingSet->get(id);
     member->loc = record->id;
     member->obj = {_txn->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
-    member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+    _workingSet->transitionToLocAndObj(id);
 
     return returnIfMatches(member, id, out);
 }

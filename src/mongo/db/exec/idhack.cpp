@@ -107,10 +107,10 @@ PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
         invariant(_recordCursor);
         WorkingSetID id = _idBeingPagedIn;
         _idBeingPagedIn = WorkingSet::INVALID_ID;
+
+        invariant(WorkingSetCommon::fetchIfUnfetched(_txn, _workingSet, id, _recordCursor));
+
         WorkingSetMember* member = _workingSet->get(id);
-
-        invariant(WorkingSetCommon::fetchIfUnfetched(_txn, member, _recordCursor));
-
         return advance(id, member, out);
     }
 
@@ -141,8 +141,8 @@ PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
         // Create a new WSM for the result document.
         id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
-        member->state = WorkingSetMember::LOC_AND_IDX;
         member->loc = loc;
+        _workingSet->transitionToLocAndIdx(id);
 
         if (!_recordCursor)
             _recordCursor = _collection->getCursor(_txn);
@@ -159,7 +159,7 @@ PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
         }
 
         // The doc was already in memory, so we go ahead and return it.
-        if (!WorkingSetCommon::fetch(_txn, member, _recordCursor)) {
+        if (!WorkingSetCommon::fetch(_txn, _workingSet, id, _recordCursor)) {
             // _id is immutable so the index would return the only record that could
             // possibly match the query.
             _workingSet->free(id);

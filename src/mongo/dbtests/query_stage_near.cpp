@@ -72,8 +72,8 @@ public:
 
         *out = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(*out);
-        member->state = WorkingSetMember::OWNED_OBJ;
         member->obj = Snapshotted<BSONObj>(SnapshotId(), next);
+        member->transitionToOwnedObj();
 
         return PlanStage::ADVANCED;
     }

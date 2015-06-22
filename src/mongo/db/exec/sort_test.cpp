@@ -95,13 +95,14 @@ void testWork(const char* patternStr,
     while (inputIt.more()) {
         BSONElement elt = inputIt.next();
         ASSERT(elt.isABSONObj());
-        BSONObj obj = elt.embeddedObject();
+        BSONObj obj = elt.embeddedObject().getOwned();
 
         // Insert obj from input array into working set.
-        WorkingSetMember wsm;
-        wsm.state = WorkingSetMember::OWNED_OBJ;
-        wsm.obj = Snapshotted<BSONObj>(SnapshotId(), obj);
-        ms->pushBack(wsm);
+        WorkingSetID id = ws.allocate();
+        WorkingSetMember* wsm = ws.get(id);
+        wsm->obj = Snapshotted<BSONObj>(SnapshotId(), obj);
+        wsm->transitionToOwnedObj();
+        ms->pushBack(id);
     }
 
     // Initialize SortStageParams

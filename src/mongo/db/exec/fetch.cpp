@@ -103,7 +103,7 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
             ++_specificStats.alreadyHasObj;
         } else {
             // We need a valid loc to fetch from and this is the only state that has one.
-            verify(WorkingSetMember::LOC_AND_IDX == member->state);
+            verify(WorkingSetMember::LOC_AND_IDX == member->getState());
             verify(member->hasLoc());
 
             try {
@@ -122,7 +122,7 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
 
                 // The doc is already in memory, so go ahead and grab it. Now we have a RecordId
                 // as well as an unowned object
-                if (!WorkingSetCommon::fetch(_txn, member, _cursor)) {
+                if (!WorkingSetCommon::fetch(_txn, _ws, id, _cursor)) {
                     _ws->free(id);
                     _commonStats.needTime++;
                     return NEED_TIME;

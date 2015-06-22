@@ -98,7 +98,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
         invariant(_params.returnDeleted);
 
         WorkingSetMember* member = _ws->get(_idReturning);
-        invariant(member->state == WorkingSetMember::OWNED_OBJ);
+        invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
         *out = _idReturning;
         _idReturning = WorkingSet::INVALID_ID;
@@ -141,7 +141,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
             std::unique_ptr<RecordCursor> cursor;
             if (_txn->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
                 cursor = _collection->getCursor(_txn);
-                if (!WorkingSetCommon::fetch(_txn, member, cursor)) {
+                if (!WorkingSetCommon::fetch(_txn, _ws, id, cursor)) {
                     // Doc is already deleted. Nothing more to do.
                     ++_commonStats.needTime;
                     return PlanStage::NEED_TIME;
@@ -175,7 +175,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
                 BSONObj deletedDoc = member->obj.value();
                 member->obj.setValue(deletedDoc.getOwned());
                 member->loc = RecordId();
-                member->state = WorkingSetMember::OWNED_OBJ;
+                member->transitionToOwnedObj();
             }
 
             // Do the write, unless this is an explain.
@@ -215,7 +215,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
             // (if it was requested).
             if (_params.returnDeleted) {
                 // member->obj should refer to the deleted document.
-                invariant(member->state == WorkingSetMember::OWNED_OBJ);
+                invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
                 _idReturning = id;
                 // Keep this member around so that we can return it on the next work() call.
@@ -228,7 +228,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
 
         if (_params.returnDeleted) {
             // member->obj should refer to the deleted document.
-            invariant(member->state == WorkingSetMember::OWNED_OBJ);
+            invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
             memberFreer.Dismiss();  // Keep this member around so we can return it.
             *out = id;

@@ -57,10 +57,13 @@ QueuedDataStage* getMS(WorkingSet* ws) {
     // Put N ADVANCED results into the mock stage, and some other stalling results (YIELD/TIME).
     for (int i = 0; i < N; ++i) {
         ms->pushBack(PlanStage::NEED_TIME);
-        WorkingSetMember wsm;
-        wsm.state = WorkingSetMember::OWNED_OBJ;
-        wsm.obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << i));
-        ms->pushBack(wsm);
+
+        WorkingSetID id = ws->allocate();
+        WorkingSetMember* wsm = ws->get(id);
+        wsm->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << i));
+        wsm->transitionToOwnedObj();
+        ms->pushBack(id);
+
         ms->pushBack(PlanStage::NEED_TIME);
     }
 

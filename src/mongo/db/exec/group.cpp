@@ -245,7 +245,7 @@ PlanStage::StageState GroupStage::work(WorkingSetID* out) {
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
         member->obj = Snapshotted<BSONObj>(SnapshotId(), results);
-        member->state = WorkingSetMember::OWNED_OBJ;
+        member->transitionToOwnedObj();
 
         ++_commonStats.advanced;
         return PlanStage::ADVANCED;

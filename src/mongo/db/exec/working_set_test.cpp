@@ -34,6 +34,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -47,7 +48,7 @@ class WorkingSetFixture : public mongo::unittest::Test {
 protected:
     void setUp() {
         ws.reset(new WorkingSet());
-        WorkingSetID id = ws->allocate();
+        id = ws->allocate();
         ASSERT(id != WorkingSet::INVALID_ID);
         member = ws->get(id);
         ASSERT(NULL != member);
@@ -59,6 +60,7 @@ protected:
     }
 
     std::unique_ptr<WorkingSet> ws;
+    WorkingSetID id;
     WorkingSetMember* member;
 };
 
@@ -66,18 +68,22 @@ TEST_F(WorkingSetFixture, noFieldToGet) {
     BSONElement elt;
 
     // Make sure we're not getting anything out of an invalid WSM.
-    ASSERT_EQUALS(WorkingSetMember::INVALID, member->state);
+    ASSERT_EQUALS(WorkingSetMember::INVALID, member->getState());
     ASSERT_FALSE(member->getFieldDotted("foo", &elt));
 
-    member->state = WorkingSetMember::LOC_AND_IDX;
+    ws->transitionToLocAndIdx(id);
     ASSERT_FALSE(member->getFieldDotted("foo", &elt));
 
     // Our state is that of a valid object.  The getFieldDotted shouldn't throw; there's
     // something to call getFieldDotted on, but there's no field there.
-    member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+    ws->transitionToLocAndObj(id);
     ASSERT_TRUE(member->getFieldDotted("foo", &elt));
 
-    member->state = WorkingSetMember::OWNED_OBJ;
+    WorkingSetMember* member = ws->get(id);
+    member->obj = {SnapshotId(),
+                   BSON("fake"
+                        << "obj")};
+    ws->transitionToOwnedObj(id);
     ASSERT_TRUE(member->getFieldDotted("foo", &elt));
 }
 
@@ -86,7 +92,7 @@ TEST_F(WorkingSetFixture, getFieldUnowned) {
 
     BSONObj obj = BSON(fieldName << 5);
     // Not truthful since the loc is bogus, but the loc isn't accessed anyway...
-    member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+    ws->transitionToLocAndObj(id);
     member->obj = Snapshotted<BSONObj>(SnapshotId(), BSONObj(obj.objdata()));
     ASSERT_TRUE(obj.isOwned());
     ASSERT_FALSE(member->obj.value().isOwned());
@@ -103,7 +109,7 @@ TEST_F(WorkingSetFixture, getFieldOwned) {
     BSONObj obj = BSON(fieldName << 5);
     member->obj = Snapshotted<BSONObj>(SnapshotId(), obj);
     ASSERT_TRUE(member->obj.value().isOwned());
-    member->state = WorkingSetMember::OWNED_OBJ;
+    ws->transitionToOwnedObj(id);
     BSONElement elt;
     ASSERT_TRUE(member->getFieldDotted(fieldName, &elt));
     ASSERT_EQUALS(elt.numberInt(), 5);
@@ -118,7 +124,7 @@ TEST_F(WorkingSetFixture, getFieldFromIndex) {
 
     member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), NULL));
     // Also a minor lie as loc is bogus.
-    member->state = WorkingSetMember::LOC_AND_IDX;
+    ws->transitionToLocAndIdx(id);
     BSONElement elt;
     ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
     ASSERT_EQUALS(elt.numberInt(), firstValue);
@@ -140,108 +146,12 @@ TEST_F(WorkingSetFixture, getDottedFieldFromIndex) {
     int firstValue = 5;
 
     member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), NULL));
-    member->state = WorkingSetMember::LOC_AND_IDX;
+    ws->transitionToLocAndIdx(id);
     BSONElement elt;
     ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
     ASSERT_EQUALS(elt.numberInt(), firstValue);
     ASSERT_FALSE(member->getFieldDotted("x", &elt));
     ASSERT_FALSE(member->getFieldDotted("y", &elt));
-}
-
-//
-// WorkingSet::iterator tests
-//
-
-TEST(WorkingSetIteratorTest, BasicIteratorTest) {
-    WorkingSet ws;
-
-    WorkingSetID id1 = ws.allocate();
-    WorkingSetMember* member1 = ws.get(id1);
-    member1->state = WorkingSetMember::LOC_AND_IDX;
-    member1->keyData.push_back(IndexKeyDatum(BSON("a" << 1), BSON("" << 3), NULL));
-
-    WorkingSetID id2 = ws.allocate();
-    WorkingSetMember* member2 = ws.get(id2);
-    member2->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-    member2->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("a" << 3));
-
-    int counter = 0;
-    for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
-        ASSERT(it->state == WorkingSetMember::LOC_AND_IDX ||
-               it->state == WorkingSetMember::LOC_AND_UNOWNED_OBJ);
-        counter++;
-    }
-    ASSERT_EQ(counter, 2);
-}
-
-TEST(WorkingSetIteratorTest, EmptyWorkingSet) {
-    WorkingSet ws;
-
-    int counter = 0;
-    for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
-        counter++;
-    }
-    ASSERT_EQ(counter, 0);
-}
-
-TEST(WorkingSetIteratorTest, EmptyWorkingSetDueToFree) {
-    WorkingSet ws;
-
-    WorkingSetID id = ws.allocate();
-    ws.free(id);
-
-    int counter = 0;
-    for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
-        counter++;
-    }
-    ASSERT_EQ(counter, 0);
-}
-
-TEST(WorkingSetIteratorTest, MixedFreeAndInUse) {
-    WorkingSet ws;
-
-    WorkingSetID id1 = ws.allocate();
-    WorkingSetID id2 = ws.allocate();
-    WorkingSetID id3 = ws.allocate();
-
-    WorkingSetMember* member = ws.get(id2);
-    member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-    member->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("a" << 3));
-
-    ws.free(id1);
-    ws.free(id3);
-
-    int counter = 0;
-    for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
-        ASSERT(it->state == WorkingSetMember::LOC_AND_UNOWNED_OBJ);
-        counter++;
-    }
-    ASSERT_EQ(counter, 1);
-}
-
-TEST(WorkingSetIteratorTest, FreeWhileIterating) {
-    WorkingSet ws;
-
-    ws.allocate();
-    ws.allocate();
-    ws.allocate();
-
-    // Free the last two members during iteration.
-    int counter = 0;
-    for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
-        if (counter > 0) {
-            it.free();
-        }
-        counter++;
-    }
-    ASSERT_EQ(counter, 3);
-
-    // Verify that only one item remains in the working set.
-    counter = 0;
-    for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
-        counter++;
-    }
-    ASSERT_EQ(counter, 1);
 }
 
 }  // namespace

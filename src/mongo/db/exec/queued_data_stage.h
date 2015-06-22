@@ -91,10 +91,13 @@ public:
     /**
      * ...data is returned (and we ADVANCED)
      *
-     * Allocates a new member and copies 'member' into it.
-     * Does not take ownership of anything in 'member'.
+     * The caller is responsible for allocating 'id' and filling out the WSM keyed by 'id'
+     * appropriately.
+     *
+     * The QueuedDataStage takes ownership of 'id', so the caller should not call WorkingSet::free()
+     * on it.
      */
-    void pushBack(const WorkingSetMember& member);
+    void pushBack(const WorkingSetID& id);
 
     static const char* kStageType;
 

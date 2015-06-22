@@ -50,40 +50,42 @@ public:
                                       const Collection* collection);
 
     /**
-     * This must be called as part of "saveState" operations after all nodes in the tree save
-     * their state.
+     * This must be called as part of "saveState" operations after all nodes in the tree save their
+     * state.
      *
-     * Iterates over 'workingSet' and converts all LOC_AND_UNOWNED_OBJ members to
-     * LOC_AND_OWNED_OBJ by calling getOwned on their obj. Also sets the isSuspicious flag on
-     * all nodes in LOC_AND_IDX state.
+     * Iterates over WorkingSetIDs in 'workingSet' which are "sensitive to yield". These are ids
+     * that have transitioned into the LOC_AND_IDX or LOC_AND_OBJ state since the previous yield.
+     *
+     * The LOC_AND_IDX members are tagged as suspicious so that they can be handled properly in case
+     * the document keyed by the index key is deleted or updated during the yield. LOC_AND_OBJ
+     * working set members with unowned BSON documents have their 'obj' field made owned in order to
+     * ensure that they don't point into storage which may be modified during yield.
      */
     static void prepareForSnapshotChange(WorkingSet* workingSet);
 
     /**
-     * Retrieves the document corresponding to 'member' from 'collection', and sets the state of
-     * 'member' appropriately.
+     * Transitions the WorkingSetMember with WorkingSetID 'id' from the LOC_AND_IDX state to the
+     * LOC_AND_OBJ state by fetching a document. Does the fetch using RecordCursor 'cursor'.
      *
      * If false is returned, the document should not be considered for the result set. It is the
-     * caller's responsibility to free 'member' in this case.
+     * caller's responsibility to free 'id' in this case.
      *
      * WriteConflict exceptions may be thrown. When they are, 'member' will be unmodified.
      */
     static bool fetch(OperationContext* txn,
-                      WorkingSetMember* member,
+                      WorkingSet* workingSet,
+                      WorkingSetID id,
                       unowned_ptr<RecordCursor> cursor);
 
     static bool fetchIfUnfetched(OperationContext* txn,
-                                 WorkingSetMember* member,
+                                 WorkingSet* workingSet,
+                                 WorkingSetID id,
                                  unowned_ptr<RecordCursor> cursor) {
+        WorkingSetMember* member = workingSet->get(id);
         if (member->hasObj())
             return true;
-        return fetch(txn, member, cursor);
+        return fetch(txn, workingSet, id, cursor);
     }
-
-    /**
-     * Initialize the fields in 'dest' from 'src', creating copies of owned objects as needed.
-     */
-    static void initFrom(WorkingSetMember* dest, const WorkingSetMember& src);
 
     /**
      * Build a BSONObj which represents a Status to return in a WorkingSet.

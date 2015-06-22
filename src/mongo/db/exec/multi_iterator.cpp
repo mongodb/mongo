@@ -46,13 +46,7 @@ const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 MultiIteratorStage::MultiIteratorStage(OperationContext* txn,
                                        WorkingSet* ws,
                                        Collection* collection)
-    : _txn(txn), _collection(collection), _ws(ws), _wsidForFetch(_ws->allocate()) {
-    // We pre-allocate a WSM and use it to pass up fetch requests. This should never be used
-    // for anything other than passing up NEED_YIELD. We use the loc and owned obj state, but
-    // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
-    WorkingSetMember* member = _ws->get(_wsidForFetch);
-    member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
-}
+    : _txn(txn), _collection(collection), _ws(ws), _wsidForFetch(_ws->allocate()) {}
 
 void MultiIteratorStage::addIterator(unique_ptr<RecordCursor> it) {
     _iterators.push_back(std::move(it));
@@ -95,7 +89,7 @@ PlanStage::StageState MultiIteratorStage::work(WorkingSetID* out) {
     WorkingSetMember* member = _ws->get(*out);
     member->loc = record->id;
     member->obj = {_txn->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
-    member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+    _ws->transitionToLocAndObj(*out);
     return PlanStage::ADVANCED;
 }
 

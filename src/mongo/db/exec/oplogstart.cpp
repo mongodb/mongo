@@ -110,7 +110,7 @@ PlanStage::StageState OplogStart::workExtentHopping(WorkingSetID* out) {
                 WorkingSetMember* member = _workingSet->get(id);
                 member->loc = record->id;
                 member->obj = {_txn->recoveryUnit()->getSnapshotId(), std::move(obj)};
-                member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                _workingSet->transitionToLocAndObj(id);
                 *out = id;
                 return PlanStage::ADVANCED;
             }

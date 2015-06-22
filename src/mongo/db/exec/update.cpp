@@ -759,7 +759,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 WorkingSetMember* member = _ws->get(*out);
                 member->obj =
                     Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(), newObj.getOwned());
-                member->state = WorkingSetMember::OWNED_OBJ;
+                member->transitionToOwnedObj();
                 ++_commonStats.advanced;
                 return PlanStage::ADVANCED;
             }
@@ -783,7 +783,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
         invariant(_params.request->shouldReturnAnyDocs());
 
         WorkingSetMember* member = _ws->get(_idReturning);
-        invariant(member->state == WorkingSetMember::OWNED_OBJ);
+        invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
         *out = _idReturning;
         _idReturning = WorkingSet::INVALID_ID;
@@ -838,7 +838,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
             if (_txn->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
                 cursor = _collection->getCursor(_txn);
                 // our snapshot has changed, refetch
-                if (!WorkingSetCommon::fetch(_txn, member, cursor)) {
+                if (!WorkingSetCommon::fetch(_txn, _ws, id, cursor)) {
                     // document was deleted, we're done here
                     ++_commonStats.needTime;
                     return PlanStage::NEED_TIME;
@@ -884,7 +884,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                     member->obj.setValue(oldObj);
                 }
                 member->loc = RecordId();
-                member->state = WorkingSetMember::OWNED_OBJ;
+                member->transitionToOwnedObj();
             }
         } catch (const WriteConflictException& wce) {
             _idRetrying = id;
@@ -909,7 +909,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
             // (if it was requested).
             if (_params.request->shouldReturnAnyDocs()) {
                 // member->obj should refer to the document we want to return.
-                invariant(member->state == WorkingSetMember::OWNED_OBJ);
+                invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
                 _idReturning = id;
                 // Keep this member around so that we can return it on the next work() call.
@@ -922,7 +922,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
 
         if (_params.request->shouldReturnAnyDocs()) {
             // member->obj should refer to the document we want to return.
-            invariant(member->state == WorkingSetMember::OWNED_OBJ);
+            invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
             memberFreer.Dismiss();  // Keep this member around so we can return it.
             *out = id;

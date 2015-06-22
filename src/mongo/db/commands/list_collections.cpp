@@ -157,12 +157,13 @@ public:
                 continue;
             }
 
-            WorkingSetMember member;
-            member.state = WorkingSetMember::OWNED_OBJ;
-            member.keyData.clear();
-            member.loc = RecordId();
-            member.obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
-            root->pushBack(member);
+            WorkingSetID id = ws->allocate();
+            WorkingSetMember* member = ws->get(id);
+            member->keyData.clear();
+            member->loc = RecordId();
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
+            member->transitionToOwnedObj();
+            root->pushBack(id);
         }
 
         std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name;

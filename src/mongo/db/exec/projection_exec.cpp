@@ -231,10 +231,10 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
             keyObj = key->getKey();
         }
 
-        member->state = WorkingSetMember::OWNED_OBJ;
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), keyObj);
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), keyObj.getOwned());
         member->keyData.clear();
         member->loc = RecordId();
+        member->transitionToOwnedObj();
         return Status::OK();
     }
 
@@ -318,10 +318,10 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
     }
 
     BSONObj newObj = bob.obj();
-    member->state = WorkingSetMember::OWNED_OBJ;
     member->obj = Snapshotted<BSONObj>(SnapshotId(), newObj);
     member->keyData.clear();
     member->loc = RecordId();
+    member->transitionToOwnedObj();
 
     return Status::OK();
 }

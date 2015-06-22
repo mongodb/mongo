@@ -44,7 +44,7 @@ bool WorkingSetCommon::fetchAndInvalidateLoc(OperationContext* txn,
                                              WorkingSetMember* member,
                                              const Collection* collection) {
     // Already in our desired state.
-    if (member->state == WorkingSetMember::OWNED_OBJ) {
+    if (member->getState() == WorkingSetMember::OWNED_OBJ) {
         return true;
     }
 
@@ -56,30 +56,39 @@ bool WorkingSetCommon::fetchAndInvalidateLoc(OperationContext* txn,
     // Do the fetch, invalidate the DL.
     member->obj = collection->docFor(txn, member->loc);
     member->obj.setValue(member->obj.value().getOwned());
-
-    member->state = WorkingSetMember::OWNED_OBJ;
     member->loc = RecordId();
+    member->transitionToOwnedObj();
+
     return true;
 }
 
 void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
     dassert(supportsDocLocking());
 
-    for (WorkingSet::iterator it = workingSet->begin(); it != workingSet->end(); ++it) {
-        if (it->state == WorkingSetMember::LOC_AND_IDX) {
-            it->isSuspicious = true;
-        } else if (it->state == WorkingSetMember::LOC_AND_UNOWNED_OBJ) {
-            // We already have the data so convert directly to owned state.
-            it->obj.setValue(it->obj.value().getOwned());
-            it->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
+    for (auto id : workingSet->getAndClearYieldSensitiveIds()) {
+        if (workingSet->isFree(id)) {
+            continue;
+        }
+
+        // We may see the same member twice, so anything we do here should be idempotent.
+        WorkingSetMember* member = workingSet->get(id);
+        if (member->getState() == WorkingSetMember::LOC_AND_IDX) {
+            member->isSuspicious = true;
+        } else if (member->getState() == WorkingSetMember::LOC_AND_OBJ) {
+            // Need to make sure that the data is owned, as underlying storage can change during a
+            // yield.
+            member->makeObjOwned();
         }
     }
 }
 
 // static
 bool WorkingSetCommon::fetch(OperationContext* txn,
-                             WorkingSetMember* member,
+                             WorkingSet* workingSet,
+                             WorkingSetID id,
                              unowned_ptr<RecordCursor> cursor) {
+    WorkingSetMember* member = workingSet->get(id);
+
     // The RecordFetcher should already have been transferred out of the WSM and used.
     invariant(!member->hasFetcher());
 
@@ -114,24 +123,8 @@ bool WorkingSetCommon::fetch(OperationContext* txn,
     }
 
     member->keyData.clear();
-    member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+    workingSet->transitionToLocAndObj(id);
     return true;
-}
-
-// static
-void WorkingSetCommon::initFrom(WorkingSetMember* dest, const WorkingSetMember& src) {
-    dest->loc = src.loc;
-    dest->obj = src.obj;
-    dest->keyData = src.keyData;
-    dest->state = src.state;
-
-    // Merge computed data.
-    typedef WorkingSetComputedDataType WSCD;
-    for (WSCD i = WSCD(0); i < WSM_COMPUTED_NUM_TYPES; i = WSCD(i + 1)) {
-        if (src.hasComputed(i)) {
-            dest->addComputed(src.getComputed(i)->clone());
-        }
-    }
 }
 
 // static
@@ -150,8 +143,8 @@ WorkingSetID WorkingSetCommon::allocateStatusMember(WorkingSet* ws, const Status
 
     WorkingSetID wsid = ws->allocate();
     WorkingSetMember* member = ws->get(wsid);
-    member->state = WorkingSetMember::OWNED_OBJ;
     member->obj = Snapshotted<BSONObj>(SnapshotId(), buildMemberStatusObject(status));
+    member->transitionToOwnedObj();
 
     return wsid;
 }

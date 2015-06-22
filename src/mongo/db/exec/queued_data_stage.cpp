@@ -102,12 +102,8 @@ void QueuedDataStage::pushBack(const PlanStage::StageState state) {
     _results.push(state);
 }
 
-void QueuedDataStage::pushBack(const WorkingSetMember& member) {
+void QueuedDataStage::pushBack(const WorkingSetID& id) {
     _results.push(PlanStage::ADVANCED);
-
-    WorkingSetID id = _ws->allocate();
-    WorkingSetMember* ourMember = _ws->get(id);
-    WorkingSetCommon::initFrom(ourMember, member);
 
     // member lives in _ws.  We'll return it when _results hits ADVANCED.
     _members.push(id);

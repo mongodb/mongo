@@ -180,7 +180,7 @@ PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
             // The front element has hit _targetLoc.  Don't move it forward anymore/work on
             // another element.
             _workingTowardRep.pop();
-            AndCommon::mergeFrom(_ws->get(_targetId), *member);
+            AndCommon::mergeFrom(_ws, _targetId, *member);
             _ws->free(id);
 
             if (0 == _workingTowardRep.size()) {

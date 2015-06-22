@@ -394,14 +394,15 @@ public:
         ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
-        // LOC_AND_UNOWNED_OBJ state.
-        unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
-        WorkingSetMember member;
-        member.loc = locs[targetDocIndex];
-        member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+        // LOC_AND_OBJ state.
+        std::unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
+        WorkingSetID id = ws->allocate();
+        WorkingSetMember* member = ws->get(id);
+        member->loc = locs[targetDocIndex];
         const BSONObj oldDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex);
-        member.obj = Snapshotted<BSONObj>(SnapshotId(), oldDoc);
-        qds->pushBack(member);
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), oldDoc);
+        ws->transitionToLocAndObj(id);
+        qds->pushBack(id);
 
         // Configure the update.
         UpdateStageParams updateParams(&request, &driver, opDebug);
@@ -411,7 +412,7 @@ public:
             stdx::make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release()));
 
         // Should return advanced.
-        WorkingSetID id = WorkingSet::INVALID_ID;
+        id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = updateStage->work(&id);
         ASSERT_EQUALS(PlanStage::ADVANCED, state);
 
@@ -423,7 +424,7 @@ public:
         // With an owned copy of the object, with no RecordId.
         ASSERT_TRUE(resultMember->hasOwnedObj());
         ASSERT_FALSE(resultMember->hasLoc());
-        ASSERT_EQUALS(resultMember->state, WorkingSetMember::OWNED_OBJ);
+        ASSERT_EQUALS(resultMember->getState(), WorkingSetMember::OWNED_OBJ);
         ASSERT_TRUE(resultMember->obj.value().isOwned());
 
         // Should be the old value.
@@ -481,14 +482,15 @@ public:
         ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
-        // LOC_AND_UNOWNED_OBJ state.
-        unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
-        WorkingSetMember member;
-        member.loc = locs[targetDocIndex];
-        member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+        // LOC_AND_OBJ state.
+        std::unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
+        WorkingSetID id = ws->allocate();
+        WorkingSetMember* member = ws->get(id);
+        member->loc = locs[targetDocIndex];
         const BSONObj oldDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex);
-        member.obj = Snapshotted<BSONObj>(SnapshotId(), oldDoc);
-        qds->pushBack(member);
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), oldDoc);
+        ws->transitionToLocAndObj(id);
+        qds->pushBack(id);
 
         // Configure the update.
         UpdateStageParams updateParams(&request, &driver, opDebug);
@@ -498,7 +500,7 @@ public:
             stdx::make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release()));
 
         // Should return advanced.
-        WorkingSetID id = WorkingSet::INVALID_ID;
+        id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = updateStage->work(&id);
         ASSERT_EQUALS(PlanStage::ADVANCED, state);
 
@@ -510,7 +512,7 @@ public:
         // With an owned copy of the object, with no RecordId.
         ASSERT_TRUE(resultMember->hasOwnedObj());
         ASSERT_FALSE(resultMember->hasLoc());
-        ASSERT_EQUALS(resultMember->state, WorkingSetMember::OWNED_OBJ);
+        ASSERT_EQUALS(resultMember->getState(), WorkingSetMember::OWNED_OBJ);
         ASSERT_TRUE(resultMember->obj.value().isOwned());
 
         // Should be the new value.
@@ -558,10 +560,13 @@ public:
 
         // Configure a QueuedDataStage to pass an OWNED_OBJ to the update stage.
         unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
-        WorkingSetMember member;
-        member.state = WorkingSetMember::OWNED_OBJ;
-        member.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson("{x: 1}"));
-        qds->pushBack(member);
+        {
+            WorkingSetID id = ws->allocate();
+            WorkingSetMember* member = ws->get(id);
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), fromjson("{x: 1}"));
+            member->transitionToOwnedObj();
+            qds->pushBack(id);
+        }
 
         // Configure the update.
         UpdateStageParams updateParams(&request, &driver, opDebug);

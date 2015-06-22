@@ -242,8 +242,7 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
         WorkingSetID hashID = it->second;
         _dataMap.erase(it);
 
-        WorkingSetMember* olderMember = _ws->get(hashID);
-        AndCommon::mergeFrom(olderMember, *member);
+        AndCommon::mergeFrom(_ws, hashID, *member);
         _ws->free(*out);
 
         ++_commonStats.advanced;
@@ -352,10 +351,11 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
         } else {
             // We have a hit.  Copy data into the WSM we already have.
             _seenMap.insert(member->loc);
-            WorkingSetMember* olderMember = _ws->get(_dataMap[member->loc]);
+            WorkingSetID olderMemberID = _dataMap[member->loc];
+            WorkingSetMember* olderMember = _ws->get(olderMemberID);
             size_t memUsageBefore = olderMember->getMemUsage();
 
-            AndCommon::mergeFrom(olderMember, *member);
+            AndCommon::mergeFrom(_ws, olderMemberID, *member);
 
             // Update memory stats.
             _memUsage += olderMember->getMemUsage() - memUsageBefore;
