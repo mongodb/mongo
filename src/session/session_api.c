@@ -527,9 +527,6 @@ __session_reset(WT_SESSION *wt_session)
 	__wt_scr_discard(session);
 	__wt_buf_free(session, &session->err);
 
-	/* Free transaction information. */
-	__wt_txn_destroy(session);
-
 	/* Confirm we're not holding any hazard pointers. */
 	__wt_hazard_close(session);
 
