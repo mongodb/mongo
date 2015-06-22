@@ -110,6 +110,9 @@ public:
      *
      * Call this before calling any methods that might block waiting for the
      * executor thread.
+     *
+     * It is safe to call exitNetwork() even if enterNetwork() has not been called - it will just
+     * be a no-op.
      */
     void exitNetwork();
 

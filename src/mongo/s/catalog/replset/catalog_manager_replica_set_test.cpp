@@ -79,7 +79,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
     expectedColl.setUpdatedAt(Date_t());
     expectedColl.setEpoch(OID::gen());
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this, &expectedColl] {
                             return assertGet(catalogManager()->getCollection(expectedColl.getNs()));
                         });
@@ -109,7 +109,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionNotExisting) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             auto status = catalogManager()->getCollection("NonExistent");
                             ASSERT_EQUALS(status.getStatus(), ErrorCodes::NamespaceNotFound);
@@ -118,7 +118,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionNotExisting) {
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
     // Now wait for the getCollection call to return
-    future.get();
+    future.wait();
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseExisting) {
@@ -131,7 +131,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseExisting) {
     expectedDb.setPrimary("shard0000");
     expectedDb.setSharded(true);
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this, &expectedDb] {
                             return assertGet(catalogManager()->getDatabase(expectedDb.getName()));
                         });
@@ -159,7 +159,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseNotExisting) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             auto dbResult = catalogManager()->getDatabase("NonExistent");
                             ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NamespaceNotFound);
@@ -167,7 +167,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseNotExisting) {
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    future.get();
+    future.wait();
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateCollection) {
@@ -182,7 +182,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollection) {
     collection.setEpoch(OID::gen());
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this, collection] {
                             auto status = catalogManager()->updateCollection(
                                 collection.getNs().toString(), collection);
@@ -229,7 +229,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMaster) {
     collection.setEpoch(OID::gen());
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this, collection] {
                             auto status = catalogManager()->updateCollection(
                                 collection.getNs().toString(), collection);
@@ -263,7 +263,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterFromTargeter) 
     collection.setEpoch(OID::gen());
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this, collection] {
                             auto status = catalogManager()->updateCollection(
                                 collection.getNs().toString(), collection);
@@ -288,7 +288,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) 
     collection.setEpoch(OID::gen());
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this, collection] {
                             auto status = catalogManager()->updateCollection(
                                 collection.getNs().toString(), collection);
@@ -360,7 +360,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsValid) {
 
     const vector<ShardType> expectedShardsList = {s1, s2, s3};
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             vector<ShardType> shards;
                             ASSERT_OK(catalogManager()->getAllShards(&shards));
@@ -394,7 +394,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsWithInvalidShard) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             vector<ShardType> shards;
                             Status status = catalogManager()->getAllShards(&shards);
@@ -415,7 +415,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsWithInvalidShard) {
         };
     });
 
-    future.get();
+    future.wait();
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSWithSortAndLimit) {
@@ -448,8 +448,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSWithSortAndLimit) {
              << ChunkType::DEPRECATED_lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
-    auto future = async(std::launch::async,
-                        [this, &chunksQuery] {
+    auto future = launchAsync([this, &chunksQuery] {
                             vector<ChunkType> chunks;
 
                             ASSERT_OK(catalogManager()->getChunks(
@@ -490,16 +489,14 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSNoSortNoLimit) {
              << ChunkType::DEPRECATED_lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
-    auto future = async(
-        std::launch::async,
-        [this, &chunksQuery] {
-            vector<ChunkType> chunks;
+    auto future = launchAsync([this, &chunksQuery] {
+        vector<ChunkType> chunks;
 
-            ASSERT_OK(catalogManager()->getChunks(chunksQuery, BSONObj(), boost::none, &chunks));
-            ASSERT_EQ(0U, chunks.size());
+        ASSERT_OK(catalogManager()->getChunks(chunksQuery, BSONObj(), boost::none, &chunks));
+        ASSERT_EQ(0U, chunks.size());
 
-            return chunks;
-        });
+        return chunks;
+    });
 
     onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -515,7 +512,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSNoSortNoLimit) {
         return vector<BSONObj>{};
     });
 
-    future.get();
+    future.wait();
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
@@ -530,7 +527,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
              << ChunkType::DEPRECATED_lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this, &chunksQuery] {
                             vector<ChunkType> chunks;
                             Status status = catalogManager()->getChunks(
@@ -560,7 +557,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
         return vector<BSONObj>{chunkA.toBSON(), chunkB.toBSON()};
     });
 
-    future.get();
+    future.wait();
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommand) {
@@ -568,7 +565,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommand) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             BSONObjBuilder responseBuilder;
                             bool ok = catalogManager()->runUserManagementReadCommand(
@@ -649,7 +646,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandSuccess) {
         Status::OK());
 
     auto future =
-        async(std::launch::async,
+        launchAsync(
               [this] {
                   BSONObjBuilder responseBuilder;
                   bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
@@ -695,7 +692,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMaster)
         Status::OK());
 
     auto future =
-        async(std::launch::async,
+        launchAsync(
               [this] {
                   BSONObjBuilder responseBuilder;
                   bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
@@ -740,7 +737,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMasterR
         Status::OK());
 
     auto future =
-        async(std::launch::async,
+        launchAsync(
               [this] {
                   BSONObjBuilder responseBuilder;
                   bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
@@ -790,7 +787,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsBalancerDoc) {
     st1.setKey(SettingsType::BalancerDocKey);
     st1.setBalancerStopped(true);
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             return assertGet(
                                 catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey));
@@ -822,7 +819,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsChunkSizeDoc) {
     st1.setKey(SettingsType::ChunkSizeDocKey);
     st1.setChunkSizeMB(80);
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             return assertGet(
                                 catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey));
@@ -849,7 +846,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsInvalidDoc) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             const auto balSettings =
                                 catalogManager()->getGlobalSettings("invalidKey");
@@ -872,7 +869,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsInvalidDoc) {
         };
     });
 
-    future.get();
+    future.wait();
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
@@ -881,7 +878,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future =
-        async(std::launch::async,
+        launchAsync(
               [this] {
                   const auto chunkSizeSettings =
                       catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey);
@@ -901,7 +898,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
         return vector<BSONObj>{};
     });
 
-    future.get();
+    future.wait();
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsNoDb) {
@@ -933,7 +930,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsNoDb) {
     coll3.setKeyPattern(KeyPattern{BSON("_id" << 1)});
     ASSERT_OK(coll3.validate());
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             vector<CollectionType> collections;
 
@@ -983,7 +980,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsWithDb) {
     coll2.setEpoch(OID::gen());
     coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             string dbName = "test";
                             vector<CollectionType> collections;
@@ -1022,7 +1019,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsInvalidCollectionType) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             string dbName = "test";
                             vector<CollectionType> collections;
@@ -1061,7 +1058,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsInvalidCollectionType) {
         };
     });
 
-    future.get();
+    future.wait();
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardValid) {
@@ -1077,7 +1074,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardValid) {
     dbt2.setName("db2");
     dbt2.setPrimary("shard0000");
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             vector<string> dbs;
                             const auto status =
@@ -1111,7 +1108,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardInvalidDoc) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = async(std::launch::async,
+    auto future = launchAsync(
                         [this] {
                             vector<string> dbs;
                             const auto status =
@@ -1132,7 +1129,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardInvalidDoc) {
         };
     });
 
-    future.get();
+    future.wait();
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollection) {

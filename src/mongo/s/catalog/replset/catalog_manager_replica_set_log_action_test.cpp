@@ -104,7 +104,7 @@ TEST_F(LogActionTest, LogActionNoRetryAfterSuccessfulCreate) {
     expectedActionLog.setWhat("moved a chunk");
 
     auto future =
-        async(std::launch::async,
+        launchAsync(
               [this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
 
     expectActionLogCreate(BSON("ok" << 1));
@@ -114,7 +114,7 @@ TEST_F(LogActionTest, LogActionNoRetryAfterSuccessfulCreate) {
     future.wait_for(kFutureTimeout);
 
     // Now log another action and confirm that we don't re-attempt to create the collection
-    future = async(std::launch::async,
+    future = launchAsync(
                    [this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
 
     expectActionLogInsert(expectedActionLog);
@@ -134,7 +134,7 @@ TEST_F(LogActionTest, LogActionNoRetryCreateIfAlreadyExists) {
     expectedActionLog.setWhat("moved a chunk");
 
     auto future =
-        async(std::launch::async,
+        launchAsync(
               [this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
 
     BSONObjBuilder createResponseBuilder;
@@ -147,7 +147,7 @@ TEST_F(LogActionTest, LogActionNoRetryCreateIfAlreadyExists) {
     future.wait_for(kFutureTimeout);
 
     // Now log another action and confirm that we don't re-attempt to create the collection
-    future = async(std::launch::async,
+    future = launchAsync(
                    [this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
 
     expectActionLogInsert(expectedActionLog);
@@ -167,7 +167,7 @@ TEST_F(LogActionTest, LogActionCreateFailure) {
     expectedActionLog.setWhat("moved a chunk");
 
     auto future =
-        async(std::launch::async,
+        launchAsync(
               [this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
 
     BSONObjBuilder createResponseBuilder;
@@ -180,7 +180,7 @@ TEST_F(LogActionTest, LogActionCreateFailure) {
     future.wait_for(kFutureTimeout);
 
     // Now log another action and confirm that we *do* attempt to re-create the collection
-    future = async(std::launch::async,
+    future = launchAsync(
                    [this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
 
     expectActionLogCreate(BSON("ok" << 1));
