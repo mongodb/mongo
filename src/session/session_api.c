@@ -203,7 +203,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
-	WT_TRET(__wt_session_reset_cursors(session, 1));
+	WT_TRET(__wt_session_reset_cursors(session, 0));
 
 	WT_ERR(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
 	if (cval.len != 0)
@@ -509,7 +509,7 @@ __session_reset(WT_SESSION *wt_session)
 	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
-	WT_TRET(__wt_session_reset_cursors(session, 9));
+	WT_TRET(__wt_session_reset_cursors(session, 1));
 
 	WT_ASSERT(session, session->ncursors == 0);
 
@@ -824,7 +824,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);
 	else {
-		WT_TRET(__wt_session_reset_cursors(session, 1));
+		WT_TRET(__wt_session_reset_cursors(session, 0));
 		WT_TRET(__wt_txn_rollback(session, cfg));
 	}
 
@@ -845,7 +845,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, rollback_transaction, config, cfg);
 	WT_STAT_FAST_CONN_INCR(session, txn_rollback);
 
-	WT_TRET(__wt_session_reset_cursors(session, 1));
+	WT_TRET(__wt_session_reset_cursors(session, 0));
 
 	WT_TRET(__wt_txn_rollback(session, cfg));
 
@@ -1008,7 +1008,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * checkpoint code will acquire the schema lock before we do that, and
 	 * some implementation of WT_CURSOR::reset might need the schema lock.
 	 */
-	WT_ERR(__wt_session_reset_cursors(session, 1));
+	WT_ERR(__wt_session_reset_cursors(session, 0));
 
 	/*
 	 * Don't highjack the session checkpoint thread for eviction.
