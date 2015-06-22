@@ -1188,7 +1188,7 @@ Status CatalogManagerLegacy::getChunks(const Query& query,
                 return {ErrorCodes::FailedToParse,
                         stream() << "Failed to parse chunk with id ("
                                  << chunkObj[ChunkType::name()].toString()
-                                 << "): " << chunkRes.getStatus().reason()};
+                                 << "): " << chunkRes.getStatus().toString()};
             }
 
             chunks->push_back(chunkRes.getValue());
@@ -1220,10 +1220,11 @@ Status CatalogManagerLegacy::getTagsForCollection(const std::string& collectionN
 
             StatusWith<TagsType> tagRes = TagsType::fromBSON(tagObj);
             if (!tagRes.isOK()) {
+                tags->clear();
                 conn.done();
                 return Status(ErrorCodes::FailedToParse,
-                              str::stream() << "Failed to parse tag BSONObj: "
-                                            << tagRes.getStatus().reason());
+                              str::stream()
+                                  << "Failed to parse tag: " << tagRes.getStatus().toString());
             }
 
             tags->push_back(tagRes.getValue());
@@ -1280,7 +1281,7 @@ Status CatalogManagerLegacy::getAllShards(vector<ShardType>* shards) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse shard with id ("
                                         << shardObj[ShardType::name()].toString()
-                                        << "): " << shardRes.getStatus().reason());
+                                        << "): " << shardRes.getStatus().toString());
         }
 
         shards->push_back(shardRes.getValue());

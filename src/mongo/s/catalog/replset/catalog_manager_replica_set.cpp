@@ -51,6 +51,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -394,6 +395,8 @@ Status CatalogManagerReplicaSet::getDatabasesForShard(const string& shardName,
 Status CatalogManagerReplicaSet::getChunks(const Query& query,
                                            int nToReturn,
                                            vector<ChunkType>* chunks) {
+    chunks->clear();
+
     auto configShard = grid.shardRegistry()->getShard("config");
     auto readHostStatus = configShard->getTargeter()->findHost(kConfigReadSelector);
     if (!readHostStatus.isOK()) {
@@ -415,7 +418,7 @@ Status CatalogManagerReplicaSet::getChunks(const Query& query,
             return {ErrorCodes::FailedToParse,
                     stream() << "Failed to parse chunk with id ("
                              << obj[ChunkType::name()].toString()
-                             << "): " << chunkRes.getStatus().reason()};
+                             << "): " << chunkRes.getStatus().toString()};
         }
 
         chunks->push_back(chunkRes.getValue());
@@ -426,7 +429,36 @@ Status CatalogManagerReplicaSet::getChunks(const Query& query,
 
 Status CatalogManagerReplicaSet::getTagsForCollection(const std::string& collectionNs,
                                                       std::vector<TagsType>* tags) {
-    return notYetImplemented;
+    tags->clear();
+
+    auto configShard = grid.shardRegistry()->getShard("config");
+    auto readHostStatus = configShard->getTargeter()->findHost(kConfigReadSelector);
+    if (!readHostStatus.isOK()) {
+        return readHostStatus.getStatus();
+    }
+
+    const Query query = Query(BSON(TagsType::ns(collectionNs))).sort(TagsType::min());
+
+    auto findStatus = grid.shardRegistry()->exhaustiveFind(readHostStatus.getValue(),
+                                                           NamespaceString(TagsType::ConfigNS),
+                                                           query.obj,
+                                                           boost::none);  // no limit
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+    for (const BSONObj& obj : findStatus.getValue()) {
+        auto tagRes = TagsType::fromBSON(obj);
+        if (!tagRes.isOK()) {
+            tags->clear();
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream()
+                              << "Failed to parse tag: " << tagRes.getStatus().toString());
+        }
+
+        tags->push_back(tagRes.getValue());
+    }
+
+    return Status::OK();
 }
 
 StatusWith<string> CatalogManagerReplicaSet::getTagForChunk(const std::string& collectionNs,
@@ -456,7 +488,7 @@ Status CatalogManagerReplicaSet::getAllShards(vector<ShardType>* shards) {
             return {ErrorCodes::FailedToParse,
                     stream() << "Failed to parse shard with id ("
                              << doc[ShardType::name()].toString()
-                             << "): " << shardRes.getStatus().reason()};
+                             << "): " << shardRes.getStatus().toString()};
         }
 
         shards->push_back(shardRes.getValue());

@@ -47,8 +47,9 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/catalog/type_settings.h"
+#include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
@@ -497,17 +498,8 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSNoChunks) {
                             ASSERT_EQ(0U, chunks.size());
                         });
 
-    onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
-
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
-
-        ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), chunksQuery.getFilter());
-
-        return vector<BSONObj>{};
-    });
+    onFindCommand(
+        [&chunksQuery](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
     future.get();
 }
@@ -534,14 +526,6 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
                         });
 
     onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
-
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
-
-        ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), chunksQuery.getFilter());
-
         ChunkType chunkA;
         chunkA.setName("chunk0000");
         chunkA.setNS("TestDB.TestColl");
@@ -1137,6 +1121,105 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardInvalidDoc) {
             dbt1.toBSON(),
             BSON(DatabaseType::name() << 0)  // DatabaseType::name() should be a string
         };
+    });
+
+    future.get();
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollection) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    TagsType tagA;
+    tagA.setNS("TestDB.TestColl");
+    tagA.setTag("TagA");
+    tagA.setMinKey(BSON("a" << 100));
+    tagA.setMaxKey(BSON("a" << 200));
+
+    TagsType tagB;
+    tagB.setNS("TestDB.TestColl");
+    tagB.setTag("TagB");
+    tagB.setMinKey(BSON("a" << 200));
+    tagB.setMaxKey(BSON("a" << 300));
+
+    auto future =
+        async(std::launch::async,
+              [this] {
+                  vector<TagsType> tags;
+
+                  ASSERT_OK(catalogManager()->getTagsForCollection("TestDB.TestColl", &tags));
+                  ASSERT_EQ(2U, tags.size());
+
+                  return tags;
+              });
+
+    onFindCommand([tagA, tagB](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), TagsType::ConfigNS);
+
+        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(query->ns(), TagsType::ConfigNS);
+
+        return vector<BSONObj>{tagA.toBSON(), tagB.toBSON()};
+    });
+
+    const auto& tags = future.get();
+    ASSERT_EQ(tagA.toBSON(), tags[0].toBSON());
+    ASSERT_EQ(tagB.toBSON(), tags[1].toBSON());
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionNoTags) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    auto future =
+        async(std::launch::async,
+              [this] {
+                  vector<TagsType> tags;
+
+                  ASSERT_OK(catalogManager()->getTagsForCollection("TestDB.TestColl", &tags));
+                  ASSERT_EQ(0U, tags.size());
+
+                  return tags;
+              });
+
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+
+    future.get();
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionInvalidTag) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    auto future = async(std::launch::async,
+                        [this] {
+                            vector<TagsType> tags;
+                            Status status =
+                                catalogManager()->getTagsForCollection("TestDB.TestColl", &tags);
+
+                            ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+                            ASSERT_EQ(0U, tags.size());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) {
+        TagsType tagA;
+        tagA.setNS("TestDB.TestColl");
+        tagA.setTag("TagA");
+        tagA.setMinKey(BSON("a" << 100));
+        tagA.setMaxKey(BSON("a" << 200));
+
+        TagsType tagB;
+        tagB.setNS("TestDB.TestColl");
+        tagB.setTag("TagB");
+        tagB.setMinKey(BSON("a" << 200));
+        // Missing maxKey
+
+        return vector<BSONObj>{tagA.toBSON(), tagB.toBSON()};
     });
 
     future.get();

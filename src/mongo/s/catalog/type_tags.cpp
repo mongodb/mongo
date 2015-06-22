@@ -150,4 +150,24 @@ std::string TagsType::toString() const {
     return toBSON().toString();
 }
 
+void TagsType::setNS(const std::string& ns) {
+    invariant(!ns.empty());
+    _ns = ns;
+}
+
+void TagsType::setTag(const std::string& tag) {
+    invariant(!tag.empty());
+    _tag = tag;
+}
+
+void TagsType::setMinKey(const BSONObj& minKey) {
+    invariant(!minKey.isEmpty());
+    _minKey = minKey;
+}
+
+void TagsType::setMaxKey(const BSONObj& maxKEy) {
+    invariant(!maxKey.isEmpty());
+    _maxKey = maxKey;
+}
+
 }  // namespace mongo
