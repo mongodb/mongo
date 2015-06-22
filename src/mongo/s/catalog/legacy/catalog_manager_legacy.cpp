@@ -39,6 +39,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
@@ -1138,12 +1139,21 @@ Status CatalogManagerLegacy::getDatabasesForShard(const string& shardName, vecto
             conn->query(DatabaseType::ConfigNS, Query(BSON(DatabaseType::primary(shardName))))));
         if (!cursor.get()) {
             conn.done();
-            return Status(ErrorCodes::HostUnreachable, "unable to open chunk cursor");
+            return Status(ErrorCodes::HostUnreachable,
+                          str::stream() << "unable to open cursor for " << DatabaseType::ConfigNS);
         }
 
         while (cursor->more()) {
-            BSONObj shard = cursor->nextSafe();
-            dbs->push_back(shard[DatabaseType::name()].str());
+            BSONObj dbObj = cursor->nextSafe();
+
+            string dbName;
+            Status status = bsonExtractStringField(dbObj, DatabaseType::name(), &dbName);
+            if (!status.isOK()) {
+                dbs->clear();
+                return status;
+            }
+
+            dbs->push_back(dbName);
         }
 
         conn.done();

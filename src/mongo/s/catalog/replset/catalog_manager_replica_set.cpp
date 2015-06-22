@@ -363,7 +363,32 @@ StatusWith<SettingsType> CatalogManagerReplicaSet::getGlobalSettings(const strin
 
 Status CatalogManagerReplicaSet::getDatabasesForShard(const string& shardName,
                                                       vector<string>* dbs) {
-    return notYetImplemented;
+    auto configShard = grid.shardRegistry()->getShard("config");
+    auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
+    if (!readHost.isOK()) {
+        return readHost.getStatus();
+    }
+
+    auto findStatus = grid.shardRegistry()->exhaustiveFind(readHost.getValue(),
+                                                           NamespaceString(DatabaseType::ConfigNS),
+                                                           BSON(DatabaseType::primary(shardName)),
+                                                           boost::none);  // no limit
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    for (const BSONObj& obj : findStatus.getValue()) {
+        string dbName;
+        Status status = bsonExtractStringField(obj, DatabaseType::name(), &dbName);
+        if (!status.isOK()) {
+            dbs->clear();
+            return status;
+        }
+
+        dbs->push_back(dbName);
+    }
+
+    return Status::OK();
 }
 
 Status CatalogManagerReplicaSet::getChunks(const Query& query,

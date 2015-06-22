@@ -1064,5 +1064,83 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsInvalidCollectionType) {
     future.get();
 }
 
+TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardValid) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    DatabaseType dbt1;
+    dbt1.setName("db1");
+    dbt1.setPrimary("shard0000");
+
+    DatabaseType dbt2;
+    dbt2.setName("db2");
+    dbt2.setPrimary("shard0000");
+
+    auto future = async(std::launch::async,
+                        [this] {
+                            vector<string> dbs;
+                            const auto status =
+                                catalogManager()->getDatabasesForShard("shard0000", &dbs);
+
+                            ASSERT_OK(status);
+                            return dbs;
+                        });
+
+    onFindCommand([dbt1, dbt2](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
+
+        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
+        ASSERT_EQ(query->getFilter(), BSON(DatabaseType::primary(dbt1.getPrimary())));
+
+        return vector<BSONObj>{dbt1.toBSON(), dbt2.toBSON()};
+    });
+
+    const auto& actualDbNames = future.get();
+    ASSERT_EQ(2U, actualDbNames.size());
+    ASSERT_EQ(dbt1.getName(), actualDbNames[0]);
+    ASSERT_EQ(dbt2.getName(), actualDbNames[1]);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardInvalidDoc) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    auto future = async(std::launch::async,
+                        [this] {
+                            vector<string> dbs;
+                            const auto status =
+                                catalogManager()->getDatabasesForShard("shard0000", &dbs);
+
+                            ASSERT_EQ(ErrorCodes::TypeMismatch, status);
+                            ASSERT_EQ(0U, dbs.size());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
+
+        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+        ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
+
+        DatabaseType dbt1;
+        dbt1.setName("db1");
+        dbt1.setPrimary("shard0000");
+        ASSERT_EQ(query->getFilter(), BSON(DatabaseType::primary(dbt1.getPrimary())));
+
+        return vector<BSONObj>{
+            dbt1.toBSON(),
+            BSON(DatabaseType::name() << 0)  // DatabaseType::name() should be a string
+        };
+    });
+
+    future.get();
+}
+
 }  // namespace
 }  // namespace mongo
