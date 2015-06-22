@@ -499,11 +499,9 @@ err:	API_END_RET_NOTFOUND_MAP(session, ret);
 static int
 __session_reset(WT_SESSION *wt_session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL_NOCONF(session, reset);
