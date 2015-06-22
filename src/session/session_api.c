@@ -17,7 +17,7 @@ static int __session_rollback_transaction(WT_SESSION *, const char *);
  *	Reset all open cursors.
  */
 int
-__wt_session_reset_cursors(WT_SESSION_IMPL *session)
+__wt_session_reset_cursors(WT_SESSION_IMPL *session, int free_buffers )
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -27,6 +27,11 @@ __wt_session_reset_cursors(WT_SESSION_IMPL *session)
 		if (session->ncursors == 0)
 			break;
 		WT_TRET(cursor->reset(cursor));
+		/* Optionally, free the cursor buffers */
+		if (free_buffers) {
+			__wt_buf_free(session, &cursor->key);
+			__wt_buf_free(session, &cursor->value);
+		}
 	}
 	return (ret);
 }
@@ -198,7 +203,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
-	WT_TRET(__wt_session_reset_cursors(session));
+	WT_TRET(__wt_session_reset_cursors(session, 1));
 
 	WT_ERR(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
 	if (cval.len != 0)
@@ -506,29 +511,13 @@ __session_reset(WT_SESSION *wt_session)
 	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
-	WT_TRET(__wt_session_reset_cursors(session));
+	WT_TRET(__wt_session_reset_cursors(session, 9));
 
 	WT_ASSERT(session, session->ncursors == 0);
-
-	/*
-	 * Also release any pinned transaction ID from a non-transactional
-	 * operation.
-	 */
-	if (conn->txn_global.states != NULL)
-		__wt_txn_release_snapshot(session);
-
-	/* Discard session cache. */
-	__wt_session_close_cache(session);
-
-	/* Close all tables. */
-	WT_TRET(__wt_schema_close_tables(session));
 
 	/* Discard scratch buffers, error memory. */
 	__wt_scr_discard(session);
 	__wt_buf_free(session, &session->err);
-
-	/* Confirm we're not holding any hazard pointers. */
-	__wt_hazard_close(session);
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -837,7 +826,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);
 	else {
-		WT_TRET(__wt_session_reset_cursors(session));
+		WT_TRET(__wt_session_reset_cursors(session, 1));
 		WT_TRET(__wt_txn_rollback(session, cfg));
 	}
 
@@ -858,7 +847,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, rollback_transaction, config, cfg);
 	WT_STAT_FAST_CONN_INCR(session, txn_rollback);
 
-	WT_TRET(__wt_session_reset_cursors(session));
+	WT_TRET(__wt_session_reset_cursors(session, 1));
 
 	WT_TRET(__wt_txn_rollback(session, cfg));
 
@@ -1021,7 +1010,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * checkpoint code will acquire the schema lock before we do that, and
 	 * some implementation of WT_CURSOR::reset might need the schema lock.
 	 */
-	WT_ERR(__wt_session_reset_cursors(session));
+	WT_ERR(__wt_session_reset_cursors(session, 1));
 
 	/*
 	 * Don't highjack the session checkpoint thread for eviction.

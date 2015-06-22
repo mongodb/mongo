@@ -572,7 +572,7 @@ extern WT_DATA_SOURCE *__wt_schema_get_source(WT_SESSION_IMPL *session, const ch
 extern int __wt_str_name_check(WT_SESSION_IMPL *session, const char *str);
 extern int __wt_name_check(WT_SESSION_IMPL *session, const char *str, size_t len);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri, int (*file_func)(WT_SESSION_IMPL *, const char *[]), int (*name_func)(WT_SESSION_IMPL *, const char *, int *), const char *cfg[], uint32_t open_flags);
-extern int __wt_session_reset_cursors(WT_SESSION_IMPL *session);
+extern int __wt_session_reset_cursors(WT_SESSION_IMPL *session, int free_buffers );
 extern int __wt_session_copy_values(WT_SESSION_IMPL *session);
 extern int __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp);
 extern int __wt_session_create_strip(WT_SESSION *wt_session, const char *v1, const char *v2, char **value_ret);
