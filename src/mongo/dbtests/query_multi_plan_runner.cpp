@@ -63,7 +63,7 @@ using std::vector;
  * Create query solution.
  */
 QuerySolution* createQuerySolution() {
-    unique_ptr<QuerySolution> soln(new QuerySolution());
+    std::unique_ptr<QuerySolution> soln(new QuerySolution());
     soln->cacheData.reset(new SolutionCacheData());
     soln->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
     soln->cacheData->tree.reset(new PlanCacheIndexTree());
@@ -152,12 +152,11 @@ public:
             new CollectionScan(&_txn, csparams, sharedWs.get(), filter.get()));
 
         // Hand the plans off to the runner.
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), BSON("foo" << 7));
-        verify(statusWithCQ.isOK());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        verify(NULL != cq.get());
+        CanonicalQuery* cq = NULL;
+        verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
+        verify(NULL != cq);
 
-        MultiPlanStage* mps = new MultiPlanStage(&_txn, ctx.getCollection(), cq.get());
+        MultiPlanStage* mps = new MultiPlanStage(&_txn, ctx.getCollection(), cq);
         mps->addPlan(createQuerySolution(), firstRoot.release(), sharedWs.get());
         mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
@@ -169,15 +168,10 @@ public:
 
         // Takes ownership of arguments other than 'collection'.
         PlanExecutor* rawExec;
-        Status status = PlanExecutor::make(&_txn,
-                                           sharedWs.release(),
-                                           mps,
-                                           cq.release(),
-                                           coll,
-                                           PlanExecutor::YIELD_MANUAL,
-                                           &rawExec);
+        Status status = PlanExecutor::make(
+            &_txn, sharedWs.release(), mps, cq, coll, PlanExecutor::YIELD_MANUAL, &rawExec);
         ASSERT_OK(status);
-        unique_ptr<PlanExecutor> exec(rawExec);
+        std::unique_ptr<PlanExecutor> exec(rawExec);
 
         // Get all our results out.
         int results = 0;
@@ -207,13 +201,14 @@ public:
         Collection* collection = ctx.getCollection();
 
         // Query for both 'a' and 'b' and sort on 'b'.
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns(),
-                                                         BSON("a" << 1 << "b" << 1),  // query
-                                                         BSON("b" << 1),              // sort
-                                                         BSONObj());                  // proj
-        verify(statusWithCQ.isOK());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        CanonicalQuery* cq;
+        verify(CanonicalQuery::canonicalize(ns(),
+                                            BSON("a" << 1 << "b" << 1),  // query
+                                            BSON("b" << 1),              // sort
+                                            BSONObj(),                   // proj
+                                            &cq).isOK());
+        ASSERT(NULL != cq);
+        std::unique_ptr<CanonicalQuery> killCq(cq);
 
         // Force index intersection.
         bool forceIxisectOldValue = internalQueryForceIntersectionPlans;
@@ -221,7 +216,7 @@ public:
 
         // Get planner params.
         QueryPlannerParams plannerParams;
-        fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
+        fillOutPlannerParams(&_txn, collection, cq, &plannerParams);
         // Turn this off otherwise it pops up in some plans.
         plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
 
@@ -235,7 +230,7 @@ public:
         ASSERT_EQUALS(solutions.size(), 3U);
 
         // Fill out the MultiPlanStage.
-        unique_ptr<MultiPlanStage> mps(new MultiPlanStage(&_txn, collection, cq.get()));
+        unique_ptr<MultiPlanStage> mps(new MultiPlanStage(&_txn, collection, cq));
         unique_ptr<WorkingSet> ws(new WorkingSet());
         // Put each solution from the planner into the MPR.
         for (size_t i = 0; i < solutions.size(); ++i) {

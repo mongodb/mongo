@@ -3761,9 +3761,10 @@ TEST(BadInputTest, CacheDataFromTaggedTree) {
     // No relevant index matching the index tag.
     relevantIndices.push_back(IndexEntry(BSON("a" << 1)));
 
-    auto statusWithCQ = CanonicalQuery::canonicalize("ns", BSON("a" << 3));
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
+    CanonicalQuery* cq;
+    Status cqStatus = CanonicalQuery::canonicalize("ns", BSON("a" << 3), &cq);
+    ASSERT_OK(cqStatus);
+    std::unique_ptr<CanonicalQuery> scopedCq(cq);
     scopedCq->root()->setTag(new IndexTag(1));
 
     s = QueryPlanner::cacheDataFromTaggedTree(scopedCq->root(), relevantIndices, &indexTree);
@@ -3772,9 +3773,10 @@ TEST(BadInputTest, CacheDataFromTaggedTree) {
 }
 
 TEST(BadInputTest, TagAccordingToCache) {
-    auto statusWithCQ = CanonicalQuery::canonicalize("ns", BSON("a" << 3));
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
+    CanonicalQuery* cq;
+    Status cqStatus = CanonicalQuery::canonicalize("ns", BSON("a" << 3), &cq);
+    ASSERT_OK(cqStatus);
+    std::unique_ptr<CanonicalQuery> scopedCq(cq);
 
     std::unique_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
     indexTree->setIndexEntry(IndexEntry(BSON("a" << 1)));
@@ -3799,9 +3801,9 @@ TEST(BadInputTest, TagAccordingToCache) {
     ASSERT_OK(s);
 
     // Regenerate canonical query in order to clear tags.
-    statusWithCQ = CanonicalQuery::canonicalize("ns", BSON("a" << 3));
-    ASSERT_OK(statusWithCQ.getStatus());
-    scopedCq = std::move(statusWithCQ.getValue());
+    cqStatus = CanonicalQuery::canonicalize("ns", BSON("a" << 3), &cq);
+    ASSERT_OK(cqStatus);
+    scopedCq.reset(cq);
 
     // Mismatched tree topology.
     PlanCacheIndexTree* child = new PlanCacheIndexTree();

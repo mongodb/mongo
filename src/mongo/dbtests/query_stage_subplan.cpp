@@ -88,9 +88,9 @@ public:
             "{$or: [{a: {$geoWithin: {$centerSphere: [[0,0],10]}}},"
             "{a: {$geoWithin: {$centerSphere: [[1,1],10]}}}]}");
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), query);
-        ASSERT_OK(statusWithCQ.getStatus());
-        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        CanonicalQuery* rawCq;
+        ASSERT_OK(CanonicalQuery::canonicalize(ns(), query, &rawCq));
+        std::unique_ptr<CanonicalQuery> cq(rawCq);
 
         Collection* collection = ctx.getCollection();
 
@@ -131,9 +131,9 @@ public:
 
         Collection* collection = ctx.getCollection();
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), query);
-        ASSERT_OK(statusWithCQ.getStatus());
-        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        CanonicalQuery* rawCq;
+        ASSERT_OK(CanonicalQuery::canonicalize(ns(), query, &rawCq));
+        std::unique_ptr<CanonicalQuery> cq(rawCq);
 
         // Get planner params.
         QueryPlannerParams plannerParams;

@@ -120,9 +120,9 @@ void addQueryShapeToPlanCache(PlanCache* planCache,
     BSONObj projectionObj = fromjson(projectionStr);
 
     // Create canonical query.
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projectionObj);
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    CanonicalQuery* cqRaw;
+    ASSERT_OK(CanonicalQuery::canonicalize(ns, queryObj, sortObj, projectionObj, &cqRaw));
+    unique_ptr<CanonicalQuery> cq(cqRaw);
 
     QuerySolution qs;
     qs.cacheData.reset(new SolutionCacheData());
@@ -144,9 +144,9 @@ bool planCacheContains(const PlanCache& planCache,
     BSONObj projectionObj = fromjson(projectionStr);
 
     // Create canonical query.
-    auto statusWithInputQuery = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projectionObj);
-    ASSERT_OK(statusWithInputQuery.getStatus());
-    unique_ptr<CanonicalQuery> inputQuery = std::move(statusWithInputQuery.getValue());
+    CanonicalQuery* cqRaw;
+    ASSERT_OK(CanonicalQuery::canonicalize(ns, queryObj, sortObj, projectionObj, &cqRaw));
+    unique_ptr<CanonicalQuery> cq(cqRaw);
 
     // Retrieve cache entries from plan cache.
     vector<PlanCacheEntry*> entries = planCache.getAllEntries();
@@ -159,12 +159,11 @@ bool planCacheContains(const PlanCache& planCache,
         // Canonicalizing query shape in cache entry to get cache key.
         // Alternatively, we could add key to PlanCacheEntry but that would be used in one place
         // only.
-        auto statusWithCurrentQuery =
-            CanonicalQuery::canonicalize(ns, entry->query, entry->sort, entry->projection);
-        ASSERT_OK(statusWithCurrentQuery.getStatus());
-        unique_ptr<CanonicalQuery> currentQuery = std::move(statusWithCurrentQuery.getValue());
+        ASSERT_OK(
+            CanonicalQuery::canonicalize(ns, entry->query, entry->sort, entry->projection, &cqRaw));
+        unique_ptr<CanonicalQuery> currentQuery(cqRaw);
 
-        if (planCache.computeKey(*currentQuery) == planCache.computeKey(*inputQuery)) {
+        if (planCache.computeKey(*currentQuery) == planCache.computeKey(*cq)) {
             found = true;
         }
         // Release resources for cache entry after extracting key.

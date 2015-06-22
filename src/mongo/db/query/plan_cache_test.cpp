@@ -59,77 +59,90 @@ static const char* ns = "somebogusns";
 /**
  * Utility functions to create a CanonicalQuery
  */
-unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj) {
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj);
-    ASSERT_OK(statusWithCQ.getStatus());
-    return std::move(statusWithCQ.getValue());
+CanonicalQuery* canonicalize(const BSONObj& queryObj) {
+    CanonicalQuery* cq;
+    Status result = CanonicalQuery::canonicalize(ns, queryObj, &cq);
+    ASSERT_OK(result);
+    return cq;
 }
 
-unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
+CanonicalQuery* canonicalize(const char* queryStr) {
     BSONObj queryObj = fromjson(queryStr);
     return canonicalize(queryObj);
 }
 
-unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
-                                        const char* sortStr,
-                                        const char* projStr) {
+CanonicalQuery* canonicalize(const char* queryStr, const char* sortStr, const char* projStr) {
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj);
-    ASSERT_OK(statusWithCQ.getStatus());
-    return std::move(statusWithCQ.getValue());
+    CanonicalQuery* cq;
+    Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, &cq);
+    ASSERT_OK(result);
+    return cq;
 }
 
-unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
-                                        const char* sortStr,
-                                        const char* projStr,
-                                        long long skip,
-                                        long long limit,
-                                        const char* hintStr,
-                                        const char* minStr,
-                                        const char* maxStr) {
+CanonicalQuery* canonicalize(const char* queryStr,
+                             const char* sortStr,
+                             const char* projStr,
+                             long long skip,
+                             long long limit,
+                             const char* hintStr,
+                             const char* minStr,
+                             const char* maxStr) {
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
     BSONObj hintObj = fromjson(hintStr);
     BSONObj minObj = fromjson(minStr);
     BSONObj maxObj = fromjson(maxStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns,
-                                                     queryObj,
-                                                     sortObj,
-                                                     projObj,
-                                                     skip,
-                                                     limit,
-                                                     hintObj,
-                                                     minObj,
-                                                     maxObj,
-                                                     false,   // snapshot
-                                                     false);  // explain
-    ASSERT_OK(statusWithCQ.getStatus());
-    return std::move(statusWithCQ.getValue());
+    CanonicalQuery* cq;
+    Status result = CanonicalQuery::canonicalize(ns,
+                                                 queryObj,
+                                                 sortObj,
+                                                 projObj,
+                                                 skip,
+                                                 limit,
+                                                 hintObj,
+                                                 minObj,
+                                                 maxObj,
+                                                 false,  // snapshot
+                                                 false,  // explain
+                                                 &cq);
+    ASSERT_OK(result);
+    return cq;
 }
 
-unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
-                                        const char* sortStr,
-                                        const char* projStr,
-                                        long long skip,
-                                        long long limit,
-                                        const char* hintStr,
-                                        const char* minStr,
-                                        const char* maxStr,
-                                        bool snapshot,
-                                        bool explain) {
+CanonicalQuery* canonicalize(const char* queryStr,
+                             const char* sortStr,
+                             const char* projStr,
+                             long long skip,
+                             long long limit,
+                             const char* hintStr,
+                             const char* minStr,
+                             const char* maxStr,
+                             bool snapshot,
+                             bool explain) {
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
     BSONObj hintObj = fromjson(hintStr);
     BSONObj minObj = fromjson(minStr);
     BSONObj maxObj = fromjson(maxStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        ns, queryObj, sortObj, projObj, skip, limit, hintObj, minObj, maxObj, snapshot, explain);
-    ASSERT_OK(statusWithCQ.getStatus());
-    return std::move(statusWithCQ.getValue());
+    CanonicalQuery* cq;
+    Status result = CanonicalQuery::canonicalize(ns,
+                                                 queryObj,
+                                                 sortObj,
+                                                 projObj,
+                                                 skip,
+                                                 limit,
+                                                 hintObj,
+                                                 minObj,
+                                                 maxObj,
+                                                 snapshot,
+                                                 explain,
+                                                 &cq);
+    ASSERT_OK(result);
+    return cq;
 }
 
 /**
@@ -367,7 +380,7 @@ TEST(PlanCacheTest, AddEmptySolutions) {
     PlanCache planCache;
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     std::vector<QuerySolution*> solns;
-    unique_ptr<PlanRankingDecision> decision(createDecision(1U));
+    std::unique_ptr<PlanRankingDecision> decision(createDecision(1U));
     ASSERT_NOT_OK(planCache.add(*cq, solns, decision.get()));
 }
 
@@ -454,11 +467,14 @@ TEST(PlanCacheTest, NotifyOfWriteOp) {
 class CachePlanSelectionTest : public mongo::unittest::Test {
 protected:
     void setUp() {
+        cq = NULL;
         params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
         addIndex(BSON("_id" << 1));
     }
 
     void tearDown() {
+        delete cq;
+
         for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
             delete *it;
         }
@@ -540,6 +556,9 @@ protected:
                       const BSONObj& maxObj,
                       bool snapshot) {
         // Clean up any previous state from a call to runQueryFull
+        delete cq;
+        cq = NULL;
+
         for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
             delete *it;
         }
@@ -547,19 +566,23 @@ protected:
         solns.clear();
 
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns,
-                                                         query,
-                                                         sort,
-                                                         proj,
-                                                         skip,
-                                                         limit,
-                                                         hint,
-                                                         minObj,
-                                                         maxObj,
-                                                         snapshot,
-                                                         false);  // explain
-        ASSERT_OK(statusWithCQ.getStatus());
-        Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns);
+        Status s = CanonicalQuery::canonicalize(ns,
+                                                query,
+                                                sort,
+                                                proj,
+                                                skip,
+                                                limit,
+                                                hint,
+                                                minObj,
+                                                maxObj,
+                                                snapshot,
+                                                false,  // explain
+                                                &cq);
+        if (!s.isOK()) {
+            cq = NULL;
+        }
+        ASSERT_OK(s);
+        s = QueryPlanner::plan(*cq, params, &solns);
         ASSERT_OK(s);
     }
 
@@ -628,9 +651,11 @@ protected:
                                       const BSONObj& sort,
                                       const BSONObj& proj,
                                       const QuerySolution& soln) const {
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns, query, sort, proj);
-        ASSERT_OK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
+        CanonicalQuery* cq;
+        Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, &cq);
+        ASSERT_OK(s);
+        unique_ptr<CanonicalQuery> scopedCq(cq);
+        cq = NULL;
 
         // Create a CachedSolution the long way..
         // QuerySolution -> PlanCacheEntry -> CachedSolution
@@ -642,7 +667,7 @@ protected:
         CachedSolution cachedSoln(ck, entry);
 
         QuerySolution* out;
-        Status s = QueryPlanner::planFromCache(*scopedCq, params, cachedSoln, &out);
+        s = QueryPlanner::planFromCache(*scopedCq.get(), params, cachedSoln, &out);
         ASSERT_OK(s);
 
         return out;
@@ -731,6 +756,7 @@ protected:
     static const PlanCacheKey ck;
 
     BSONObj queryObj;
+    CanonicalQuery* cq;
     QueryPlannerParams params;
     vector<QuerySolution*> solns;
 };

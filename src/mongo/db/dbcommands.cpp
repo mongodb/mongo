@@ -587,12 +587,11 @@ public:
         BSONObj sort = BSON("files_id" << 1 << "n" << 1);
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            auto statusWithCQ = CanonicalQuery::canonicalize(ns, query, sort, BSONObj());
-            if (!statusWithCQ.isOK()) {
+            CanonicalQuery* cq;
+            if (!CanonicalQuery::canonicalize(ns, query, sort, BSONObj(), &cq).isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return 0;
             }
-            unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
             // Check shard version at startup.
             // This will throw before we've done any work if shard version is outdated
@@ -603,7 +602,7 @@ public:
             PlanExecutor* rawExec;
             if (!getExecutor(txn,
                              coll,
-                             cq.release(),
+                             cq,
                              PlanExecutor::YIELD_MANUAL,
                              &rawExec,
                              QueryPlannerParams::NO_TABLE_SCAN).isOK()) {

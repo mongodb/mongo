@@ -35,6 +35,7 @@ namespace mongo {
 namespace {
 
 using std::string;
+using std::unique_ptr;
 using unittest::assertGet;
 
 static const char* ns = "somebogusns";
@@ -51,7 +52,6 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
            << ". Reason: " << status.getStatus().toString();
         FAIL(ss);
     }
-
     return status.getValue();
 }
 
@@ -62,7 +62,8 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
  */
 Status isValid(const std::string& queryStr, const LiteParsedQuery& lpqRaw) {
     BSONObj queryObj = fromjson(queryStr);
-    unique_ptr<MatchExpression> me(CanonicalQuery::normalizeTree(parseMatchExpression(queryObj)));
+    std::unique_ptr<MatchExpression> me(
+        CanonicalQuery::normalizeTree(parseMatchExpression(queryObj)));
     return CanonicalQuery::isValid(me.get(), lpqRaw);
 }
 
@@ -460,22 +461,22 @@ TEST(CanonicalQueryTest, SortTreeNumChildrenComparison) {
 /**
  * Utility function to create a CanonicalQuery
  */
-unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
+CanonicalQuery* canonicalize(const char* queryStr) {
     BSONObj queryObj = fromjson(queryStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj);
-    ASSERT_OK(statusWithCQ.getStatus());
-    return std::move(statusWithCQ.getValue());
+    CanonicalQuery* cq;
+    Status result = CanonicalQuery::canonicalize(ns, queryObj, &cq);
+    ASSERT_OK(result);
+    return cq;
 }
 
-std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
-                                             const char* sortStr,
-                                             const char* projStr) {
+CanonicalQuery* canonicalize(const char* queryStr, const char* sortStr, const char* projStr) {
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj);
-    ASSERT_OK(statusWithCQ.getStatus());
-    return std::move(statusWithCQ.getValue());
+    CanonicalQuery* cq;
+    Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, &cq);
+    ASSERT_OK(result);
+    return cq;
 }
 
 // Don't do anything with a double OR.

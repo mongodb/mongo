@@ -41,28 +41,26 @@ namespace mongo {
 class CanonicalQuery {
 public:
     /**
-     * If parsing succeeds, returns a std::unique_ptr<CanonicalQuery> representing the parsed
-     * query (which will never be NULL).  If parsing fails, returns an error Status.
+     * Caller owns the pointer in 'out' if any call to canonicalize returns Status::OK().
      *
      * Used for legacy find through the OP_QUERY message.
      */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const QueryMessage& qm,
-        const MatchExpressionParser::WhereCallback& whereCallback =
-            MatchExpressionParser::WhereCallback());
+    static Status canonicalize(const QueryMessage& qm,
+                               CanonicalQuery** out,
+                               const MatchExpressionParser::WhereCallback& whereCallback =
+                                   MatchExpressionParser::WhereCallback());
 
     /**
      * Takes ownership of 'lpq'.
      *
-     * If parsing succeeds, returns a std::unique_ptr<CanonicalQuery> representing the parsed
-     * query (which will never be NULL).  If parsing fails, returns an error Status.
+     * Caller owns the pointer in 'out' if any call to canonicalize returns Status::OK().
      *
      * Used for finds using the find command path.
      */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        LiteParsedQuery* lpq,
-        const MatchExpressionParser::WhereCallback& whereCallback =
-            MatchExpressionParser::WhereCallback());
+    static Status canonicalize(LiteParsedQuery* lpq,
+                               CanonicalQuery** out,
+                               const MatchExpressionParser::WhereCallback& whereCallback =
+                                   MatchExpressionParser::WhereCallback());
 
     /**
      * For testing or for internal clients to use.
@@ -75,76 +73,76 @@ public:
      *
      * Does not take ownership of 'root'.
      */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const CanonicalQuery& baseQuery,
-        MatchExpression* root,
-        const MatchExpressionParser::WhereCallback& whereCallback =
-            MatchExpressionParser::WhereCallback());
+    static Status canonicalize(const CanonicalQuery& baseQuery,
+                               MatchExpression* root,
+                               CanonicalQuery** out,
+                               const MatchExpressionParser::WhereCallback& whereCallback =
+                                   MatchExpressionParser::WhereCallback());
 
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
-        const BSONObj& query,
-        const MatchExpressionParser::WhereCallback& whereCallback =
-            MatchExpressionParser::WhereCallback());
+    static Status canonicalize(const std::string& ns,
+                               const BSONObj& query,
+                               CanonicalQuery** out,
+                               const MatchExpressionParser::WhereCallback& whereCallback =
+                                   MatchExpressionParser::WhereCallback());
 
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
-        const BSONObj& query,
-        bool explain,
-        const MatchExpressionParser::WhereCallback& whereCallback =
-            MatchExpressionParser::WhereCallback());
+    static Status canonicalize(const std::string& ns,
+                               const BSONObj& query,
+                               bool explain,
+                               CanonicalQuery** out,
+                               const MatchExpressionParser::WhereCallback& whereCallback =
+                                   MatchExpressionParser::WhereCallback());
 
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
-        const BSONObj& query,
-        long long skip,
-        long long limit,
-        const MatchExpressionParser::WhereCallback& whereCallback =
-            MatchExpressionParser::WhereCallback());
+    static Status canonicalize(const std::string& ns,
+                               const BSONObj& query,
+                               long long skip,
+                               long long limit,
+                               CanonicalQuery** out,
+                               const MatchExpressionParser::WhereCallback& whereCallback =
+                                   MatchExpressionParser::WhereCallback());
 
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
-        const BSONObj& query,
-        const BSONObj& sort,
-        const BSONObj& proj,
-        const MatchExpressionParser::WhereCallback& whereCallback =
-            MatchExpressionParser::WhereCallback());
+    static Status canonicalize(const std::string& ns,
+                               const BSONObj& query,
+                               const BSONObj& sort,
+                               const BSONObj& proj,
+                               CanonicalQuery** out,
+                               const MatchExpressionParser::WhereCallback& whereCallback =
+                                   MatchExpressionParser::WhereCallback());
 
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
-        const BSONObj& query,
-        const BSONObj& sort,
-        const BSONObj& proj,
-        long long skip,
-        long long limit,
-        const MatchExpressionParser::WhereCallback& whereCallback =
-            MatchExpressionParser::WhereCallback());
+    static Status canonicalize(const std::string& ns,
+                               const BSONObj& query,
+                               const BSONObj& sort,
+                               const BSONObj& proj,
+                               long long skip,
+                               long long limit,
+                               CanonicalQuery** out,
+                               const MatchExpressionParser::WhereCallback& whereCallback =
+                                   MatchExpressionParser::WhereCallback());
 
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
-        const BSONObj& query,
-        const BSONObj& sort,
-        const BSONObj& proj,
-        long long skip,
-        long long limit,
-        const BSONObj& hint,
-        const MatchExpressionParser::WhereCallback& whereCallback =
-            MatchExpressionParser::WhereCallback());
+    static Status canonicalize(const std::string& ns,
+                               const BSONObj& query,
+                               const BSONObj& sort,
+                               const BSONObj& proj,
+                               long long skip,
+                               long long limit,
+                               const BSONObj& hint,
+                               CanonicalQuery** out,
+                               const MatchExpressionParser::WhereCallback& whereCallback =
+                                   MatchExpressionParser::WhereCallback());
 
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
-        const BSONObj& query,
-        const BSONObj& sort,
-        const BSONObj& proj,
-        long long skip,
-        long long limit,
-        const BSONObj& hint,
-        const BSONObj& minObj,
-        const BSONObj& maxObj,
-        bool snapshot,
-        bool explain,
-        const MatchExpressionParser::WhereCallback& whereCallback =
-            MatchExpressionParser::WhereCallback());
+    static Status canonicalize(const std::string& ns,
+                               const BSONObj& query,
+                               const BSONObj& sort,
+                               const BSONObj& proj,
+                               long long skip,
+                               long long limit,
+                               const BSONObj& hint,
+                               const BSONObj& minObj,
+                               const BSONObj& maxObj,
+                               bool snapshot,
+                               bool explain,
+                               CanonicalQuery** out,
+                               const MatchExpressionParser::WhereCallback& whereCallback =
+                                   MatchExpressionParser::WhereCallback());
 
     /**
      * Returns true if "query" describes an exact-match query on _id, possibly with

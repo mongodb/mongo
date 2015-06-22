@@ -169,9 +169,10 @@ Status PlanCacheCommand::checkAuthForCommand(ClientBasic* client,
 }
 
 // static
-StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationContext* txn,
-                                                                      const string& ns,
-                                                                      const BSONObj& cmdObj) {
+Status PlanCacheCommand::canonicalize(OperationContext* txn,
+                                      const string& ns,
+                                      const BSONObj& cmdObj,
+                                      CanonicalQuery** canonicalQueryOut) {
     // query - required
     BSONElement queryElt = cmdObj.getField("query");
     if (queryElt.eoo()) {
@@ -206,15 +207,19 @@ StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationC
     }
 
     // Create canonical query
+    CanonicalQuery* cqRaw;
+
     const NamespaceString nss(ns);
     const WhereCallbackReal whereCallback(txn, nss.db());
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, whereCallback);
-    if (!statusWithCQ.isOK()) {
-        return statusWithCQ.getStatus();
+    Status result =
+        CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, &cqRaw, whereCallback);
+    if (!result.isOK()) {
+        return result;
     }
 
-    return std::move(statusWithCQ.getValue());
+    *canonicalQueryOut = cqRaw;
+    return Status::OK();
 }
 
 PlanCacheListQueryShapes::PlanCacheListQueryShapes()
@@ -299,12 +304,13 @@ Status PlanCacheClear::clear(OperationContext* txn,
     // - clear plans for single query shape when a query shape is described in the
     //   command arguments.
     if (cmdObj.hasField("query")) {
-        auto statusWithCQ = PlanCacheCommand::canonicalize(txn, ns, cmdObj);
-        if (!statusWithCQ.isOK()) {
-            return statusWithCQ.getStatus();
+        CanonicalQuery* cqRaw;
+        Status status = PlanCacheCommand::canonicalize(txn, ns, cmdObj, &cqRaw);
+        if (!status.isOK()) {
+            return status;
         }
 
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        unique_ptr<CanonicalQuery> cq(cqRaw);
 
         if (!planCache->contains(*cq)) {
             // Log if asked to clear non-existent query shape.
@@ -368,11 +374,13 @@ Status PlanCacheListPlans::list(OperationContext* txn,
                                 const std::string& ns,
                                 const BSONObj& cmdObj,
                                 BSONObjBuilder* bob) {
-    auto statusWithCQ = canonicalize(txn, ns, cmdObj);
-    if (!statusWithCQ.isOK()) {
-        return statusWithCQ.getStatus();
+    CanonicalQuery* cqRaw;
+    Status status = canonicalize(txn, ns, cmdObj, &cqRaw);
+    if (!status.isOK()) {
+        return status;
     }
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+    unique_ptr<CanonicalQuery> cq(cqRaw);
 
     if (!planCache.contains(*cq)) {
         // Return empty plans in results if query shape does not

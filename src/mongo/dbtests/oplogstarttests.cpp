@@ -83,9 +83,10 @@ protected:
     }
 
     void setupFromQuery(const BSONObj& query) {
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), query);
-        ASSERT_OK(statusWithCQ.getStatus());
-        _cq = std::move(statusWithCQ.getValue());
+        CanonicalQuery* cq;
+        Status s = CanonicalQuery::canonicalize(ns(), query, &cq);
+        ASSERT(s.isOK());
+        _cq.reset(cq);
         _oplogws.reset(new WorkingSet());
         _stage.reset(new OplogStart(&_txn, collection(), _cq->root(), _oplogws.get()));
     }

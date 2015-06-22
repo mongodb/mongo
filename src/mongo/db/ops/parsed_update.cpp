@@ -73,6 +73,7 @@ Status ParsedUpdate::parseQuery() {
 Status ParsedUpdate::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
+    CanonicalQuery* cqRaw;
     const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
@@ -86,23 +87,24 @@ Status ParsedUpdate::parseQueryToCQ() {
     // The projection needs to be applied after the update operation, so we specify an empty
     // BSONObj as the projection during canonicalization.
     const BSONObj emptyObj;
-    auto statusWithCQ = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
-                                                     _request->getQuery(),
-                                                     _request->getSort(),
-                                                     emptyObj,  // projection
-                                                     0,         // skip
-                                                     limit,
-                                                     emptyObj,  // hint
-                                                     emptyObj,  // min
-                                                     emptyObj,  // max
-                                                     false,     // snapshot
-                                                     _request->isExplain(),
-                                                     whereCallback);
-    if (statusWithCQ.isOK()) {
-        _canonicalQuery = std::move(statusWithCQ.getValue());
+    Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
+                                                 _request->getQuery(),
+                                                 _request->getSort(),
+                                                 emptyObj,  // projection
+                                                 0,         // skip
+                                                 limit,
+                                                 emptyObj,  // hint
+                                                 emptyObj,  // min
+                                                 emptyObj,  // max
+                                                 false,     // snapshot
+                                                 _request->isExplain(),
+                                                 &cqRaw,
+                                                 whereCallback);
+    if (status.isOK()) {
+        _canonicalQuery.reset(cqRaw);
     }
 
-    return statusWithCQ.getStatus();
+    return status;
 }
 
 Status ParsedUpdate::parseUpdate() {
@@ -136,9 +138,9 @@ bool ParsedUpdate::hasParsedQuery() const {
     return _canonicalQuery.get() != NULL;
 }
 
-std::unique_ptr<CanonicalQuery> ParsedUpdate::releaseParsedQuery() {
+CanonicalQuery* ParsedUpdate::releaseParsedQuery() {
     invariant(_canonicalQuery.get() != NULL);
-    return std::move(_canonicalQuery);
+    return _canonicalQuery.release();
 }
 
 const UpdateRequest* ParsedUpdate::getRequest() const {

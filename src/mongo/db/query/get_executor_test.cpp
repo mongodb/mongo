@@ -48,15 +48,14 @@ static const char* ns = "somebogusns";
 /**
  * Utility functions to create a CanonicalQuery
  */
-unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
-                                        const char* sortStr,
-                                        const char* projStr) {
+CanonicalQuery* canonicalize(const char* queryStr, const char* sortStr, const char* projStr) {
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj);
-    ASSERT_OK(statusWithCQ.getStatus());
-    return std::move(statusWithCQ.getValue());
+    CanonicalQuery* cq;
+    Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, &cq);
+    ASSERT_OK(result);
+    return cq;
 }
 
 //

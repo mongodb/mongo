@@ -130,23 +130,27 @@ Status SubplanStage::planSubqueries() {
         MatchExpression* orChild = orExpr->getChild(i);
 
         // Turn the i-th child into its own query.
-        auto statusWithCQ = CanonicalQuery::canonicalize(*_query, orChild, whereCallback);
-        if (!statusWithCQ.isOK()) {
-            mongoutils::str::stream ss;
-            ss << "Can't canonicalize subchild " << orChild->toString() << " "
-               << statusWithCQ.getStatus().reason();
-            return Status(ErrorCodes::BadValue, ss);
-        }
+        {
+            CanonicalQuery* orChildCQ;
+            Status childCQStatus =
+                CanonicalQuery::canonicalize(*_query, orChild, &orChildCQ, whereCallback);
+            if (!childCQStatus.isOK()) {
+                mongoutils::str::stream ss;
+                ss << "Can't canonicalize subchild " << orChild->toString() << " "
+                   << childCQStatus.reason();
+                return Status(ErrorCodes::BadValue, ss);
+            }
 
-        branchResult->canonicalQuery = std::move(statusWithCQ.getValue());
+            branchResult->canonicalQuery.reset(orChildCQ);
+        }
 
         // Plan the i-th child. We might be able to find a plan for the i-th child in the plan
         // cache. If there's no cached plan, then we generate and rank plans using the MPS.
         CachedSolution* rawCS;
-        if (PlanCache::shouldCacheQuery(*branchResult->canonicalQuery) &&
+        if (PlanCache::shouldCacheQuery(*branchResult->canonicalQuery.get()) &&
             _collection->infoCache()
                 ->getPlanCache()
-                ->get(*branchResult->canonicalQuery, &rawCS)
+                ->get(*branchResult->canonicalQuery.get(), &rawCS)
                 .isOK()) {
             // We have a CachedSolution. Store it for later.
             LOG(5) << "Subplanner: cached plan found for child " << i << " of "
@@ -159,7 +163,7 @@ Status SubplanStage::planSubqueries() {
 
             // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
             // considering any plan that's a collscan.
-            Status status = QueryPlanner::plan(*branchResult->canonicalQuery,
+            Status status = QueryPlanner::plan(*branchResult->canonicalQuery.get(),
                                                _plannerParams,
                                                &branchResult->solutions.mutableVector());
 
