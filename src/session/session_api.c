@@ -492,17 +492,16 @@ err:	API_END_RET_NOTFOUND_MAP(session, ret);
  *	WT_SESSION->reset method.
  */
 static int
-__session_reset(WT_SESSION *wt_session, const char *config)
+__session_reset(WT_SESSION *wt_session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	SESSION_API_CALL(session, reset, config, cfg);
+	SESSION_API_CALL_NOCONF(session, reset);
 
 	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
