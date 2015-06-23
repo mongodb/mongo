@@ -1,6 +1,6 @@
 logging:
   executor:
-    format: '%(asctime)s [%(name)s] %(message)s'
+    format: '[%(name)s] %(asctime)s %(message)s'
     handlers:
       - class: logging.StreamHandler
   fixture:
@@ -8,6 +8,6 @@ logging:
     handlers:
       - class: logging.StreamHandler
   tests:
-    format: '%(asctime)s [%(name)s] %(message)s'
+    format: '[%(name)s] %(asctime)s %(message)s'
     handlers:
       - class: logging.StreamHandler

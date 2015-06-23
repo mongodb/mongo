@@ -1,6 +1,6 @@
 logging:
   executor:
-    format: '%(asctime)s [%(name)s] %(message)s'
+    format: '[%(name)s] %(asctime)s %(message)s'
     handlers:
       - class: logging.FileHandler
         filename: executor.log
@@ -12,7 +12,7 @@ logging:
         filename: fixture.log
         mode: w
   tests:
-    format: '%(asctime)s [%(name)s] %(message)s'
+    format: '[%(name)s] %(asctime)s %(message)s'
     handlers:
       - class: logging.FileHandler
         filename: tests.log

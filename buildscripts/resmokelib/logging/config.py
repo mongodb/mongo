@@ -8,6 +8,7 @@ import logging
 import sys
 
 from . import buildlogger
+from . import formatters
 from . import loggers
 
 
@@ -64,7 +65,7 @@ def apply_buildlogger_global_handler(logger, logging_config, build_id=None, buil
 
     if all(x is not None for x in (build_id, build_config)):
         log_format = logger_info.get("format", _DEFAULT_FORMAT)
-        formatter = logging.Formatter(fmt=log_format)
+        formatter = formatters.ISO8601Formatter(fmt=log_format)
 
         handler = buildlogger.BuildloggerGlobalHandler(build_id,
                                                        build_config,
@@ -95,7 +96,7 @@ def apply_buildlogger_test_handler(logger,
 
     if all(x is not None for x in (build_id, build_config, test_id)):
         log_format = logger_info.get("format", _DEFAULT_FORMAT)
-        formatter = logging.Formatter(fmt=log_format)
+        formatter = formatters.ISO8601Formatter(fmt=log_format)
 
         handler = buildlogger.BuildloggerTestHandler(build_id,
                                                      build_config,
@@ -115,7 +116,7 @@ def _configure_logger(logger, logger_info):
     """
 
     log_format = logger_info.get("format", _DEFAULT_FORMAT)
-    formatter = logging.Formatter(fmt=log_format)
+    formatter = formatters.ISO8601Formatter(fmt=log_format)
 
     for handler_info in logger_info.get("handlers", []):
         handler_class = handler_info["class"]
@@ -140,7 +141,7 @@ def _fallback_buildlogger_handler():
     """
 
     log_format = "[buildlogger:%(name)s] %(message)s"
-    formatter = logging.Formatter(fmt=log_format)
+    formatter = formatters.ISO8601Formatter(fmt=log_format)
 
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
