@@ -11,10 +11,16 @@
 /*
  * Tuning constants.
  */
-/* Threshold when a connection is allocated more cache */
-#define	WT_CACHE_POOL_BUMP_THRESHOLD	6
-/* Threshold when a connection is allocated less cache */
-#define	WT_CACHE_POOL_REDUCE_THRESHOLD	2
+/*
+ * Threshold when a connection is allocated more cache, as a percentage of
+ * the amount of pressure the busiest participant has.
+ */
+#define	WT_CACHE_POOL_BUMP_THRESHOLD	60
+/*
+ * Threshold when a connection is allocated less cache, as a percentage of
+ * the amount of pressure the busiest participant has.
+ */
+#define	WT_CACHE_POOL_REDUCE_THRESHOLD	20
 /* Balancing passes after a bump before a connection is a candidate. */
 #define	WT_CACHE_POOL_BUMP_SKIPS	10
 /* Balancing passes after a reduction before a connection is a candidate. */
@@ -444,7 +450,8 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 	uint64_t entries, highest, new;
 
 	cp = __wt_process.cache_pool;
-	entries = highest = 0;
+	entries = 0;
+	highest = 1; /* Avoid divide by zero */
 
 	/* Generate read pressure information. */
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
@@ -466,9 +473,6 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 	WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 	    "Highest eviction count: %" PRIu64 ", entries: %" PRIu64,
 	    highest, entries));
-	/* Normalize eviction information across connections. */
-	highest = highest / (entries + 1);
-	++highest; /* Avoid divide by zero. */
 
 	*phighest = highest;
 	return (0);
@@ -487,13 +491,16 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
-	uint64_t adjusted, reserved, read_pressure;
+	uint64_t adjusted, highest_percentile, read_pressure, reserved;
 	int force, grew;
 
 	*adjustedp = 0;
 	cp = __wt_process.cache_pool;
 	force = (cp->currently_used > cp->size);
 	grew = 0;
+	/* Highest as a percentage, avoid 0 */
+	highest_percentile = (highest / 100) + 1;
+
 	if (WT_VERBOSE_ISSET(session, WT_VERB_SHARED_CACHE)) {
 		WT_RET(__wt_verbose(session,
 		    WT_VERB_SHARED_CACHE, "Cache pool distribution: "));
@@ -506,7 +513,14 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		reserved = cache->cp_reserved;
 		adjusted = 0;
 
-		read_pressure = cache->cp_current_read / highest;
+		/*
+		 * The read pressure is calculated as a percentage of how
+		 * much read pressure there is on this participant compared
+		 * to the participant with the most activity. The closer we
+		 * are to the most active the more cache we should get
+		 * assigned.
+		 */
+		read_pressure = cache->cp_current_read / highest_percentile;
 		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
 		    entry->cache_size, read_pressure, cache->cp_skip_count));
@@ -555,8 +569,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 *  - There is space available in the pool
 		 *  - Additional cache would benefit the connection
 		 */
-		} else if (highest > 1 &&
-		    entry->cache_size < cp->size &&
+		} else if (entry->cache_size < cp->size &&
 		     cache->bytes_inmem >=
 		     (entry->cache_size * cache->eviction_target) / 100 &&
 		     cp->currently_used < cp->size &&
