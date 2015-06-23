@@ -411,6 +411,16 @@ void OpDebug::reset() {
     responseLength = -1;
 }
 
+namespace {
+StringData getProtoString(int op) {
+    if (op == dbQuery) {
+        return "op_query";
+    } else if (op == dbCommand) {
+        return "op_command";
+    }
+    MONGO_UNREACHABLE;
+}
+}  // namespace
 
 #define OPDEBUG_TOSTRING_HELP(x) \
     if (x >= 0)                  \
@@ -495,6 +505,10 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
         BSONObjBuilder locks;
         lockStats.report(&locks);
         s << " locks:" << locks.obj().toString();
+    }
+
+    if (iscommand) {
+        s << " protocol:" << getProtoString(op);
     }
 
     s << " " << executionTime << "ms";
@@ -595,6 +609,9 @@ void OpDebug::append(const CurOp& curop,
 
     OPDEBUG_APPEND_NUMBER(nreturned);
     OPDEBUG_APPEND_NUMBER(responseLength);
+    if (iscommand) {
+        b.append("protocol", getProtoString(op));
+    }
     b.append("millis", executionTime);
 
     execStats.append(b, "execStats");
