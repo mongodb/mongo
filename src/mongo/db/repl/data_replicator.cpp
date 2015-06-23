@@ -42,7 +42,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/reporter.h"
+#include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -502,33 +505,24 @@ void DatabasesCloner::_failed() {
 }
 
 // Data Replicator
-DataReplicator::DataReplicator(DataReplicatorOptions opts,
-                               ReplicationExecutor* exec,
-                               ReplicationCoordinator* replCoord)
-    : DataReplicator(
-          opts,
-          exec,
-          replCoord,
-          // TODO: replace this with a method in the replication coordinator.
-          [replCoord](const Timestamp& ts) { replCoord->setMyLastOptime(OpTime(ts, 0)); }) {}
-
 DataReplicator::DataReplicator(DataReplicatorOptions opts, ReplicationExecutor* exec)
-    : DataReplicator(opts, exec, nullptr, [](const Timestamp& ts) {}) {}
-
-DataReplicator::DataReplicator(DataReplicatorOptions opts,
-                               ReplicationExecutor* exec,
-                               ReplicationCoordinator* replCoord,
-                               OnBatchCompleteFn batchCompletedFn)
     : _opts(opts),
       _exec(exec),
-      _replCoord(replCoord),
       _state(DataReplicatorState::Uninitialized),
       _fetcherPaused(false),
       _reporterPaused(false),
       _applierActive(false),
       _applierPaused(false),
-      _batchCompletedFn(batchCompletedFn),
-      _oplogBuffer(kOplogBufferSize, &getSize) {}
+      _oplogBuffer(kOplogBufferSize, &getSize) {
+    uassert(ErrorCodes::BadValue, "invalid applier function", _opts.applierFn);
+    uassert(ErrorCodes::BadValue,
+            "invalid replication progress manager",
+            _opts.replicationProgressManager);
+    uassert(ErrorCodes::BadValue, "invalid getMyLastOptime function", _opts.getMyLastOptime);
+    uassert(ErrorCodes::BadValue, "invalid setMyLastOptime function", _opts.setMyLastOptime);
+    uassert(ErrorCodes::BadValue, "invalid setFollowerMode function", _opts.setFollowerMode);
+    uassert(ErrorCodes::BadValue, "invalid sync source selector", _opts.syncSourceSelector);
+}
 
 DataReplicator::~DataReplicator() {
     DESTRUCTOR_GUARD(_cancelAllHandles_inlock(); _waitOnAll_inlock(););
@@ -566,6 +560,11 @@ DataReplicatorState DataReplicator::getState() const {
 Timestamp DataReplicator::getLastTimestampFetched() const {
     LockGuard lk(_mutex);
     return _lastTimestampFetched;
+}
+
+size_t DataReplicator::getOplogBufferCount() const {
+    // Oplog buffer is internally synchronized.
+    return _oplogBuffer.count();
 }
 
 std::string DataReplicator::getDiagnosticString() const {
@@ -716,7 +715,9 @@ TimestampStatus DataReplicator::initialSync() {
         Event initialSyncFinishEvent;
         if (attemptErrorStatus.isOK() && _syncSource.empty()) {
             attemptErrorStatus = _ensureGoodSyncSource_inlock();
-        } else if (attemptErrorStatus.isOK()) {
+        }
+
+        if (attemptErrorStatus.isOK()) {
             StatusWith<Event> status = _exec->makeEvent();
             if (!status.isOK()) {
                 attemptErrorStatus = status.getStatus();
@@ -954,7 +955,7 @@ void DataReplicator::_doNextActions_Rollback_inlock() {
 void DataReplicator::_doNextActions_Steady_inlock() {
     // Check sync source is still good.
     if (_syncSource.empty()) {
-        _syncSource = _replCoord->chooseNewSyncSource();
+        _syncSource = _opts.syncSourceSelector->chooseNewSyncSource();
     }
     if (_syncSource.empty()) {
         // No sync source, reschedule check
@@ -982,7 +983,7 @@ void DataReplicator::_doNextActions_Steady_inlock() {
 
     if (!_reporterPaused && (!_reporter || !_reporter->getStatus().isOK())) {
         // TODO get reporter in good shape
-        _reporter.reset(new Reporter(_exec, _replCoord, _syncSource));
+        _reporter.reset(new Reporter(_exec, _opts.replicationProgressManager, _syncSource));
     }
 }
 
@@ -1014,11 +1015,9 @@ void DataReplicator::_onApplyBatchFinish(const CallbackArgs& cbData,
     _lastTimestampApplied = ts.getValue();
     lk.unlock();
 
-    if (_batchCompletedFn) {
-        _batchCompletedFn(ts.getValue());
-    }
-    // TODO: move the reporter to the replication coordinator and set _batchCompletedFn to a
-    // function in the replCoord.
+    _opts.setMyLastOptime(OpTime(ts.getValue(), 0));
+
+    // TODO: move the reporter to the replication coordinator.
     if (_reporter) {
         _reporter->trigger();
     }
@@ -1155,13 +1154,9 @@ Status DataReplicator::_scheduleFetch() {
 
 Status DataReplicator::_ensureGoodSyncSource_inlock() {
     if (_syncSource.empty()) {
-        if (_replCoord) {
-            _syncSource = _replCoord->chooseNewSyncSource();
-            if (!_syncSource.empty()) {
-                return Status::OK();
-            }
-        } else {
-            _syncSource = _opts.syncSource;  // set this back to the options source
+        _syncSource = _opts.syncSourceSelector->chooseNewSyncSource();
+        if (!_syncSource.empty()) {
+            return Status::OK();
         }
 
         return Status{ErrorCodes::InvalidSyncSource, "No valid sync source."};
@@ -1178,8 +1173,7 @@ Status DataReplicator::_scheduleFetch_inlock() {
             }
         }
 
-        const auto startOptime =
-            _replCoord ? _replCoord->getMyLastOptime().getTimestamp() : _opts.startOptime;
+        const auto startOptime = _opts.getMyLastOptime().getTimestamp();
         const auto remoteOplogNS = _opts.remoteOplogNS;
 
         // TODO: add query options await_data, oplog_replay
@@ -1290,7 +1284,7 @@ void DataReplicator::_onOplogFetchFinish(const StatusWith<Fetcher::QueryResponse
                 // possible rollback
                 _rollbackCommonOptime = findCommonPoint(_syncSource, _lastTimestampApplied);
                 if (_rollbackCommonOptime.isNull()) {
-                    auto s = _replCoord->setFollowerMode(MemberState::RS_RECOVERING);
+                    auto s = _opts.setFollowerMode(MemberState::RS_RECOVERING);
                     if (!s) {
                         error() << "Failed to transition to RECOVERING when "
                                    "we couldn't find oplog start position ("
@@ -1299,7 +1293,7 @@ void DataReplicator::_onOplogFetchFinish(const StatusWith<Fetcher::QueryResponse
                     }
                     Date_t until{_exec->now() +
                                  _opts.blacklistSyncSourcePenaltyForOplogStartMissing};
-                    _replCoord->blacklistSyncSource(_syncSource, until);
+                    _opts.syncSourceSelector->blacklistSyncSource(_syncSource, until);
                 } else {
                     // TODO: cleanup state/restart -- set _lastApplied, and other stuff
                 }
@@ -1311,7 +1305,7 @@ void DataReplicator::_onOplogFetchFinish(const StatusWith<Fetcher::QueryResponse
             default:
                 Date_t until{_exec->now() +
                              _opts.blacklistSyncSourcePenaltyForNetworkConnectionError};
-                _replCoord->blacklistSyncSource(_syncSource, until);
+                _opts.syncSourceSelector->blacklistSyncSource(_syncSource, until);
         }
         LockGuard lk(_mutex);
         _syncSource = HostAndPort();

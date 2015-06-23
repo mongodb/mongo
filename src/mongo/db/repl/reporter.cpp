@@ -38,8 +38,6 @@
 namespace mongo {
 namespace repl {
 
-ReplicationProgressManager::~ReplicationProgressManager() {}
-
 Reporter::Reporter(ReplicationExecutor* executor,
                    ReplicationProgressManager* replicationProgressManager,
                    const HostAndPort& target)

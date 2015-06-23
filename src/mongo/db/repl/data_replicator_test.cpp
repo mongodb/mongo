@@ -36,13 +36,11 @@
 #include "mongo/db/json.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/data_replicator.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_impl.h"
-#include "mongo/db/repl/replica_set_config.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/reporter.h"
+#include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point_service.h"
@@ -60,33 +58,41 @@ using LockGuard = stdx::lock_guard<stdx::mutex>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 using mutex = stdx::mutex;
 
-ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBson) {
-    ReplicaSetConfig config;
-    ASSERT_OK(config.initialize(configBson));
-    ASSERT_OK(config.validate());
-    return config;
-}
-const HostAndPort target("localhost", -1);
-
-class DataReplicatorTest : public ReplicationExecutorTest {
+class DataReplicatorTest : public ReplicationExecutorTest,
+                           public ReplicationProgressManager,
+                           public SyncSourceSelector {
 public:
     DataReplicatorTest() {}
 
     void postExecutorThreadLaunch() override{};
 
+    /**
+     * clear/reset state
+     */
     void reset() {
-        // clear/reset state
+        _applierFn = [](OperationContext*, const BSONObj&) -> Status { return Status::OK(); };
+        _setMyLastOptime = [this](const OpTime& opTime) { _myLastOpTime = opTime; };
+        _myLastOpTime = OpTime();
+        _memberState = MemberState::RS_UNKNOWN;
+        _syncSource = HostAndPort("localhost", -1);
     }
 
-    void createDataReplicator(DataReplicatorOptions opts) {
-        _dr.reset(new DataReplicator(opts, &(getExecutor()), _repl.get()));
-        _dr->__setSourceForTesting(target);
+    // ReplicationProgressManager
+    bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) override {
+        cmdBuilder->append("replSetUpdatePosition", 1);
+        return true;
     }
 
-    void createDataReplicator(DataReplicatorOptions opts,
-                              DataReplicator::OnBatchCompleteFn batchCompletedFn) {
-        _dr.reset(new DataReplicator(opts, &(getExecutor()), _repl.get(), batchCompletedFn));
-        _dr->__setSourceForTesting(target);
+    // SyncSourceSelector
+    void clearSyncSourceBlacklist() override {}
+    HostAndPort chooseNewSyncSource() override {
+        HostAndPort result = _syncSource;
+        _syncSource = HostAndPort();
+        return result;
+    }
+    void blacklistSyncSource(const HostAndPort& host, Date_t until) {}
+    bool shouldChangeSyncSource(const HostAndPort& currentSource) {
+        return false;
     }
 
     void scheduleNetworkResponse(const BSONObj& obj) {
@@ -129,34 +135,47 @@ public:
     DataReplicator& getDR() {
         return *_dr;
     }
-    ReplicationCoordinator& getRepl() {
-        return *_repl;
-    }
 
 protected:
     void setUp() override {
         ReplicationExecutorTest::setUp();
         reset();
 
-        _settings.replSet = "foo";  // We are a replica set :)
-        _repl.reset(new ReplicationCoordinatorMock(_settings));
         launchExecutorThread();
         DataReplicatorOptions options;
         options.initialSyncRetryWait = Milliseconds(0);
-        createDataReplicator(options);
+        options.applierFn = [this](OperationContext* txn, const BSONObj& operation) {
+            return _applierFn(txn, operation);
+        };
+        options.replicationProgressManager = this;
+        options.getMyLastOptime = [this]() { return _myLastOpTime; };
+        options.setMyLastOptime = [this](const OpTime& opTime) { _setMyLastOptime(opTime); };
+        options.setFollowerMode = [this](const MemberState& state) {
+            _memberState = state;
+            return true;
+        };
+        options.syncSourceSelector = this;
+        try {
+            _dr.reset(new DataReplicator(options, &(getExecutor())));
+        } catch (...) {
+            ASSERT_OK(exceptionToStatus());
+        }
     }
 
     void tearDown() override {
         ReplicationExecutorTest::tearDown();
         _dr.reset();
-        _repl.reset();
         // Executor may still invoke callback before shutting down.
     }
 
+    Applier::ApplyOperationFn _applierFn;
+    DataReplicatorOptions::SetMyLastOptimeFn _setMyLastOptime;
+    OpTime _myLastOpTime;
+    MemberState _memberState;
+    HostAndPort _syncSource;
+
 private:
     std::unique_ptr<DataReplicator> _dr;
-    std::unique_ptr<ReplicationCoordinator> _repl;
-    ReplSettings _settings;
 };
 
 TEST_F(DataReplicatorTest, CreateDestroy) {}
@@ -392,13 +411,12 @@ TEST_F(InitialSyncTest, Complete) {
 TEST_F(InitialSyncTest, MissingDocOnApplyCompletes) {
     DataReplicatorOptions opts;
     int applyCounter{0};
-    opts.applierFn = [&](OperationContext* txn, const BSONObj& op) {
+    _applierFn = [&](OperationContext* txn, const BSONObj& op) {
         if (++applyCounter == 1) {
             return Status(ErrorCodes::NoMatchingDocument, "failed: missing doc.");
         }
         return Status::OK();
     };
-    createDataReplicator(opts);
 
     const std::vector<BSONObj> responses = {
         // get latest oplog ts
@@ -460,11 +478,10 @@ TEST_F(InitialSyncTest, Failpoint) {
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345")));
 
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
     Timestamp time1(100, 1);
     OpTime opTime1(time1, OpTime::kDefaultTerm);
-    getRepl().setMyLastOptime(opTime1);
-    ASSERT(getRepl().setFollowerMode(MemberState::RS_SECONDARY));
+    _myLastOpTime = opTime1;
+    _memberState = MemberState::RS_SECONDARY;
 
     DataReplicator* dr = &(getDR());
     InitialSyncBackgroundRunner isbr(dr);
@@ -509,8 +526,7 @@ protected:
         auto noi = net->getNextReadyRequest();
         scheduleNetworkResponse(noi, oplogFetcherResponse);
         net->runReadyNetworkOperations();
-        ASSERT_EQUALS(MemberState(MemberState::RS_RECOVERING).toString(),
-                      getRepl().getMemberState().toString());
+        ASSERT_EQUALS(MemberState(MemberState::RS_RECOVERING).toString(), _memberState.toString());
     }
 };
 
@@ -567,6 +583,87 @@ TEST_F(SteadyStateTest, RemoteOplogFirstOperationTimestampDoesNotMatch) {
         "firstBatch: [{ts:Timestamp(1,1)}]}}"));
 }
 
+TEST_F(SteadyStateTest, PauseDataReplicator) {
+    auto operationToApply = BSON("op"
+                                 << "a"
+                                 << "ts" << Timestamp(Seconds(123), 0));
+    stdx::mutex mutex;
+    unittest::Barrier barrier(2U);
+    Timestamp lastTimestampApplied;
+    BSONObj operationApplied;
+    _applierFn = [&](OperationContext* txn, const BSONObj& op) {
+        stdx::lock_guard<stdx::mutex> lock(mutex);
+        operationApplied = op;
+        barrier.countDownAndWait();
+        return Status::OK();
+    };
+    DataReplicatorOptions::SetMyLastOptimeFn oldSetMyLastOptime = _setMyLastOptime;
+    _setMyLastOptime = [&](const OpTime& opTime) {
+        oldSetMyLastOptime(opTime);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
+        lastTimestampApplied = opTime.getTimestamp();
+        barrier.countDownAndWait();
+    };
+
+    auto& dr = getDR();
+    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kDefaultTerm);
+    _memberState = MemberState::RS_SECONDARY;
+
+    auto net = getNet();
+    net->enterNetwork();
+
+    ASSERT_OK(dr.start());
+
+    ASSERT_TRUE(net->hasReadyRequests());
+    {
+        auto networkRequest = net->getNextReadyRequest();
+        auto commandResponse = BSON(
+            "ok" << 1 << "cursor" << BSON("id" << 0LL << "ns"
+                                               << "local.oplog.rs"
+                                               << "firstBatch" << BSON_ARRAY(operationToApply)));
+        scheduleNetworkResponse(networkRequest, commandResponse);
+    }
+
+    dr.pause();
+
+    ASSERT_EQUALS(0U, dr.getOplogBufferCount());
+
+    // Data replication will process the fetcher response but will not schedule the applier.
+    net->runReadyNetworkOperations();
+    ASSERT_EQUALS(operationToApply["ts"].timestamp(), dr.getLastTimestampFetched());
+
+    // Schedule a bogus work item to ensure that the operation applier function
+    // is not scheduled.
+    auto& exec = getExecutor();
+    exec.scheduleWork(
+        [&barrier](const executor::TaskExecutor::CallbackArgs&) { barrier.countDownAndWait(); });
+
+
+    // Wake up executor thread and wait for bogus work callback to be invoked.
+    net->exitNetwork();
+    barrier.countDownAndWait();
+
+    // Oplog buffer should contain fetched operations since applier is not scheduled.
+    ASSERT_EQUALS(1U, dr.getOplogBufferCount());
+
+    dr.resume();
+
+    // Wait for applier function.
+    barrier.countDownAndWait();
+    // Run scheduleWork() work item scheduled in DataReplicator::_onApplyBatchFinish().
+    net->exitNetwork();
+
+    // Wait for batch completion callback.
+    barrier.countDownAndWait();
+
+    ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(), _memberState.toString());
+    {
+        stdx::lock_guard<stdx::mutex> lock(mutex);
+        ASSERT_EQUALS(operationToApply, operationApplied);
+        ASSERT_EQUALS(operationToApply["ts"].timestamp(), lastTimestampApplied);
+    }
+}
+
 TEST_F(SteadyStateTest, ApplyOneOperation) {
     auto operationToApply = BSON("op"
                                  << "a"
@@ -575,23 +672,22 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
     unittest::Barrier barrier(2U);
     Timestamp lastTimestampApplied;
     BSONObj operationApplied;
-    auto batchCompletedFn = [&](const Timestamp& ts) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
-        lastTimestampApplied = ts;
-        barrier.countDownAndWait();
-    };
-    DataReplicatorOptions opts;
-    opts.applierFn = [&](OperationContext* txn, const BSONObj& op) {
+    _applierFn = [&](OperationContext* txn, const BSONObj& op) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         operationApplied = op;
         barrier.countDownAndWait();
         return Status::OK();
     };
-    createDataReplicator(opts, batchCompletedFn);
+    DataReplicatorOptions::SetMyLastOptimeFn oldSetMyLastOptime = _setMyLastOptime;
+    _setMyLastOptime = [&](const OpTime& opTime) {
+        oldSetMyLastOptime(opTime);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
+        lastTimestampApplied = opTime.getTimestamp();
+        barrier.countDownAndWait();
+    };
 
-    auto& repl = getRepl();
-    repl.setMyLastOptime(OpTime(operationToApply["ts"].timestamp(), 0));
-    ASSERT_TRUE(repl.setFollowerMode(MemberState::RS_SECONDARY));
+    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kDefaultTerm);
+    _memberState = MemberState::RS_SECONDARY;
 
     auto net = getNet();
     net->enterNetwork();
@@ -608,7 +704,11 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
                                                << "firstBatch" << BSON_ARRAY(operationToApply)));
         scheduleNetworkResponse(networkRequest, commandResponse);
     }
+    ASSERT_EQUALS(0U, dr.getOplogBufferCount());
+
+    // Oplog buffer should be empty because contents are transferred to applier.
     net->runReadyNetworkOperations();
+    ASSERT_EQUALS(0U, dr.getOplogBufferCount());
 
     // Wait for applier function.
     barrier.countDownAndWait();
@@ -619,8 +719,7 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
     // Wait for batch completion callback.
     barrier.countDownAndWait();
 
-    ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
-                  repl.getMemberState().toString());
+    ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(), _memberState.toString());
     {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         ASSERT_EQUALS(operationToApply, operationApplied);

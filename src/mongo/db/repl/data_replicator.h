@@ -40,9 +40,9 @@
 #include "mongo/db/repl/applier.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/reporter.h"
+#include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/queue.h"
@@ -69,6 +69,10 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 class OplogFetcher;
 struct InitialSyncState;
+struct MemberState;
+class ReplicationProgressManager;
+class Reporter;
+class SyncSourceSelector;
 
 /** State for decision tree */
 enum class DataReplicatorState {
@@ -84,6 +88,15 @@ std::string toString(DataReplicatorState s);
 enum class DataReplicatorScope { ReplicateAll, ReplicateDB, ReplicateCollection };
 
 struct DataReplicatorOptions {
+    /** Function to return optime of last operation applied on this node */
+    using GetMyLastOptimeFn = stdx::function<OpTime()>;
+
+    /** Function to update optime of last operation applied on this node */
+    using SetMyLastOptimeFn = stdx::function<void(const OpTime&)>;
+
+    /** Function to sets this node into a specific follower mode. */
+    using SetFollowerModeFn = stdx::function<bool(const MemberState&)>;
+
     // Error and retry values
     Milliseconds syncSourceRetryWait{1000};
     Milliseconds initialSyncRetryWait{1000};
@@ -91,7 +104,6 @@ struct DataReplicatorOptions {
     Minutes blacklistSyncSourcePenaltyForOplogStartMissing{10};
 
     // Replication settings
-    Timestamp startOptime;
     NamespaceString localOplogNS = NamespaceString("local.oplog.rs");
     NamespaceString remoteOplogNS = NamespaceString("local.oplog.rs");
 
@@ -99,18 +111,18 @@ struct DataReplicatorOptions {
     DataReplicatorScope scope = DataReplicatorScope::ReplicateAll;
     std::string scopeNS;
     BSONObj filterCriteria;
-    HostAndPort syncSource;  // for use without replCoord -- maybe some kind of rsMonitor/interface
 
-    // TODO: replace with real applier function
-    Applier::ApplyOperationFn applierFn =
-        [](OperationContext*, const BSONObj&) -> Status { return Status::OK(); };
+    Applier::ApplyOperationFn applierFn;
+    ReplicationProgressManager* replicationProgressManager = nullptr;
+    GetMyLastOptimeFn getMyLastOptime;
+    SetMyLastOptimeFn setMyLastOptime;
+    SetFollowerModeFn setFollowerMode;
+    SyncSourceSelector* syncSourceSelector = nullptr;
 
     std::string toString() const {
         return str::stream() << "DataReplicatorOptions -- "
                              << " localOplogNs: " << localOplogNS.toString()
-                             << " remoteOplogNS: " << remoteOplogNS.toString()
-                             << " syncSource: " << syncSource.toString()
-                             << " startOptime: " << startOptime.toString();
+                             << " remoteOplogNS: " << remoteOplogNS.toString();
     }
 };
 
@@ -123,24 +135,7 @@ struct DataReplicatorOptions {
  */
 class DataReplicator {
 public:
-    /** Function to call when a batch is applied. */
-    using OnBatchCompleteFn = stdx::function<void(const Timestamp&)>;
-
-    DataReplicator(DataReplicatorOptions opts,
-                   ReplicationExecutor* exec,
-                   ReplicationCoordinator* replCoord);
-    /**
-     * Used by non-replication coordinator processes, like sharding.
-     */
     DataReplicator(DataReplicatorOptions opts, ReplicationExecutor* exec);
-
-    /**
-     * Used for testing.
-     */
-    DataReplicator(DataReplicatorOptions opts,
-                   ReplicationExecutor* exec,
-                   ReplicationCoordinator* replCoord,
-                   OnBatchCompleteFn batchCompletedFn);
 
     virtual ~DataReplicator();
 
@@ -178,14 +173,17 @@ public:
 
     DataReplicatorState getState() const;
     Timestamp getLastTimestampFetched() const;
+
+    /**
+     * Number of operations in the oplog buffer.
+     */
+    size_t getOplogBufferCount() const;
+
     std::string getDiagnosticString() const;
 
     // For testing only
 
     void _resetState_inlock(Timestamp lastAppliedOptime);
-    void __setSourceForTesting(HostAndPort src) {
-        _syncSource = src;
-    }
     void _setInitialSyncStorageInterface(CollectionCloner::StorageInterface* si);
 
 private:
@@ -241,7 +239,6 @@ private:
     // Set during construction
     const DataReplicatorOptions _opts;
     ReplicationExecutor* _exec;
-    ReplicationCoordinator* _replCoord;
 
     //
     // All member variables are labeled with one of the following codes indicating the
@@ -257,7 +254,7 @@ private:
     //      _mutex or be in a callback in _exec to read.
     // (I)  Independently synchronized, see member variable comment.
 
-    // Protects member data of this ReplicationCoordinator.
+    // Protects member data of this DataReplicator.
     mutable stdx::mutex _mutex;  // (S)
     DataReplicatorState _state;  // (MX)
 
@@ -274,11 +271,9 @@ private:
     Handle _reporterHandle;               // (M)
     std::unique_ptr<Reporter> _reporter;  // (M)
 
-    bool _applierActive;                  // (M)
-    bool _applierPaused;                  // (X)
-    std::unique_ptr<Applier> _applier;    // (M)
-    OnBatchCompleteFn _batchCompletedFn;  // (M)
-
+    bool _applierActive;                // (M)
+    bool _applierPaused;                // (X)
+    std::unique_ptr<Applier> _applier;  // (M)
 
     HostAndPort _syncSource;              // (M)
     Timestamp _lastTimestampFetched;      // (MX)

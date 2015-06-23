@@ -316,7 +316,6 @@ env.Library('repl_coordinator_interface',
             LIBDEPS=[
                 '$BUILD_DIR/mongo/util/net/hostandport',
                 'optime',
-                'reporter',
             ])
 
 env.Library('repl_coordinator_global',
@@ -589,7 +588,7 @@ env.Library(
         'applier',
         'collection_cloner',
         'database_cloner',
-        'repl_coordinator_interface',
+        'reporter',
         '$BUILD_DIR/mongo/client/fetcher',
     ],
 )
@@ -602,9 +601,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'base_cloner_test_fixture',
         'data_replicator',
-        'replica_set_messages',
         'replication_executor_test_fixture',
-        'replmocks',
         '$BUILD_DIR/mongo/unittest/concurrency',
     ],
 )

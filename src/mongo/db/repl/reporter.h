@@ -38,7 +38,7 @@ namespace repl {
 class ReplicationProgressManager {
 public:
     virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
-    virtual ~ReplicationProgressManager();
+    virtual ~ReplicationProgressManager() = default;
 };
 
 class Reporter {

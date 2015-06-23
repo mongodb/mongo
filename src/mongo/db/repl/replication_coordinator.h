@@ -35,6 +35,7 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/reporter.h"
+#include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -84,7 +85,7 @@ extern const char* replAllDead;
  * with the rest of the system.  The public methods on ReplicationCoordinator are the public
  * API that the replication subsystem presents to the rest of the codebase.
  */
-class ReplicationCoordinator : public ReplicationProgressManager {
+class ReplicationCoordinator : public ReplicationProgressManager, public SyncSourceSelector {
     MONGO_DISALLOW_COPYING(ReplicationCoordinator);
 
 public:
@@ -160,11 +161,6 @@ public:
      * configuration.
      */
     virtual Seconds getSlaveDelaySecs() const = 0;
-
-    /**
-     * Clears the list of sync sources we have blacklisted.
-     */
-    virtual void clearSyncSourceBlacklist() = 0;
 
     /**
      * Blocks the calling thread for up to writeConcern.wTimeout millis, or until "opTime" has
@@ -563,26 +559,10 @@ public:
     virtual Status checkReplEnabledForCommand(BSONObjBuilder* result) = 0;
 
     /**
-     * Chooses a viable sync source, or, if none available, returns empty HostAndPort.
-     */
-    virtual HostAndPort chooseNewSyncSource() = 0;
-
-    /**
-     * Blacklists choosing 'host' as a sync source until time 'until'.
-     */
-    virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) = 0;
-
-    /**
      * Loads the optime from the last op in the oplog into the coordinator's lastOpApplied
      * value.
      */
     virtual void resetLastOpTimeFromOplog(OperationContext* txn) = 0;
-
-    /**
-     * Determines if a new sync source should be considered.
-     * currentSource: the current sync source
-     */
-    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) = 0;
 
     /**
      * Returns the OpTime of the latest replica set-committed op known to this server.
