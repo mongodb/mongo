@@ -121,7 +121,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             self.logger.info("Stopping all members of the replica set...")
 
         # Terminate the secondaries first to reduce noise in the logs.
-        for node in self.nodes[::-1]:
+        for node in reversed(self.nodes):
             success = node.teardown() and success
 
         if running_at_start:

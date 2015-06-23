@@ -120,9 +120,7 @@ def _write_report_file(suites, pathname):
     reports = []
     for suite in suites:
         for group in suite.test_groups:
-            report = group.get_latest_report()
-            if report is not None:
-                reports.append(report)
+            reports.extend(group.get_reports())
 
     combined_report_dict = resmokelib.testing.report.TestReport.combine(*reports).as_dict()
     with open(pathname, "w") as fp:

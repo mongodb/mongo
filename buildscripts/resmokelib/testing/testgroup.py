@@ -30,14 +30,11 @@ class TestGroup(object):
         self._end_times = []
         self._reports = []
 
-    def get_latest_report(self):
+    def get_reports(self):
         """
-        Returns the report of the most recent execution, and None if
-        the test group has not been executed.
+        Returns the list of reports.
         """
-        if self._reports:
-            return self._reports[-1]
-        return None
+        return self._reports
 
     def record_start(self):
         """
@@ -110,7 +107,7 @@ class TestGroup(object):
         time_taken = self._end_times[iteration] - self._start_times[iteration]
 
         num_run = report.num_succeeded + report.num_errored + report.num_failed
-        num_skipped = len(self.tests) + report.num_dynamic() - num_run
+        num_skipped = len(self.tests) + report.num_dynamic - num_run
 
         if report.num_succeeded == num_run and num_skipped == 0:
             sb.append("All %d test(s) passed in %0.2f seconds." % (num_run, time_taken))
@@ -124,12 +121,12 @@ class TestGroup(object):
 
         if report.num_failed > 0:
             sb.append("The following tests failed (with exit code):")
-            for test_id in report.get_failed():
-                sb.append("    %s (%d)" % (test_id, report.return_codes[test_id]))
+            for test_info in report.get_failed():
+                sb.append("    %s (%d)" % (test_info.test_id, test_info.return_code))
 
         if report.num_errored > 0:
             sb.append("The following tests had errors:")
-            for test_id in report.get_errored():
-                sb.append("    %s" % test_id)
+            for test_info in report.get_errored():
+                sb.append("    %s" % (test_info.test_id))
 
         return summary
