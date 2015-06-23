@@ -17,7 +17,7 @@ static int __session_rollback_transaction(WT_SESSION *, const char *);
  *	Reset all open cursors.
  */
 int
-__wt_session_reset_cursors(WT_SESSION_IMPL *session, int free_buffers )
+__wt_session_reset_cursors(WT_SESSION_IMPL *session, int free_buffers)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -513,7 +513,6 @@ __session_reset(WT_SESSION *wt_session)
 
 	WT_ASSERT(session, session->ncursors == 0);
 
-	/* Discard scratch buffers, error memory. */
 	__wt_scr_discard(session);
 	__wt_buf_free(session, &session->err);
 
