@@ -143,7 +143,7 @@ func parseVal(val string) int {
 	idx := strings.Index(val, "=")
 	ret, err := strconv.Atoi(val[idx+1:])
 	if err != nil {
-		panic(fmt.Errorf("could not parse verbosity level as an integer: %v", err))
+		panic(fmt.Errorf("value was not a valid integer: %v", err))
 	}
 	return ret
 }
