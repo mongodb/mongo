@@ -62,8 +62,10 @@ HostAndPort selectNode(const vector<Node>& nodes,
 
     ReadPreferenceSetting criteria(pref, tagSet);
     HostAndPort out = set.getMatchingHost(criteria);
-    if (isPrimarySelected) {
-        *isPrimarySelected = !out.empty() && set.findNode(out)->isMaster;
+    if (isPrimarySelected && !out.empty()) {
+        Node* node = set.findNode(out);
+        ASSERT(node);
+        *isPrimarySelected = node->isMaster;
     }
 
     return out;
