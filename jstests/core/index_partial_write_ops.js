@@ -1,11 +1,11 @@
-// Write ops tests for partial indexes
+// Write ops tests for partial indexes.
 
 (function() {
     "use strict";
     var isMongos = (db.runCommand("isMaster").msg === "isdbgrid");
     var coll = db.index_partial_write_ops;
 
-    var getNumKeys = function(idxName) {
+    var getNumKeys = function (idxName) {
         var res = assert.commandWorked(coll.validate(true));
         var kpi;
         if (isMongos) {
@@ -60,5 +60,4 @@
     // Delete that does affect partial index.
     assert.writeOK(coll.remove({x: 6}));
     assert.eq(0, getNumKeys("x_1"));
-
 })();
