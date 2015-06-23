@@ -15,11 +15,6 @@ for f in \
 		cat $t
 	fi
 
-	if grep "(unsigned)" $f > $t; then
-		echo "$f: (unsigned) cast should be u_int"
-		cat $t
-	fi
-
 	if grep WT_DEADLOCK $f | grep -v '#define.WT_DEADLOCK' > $t; then
 		echo "$f: WT_DEADLOCK deprecated in favor of WT_ROLLBACK"
 		cat $t
