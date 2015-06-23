@@ -1,0 +1,57 @@
+#! /bin/sh
+
+# Check WiredTiger error/return macros.
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+cd ..
+
+# Turn a C file into a line per function so we can use grep on it.
+file_parse()
+{
+	sed -n \
+	    -e '/^{$/,/^}$/{=;p;}' $1 |
+	sed 'N;s/\n/:/' |
+	sed -e '/./{H;/^[0-9][0-9]*:}$/!d;}' \
+	    -e x \
+	    -e 's/\n/ /g' \
+	    -e p \
+	    -e '{s/.*//;x;}'
+}
+
+# Returns in functions after a jump to the error label, or an infinite loop
+# where there's a jump to the error label after the error label.
+for f in `find bench examples ext src test -name '*.[ci]'`; do
+	file_parse $f |
+	egrep '(WT_ERR|WT_ERR_MSG|WT_ERR_NOTFOUND_OK|WT_ERR_TEST|WT_ILLEGAL_VALUE_ERR)\(.*(WT_ASSERT_RET|WT_ILLEGAL_VALUE|WT_RET|WT_RET_MSG|WT_RET_NOTFOUND_OK|WT_RET_TEST|WT_VERBOSE_RET|WT_VERBOSE_RETVAL)\(.*err:|[^a-z_]err:.*(WT_ERR|WT_ERR_MSG|WT_ERR_NOTFOUND_OK|WT_ERR_TEST|WT_ILLEGAL_VALUE_ERR)\(' |
+	sed 's/:.*//' > $t
+
+	test -s $t && {
+		echo "$f: return after a jump to the error label or a jump to the error label after the error label"
+		sed 's/^/function @ line:/' < $t
+	}
+done
+
+# Return of 0 in functions after a jump to the error label.
+for f in `find bench examples ext src test -name '*.[ci]'`; do
+	file_parse $f |
+	egrep -v '[^a-z_]err:.*return \(ret|[^a-z_]err:.*WT_RET' |
+	egrep '[^a-z_]err:.*return \(0\);' |
+	sed 's/:.*//' > $t
+
+	test -s $t && {
+		echo "$f: error label followed by a return of 0"
+		sed 's/^/function @ line:/' < $t
+	}
+done
+
+# Early exits from critical loops.
+for f in `find bench examples ext src test -name '*.[ci]'`; do
+	sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
+	       -e '/LSM_.*ENTER*;$/,/LSM_.*LEAVE*;/{=;p;}' \
+	       -e '/va_start/,/va_end/{=;p;}' $f | \
+		sed 'N;s/\n/:/' | \
+		egrep -w 'return|WT_RET' | \
+		sed -e "s,^,$f:," -e 's/$/ [return skips API_END call]/'
+
+done
