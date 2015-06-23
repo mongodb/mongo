@@ -1358,5 +1358,80 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkInvalidTagDoc) {
     future.get();
 }
 
+TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabase) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    DatabaseType dbt;
+    dbt.setName("test");
+    dbt.setPrimary("shard0000");
+    dbt.setSharded(true);
+
+    auto future = async(std::launch::async,
+                        [this, dbt] {
+                            auto status = catalogManager()->updateDatabase(dbt.getName(), dbt);
+                            ASSERT_OK(status);
+                        });
+
+    onCommand([dbt](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS("config", request.dbname);
+
+        BatchedUpdateRequest actualBatchedUpdate;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.cmdObj, &errmsg));
+        ASSERT_EQUALS(DatabaseType::ConfigNS, actualBatchedUpdate.getCollName());
+        auto updates = actualBatchedUpdate.getUpdates();
+        ASSERT_EQUALS(1U, updates.size());
+        auto update = updates.front();
+
+        ASSERT_TRUE(update->getUpsert());
+        ASSERT_FALSE(update->getMulti());
+        ASSERT_EQUALS(update->getQuery(), BSON(DatabaseType::name(dbt.getName())));
+        ASSERT_EQUALS(update->getUpdateExpr(), dbt.toBSON());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    // Now wait for the updateDatabase call to return
+    future.wait_for(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabaseHostUnreachable) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    HostAndPort host1("TestHost1");
+    targeter->setFindHostReturnValue(host1);
+
+    DatabaseType dbt;
+    dbt.setName("test");
+    dbt.setPrimary("shard0001");
+    dbt.setSharded(false);
+
+    auto future = async(std::launch::async,
+                        [this, dbt] {
+                            auto status = catalogManager()->updateDatabase(dbt.getName(), dbt);
+                            ASSERT_EQ(ErrorCodes::HostUnreachable, status);
+                        });
+
+    onCommand([host1](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(host1, request.target);
+
+        BatchedCommandResponse response;
+        response.setOk(false);
+        response.setErrCode(ErrorCodes::HostUnreachable);
+        response.setErrMessage("socket error");
+
+        return response.toBSON();
+    });
+
+    // Now wait for the updateDatabase call to return
+    future.wait_for(kFutureTimeout);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -154,12 +154,6 @@ StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationC
     return notYetImplemented;
 }
 
-Status CatalogManagerReplicaSet::updateDatabase(const std::string& dbName, const DatabaseType& db) {
-    fassert(28684, db.validate());
-
-    return notYetImplemented;
-}
-
 StatusWith<DatabaseType> CatalogManagerReplicaSet::getDatabase(const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
 
@@ -196,26 +190,6 @@ StatusWith<DatabaseType> CatalogManagerReplicaSet::getDatabase(const std::string
     invariant(docs.size() == 1);
 
     return DatabaseType::fromBSON(docs.front());
-}
-
-Status CatalogManagerReplicaSet::updateCollection(const std::string& collNs,
-                                                  const CollectionType& coll) {
-    fassert(28683, coll.validate());
-
-    BatchedCommandResponse response;
-    Status status = update(CollectionType::ConfigNS,
-                           BSON(CollectionType::fullNs(collNs)),
-                           coll.toBSON(),
-                           true,   // upsert
-                           false,  // multi
-                           &response);
-    if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "collection metadata write failed: " << response.toBSON()
-                                    << "; status: " << status.toString());
-    }
-
-    return Status::OK();
 }
 
 StatusWith<CollectionType> CatalogManagerReplicaSet::getCollection(const std::string& collNs) {

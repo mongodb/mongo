@@ -79,11 +79,7 @@ public:
 
     Status createDatabase(const std::string& dbName) override;
 
-    Status updateDatabase(const std::string& dbName, const DatabaseType& db) override;
-
     StatusWith<DatabaseType> getDatabase(const std::string& dbName) override;
-
-    Status updateCollection(const std::string& collNs, const CollectionType& coll) override;
 
     StatusWith<CollectionType> getCollection(const std::string& collNs) override;
 

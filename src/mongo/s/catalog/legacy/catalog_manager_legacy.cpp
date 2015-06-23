@@ -811,25 +811,6 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
     return ShardDrainingStatus::ONGOING;
 }
 
-Status CatalogManagerLegacy::updateDatabase(const std::string& dbName, const DatabaseType& db) {
-    fassert(28616, db.validate());
-
-    BatchedCommandResponse response;
-    Status status = update(DatabaseType::ConfigNS,
-                           BSON(DatabaseType::name(dbName)),
-                           db.toBSON(),
-                           true,   // upsert
-                           false,  // multi
-                           &response);
-    if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "database metadata write failed: " << response.toBSON()
-                                    << "; status: " << status.toString());
-    }
-
-    return Status::OK();
-}
-
 StatusWith<DatabaseType> CatalogManagerLegacy::getDatabase(const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
 
@@ -854,26 +835,6 @@ StatusWith<DatabaseType> CatalogManagerLegacy::getDatabase(const std::string& db
 
     conn.done();
     return DatabaseType::fromBSON(dbObj);
-}
-
-Status CatalogManagerLegacy::updateCollection(const std::string& collNs,
-                                              const CollectionType& coll) {
-    fassert(28634, coll.validate());
-
-    BatchedCommandResponse response;
-    Status status = update(CollectionType::ConfigNS,
-                           BSON(CollectionType::fullNs(collNs)),
-                           coll.toBSON(),
-                           true,   // upsert
-                           false,  // multi
-                           &response);
-    if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "collection metadata write failed: " << response.toBSON()
-                                    << "; status: " << status.toString());
-    }
-
-    return Status::OK();
 }
 
 StatusWith<CollectionType> CatalogManagerLegacy::getCollection(const std::string& collNs) {

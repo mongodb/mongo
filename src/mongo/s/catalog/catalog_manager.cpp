@@ -35,12 +35,15 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
 #include "mongo/s/write_ops/batched_delete_request.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_document.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -147,6 +150,44 @@ Status CatalogManager::remove(const string& ns,
 
     writeConfigServerDirect(request, response);
     return getStatus(*response);
+}
+
+Status CatalogManager::updateCollection(const std::string& collNs, const CollectionType& coll) {
+    fassert(28634, coll.validate());
+
+    BatchedCommandResponse response;
+    Status status = update(CollectionType::ConfigNS,
+                           BSON(CollectionType::fullNs(collNs)),
+                           coll.toBSON(),
+                           true,   // upsert
+                           false,  // multi
+                           &response);
+    if (!status.isOK()) {
+        return Status(status.code(),
+                      str::stream() << "collection metadata write failed: " << response.toBSON()
+                                    << "; status: " << status.toString());
+    }
+
+    return Status::OK();
+}
+
+Status CatalogManager::updateDatabase(const std::string& dbName, const DatabaseType& db) {
+    fassert(28616, db.validate());
+
+    BatchedCommandResponse response;
+    Status status = update(DatabaseType::ConfigNS,
+                           BSON(DatabaseType::name(dbName)),
+                           db.toBSON(),
+                           true,   // upsert
+                           false,  // multi
+                           &response);
+    if (!status.isOK()) {
+        return Status(status.code(),
+                      str::stream() << "database metadata write failed: " << response.toBSON()
+                                    << "; status: " << status.toString());
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo

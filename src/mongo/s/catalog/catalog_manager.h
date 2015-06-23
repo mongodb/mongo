@@ -174,7 +174,7 @@ public:
     /**
      * Updates or creates the metadata for a given database.
      */
-    virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db) = 0;
+    virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db);
 
     /**
      * Retrieves the metadata for a given database, if it exists.
@@ -190,7 +190,7 @@ public:
     /**
      * Updates or creates the metadata for a given collection.
      */
-    virtual Status updateCollection(const std::string& collNs, const CollectionType& coll) = 0;
+    virtual Status updateCollection(const std::string& collNs, const CollectionType& coll);
 
     /**
      * Retrieves the metadata for a given collection, if it exists.
