@@ -132,15 +132,6 @@ Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
     if (!status.isOK())
         return status;
 
-    //
-    // Parse protocol version
-    //
-    BSONElement protocolVersionElement;
-    status = bsonExtractIntegerField(cfg, kProtocolVersionFieldName, &_protocolVersion);
-    if (!status.isOK() && status != ErrorCodes::NoSuchKey) {
-        return status;
-    }
-
     _calculateMajorities();
     _addInternalWriteConcernModes();
     _isInitialized = true;
@@ -246,6 +237,15 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
         }
         _customWriteConcernModes[modeElement.fieldNameStringData()] = pattern;
     }
+
+    //
+    // Parse protocol version
+    //
+    status = bsonExtractIntegerField(settings, kProtocolVersionFieldName, &_protocolVersion);
+    if (!status.isOK() && status != ErrorCodes::NoSuchKey) {
+        return status;
+    }
+
     return Status::OK();
 }
 
