@@ -158,6 +158,9 @@ private:
     // Whether the logAction call should attempt to create the actionlog collection
     AtomicInt32 _actionLogCollectionCreated;
 
+    // Whether the logChange call should attempt to create the changelog collection
+    AtomicInt32 _changeLogCollectionCreated;
+
     // protects _inShutdown
     std::mutex _mutex;
 

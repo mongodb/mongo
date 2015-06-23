@@ -43,9 +43,12 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_actionlog.h"
+#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
@@ -84,6 +87,7 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::SecondaryOnly, T
 const int kNotMasterNumRetries = 3;
 const Milliseconds kNotMasterRetryInterval{500};
 const int kActionLogCollectionSize = 1024 * 1024 * 2;
+const int kChangeLogCollectionSize = 1024 * 1024 * 10;
 
 void _toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
@@ -297,7 +301,47 @@ void CatalogManagerReplicaSet::logAction(const ActionLogType& actionLog) {
 void CatalogManagerReplicaSet::logChange(const string& clientAddress,
                                          const string& what,
                                          const string& ns,
-                                         const BSONObj& detail) {}
+                                         const BSONObj& detail) {
+    if (_changeLogCollectionCreated.load() == 0) {
+        BSONObj createCmd = BSON("create" << ChangelogType::ConfigNS << "capped" << true << "size"
+                                          << kChangeLogCollectionSize);
+        auto result = _runConfigServerCommandWithNotMasterRetries("config", createCmd);
+        if (!result.isOK()) {
+            LOG(1) << "couldn't create changelog collection: " << causedBy(result.getStatus());
+            return;
+        }
+
+        Status commandStatus = Command::getStatusFromCommandResult(result.getValue());
+        if (commandStatus.isOK() || commandStatus == ErrorCodes::NamespaceExists) {
+            _changeLogCollectionCreated.store(1);
+        } else {
+            LOG(1) << "couldn't create changelog collection: " << causedBy(commandStatus);
+            return;
+        }
+    }
+
+    Date_t now = grid.shardRegistry()->getExecutor()->now();
+    std::string hostName = grid.shardRegistry()->getNetwork()->getHostName();
+    const string changeID = str::stream() << hostName << "-" << now.toString() << "-" << OID::gen();
+
+    ChangelogType changeLog;
+    changeLog.setChangeID(changeID);
+    changeLog.setServer(hostName);
+    changeLog.setClientAddr(clientAddress);
+    changeLog.setTime(now);
+    changeLog.setNS(ns);
+    changeLog.setWhat(what);
+    changeLog.setDetails(detail);
+
+    BSONObj changeLogBSON = changeLog.toBSON();
+    log() << "about to log metadata event: " << changeLogBSON;
+
+    Status result = insert(ChangelogType::ConfigNS, changeLogBSON, NULL);
+    if (!result.isOK()) {
+        warning() << "Error encountered while logging config change with ID " << changeID << ": "
+                  << result;
+    }
+}
 
 StatusWith<SettingsType> CatalogManagerReplicaSet::getGlobalSettings(const string& key) {
     const auto configShard = grid.shardRegistry()->getShard("config");

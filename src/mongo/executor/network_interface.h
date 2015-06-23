@@ -99,6 +99,11 @@ public:
     virtual Date_t now() = 0;
 
     /**
+     * Returns the hostname of the current process.
+     */
+    virtual std::string getHostName() = 0;
+
+    /**
      * Starts asynchronous execution of the command described by "request".
      */
     virtual void startCommand(const TaskExecutor::CallbackHandle& cbHandle,

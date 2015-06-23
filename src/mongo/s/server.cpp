@@ -230,6 +230,7 @@ static ExitCode runMongosServer(bool doUpgrade) {
         stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
                                          stdx::make_unique<RemoteCommandRunnerImpl>(0),
                                          std::unique_ptr<executor::TaskExecutor>{nullptr},
+                                         nullptr,
                                          catalogManager.get());
 
     grid.init(std::move(catalogManager), std::move(shardRegistry));

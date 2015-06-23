@@ -52,6 +52,7 @@ class StatusWith;
 
 namespace executor {
 
+class NetworkInterface;
 class TaskExecutor;
 
 }  // namespace executor
@@ -68,11 +69,13 @@ public:
      * @param targeterFactory Produces targeters for each shard's individual connection string
      * @param commandRunner Command runner for executing commands against hosts
      * @param executor Asynchronous task executor to use for making calls to shards.
+     * @param network Network interface backing executor.
      * @param catalogManager Used to retrieve the list of registered shard. TODO: remove.
      */
     ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                   std::unique_ptr<RemoteCommandRunner> commandRunner,
                   std::unique_ptr<executor::TaskExecutor> executor,
+                  executor::NetworkInterface* network,
                   CatalogManager* catalogManager);
 
     ~ShardRegistry();
@@ -83,6 +86,10 @@ public:
 
     executor::TaskExecutor* getExecutor() const {
         return _executor.get();
+    }
+
+    executor::NetworkInterface* getNetwork() const {
+        return _network;
     }
 
     void reload();
@@ -150,6 +157,10 @@ private:
     // Executor for scheduling work and remote commands to shards that run in an asynchronous
     // manner.
     const std::unique_ptr<executor::TaskExecutor> _executor;
+
+    // Network interface being used by _executor.  Used for asking questions about the network
+    // configuration, such as getting the current server's hostname.
+    executor::NetworkInterface* const _network;
 
     // Catalog manager from which to load the shard information. Not owned and must outlive
     // the shard registry object.

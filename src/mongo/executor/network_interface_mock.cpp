@@ -61,6 +61,10 @@ Date_t NetworkInterfaceMock::now() {
     return _now_inlock();
 }
 
+std::string NetworkInterfaceMock::getHostName() {
+    return "thisisourhostname";
+}
+
 void NetworkInterfaceMock::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                         const RemoteCommandRequest& request,
                                         const RemoteCommandCompletionFn& onFinish) {

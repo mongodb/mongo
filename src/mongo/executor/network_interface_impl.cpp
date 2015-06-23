@@ -39,6 +39,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -259,6 +260,10 @@ void NetworkInterfaceImpl::cancelCommand(const TaskExecutor::CallbackHandle& cbH
 
 Date_t NetworkInterfaceImpl::now() {
     return Date_t::now();
+}
+
+std::string NetworkInterfaceImpl::getHostName() {
+    return getHostNameCached();
 }
 
 }  // namespace executor

@@ -77,6 +77,7 @@ void CatalogManagerReplSetTestFixture::setUp() {
         stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
                                          stdx::make_unique<RemoteCommandRunnerMock>(),
                                          std::move(executor),
+                                         _mockNetwork,
                                          cm.get()));
 
     // For now initialize the global grid object. All sharding objects will be accessible

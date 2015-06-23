@@ -82,6 +82,7 @@ public:
     virtual void waitForWorkUntil(Date_t when);
     virtual void signalWorkAvailable();
     virtual Date_t now();
+    virtual std::string getHostName();
     virtual void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                               const RemoteCommandRequest& request,
                               const RemoteCommandCompletionFn& onFinish);
