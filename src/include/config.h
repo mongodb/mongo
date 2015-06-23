@@ -72,22 +72,23 @@ struct __wt_config_parser_impl {
 #define	WT_CONFIG_ENTRY_WT_SESSION_open_cursor		20
 #define	WT_CONFIG_ENTRY_WT_SESSION_reconfigure		21
 #define	WT_CONFIG_ENTRY_WT_SESSION_rename		22
-#define	WT_CONFIG_ENTRY_WT_SESSION_rollback_transaction	23
-#define	WT_CONFIG_ENTRY_WT_SESSION_salvage		24
-#define	WT_CONFIG_ENTRY_WT_SESSION_snapshot		25
-#define	WT_CONFIG_ENTRY_WT_SESSION_strerror		26
-#define	WT_CONFIG_ENTRY_WT_SESSION_transaction_sync	27
-#define	WT_CONFIG_ENTRY_WT_SESSION_truncate		28
-#define	WT_CONFIG_ENTRY_WT_SESSION_upgrade		29
-#define	WT_CONFIG_ENTRY_WT_SESSION_verify		30
-#define	WT_CONFIG_ENTRY_colgroup_meta			31
-#define	WT_CONFIG_ENTRY_file_meta			32
-#define	WT_CONFIG_ENTRY_index_meta			33
-#define	WT_CONFIG_ENTRY_table_meta			34
-#define	WT_CONFIG_ENTRY_wiredtiger_open			35
-#define	WT_CONFIG_ENTRY_wiredtiger_open_all		36
-#define	WT_CONFIG_ENTRY_wiredtiger_open_basecfg		37
-#define	WT_CONFIG_ENTRY_wiredtiger_open_usercfg		38
+#define	WT_CONFIG_ENTRY_WT_SESSION_reset		23
+#define	WT_CONFIG_ENTRY_WT_SESSION_rollback_transaction	24
+#define	WT_CONFIG_ENTRY_WT_SESSION_salvage		25
+#define	WT_CONFIG_ENTRY_WT_SESSION_snapshot		26
+#define	WT_CONFIG_ENTRY_WT_SESSION_strerror		27
+#define	WT_CONFIG_ENTRY_WT_SESSION_transaction_sync	28
+#define	WT_CONFIG_ENTRY_WT_SESSION_truncate		29
+#define	WT_CONFIG_ENTRY_WT_SESSION_upgrade		30
+#define	WT_CONFIG_ENTRY_WT_SESSION_verify		31
+#define	WT_CONFIG_ENTRY_colgroup_meta			32
+#define	WT_CONFIG_ENTRY_file_meta			33
+#define	WT_CONFIG_ENTRY_index_meta			34
+#define	WT_CONFIG_ENTRY_table_meta			35
+#define	WT_CONFIG_ENTRY_wiredtiger_open			36
+#define	WT_CONFIG_ENTRY_wiredtiger_open_all		37
+#define	WT_CONFIG_ENTRY_wiredtiger_open_basecfg		38
+#define	WT_CONFIG_ENTRY_wiredtiger_open_usercfg		39
 /*
  * configuration section: END
  * DO NOT EDIT: automatically built by dist/flags.py.

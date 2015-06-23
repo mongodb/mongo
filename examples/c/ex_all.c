@@ -689,6 +689,10 @@ session_ops(WT_SESSION *session)
 	ret = session->transaction_sync(session, NULL);
 	/*! [Transaction sync] */
 
+	/*! [Reset the session] */
+	ret = session->reset(session);
+	/*! [Reset the session] */
+
 	{
 	/*
 	 * Insert a pair of keys so we can truncate a range.

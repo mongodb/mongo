@@ -1261,6 +1261,23 @@ struct __wt_session {
 	    const char *uri, const char *newuri, const char *config);
 
 	/*!
+	 * Reset the session handle.
+	 *
+	 * This will reset all cursors associated with this session and clear
+	 * any buffers that each cursor held. After this the buffers associated
+	 * with the session will be discarded. The session can be re-used
+	 * immediately after this call returns. If a transaction is running on
+	 * this session, then this call will take no action and return a busy
+	 * error.
+	 *
+	 * @snippet ex_all.c Reset the session
+	 *
+	 * @param session the session handle
+	 * @ebusy_errors
+	 */
+	int __F(reset)(WT_SESSION *session);
+
+	/*!
 	 * Salvage a file or table
 	 *
 	 * Salvage rebuilds the file, or files of which a table is comprised,
