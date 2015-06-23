@@ -171,6 +171,7 @@ public:
     // Don't use above methods before these
     TimestampStatus initialSync();
 
+    HostAndPort getSyncSource() const;
     DataReplicatorState getState() const;
     Timestamp getLastTimestampFetched() const;
 

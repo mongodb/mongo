@@ -46,6 +46,7 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -57,6 +58,24 @@ using executor::NetworkInterfaceMock;
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 using mutex = stdx::mutex;
+
+class SyncSourceSelectorMock : public SyncSourceSelector {
+    MONGO_DISALLOW_COPYING(SyncSourceSelectorMock);
+
+public:
+    SyncSourceSelectorMock(const HostAndPort& syncSource) : _syncSource(syncSource) {}
+    void clearSyncSourceBlacklist() override {}
+    HostAndPort chooseNewSyncSource() override {
+        HostAndPort result = _syncSource;
+        _syncSource = HostAndPort();
+        return result;
+    }
+    void blacklistSyncSource(const HostAndPort& host, Date_t until) override {}
+    bool shouldChangeSyncSource(const HostAndPort& currentSource) override {
+        return false;
+    }
+    HostAndPort _syncSource;
+};
 
 class DataReplicatorTest : public ReplicationExecutorTest,
                            public ReplicationProgressManager,
@@ -74,7 +93,7 @@ public:
         _setMyLastOptime = [this](const OpTime& opTime) { _myLastOpTime = opTime; };
         _myLastOpTime = OpTime();
         _memberState = MemberState::RS_UNKNOWN;
-        _syncSource = HostAndPort("localhost", -1);
+        _syncSourceSelector.reset(new SyncSourceSelectorMock(HostAndPort("localhost", -1)));
     }
 
     // ReplicationProgressManager
@@ -84,15 +103,17 @@ public:
     }
 
     // SyncSourceSelector
-    void clearSyncSourceBlacklist() override {}
-    HostAndPort chooseNewSyncSource() override {
-        HostAndPort result = _syncSource;
-        _syncSource = HostAndPort();
-        return result;
+    void clearSyncSourceBlacklist() override {
+        _syncSourceSelector->clearSyncSourceBlacklist();
     }
-    void blacklistSyncSource(const HostAndPort& host, Date_t until) {}
-    bool shouldChangeSyncSource(const HostAndPort& currentSource) {
-        return false;
+    HostAndPort chooseNewSyncSource() override {
+        return _syncSourceSelector->chooseNewSyncSource();
+    }
+    void blacklistSyncSource(const HostAndPort& host, Date_t until) override {
+        _syncSourceSelector->blacklistSyncSource(host, until);
+    }
+    bool shouldChangeSyncSource(const HostAndPort& currentSource) override {
+        return _syncSourceSelector->shouldChangeSyncSource(currentSource);
     }
 
     void scheduleNetworkResponse(const BSONObj& obj) {
@@ -172,7 +193,7 @@ protected:
     DataReplicatorOptions::SetMyLastOptimeFn _setMyLastOptime;
     OpTime _myLastOpTime;
     MemberState _memberState;
-    HostAndPort _syncSource;
+    std::unique_ptr<SyncSourceSelector> _syncSourceSelector;
 
 private:
     std::unique_ptr<DataReplicator> _dr;
@@ -566,6 +587,68 @@ TEST_F(SteadyStateTest, RequestShutdownAfterStart) {
     net->exitNetwork();  // runs work item scheduled in 'scheduleShutdown()).
     dr.waitForShutdown();
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
+}
+
+TEST_F(SteadyStateTest, ScheduleNextActionFailsAfterChoosingEmptySyncSource) {
+    class TestSyncSourceSelector : public SyncSourceSelector {
+    public:
+        TestSyncSourceSelector(ReplicationExecutor* exec) : _exec(exec) {}
+        void clearSyncSourceBlacklist() override {}
+        HostAndPort chooseNewSyncSource() override {
+            _exec->shutdown();
+            return HostAndPort();
+        }
+        void blacklistSyncSource(const HostAndPort& host, Date_t until) override {}
+        bool shouldChangeSyncSource(const HostAndPort& currentSource) override {
+            return false;
+        }
+        ReplicationExecutor* _exec;
+    };
+    TestSyncSourceSelector* testSyncSourceSelector = new TestSyncSourceSelector(&getExecutor());
+    _syncSourceSelector.reset(testSyncSourceSelector);
+
+    DataReplicator& dr = getDR();
+    ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
+    auto net = getNet();
+    net->enterNetwork();
+    ASSERT_OK(dr.start());
+    ASSERT_EQUALS(HostAndPort(), dr.getSyncSource());
+    ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
+}
+
+class TestSyncSourceSelector2 : public SyncSourceSelector {
+public:
+    void clearSyncSourceBlacklist() override {}
+    HostAndPort chooseNewSyncSource() override {
+        return HostAndPort(str::stream() << "host-" << _sourceNum++, -1);
+    }
+    void blacklistSyncSource(const HostAndPort& host, Date_t until) override {
+        _blacklistedSource = host;
+    }
+    bool shouldChangeSyncSource(const HostAndPort& currentSource) override {
+        return false;
+    }
+    int _sourceNum{0};
+    HostAndPort _blacklistedSource;
+};
+
+TEST_F(SteadyStateTest, ChooseNewSyncSourceAfterFailedNetworkRequest) {
+    TestSyncSourceSelector2* testSyncSourceSelector = new TestSyncSourceSelector2();
+    _syncSourceSelector.reset(testSyncSourceSelector);
+
+    DataReplicator& dr = getDR();
+    ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
+    auto net = getNet();
+    net->enterNetwork();
+    ASSERT_OK(dr.start());
+    ASSERT_TRUE(net->hasReadyRequests());
+    ASSERT_EQUALS(toString(DataReplicatorState::Steady), toString(dr.getState()));
+    // Simulating an invalid remote oplog query response to cause the data replicator to
+    // blacklist the existing sync source and request a new one.
+    scheduleNetworkResponse(BSON("ok" << 0));
+    net->runReadyNetworkOperations();
+    ASSERT_EQUALS(HostAndPort("host-0", -1), testSyncSourceSelector->_blacklistedSource);
+    ASSERT_EQUALS(HostAndPort("host-1", -1), dr.getSyncSource());
 }
 
 TEST_F(SteadyStateTest, RemoteOplogEmpty) {

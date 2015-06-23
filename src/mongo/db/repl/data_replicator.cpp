@@ -552,6 +552,11 @@ Status DataReplicator::pause() {
     return Status::OK();
 }
 
+HostAndPort DataReplicator::getSyncSource() const {
+    LockGuard lk(_mutex);
+    return _syncSource;
+}
+
 DataReplicatorState DataReplicator::getState() const {
     LockGuard lk(_mutex);
     return _state;
@@ -968,7 +973,13 @@ void DataReplicator::_doNextActions_Steady_inlock() {
             }
             _doNextActions();
         };
-        _exec->scheduleWorkAt(when, checkSyncSource);
+        auto scheduleResult = _exec->scheduleWorkAt(when, checkSyncSource);
+        if (!scheduleResult.isOK()) {
+            severe() << "failed to schedule sync source refresh: " << scheduleResult.getStatus()
+                     << ". stopping data replicator";
+            _state = DataReplicatorState::Uninitialized;
+            return;
+        }
     } else {
         // Check if active fetch, if not start one
         if (!_fetcher || !_fetcher->isActive()) {
