@@ -48,8 +48,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 * There's some chance the application specified a record past
 		 * the last record on the page.  If that's the case, and we're
 		 * inserting a new WT_INSERT/WT_UPDATE pair, it goes on the
-		 * append list, not the update list.   In addition, a recno of
-		 * 0 implies an append operation, we're allocating a new row.
+		 * append list, not the update list. In addition, a recno of 0
+		 * implies an append operation, we're allocating a new row.
 		 */
 		if (recno == 0 ||
 		    recno > (btree->type == BTREE_COL_VAR ?

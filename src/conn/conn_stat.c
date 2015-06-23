@@ -445,7 +445,7 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
 	 * Start the thread.
 	 *
 	 * Statistics logging creates a thread per database, rather than using
-	 * a single thread to do logging for all of the databases.   If we ever
+	 * a single thread to do logging for all of the databases. If we ever
 	 * see lots of databases at a time, doing statistics logging, and we
 	 * want to reduce the number of threads, there's no reason we have to
 	 * have more than one thread, I just didn't feel like writing the code

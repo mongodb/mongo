@@ -6,56 +6,12 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 cd ..
 
-# Turn a C file into a line per function so we can use grep on it.
-file_parse()
-{
-	sed -n \
-	    -e '/^{$/,/^}$/{=;p;}' $1 |
-	sed 'N;s/\n/:/' |
-	sed -e '/./{H;/^[0-9][0-9]*:}$/!d;}' \
-	    -e x \
-	    -e 's/\n/ /g' \
-	    -e p \
-	    -e '{s/.*//;x;}'
-}
-
-# Returns in functions after a jump to the error label, or an infinite loop
-# where there's a jump to the error label after the error label.
-for f in `find bench examples ext src test -name '*.[ci]'`; do
-	file_parse $f |
-	egrep '(WT_ERR|WT_ERR_MSG|WT_ERR_NOTFOUND_OK|WT_ERR_TEST|WT_ILLEGAL_VALUE_ERR)\(.*(WT_ASSERT_RET|WT_ILLEGAL_VALUE|WT_RET|WT_RET_MSG|WT_RET_NOTFOUND_OK|WT_RET_TEST|WT_VERBOSE_RET|WT_VERBOSE_RETVAL)\(.*err:|[^a-z_]err:.*(WT_ERR|WT_ERR_MSG|WT_ERR_NOTFOUND_OK|WT_ERR_TEST|WT_ILLEGAL_VALUE_ERR)\(' |
-	sed 's/:.*//' > $t
-
-	test -s $t && {
-		echo "$f: return after a jump to the error label or a jump to the error label after the error label"
-		sed 's/^/function @ line:/' < $t
-	}
-done
-
-# Return of 0 in functions after a jump to the error label.
-for f in `find bench examples ext src test -name '*.[ci]'`; do
-	file_parse $f |
-	egrep -v '[^a-z_]err:.*return \(ret|[^a-z_]err:.*WT_RET' |
-	egrep '[^a-z_]err:.*return \(0\);' |
-	sed 's/:.*//' > $t
-
-	test -s $t && {
-		echo "$f: error label followed by a return of 0"
-		sed 's/^/function @ line:/' < $t
-	}
-done
-
 for f in \
     `find bench examples ext src test -name '*.[chisy]' -o -name '*.in' |
     sed -e '/Makefile.in/d' \
 	-e '/build_win\/wiredtiger_config.h/d'`; do
 	if grep "^[^}]*while (0);" $f > $t; then
 		echo "$f: while (0) has trailing semi-colon"
-		cat $t
-	fi
-
-	if grep "(unsigned)" $f > $t; then
-		echo "$f: (unsigned) cast is wrong"
 		cat $t
 	fi
 
@@ -128,14 +84,6 @@ for f in \
 		}
 	fi
 
-	# Early exits from critical loops
-	sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
-	       -e '/LSM_.*ENTER*;$/,/LSM_.*LEAVE*;/{=;p;}' \
-	       -e '/va_start/,/va_end/{=;p;}' $f | \
-		sed 'N;s/\n/:/' | \
-		egrep -w 'return|WT_RET' | \
-		sed -e "s,^,$f:," -e 's/$/ [return skips API_END call]/'
-
 	tr -cd '[:alnum:][:space:][:punct:]' < $f |
 	unexpand |
 	sed -e 's/){/) {/' \
@@ -164,26 +112,6 @@ for f in \
 
 	cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)
 done
-
-# Check Python coding standards: check for tab characters.
-egrep '	' `find . -name '*.py'` |
-    sed -e 's/:.*//' \
-	-e '/__init__.py/d' \
-	-e '/src\/docs\/tools\/doxypy.py/d' |
-    sort -u |
-    sed 's/^/	/' > $t
-test -s $t && {
-	echo '[tab] characters appear in Python scripts:'
-	cat $t
-}
-# Check Python coding standards: check for trailing semi-colons.
-# Don't check too widely, there are third-party tools that fail this test as
-# well as scripts in this directory that output C code, and so fail the test.
-egrep ';$' `find lang test -name '*.py'`> $t
-test -s $t && {
-	echo 'trailing semi-colons in selected Python code:'
-	cat $t
-}
 
 # Check for common typos (Wikipedia's list).
 find bench examples ext src test \

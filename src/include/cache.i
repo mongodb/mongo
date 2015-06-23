@@ -27,11 +27,11 @@ __wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_cache_read_gen_set --
- *      Get the read generation to store in a page.
+ * __wt_cache_read_gen_bump --
+ *      Get the read generation to keep a page in memory.
  */
 static inline uint64_t
-__wt_cache_read_gen_set(WT_SESSION_IMPL *session)
+__wt_cache_read_gen_bump(WT_SESSION_IMPL *session)
 {
 	/*
 	 * We return read-generations from the future (where "the future" is
@@ -43,6 +43,19 @@ __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 	 * immediately after each update we have to make.
 	 */
 	return (__wt_cache_read_gen(session) + WT_READGEN_STEP);
+}
+
+/*
+ * __wt_cache_read_gen_new --
+ *      Get the read generation for a new page in memory.
+ */
+static inline uint64_t
+__wt_cache_read_gen_new(WT_SESSION_IMPL *session)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	return (__wt_cache_read_gen(session) + cache->read_gen_oldest) / 2;
 }
 
 /*

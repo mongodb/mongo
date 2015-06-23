@@ -33,7 +33,7 @@
  * For example, if 8-bits of a 32-bit quantity were written, then the rest of
  * the 32-bits were written, and another thread of control was able to read the
  * memory location after the first 8-bits were written and before the subsequent
- * 24-bits were written, WiredTiger would break.   Or, if two threads of control
+ * 24-bits were written, WiredTiger would break. Or, if two threads of control
  * attempt to write the same location simultaneously, the result must be one or
  * the other of the two values, not some combination of both.
  *
@@ -44,7 +44,7 @@
  * adjacent 32-bit locations.  The problem is when two threads are cooperating
  * (thread X finds 32-bits set to 0, writes in a new value, flushes memory;
  * thread Y reads 32-bits that are non-zero, does some operation, resets the
- * memory location to 0 and flushes).   If thread X were to read the 32 bits
+ * memory location to 0 and flushes). If thread X were to read the 32 bits
  * adjacent to a different 32 bits, and write them both, the two threads could
  * race.  If that can happen, you must increase the size of the memory type to
  * a type guaranteed to be written atomically in a single cycle, without writing
@@ -139,10 +139,10 @@
 /* Compile read-write barrier */
 #define	WT_BARRIER() __asm__ volatile("" ::: "memory")
 
+#if defined(x86_64) || defined(__x86_64__)
 /* Pause instruction to prevent excess processor bus usage */
 #define	WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
 
-#if defined(x86_64) || defined(__x86_64__)
 #define	WT_FULL_BARRIER() do {						\
 	__asm__ volatile ("mfence" ::: "memory");			\
 } while (0)
@@ -154,8 +154,17 @@
 } while (0)
 
 #elif defined(i386) || defined(__i386__)
+#define	WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
 #define	WT_FULL_BARRIER() do {						\
 	__asm__ volatile ("lock; addl $0, 0(%%esp)" ::: "memory");	\
+} while (0)
+#define	WT_READ_BARRIER()	WT_FULL_BARRIER()
+#define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
+
+#elif defined(__PPC64__) || defined(PPC64)
+#define	WT_PAUSE()	__asm__ volatile("ori 0,0,0" ::: "memory")
+#define	WT_FULL_BARRIER()	do {
+	__asm__ volatile ("sync" ::: "memory");				\
 } while (0)
 #define	WT_READ_BARRIER()	WT_FULL_BARRIER()
 #define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()

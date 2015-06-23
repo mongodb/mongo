@@ -378,16 +378,12 @@ retry:	SLIST_FOREACH(dhandle_cache, &session->dhhash[bucket], hashl) {
 		}
 		if (strcmp(uri, dhandle->name) != 0)
 			continue;
-		if (checkpoint == NULL && dhandle->checkpoint == NULL)
-			break;
-		if (checkpoint != NULL && dhandle->checkpoint != NULL &&
-		    strcmp(checkpoint, dhandle->checkpoint) == 0)
-			break;
-	}
-
-	if (dhandle_cache != NULL) {
-		session->dhandle = dhandle;
-		return (0);
+		if ((checkpoint == NULL && dhandle->checkpoint == NULL) ||
+		    (checkpoint != NULL && dhandle->checkpoint != NULL &&
+		    strcmp(checkpoint, dhandle->checkpoint) == 0)) {
+			session->dhandle = dhandle;
+			return (0);
+		}
 	}
 
 	/*

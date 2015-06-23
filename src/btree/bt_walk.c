@@ -141,6 +141,12 @@ ascend:	/*
 					    session, couple, flags));
 					WT_ERR(ret);
 				}
+
+				/*
+				 * Set the reference hint (used when we continue
+				 * the walk).
+				 */
+				ref->pindex_hint = slot;
 			}
 
 			*refp = ref;
@@ -157,6 +163,12 @@ ascend:	/*
 
 		for (;;) {
 			ref = pindex->index[slot];
+
+			/*
+			 * Set the reference hint (used when we continue the
+			 * walk).
+			 */
+			ref->pindex_hint = slot;
 
 			if (LF_ISSET(WT_READ_CACHE)) {
 				/*

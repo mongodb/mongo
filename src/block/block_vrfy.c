@@ -220,7 +220,7 @@ __wt_verify_ckpt_load(
 	 * Checkpoint verification is similar to deleting checkpoints.  As we
 	 * read each new checkpoint, we merge the allocation lists (accumulating
 	 * all allocated pages as we move through the system), and then remove
-	 * any pages found in the discard list.   The result should be a
+	 * any pages found in the discard list. The result should be a
 	 * one-to-one mapping to the pages we find in this specific checkpoint.
 	 */
 	el = &ci->alloc;
@@ -259,7 +259,7 @@ __wt_verify_ckpt_load(
 
 	/*
 	 * The root page of the checkpoint appears on the alloc list, but not,
-	 * at least until the checkpoint is deleted, on a discard list.   To
+	 * at least until the checkpoint is deleted, on a discard list. To
 	 * handle this case, remove the root page from the accumulated list of
 	 * checkpoint pages, so it doesn't add a new requirement for subsequent
 	 * checkpoints.

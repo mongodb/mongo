@@ -183,7 +183,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    page->read_gen != WT_READGEN_OLDEST &&
 			    page->read_gen < __wt_cache_read_gen(session))
 				page->read_gen =
-				    __wt_cache_read_gen_set(session);
+				    __wt_cache_read_gen_bump(session);
 skip_evict:
 			/*
 			 * Check if we need an autocommit transaction.

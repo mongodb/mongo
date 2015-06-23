@@ -432,7 +432,7 @@ __wt_cell_total_len(WT_CELL_UNPACK *unpack)
 	 * it represents the length of the current cell (normally used for the
 	 * loop that walks through cells on the page), but occasionally we want
 	 * to copy a cell directly from the page, and what we need is the cell's
-	 * total length.   The problem is dictionary-copy cells, because in that
+	 * total length. The problem is dictionary-copy cells, because in that
 	 * case, the __len field is the length of the current cell, not the cell
 	 * for which we're returning data.  To use the __len field, you must be
 	 * sure you're not looking at a copy cell.

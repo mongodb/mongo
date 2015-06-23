@@ -240,7 +240,7 @@ __ovfl_reuse_skip_search(
 		 * of identical overflow items.  (We've seen it in benchmarks.)
 		 * Move through a list of identical items at the current level
 		 * as long as the next one is in-use, otherwise, drop down a
-		 * level.   When at the bottom level, return items if reusable,
+		 * level. When at the bottom level, return items if reusable,
 		 * else NULL.
 		 */
 		len = WT_MIN((*e)->value_size, value_size);

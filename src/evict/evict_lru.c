@@ -486,6 +486,14 @@ __evict_pass(WT_SESSION_IMPL *session)
 			    session, cache->evict_waiter_cond));
 		}
 
+		/*
+		 * Increment the shared read generation.  We do this
+		 * occasionally even if eviction is not currently required, so
+		 * that pages have some relative read generation when the
+		 * eviction server does need to do some work.
+		 */
+		__wt_cache_read_gen_incr(session);
+
 		WT_RET(__evict_has_work(session, &flags));
 		if (flags == 0)
 			break;
@@ -830,6 +838,9 @@ __evict_lru_walk(WT_SESSION_IMPL *session, uint32_t flags)
 
 	WT_ASSERT(session, cache->evict[0].ref != NULL);
 
+	/* Track the oldest read generation we have in the queue. */
+	cache->read_gen_oldest = cache->evict[0].ref->page->read_gen;
+
 	if (LF_ISSET(WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK))
 		/*
 		 * Take all candidates if we only gathered pages with an oldest
@@ -923,9 +934,6 @@ __evict_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	dhandle = NULL;
 	incr = dhandle_locked = 0;
 	retries = 0;
-
-	/* Increment the shared read generation. */
-	__wt_cache_read_gen_incr(session);
 
 	/*
 	 * Update the oldest ID: we use it to decide whether pages are
@@ -1213,15 +1221,11 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 
 		/*
-		 * If this page has never been considered for eviction,
-		 * set its read generation to a little bit in the
-		 * future and move on, give readers a chance to start
-		 * updating the read generation.
+		 * If this page has never been considered for eviction, set its
+		 * read generation to somewhere in the middle of the LRU list.
 		 */
-		if (page->read_gen == WT_READGEN_NOTSET) {
-			page->read_gen = __wt_cache_read_gen_set(session);
-			continue;
-		}
+		if (page->read_gen == WT_READGEN_NOTSET)
+			page->read_gen = __wt_cache_read_gen_new(session);
 
 fast:		/* If the page can't be evicted, give up. */
 		if (!__wt_page_can_evict(session, page, 1, NULL))
@@ -1414,7 +1418,7 @@ __evict_page(WT_SESSION_IMPL *session, int is_server)
 	 */
 	page = ref->page;
 	if (page->read_gen != WT_READGEN_OLDEST)
-		page->read_gen = __wt_cache_read_gen_set(session);
+		page->read_gen = __wt_cache_read_gen_bump(session);
 
 	/*
 	 * If we are evicting in a dead tree, don't write dirty pages.
@@ -1593,8 +1597,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 		    &next_walk, NULL, WT_READ_CACHE | WT_READ_NO_WAIT) == 0 &&
 		    next_walk != NULL) {
 			page = next_walk->page;
-			if (page->type == WT_PAGE_COL_INT ||
-			    page->type == WT_PAGE_ROW_INT)
+			if (WT_PAGE_IS_INTERNAL(page))
 				++file_intl_pages;
 			else
 				++file_leaf_pages;
@@ -1604,10 +1607,13 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 		}
 		session->dhandle = NULL;
 
-		printf("cache dump: %s [%s]:"
+		printf("cache dump: %s%s%s%s:"
 		    " %" PRIu64 " intl pages, %" PRIu64 " leaf pages,"
 		    " %" PRIu64 "MB, %" PRIu64 "MB dirty\n",
-		    dhandle->name, dhandle->checkpoint,
+		    dhandle->name,
+		    dhandle->checkpoint == NULL ? "" : " [",
+		    dhandle->checkpoint == NULL ? "" : dhandle->checkpoint,
+		    dhandle->checkpoint == NULL ? "" : "]",
 		    file_intl_pages, file_leaf_pages,
 		    file_bytes >> 20, file_dirty >> 20);
 
