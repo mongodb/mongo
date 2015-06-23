@@ -75,7 +75,7 @@ namespace mongo {
          *
          * @return true if this is not the final batch.
          */
-        bool sendNextBatch( Request& r, int ntoreturn, BufBuilder& buffer, int& docCount );
+        bool sendNextBatch( Request& r, int batchSize, BufBuilder& buffer, int& docCount );
 
         void accessed();
         /** @return idle time in ms */
