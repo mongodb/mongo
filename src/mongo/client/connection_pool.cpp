@@ -33,7 +33,6 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
-#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace {
@@ -56,10 +55,7 @@ ConnectionPool::~ConnectionPool() {
 
 void ConnectionPool::cleanUpOlderThan(Date_t now) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _cleanUpOlderThan_inlock(now);
-}
 
-void ConnectionPool::_cleanUpOlderThan_inlock(Date_t now) {
     HostConnectionMap::iterator hostConns = _connections.begin();
     while (hostConns != _connections.end()) {
         _cleanUpOlderThan_inlock(now, &hostConns->second);
@@ -123,9 +119,10 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     _cleanUpStaleHosts_inlock(now);
 
     for (HostConnectionMap::iterator hostConns;
-         ((hostConns = _connections.find(target)) != _connections.end());) {
+         (hostConns = _connections.find(target)) != _connections.end();) {
         // Clean up the requested host to remove stale/unused connections
         _cleanUpOlderThan_inlock(now, &hostConns->second);
+
         if (hostConns->second.empty()) {
             // prevent host from causing unnecessary cleanups
             _lastUsedHosts[hostConns->first] = kNeverTooStale;
@@ -137,6 +134,7 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
 
         const ConnectionList::iterator candidate = _inUseConnections.begin();
         lk.unlock();
+
         try {
             if (candidate->conn->isStillConnected()) {
                 // setSoTimeout takes a double representing the number of seconds for send and
@@ -157,7 +155,8 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
 
     // No idle connection in the pool; make a new one.
     lk.unlock();
-    std::unique_ptr<DBClientConnection> conn(new DBClientConnection);
+
+    std::unique_ptr<DBClientConnection> conn(new DBClientConnection());
 
     // setSoTimeout takes a double representing the number of seconds for send and receive
     // timeouts.  Thus, we must take count() and divide by 1000.0 to get the number
@@ -190,6 +189,7 @@ void ConnectionPool::releaseConnection(ConnectionList::iterator iter, const Date
 
     ConnectionList& hostConns = _connections[iter->conn->getServerHostAndPort()];
     _cleanUpOlderThan_inlock(now, &hostConns);
+
     hostConns.splice(hostConns.begin(), _inUseConnections, iter);
     _lastUsedHosts[iter->conn->getServerHostAndPort()] = now;
 }
