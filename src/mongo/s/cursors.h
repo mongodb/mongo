@@ -66,7 +66,7 @@ public:
      *
      * @return true if this is not the final batch.
      */
-    bool sendNextBatch(int ntoreturn, BufBuilder& buffer, int& docCount);
+    bool sendNextBatch(int batchSize, BufBuilder& buffer, int& docCount);
 
     void accessed();
     /** @return idle time in ms */
