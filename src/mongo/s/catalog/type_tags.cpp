@@ -165,7 +165,7 @@ void TagsType::setMinKey(const BSONObj& minKey) {
     _minKey = minKey;
 }
 
-void TagsType::setMaxKey(const BSONObj& maxKEy) {
+void TagsType::setMaxKey(const BSONObj& maxKey) {
     invariant(!maxKey.isEmpty());
     _maxKey = maxKey;
 }
