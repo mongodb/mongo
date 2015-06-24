@@ -125,7 +125,7 @@ using rwlock_underlying_shared_mutex = boost::modified_shared_mutex;
 #include <boost/thread/shared_mutex.hpp>
 namespace mongo {
 namespace detail {
-using rwlock_underlying_shared_mutex = boost::shared_mutex;
+using rwlock_underlying_shared_mutex = boost::shared_mutex;  // NOLINT
 }  // namespace detail
 }  // namespace mongo
 #endif
@@ -164,14 +164,14 @@ protected:
 #if defined(_WIN32)
         return _m.timed_lock_shared(boost::posix_time::milliseconds(millis));
 #else
-        return _m.try_lock_shared_for(boost::chrono::milliseconds(millis));
+        return _m.try_lock_shared_for(boost::chrono::milliseconds(millis));  // NOLINT
 #endif
     }
     bool lock_try(int millis = 0) {
 #if defined(_WIN32)
         return _m.timed_lock(boost::posix_time::milliseconds(millis));
 #else
-        return _m.try_lock_for(boost::chrono::milliseconds(millis));
+        return _m.try_lock_for(boost::chrono::milliseconds(millis));         // NOLINT
 #endif
     }
 

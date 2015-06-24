@@ -605,10 +605,10 @@ public:
 
 RWLock lk("testrw");
 SimpleMutex m;
-boost::mutex mboost;
-boost::timed_mutex mboost_timed;
-std::mutex mstd;
-std::timed_mutex mstd_timed;
+boost::mutex mboost;              // NOLINT
+boost::timed_mutex mboost_timed;  // NOLINT
+std::mutex mstd;                  // NOLINT
+std::timed_mutex mstd_timed;      // NOLINT
 SpinLock s;
 stdx::condition_variable c;
 
@@ -639,7 +639,7 @@ public:
         return false;
     }
     void timed() {
-        boost::lock_guard<boost::mutex> lk(mboost);
+        boost::lock_guard<boost::mutex> lk(mboost);  // NOLINT
     }
 };
 class boosttimed_mutexspeed : public B {
@@ -654,7 +654,7 @@ public:
         return false;
     }
     void timed() {
-        boost::lock_guard<boost::timed_mutex> lk(mboost_timed);
+        boost::lock_guard<boost::timed_mutex> lk(mboost_timed);  // NOLINT
     }
 };
 class simplemutexspeed : public B {
@@ -685,7 +685,7 @@ public:
         return false;
     }
     void timed() {
-        std::lock_guard<std::mutex> lk(mstd);
+        std::lock_guard<std::mutex> lk(mstd);  // NOLINT
     }
 };
 class stdtimed_mutexspeed : public B {
@@ -700,7 +700,7 @@ public:
         return false;
     }
     void timed() {
-        std::lock_guard<std::timed_mutex> lk(mstd_timed);
+        std::lock_guard<std::timed_mutex> lk(mstd_timed);  // NOLINT
     }
 };
 

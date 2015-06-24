@@ -149,7 +149,7 @@ void WiredTigerSessionCache::shuttingDown() {
         // This ensures that any calls, which are currently inside of getSession/releaseSession
         // will be able to complete before we start cleaning up the pool. Any others, which are
         // about to enter will return immediately because of _shuttingDown == true.
-        stdx::lock_guard<boost::shared_mutex> lk(_shutdownLock);
+        stdx::lock_guard<boost::shared_mutex> lk(_shutdownLock);  // NOLINT
     }
 
     closeAll();
@@ -172,7 +172,7 @@ void WiredTigerSessionCache::closeAll() {
 }
 
 WiredTigerSession* WiredTigerSessionCache::getSession() {
-    boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);
+    boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);  // NOLINT
 
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.
@@ -203,7 +203,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     invariant(session);
     invariant(session->cursorsOut() == 0);
 
-    boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);
+    boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);  // NOLINT
     if (_shuttingDown.loadRelaxed()) {
         // Leak the session in order to avoid race condition with clean shutdown, where the
         // storage engine is ripped from underneath transactions, which are not "active"

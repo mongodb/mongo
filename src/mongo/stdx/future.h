@@ -33,12 +33,12 @@
 namespace mongo {
 namespace stdx {
 
-using boost::async;
-using boost::future;
-using boost::future_status;
-using boost::launch;
-using boost::packaged_task;
-using boost::promise;
+using boost::async;          // NOLINT
+using boost::future;         // NOLINT
+using boost::future_status;  // NOLINT
+using boost::launch;         // NOLINT
+using boost::packaged_task;  // NOLINT
+using boost::promise;        // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo

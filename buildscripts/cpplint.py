@@ -190,6 +190,7 @@ _ERROR_CATEGORIES = [
   'build/printf_format',
   'build/storage_class',
   'legal/copyright',
+  'mongo/polyfill',
   'readability/alt_tokens',
   'readability/braces',
   'readability/casting',
@@ -1610,6 +1611,49 @@ def ReverseCloseExpression(clean_lines, linenum, pos):
   # Did not find start of expression before beginning of file, give up
   return (line, 0, -1)
 
+def make_polyfill_regex():
+  polyfill_required_names = [
+    '_',
+    'adopt_lock',
+    'async',
+    'bind',
+    'chrono',
+    'condition_variable',
+    'condition_variable_any',
+    'cv_status',
+    'defer_lock',
+    'function',
+    'future',
+    'future_status',
+    'launch',
+    'lock_guard',
+    'make_unique',
+    'mutex',
+    'packaged_task',
+    'placeholders',
+    'promise',
+    'recursive_mutex',
+    'shared_lock,',
+    'shared_mutex',
+    'shared_timed_mutex',
+    'this_thread',
+    'thread',
+    'timed_mutex',
+    'try_to_lock',
+    'unique_lock',
+  ]
+
+  qualified_names = ['boost::' + name + "(?!_)" for name in polyfill_required_names]
+  qualified_names.extend('std::' + name  + "(?!_)" for name in polyfill_required_names)
+  qualified_names_regex = '|'.join(qualified_names)
+  return re.compile(qualified_names_regex)
+_RE_PATTERN_MONGO_POLYFILL=make_polyfill_regex()
+
+def CheckForMongoPolyfill(filename, clean_lines, linenum, error):
+  line = clean_lines.elided[linenum]
+  if re.search(_RE_PATTERN_MONGO_POLYFILL, line):
+    error(filename, linenum, 'mongodb/polyfill', 5,
+          'Illegal use of banned name from std::/boost::, use mongo::stdx:: variant instead')
 
 def CheckForCopyright(filename, lines, error):
   """Logs an error if no Copyright message appears at the top of the file."""
@@ -5752,6 +5796,7 @@ def ProcessLine(filename, file_extension, clean_lines, line,
   nesting_state.Update(filename, clean_lines, line, error)
   CheckForNamespaceIndentation(filename, nesting_state, clean_lines, line,
                                error)
+  CheckForMongoPolyfill(filename, clean_lines, line, error)
   if nesting_state.InAsmBlock(): return
   CheckForFunctionLengths(filename, clean_lines, line, function_state, error)
   CheckForMultilineCommentsAndStrings(filename, clean_lines, line, error)

@@ -37,7 +37,7 @@
 namespace mongo {
 namespace stdx {
 
-using ::std::make_unique;
+using ::std::make_unique;  // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo
@@ -49,7 +49,7 @@ using ::std::make_unique;
 namespace mongo {
 namespace stdx {
 
-using boost::make_unique;
+using boost::make_unique;  // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo

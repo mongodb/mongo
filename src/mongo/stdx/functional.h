@@ -42,9 +42,9 @@
 namespace mongo {
 namespace stdx {
 
-using ::std::bind;
-using ::std::function;
-namespace placeholders = ::std::placeholders;
+using ::std::bind;                             // NOLINT
+using ::std::function;                         // NOLINT
+namespace placeholders = ::std::placeholders;  // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo
@@ -57,8 +57,8 @@ namespace placeholders = ::std::placeholders;
 namespace mongo {
 namespace stdx {
 
-using boost::bind;
-using boost::function;
+using boost::bind;      // NOLINT
+using boost::function;  // NOLINT
 
 namespace placeholders {
 static boost::arg<1> _1;

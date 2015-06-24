@@ -33,8 +33,8 @@
 namespace mongo {
 namespace stdx {
 
-using thread = boost::thread;
-namespace this_thread = boost::this_thread;
+using thread = boost::thread;                // NOLINT
+namespace this_thread = boost::this_thread;  // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo
