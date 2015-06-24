@@ -97,8 +97,6 @@ struct RemoteCommandRequest {
 struct RemoteCommandResponse {
     RemoteCommandResponse() : data(), elapsedMillis(Milliseconds(0)) {}
 
-    RemoteCommandResponse(BSONObj obj, Milliseconds millis) : data(obj), elapsedMillis(millis) {}
-
     RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj, Milliseconds millis)
         : data(std::move(dataObj)), metadata(std::move(metadataObj)), elapsedMillis(millis) {}
 

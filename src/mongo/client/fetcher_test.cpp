@@ -119,7 +119,7 @@ void FetcherTest::scheduleNetworkResponse(const BSONObj& obj) {
     NetworkInterfaceMock* net = getNet();
     ASSERT_TRUE(net->hasReadyRequests());
     Milliseconds millis(0);
-    RemoteCommandResponse response(obj, millis);
+    RemoteCommandResponse response(obj, BSONObj(), millis);
     ReplicationExecutor::ResponseStatus responseStatus(response);
     net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
 }
@@ -129,7 +129,7 @@ void FetcherTest::scheduleNetworkResponseFor(const BSONObj& filter, const BSONOb
     NetworkInterfaceMock* net = getNet();
     ASSERT_TRUE(net->hasReadyRequests());
     Milliseconds millis(0);
-    RemoteCommandResponse response(obj, millis);
+    RemoteCommandResponse response(obj, BSONObj(), millis);
     ReplicationExecutor::ResponseStatus responseStatus(response);
     auto req = net->getNextReadyRequest();
     ASSERT_EQ(req->getRequest().cmdObj[0], filter[0]);

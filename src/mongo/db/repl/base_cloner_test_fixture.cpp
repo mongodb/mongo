@@ -122,7 +122,7 @@ const Status& BaseClonerTest::getStatus() const {
 void BaseClonerTest::scheduleNetworkResponse(NetworkOperationIterator noi, const BSONObj& obj) {
     auto net = getNet();
     Milliseconds millis(0);
-    RemoteCommandResponse response(obj, millis);
+    RemoteCommandResponse response(obj, BSONObj(), millis);
     ReplicationExecutor::ResponseStatus responseStatus(response);
     net->scheduleResponse(noi, net->now(), responseStatus);
 }

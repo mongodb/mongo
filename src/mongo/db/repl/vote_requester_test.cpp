@@ -124,7 +124,8 @@ protected:
         response.setOk(true);
         response.setVoteGranted(true);
         response.setTerm(1);
-        return ResponseStatus(NetworkInterfaceMock::Response(response.toBSON(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus votedNoBecauseConfigVersionDoesNotMatch() {
@@ -133,7 +134,8 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's config version differs from mine");
-        return ResponseStatus(NetworkInterfaceMock::Response(response.toBSON(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus votedNoBecauseSetNameDiffers() {
@@ -142,7 +144,8 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's set name differs from mine");
-        return ResponseStatus(NetworkInterfaceMock::Response(response.toBSON(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus votedNoBecauseLastOpTimeIsGreater() {
@@ -151,7 +154,8 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's data is staler than mine");
-        return ResponseStatus(NetworkInterfaceMock::Response(response.toBSON(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus votedNoBecauseTermIsGreater() {
@@ -160,7 +164,8 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(3);
         response.setReason("candidate's term is lower than mine");
-        return ResponseStatus(NetworkInterfaceMock::Response(response.toBSON(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus votedNoBecauseAlreadyVoted() {
@@ -169,7 +174,8 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(2);
         response.setReason("already voted for another candidate this term");
-        return ResponseStatus(NetworkInterfaceMock::Response(response.toBSON(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
     }
 
     std::unique_ptr<VoteRequester::Algorithm> _requester;

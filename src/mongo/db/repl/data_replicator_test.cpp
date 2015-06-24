@@ -126,7 +126,7 @@ public:
                                  const BSONObj& obj) {
         NetworkInterfaceMock* net = getNet();
         Milliseconds millis(0);
-        RemoteCommandResponse response(obj, millis);
+        RemoteCommandResponse response(obj, BSONObj(), millis);
         ReplicationExecutor::ResponseStatus responseStatus(response);
         net->scheduleResponse(noi, net->now(), responseStatus);
     }
@@ -318,7 +318,7 @@ protected:
                 net->scheduleResponse(
                     noi,
                     net->now(),
-                    ResponseStatus(RemoteCommandResponse(respBSON, Milliseconds(10))));
+                    ResponseStatus(RemoteCommandResponse(respBSON, BSONObj(), Milliseconds(10))));
                 net->runReadyNetworkOperations();
                 net->exitNetwork();
                 continue;
@@ -332,7 +332,7 @@ protected:
             net->scheduleResponse(noi,
                                   net->now(),
                                   ResponseStatus(RemoteCommandResponse(
-                                      _responses[processedRequests], Milliseconds(10))));
+                                      _responses[processedRequests], BSONObj(), Milliseconds(10))));
             net->runReadyNetworkOperations();
             net->exitNetwork();
             if (++processedRequests >= expectedResponses) {

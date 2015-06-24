@@ -193,11 +193,12 @@ TEST_F(ElectCmdRunnerTest, TwoNodes) {
     ASSERT_EQUALS("admin", noi->getRequest().dbname);
     ASSERT_EQUALS(stripRound(electRequest), stripRound(noi->getRequest().cmdObj));
     ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
-    _net->scheduleResponse(
-        noi,
-        startDate + Milliseconds(10),
-        ResponseStatus(RemoteCommandResponse(
-            BSON("ok" << 1 << "vote" << 1 << "round" << 380865962699346850ll), Milliseconds(8))));
+    _net->scheduleResponse(noi,
+                           startDate + Milliseconds(10),
+                           ResponseStatus(RemoteCommandResponse(
+                               BSON("ok" << 1 << "vote" << 1 << "round" << 380865962699346850ll),
+                               BSONObj(),
+                               Milliseconds(8))));
     _net->runUntil(startDate + Milliseconds(10));
     _net->exitNetwork();
     ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
@@ -284,21 +285,23 @@ protected:
     }
 
     ResponseStatus wrongTypeForVoteField() {
-        return ResponseStatus(
-            NetworkInterfaceMock::Response(BSON("vote" << std::string("yea")), Milliseconds(10)));
+        return ResponseStatus(NetworkInterfaceMock::Response(
+            BSON("vote" << std::string("yea")), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus voteYea() {
-        return ResponseStatus(NetworkInterfaceMock::Response(BSON("vote" << 1), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(BSON("vote" << 1), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus voteNay() {
         return ResponseStatus(
-            NetworkInterfaceMock::Response(BSON("vote" << -10000), Milliseconds(10)));
+            NetworkInterfaceMock::Response(BSON("vote" << -10000), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus abstainFromVoting() {
-        return ResponseStatus(NetworkInterfaceMock::Response(BSON("vote" << 0), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(BSON("vote" << 0), BSONObj(), Milliseconds(10)));
     }
 
     BSONObj threeNodesTwoArbitersConfig() {

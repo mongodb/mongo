@@ -185,6 +185,7 @@ TEST_F(FreshnessCheckerTest, TwoNodes) {
                                              << "who"
                                              << "h1"
                                              << "cfgver" << 1 << "opTime" << Date_t()),
+                                   BSONObj(),
                                    Milliseconds(8))));
     }
     _net->runUntil(startDate + Milliseconds(10));
@@ -249,6 +250,7 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshest) {
                                                            << "h1"
                                                            << "cfgver" << 1 << "fresher" << true
                                                            << "opTime" << Date_t()),
+                                                 BSONObj(),
                                                  Milliseconds(8))));
     }
     _net->runUntil(startDate + Milliseconds(10));
@@ -295,6 +297,7 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTime) {
                           << "h1"
                           << "cfgver" << 1 << "opTime"
                           << Date_t::fromMillisSinceEpoch(Timestamp(10, 0).asLL())),
+                BSONObj(),
                 Milliseconds(8))));
     }
     _net->runUntil(startDate + Milliseconds(10));
@@ -338,6 +341,7 @@ TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponse) {
                                                            << "who"
                                                            << "h1"
                                                            << "cfgver" << 1 << "opTime" << 3),
+                                                 BSONObj(),
                                                  Milliseconds(8))));
     }
     _net->runUntil(startDate + Milliseconds(10));
@@ -389,6 +393,7 @@ TEST_F(FreshnessCheckerTest, ElectVetoed) {
                           << "cfgver" << 1 << "veto" << true << "errmsg"
                           << "I'd rather you didn't"
                           << "opTime" << Date_t::fromMillisSinceEpoch(Timestamp(0, 0).asLL())),
+                BSONObj(),
                 Milliseconds(8))));
     }
     _net->runUntil(startDate + Milliseconds(10));
@@ -453,10 +458,10 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestManyNodes) {
         if (target.host() == "h1") {
             responseBuilder << "fresher" << true;
         }
-        _net->scheduleResponse(
-            noi,
-            startDate + Milliseconds(10),
-            ResponseStatus(RemoteCommandResponse(responseBuilder.obj(), Milliseconds(8))));
+        _net->scheduleResponse(noi,
+                               startDate + Milliseconds(10),
+                               ResponseStatus(RemoteCommandResponse(
+                                   responseBuilder.obj(), BSONObj(), Milliseconds(8))));
     }
     _net->runUntil(startDate + Milliseconds(10));
     _net->exitNetwork();
@@ -511,19 +516,19 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTimeManyNodes
                             << "rs0"
                             << "who" << target.toString() << "cfgver" << 1 << "opTime"
                             << Date_t::fromMillisSinceEpoch(Timestamp(20, 0).asLL());
-            _net->scheduleResponse(
-                noi,
-                startDate + Milliseconds(20),
-                ResponseStatus(RemoteCommandResponse(responseBuilder.obj(), Milliseconds(8))));
+            _net->scheduleResponse(noi,
+                                   startDate + Milliseconds(20),
+                                   ResponseStatus(RemoteCommandResponse(
+                                       responseBuilder.obj(), BSONObj(), Milliseconds(8))));
         } else {
             responseBuilder << "ok" << 1 << "id" << findIdForMember(config, target) << "set"
                             << "rs0"
                             << "who" << target.toString() << "cfgver" << 1 << "opTime"
                             << Date_t::fromMillisSinceEpoch(Timestamp(10, 0).asLL());
-            _net->scheduleResponse(
-                noi,
-                startDate + Milliseconds(10),
-                ResponseStatus(RemoteCommandResponse(responseBuilder.obj(), Milliseconds(8))));
+            _net->scheduleResponse(noi,
+                                   startDate + Milliseconds(10),
+                                   ResponseStatus(RemoteCommandResponse(
+                                       responseBuilder.obj(), BSONObj(), Milliseconds(8))));
         }
     }
     _net->runUntil(startDate + Milliseconds(10));
@@ -580,10 +585,10 @@ TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponseManyNodes) {
         } else {
             responseBuilder << "opTime" << Date_t::fromMillisSinceEpoch(Timestamp(0, 0).asLL());
         }
-        _net->scheduleResponse(
-            noi,
-            startDate + Milliseconds(10),
-            ResponseStatus(RemoteCommandResponse(responseBuilder.obj(), Milliseconds(8))));
+        _net->scheduleResponse(noi,
+                               startDate + Milliseconds(10),
+                               ResponseStatus(RemoteCommandResponse(
+                                   responseBuilder.obj(), BSONObj(), Milliseconds(8))));
     }
     _net->runUntil(startDate + Milliseconds(10));
     _net->exitNetwork();
@@ -640,10 +645,10 @@ TEST_F(FreshnessCheckerTest, ElectVetoedManyNodes) {
             responseBuilder << "veto" << true << "errmsg"
                             << "I'd rather you didn't";
         }
-        _net->scheduleResponse(
-            noi,
-            startDate + Milliseconds(10),
-            ResponseStatus(RemoteCommandResponse(responseBuilder.obj(), Milliseconds(8))));
+        _net->scheduleResponse(noi,
+                               startDate + Milliseconds(10),
+                               ResponseStatus(RemoteCommandResponse(
+                                   responseBuilder.obj(), BSONObj(), Milliseconds(8))));
     }
     _net->runUntil(startDate + Milliseconds(10));
     _net->exitNetwork();
@@ -703,19 +708,19 @@ TEST_F(FreshnessCheckerTest, ElectVetoedAndTiedFreshnessManyNodes) {
                             << "errmsg"
                             << "I'd rather you didn't"
                             << "opTime" << Date_t::fromMillisSinceEpoch(Timestamp(10, 0).asLL());
-            _net->scheduleResponse(
-                noi,
-                startDate + Milliseconds(20),
-                ResponseStatus(RemoteCommandResponse(responseBuilder.obj(), Milliseconds(8))));
+            _net->scheduleResponse(noi,
+                                   startDate + Milliseconds(20),
+                                   ResponseStatus(RemoteCommandResponse(
+                                       responseBuilder.obj(), BSONObj(), Milliseconds(8))));
         } else {
             responseBuilder << "ok" << 1 << "id" << findIdForMember(config, target) << "set"
                             << "rs0"
                             << "who" << target.toString() << "cfgver" << 1 << "opTime"
                             << Date_t::fromMillisSinceEpoch(Timestamp(10, 0).asLL());
-            _net->scheduleResponse(
-                noi,
-                startDate + Milliseconds(10),
-                ResponseStatus(RemoteCommandResponse(responseBuilder.obj(), Milliseconds(8))));
+            _net->scheduleResponse(noi,
+                                   startDate + Milliseconds(10),
+                                   ResponseStatus(RemoteCommandResponse(
+                                       responseBuilder.obj(), BSONObj(), Milliseconds(8))));
         }
     }
     _net->runUntil(startDate + Milliseconds(10));
@@ -779,10 +784,10 @@ TEST_F(FreshnessCheckerTest, ElectManyNodesNotAllRespond) {
                             << "rs0"
                             << "who" << target.toString() << "cfgver" << 1 << "opTime"
                             << Date_t::fromMillisSinceEpoch(Timestamp(0, 0).asLL());
-            _net->scheduleResponse(
-                noi,
-                startDate + Milliseconds(10),
-                ResponseStatus(RemoteCommandResponse(responseBuilder.obj(), Milliseconds(8))));
+            _net->scheduleResponse(noi,
+                                   startDate + Milliseconds(10),
+                                   ResponseStatus(RemoteCommandResponse(
+                                       responseBuilder.obj(), BSONObj(), Milliseconds(8))));
         }
     }
     _net->runUntil(startDate + Milliseconds(10));
@@ -840,21 +845,24 @@ protected:
         BSONObjBuilder bb;
         bb.append("ok", 1.0);
         bb.appendDate("opTime", Date_t::fromMillisSinceEpoch(Timestamp(10, 0).asLL()));
-        return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(bb.obj(), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus moreFreshViaOpTime() {
         BSONObjBuilder bb;
         bb.append("ok", 1.0);
         bb.appendDate("opTime", Date_t::fromMillisSinceEpoch(Timestamp(110, 0).asLL()));
-        return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(bb.obj(), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus wrongTypeForOpTime() {
         BSONObjBuilder bb;
         bb.append("ok", 1.0);
         bb.append("opTime", std::string("several minutes ago"));
-        return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(bb.obj(), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus unauthorized() {
@@ -862,25 +870,28 @@ protected:
         bb.append("ok", 0.0);
         bb.append("code", ErrorCodes::Unauthorized);
         bb.append("errmsg", "Unauthorized");
-        return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(bb.obj(), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus tiedForFreshness() {
         BSONObjBuilder bb;
         bb.append("ok", 1.0);
         bb.appendDate("opTime", Date_t::fromMillisSinceEpoch(Timestamp(100, 0).asLL()));
-        return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
+        return ResponseStatus(
+            NetworkInterfaceMock::Response(bb.obj(), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus moreFresh() {
-        return ResponseStatus(NetworkInterfaceMock::Response(BSON("ok" << 1.0 << "fresher" << true),
-                                                             Milliseconds(10)));
+        return ResponseStatus(NetworkInterfaceMock::Response(
+            BSON("ok" << 1.0 << "fresher" << true), BSONObj(), Milliseconds(10)));
     }
 
     ResponseStatus veto() {
         return ResponseStatus(
             NetworkInterfaceMock::Response(BSON("ok" << 1.0 << "veto" << true << "errmsg"
                                                      << "vetoed!"),
+                                           BSONObj(),
                                            Milliseconds(10)));
     }
 

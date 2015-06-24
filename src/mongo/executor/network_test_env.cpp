@@ -59,7 +59,7 @@ void NetworkTestEnv::onCommand(OnCommandFunction func) {
 
     Command::appendCommandStatus(result, resultStatus.getStatus());
 
-    const RemoteCommandResponse response(result.obj(), Milliseconds(1));
+    const RemoteCommandResponse response(result.obj(), BSONObj(), Milliseconds(1));
 
     _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
     _mockNetwork->runReadyNetworkOperations();

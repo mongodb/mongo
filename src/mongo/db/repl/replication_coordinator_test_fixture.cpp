@@ -160,7 +160,7 @@ void ReplCoordTest::assertStartSuccess(const BSONObj& configDoc, const HostAndPo
 
 ResponseStatus ReplCoordTest::makeResponseStatus(const BSONObj& doc, Milliseconds millis) {
     log() << "Responding with " << doc;
-    return ResponseStatus(RemoteCommandResponse(doc, millis));
+    return ResponseStatus(RemoteCommandResponse(doc, BSONObj(), millis));
 }
 
 void ReplCoordTest::simulateSuccessfulV1Election() {

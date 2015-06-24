@@ -299,7 +299,7 @@ TEST_F(ReplCoordTest, InitiatePassesIfQuorumMet) {
     getNet()->scheduleResponse(
         noi,
         startDate + Milliseconds(10),
-        ResponseStatus(RemoteCommandResponse(hbResp.toBSON(false), Milliseconds(8))));
+        ResponseStatus(RemoteCommandResponse(hbResp.toBSON(false), BSONObj(), Milliseconds(8))));
     getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());

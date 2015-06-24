@@ -105,7 +105,7 @@ void ReporterTest::scheduleNetworkResponse(const BSONObj& obj) {
     NetworkInterfaceMock* net = getNet();
     ASSERT_TRUE(net->hasReadyRequests());
     Milliseconds millis(0);
-    RemoteCommandResponse response(obj, millis);
+    RemoteCommandResponse response(obj, BSONObj(), millis);
     ReplicationExecutor::ResponseStatus responseStatus(response);
     net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
 }
