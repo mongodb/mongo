@@ -47,6 +47,7 @@ using Microseconds = stdx::chrono::microseconds;
 using Milliseconds = stdx::chrono::milliseconds;
 using Seconds = stdx::chrono::seconds;
 using Minutes = stdx::chrono::minutes;
+using Hours = stdx::chrono::hours;
 using stdx::chrono::duration_cast;
 
 void time_t_to_Struct(time_t t, struct tm* buf, bool local = false);
