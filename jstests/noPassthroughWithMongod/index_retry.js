@@ -42,7 +42,7 @@
                 // Identify the index build as a createIndexes command.
                 // It is assumed that no other clients are concurrently
                 // accessing the 'test' database.
-                if ( op.op == 'query' && 'createIndexes' in op.query ) {
+                if ( (op.op == 'query' || op.op == 'command') && 'createIndexes' in op.query ) {
                     debug(op.opid);
                     var idxSpec = op.query.indexes[0];
                     // SERVER-4295 Make sure the index details are there
