@@ -37,6 +37,7 @@
 #include <csignal>
 #include <exception>
 #include <iostream>
+#include <fstream>
 #include <memory>
 #include <streambuf>
 #include <typeinfo>
@@ -265,6 +266,18 @@ void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void*) {
 
     printSignalAndBacktrace(signalNum);
     breakpoint();
+
+#if defined(__linux__)
+    // Dump /proc/self/maps if possible to see where the bad address relates to our layout.
+    // We do this last just in case it goes wrong.
+    mallocFreeOStream << "/proc/self/maps:\n";
+    std::ifstream is("/proc/self/maps");
+    std::string str;
+    while(getline(is, str)) {
+        mallocFreeOStream << str;
+        writeMallocFreeStreamToLog();
+    }
+#endif
     quickExit(EXIT_ABRUPT);
 }
 
