@@ -2531,12 +2531,24 @@ void ReplicationCoordinatorImpl::_processReplSetDeclareElectionWinner_finish(
 
 void ReplicationCoordinatorImpl::prepareCursorResponseInfo(BSONObjBuilder* objBuilder) {
     if (getReplicationMode() == modeReplSet && isV1ElectionProtocol()) {
-        BSONObjBuilder replObj(objBuilder->subobjStart("repl"));
-        _topCoord->prepareCursorResponseInfo(objBuilder, getLastCommittedOpTime());
-        replObj.done();
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_prepareCursorResponseInfo_finish,
+                       this,
+                       stdx::placeholders::_1,
+                       objBuilder));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return;
+        }
+        _replExecutor.wait(cbh.getValue());
     }
 }
 
+void ReplicationCoordinatorImpl::_prepareCursorResponseInfo_finish(
+    const ReplicationExecutor::CallbackArgs& cbData, BSONObjBuilder* objBuilder) {
+    BSONObjBuilder replObj(objBuilder->subobjStart("repl"));
+    _topCoord->prepareCursorResponseInfo(&replObj, getLastCommittedOpTime());
+    replObj.done();
+}
 bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {
     return getConfig().getProtocolVersion() == 1;
 }

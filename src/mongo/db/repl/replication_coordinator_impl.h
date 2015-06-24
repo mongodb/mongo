@@ -476,6 +476,11 @@ private:
                                             Status* result);
 
     /**
+     * Bottom half of prepareCursorResponseInfo.
+     */
+    void _prepareCursorResponseInfo_finish(const ReplicationExecutor::CallbackArgs& cbData,
+                                           BSONObjBuilder* objBuilder);
+    /**
      * Scheduled to cause the ReplicationCoordinator to reconsider any state that might
      * need to change as a result of time passing - for instance becoming PRIMARY when a single
      * node replica set member's stepDown period ends.
