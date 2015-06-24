@@ -84,6 +84,7 @@ namespace mongo {
 using std::map;
 using std::pair;
 using std::set;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 using str::stream;
@@ -431,16 +432,18 @@ Status CatalogManagerLegacy::enableSharding(const std::string& dbName) {
     Status status = _checkDbDoesNotExist(dbName);
     if (status.isOK()) {
         // Database does not exist, create a new entry
-        const ShardPtr primary = Shard::pick();
-        if (primary) {
-            log() << "Placing [" << dbName << "] on: " << primary->toString();
-
-            db.setName(dbName);
-            db.setPrimary(primary->getId());
-            db.setSharded(true);
-        } else {
-            return Status(ErrorCodes::ShardNotFound, "can't find a shard to put new db on");
+        auto newShardIdStatus = selectShardForNewDatabase(grid.shardRegistry());
+        if (!newShardIdStatus.isOK()) {
+            return newShardIdStatus.getStatus();
         }
+
+        const ShardId& newShardId = newShardIdStatus.getValue();
+
+        log() << "Placing [" << dbName << "] on: " << newShardId;
+
+        db.setName(dbName);
+        db.setPrimary(newShardId);
+        db.setSharded(true);
     } else if (status.code() == ErrorCodes::NamespaceExists) {
         // Database exists, so just update it
         StatusWith<DatabaseType> dbStatus = getDatabase(dbName);
@@ -590,16 +593,18 @@ Status CatalogManagerLegacy::createDatabase(const std::string& dbName) {
     }
 
     // Database does not exist, pick a shard and create a new entry
-    const ShardPtr primaryShard = Shard::pick();
-    if (!primaryShard) {
-        return Status(ErrorCodes::ShardNotFound, "can't find a shard to put new db on");
+    auto newShardIdStatus = selectShardForNewDatabase(grid.shardRegistry());
+    if (!newShardIdStatus.isOK()) {
+        return newShardIdStatus.getStatus();
     }
 
-    log() << "Placing [" << dbName << "] on: " << primaryShard->toString();
+    const ShardId& newShardId = newShardIdStatus.getValue();
+
+    log() << "Placing [" << dbName << "] on: " << newShardId;
 
     DatabaseType db;
     db.setName(dbName);
-    db.setPrimary(primaryShard->getId());
+    db.setPrimary(newShardId);
     db.setSharded(false);
 
     BatchedCommandResponse response;

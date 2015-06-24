@@ -52,6 +52,7 @@ class DistLockManager;
 class OperationContext;
 class SettingsType;
 class ShardKeyPattern;
+class ShardRegistry;
 class ShardType;
 class Status;
 template <typename T>
@@ -396,6 +397,12 @@ public:
 
 protected:
     CatalogManager() = default;
+
+    /**
+     * Selects an optimal shard on which to place a newly created database from the set of
+     * available shards. Will return ShardNotFound if shard could not be found.
+     */
+    static StatusWith<ShardId> selectShardForNewDatabase(ShardRegistry* shardRegistry);
 };
 
 }  // namespace mongo

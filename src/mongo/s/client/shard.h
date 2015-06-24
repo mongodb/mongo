@@ -113,12 +113,6 @@ public:
 
     static ShardPtr lookupRSName(const std::string& name);
 
-    /**
-     * @parm current - shard where the chunk/database currently lives in
-     * @return the currently emptiest shard, if best then current, or nullptr
-     */
-    static ShardPtr pick();
-
     static void reloadShardInfo();
 
     static void removeShard(const ShardId& id);

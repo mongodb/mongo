@@ -37,6 +37,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
@@ -47,8 +48,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
+using std::vector;
 
 namespace {
 
@@ -188,6 +190,44 @@ Status CatalogManager::updateDatabase(const std::string& dbName, const DatabaseT
     }
 
     return Status::OK();
+}
+
+// static
+StatusWith<ShardId> CatalogManager::selectShardForNewDatabase(ShardRegistry* shardRegistry) {
+    vector<ShardId> allShardIds;
+
+    shardRegistry->getAllShardIds(&allShardIds);
+    if (allShardIds.empty()) {
+        shardRegistry->reload();
+        shardRegistry->getAllShardIds(&allShardIds);
+
+        if (allShardIds.empty()) {
+            return Status(ErrorCodes::ShardNotFound, "No shards found");
+        }
+    }
+
+    auto bestShard = shardRegistry->getShard(allShardIds[0]);
+    if (!bestShard) {
+        return {ErrorCodes::ShardNotFound, "Candidate shard disappeared"};
+    }
+
+    ShardStatus bestStatus = bestShard->getStatus();
+
+    for (size_t i = 1; i < allShardIds.size(); i++) {
+        const auto shard = shardRegistry->getShard(allShardIds[i]);
+        if (!shard) {
+            continue;
+        }
+
+        const ShardStatus status = shard->getStatus();
+
+        if (status < bestStatus) {
+            bestShard = shard;
+            bestStatus = status;
+        }
+    }
+
+    return bestShard->getId();
 }
 
 }  // namespace mongo

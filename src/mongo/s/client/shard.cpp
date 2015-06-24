@@ -33,7 +33,6 @@
 #include "mongo/s/client/shard.h"
 
 #include <string>
-#include <vector>
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/read_preference.h"
@@ -50,7 +49,6 @@ namespace mongo {
 
 using std::string;
 using std::stringstream;
-using std::vector;
 
 Shard::Shard(const ShardId& id,
              const ConnectionString& connStr,
@@ -134,44 +132,6 @@ void Shard::reloadShardInfo() {
 
 void Shard::removeShard(const ShardId& id) {
     grid.shardRegistry()->remove(id);
-}
-
-ShardPtr Shard::pick() {
-    vector<ShardId> all;
-
-    grid.shardRegistry()->getAllShardIds(&all);
-    if (all.size() == 0) {
-        grid.shardRegistry()->reload();
-        grid.shardRegistry()->getAllShardIds(&all);
-
-        if (all.empty()) {
-            return nullptr;
-        }
-    }
-
-    auto bestShard = grid.shardRegistry()->getShard(all[0]);
-    if (!bestShard) {
-        return nullptr;
-    }
-
-    ShardStatus bestStatus = bestShard->getStatus();
-
-    for (size_t i = 1; i < all.size(); i++) {
-        const auto shard = grid.shardRegistry()->getShard(all[i]);
-        if (!shard) {
-            continue;
-        }
-
-        const ShardStatus status = shard->getStatus();
-
-        if (status < bestStatus) {
-            bestShard = shard;
-            bestStatus = status;
-        }
-    }
-
-    LOG(1) << "best shard for new allocation is " << bestStatus;
-    return bestShard;
 }
 
 ShardStatus::ShardStatus(long long dataSizeBytes, const string& mongoVersion)
