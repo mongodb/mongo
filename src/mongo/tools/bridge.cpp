@@ -94,7 +94,7 @@ public:
 
                 int oldId = m.header().getId();
                 if (m.operation() == dbQuery || m.operation() == dbMsg ||
-                    m.operation() == dbGetMore) {
+                    m.operation() == dbGetMore || m.operation() == dbCommand) {
                     bool exhaust = false;
                     if (m.operation() == dbQuery) {
                         DbMessage d(m);

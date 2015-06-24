@@ -41,8 +41,10 @@ namespace mongo {
 class Message;
 
 namespace rpc {
+class ReplyBuilderInterface;
 class ReplyInterface;
 class RequestBuilderInterface;
+class RequestInterface;
 
 /**
  * Returns the appropriate concrete RequestBuilder. Throws if one cannot be chosen.
@@ -55,6 +57,17 @@ std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(ProtocolSet clientPr
  * Throws if one cannot be chosen.
  */
 std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage);
+
+/**
+ * Returns the appropriate concrete Request according to the contents of the message.
+ * Throws if one cannot be chosen.
+ */
+std::unique_ptr<RequestInterface> makeRequest(const Message* unownedMessage);
+
+/**
+ * Returns the appropriate concrete ReplyBuilder.
+ */
+std::unique_ptr<ReplyBuilderInterface> makeReplyBuilder(Protocol protocol);
 
 }  // namespace rpc
 }  // namespace mongo

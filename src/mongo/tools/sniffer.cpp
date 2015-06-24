@@ -67,6 +67,8 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/util/net/message.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/message.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
 
@@ -362,7 +364,7 @@ void processMessage(Connection& c, Message& m) {
             std::shared_ptr<DBClientConnection> conn = forwarder[c];
             if (!conn) {
                 conn.reset(new DBClientConnection(true));
-                conn->connect(forwardAddress);
+                uassertStatusOK(conn->connect(mongo::HostAndPort{forwardAddress}));
                 forwarder[c] = conn;
             }
             if (m.operation() == mongo::dbQuery || m.operation() == mongo::dbGetMore) {

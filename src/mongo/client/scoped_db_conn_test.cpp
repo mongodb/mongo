@@ -36,15 +36,19 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/db/wire_version.h"
+#include "mongo/rpc/factory.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/rpc/request_interface.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message_port.h"
 #include "mongo/util/net/message_server.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
-#include "mongo/unittest/unittest.h"
 
 /**
  * Tests for ScopedDbConnection, particularly in connection pool management.
@@ -107,7 +111,23 @@ class DummyMessageHandler final : public MessageHandler {
 public:
     virtual void connected(AbstractMessagingPort* p) {}
 
-    virtual void process(Message& m, AbstractMessagingPort* por) {}
+    virtual void process(Message& m, AbstractMessagingPort* port) {
+        auto request = rpc::makeRequest(&m);
+        auto reply = rpc::makeReplyBuilder(request->getProtocol());
+
+        BSONObjBuilder commandResponse;
+
+        // We need to handle the isMaster received during connection.
+        if (request->getCommandName() == "isMaster") {
+            commandResponse.append("maxWireVersion", WireVersion::RELEASE_3_1_5);
+            commandResponse.append("minWireVersion", WireVersion::RELEASE_2_4_AND_BEFORE);
+        }
+
+        port->reply(m,
+                    *reply->setMetadata(rpc::makeEmptyMetadata())
+                         .setCommandReply(commandResponse.done())
+                         .done());
+    }
 
 } dummyHandler;
 
@@ -221,13 +241,13 @@ public:
 
         // Make sure the dummy server is up and running before proceeding
         while (true) {
-            try {
-                conn.connect(TARGET_HOST);
+            auto connectStatus = conn.connect(HostAndPort{TARGET_HOST});
+            if (connectStatus.isOK()) {
                 break;
-            } catch (const ConnectException&) {
-                if (timer.seconds() > 20) {
-                    FAIL("Timed out connecting to dummy server");
-                }
+            }
+            if (timer.seconds() > 20) {
+                FAIL(str::stream()
+                     << "Timed out connecting to dummy server: " << connectStatus.toString());
             }
         }
     }

@@ -55,6 +55,7 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_win32.h"
@@ -660,7 +661,7 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
             //
             try {
                 DBClientConnection conn;
-                conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
+                conn.connect(HostAndPort{"127.0.0.1:" + BSONObjBuilder::numStr(port)});
 
                 BSONElement authObj = opt["auth"];
 

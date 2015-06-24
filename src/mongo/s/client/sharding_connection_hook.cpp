@@ -49,28 +49,6 @@ namespace mongo {
 
 using std::string;
 
-namespace {
-
-bool initWireVersion(DBClientBase* conn, std::string* errMsg) {
-    BSONObj response;
-    if (!conn->runCommand("admin", BSON("isMaster" << 1), response)) {
-        *errMsg = str::stream() << "Failed to determine wire version "
-                                << "for internal connection: " << response;
-        return false;
-    }
-
-    if (response.hasField("minWireVersion") && response.hasField("maxWireVersion")) {
-        int minWireVersion = response["minWireVersion"].numberInt();
-        int maxWireVersion = response["maxWireVersion"].numberInt();
-        conn->setWireVersions(minWireVersion, maxWireVersion);
-    }
-
-    return true;
-}
-
-}  // namespace
-
-
 ShardingConnectionHook::ShardingConnectionHook(bool shardedConnections)
     : _shardedConnections(shardedConnections) {}
 
@@ -85,18 +63,6 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
         uassert(15847,
                 str::stream() << "can't authenticate to server " << conn->getServerAddress(),
                 result);
-    }
-
-    // Initialize the wire version of single connections
-    if (conn->type() == ConnectionString::MASTER) {
-        LOG(2) << "checking wire version of new connection " << conn->toString();
-
-        // Initialize the wire protocol version of the connection to find out if we
-        // can send write commands to this connection.
-        string errMsg;
-        if (!initWireVersion(conn, &errMsg)) {
-            uasserted(17363, errMsg);
-        }
     }
 
     if (_shardedConnections) {

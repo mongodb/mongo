@@ -34,6 +34,9 @@
 #include <iterator>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -104,6 +107,46 @@ StatusWith<ProtocolSet> parseProtocolSet(StringData repr) {
                                 << "'none' (0x0), 'opQueryOnly' (0x1), 'opCommandOnly' (0x2), "
                                 << "and 'all' (0x3) are supported.");
 }
+
+StatusWith<ProtocolSet> parseProtocolSetFromIsMasterReply(const BSONObj& isMasterReply) {
+    long long maxWireVersion;
+    auto maxWireExtractStatus =
+        bsonExtractIntegerField(isMasterReply, "maxWireVersion", &maxWireVersion);
+
+    long long minWireVersion;
+    auto minWireExtractStatus =
+        bsonExtractIntegerField(isMasterReply, "minWireVersion", &minWireVersion);
+
+    // MongoDB 2.4 and earlier do not have maxWireVersion/minWireVersion in their 'isMaster' replies
+    if ((maxWireExtractStatus == minWireExtractStatus) &&
+        (maxWireExtractStatus == ErrorCodes::NoSuchKey)) {
+        return supports::kOpQueryOnly;
+    } else if (!maxWireExtractStatus.isOK()) {
+        return maxWireExtractStatus;
+    } else if (!minWireExtractStatus.isOK()) {
+        return minWireExtractStatus;
+    }
+
+    bool hasWireVersionForOpCommandInMongod = (minWireVersion <= WireVersion::RELEASE_3_1_5) &&
+        (maxWireVersion >= WireVersion::RELEASE_3_1_5);
+
+    bool isMongos = false;
+
+    std::string msgField;
+    auto msgFieldExtractStatus = bsonExtractStringField(isMasterReply, "msg", &msgField);
+
+    if (msgFieldExtractStatus == ErrorCodes::NoSuchKey) {
+        isMongos = false;
+    } else if (!msgFieldExtractStatus.isOK()) {
+        return msgFieldExtractStatus;
+    } else {
+        isMongos = (msgField == "isdbgrid");
+    }
+
+    return (!isMongos && hasWireVersionForOpCommandInMongod) ? supports::kAll
+                                                             : supports::kOpQueryOnly;
+}
+
 
 }  // namespace rpc
 }  // namespace mongo

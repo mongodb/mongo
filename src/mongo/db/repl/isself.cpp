@@ -191,9 +191,14 @@ bool isSelf(const HostAndPort& hostAndPort) {
 
     try {
         DBClientConnection conn;
-        std::string errmsg;
         conn.setSoTimeout(30);  // 30 second timeout
-        if (!conn.connect(hostAndPort, errmsg)) {
+
+        // We need to avoid the isMaster call triggered by a normal connect, which would
+        // cause a deadlock. 'isSelf' is called by the Replication Coordinator when validating
+        // a replica set configuration document, but the 'isMaster' command requires a lock on the
+        // replication coordinator to execute. As such we call we call 'connectSocketOnly', which
+        // does not call 'isMaster'.
+        if (!conn.connectSocketOnly(hostAndPort).isOK()) {
             return false;
         }
 

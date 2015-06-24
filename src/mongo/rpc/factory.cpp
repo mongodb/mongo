@@ -31,8 +31,12 @@
 #include "mongo/rpc/factory.h"
 
 #include "mongo/rpc/command_reply.h"
+#include "mongo/rpc/command_reply_builder.h"
+#include "mongo/rpc/command_request.h"
 #include "mongo/rpc/command_request_builder.h"
 #include "mongo/rpc/legacy_reply.h"
+#include "mongo/rpc/legacy_reply_builder.h"
+#include "mongo/rpc/legacy_request.h"
 #include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/stdx/memory.h"
@@ -65,6 +69,30 @@ std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
             uasserted(ErrorCodes::UnsupportedFormat,
                       str::stream() << "Received a reply message with unexpected opcode: "
                                     << unownedMessage->operation());
+    }
+}
+
+std::unique_ptr<RequestInterface> makeRequest(const Message* unownedMessage) {
+    switch (unownedMessage->operation()) {
+        case mongo::dbQuery:
+            return stdx::make_unique<LegacyRequest>(unownedMessage);
+        case mongo::dbCommand:
+            return stdx::make_unique<CommandRequest>(unownedMessage);
+        default:
+            uasserted(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "Received a reply message with unexpected opcode: "
+                                    << unownedMessage->operation());
+    }
+}
+
+std::unique_ptr<ReplyBuilderInterface> makeReplyBuilder(Protocol protocol) {
+    switch (protocol) {
+        case Protocol::kOpQuery:
+            return stdx::make_unique<LegacyReplyBuilder>();
+        case Protocol::kOpCommandV1:
+            return stdx::make_unique<CommandReplyBuilder>();
+        default:
+            MONGO_UNREACHABLE;
     }
 }
 

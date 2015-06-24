@@ -352,7 +352,12 @@ void onConnect(DBClientWithCommands& c) {
     if (_nokillop) {
         return;
     }
-    c.setClientRPCProtocols(shellGlobalParams.rpcProtocols);
+
+    // Only override the default rpcProtocols if they were set on the command line.
+    if (shellGlobalParams.rpcProtocols) {
+        c.setClientRPCProtocols(*shellGlobalParams.rpcProtocols);
+    }
+
     connectionRegistry.registerConnection(c);
 }
 

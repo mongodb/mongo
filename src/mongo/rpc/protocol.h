@@ -35,6 +35,7 @@
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
+class BSONObj;
 namespace rpc {
 
 /**
@@ -94,6 +95,11 @@ StatusWith<StringData> toString(ProtocolSet protocols);
  * 'supports' namespace are supported
  */
 StatusWith<ProtocolSet> parseProtocolSet(StringData repr);
+
+/**
+ * Determines the ProtocolSet of a remote server from an isMaster reply.
+ */
+StatusWith<ProtocolSet> parseProtocolSetFromIsMasterReply(const BSONObj& isMasterReply);
 
 }  // namespace rpc
 }  // namespace mongo

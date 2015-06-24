@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 #include <vector>
 
@@ -69,14 +70,14 @@ struct ShellGlobalParams {
 
     std::string readMode;
 
-    rpc::ProtocolSet rpcProtocols;
+    boost::optional<rpc::ProtocolSet> rpcProtocols;
 
     ShellGlobalParams()
         : autoKillOp(false),
           useWriteCommandsDefault(true),
           writeMode("commands"),
           readMode("compatibility"),
-          rpcProtocols(rpc::supports::kOpQueryOnly) {}
+          rpcProtocols() {}
 };
 
 extern ShellGlobalParams shellGlobalParams;
