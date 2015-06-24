@@ -86,8 +86,12 @@ var RandomOps = {
     },
 
     getRandomDoc: function(collection) {
-        var randIndex = Random.randInt(0, collection.find().count());
-        return collection.find().sort({$natural: 1}).skip(randIndex).limit(1)[0];
+        try {
+            var randIndex = Random.randInt(0, collection.find().count());
+            return collection.find().sort({$natural: 1}).skip(randIndex).limit(1)[0];
+        } catch(e) {
+            return undefined;
+        }
     },
 
     /*
@@ -151,13 +155,17 @@ var RandomOps = {
         if (coll === null || coll.find().count() === 0) {
             return null;  // No data, can't delete anything.
         }
-        // If multithreaded, doc might be undefined.
         var doc = this.getRandomDoc(coll);
+        if (doc === undefined) {
+            // If multithreaded, there could have been issues finding a random doc.
+            // If so, just skip this operation.
+            return;
+        }
+
         if (this.verbose) {
             print("Deleting:");
             printjson(doc);
         }
-        // If multithreaded, doc might not exist anymore.
         try {
             coll.remove(doc);
         } catch(e) {
@@ -175,8 +183,13 @@ var RandomOps = {
         if (coll === null || coll.find().count() === 0) {
             return null;  // No data, can't update anything.
         }
-        // If multithreaded, doc might be undefined.
         var doc = this.getRandomDoc(coll);
+        if (doc === undefined) {
+            // If multithreaded, there could have been issues finding a random doc.
+            // If so, just skip this operation.
+            return;
+        }
+
         var field = this.randomChoice(this.fieldNames);
         var updateDoc = {$set: {}};
         updateDoc.$set[field] = this.randomChoice(this.fieldValues);
