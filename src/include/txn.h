@@ -21,7 +21,7 @@
 	((t1) <= (t2))
 
 #define	WT_TXNID_LT(t1, t2)						\
-	((t1) != (t2) && WT_TXNID_LE(t1, t2))
+	((t1) < (t2))
 
 #define	WT_SESSION_TXN_STATE(s) (&S2C(s)->txn_global.states[(s)->id])
 

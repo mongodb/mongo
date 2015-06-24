@@ -607,6 +607,7 @@ icount
 idx
 ifdef's
 ikey
+impl
 incr
 incrementing
 indices
@@ -855,6 +856,7 @@ skiplists
 slotsp
 slvg
 snaplen
+snapsort
 snprintf
 sp
 spinlock

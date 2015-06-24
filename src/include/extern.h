@@ -659,7 +659,6 @@ extern void __wt_stat_refresh_dsrc_stats(void *stats_arg);
 extern void __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent);
 extern void __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats);
 extern void __wt_stat_refresh_connection_stats(void *stats_arg);
-extern int WT_CDECL __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force);
