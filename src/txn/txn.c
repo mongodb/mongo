@@ -53,7 +53,8 @@ __snapsort_impl(uint64_t *array, uint32_t f, uint32_t l)
  * __snapsort --
  *	Sort an array of transaction IDs.
  */
-void __snapsort(uint64_t *array, uint32_t size)
+static void
+__snapsort(uint64_t *array, uint32_t size)
 {
 	__snapsort_impl(array, 0, size - 1);
 	WT_INSERTION_SORT(array, size, uint64_t, WT_TXNID_LT);
