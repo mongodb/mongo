@@ -158,6 +158,7 @@ static inline int
 __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 {
 	WT_TXN *txn;
+	int found;
 
 	txn = &session->txn;
 
@@ -208,8 +209,9 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	if (txn->snapshot_count == 0 || WT_TXNID_LT(id, txn->snap_min))
 		return (1);
 
-	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
-	    sizeof(uint64_t), __wt_txnid_cmp) == NULL);
+	WT_BINARY_SEARCH(
+	    id, txn->snapshot, txn->snapshot_count, WT_TXNID_LT, found);
+	return (!found);
 }
 
 /*

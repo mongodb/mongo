@@ -9,18 +9,55 @@
 #include "wt_internal.h"
 
 /*
- * __wt_txnid_cmp --
- *	Compare transaction IDs for sorting / searching.
+ * __snapsort_partition --
+ *	Custom quick sort partitioning for snapshots.
  */
-int WT_CDECL
-__wt_txnid_cmp(const void *v1, const void *v2)
+static uint32_t
+__snapsort_partition(uint64_t *array, uint32_t f, uint32_t l, uint64_t pivot)
 {
-	uint64_t id1, id2;
+	uint32_t i = f - 1, j = l + 1;
 
-	id1 = *(uint64_t *)v1;
-	id2 = *(uint64_t *)v2;
+	for (;;) {
+		while (pivot < array[--j])
+			;
+		while (array[++i] < pivot)
+			;
+		if (i<j) {
+			uint64_t tmp = array[i];
+			array[i] = array[j];
+			array[j] = tmp;
+		} else
+			return (j);
+	}
+}
 
-	return ((id1 == id2) ? 0 : WT_TXNID_LT(id1, id2) ? -1 : 1);
+/*
+ * __snapsort_impl --
+ *	Custom quick sort implementation for snapshots.
+ */
+static void
+__snapsort_impl(uint64_t *array, uint32_t f, uint32_t l)
+{
+	while (f + 16 < l) {
+		uint64_t v1 = array[f], v2 = array[l], v3 = array[(f + l)/2];
+		uint64_t median = v1 < v2 ?
+		    (v3 < v1 ? v1 : WT_MIN(v2, v3)) :
+		    (v3 < v2 ? v2 : WT_MIN(v1, v3));
+		uint32_t m = __snapsort_partition(array, f, l, median);
+		__snapsort_impl(array, f, m);
+		f = m + 1;
+	}
+}
+
+/*
+ * __snapsort --
+ *	Sort an array of transaction IDs.
+ */
+static void
+__snapsort(uint64_t *array, uint32_t size)
+{
+	__snapsort_impl(array, 0, size - 1);
+	WT_INSERTION_SORT(array, size, uint64_t, WT_TXNID_LT);
 }
 
 /*
@@ -34,10 +71,8 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 
 	txn = &session->txn;
 
-	if (n <= 10)
-		WT_INSERTION_SORT(txn->snapshot, n, uint64_t, WT_TXNID_LT);
-	else
-		qsort(txn->snapshot, n, sizeof(uint64_t), __wt_txnid_cmp);
+	if (n > 1)
+		__snapsort(txn->snapshot, n);
 
 	txn->snapshot_count = n;
 	txn->snap_max = snap_max;
