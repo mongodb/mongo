@@ -1299,11 +1299,18 @@ bool Command::run(OperationContext* txn,
 
     // For commands from mongos, append some info to help getLastError(w) work.
     // TODO: refactor out of here as part of SERVER-18326
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-        shardingState.enabled()) {
+    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+
+    if (isReplSet && shardingState.enabled()) {
         rpc::ShardingMetadata(
             repl::ReplClientInfo::forClient(txn->getClient()).getLastOp().getTimestamp(),
             replCoord->getElectionId()).writeToMetadata(&metadataBob);
+    }
+
+    const auto& metadata = request.getMetadata();
+    if (isReplSet && metadata.hasField(rpc::kReplicationMetadataFieldName)) {
+        BSONObjBuilder replInfoBob(metadataBob.subobjStart(rpc::kReplicationMetadataFieldName));
+        replCoord->prepareReplResponseMetadata(&replInfoBob);
     }
 
     auto cmdResponse = replyBuilderBob.done();

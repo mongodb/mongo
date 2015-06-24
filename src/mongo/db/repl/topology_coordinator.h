@@ -390,8 +390,8 @@ public:
     /**
      * Prepares a BSONObj describing the current term, primary, and lastOp information.
      */
-    virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder,
-                                           const OpTime& lastCommittedOpTime) const = 0;
+    virtual void prepareReplResponseMetadata(BSONObjBuilder* objBuilder,
+                                             const OpTime& lastCommittedOpTime) const = 0;
 
     /**
      * Writes into 'output' all the information needed to generate a summary of the current

@@ -149,11 +149,13 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
                  const HostAndPort& source,
                  const std::string& dbname,
                  const BSONObj& findCmdObj,
-                 const CallbackFn& work)
+                 const CallbackFn& work,
+                 const BSONObj& metadata)
     : _executor(executor),
       _source(source),
       _dbname(dbname),
       _cmdObj(findCmdObj.getOwned()),
+      _metadata(metadata.getOwned()),
       _work(work),
       _active(false),
       _remoteCommandCallbackHandle() {
@@ -175,6 +177,7 @@ std::string Fetcher::getDiagnosticString() const {
     output << " source: " << _source.toString();
     output << " database: " << _dbname;
     output << " query: " << _cmdObj;
+    output << " query metadata: " << _metadata;
     output << " active: " << _active;
     return output;
 }
@@ -216,7 +219,7 @@ void Fetcher::wait() {
 Status Fetcher::_schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName) {
     StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(
-            RemoteCommandRequest(_source, _dbname, cmdObj),
+            RemoteCommandRequest(_source, _dbname, cmdObj, _metadata),
             stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, batchFieldName));
 
     if (!scheduleResult.isOK()) {
@@ -257,6 +260,8 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
         _finishCallback();
         return;
     }
+
+    batchData.otherFields.metadata = std::move(rcbd.response.getValue().metadata);
 
     NextAction nextAction = NextAction::kNoAction;
 

@@ -39,6 +39,8 @@
 namespace mongo {
 namespace rpc {
 
+const char kReplicationMetadataFieldName[] = "$replData";
+
 BSONObj makeEmptyMetadata() {
     return BSONObj();
 }

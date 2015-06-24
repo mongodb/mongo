@@ -250,7 +250,7 @@ public:
     virtual Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
                                                        long long* responseTerm) override;
 
-    virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder);
+    virtual void prepareReplResponseMetadata(BSONObjBuilder* objBuilder);
 
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                       ReplSetHeartbeatResponse* response) override;
@@ -476,10 +476,10 @@ private:
                                             Status* result);
 
     /**
-     * Bottom half of prepareCursorResponseInfo.
+     * Bottom half of prepareReplResponseMetadata.
      */
-    void _prepareCursorResponseInfo_finish(const ReplicationExecutor::CallbackArgs& cbData,
-                                           BSONObjBuilder* objBuilder);
+    void _prepareReplResponseMetadata_finish(const ReplicationExecutor::CallbackArgs& cbData,
+                                             BSONObjBuilder* objBuilder);
     /**
      * Scheduled to cause the ReplicationCoordinator to reconsider any state that might
      * need to change as a result of time passing - for instance becoming PRIMARY when a single

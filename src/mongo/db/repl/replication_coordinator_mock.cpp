@@ -327,7 +327,7 @@ Status ReplicationCoordinatorMock::processReplSetDeclareElectionWinner(
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::prepareCursorResponseInfo(BSONObjBuilder* objBuilder) {}
+void ReplicationCoordinatorMock::prepareReplResponseMetadata(BSONObjBuilder* objBuilder) {}
 
 Status ReplicationCoordinatorMock::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                                       ReplSetHeartbeatResponse* response) {

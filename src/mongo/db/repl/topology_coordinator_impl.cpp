@@ -2113,8 +2113,8 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
     return false;
 }
 
-void TopologyCoordinatorImpl::prepareCursorResponseInfo(BSONObjBuilder* objBuilder,
-                                                        const OpTime& lastCommittedOpTime) const {
+void TopologyCoordinatorImpl::prepareReplResponseMetadata(BSONObjBuilder* objBuilder,
+                                                          const OpTime& lastCommittedOpTime) const {
     objBuilder->append("term", _term);
     objBuilder->append("lastOpCommittedTimestamp", lastCommittedOpTime.getTimestamp());
     objBuilder->append("lastOpCommittedTerm", lastCommittedOpTime.getTerm());

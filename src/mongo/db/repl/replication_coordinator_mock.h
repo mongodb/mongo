@@ -187,7 +187,7 @@ public:
     virtual Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
                                                        long long* responseTerm);
 
-    virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder);
+    virtual void prepareReplResponseMetadata(BSONObjBuilder* objBuilder);
 
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                       ReplSetHeartbeatResponse* response);

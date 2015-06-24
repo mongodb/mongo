@@ -134,7 +134,8 @@ OplogFetcher::OplogFetcher(ReplicationExecutor* exec,
                    oplogNSS,
                    BSON("find" << oplogNSS.coll() << "filter"
                                << BSON("ts" << BSON("$gte" << startTS))),
-                   work),
+                   work,
+                   BSON(rpc::kReplicationMetadataFieldName << 1)),
       _startTS(startTS) {}
 
 std::string OplogFetcher::toString() const {

@@ -36,7 +36,8 @@ QueryFetcher::QueryFetcher(executor::TaskExecutor* exec,
                            const HostAndPort& src,
                            const NamespaceString& nss,
                            const BSONObj& cmdBSON,
-                           const CallbackFn& work)
+                           const CallbackFn& work,
+                           const BSONObj& metadata)
     : _exec(exec),
       _fetcher(exec,
                src,
@@ -46,7 +47,8 @@ QueryFetcher::QueryFetcher(executor::TaskExecutor* exec,
                           this,
                           stdx::placeholders::_1,
                           stdx::placeholders::_2,
-                          stdx::placeholders::_3)),
+                          stdx::placeholders::_3),
+               metadata),
       _responses(0),
       _work(work) {}
 

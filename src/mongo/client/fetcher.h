@@ -63,7 +63,6 @@ public:
         CursorId cursorId = 0;
         NamespaceString nss;
         Documents documents;
-        // TODO: fill in with replication metadata.
         struct OtherFields {
             BSONObj metadata;
         } otherFields;
@@ -118,7 +117,8 @@ public:
             const HostAndPort& source,
             const std::string& dbname,
             const BSONObj& cmdObj,
-            const CallbackFn& work);
+            const CallbackFn& work,
+            const BSONObj& metadata = rpc::makeEmptyMetadata());
 
     virtual ~Fetcher();
 
@@ -180,6 +180,7 @@ private:
     HostAndPort _source;
     std::string _dbname;
     BSONObj _cmdObj;
+    BSONObj _metadata;
     CallbackFn _work;
 
     // Protects member data of this Fetcher.

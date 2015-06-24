@@ -202,8 +202,8 @@ public:
     virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied);
     virtual bool stepDownIfPending();
     virtual Date_t getStepDownTime() const;
-    virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder,
-                                           const OpTime& lastCommitttedOpTime) const;
+    virtual void prepareReplResponseMetadata(BSONObjBuilder* objBuilder,
+                                             const OpTime& lastCommitttedOpTime) const;
     Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
                                                long long* responseTerm);
     virtual void processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,

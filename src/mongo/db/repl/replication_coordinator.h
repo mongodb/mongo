@@ -590,7 +590,7 @@ public:
     /**
      * Prepares a BSONObj describing the current term, primary, and lastOp information.
      */
-    virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder) = 0;
+    virtual void prepareReplResponseMetadata(BSONObjBuilder* objBuilder) = 0;
 
     /**
      * Returns true if the V1 election protocol is being used and false otherwise.

@@ -58,7 +58,8 @@ public:
                  const HostAndPort& source,
                  const NamespaceString& nss,
                  const BSONObj& cmdBSON,
-                 const QueryFetcher::CallbackFn& onBatchAvailable);
+                 const QueryFetcher::CallbackFn& onBatchAvailable,
+                 const BSONObj& metadata = rpc::makeEmptyMetadata());
     virtual ~QueryFetcher() = default;
 
     bool isActive() const {
