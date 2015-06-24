@@ -25,6 +25,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
 
 #include "mongo/platform/basic.h"
 
@@ -34,12 +35,13 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 namespace {
-
+using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 const char* kCursorFieldName = "cursor";
 const char* kCursorIdFieldName = "id";
 const char* kNamespaceFieldName = "ns";
@@ -226,8 +228,7 @@ Status Fetcher::_schedule_inlock(const BSONObj& cmdObj, const char* batchFieldNa
     return Status::OK();
 }
 
-void Fetcher::_callback(const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd,
-                        const char* batchFieldName) {
+void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batchFieldName) {
     if (!rcbd.response.isOK()) {
         _work(StatusWith<Fetcher::QueryResponse>(rcbd.response.getStatus()), nullptr, nullptr);
         _finishCallback();
@@ -273,6 +274,7 @@ void Fetcher::_callback(const executor::TaskExecutor::RemoteCommandCallbackArgs&
     // Callback function _work may modify nextAction to request the fetcher
     // not to schedule a getMore command.
     if (nextAction != NextAction::kGetMore) {
+        _sendKillCursors(batchData.cursorId, batchData.nss);
         _finishCallback();
         return;
     }
@@ -281,6 +283,7 @@ void Fetcher::_callback(const executor::TaskExecutor::RemoteCommandCallbackArgs&
     // BSONObjBuilder for the getMore command.
     auto cmdObj = bob.obj();
     if (cmdObj.isEmpty()) {
+        _sendKillCursors(batchData.cursorId, batchData.nss);
         _finishCallback();
         return;
     }
@@ -292,11 +295,24 @@ void Fetcher::_callback(const executor::TaskExecutor::RemoteCommandCallbackArgs&
     if (!status.isOK()) {
         nextAction = NextAction::kNoAction;
         _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
+        _sendKillCursors(batchData.cursorId, batchData.nss);
         _finishCallback();
         return;
     }
 }
 
+void Fetcher::_sendKillCursors(const CursorId id, const NamespaceString& nss) {
+    if (id) {
+        _executor->scheduleRemoteCommand(
+            RemoteCommandRequest(
+                _source, _dbname, BSON("killCursors" << nss.coll() << "cursors" << BSON_ARRAY(id))),
+            [](const RemoteCommandCallbackArgs& args) {
+                if (!args.response.isOK()) {
+                    log() << "killCursors command failed: " << args.response.getStatus().toString();
+                }
+            });
+    }
+}
 void Fetcher::_finishCallback() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _active = false;

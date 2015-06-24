@@ -54,8 +54,13 @@ public:
     void clear();
     void scheduleNetworkResponse(const BSONObj& obj);
     void scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason);
+    void scheduleNetworkResponseFor(const BSONObj& filter, const BSONObj& obj);
+
+    // Calls scheduleNetworkResponse + finishProcessingNetworkResponse
     void processNetworkResponse(const BSONObj& obj);
+    // Calls scheduleNetworkResponse + finishProcessingNetworkResponse
     void processNetworkResponse(ErrorCodes::Error code, const std::string& reason);
+
     void finishProcessingNetworkResponse();
 
 protected:
@@ -117,6 +122,18 @@ void FetcherTest::scheduleNetworkResponse(const BSONObj& obj) {
     RemoteCommandResponse response(obj, millis);
     ReplicationExecutor::ResponseStatus responseStatus(response);
     net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
+}
+
+void FetcherTest::scheduleNetworkResponseFor(const BSONObj& filter, const BSONObj& obj) {
+    ASSERT_TRUE(filter[1].eoo());  // The filter should only have one field, to match the cmd name
+    NetworkInterfaceMock* net = getNet();
+    ASSERT_TRUE(net->hasReadyRequests());
+    Milliseconds millis(0);
+    RemoteCommandResponse response(obj, millis);
+    ReplicationExecutor::ResponseStatus responseStatus(response);
+    auto req = net->getNextReadyRequest();
+    ASSERT_EQ(req->getRequest().cmdObj[0], filter[0]);
+    net->scheduleResponse(req, net->now(), responseStatus);
 }
 
 void FetcherTest::scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason) {
@@ -593,6 +610,8 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
     callbackHook = setNextActionToNoAction;
 
     getNet()->runReadyNetworkOperations();
+
+    scheduleNetworkResponseFor(BSON("killCursors" << nss.coll()), BSON("ok" << false));
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());

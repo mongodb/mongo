@@ -167,6 +167,13 @@ private:
      */
     void _finishCallback();
 
+    /**
+     * Sends a kill cursor for the specified id and collection (namespace)
+     *
+     * Note: Errors are ignored and no retry is done
+     */
+    void _sendKillCursors(const CursorId id, const NamespaceString& nss);
+
     // Not owned by us.
     executor::TaskExecutor* _executor;
 
