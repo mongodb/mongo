@@ -18,13 +18,13 @@ for( i = 0; i < 100; ++i ) {
 assert.writeOK(bulk.execute());
 
 // Attempt to remove the last match for the {a:1} index scan while distinct is yielding.
-p = startParallelShell( 'var bulk = db.jstests_distinct3.initializeUnorderedBulkOp();' +
-                        'for( i = 0; i < 100; ++i ) {                              ' +
-                        '    bulk.remove( { a:49 } );                              ' +
+p = startParallelShell( 'for( i = 0; i < 100; ++i ) {                              ' +
+                        '    var bulk = db.jstests_distinct3.initializeUnorderedBulkOp();' +
+                        '    bulk.find( { a:49 } ).remove();                       ' +
                         '    for( j = 0; j < 20; ++j ) {                           ' +
                         '        bulk.insert( { a:49, c:49, d:j } );               ' +
                         '    }                                                     ' +
-                        '    bulk.execute();                                       ' +
+                        '    assert.writeOK(bulk.execute());                       ' +
                         '}                                                         ' );
 
 for( i = 0; i < 100; ++i ) {

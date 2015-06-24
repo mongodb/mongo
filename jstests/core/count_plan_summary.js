@@ -10,7 +10,7 @@ for (var i = 0; i < 1000; i++) {
 
 // Mock a long-running count operation by sleeping for each of
 // the documents in the collection.
-s = startParallelShell(
+var awaitShell = startParallelShell(
     "db.jstests_count_plan_summary.find({x: 1, $where: 'sleep(100)'}).count()"
 );
 
@@ -44,4 +44,5 @@ assert.soon(function() {
     return true;
 });
 
-s();
+var exitCode = awaitShell({checkExitSuccess: false});
+assert.neq(0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");

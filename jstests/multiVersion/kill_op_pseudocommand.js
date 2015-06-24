@@ -56,9 +56,10 @@
     } while (opToKill === null);
 
     db.killOp(opToKill);
-    try {
-      parShell(); // wait for query to end
-    } catch (ex) {} // ignore
+
+    var exitCode = parShell({checkExitSuccess: false}); // wait for query to end
+    assert.neq(0, exitCode,
+               "expected shell to exit abnormally due to JS execution being terminated");
 
     var end = new Date();
 

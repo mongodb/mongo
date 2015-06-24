@@ -39,16 +39,17 @@ function f(variant, quickCommits, paranoid) {
     print("initial sync done")
 
     var writeOps = startParallelShell('var coll = db.getSiblingDB("' + ourdb + '").foo; \
-                                       var bulk = coll.initializeUnorderedBulkOp(); \
                                        for( var i = 0; i < ' + N + '; i++ ) { \
+                                           var bulk = coll.initializeUnorderedBulkOp(); \
                                            bulk.insert({ x: 1 }); \
                                            if ( i % 7 == 0 ) \
                                                bulk.insert({ x: 99, y: 2 }); \
                                            if ( i % 49 == 0 ) \
                                                bulk.find({ x: 99 }).update( \
-                                                   { a: 1, b: 2, c: 3, d: 4 }); \
+                                                   { $set: { a: 1, b: 2, c: 3, d: 4 }}); \
                                            if( i == 800 ) \
                                                coll.ensureIndex({ x: 1 }); \
+                                           assert.writeOK(bulk.execute()); \
                                        }', conn.port);
 
     for( var i = 0; i < N; i++ ) {
@@ -80,14 +81,14 @@ function f(variant, quickCommits, paranoid) {
         assert( res.ok, "dropDatabase res.ok=false");
     }
 
+    writeOps();
+
     print("closeall.js end test loop.  slave.foo.count:");
     print(slave.foo.count());
 
     print("closeall.js shutting down servers");
     MongoRunner.stopMongod(connSlave);
     MongoRunner.stopMongod(conn);
-
-    writeOps();
 }
 
 // Skip this test on 32-bit Windows (unfixable failures in MapViewOfFileEx)

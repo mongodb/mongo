@@ -72,8 +72,9 @@ for(var i in o) {
 
 start = new Date();
 
-s1();
-s2();
+// The operations running in the parallel shells may or may not have been killed.
+s1({checkExitSuccess: false});
+s2({checkExitSuccess: false});
 
 // don't want to pass if timeout killed the js function
 assert( ( new Date() ) - start < 30000 );

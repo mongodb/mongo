@@ -36,28 +36,28 @@ function ops() {
     return ids;
 }
 
-var s1 = null;
-var s2 = null;
-try {
-    jsTestLog("Starting long-running $where operation");
-    s1 = startParallelShell( "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )" );
-    s2 = startParallelShell( "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )" );
+jsTestLog("Starting long-running $where operation");
+var s1 = startParallelShell(
+    "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )" );
+var s2 = startParallelShell(
+    "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )" );
 
-    jsTestLog("Finding ops in currentOp() output");
-    o = [];
-    assert.soon(function() { o = ops(); return o.length == 2; },
-                { toString: function () { return tojson(db.currentOp().inprog); } },
-               10000);
-    start = new Date();
-    jsTestLog("Killing ops");
-    db.killOp( o[ 0 ] );
-    db.killOp( o[ 1 ] );
-}
-finally {
-    jsTestLog("Waiting for ops to terminate");
-    if (s1) s1();
-    if (s2) s2();
-}
+jsTestLog("Finding ops in currentOp() output");
+o = [];
+assert.soon(function() { o = ops(); return o.length == 2; },
+            { toString: function () { return tojson(db.currentOp().inprog); } },
+           10000);
+start = new Date();
+jsTestLog("Killing ops");
+db.killOp( o[ 0 ] );
+db.killOp( o[ 1 ] );
+
+jsTestLog("Waiting for ops to terminate");
+[s1, s2].forEach(function(awaitShell) {
+    var exitCode = awaitShell({checkExitSuccess: false});
+    assert.neq(0, exitCode,
+               "expected shell to exit abnormally due to JS execution being terminated");
+});
 
 // don't want to pass if timeout killed the js function.
 var end = new Date();

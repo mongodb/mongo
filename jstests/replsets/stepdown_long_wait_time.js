@@ -78,7 +78,11 @@
     jsTestLog("signal update thread to exit");
     var newPrimary = replSet.getPrimary();
     assert.writeOK(newPrimary.getDB(name).foo.remove({}));
-    stepDowner();
-    writer();
 
+    var exitCode = stepDowner({checkExitSuccess: false});
+    assert.neq(0, exitCode, "expected replSetStepDown to close the shell's connection");
+
+    // The connection for the 'writer' may be closed due to the primary stepping down, or signaled
+    // by the main thread to quit.
+    writer({checkExitSuccess: false});
 })();

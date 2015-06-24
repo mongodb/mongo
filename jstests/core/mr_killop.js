@@ -76,7 +76,8 @@ function testOne( map, reduce, finalize, scope, childLoop, wait ) {
     
     // The assert below won't be caught by this test script, but it will cause error messages
     // to be printed.
-    s = startParallelShell( "assert.commandWorked( db.runCommand( " + stringifiedSpec + " ) );" );
+    var awaitShell = startParallelShell( "assert.commandWorked( db.runCommand( " +
+                                         stringifiedSpec + " ) );" );
     
     if ( wait ) {
         sleep( 2000 );
@@ -89,7 +90,9 @@ function testOne( map, reduce, finalize, scope, childLoop, wait ) {
     debug( "did kill : " + tojson( res ) );
     
     // When the map reduce op is killed, the spawned shell will exit
-    s();
+    var exitCode = awaitShell({checkExitSuccess: false});
+    assert.neq(0, exitCode,
+               "expected shell to exit abnormally due to map-reduce execution being terminated");
     debug( "parallel shell completed" );
     
     assert.eq( -1, op( childLoop ) );

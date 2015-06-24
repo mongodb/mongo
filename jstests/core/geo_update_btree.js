@@ -13,7 +13,7 @@ if (testingReplication) {
 
 var parallelInsert = startParallelShell(
     "for ( var i = 0; i < 1000; i++ ) {" +
-    "    var doc = { loc: [ Random.rand() * 180, Random.rand() * 180 ], v: '' }" +
+    "    var doc = { loc: [ Random.rand() * 180, Random.rand() * 180 ], v: '' };" +
     "    db.jstests_geo_update_btree.insert(doc);" +
     "}");
 

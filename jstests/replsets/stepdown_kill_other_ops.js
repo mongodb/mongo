@@ -62,6 +62,7 @@
      var newPrimary = replSet.getPrimary();
      assert.neq(primary, newPrimary, "SECONDARY did not become PRIMARY");
 
-     var code = evalRunner();
-     assert.neq(0, code); // Eval should have exited with an error due to being interrupted
+     var exitCode = evalRunner({checkExitSuccess: false});
+     assert.neq(0, exitCode,
+                "expected shell to exit abnormally due to JS execution being terminated");
  })();

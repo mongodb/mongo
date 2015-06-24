@@ -25,28 +25,31 @@ function getOpId( drop ) {
     return null;
 }
 
-var shell1 = startParallelShell( "print(\"Count thread started\");"
-                                 + "db.getMongo().getCollection(\""
-                                 + (coll + "") + "\")" 
-                                 + ".count( { $where: function() {"
-                                 + "while( 1 ) { sleep( 1 ); } } } );"
-                                 + "print(\"Count thread terminating\");" );
+var awaitCount = startParallelShell( "print(\"Count thread started\");"
+                                     + "db.getMongo().getCollection(\""
+                                     + (coll + "") + "\")"
+                                     + ".count( { $where: function() {"
+                                     + "while( 1 ) { sleep( 1 ); } } } );"
+                                     + "print(\"Count thread terminating\");" );
 countOpId = null;
 assert.soon( function() { countOpId = getOpId( false ); return countOpId; } );
 
-var shell2 = startParallelShell( "print(\"Drop thread started\");"
-                                 + "print(\"drop result: \" + " 
-                                 + "db.getMongo().getCollection(\"" 
-                                 + (coll + "") + "\")"
-                                 + ".drop() );"
-                                 + "print(\"Drop thread terminating\")" );
+var awaitDrop = startParallelShell( "print(\"Drop thread started\");"
+                                    + "print(\"drop result: \" + "
+                                    + "db.getMongo().getCollection(\""
+                                    + (coll + "") + "\")"
+                                    + ".drop() );"
+                                    + "print(\"Drop thread terminating\")" );
 dropOpId = null;
 assert.soon( function() { dropOpId = getOpId( true ); return dropOpId; } );
 
 db.killOp( dropOpId );
 db.killOp( countOpId );
 
-shell1();
-shell2();
+var exitCode = awaitCount({checkExitSuccess: false});
+assert.neq(0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");
+
+// The drop operation may or may not have been killed.
+awaitDrop({checkExitSuccess: false});
 
 coll.drop(); // in SERVER-1818, this fails

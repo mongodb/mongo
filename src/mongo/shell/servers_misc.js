@@ -217,8 +217,6 @@ SyncCCTest.prototype.tempStart = function( num ){
 
 
 function startParallelShell( jsCode, port, noConnect ){
-    var x;
-
     var args = ["mongo"];
 
     if (typeof db == "object") {
@@ -256,9 +254,25 @@ function startParallelShell( jsCode, port, noConnect ){
 
     args.push("--eval", jsCode);
 
-    x = startMongoProgramNoConnect.apply(null, args);
-    return function(){
-        return waitProgram( x );
+    var pid = startMongoProgramNoConnect.apply(null, args);
+
+    // Returns a function that when called waits for the parallel shell to exit and returns the exit
+    // code of the process. By default an error is thrown if the parallel shell exits with a nonzero
+    // exit code.
+    return function(options) {
+        if (arguments.length > 0) {
+            if (typeof options !== "object") {
+                throw new Error("options must be an object");
+            }
+            if (options === null) {
+                throw new Error("options cannot be null");
+            }
+        }
+        var exitCode = waitProgram(pid);
+        if (arguments.length === 0 || options.checkExitSuccess) {
+            assert.eq(0, exitCode, "encountered an error in the parallel shell");
+        }
+        return exitCode;
     };
 }
 

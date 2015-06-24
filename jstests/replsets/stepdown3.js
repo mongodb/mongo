@@ -28,7 +28,7 @@ master.getDB("test").foo.insert({x:3});
 // step down the primary asyncronously
 print("stepdown");
 var command = "sleep(4000); tojson(db.adminCommand( { replSetStepDown : 60, force : 1 } ));"
-var waitfunc = startParallelShell(command, master.port);
+var awaitShell = startParallelShell(command, master.port);
 
 print("getlasterror; should assert or return an error, depending on timing");
 var gleFunction = function() {
@@ -44,6 +44,9 @@ var gleFunction = function() {
 var result = assert.throws(gleFunction);
 print("result of gle:");
 printjson(result);
+
+var exitCode = awaitShell({checkExitSuccess: false});
+assert.neq(0, exitCode, "expected replSetStepDown to close the shell's connection");
 
 // unlock and shut down
 printjson(locked.getDB("admin").fsyncUnlock());

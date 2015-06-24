@@ -8,15 +8,11 @@ testServer = new SlowWeeklyMongod( baseName )
 t = testServer.getDB( baseName )[ baseName ];
 t.drop();
 
-function protect( f ) {
-    try {
-        f();   
-    } catch( e ) {
-        printjson( e );
-    }
-}
-
-s = startParallelShell( "db = db.getSisterDB( '" + baseName + "'); for( i = 0; i < 10; ++i ) { db.repairDatabase(); sleep( 5000 ); }" );
+var awaitShell = startParallelShell( "db = db.getSiblingDB( '" + baseName + "');" +
+                                     "for( i = 0; i < 10; ++i ) { " +
+                                         "db.repairDatabase();" +
+                                         "sleep( 5000 );" +
+                                     " }", testServer.port );
 
 for( i = 0; i < 30; ++i ) {
     var bulk = t.initializeUnorderedBulkOp();
@@ -32,5 +28,6 @@ for( i = 0; i < 30; ++i ) {
     assert.eq( 0, t.count() );
 }
 
+awaitShell();
 
 testServer.stop();

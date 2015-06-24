@@ -76,7 +76,9 @@
 
         print("killing the mongod");
         MongoRunner.stopMongod(ports[0], /* signal */ 9);
-        createIdx();
+
+        var exitCode = createIdx({checkExitSuccess: false});
+        assert.neq(0, exitCode, "expected shell to exit abnormally due to mongod being terminated");
     }
 
     abortDuringIndexBuild();

@@ -11,12 +11,12 @@ var port = allocatePorts( 1 )[ 0 ]
 var baseName = "jstests_disk_killall";
 var dbpath = MongoRunner.dataPath + baseName;
 
-var mongod = MongoRunner.runMongod({});
+var mongod = MongoRunner.runMongod({port: port, dbpath: dbpath});
 var db = mongod.getDB( "test" );
 var collection = db.getCollection( baseName );
 assert.writeOK(collection.insert({}));
 
-var s1 = startParallelShell(
+var awaitShell = startParallelShell(
             "db." + baseName + ".count( { $where: function() { while( 1 ) { ; } } } )",
             port);
 sleep( 1000 );
@@ -32,9 +32,15 @@ var exitCode = MongoRunner.stopMongod(mongod);
 assert.eq(0, exitCode, "got unexpected exitCode");
 
 // Waits for shell to complete
-s1();
+exitCode = awaitShell({checkExitSuccess: false});
+assert.neq(0, exitCode, "expected shell to exit abnormally due to mongod being terminated");
 
-mongod = MongoRunner.runMongod({restart:true, cleanData: false, dbpath: mongod.dbpath});
+mongod = MongoRunner.runMongod({
+    port: port,
+    restart: true,
+    cleanData: false,
+    dbpath: mongod.dbpath
+});
 db = mongod.getDB( "test" );
 collection = db.getCollection( baseName );
 

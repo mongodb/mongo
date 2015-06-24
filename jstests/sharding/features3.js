@@ -59,20 +59,14 @@ var start = new Date();
 // solution is to increase sleep time
 var whereKillSleepTime = 10000;
 var parallelCommand =
-    "try { " +
-    "    db.foo.find(function(){ " +
-    "        sleep( " + whereKillSleepTime + " ); " +
-    "        return false; " +
-    "     }).itcount(); " +
-    "} " +
-    "catch(e) { " +
-    "    print('PShell execution ended:'); " +
-    "    printjson(e) " +
-    "}";
+    "db.foo.find(function() { " +
+    "    sleep( " + whereKillSleepTime + " ); " +
+    "    return false; " +
+    "}).itcount(); ";
 
 // fork a parallel shell, but do not wait for it to start
 print("about to fork new shell at: " + Date());
-join = startParallelShell(parallelCommand);
+var awaitShell = startParallelShell(parallelCommand);
 print("done forking shell at: " + Date());
 
 // Get all current $where operations
@@ -133,7 +127,9 @@ print("time if run full: " + (numDocs * whereKillSleepTime));
 assert.gt(whereKillSleepTime * numDocs / 20, killTime, "took too long to kill");
 
 // wait for the parallel shell we spawned to complete
-join();
+var exitCode = awaitShell({checkExitSuccess: false});
+assert.neq(0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");
+
 var end = new Date();
 print("elapsed: " + (end.getTime() - start.getTime()));
 

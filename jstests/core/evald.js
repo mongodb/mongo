@@ -28,11 +28,12 @@ function op( ev, where ) {
 }
 
 function doIt( ev, wait, where ) {
+    var awaitShell;
 
     if ( where ) {
-        s = startParallelShell( ev );
+        awaitShell = startParallelShell( ev );
     } else {
-        s = startParallelShell( "db.eval( '" + ev + "' )" );        
+        awaitShell = startParallelShell( "db.eval( '" + ev + "' )" );
     }
 
     o = null;
@@ -48,8 +49,9 @@ function doIt( ev, wait, where ) {
 
     debug( "sent kill" );
 
-    s();
-
+    var exitCode = awaitShell({checkExitSuccess: false});
+    assert.neq(0, exitCode,
+               "expected shell to exit abnormally due to JS execution being terminated");
 }
 
 // nested scope with nested invoke()
