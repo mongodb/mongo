@@ -208,11 +208,11 @@ def complex_populate_type(self, uri, config, rows, type):
         cursor[key_populate(cursor, i)] = (v[0], v[1], v[2], v[3])
     cursor.close()
 
-def complex_populate_colgroup_name(self, uri):
-    return 'colgroup:' + uri.split(":")[1] + ':cgroup1'
+def complex_populate_colgroup_name(self, uri, i):
+    return 'colgroup:' + uri.split(":")[1] + ':cgroup' + str(i + 1)
 
-def complex_populate_index_name(self, uri):
-    return 'index:' + uri.split(":")[1] + ':indx1'
+def complex_populate_index_name(self, uri, i):
+    return 'index:' + uri.split(":")[1] + ':indx' + str(i + 1)
 
 def complex_populate_check_cursor(self, cursor, rows):
     i = 0
