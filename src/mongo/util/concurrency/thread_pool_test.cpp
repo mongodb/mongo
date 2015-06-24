@@ -274,7 +274,6 @@ DEATH_TEST(ThreadPoolTest,
     while ((stats = pool->getStats()).numIdleThreads != 0U) {
         sleepmillis(50);
     }
-    ASSERT_EQ(1U, stats.numThreads);
     ASSERT_EQ(0U, stats.numPendingTasks);
     pool.reset();
     lk.unlock();
