@@ -44,32 +44,37 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
     create_params = 'key_format=i,value_format=i'
     freq = 5
 
+    def copy_windows(self, olddir, newdir):
+        os.mkdir(newdir)
+        for fname in os.listdir(olddir):
+            fullname = os.path.join(olddir, fname)
+            # Skip lock file on Windows since it is locked
+            if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname:
+                shutil.copy(fullname, newdir)
+
     def check_manual_backup(self, i, olddir, newdir):
         ''' Simulate a manual backup from olddir and restart in newdir. '''
         self.session.checkpoint()
         cbkup = self.session.open_cursor('backup:', None, None)
         # with the connection still open, copy files to new directory
         shutil.rmtree(newdir, ignore_errors=True)
-        # !!! A similar test, test_durability01.py contains the following:
-        #    Skip lock file on Windows since it is locked
-        #    if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname:
-        #        shutil.copy(fullname, newdir)
-        # I suspect most fsyncLock users will do 'cp -r' which is what
-        # shutil.copytree does.
 
-        # Half the time use copytree, the other half use a dd command that
-        # does not align on a block boundary.
-        if i % (self.freq * 2) == 0:
-            os.mkdir(newdir)
-            for fname in os.listdir(olddir):
-                fullname = os.path.join(olddir, fname)
-                inpf = 'if=' + fullname
-                outf = 'of=' + newdir + '/' + fullname
-                cmd_list = ['dd', inpf, outf, 'bs=300']
-                a = subprocess.Popen(cmd_list)
-                a.wait()
+        if os.name == "nt":
+            copy_windows(olddir, newdir)
         else:
-            shutil.copytree(olddir, newdir)
+            # Half the time use copytree, the other half use a dd command that
+            # does not align on a block boundary.
+            if i % (self.freq * 2) == 0:
+                os.mkdir(newdir)
+                for fname in os.listdir(olddir):
+                    fullname = os.path.join(olddir, fname)
+                    inpf = 'if=' + fullname
+                    outf = 'of=' + newdir + '/' + fullname
+                    cmd_list = ['dd', inpf, outf, 'bs=300']
+                    a = subprocess.Popen(cmd_list)
+                    a.wait()
+            else:
+                shutil.copytree(olddir, newdir)
 
         # Now simulate fsyncUnlock by closing the backup cursor.
         cbkup.close()
