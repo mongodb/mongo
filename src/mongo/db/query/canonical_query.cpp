@@ -258,7 +258,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
     Status initStatus =
-        cq->init(lpqStatus.getValue().release(), whereCallback, root->shallowClone());
+        cq->init(lpqStatus.getValue().release(), whereCallback, root->shallowClone().release());
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -596,7 +596,7 @@ MatchExpression* CanonicalQuery::logicalRewrite(MatchExpression* tree) {
     for (size_t i = 0; i < orChildren.size(); ++i) {
         AndMatchExpression* ama = new AndMatchExpression();
         ama->add(orChildren[i]);
-        ama->add(tree->shallowClone());
+        ama->add(tree->shallowClone().release());
         orChildren[i] = ama;
     }
     delete tree;

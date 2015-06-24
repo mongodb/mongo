@@ -175,7 +175,7 @@ bool PlanEnumerator::getNext(MatchExpression** tree) {
     // Tag with our first solution.
     tagMemo(memoIDForNode(_root));
 
-    *tree = _root->shallowClone();
+    *tree = _root->shallowClone().release();
     tagForSort(*tree);
     sortUsingTags(*tree);
 

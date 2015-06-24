@@ -530,7 +530,7 @@ public:
         return false;
     }
 
-    virtual LeafMatchExpression* shallowClone() const {
+    virtual unique_ptr<MatchExpression> shallowClone() const {
         invariant(false);
         return NULL;
     }
@@ -577,7 +577,7 @@ public:
         return true;
     }
 
-    virtual MatchExpression* shallowClone() const {
+    virtual unique_ptr<MatchExpression> shallowClone() const {
         invariant(false);
         return NULL;
     }
@@ -790,7 +790,7 @@ StatusWith<NearStage::CoveredInterval*>  //
     if (_nearParams.filter) {
         AndMatchExpression* andMatcher = new AndMatchExpression();
         andMatcher->add(keyMatcher);
-        andMatcher->add(_nearParams.filter->shallowClone());
+        andMatcher->add(_nearParams.filter->shallowClone().release());
         keyMatcher = andMatcher;
     }
 
@@ -927,7 +927,7 @@ public:
         return true;
     }
 
-    virtual MatchExpression* shallowClone() const {
+    virtual unique_ptr<MatchExpression> shallowClone() const {
         invariant(false);
         return NULL;
     }

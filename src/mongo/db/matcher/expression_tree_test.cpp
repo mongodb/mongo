@@ -545,11 +545,11 @@ TEST(NorOp, Equivalent) {
     ASSERT(sub2.init("b", baseOperand2["b"]).isOK());
 
     NorMatchExpression e1;
-    e1.add(sub1.shallowClone());
-    e1.add(sub2.shallowClone());
+    e1.add(sub1.shallowClone().release());
+    e1.add(sub2.shallowClone().release());
 
     NorMatchExpression e2;
-    e2.add(sub1.shallowClone());
+    e2.add(sub1.shallowClone().release());
 
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));

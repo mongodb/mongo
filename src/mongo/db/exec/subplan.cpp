@@ -230,7 +230,7 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
 Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     // This is what we annotate with the index selections and then turn into a solution.
     unique_ptr<OrMatchExpression> orExpr(
-        static_cast<OrMatchExpression*>(_query->root()->shallowClone()));
+        static_cast<OrMatchExpression*>(_query->root()->shallowClone().release()));
 
     // This is the skeleton of index selections that is inserted into the cache.
     unique_ptr<PlanCacheIndexTree> cacheData(new PlanCacheIndexTree());

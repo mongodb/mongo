@@ -94,7 +94,7 @@ public:
 
     virtual bool equivalent(const MatchExpression* other) const;
 
-    virtual LeafMatchExpression* shallowClone() const;
+    virtual std::unique_ptr<MatchExpression> shallowClone() const;
 
     const GeoExpression& getGeoExpression() const {
         return *_query;
@@ -168,7 +168,7 @@ public:
 
     virtual bool equivalent(const MatchExpression* other) const;
 
-    virtual LeafMatchExpression* shallowClone() const;
+    virtual std::unique_ptr<MatchExpression> shallowClone() const;
 
     const GeoNearExpression& getData() const {
         return *_query;

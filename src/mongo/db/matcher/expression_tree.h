@@ -88,15 +88,15 @@ public:
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const;
     virtual bool matchesSingleElement(const BSONElement& e) const;
 
-    virtual MatchExpression* shallowClone() const {
-        AndMatchExpression* self = new AndMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<AndMatchExpression> self = stdx::make_unique<AndMatchExpression>();
         for (size_t i = 0; i < numChildren(); ++i) {
-            self->add(getChild(i)->shallowClone());
+            self->add(getChild(i)->shallowClone().release());
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
-        return self;
+        return std::move(self);
     }
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
@@ -112,15 +112,15 @@ public:
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const;
     virtual bool matchesSingleElement(const BSONElement& e) const;
 
-    virtual MatchExpression* shallowClone() const {
-        OrMatchExpression* self = new OrMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<OrMatchExpression> self = stdx::make_unique<OrMatchExpression>();
         for (size_t i = 0; i < numChildren(); ++i) {
-            self->add(getChild(i)->shallowClone());
+            self->add(getChild(i)->shallowClone().release());
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
-        return self;
+        return std::move(self);
     }
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
@@ -136,15 +136,15 @@ public:
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const;
     virtual bool matchesSingleElement(const BSONElement& e) const;
 
-    virtual MatchExpression* shallowClone() const {
-        NorMatchExpression* self = new NorMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<NorMatchExpression> self = stdx::make_unique<NorMatchExpression>();
         for (size_t i = 0; i < numChildren(); ++i) {
-            self->add(getChild(i)->shallowClone());
+            self->add(getChild(i)->shallowClone().release());
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
-        return self;
+        return std::move(self);
     }
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
@@ -164,14 +164,13 @@ public:
         return Status::OK();
     }
 
-    virtual MatchExpression* shallowClone() const {
-        NotMatchExpression* self = new NotMatchExpression();
-        MatchExpression* child = _exp->shallowClone();
-        self->init(child);
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<NotMatchExpression> self = stdx::make_unique<NotMatchExpression>();
+        self->init(_exp->shallowClone().release());
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
-        return self;
+        return std::move(self);
     }
 
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const {

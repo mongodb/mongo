@@ -140,7 +140,7 @@ struct QuerySolutionNode {
             other->children.push_back(this->children[i]->clone());
         }
         if (NULL != this->filter) {
-            other->filter.reset(this->filter->shallowClone());
+            other->filter = std::move(this->filter->shallowClone());
         }
     }
 

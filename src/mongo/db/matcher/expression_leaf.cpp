@@ -38,6 +38,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/path.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -511,7 +512,7 @@ void ArrayFilterEntries::copyTo(ArrayFilterEntries& toFillIn) const {
     toFillIn._equalities = _equalities;
     for (unsigned i = 0; i < _regexes.size(); i++)
         toFillIn._regexes.push_back(
-            static_cast<RegexMatchExpression*>(_regexes[i]->shallowClone()));
+            static_cast<RegexMatchExpression*>(_regexes[i]->shallowClone().release()));
 }
 
 void ArrayFilterEntries::debugString(StringBuilder& debug) const {
@@ -603,13 +604,13 @@ bool InMatchExpression::equivalent(const MatchExpression* other) const {
     return path() == realOther->path() && _arrayEntries.equivalent(realOther->_arrayEntries);
 }
 
-LeafMatchExpression* InMatchExpression::shallowClone() const {
-    InMatchExpression* next = new InMatchExpression();
-    copyTo(next);
+std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
+    std::unique_ptr<InMatchExpression> next = stdx::make_unique<InMatchExpression>();
+    copyTo(next.get());
     if (getTag()) {
         next->setTag(getTag()->clone());
     }
-    return next;
+    return std::move(next);
 }
 
 void InMatchExpression::copyTo(InMatchExpression* toFillIn) const {

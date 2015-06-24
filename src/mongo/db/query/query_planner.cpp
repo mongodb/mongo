@@ -371,7 +371,7 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
     // cases, and we proceed by using the PlanCacheIndexTree to tag the query tree.
 
     // Create a copy of the expression tree.  We use cachedSoln to annotate this with indices.
-    MatchExpression* clone = query.root()->shallowClone();
+    unique_ptr<MatchExpression> clone = std::move(query.root()->shallowClone());
 
     LOG(5) << "Tagging the match expression according to cache data: " << endl
            << "Filter:" << endl
@@ -388,20 +388,20 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
         LOG(5) << "Index " << i << ": " << ie.keyPattern.toString() << endl;
     }
 
-    Status s = tagAccordingToCache(clone, winnerCacheData.tree.get(), indexMap);
+    Status s = tagAccordingToCache(clone.get(), winnerCacheData.tree.get(), indexMap);
     if (!s.isOK()) {
         return s;
     }
 
     // The planner requires a defined sort order.
-    sortUsingTags(clone);
+    sortUsingTags(clone.get());
 
     LOG(5) << "Tagged tree:" << endl
            << clone->toString();
 
-    // Use the cached index assignments to build solnRoot.  Takes ownership of clone.
-    QuerySolutionNode* solnRoot =
-        QueryPlannerAccess::buildIndexedDataAccess(query, clone, false, params.indices, params);
+    // Use the cached index assignments to build solnRoot.
+    QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(
+        query, clone.release(), false, params.indices, params);
 
     if (!solnRoot) {
         return Status(ErrorCodes::BadValue,

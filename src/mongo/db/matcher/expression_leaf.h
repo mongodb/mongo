@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/stdx/memory.h"
 
 namespace pcrecpp {
 class RE;
@@ -114,65 +115,65 @@ protected:
 class EqualityMatchExpression : public ComparisonMatchExpression {
 public:
     EqualityMatchExpression() : ComparisonMatchExpression(EQ) {}
-    virtual LeafMatchExpression* shallowClone() const {
-        ComparisonMatchExpression* e = new EqualityMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<EqualityMatchExpression>();
         e->init(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 };
 
 class LTEMatchExpression : public ComparisonMatchExpression {
 public:
     LTEMatchExpression() : ComparisonMatchExpression(LTE) {}
-    virtual LeafMatchExpression* shallowClone() const {
-        ComparisonMatchExpression* e = new LTEMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<LTEMatchExpression>();
         e->init(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 };
 
 class LTMatchExpression : public ComparisonMatchExpression {
 public:
     LTMatchExpression() : ComparisonMatchExpression(LT) {}
-    virtual LeafMatchExpression* shallowClone() const {
-        ComparisonMatchExpression* e = new LTMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<LTMatchExpression>();
         e->init(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 };
 
 class GTMatchExpression : public ComparisonMatchExpression {
 public:
     GTMatchExpression() : ComparisonMatchExpression(GT) {}
-    virtual LeafMatchExpression* shallowClone() const {
-        ComparisonMatchExpression* e = new GTMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<GTMatchExpression>();
         e->init(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 };
 
 class GTEMatchExpression : public ComparisonMatchExpression {
 public:
     GTEMatchExpression() : ComparisonMatchExpression(GTE) {}
-    virtual LeafMatchExpression* shallowClone() const {
-        ComparisonMatchExpression* e = new GTEMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<GTEMatchExpression>();
         e->init(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 };
 
@@ -195,13 +196,13 @@ public:
     Status init(StringData path, StringData regex, StringData options);
     Status init(StringData path, const BSONElement& e);
 
-    virtual LeafMatchExpression* shallowClone() const {
-        RegexMatchExpression* e = new RegexMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<RegexMatchExpression> e = stdx::make_unique<RegexMatchExpression>();
         e->init(path(), _regex, _flags);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 
     virtual bool matchesSingleElement(const BSONElement& e) const;
@@ -233,13 +234,13 @@ public:
 
     Status init(StringData path, int divisor, int remainder);
 
-    virtual LeafMatchExpression* shallowClone() const {
-        ModMatchExpression* m = new ModMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<ModMatchExpression> m = stdx::make_unique<ModMatchExpression>();
         m->init(path(), _divisor, _remainder);
         if (getTag()) {
             m->setTag(getTag()->clone());
         }
-        return m;
+        return std::move(m);
     }
 
     virtual bool matchesSingleElement(const BSONElement& e) const;
@@ -268,13 +269,13 @@ public:
 
     Status init(StringData path);
 
-    virtual LeafMatchExpression* shallowClone() const {
-        ExistsMatchExpression* e = new ExistsMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<ExistsMatchExpression> e = stdx::make_unique<ExistsMatchExpression>();
         e->init(path());
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 
     virtual bool matchesSingleElement(const BSONElement& e) const;
@@ -352,7 +353,7 @@ public:
     InMatchExpression() : LeafMatchExpression(MATCH_IN) {}
     Status init(StringData path);
 
-    virtual LeafMatchExpression* shallowClone() const;
+    virtual std::unique_ptr<MatchExpression> shallowClone() const;
 
     ArrayFilterEntries* getArrayFilterEntries() {
         return &_arrayEntries;
@@ -391,13 +392,13 @@ public:
 
     Status init(StringData path, int type);
 
-    virtual MatchExpression* shallowClone() const {
-        TypeMatchExpression* e = new TypeMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<TypeMatchExpression> e = stdx::make_unique<TypeMatchExpression>();
         e->init(_path, _type);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 
     virtual bool matchesSingleElement(const BSONElement& e) const;

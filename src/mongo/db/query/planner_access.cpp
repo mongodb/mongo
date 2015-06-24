@@ -42,6 +42,7 @@
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -61,6 +62,7 @@ namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& query,
@@ -69,7 +71,7 @@ QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& 
     // Make the (only) node, a collection scan.
     CollectionScanNode* csn = new CollectionScanNode();
     csn->name = query.ns();
-    csn->filter.reset(query.root()->shallowClone());
+    csn->filter = std::move(query.root()->shallowClone());
     csn->tailable = tailable;
     csn->maxScan = query.getParsed().getMaxScan();
 
@@ -825,7 +827,7 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedAnd(const CanonicalQuery& que
     // XXX: This block is a hack to accommodate the storage layer concurrency model.
     std::unique_ptr<MatchExpression> clonedRoot;
     if (params.options & QueryPlannerParams::CANNOT_TRIM_IXISECT) {
-        clonedRoot.reset(root->shallowClone());
+        clonedRoot = std::move(root->shallowClone());
     }
 
     vector<QuerySolutionNode*> ixscanNodes;
@@ -1126,7 +1128,7 @@ QuerySolutionNode* QueryPlannerAccess::scanWholeIndex(const IndexEntry& index,
     QuerySolutionNode* solnRoot = NULL;
 
     // Build an ixscan over the id index, use it, and return it.
-    IndexScanNode* isn = new IndexScanNode();
+    unique_ptr<IndexScanNode> isn = make_unique<IndexScanNode>();
     isn->indexKeyPattern = index.keyPattern;
     isn->indexIsMultiKey = index.multikey;
     isn->maxScan = query.getParsed().getMaxScan();
@@ -1135,23 +1137,22 @@ QuerySolutionNode* QueryPlannerAccess::scanWholeIndex(const IndexEntry& index,
     IndexBoundsBuilder::allValuesBounds(index.keyPattern, &isn->bounds);
 
     if (-1 == direction) {
-        QueryPlannerCommon::reverseScans(isn);
+        QueryPlannerCommon::reverseScans(isn.get());
         isn->direction = -1;
     }
 
-    MatchExpression* filter = query.root()->shallowClone();
+    unique_ptr<MatchExpression> filter = std::move(query.root()->shallowClone());
 
     // If it's find({}) remove the no-op root.
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-        delete filter;
-        solnRoot = isn;
+        solnRoot = isn.release();
     } else {
         // TODO: We may not need to do the fetch if the predicates in root are covered.  But
         // for now it's safe (though *maybe* slower).
-        FetchNode* fetch = new FetchNode();
-        fetch->filter.reset(filter);
-        fetch->children.push_back(isn);
-        solnRoot = fetch;
+        unique_ptr<FetchNode> fetch = make_unique<FetchNode>();
+        fetch->filter = std::move(filter);
+        fetch->children.push_back(isn.release());
+        solnRoot = fetch.release();
     }
 
     return solnRoot;
@@ -1172,17 +1173,17 @@ void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
         // The 'node' already has a filter that does not match 'type'. If 'type' is AND, then
         // combine 'match' with the existing filter by adding an AND. If 'type' is OR, combine
         // by adding an OR node.
-        ListOfMatchExpression* listFilter;
+        unique_ptr<ListOfMatchExpression> listFilter;
         if (MatchExpression::AND == type) {
-            listFilter = new AndMatchExpression();
+            listFilter = make_unique<AndMatchExpression>();
         } else {
             verify(MatchExpression::OR == type);
-            listFilter = new OrMatchExpression();
+            listFilter = make_unique<OrMatchExpression>();
         }
-        MatchExpression* oldFilter = node->filter->shallowClone();
-        listFilter->add(oldFilter);
+        unique_ptr<MatchExpression> oldFilter = std::move(node->filter->shallowClone());
+        listFilter->add(oldFilter.release());
         listFilter->add(match);
-        node->filter.reset(listFilter);
+        node->filter = std::move(listFilter);
     }
 }
 
@@ -1274,19 +1275,18 @@ QuerySolutionNode* QueryPlannerAccess::makeIndexScan(const IndexEntry& index,
     isn->bounds.endKey = endKey;
     isn->bounds.endKeyInclusive = false;
 
-    MatchExpression* filter = query.root()->shallowClone();
+    unique_ptr<MatchExpression> filter = std::move(query.root()->shallowClone());
 
     // If it's find({}) remove the no-op root.
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-        delete filter;
         solnRoot = isn;
     } else {
         // TODO: We may not need to do the fetch if the predicates in root are covered.  But
         // for now it's safe (though *maybe* slower).
-        FetchNode* fetch = new FetchNode();
-        fetch->filter.reset(filter);
+        unique_ptr<FetchNode> fetch = make_unique<FetchNode>();
+        fetch->filter = std::move(filter);
         fetch->children.push_back(isn);
-        solnRoot = fetch;
+        solnRoot = fetch.release();
     }
 
     return solnRoot;

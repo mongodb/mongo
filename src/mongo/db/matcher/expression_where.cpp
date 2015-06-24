@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/memory.h"
 
 
 namespace mongo {
@@ -46,6 +47,7 @@ using std::unique_ptr;
 using std::endl;
 using std::string;
 using std::stringstream;
+using stdx::make_unique;
 
 class WhereMatchExpression : public MatchExpression {
 public:
@@ -65,13 +67,13 @@ public:
         return false;
     }
 
-    virtual MatchExpression* shallowClone() const {
-        WhereMatchExpression* e = new WhereMatchExpression(_txn);
+    virtual unique_ptr<MatchExpression> shallowClone() const {
+        unique_ptr<WhereMatchExpression> e = make_unique<WhereMatchExpression>(_txn);
         e->init(_dbName, _code, _userScope);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;

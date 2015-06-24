@@ -30,10 +30,13 @@
 
 #include "mongo/platform/basic.h"
 #include "mongo/db/matcher/expression_text.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::string;
+using std::unique_ptr;
+using stdx::make_unique;
 
 Status TextMatchExpression::init(const string& query, const string& language, bool caseSensitive) {
     _query = query;
@@ -88,12 +91,12 @@ bool TextMatchExpression::equivalent(const MatchExpression* other) const {
     return true;
 }
 
-LeafMatchExpression* TextMatchExpression::shallowClone() const {
-    TextMatchExpression* next = new TextMatchExpression();
+unique_ptr<MatchExpression> TextMatchExpression::shallowClone() const {
+    unique_ptr<TextMatchExpression> next = make_unique<TextMatchExpression>();
     next->init(_query, _language, _caseSensitive);
     if (getTag()) {
         next->setTag(getTag()->clone());
     }
-    return next;
+    return std::move(next);
 }
 }

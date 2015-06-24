@@ -51,7 +51,7 @@ public:
 
     virtual bool equivalent(const MatchExpression* other) const;
 
-    virtual LeafMatchExpression* shallowClone() const;
+    virtual std::unique_ptr<MatchExpression> shallowClone() const;
 
     const std::string& getQuery() const {
         return _query;

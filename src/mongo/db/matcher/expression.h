@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/matchable.h"
 #include "mongo/db/matcher/match_details.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -176,7 +177,7 @@ public:
     }
 
     // XXX: document
-    virtual MatchExpression* shallowClone() const = 0;
+    virtual std::unique_ptr<MatchExpression> shallowClone() const = 0;
 
     // XXX document
     virtual bool equivalent(const MatchExpression* other) const = 0;
@@ -253,8 +254,8 @@ public:
         return true;
     }
 
-    virtual MatchExpression* shallowClone() const {
-        return new AtomicMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        return stdx::make_unique<AtomicMatchExpression>();
     }
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
@@ -278,8 +279,8 @@ public:
         return false;
     }
 
-    virtual MatchExpression* shallowClone() const {
-        return new FalseMatchExpression();
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        return stdx::make_unique<FalseMatchExpression>();
     }
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;

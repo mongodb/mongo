@@ -484,7 +484,8 @@ TEST(CanonicalQueryTest, RewriteNoDoubleOr) {
     string queryStr = "{$or:[{a:1}, {b:1}], $or:[{c:1}, {d:1}], e:1}";
     BSONObj queryObj = fromjson(queryStr);
     unique_ptr<MatchExpression> base(parseMatchExpression(queryObj));
-    unique_ptr<MatchExpression> rewrite(CanonicalQuery::logicalRewrite(base->shallowClone()));
+    unique_ptr<MatchExpression> rewrite(
+        CanonicalQuery::logicalRewrite(base->shallowClone().release()));
     assertEquivalent(queryStr.c_str(), base.get(), rewrite.get());
 }
 

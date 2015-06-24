@@ -32,11 +32,13 @@
 #include "mongo/base/init.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::string;
+using stdx::make_unique;
 
 /**
  * Bogus no-op $where match expression to parse $where in mongos,
@@ -59,13 +61,13 @@ public:
         return false;
     }
 
-    virtual MatchExpression* shallowClone() const {
-        WhereNoOpMatchExpression* e = new WhereNoOpMatchExpression();
+    virtual unique_ptr<MatchExpression> shallowClone() const {
+        unique_ptr<WhereNoOpMatchExpression> e = make_unique<WhereNoOpMatchExpression>();
         e->init(_code);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
