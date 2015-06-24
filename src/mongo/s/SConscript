@@ -10,25 +10,33 @@ env.SConscript(
     ],
 )
 
-#
-# Schema and backward compatibility code for "config" collections.
-#
+env.Library(
+    target='base',
+    source=[
+        'type_locks.cpp',
+        'type_lockpings.cpp',
+        'type_config_version.cpp',
+        'type_mongos.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/db/common',
+    ]
+)
 
-env.Library('base', ['mongo_version_range.cpp',
-                     'type_locks.cpp',
-                     'type_lockpings.cpp',
-                     'type_config_version.cpp',
-                     'type_mongos.cpp'],
-            LIBDEPS=['$BUILD_DIR/mongo/base/base',
-                     '$BUILD_DIR/mongo/bson/bson'])
+env.Library(
+    target='shard_util',
+    source=[
+        'shard_util.cpp',
+    ],
+    LIBDEPS=[
+        'client/sharding_client',
+    ]
+)
 
 env.CppUnitTest('chunk_version_test', 'chunk_version_test.cpp',
                 LIBDEPS=['base',
-                         '$BUILD_DIR/mongo/db/common'])
-
-env.CppUnitTest('mongo_version_range_test', 'mongo_version_range_test.cpp', 
-                LIBDEPS=['base',
-                         '$BUILD_DIR/mongo/bson/bson',
                          '$BUILD_DIR/mongo/db/common'])
 
 env.CppUnitTest('type_config_version_test', 'type_config_version_test.cpp',
@@ -76,12 +84,12 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog/legacy/catalog_manager_legacy',
+        'coreshard',
         'metadata',
+        'mongoscore',
         '$BUILD_DIR/mongo/db/coredb',
-        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/db/common',
     ])
 
@@ -207,9 +215,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/bson',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
         'cluster_ops',
         'cluster_write_op_conversion',
+        'client/sharding_client',
     ],
 )
 
@@ -219,10 +227,10 @@ env.CppUnitTest(
         'chunk_manager_targeter_test.cpp',
     ],
     LIBDEPS=[
+        'coreshard',
+        'mongoscore',
         '$BUILD_DIR/mongo/db/coredb',
-        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/s/mongoscore',
     ]
 )
 
@@ -243,8 +251,10 @@ env.Library(
     ],
     LIBDEPS=[
         'base',
+        'catalog/catalog_manager',
         'client/sharding_client',
-        'cluster_ops_impl'
+        'cluster_ops_impl',
+        'shard_util',
     ]
 )
 

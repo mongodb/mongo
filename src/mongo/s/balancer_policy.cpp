@@ -35,12 +35,16 @@
 
 #include <algorithm>
 
+#include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 
@@ -51,6 +55,37 @@ using std::numeric_limits;
 using std::set;
 using std::string;
 using std::vector;
+
+namespace {
+
+/**
+ * Executes the serverStatus command against the specified shard and obtains the version of the
+ * running MongoD service.
+ *
+ * The MongoD version or throws an exception. Known exception codes are:
+ *  ShardNotFound if shard by that id is not available on the registry
+ *  NoSuchKey if the version could not be retrieved
+ */
+std::string retrieveShardMongoDVersion(ShardId shardId, ShardRegistry* shardRegistry) {
+    auto shard = shardRegistry->getShard(shardId);
+    if (!shard) {
+        uassertStatusOK({ErrorCodes::ShardNotFound, "Shard not found"});
+    }
+
+    auto shardHost = uassertStatusOK(
+        shard->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
+
+    BSONObj serverStatus =
+        uassertStatusOK(shardRegistry->runCommand(shardHost, "admin", BSON("serverStatus" << 1)));
+    BSONElement versionElement = serverStatus["version"];
+    if (versionElement.type() != String) {
+        uassertStatusOK({ErrorCodes::NoSuchKey, "version field not found in serverStatus"});
+    }
+
+    return versionElement.str();
+}
+
+}  // namespace
 
 string TagRange::toString() const {
     return str::stream() << min << " -->> " << max << "  on  " << tag;
@@ -247,26 +282,19 @@ Status DistributionStatus::populateShardInfoMap(ShardInfoMap* shardInfo) {
         }
 
         for (const ShardType& shardData : shards) {
-            std::shared_ptr<Shard> shard = grid.shardRegistry()->getShard(shardData.getName());
-
-            // The shard must still exist in the registry. If it doesn't, which may happen in
-            // the very low proability case that it gets dropped between the call to
-            // getAllShards above and the call to getShard, just don't account for it since
-            // it is missing anyways.
-            if (!shard) {
-                warning() << "Shard [" << shardData.getName() << "] was not found. Skipping.";
-                continue;
-            }
-
-            ShardStatus shardStatus = shard->getStatus();
-
             std::set<std::string> dummy;
 
+            const long long shardSizeBytes = uassertStatusOK(
+                shardutil::retrieveTotalShardSize(shardData.getName(), grid.shardRegistry()));
+
+            const std::string shardMongodVersion =
+                retrieveShardMongoDVersion(shardData.getName(), grid.shardRegistry());
+
             ShardInfo newShardEntry(shardData.getMaxSizeMB(),
-                                    shardStatus.dataSizeBytes() / 1024 / 1024,
+                                    shardSizeBytes / 1024 / 1024,
                                     shardData.getDraining(),
                                     dummy,
-                                    shardStatus.mongoVersion());
+                                    shardMongodVersion);
 
             for (const string& shardTag : shardData.getTags()) {
                 newShardEntry.addTag(shardTag);

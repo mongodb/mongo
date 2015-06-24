@@ -34,9 +34,8 @@
 
 #include <string>
 
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -59,25 +58,6 @@ ShardPtr Shard::lookupRSName(const string& name) {
     return grid.shardRegistry()->lookupRSName(name);
 }
 
-ShardStatus Shard::getStatus() const {
-    const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
-    auto shardHost = uassertStatusOK(getTargeter()->findHost(readPref));
-
-    // List databases command
-    BSONObj listDatabases = uassertStatusOK(
-        grid.shardRegistry()->runCommand(shardHost, "admin", BSON("listDatabases" << 1)));
-    BSONElement totalSizeElem = listDatabases["totalSize"];
-    uassert(28590, "totalSize field not found in listDatabases", totalSizeElem.isNumber());
-
-    // Server status command
-    BSONObj serverStatus = uassertStatusOK(
-        grid.shardRegistry()->runCommand(shardHost, "admin", BSON("serverStatus" << 1)));
-    BSONElement versionElement = serverStatus["version"];
-    uassert(28599, "version field not found in serverStatus", versionElement.type() == String);
-
-    return ShardStatus(totalSizeElem.numberLong(), versionElement.str());
-}
-
 std::string Shard::toString() const {
     return _id + ":" + _cs.toString();
 }
@@ -88,17 +68,6 @@ void Shard::reloadShardInfo() {
 
 void Shard::removeShard(const ShardId& id) {
     grid.shardRegistry()->remove(id);
-}
-
-ShardStatus::ShardStatus(long long dataSizeBytes, const string& mongoVersion)
-    : _dataSizeBytes(dataSizeBytes), _mongoVersion(mongoVersion) {}
-
-std::string ShardStatus::toString() const {
-    return str::stream() << " dataSizeBytes: " << _dataSizeBytes << " version: " << _mongoVersion;
-}
-
-bool ShardStatus::operator<(const ShardStatus& other) const {
-    return dataSizeBytes() < other.dataSizeBytes();
 }
 
 }  // namespace mongo

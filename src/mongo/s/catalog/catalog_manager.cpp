@@ -38,6 +38,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
@@ -206,28 +207,28 @@ StatusWith<ShardId> CatalogManager::selectShardForNewDatabase(ShardRegistry* sha
         }
     }
 
-    auto bestShard = shardRegistry->getShard(allShardIds[0]);
-    if (!bestShard) {
-        return {ErrorCodes::ShardNotFound, "Candidate shard disappeared"};
-    }
+    ShardId candidateShardId = allShardIds[0];
 
-    ShardStatus bestStatus = bestShard->getStatus();
+    auto candidateSizeStatus = shardutil::retrieveTotalShardSize(candidateShardId, shardRegistry);
+    if (!candidateSizeStatus.isOK()) {
+        return candidateSizeStatus.getStatus();
+    }
 
     for (size_t i = 1; i < allShardIds.size(); i++) {
-        const auto shard = shardRegistry->getShard(allShardIds[i]);
-        if (!shard) {
-            continue;
+        const ShardId shardId = allShardIds[i];
+
+        const auto sizeStatus = shardutil::retrieveTotalShardSize(shardId, shardRegistry);
+        if (!sizeStatus.isOK()) {
+            return sizeStatus.getStatus();
         }
 
-        const ShardStatus status = shard->getStatus();
-
-        if (status < bestStatus) {
-            bestShard = shard;
-            bestStatus = status;
+        if (sizeStatus.getValue() < candidateSizeStatus.getValue()) {
+            candidateSizeStatus = sizeStatus;
+            candidateShardId = shardId;
         }
     }
 
-    return bestShard->getId();
+    return candidateShardId;
 }
 
 }  // namespace mongo

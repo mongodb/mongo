@@ -26,7 +26,9 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/s/mongo_version_range.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/s/catalog/legacy/mongo_version_range.h"
 
 #include <string>
 #include <vector>

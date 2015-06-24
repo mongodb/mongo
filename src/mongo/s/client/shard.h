@@ -40,29 +40,6 @@ class RemoteCommandTargeter;
 
 using ShardId = std::string;
 
-/**
- * Contains runtime information obtained from the shard.
- */
-class ShardStatus {
-public:
-    ShardStatus(long long dataSizeBytes, const std::string& version);
-
-    long long dataSizeBytes() const {
-        return _dataSizeBytes;
-    }
-    const std::string& mongoVersion() const {
-        return _mongoVersion;
-    }
-
-    std::string toString() const;
-
-    bool operator<(const ShardStatus& other) const;
-
-private:
-    long long _dataSizeBytes;
-    std::string _mongoVersion;
-};
-
 class Shard;
 using ShardPtr = std::shared_ptr<Shard>;
 
@@ -94,11 +71,6 @@ public:
     RemoteCommandTargeter* getTargeter() const {
         return _targeter.get();
     }
-
-    /**
-     * Returns metadata and stats for this shard.
-     */
-    ShardStatus getStatus() const;
 
     /**
      * Returns a string description of this shard entry.
