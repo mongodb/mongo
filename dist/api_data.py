@@ -656,7 +656,7 @@ common_wiredtiger_open = [
         Config('enabled', 'false', r'''
             whether to sync the log on every commit by default, can be
             overridden by the \c sync setting to
-            WT_SESSION::begin_transaction''',
+            WT_SESSION::commit_transaction''',
             type='boolean'),
         Config('method', 'fsync', r'''
             the method used to ensure log records are stable on disk, see
