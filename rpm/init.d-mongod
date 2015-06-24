@@ -76,8 +76,8 @@ stop()
 }
 
 restart () {
-	stop
-	start
+        stop
+        start
 }
 
 # Send TERM signal to process and wait up to 300 seconds for process to go away.
@@ -104,12 +104,10 @@ mongo_killproc()
   kill -KILL $pid >/dev/null 2>&1
   usleep 100000
 
-  rm -f "${pid_file}"
-
-  checkpid $pid
+  checkpid $pid # returns 0 only if the process exists
   local RC=$?
-  [ "$RC" -eq 0 ] && failure "${procname} shutdown" || success "${procname} shutdown"
-  RC=$((! $RC))
+  [ "$RC" -eq 0 ] && failure "${procname} shutdown" || rm -f "${pid_file}"; success "${procname} shutdown"
+  RC=$((! $RC)) # invert return code so we return 0 when process is dead.
   return $RC
 }
 
