@@ -7,7 +7,7 @@ executor:
   js_test:
     config:
       shell_options:
-        rpcProtocols: opCommandOnly
+        rpcProtocols: opQueryOnly
     hooks:
     - class: CleanEveryN
       n: 20

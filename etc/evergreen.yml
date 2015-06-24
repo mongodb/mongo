@@ -605,21 +605,21 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: jsCore_op_command
+  name: jsCore_op_query
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core_op_command --storageEngine=mmapv1
+      resmoke_args: --suites=core_op_query --storageEngine=mmapv1
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: jsCore_op_command_WT
+  name: jsCore_op_query_WT
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core_op_command --storageEngine=wiredTiger
+      resmoke_args: --suites=core_op_query --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -1448,8 +1448,8 @@ buildvariants:
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
-  - name: jsCore_op_command
-  - name: jsCore_op_command_WT
+  - name: jsCore_op_query
+  - name: jsCore_op_query_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
   - name: jsCore_small_oplog
