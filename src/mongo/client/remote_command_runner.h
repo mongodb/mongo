@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -55,6 +56,21 @@ struct RemoteCommandRequest {
     RemoteCommandRequest(const HostAndPort& theTarget,
                          const std::string& theDbName,
                          const BSONObj& theCmdObj,
+                         const BSONObj& metadataObj,
+                         const Milliseconds timeoutMillis = kNoTimeout)
+        : target(theTarget),
+          dbname(theDbName),
+          metadata(metadataObj),
+          cmdObj(theCmdObj),
+          timeout(timeoutMillis) {
+        if (timeoutMillis == kNoTimeout) {
+            expirationDate = kNoExpirationDate;
+        }
+    }
+
+    RemoteCommandRequest(const HostAndPort& theTarget,
+                         const std::string& theDbName,
+                         const BSONObj& theCmdObj,
                          const Milliseconds timeoutMillis = kNoTimeout)
         : target(theTarget), dbname(theDbName), cmdObj(theCmdObj), timeout(timeoutMillis) {
         if (timeoutMillis == kNoTimeout) {
@@ -66,6 +82,7 @@ struct RemoteCommandRequest {
 
     HostAndPort target;
     std::string dbname;
+    BSONObj metadata{rpc::makeEmptyMetadata()};
     BSONObj cmdObj;
     Milliseconds timeout;
 
@@ -82,9 +99,13 @@ struct RemoteCommandResponse {
 
     RemoteCommandResponse(BSONObj obj, Milliseconds millis) : data(obj), elapsedMillis(millis) {}
 
+    RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj, Milliseconds millis)
+        : data(std::move(dataObj)), metadata(std::move(metadataObj)), elapsedMillis(millis) {}
+
     std::string toString() const;
 
     BSONObj data;
+    BSONObj metadata;
     Milliseconds elapsedMillis;
 };
 

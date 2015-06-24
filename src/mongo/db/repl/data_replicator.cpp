@@ -388,7 +388,7 @@ Status DatabasesCloner::start() {
 
     log() << "starting cloning of all databases";
     // Schedule listDatabase command which will kick off the database cloner per result db.
-    Request listDBsReq(_source, "admin", BSON("listDatabases" << true));
+    Request listDBsReq(_source, "admin", BSON("listDatabases" << true), BSON("$secondaryOk" << 1));
     CBHStatus s = _exec->scheduleRemoteCommand(
         listDBsReq,
         stdx::bind(&DatabasesCloner::_onListDatabaseFinish, this, stdx::placeholders::_1));

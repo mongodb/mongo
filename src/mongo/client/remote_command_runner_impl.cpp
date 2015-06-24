@@ -218,8 +218,6 @@ void RemoteCommandRunnerImpl::shutdown() {
 StatusWith<RemoteCommandResponse> RemoteCommandRunnerImpl::runCommand(
     const RemoteCommandRequest& request) {
     try {
-        BSONObj output;
-
         const Date_t requestStartDate = Date_t::now();
         const auto timeoutMillis = getTimeoutMillis(request.expirationDate, requestStartDate);
         if (!timeoutMillis.isOK()) {
@@ -229,13 +227,19 @@ StatusWith<RemoteCommandResponse> RemoteCommandRunnerImpl::runCommand(
         ConnectionPool::ConnectionPtr conn(
             &_connPool, request.target, requestStartDate, timeoutMillis.getValue());
 
-        bool ok = conn.get()->runCommand(request.dbname, request.cmdObj, output);
+        rpc::UniqueReply commandResponse =
+            conn.get()->runCommandWithMetadata(request.dbname,
+                                               request.cmdObj.firstElementFieldName(),
+                                               request.metadata,
+                                               request.cmdObj);
+
+        BSONObj output = commandResponse->getCommandReply().getOwned();
 
         // If remote server does not support either find or getMore commands, down convert
         // to using DBClientInterface::query()/getMore().
         // TODO: Perform down conversion based on wire protocol version.
         //       Refer to the down conversion implementation in the shell.
-        if (!ok && getStatusFromCommandResult(output).code() == ErrorCodes::CommandNotFound) {
+        if (getStatusFromCommandResult(output).code() == ErrorCodes::CommandNotFound) {
             // 'commandName' will be an empty string if the command object is an empty BSON
             // document.
             StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
@@ -250,7 +254,9 @@ StatusWith<RemoteCommandResponse> RemoteCommandRunnerImpl::runCommand(
         conn.done(requestFinishDate);
 
         return StatusWith<RemoteCommandResponse>(
-            RemoteCommandResponse(output, Milliseconds(requestFinishDate - requestStartDate)));
+            RemoteCommandResponse(std::move(output),
+                                  commandResponse->getCommandReply().getOwned(),
+                                  Milliseconds(requestFinishDate - requestStartDate)));
     } catch (const DBException& ex) {
         return StatusWith<RemoteCommandResponse>(ex.toStatus());
     } catch (const std::exception& ex) {
