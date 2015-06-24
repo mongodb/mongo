@@ -18,9 +18,9 @@ will impact performance.
 
 If \c transaction_sync=(enabled=false) is configured to ::wiredtiger_open,
 log records may be buffered in memory, and only flushed to disk by
-checkpoints, when log files switch or calls to WT_SESSION::begin_transaction
-with \c sync=true.  (Note that any call to WT_SESSION::begin_transaction
-with \c sync=true will flush the log records for all committed transactions,
+checkpoints, when log files switch or calls to WT_SESSION::commit_transaction
+with \c sync=on.  (Note that any call to WT_SESSION::commit_transaction
+with \c sync=on will flush the log records for all committed transactions,
 not just the transaction where the configuration is set.)  This provides the
 minimal guarantees, but will be significantly faster than other configurations.
 
