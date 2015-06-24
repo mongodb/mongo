@@ -589,7 +589,21 @@ bool CatalogManagerReplicaSet::runUserManagementReadCommand(const std::string& d
 
 Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(const BSONArray& updateOps,
                                                          const BSONArray& preCondition) {
-    return notYetImplemented;
+    BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition);
+    auto response = _runConfigServerCommandWithNotMasterRetries("config", cmd);
+
+    if (!response.isOK()) {
+        return response.getStatus();
+    }
+
+    Status status = Command::getStatusFromCommandResult(response.getValue());
+    if (!status.isOK()) {
+        string errMsg(str::stream() << "Unable to save chunk ops. Command: " << cmd
+                                    << ". Result: " << response.getValue());
+
+        return Status(status.code(), errMsg);
+    }
+    return Status::OK();
 }
 
 DistLockManager* CatalogManagerReplicaSet::getDistLockManager() const {
