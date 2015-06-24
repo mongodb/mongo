@@ -318,6 +318,8 @@ __log_file_server(void *arg)
 			__wt_spin_lock(session, &log->log_sync_lock);
 			locked = 1;
 			WT_ERR(__wt_close(session, &close_fh));
+			WT_ASSERT(session,
+			    WT_LOG_CMP(&close_end_lsn, &log->sync_lsn) >= 0);
 			log->sync_lsn = close_end_lsn;
 			WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 			locked = 0;
