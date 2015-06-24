@@ -152,7 +152,37 @@ DistLockCatalogImpl::DistLockCatalogImpl(RemoteCommandTargeter* targeter,
 DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 
 StatusWith<LockpingsType> DistLockCatalogImpl::getPing(StringData processID) {
-    invariant(false);  // TODO
+    auto targetStatus = _targeter->findHost(kReadPref);
+
+    if (!targetStatus.isOK()) {
+        return targetStatus.getStatus();
+    }
+
+    auto findResult = _client->exhaustiveFind(targetStatus.getValue(),
+                                              _lockPingNS,
+                                              BSON(LockpingsType::process() << processID),
+                                              BSONObj(),
+                                              1);
+
+    if (!findResult.isOK()) {
+        return findResult.getStatus();
+    }
+
+    const auto& findResultSet = findResult.getValue();
+
+    if (findResultSet.empty()) {
+        return {ErrorCodes::NoMatchingDocument,
+                str::stream() << "ping entry for " << processID << " not found"};
+    }
+
+    LockpingsType pingDoc;
+
+    string errMsg;
+    if (!pingDoc.parseBSON(findResultSet.front(), &errMsg)) {
+        return {ErrorCodes::FailedToParse, errMsg};
+    }
+
+    return pingDoc;
 }
 
 Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
@@ -164,7 +194,7 @@ Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
 
     auto request =
         FindAndModifyRequest::makeUpdate(_lockPingNS,
-                                         BSON(LockpingsType::process(processID.toString())),
+                                         BSON(LockpingsType::process() << processID),
                                          BSON("$set" << BSON(LockpingsType::ping(ping))));
     request.setUpsert(true);
     request.setWriteConcern(_writeConcern);
@@ -379,11 +409,65 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
 }
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& lockSessionID) {
-    invariant(false);  // TODO
+    auto targetStatus = _targeter->findHost(kReadPref);
+
+    if (!targetStatus.isOK()) {
+        return targetStatus.getStatus();
+    }
+
+    auto findResult = _client->exhaustiveFind(
+        targetStatus.getValue(), _locksNS, BSON(LocksType::lockID(lockSessionID)), BSONObj(), 1);
+
+    if (!findResult.isOK()) {
+        return findResult.getStatus();
+    }
+
+    const auto& findResultSet = findResult.getValue();
+
+    if (findResultSet.empty()) {
+        return {ErrorCodes::LockNotFound,
+                str::stream() << "lock with ts " << lockSessionID << " not found"};
+    }
+
+    LocksType lockDoc;
+
+    string errMsg;
+    if (!lockDoc.parseBSON(findResultSet.front(), &errMsg)) {
+        return {ErrorCodes::FailedToParse, errMsg};
+    }
+
+    return lockDoc;
 }
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByName(StringData name) {
-    invariant(false);  // TODO
+    auto targetStatus = _targeter->findHost(kReadPref);
+
+    if (!targetStatus.isOK()) {
+        return targetStatus.getStatus();
+    }
+
+    auto findResult = _client->exhaustiveFind(
+        targetStatus.getValue(), _locksNS, BSON(LocksType::name() << name), BSONObj(), 1);
+
+    if (!findResult.isOK()) {
+        return findResult.getStatus();
+    }
+
+    const auto& findResultSet = findResult.getValue();
+
+    if (findResultSet.empty()) {
+        return {ErrorCodes::LockNotFound,
+                str::stream() << "lock with name " << name << " not found"};
+    }
+
+    LocksType lockDoc;
+
+    string errMsg;
+    if (!lockDoc.parseBSON(findResultSet.front(), &errMsg)) {
+        return {ErrorCodes::FailedToParse, errMsg};
+    }
+
+    return lockDoc;
 }
 
 Status DistLockCatalogImpl::stopPing(StringData processId) {

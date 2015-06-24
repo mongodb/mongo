@@ -1289,5 +1289,305 @@ TEST_F(DistLockCatalogFixture, StopPingUnsupportedResponseFormat) {
     future.get();
 }
 
+TEST_F(DistLockCatalogFixture, BasicGetPing) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            Date_t ping(dateFromISOString("2015-05-26T13:06:27.293Z").getValue());
+                            auto resultStatus = catalog()->getPing("test");
+                            ASSERT_OK(resultStatus.getStatus());
+
+                            const auto& pingDoc = resultStatus.getValue();
+                            ASSERT_EQUALS("test", pingDoc.getProcess());
+                            ASSERT_EQUALS(ping, pingDoc.getPing());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
+        ASSERT_EQUALS(dummyHost, request.target);
+        ASSERT_EQUALS("config", request.dbname);
+
+        BSONObj expectedCmd(fromjson(R"({
+            find: "lockpings",
+            filter: { _id: "test" },
+            limit: 1
+        })"));
+
+        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+
+        BSONObj pingDoc(fromjson(R"({
+            _id: "test",
+            ping: { $date: "2015-05-26T13:06:27.293Z" }
+        })"));
+
+        std::vector<BSONObj> result;
+        result.push_back(pingDoc);
+
+        return result;
+    });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, GetPingTargetError) {
+    targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
+    auto status = catalog()->getPing("").getStatus();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::InternalError, status.code());
+}
+
+TEST_F(DistLockCatalogFixture, GetPingRunnerError) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            auto status = catalog()->getPing("").getStatus();
+                            ASSERT_NOT_OK(status);
+                            ASSERT_EQUALS(ErrorCodes::InternalError, status.code());
+                            ASSERT_FALSE(status.reason().empty());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
+        return {ErrorCodes::InternalError, "Bad"};
+    });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, GetPingNotFound) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            auto status = catalog()->getPing("").getStatus();
+                            ASSERT_NOT_OK(status);
+                            ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, status.code());
+                            ASSERT_FALSE(status.reason().empty());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request)
+                      -> StatusWith<vector<BSONObj>> { return std::vector<BSONObj>(); });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, GetPingUnsupportedFormat) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            auto status = catalog()->getPing("test").getStatus();
+                            ASSERT_NOT_OK(status);
+                            ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
+                            ASSERT_FALSE(status.reason().empty());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
+        BSONObj pingDoc(fromjson(R"({
+            _id: "test",
+            ping: "bad"
+        })"));
+
+        std::vector<BSONObj> result;
+        result.push_back(pingDoc);
+
+        return result;
+    });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, BasicGetLockByTS) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            OID ts("555f99712c99a78c5b083358");
+                            auto resultStatus = catalog()->getLockByTS(ts);
+                            ASSERT_OK(resultStatus.getStatus());
+
+                            const auto& lockDoc = resultStatus.getValue();
+                            ASSERT_EQUALS("test", lockDoc.getName());
+                            ASSERT_EQUALS(ts, lockDoc.getLockID());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
+        ASSERT_EQUALS(dummyHost, request.target);
+        ASSERT_EQUALS("config", request.dbname);
+
+        BSONObj expectedCmd(fromjson(R"({
+            find: "locks",
+            filter: { ts: ObjectId("555f99712c99a78c5b083358") },
+            limit: 1
+        })"));
+
+        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+
+        BSONObj lockDoc(fromjson(R"({
+            _id: "test",
+            state: 2,
+            ts: ObjectId("555f99712c99a78c5b083358")
+        })"));
+
+        std::vector<BSONObj> result;
+        result.push_back(lockDoc);
+        return result;
+    });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, GetLockByTSTargetError) {
+    targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
+    auto status = catalog()->getLockByTS(OID()).getStatus();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::InternalError, status.code());
+}
+
+TEST_F(DistLockCatalogFixture, GetLockByTSRunnerError) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            auto status = catalog()->getLockByTS(OID()).getStatus();
+                            ASSERT_NOT_OK(status);
+                            ASSERT_EQUALS(ErrorCodes::InternalError, status.code());
+                            ASSERT_FALSE(status.reason().empty());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
+        return {ErrorCodes::InternalError, "Bad"};
+    });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, GetLockByTSNotFound) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            auto status = catalog()->getLockByTS(OID()).getStatus();
+                            ASSERT_NOT_OK(status);
+                            ASSERT_EQUALS(ErrorCodes::LockNotFound, status.code());
+                            ASSERT_FALSE(status.reason().empty());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request)
+                      -> StatusWith<vector<BSONObj>> { return std::vector<BSONObj>(); });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, GetLockByTSUnsupportedFormat) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            auto status = catalog()->getLockByTS(OID()).getStatus();
+                            ASSERT_NOT_OK(status);
+                            ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
+                            ASSERT_FALSE(status.reason().empty());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
+        BSONObj lockDoc(fromjson(R"({
+            _id: "test",
+            state: "bad"
+        })"));
+
+        std::vector<BSONObj> result;
+        result.push_back(lockDoc);
+
+        return result;
+    });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, BasicGetLockByName) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            OID ts("555f99712c99a78c5b083358");
+                            auto resultStatus = catalog()->getLockByName("abc");
+                            ASSERT_OK(resultStatus.getStatus());
+
+                            const auto& lockDoc = resultStatus.getValue();
+                            ASSERT_EQUALS("abc", lockDoc.getName());
+                            ASSERT_EQUALS(ts, lockDoc.getLockID());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
+        ASSERT_EQUALS(dummyHost, request.target);
+        ASSERT_EQUALS("config", request.dbname);
+
+        BSONObj expectedCmd(fromjson(R"({
+            find: "locks",
+            filter: { _id: "abc" },
+            limit: 1
+        })"));
+
+        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+
+        BSONObj lockDoc(fromjson(R"({
+            _id: "abc",
+            state: 2,
+            ts: ObjectId("555f99712c99a78c5b083358")
+        })"));
+
+        std::vector<BSONObj> result;
+        result.push_back(lockDoc);
+        return result;
+    });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, GetLockByNameTargetError) {
+    targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
+    auto status = catalog()->getLockByName("x").getStatus();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::InternalError, status.code());
+}
+
+TEST_F(DistLockCatalogFixture, GetLockByNameRunnerError) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            auto status = catalog()->getLockByName("x").getStatus();
+                            ASSERT_NOT_OK(status);
+                            ASSERT_EQUALS(ErrorCodes::InternalError, status.code());
+                            ASSERT_FALSE(status.reason().empty());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
+        return {ErrorCodes::InternalError, "Bad"};
+    });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, GetLockByNameNotFound) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            auto status = catalog()->getLockByName("x").getStatus();
+                            ASSERT_NOT_OK(status);
+                            ASSERT_EQUALS(ErrorCodes::LockNotFound, status.code());
+                            ASSERT_FALSE(status.reason().empty());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request)
+                      -> StatusWith<vector<BSONObj>> { return std::vector<BSONObj>(); });
+
+    future.get();
+}
+
+TEST_F(DistLockCatalogFixture, GetLockByNameUnsupportedFormat) {
+    auto future = async(std::launch::async,
+                        [this] {
+                            auto status = catalog()->getLockByName("x").getStatus();
+                            ASSERT_NOT_OK(status);
+                            ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
+                            ASSERT_FALSE(status.reason().empty());
+                        });
+
+    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
+        BSONObj lockDoc(fromjson(R"({
+            _id: "x",
+            state: "bad"
+        })"));
+
+        std::vector<BSONObj> result;
+        result.push_back(lockDoc);
+
+        return result;
+    });
+
+    future.get();
+}
+
 }  // unnamed namespace
 }  // namespace mongo
