@@ -373,8 +373,6 @@ uint64_t CurOp::MaxTimeTracker::getRemainingMicros() const {
 }
 
 void OpDebug::reset() {
-    extra.reset();
-
     op = 0;
     iscommand = false;
     ns = "";
@@ -484,9 +482,6 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     OPDEBUG_TOSTRING_HELP_BOOL(cursorExhausted);
     OPDEBUG_TOSTRING_HELP(keyUpdates);
     OPDEBUG_TOSTRING_HELP(writeConflicts);
-
-    if (extra.len())
-        s << " " << extra.str();
 
     if (!exceptionInfo.empty()) {
         s << " exception: " << exceptionInfo.msg;

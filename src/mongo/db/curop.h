@@ -148,8 +148,6 @@ public:
 
     // -------------------
 
-    StringBuilder extra;  // weird things we need to fix later
-
     // basic options
     int op;
     bool iscommand;
