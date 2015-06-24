@@ -31,14 +31,46 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
+using Parser = DocumentSource::Parser;
 using boost::intrusive_ptr;
+using std::string;
 using std::vector;
 
 DocumentSource::DocumentSource(const intrusive_ptr<ExpressionContext>& pCtx)
     : pSource(NULL), pExpCtx(pCtx) {}
+
+namespace {
+// Used to keep track of which DocumentSources are registered under which name.
+static StringMap<Parser> parserMap;
+}  // namespace
+
+void DocumentSource::registerParser(string name, Parser parser) {
+    auto it = parserMap.find(name);
+    massert(28707,
+            str::stream() << "Duplicate document source (" << name << ") registered.",
+            it == parserMap.end());
+    parserMap[name] = parser;
+}
+
+intrusive_ptr<DocumentSource> DocumentSource::parse(const intrusive_ptr<ExpressionContext> expCtx,
+                                                    BSONObj stageObj) {
+    uassert(16435,
+            "A pipeline stage specification object must contain exactly one field.",
+            stageObj.nFields() == 1);
+    BSONElement stageSpec = stageObj.firstElement();
+    auto stageName = stageSpec.fieldNameStringData();
+
+    // Get the registered parser and call that.
+    auto it = parserMap.find(stageName);
+    uassert(16436,
+            str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
+            it != parserMap.end());
+    return it->second(stageSpec, expCtx);
+}
 
 const char* DocumentSource::getSourceName() const {
     static const char unknown[] = "[UNKNOWN]";

@@ -62,33 +62,6 @@ const char Pipeline::mongosPipelineName[] = "mongosPipeline";
 Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx)
     : explain(false), pCtx(pTheCtx) {}
 
-
-/* this structure is used to make a lookup table of operators */
-struct StageDesc {
-    const char* pName;
-    intrusive_ptr<DocumentSource>(*pFactory)(BSONElement, const intrusive_ptr<ExpressionContext>&);
-};
-
-/* this table must be in alphabetical order by name for bsearch() */
-static const StageDesc stageDesc[] = {
-    {DocumentSourceGeoNear::geoNearName, DocumentSourceGeoNear::createFromBson},
-    {DocumentSourceGroup::groupName, DocumentSourceGroup::createFromBson},
-    {DocumentSourceLimit::limitName, DocumentSourceLimit::createFromBson},
-    {DocumentSourceMatch::matchName, DocumentSourceMatch::createFromBson},
-    {DocumentSourceMergeCursors::name, DocumentSourceMergeCursors::createFromBson},
-    {DocumentSourceOut::outName, DocumentSourceOut::createFromBson},
-    {DocumentSourceProject::projectName, DocumentSourceProject::createFromBson},
-    {DocumentSourceRedact::redactName, DocumentSourceRedact::createFromBson},
-    {DocumentSourceSkip::skipName, DocumentSourceSkip::createFromBson},
-    {DocumentSourceSort::sortName, DocumentSourceSort::createFromBson},
-    {DocumentSourceUnwind::unwindName, DocumentSourceUnwind::createFromBson},
-};
-static const size_t nStageDesc = sizeof(stageDesc) / sizeof(StageDesc);
-
-static int stageDescCmp(const void* pL, const void* pR) {
-    return strcmp(((const StageDesc*)pL)->pName, ((const StageDesc*)pR)->pName);
-}
-
 intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
                                                const BSONObj& cmdObj,
                                                const intrusive_ptr<ExpressionContext>& pCtx) {
@@ -174,31 +147,12 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
         uassert(15942,
                 str::stream() << "pipeline element " << iStep << " is not an object",
                 pipeElement.type() == Object);
-        BSONObj bsonObj(pipeElement.Obj());
 
-        // Parse a pipeline stage from 'bsonObj'.
-        uassert(16435,
-                "A pipeline stage specification object must contain exactly one field.",
-                bsonObj.nFields() == 1);
-        BSONElement stageSpec = bsonObj.firstElement();
-        const char* stageName = stageSpec.fieldName();
-
-        // Create a DocumentSource pipeline stage from 'stageSpec'.
-        StageDesc key;
-        key.pName = stageName;
-        const StageDesc* pDesc =
-            (const StageDesc*)bsearch(&key, stageDesc, nStageDesc, sizeof(StageDesc), stageDescCmp);
-
-        uassert(16436,
-                str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
-                pDesc);
-        intrusive_ptr<DocumentSource> stage = pDesc->pFactory(stageSpec, pCtx);
-        verify(stage);
-        sources.push_back(stage);
+        sources.push_back(DocumentSource::parse(pCtx, pipeElement.Obj()));
 
         // TODO find a good general way to check stages that must be first syntactically
 
-        if (dynamic_cast<DocumentSourceOut*>(stage.get())) {
+        if (dynamic_cast<DocumentSourceOut*>(sources.back().get())) {
             uassert(16991, "$out can only be the final stage in the pipeline", iStep == nSteps - 1);
         }
     }

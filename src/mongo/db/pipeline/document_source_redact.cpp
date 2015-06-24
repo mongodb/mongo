@@ -42,14 +42,14 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::vector;
 
-const char DocumentSourceRedact::redactName[] = "$redact";
-
 DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext>& expCtx,
                                            const intrusive_ptr<Expression>& expression)
     : DocumentSource(expCtx), _expression(expression) {}
 
+REGISTER_DOCUMENT_SOURCE(redact, DocumentSourceRedact::createFromBson);
+
 const char* DocumentSourceRedact::getSourceName() const {
-    return redactName;
+    return "$redact";
 }
 
 static const Value descendVal = Value("descend");

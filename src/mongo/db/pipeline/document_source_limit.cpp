@@ -39,14 +39,14 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-const char DocumentSourceLimit::limitName[] = "$limit";
-
 DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext>& pExpCtx,
                                          long long limit)
     : DocumentSource(pExpCtx), limit(limit), count(0) {}
 
+REGISTER_DOCUMENT_SOURCE(limit, DocumentSourceLimit::createFromBson);
+
 const char* DocumentSourceLimit::getSourceName() const {
-    return limitName;
+    return "$limit";
 }
 
 bool DocumentSourceLimit::coalesce(const intrusive_ptr<DocumentSource>& pNextSource) {

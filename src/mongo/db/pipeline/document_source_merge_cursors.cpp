@@ -38,20 +38,20 @@ using std::make_pair;
 using std::string;
 using std::vector;
 
-const char DocumentSourceMergeCursors::name[] = "$mergeCursors";
+DocumentSourceMergeCursors::DocumentSourceMergeCursors(
+    const CursorIds& cursorIds, const intrusive_ptr<ExpressionContext>& pExpCtx)
+    : DocumentSource(pExpCtx), _cursorIds(cursorIds), _unstarted(true) {}
+
+REGISTER_DOCUMENT_SOURCE(mergeCursors, DocumentSourceMergeCursors::createFromBson);
 
 const char* DocumentSourceMergeCursors::getSourceName() const {
-    return name;
+    return "$mergeCursors";
 }
 
 void DocumentSourceMergeCursors::setSource(DocumentSource* pSource) {
     /* this doesn't take a source */
     verify(false);
 }
-
-DocumentSourceMergeCursors::DocumentSourceMergeCursors(
-    const CursorIds& cursorIds, const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _cursorIds(cursorIds), _unstarted(true) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
     const CursorIds& cursorIds, const intrusive_ptr<ExpressionContext>& pExpCtx) {

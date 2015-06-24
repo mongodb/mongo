@@ -45,10 +45,10 @@ using std::make_pair;
 using std::string;
 using std::vector;
 
-const char DocumentSourceSort::sortName[] = "$sort";
+REGISTER_DOCUMENT_SOURCE(sort, DocumentSourceSort::createFromBson);
 
 const char* DocumentSourceSort::getSourceName() const {
-    return sortName;
+    return "$sort";
 }
 
 boost::optional<Document> DocumentSourceSort::getNext() {
@@ -143,10 +143,7 @@ DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(DepsTracker* d
 
 intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(15973,
-            str::stream() << " the " << sortName << " key specification must be an object",
-            elem.type() == Object);
-
+    uassert(15973, "the $sort key specification must be an object", elem.type() == Object);
     return create(pExpCtx, elem.embeddedObject());
 }
 
@@ -189,9 +186,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
         pSort->addKey(fieldName, (sortOrder > 0));
     }
 
-    uassert(15976,
-            str::stream() << sortName << " must have at least one sort key",
-            !pSort->vSortKey.empty());
+    uassert(15976, "$sort stage must have at least one sort key", !pSort->vSortKey.empty());
 
     if (limit > 0) {
         bool coalesced = pSort->coalesce(DocumentSourceLimit::create(pExpCtx, limit));

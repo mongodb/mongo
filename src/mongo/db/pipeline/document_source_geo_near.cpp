@@ -39,9 +39,10 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::min;
 
-char DocumentSourceGeoNear::geoNearName[] = "$geoNear";
+REGISTER_DOCUMENT_SOURCE(geoNear, DocumentSourceGeoNear::createFromBson);
+
 const char* DocumentSourceGeoNear::getSourceName() const {
-    return geoNearName;
+    return "$geoNear";
 }
 
 boost::optional<Document> DocumentSourceGeoNear::getNext() {

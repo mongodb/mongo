@@ -35,6 +35,7 @@
 #include <boost/unordered_map.hpp>
 #include <deque>
 
+#include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/jsobj.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/s/strategy.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 
 
@@ -59,8 +61,22 @@ class ExpressionObject;
 class DocumentSourceLimit;
 class PlanExecutor;
 
+/**
+ * Registers a DocumentSource to have the name 'key'. When a stage with name '$key' is found,
+ * 'parser' will be called to construct a DocumentSource.
+ */
+#define REGISTER_DOCUMENT_SOURCE(key, parser)                               \
+    MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) { \
+        /* Prevent duplicate document sources with the same name. */        \
+        DocumentSource::registerParser("$" #key, (parser));                 \
+        return Status::OK();                                                \
+    }
+
 class DocumentSource : public IntrusiveCounterUnsigned {
 public:
+    using Parser = stdx::function<boost::intrusive_ptr<DocumentSource>(
+        BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;
+
     virtual ~DocumentSource() {}
 
     /** Returns the next Document if there is one or boost::none if at EOF.
@@ -159,6 +175,21 @@ public:
     virtual bool isValidInitialSource() const {
         return false;
     }
+
+    /**
+     * Create a DocumentSource pipeline stage from 'stageObj'.
+     */
+    static boost::intrusive_ptr<DocumentSource> parse(
+        const boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj stageObj);
+
+    /**
+     * Registers a DocumentSource with a parsing function, so that when a stage with the given name
+     * is encountered, it will call 'parser' to construct that stage.
+     *
+     * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
+     * this file.
+     */
+    static void registerParser(std::string name, Parser parser);
 
 protected:
     /**

@@ -44,10 +44,10 @@ using std::shared_ptr;
 using std::pair;
 using std::vector;
 
-const char DocumentSourceGroup::groupName[] = "$group";
+REGISTER_DOCUMENT_SOURCE(group, DocumentSourceGroup::createFromBson);
 
 const char* DocumentSourceGroup::getSourceName() const {
-    return groupName;
+    return "$group";
 }
 
 boost::optional<Document> DocumentSourceGroup::getNext() {

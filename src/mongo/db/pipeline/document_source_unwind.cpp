@@ -111,13 +111,13 @@ boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
     return _output.peek();
 }
 
-const char DocumentSourceUnwind::unwindName[] = "$unwind";
-
 DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx) {}
 
+REGISTER_DOCUMENT_SOURCE(unwind, DocumentSourceUnwind::createFromBson);
+
 const char* DocumentSourceUnwind::getSourceName() const {
-    return unwindName;
+    return "$unwind";
 }
 
 boost::optional<Document> DocumentSourceUnwind::getNext() {
@@ -151,7 +151,7 @@ DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(DepsTracker*
 
 void DocumentSourceUnwind::unwindPath(const FieldPath& fieldPath) {
     // Can't set more than one unwind path.
-    uassert(15979, str::stream() << unwindName << "can't unwind more than one path", !_unwindPath);
+    uassert(15979, "$unwind can't unwind more than one path", !_unwindPath);
     // Record the unwind path.
     _unwindPath.reset(new FieldPath(fieldPath));
     _unwinder.reset(new Unwinder(fieldPath));
@@ -162,9 +162,7 @@ intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
     /*
       The value of $unwind should just be a field path.
      */
-    uassert(15981,
-            str::stream() << "the " << unwindName << " field path must be specified as a string",
-            elem.type() == String);
+    uassert(15981, "the $unwind field path must be specified as a string", elem.type() == String);
 
     string prefixedPathString(elem.str());
     string pathString(Expression::removeFieldPrefix(prefixedPathString));

@@ -43,10 +43,10 @@ using boost::intrusive_ptr;
 using std::string;
 using std::vector;
 
-const char DocumentSourceMatch::matchName[] = "$match";
+REGISTER_DOCUMENT_SOURCE(match, DocumentSourceMatch::createFromBson);
 
 const char* DocumentSourceMatch::getSourceName() const {
-    return matchName;
+    return "$match";
 }
 
 Value DocumentSourceMatch::serialize(bool explain) const {
