@@ -273,7 +273,7 @@ void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void*) {
     mallocFreeOStream << "/proc/self/maps:\n";
     std::ifstream is("/proc/self/maps");
     std::string str;
-    while(getline(is, str)) {
+    while (getline(is, str)) {
         mallocFreeOStream << str;
         writeMallocFreeStreamToLog();
     }
