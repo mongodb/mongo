@@ -414,9 +414,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
             _numRecords.store(numRecords);
             _dataSize.store(dataSize);
             _sizeStorer->onCreate(this, numRecords, dataSize);
-        }
-
-        else {
+        } else {
             LOG(1) << "Doing scan of collection " << ns << " to get size and count info";
 
             _numRecords.store(0);
@@ -426,10 +424,6 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
                 _numRecords.fetchAndAdd(1);
                 _dataSize.fetchAndAdd(record->data.size());
             } while ((record = cursor.next()));
-
-            if (_sizeStorer) {
-                _sizeStorer->storeToCache(_uri, _numRecords.load(), _dataSize.load());
-            }
         }
     } else {
         _dataSize.store(0);
