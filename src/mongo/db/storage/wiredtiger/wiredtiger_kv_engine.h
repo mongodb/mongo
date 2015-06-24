@@ -151,5 +151,7 @@ private:
     std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
     std::string _sizeStorerUri;
     mutable ElapsedTracker _sizeStorerSyncTracker;
+
+    mutable Date_t _previousCheckedDropsQueued;
 };
 }

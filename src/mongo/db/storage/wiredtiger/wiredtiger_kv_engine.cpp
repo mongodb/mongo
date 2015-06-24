@@ -50,6 +50,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 #if !defined(__has_feature)
 #define __has_feature(x) 0
@@ -94,6 +95,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,
             }
         }
     }
+
+    _previousCheckedDropsQueued = Date_t::now();
 
     std::stringstream ss;
     ss << "create,";
@@ -345,10 +348,20 @@ bool WiredTigerKVEngine::_drop(StringData ident) {
 }
 
 bool WiredTigerKVEngine::haveDropsQueued() const {
+    Date_t now = Date_t::now();
+    Milliseconds delta = now - _previousCheckedDropsQueued;
+
     if (_sizeStorerSyncTracker.intervalHasElapsed()) {
         _sizeStorerSyncTracker.resetLastTime();
         syncSizeInfo(false);
     }
+
+    // We only want to check the queue max once per second or we'll thrash
+    // This is done in haveDropsQueued, not dropAllQueued so we skip the mutex
+    if (delta < Milliseconds(1000))
+        return false;
+
+    _previousCheckedDropsQueued = now;
     stdx::lock_guard<stdx::mutex> lk(_identToDropMutex);
     return !_identToDrop.empty();
 }
