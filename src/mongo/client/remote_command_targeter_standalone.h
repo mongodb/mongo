@@ -41,6 +41,8 @@ class RemoteCommandTargeterStandalone final : public RemoteCommandTargeter {
 public:
     explicit RemoteCommandTargeterStandalone(const HostAndPort& hostAndPort);
 
+    ConnectionString connectionString() override;
+
     StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
 
 private:

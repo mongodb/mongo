@@ -35,6 +35,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -137,15 +138,16 @@ public:
      * Adds a new shard. It expects a standalone mongod process or replica set to be running
      * on the provided address.
      *
-     * @param  name is an optional string with the name of the shard.
-     *         If empty, a name will be automatically generated.
+     * @param  shardProposedName is an optional string with the proposed name of the shard.
+     *         If it is nullptr, a name will be automatically generated; if not nullptr, it cannot
+     *         contain the empty string.
      * @param  shardConnectionString is the connection string of the shard being added.
      * @param  maxSize is the optional space quota in bytes. Zeros means there's
      *         no limitation to space usage.
      * @return either an !OK status or the name of the newly added shard.
      */
     virtual StatusWith<std::string> addShard(OperationContext* txn,
-                                             const std::string& name,
+                                             const std::string* shardProposedName,
                                              const ConnectionString& shardConnectionString,
                                              const long long maxSize) = 0;
 
@@ -407,6 +409,34 @@ protected:
      * available shards. Will return ShardNotFound if shard could not be found.
      */
     static StatusWith<ShardId> selectShardForNewDatabase(ShardRegistry* shardRegistry);
+
+    /**
+     * Validates that the specified connection string can serve as a shard server. In particular,
+     * this function checks that the shard can be contacted, that it is not already member of
+     * another sharded cluster and etc.
+     *
+     * @param shardRegistry Shard registry to use for opening connections to the shards.
+     * @param connectionString Connection string to be attempted as a shard host.
+     * @param shardProposedName Optional proposed name for the shard. Can be omitted in which case
+     *      a unique name for the shard will be generated from the shard's connection string. If it
+     *      is not omitted, the value cannot be the empty string.
+     *
+     * On success returns a partially initialized shard type object corresponding to the requested
+     * shard. It will have the hostName field set and optionally the name, if the name could be
+     * generated from either the proposed name or the connection string set name. The returned
+     * shard's name should be checked and if empty, one should be generated using some uniform
+     * algorithm.
+     */
+    static StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
+                                                     const ConnectionString& connectionString,
+                                                     const std::string* shardProposedName);
+
+    /**
+     * Runs the listDatabases command on the specified host and returns the names of all databases
+     * it returns excluding those named local and admin, since they serve administrative purpose.
+     */
+    static StatusWith<std::vector<std::string>> getDBNamesListFromShard(
+        ShardRegistry* shardRegistry, const ConnectionString& connectionString);
 };
 
 }  // namespace mongo

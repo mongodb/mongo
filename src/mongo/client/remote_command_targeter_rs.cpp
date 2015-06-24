@@ -31,6 +31,7 @@
 #include "mongo/client/remote_command_targeter_rs.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/util/assert_util.h"
@@ -46,13 +47,15 @@ RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
     if (!_rsMonitor) {
         std::set<HostAndPort> seedServers(seedHosts.begin(), seedHosts.end());
 
-        // TODO: Replica set monitor should be entirely owned and maintained by the remote
-        //       command targeter. Otherwise, there is a slight race condition here where the
-        //       RS monitor might be created, but then before the get call it gets removed so
-        //       we end up with a NULL _rsMonitor.
         ReplicaSetMonitor::createIfNeeded(rsName, seedServers);
         _rsMonitor = ReplicaSetMonitor::get(rsName);
+
+        fassert(28711, _rsMonitor != nullptr);
     }
+}
+
+ConnectionString RemoteCommandTargeterRS::connectionString() {
+    return fassertStatusOK(28712, ConnectionString::parse(_rsMonitor->getServerAddress()));
 }
 
 StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(const ReadPreferenceSetting& readPref) {
