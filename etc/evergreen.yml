@@ -183,30 +183,12 @@ functions:
         done
         exit 0
 
-  # TODO: Remove the "install_pyyaml" function after PyYAML is installed on all build variants.
-  "install pyyaml" : &install_pyyaml
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        if [ ${has_pyyaml_installed|false} = false ]; then
-          curl -s http://pyyaml.org/download/pyyaml/PyYAML-3.11.tar.gz --output PyYAML-3.11.tar.gz
-          ${decompress} PyYAML-3.11.tar.gz
-          # 7-Zip decompresses and untars as two separate steps.
-          if [ ${is_windows|false} = true ]; then
-            ${decompress} dist/PyYAML-3.11.tar
-          fi
-          cd PyYAML-3.11
-          ${python|python} setup.py install --user
-        fi
-
   "do setup" :
   - *fetch_artifacts
   - *fetch_binaries
   - *extract_binaries
   - *get_buildnumber
   - *setup_credentials
-  - *install_pyyaml
 
   "run tests" :
     command: shell.exec
@@ -271,7 +253,6 @@ tasks:
         directory: src
     - func: "get buildnumber"
     - func: "setup credentials"
-    - func: "install pyyaml"
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - command: shell.exec
@@ -2101,8 +2082,6 @@ buildvariants:
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
-    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
-    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -2186,8 +2165,6 @@ buildvariants:
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
-    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
-    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -2258,8 +2235,6 @@ buildvariants:
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus
     ext: zip
-    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
-    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -2325,8 +2300,6 @@ buildvariants:
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
-    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
-    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -2368,8 +2341,6 @@ buildvariants:
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
-    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
-    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -2444,8 +2415,6 @@ buildvariants:
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
     ext: zip
-    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
-    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -3166,8 +3135,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    # TODO: Remove the "has_pyyaml_installed" expansion after PyYAML is installed on all build variants.
-    has_pyyaml_installed: true
   tasks:
   - name: compile
     distros:
@@ -3205,8 +3172,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    # TODO: Remove the "has_pyyaml_installed" expansion after PyYAML is installed on all build variants.
-    has_pyyaml_installed: true
   tasks:
   - name: compile
     distros:
