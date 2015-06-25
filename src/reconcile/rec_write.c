@@ -1258,7 +1258,7 @@ __rec_child_deleted(
 		}
 		ref->addr = NULL;
 	}
-	
+
 	/*
 	 * If there are deleted child pages that we can't discard immediately,
 	 * keep the page dirty so they are eventually freed.
