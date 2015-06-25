@@ -2026,7 +2026,7 @@ def doConfigure(myenv):
         conf.FindSysLibDep("snappy", ["snappy"])
 
     if use_system_version_of_library("zlib"):
-        conf.FindSysLibDep("zlib", ["zlib" if windows else "z"])
+        conf.FindSysLibDep("zlib", ["zdll" if conf.env.TargetOSIs('windows') else "z"])
 
     if use_system_version_of_library("stemmer"):
         conf.FindSysLibDep("stemmer", ["stemmer"])
