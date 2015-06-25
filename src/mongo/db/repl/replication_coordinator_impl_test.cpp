@@ -988,7 +988,7 @@ TEST_F(ReplCoordTest, UpdateTerm) {
                            << BSON("_id" << 1 << "host"
                                          << "test2:1234") << BSON("_id" << 2 << "host"
                                                                         << "test3:1234"))
-             << "protocolVersion" << 1),
+             << "settings" << BSON("protocolVersion" << 1)),
         HostAndPort("test1", 1234));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 1), 0));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));

@@ -3439,8 +3439,8 @@ public:
                                                    << "hself")
                                         << BSON("_id" << 20 << "host"
                                                       << "h2") << BSON("_id" << 30 << "host"
-                                                                             << "h3"))
-                          << "protocolVersion" << 1),
+                                                                             << "h3")) << "settings"
+                          << BSON("protocolVersion" << 1)),
                      0);
         setSelfMemberState(MemberState::RS_SECONDARY);
     }
@@ -3483,7 +3483,7 @@ TEST_F(PrepareHeartbeatResponseV1Test, PrepareHeartbeatResponseWhenOutOfSet) {
                                                                               << "h2")
                                                                    << BSON("_id" << 30 << "host"
                                                                                  << "h3"))
-                      << "protocolVersion" << 1),
+                      << "settings" << BSON("protocolVersion" << 1)),
                  -1);
     ReplSetHeartbeatArgsV1 args;
     args.setSetName("rs0");

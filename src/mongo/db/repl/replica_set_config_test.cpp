@@ -68,7 +68,7 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
                               << BSON("w"
                                       << "majority") << "getLastErrorModes"
                               << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed" << false
-                              << "heartbeatTimeoutSecs" << 120) << "protocolVersion" << 2)));
+                              << "heartbeatTimeoutSecs" << 120 << "protocolVersion" << 2))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1234, config.getConfigVersion());
