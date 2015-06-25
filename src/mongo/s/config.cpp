@@ -36,6 +36,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -494,7 +495,7 @@ bool DBConfig::_reload() {
     return _load();
 }
 
-bool DBConfig::dropDatabase(string& errmsg) {
+bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
     /**
      * 1) update config server
      * 2) drop and reset sharded collections
@@ -503,7 +504,8 @@ bool DBConfig::dropDatabase(string& errmsg) {
      */
 
     log() << "DBConfig::dropDatabase: " << _name << endl;
-    grid.catalogManager()->logChange(NULL, "dropDatabase.start", _name, BSONObj());
+    grid.catalogManager()->logChange(
+        txn->getClient()->clientAddress(true), "dropDatabase.start", _name, BSONObj());
 
     // 1
     grid.catalogCache()->invalidate(_name);
@@ -523,7 +525,7 @@ bool DBConfig::dropDatabase(string& errmsg) {
     // 2
     while (true) {
         int num = 0;
-        if (!_dropShardedCollections(num, shardIds, errmsg)) {
+        if (!_dropShardedCollections(txn, num, shardIds, errmsg)) {
             return 0;
         }
 
@@ -564,12 +566,16 @@ bool DBConfig::dropDatabase(string& errmsg) {
 
     LOG(1) << "\t dropped primary db for: " << _name << endl;
 
-    grid.catalogManager()->logChange(NULL, "dropDatabase", _name, BSONObj());
+    grid.catalogManager()->logChange(
+        txn->getClient()->clientAddress(true), "dropDatabase", _name, BSONObj());
 
     return true;
 }
 
-bool DBConfig::_dropShardedCollections(int& num, set<ShardId>& shardIds, string& errmsg) {
+bool DBConfig::_dropShardedCollections(OperationContext* txn,
+                                       int& num,
+                                       set<ShardId>& shardIds,
+                                       string& errmsg) {
     num = 0;
     set<string> seen;
     while (true) {
@@ -593,7 +599,7 @@ bool DBConfig::_dropShardedCollections(int& num, set<ShardId>& shardIds, string&
 
         i->second.getCM()->getAllShardIds(&shardIds);
 
-        uassertStatusOK(grid.catalogManager()->dropCollection(i->first));
+        uassertStatusOK(grid.catalogManager()->dropCollection(txn, i->first));
 
         // We should warn, but it's not a fatal error if someone else reloaded the db/coll as
         // unsharded in the meantime

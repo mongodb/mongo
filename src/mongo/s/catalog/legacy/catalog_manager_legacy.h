@@ -62,13 +62,15 @@ public:
 
     Status enableSharding(const std::string& dbName) override;
 
-    Status shardCollection(const std::string& ns,
+    Status shardCollection(OperationContext* txn,
+                           const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,
                            bool unique,
                            std::vector<BSONObj>* initPoints,
                            std::set<ShardId>* initShardIds) override;
 
-    StatusWith<std::string> addShard(const std::string& name,
+    StatusWith<std::string> addShard(OperationContext* txn,
+                                     const std::string& name,
                                      const ConnectionString& shardConnectionString,
                                      const long long maxSize) override;
 
@@ -83,7 +85,7 @@ public:
 
     Status getCollections(const std::string* dbName, std::vector<CollectionType>* collections);
 
-    Status dropCollection(const std::string& collectionNs);
+    Status dropCollection(OperationContext* txn, const std::string& collectionNs);
 
     Status getDatabasesForShard(const std::string& shardName,
                                 std::vector<std::string>* dbs) override;
@@ -120,7 +122,7 @@ public:
 
     void logAction(const ActionLogType& actionLog);
 
-    void logChange(OperationContext* txn,
+    void logChange(const std::string& clientAddress,
                    const std::string& what,
                    const std::string& ns,
                    const BSONObj& detail) override;

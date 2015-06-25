@@ -131,7 +131,8 @@ Status CatalogManagerReplicaSet::enableSharding(const std::string& dbName) {
     return notYetImplemented;
 }
 
-Status CatalogManagerReplicaSet::shardCollection(const string& ns,
+Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
+                                                 const string& ns,
                                                  const ShardKeyPattern& fieldsAndOrder,
                                                  bool unique,
                                                  vector<BSONObj>* initPoints,
@@ -143,7 +144,8 @@ Status CatalogManagerReplicaSet::createDatabase(const std::string& dbName) {
     return notYetImplemented;
 }
 
-StatusWith<string> CatalogManagerReplicaSet::addShard(const string& name,
+StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
+                                                      const string& name,
                                                       const ConnectionString& shardConnectionString,
                                                       const long long maxSize) {
     return notYetImplemented;
@@ -262,7 +264,8 @@ Status CatalogManagerReplicaSet::getCollections(const std::string* dbName,
     return Status::OK();
 }
 
-Status CatalogManagerReplicaSet::dropCollection(const std::string& collectionNs) {
+Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn,
+                                                const std::string& collectionNs) {
     return notYetImplemented;
 }
 
@@ -291,7 +294,7 @@ void CatalogManagerReplicaSet::logAction(const ActionLogType& actionLog) {
     }
 }
 
-void CatalogManagerReplicaSet::logChange(OperationContext* opCtx,
+void CatalogManagerReplicaSet::logChange(const string& clientAddress,
                                          const string& what,
                                          const string& ns,
                                          const BSONObj& detail) {}

@@ -110,6 +110,7 @@ private:
             stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
                                              stdx::make_unique<RemoteCommandRunnerMock>(),
                                              std::move(executor),
+                                             network,
                                              &_catalogMgr);
 
         _distLockCatalog =

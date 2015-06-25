@@ -124,7 +124,8 @@ public:
 
         audit::logAddShard(ClientBasic::getCurrent(), name, servers.toString(), maxSize);
 
-        StatusWith<string> addShardResult = grid.catalogManager()->addShard(name, servers, maxSize);
+        StatusWith<string> addShardResult =
+            grid.catalogManager()->addShard(txn, name, servers, maxSize);
         if (!addShardResult.isOK()) {
             log() << "addShard request '" << cmdObj << "'"
                   << " failed: " << addShardResult.getStatus().reason();

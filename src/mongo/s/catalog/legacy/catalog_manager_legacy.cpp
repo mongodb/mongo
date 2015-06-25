@@ -463,7 +463,8 @@ Status CatalogManagerLegacy::enableSharding(const std::string& dbName) {
     return updateDatabase(dbName, db);
 }
 
-Status CatalogManagerLegacy::shardCollection(const string& ns,
+Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
+                                             const string& ns,
                                              const ShardKeyPattern& fieldsAndOrder,
                                              bool unique,
                                              vector<BSONObj>* initPoints,
@@ -520,7 +521,8 @@ Status CatalogManagerLegacy::shardCollection(const string& ns,
     collectionDetail.append("initShards", initialShards);
     collectionDetail.append("numChunks", static_cast<int>(initPoints->size() + 1));
 
-    logChange(NULL, "shardCollection.start", ns, collectionDetail.obj());
+    logChange(
+        txn->getClient()->clientAddress(true), "shardCollection.start", ns, collectionDetail.obj());
 
     ChunkManagerPtr manager(new ChunkManager(ns, fieldsAndOrder, unique));
     manager->createFirstChunks(dbPrimaryShardId, initPoints, initShardIds);
@@ -566,7 +568,7 @@ Status CatalogManagerLegacy::shardCollection(const string& ns,
 
     finishDetail.append("version", manager->getVersion().toString());
 
-    logChange(NULL, "shardCollection", ns, finishDetail.obj());
+    logChange(txn->getClient()->clientAddress(true), "shardCollection", ns, finishDetail.obj());
 
     return Status::OK();
 }
@@ -622,7 +624,8 @@ Status CatalogManagerLegacy::createDatabase(const std::string& dbName) {
                                 << ". Error: " << response.toBSON());
 }
 
-StatusWith<string> CatalogManagerLegacy::addShard(const string& name,
+StatusWith<string> CatalogManagerLegacy::addShard(OperationContext* txn,
+                                                  const string& name,
                                                   const ConnectionString& shardConnectionString,
                                                   const long long maxSize) {
     string shardName;
@@ -725,7 +728,7 @@ StatusWith<string> CatalogManagerLegacy::addShard(const string& name,
     shardDetails.append("name", shardName);
     shardDetails.append("host", shardConnectionString.toString());
 
-    logChange(NULL, "addShard", "", shardDetails.obj());
+    logChange(txn->getClient()->clientAddress(true), "addShard", "", shardDetails.obj());
 
     return shardName;
 }
@@ -778,7 +781,10 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
         conn.done();
 
         // Record start in changelog
-        logChange(txn, "removeShard.start", "", buildRemoveLogEntry(name, true));
+        logChange(txn->getClient()->clientAddress(true),
+                  "removeShard.start",
+                  "",
+                  buildRemoveLogEntry(name, true));
         return ShardDrainingStatus::STARTED;
     }
 
@@ -808,7 +814,10 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
         conn.done();
 
         // Record finish in changelog
-        logChange(txn, "removeShard", "", buildRemoveLogEntry(name, false));
+        logChange(txn->getClient()->clientAddress(true),
+                  "removeShard",
+                  "",
+                  buildRemoveLogEntry(name, false));
         return ShardDrainingStatus::COMPLETED;
     }
 
@@ -890,8 +899,10 @@ Status CatalogManagerLegacy::getCollections(const std::string* dbName,
     return Status::OK();
 }
 
-Status CatalogManagerLegacy::dropCollection(const std::string& collectionNs) {
-    logChange(NULL, "dropCollection.start", collectionNs, BSONObj());
+Status CatalogManagerLegacy::dropCollection(OperationContext* txn,
+                                            const std::string& collectionNs) {
+    logChange(
+        txn->getClient()->clientAddress(true), "dropCollection.start", collectionNs, BSONObj());
 
     // Lock the collection globally so that split/migrate cannot run
     auto scopedDistLock = getDistLockManager()->lock(collectionNs, "drop");
@@ -983,7 +994,7 @@ Status CatalogManagerLegacy::dropCollection(const std::string& collectionNs) {
 
     LOG(1) << "dropCollection " << collectionNs << " completed";
 
-    logChange(NULL, "dropCollection", collectionNs, BSONObj());
+    logChange(txn->getClient()->clientAddress(true), "dropCollection", collectionNs, BSONObj());
 
     return Status::OK();
 }
@@ -1012,7 +1023,7 @@ void CatalogManagerLegacy::logAction(const ActionLogType& actionLog) {
     }
 }
 
-void CatalogManagerLegacy::logChange(OperationContext* opCtx,
+void CatalogManagerLegacy::logChange(const string& clientAddress,
                                      const string& what,
                                      const string& ns,
                                      const BSONObj& detail) {
@@ -1026,32 +1037,25 @@ void CatalogManagerLegacy::logChange(OperationContext* opCtx,
 
             _changeLogCollectionCreated.store(1);
         } catch (const UserException& e) {
-            // It's ok to ignore this exception
             LOG(1) << "couldn't create changelog collection: " << e;
+            // If we couldn't create the collection don't attempt the insert otherwise we might
+            // implicitly create the collection without it being capped.
+            return;
         }
     }
 
     // Store this entry's ID so we can use on the exception code path too
     StringBuilder changeIdBuilder;
-    changeIdBuilder << getHostNameCached() << "-" << terseCurrentTime() << "-" << OID::gen();
+    changeIdBuilder << getHostNameCached() << "-" << Date_t::now().toString() << "-" << OID::gen();
 
     const string changeID = changeIdBuilder.str();
-
-    Client* client;
-    if (opCtx) {
-        client = opCtx->getClient();
-    } else if (haveClient()) {
-        client = &cc();
-    } else {
-        client = nullptr;
-    }
 
     // Send a copy of the message to the local log in case it doesn't manage to reach
     // config.changelog
     BSONObj msg = BSON(ChangelogType::changeID(changeID)
                        << ChangelogType::server(getHostNameCached())
-                       << ChangelogType::clientAddr((client ? client->clientAddress(true) : ""))
-                       << ChangelogType::time(jsTime()) << ChangelogType::what(what)
+                       << ChangelogType::clientAddr(clientAddress)
+                       << ChangelogType::time(Date_t::now()) << ChangelogType::what(what)
                        << ChangelogType::ns(ns) << ChangelogType::details(detail));
 
     log() << "about to log metadata event: " << msg;

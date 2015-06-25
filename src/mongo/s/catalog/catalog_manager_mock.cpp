@@ -62,7 +62,8 @@ Status CatalogManagerMock::enableSharding(const string& dbName) {
     return Status::OK();
 }
 
-Status CatalogManagerMock::shardCollection(const string& ns,
+Status CatalogManagerMock::shardCollection(OperationContext* txn,
+                                           const string& ns,
                                            const ShardKeyPattern& fieldsAndOrder,
                                            bool unique,
                                            vector<BSONObj>* initPoints,
@@ -70,7 +71,8 @@ Status CatalogManagerMock::shardCollection(const string& ns,
     return Status::OK();
 }
 
-StatusWith<string> CatalogManagerMock::addShard(const string& name,
+StatusWith<string> CatalogManagerMock::addShard(OperationContext* txn,
+                                                const string& name,
                                                 const ConnectionString& shardConnectionString,
                                                 const long long maxSize) {
     return Status::OK();
@@ -106,7 +108,7 @@ Status CatalogManagerMock::getCollections(const string* dbName,
     return Status::OK();
 }
 
-Status CatalogManagerMock::dropCollection(const string& collectionNs) {
+Status CatalogManagerMock::dropCollection(OperationContext* txn, const string& collectionNs) {
     return Status::OK();
 }
 
@@ -159,7 +161,7 @@ Status CatalogManagerMock::applyChunkOpsDeprecated(const BSONArray& updateOps,
 
 void CatalogManagerMock::logAction(const ActionLogType& actionLog) {}
 
-void CatalogManagerMock::logChange(OperationContext* opCtx,
+void CatalogManagerMock::logChange(const string& clientAddress,
                                    const string& what,
                                    const string& ns,
                                    const BSONObj& detail) {}

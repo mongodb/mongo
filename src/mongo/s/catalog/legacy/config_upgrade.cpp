@@ -300,7 +300,7 @@ bool _nextUpgrade(CatalogManager* catalogManager,
     log() << "starting next upgrade step from v" << fromVersion << " to v" << toVersion;
 
     // Log begin to config.changelog
-    catalogManager->logChange(NULL,
+    catalogManager->logChange("<upgrade>",
                               "starting upgrade of config database",
                               VersionType::ConfigNS,
                               BSON("from" << fromVersion << "to" << toVersion));
@@ -321,7 +321,7 @@ bool _nextUpgrade(CatalogManager* catalogManager,
         return false;
     }
 
-    catalogManager->logChange(NULL,
+    catalogManager->logChange("<upgrade>",
                               "finished upgrade of config database",
                               VersionType::ConfigNS,
                               BSON("from" << fromVersion << "to" << toVersion));

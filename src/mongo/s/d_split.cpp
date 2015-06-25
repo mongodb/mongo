@@ -848,7 +848,8 @@ public:
             appendShortVersion(logDetail.subobjStart("left"), *newChunks[0]);
             appendShortVersion(logDetail.subobjStart("right"), *newChunks[1]);
 
-            grid.catalogManager()->logChange(txn, "split", ns, logDetail.obj());
+            grid.catalogManager()->logChange(
+                txn->getClient()->clientAddress(true), "split", ns, logDetail.obj());
         } else {
             BSONObj beforeDetailObj = logDetail.obj();
             BSONObj firstDetailObj = beforeDetailObj.getOwned();
@@ -861,7 +862,8 @@ public:
                 chunkDetail.append("of", newChunksSize);
                 appendShortVersion(chunkDetail.subobjStart("chunk"), *newChunks[i]);
 
-                grid.catalogManager()->logChange(txn, "multi-split", ns, chunkDetail.obj());
+                grid.catalogManager()->logChange(
+                    txn->getClient()->clientAddress(true), "multi-split", ns, chunkDetail.obj());
             }
         }
 

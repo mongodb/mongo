@@ -175,7 +175,10 @@ public:
                 _b.append("errmsg", *_cmdErrmsg);
             }
 
-            grid.catalogManager()->logChange(_txn, (string) "moveChunk." + _where, _ns, _b.obj());
+            grid.catalogManager()->logChange(_txn->getClient()->clientAddress(true),
+                                             (string) "moveChunk." + _where,
+                                             _ns,
+                                             _b.obj());
         } catch (const std::exception& e) {
             warning() << "couldn't record timing for moveChunk '" << _where << "': " << e.what()
                       << migrateLog;
@@ -1177,7 +1180,8 @@ public:
         BSONObj chunkInfo =
             BSON("min" << min << "max" << max << "from" << fromShardName << "to" << toShardName);
 
-        grid.catalogManager()->logChange(txn, "moveChunk.start", ns, chunkInfo);
+        grid.catalogManager()->logChange(
+            txn->getClient()->clientAddress(true), "moveChunk.start", ns, chunkInfo);
 
         // Always refresh our metadata remotely
         ChunkVersion origShardVersion;
@@ -1711,7 +1715,8 @@ public:
                 commitInfo.appendElements(res["counts"].Obj());
             }
 
-            grid.catalogManager()->logChange(txn, "moveChunk.commit", ns, commitInfo.obj());
+            grid.catalogManager()->logChange(
+                txn->getClient()->clientAddress(true), "moveChunk.commit", ns, commitInfo.obj());
         }
 
         migrateFromStatus.done(txn);

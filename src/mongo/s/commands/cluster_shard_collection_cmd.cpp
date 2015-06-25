@@ -397,7 +397,7 @@ public:
         audit::logShardCollection(ClientBasic::getCurrent(), ns, proposedKey, careAboutUnique);
 
         Status status = grid.catalogManager()->shardCollection(
-            ns, proposedShardKey, careAboutUnique, &initSplits);
+            txn, ns, proposedShardKey, careAboutUnique, &initSplits);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }

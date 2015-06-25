@@ -108,7 +108,7 @@ public:
         // particularly important since a database drop can be aborted by *any* collection
         // with a distributed namespace lock taken (migrates/splits)
 
-        if (!conf->dropDatabase(errmsg)) {
+        if (!conf->dropDatabase(txn, errmsg)) {
             return false;
         }
 
