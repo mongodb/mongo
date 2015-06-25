@@ -1220,10 +1220,6 @@ __rec_child_deleted(
 		if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
 			WT_PANIC_RET(session, EINVAL,
 			    "reconciliation illegally skipped an update");
-
-		/* If this page cannot be evicted, quit now. */
-		if (F_ISSET(r, WT_EVICTING))
-			return (EBUSY);
 	}
 
 	/*
@@ -1261,6 +1257,17 @@ __rec_child_deleted(
 			__wt_free(session, ref->addr);
 		}
 		ref->addr = NULL;
+	} else {
+		/*
+		 * There are deleted child pages that we can't discard
+		 * immediately: keep the page dirty so they are eventually
+		 * freed.
+		 */
+		r->leave_dirty = 1;
+
+		/* If this page cannot be evicted, quit now. */
+		if (F_ISSET(r, WT_EVICTING))
+			return (EBUSY);
 	}
 
 	/*
