@@ -164,7 +164,7 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     // of seconds with a fractional part.
     conn->setSoTimeout(timeout.count() / 1000.0);
     std::string errmsg;
-    uassert(28640,
+    uassert(ErrorCodes::HostUnreachable,
             str::stream() << "Failed attempt to connect to " << target.toString() << "; " << errmsg,
             conn->connect(target, errmsg));
 
