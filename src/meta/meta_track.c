@@ -17,6 +17,7 @@ typedef struct __wt_meta_track {
 	enum {
 		WT_ST_EMPTY,		/* Unused slot */
 		WT_ST_CHECKPOINT,	/* Complete a checkpoint */
+		WT_ST_DROP_COMMIT,	/* Drop post commit */
 		WT_ST_FILEOP,		/* File operation */
 		WT_ST_LOCK,		/* Lock a handle */
 		WT_ST_REMOVE,		/* Remove a metadata entry */
@@ -106,7 +107,8 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	 * Unlock handles and complete checkpoints regardless of whether we are
 	 * unrolling.
 	 */
-	if (!unroll && trk->op != WT_ST_CHECKPOINT && trk->op != WT_ST_LOCK)
+	if (!unroll && trk->op != WT_ST_CHECKPOINT &&
+	    trk->op != WT_ST_DROP_COMMIT && trk->op != WT_ST_LOCK)
 		goto free;
 
 	switch (trk->op) {
@@ -118,6 +120,14 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 			bm = btree->bm;
 			WT_WITH_DHANDLE(session, trk->dhandle,
 			    WT_TRET(bm->checkpoint_resolve(bm, session)));
+		}
+		break;
+	case WT_ST_DROP_COMMIT:
+		if ((tret = __wt_remove_if_exists(session, trk->a)) != 0) {
+			__wt_err(session, tret,
+			    "metadata remove dropped file %s",
+			    trk->a);
+			WT_TRET(tret);
 		}
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */
@@ -388,6 +398,23 @@ __wt_meta_track_fileop(
 	trk->op = WT_ST_FILEOP;
 	WT_RET(__wt_strdup(session, olduri, &trk->a));
 	WT_RET(__wt_strdup(session, newuri, &trk->b));
+	return (0);
+}
+
+/*
+ * __wt_meta_track_drop --
+ *	Track a file drop, where the remove is deferred until commit.
+ */
+int
+__wt_meta_track_drop(
+    WT_SESSION_IMPL *session, const char *filename)
+{
+	WT_META_TRACK *trk;
+
+	WT_RET(__meta_track_next(session, &trk));
+
+	trk->op = WT_ST_DROP_COMMIT;
+	WT_RET(__wt_strdup(session, filename, &trk->a));
 	return (0);
 }
 
