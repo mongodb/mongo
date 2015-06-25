@@ -81,8 +81,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 	while (log->sync_lsn.file < min_lsn->file) {
 		WT_ERR(__wt_cond_signal(session,
 		    S2C(session)->log_file_cond));
-		WT_ERR(__wt_cond_wait(
-		    session, log->log_sync_cond, 10000));
+		WT_ERR(__wt_cond_wait(session, log->log_sync_cond, 10000));
 	}
 	__wt_spin_lock(session, &log->log_sync_lock);
 	WT_ASSERT(session, log->log_dir_fh != NULL);
