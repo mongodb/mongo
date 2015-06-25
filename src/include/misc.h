@@ -160,21 +160,21 @@
 } while (0)
 
 /*
- * Binary search for a key.
- *
- * The "compare_lt" argument is a function or macro that returns true when
- * its first argument is less than its second argument.
+ * Binary search for an integer key.
  */
-#define	WT_BINARY_SEARCH(key, arrayp, n, compare_lt, found) do {	\
-	uint32_t __base = 0, __indx = 0, __limit = (n) - 1;		\
-	for (; __limit != 0; __limit >>= 1) {				\
+#define	WT_BINARY_SEARCH(key, arrayp, n, found) do {			\
+	uint32_t __base, __indx, __limit;				\
+	found = 0;							\
+	for (__base = 0, __limit = (n); __limit != 0; __limit >>= 1) {	\
 		__indx = __base + (__limit >> 1);			\
-		if (compare_lt((arrayp)[__indx], key)) {		\
+		if ((arrayp)[__indx] < key) {				\
 			__base = __indx + 1;				\
 			--__limit;					\
+		} else if ((arrayp)[__indx] == key) {			\
+			found = 1;					\
+			break;						\
 		}							\
 	}								\
-	found = ((n) > 0 && key == (arrayp)[__indx]);			\
 } while (0)
 
 /* Verbose messages. */

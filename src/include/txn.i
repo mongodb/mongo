@@ -217,8 +217,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	if (txn->snapshot_count == 0 || WT_TXNID_LT(id, txn->snap_min))
 		return (1);
 
-	WT_BINARY_SEARCH(
-	    id, txn->snapshot, txn->snapshot_count, WT_TXNID_LT, found);
+	WT_BINARY_SEARCH(id, txn->snapshot, txn->snapshot_count, found);
 	return (!found);
 }
 
