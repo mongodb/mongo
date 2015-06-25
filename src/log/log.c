@@ -577,7 +577,6 @@ __log_file_header(
 		tmp.slot_fh = fh;
 	} else {
 		WT_ASSERT(session, fh == NULL);
-		log->prep_missed++;
 		WT_ERR(__log_acquire(session, logrec->len, &tmp));
 	}
 	WT_ERR(__log_fill(session, &myslot, 1, buf, NULL));
@@ -1245,9 +1244,12 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	/*
 	 * If we need to create the log file, do so now.
 	 */
-	if (create_log && (ret = __wt_log_allocfile(
-	    session, log->fileid, WT_LOG_FILENAME, 0)) != 0)
-		return (ret);
+	if (create_log) {
+		log->prep_missed++;
+		if ((ret = __wt_log_allocfile(
+		    session, log->fileid, WT_LOG_FILENAME, 0)) != 0)
+			return (ret);
+	}
 	WT_RET(__log_openfile(session,
 	    0, &log->log_fh, WT_LOG_FILENAME, log->fileid));
 	/*
