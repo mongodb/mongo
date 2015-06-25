@@ -38,6 +38,9 @@ __drop_file(
 	if (!remove_files)
 		return (ret);
 
+	/* Make sure the metadata is flushed before removing the file. */
+	WT_TRET(__wt_metadata_sync(session));
+
 	/*
 	 * Remove the underlying physical file. There is no point tracking this
 	 * operation: there is no going back from here.

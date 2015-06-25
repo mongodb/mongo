@@ -50,6 +50,34 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_metadata_sync --
+ *	Make the metadata durable, either by flushing the log or by
+ *	checkpointing the metadata.
+ */
+int
+__wt_metadata_sync(WT_SESSION_IMPL *session)
+{
+	WT_DECL_RET;
+
+	/* If we're logging, make sure the metadata update was flushed. */
+	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED)) {
+		if (!FLD_ISSET(S2C(session)->txn_logsync,
+		    WT_LOG_DSYNC | WT_LOG_FSYNC))
+			WT_WITH_DHANDLE(session, session->meta_dhandle,
+			    ret = __wt_txn_checkpoint_log(session,
+			    0, WT_TXN_LOG_CKPT_SYNC, NULL));
+	} else {
+		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		    ret = __wt_checkpoint(session, NULL));
+		WT_RET(ret);
+		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		    ret = __wt_checkpoint_sync(session, NULL));
+	}
+
+	return (ret);
+}
+
+/*
  * __wt_metadata_cursor --
  *	Opens a cursor on the metadata.
  */
