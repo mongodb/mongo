@@ -233,11 +233,7 @@ void CurOp::reportState(BSONObjBuilder* builder) {
 
     builder->append("op", opToString(_op));
 
-    // Fill out "ns" from our namespace member (and if it's not available, fall back to the
-    // OpDebug namespace member). We prefer our ns when set because it changes to match each
-    // accessed namespace, while _debug.ns is set once at the start of the operation. However,
-    // sometimes _ns is not yet set.
-    builder->append("ns", !_ns.empty() ? _ns : _debug.ns);
+    builder->append("ns", _ns);
 
     if (_op == dbInsert) {
         _query.append(*builder, "insert");
@@ -375,7 +371,6 @@ uint64_t CurOp::MaxTimeTracker::getRemainingMicros() const {
 void OpDebug::reset() {
     op = 0;
     iscommand = false;
-    ns = "";
     query = BSONObj();
     updateobj = BSONObj();
 
@@ -432,7 +427,8 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
         s << "command ";
     else
         s << opToString(op) << ' ';
-    s << ns;
+
+    s << curop.getNS();
 
     if (!query.isEmpty()) {
         if (iscommand) {
@@ -556,7 +552,7 @@ void OpDebug::append(const CurOp& curop,
     const size_t maxElementSize = 50 * 1024;
 
     b.append("op", iscommand ? "command" : opToString(op));
-    b.append("ns", ns);
+    b.append("ns", curop.getNS());
 
     if (!query.isEmpty()) {
         appendAsObjOrString(iscommand ? "command" : "query", query, maxElementSize, &b);
