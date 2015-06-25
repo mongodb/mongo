@@ -3,6 +3,8 @@ selector:
     roots:
     - jstests/dur/*.js
     exclude_files:
+    # SERVER-19124 closeall.js causes the task to time out in Evergreen.
+    - jstests/dur/closeall.js
     # Skip the passthrough test because it is run separately.
     - jstests/dur/dur_jscore_passthrough.js
 
