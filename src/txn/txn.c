@@ -98,6 +98,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 	WT_ASSERT(session,
 	    txn_state->snap_min == WT_TXN_NONE ||
 	    session->txn.isolation == WT_ISO_READ_UNCOMMITTED ||
+	    session->id == S2C(session)->txn_global.checkpoint_id ||
 	    !__wt_txn_visible_all(session, txn_state->snap_min));
 
 	txn_state->snap_min = WT_TXN_NONE;
@@ -115,9 +116,9 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s, *txn_state;
-	uint64_t ckpt_id, current_id, id;
+	uint64_t current_id, id;
 	uint64_t prev_oldest_id, snap_min;
-	uint32_t i, n, session_cnt;
+	uint32_t ckpt_id, i, n, session_cnt;
 	int32_t count;
 
 	conn = S2C(session);
@@ -159,7 +160,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	ckpt_id = txn_global->checkpoint_id;
 	for (i = n = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 		/* Skip the checkpoint transaction; it is never read from. */
-		if (ckpt_id != WT_TXN_NONE && ckpt_id == s->id)
+		if (i == ckpt_id)
 			continue;
 
 		/*
@@ -219,8 +220,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	WT_SESSION_IMPL *oldest_session;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
-	uint64_t ckpt_id, current_id, id, oldest_id, prev_oldest_id, snap_min;
-	uint32_t i, session_cnt;
+	uint64_t current_id, id, oldest_id, prev_oldest_id, snap_min;
+	uint32_t ckpt_id, i, session_cnt;
 	int32_t count;
 	int last_running_moved;
 
@@ -259,7 +260,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	ckpt_id = txn_global->checkpoint_id;
 	for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 		/* Skip the checkpoint transaction; it is never read from. */
-		if (ckpt_id != WT_TXN_NONE && ckpt_id == s->id)
+		if (i == ckpt_id)
 			continue;
 
 		/*
@@ -315,7 +316,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 			 * Skip the checkpoint transaction; it is never read
 			 * from.
 			 */
-			if (ckpt_id != WT_TXN_NONE && ckpt_id == s->id)
+			if (i == ckpt_id)
 				continue;
 
 			if ((id = s->id) != WT_TXN_NONE &&
