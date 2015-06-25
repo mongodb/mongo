@@ -59,6 +59,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/replication_metadata.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -1544,6 +1545,40 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result)
     result->append("config", _rsConfig.toBSON());
 }
 
+void ReplicationCoordinatorImpl::processReplicationMetadata(
+    const ReplicationMetadata& replMetadata) {
+    CBHStatus cbh = _replExecutor.scheduleWork(
+        stdx::bind(&ReplicationCoordinatorImpl::_processReplicationMetadata_helper,
+                   this,
+                   stdx::placeholders::_1,
+                   replMetadata));
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28710, cbh.getStatus());
+    _replExecutor.wait(cbh.getValue());
+}
+
+void ReplicationCoordinatorImpl::_processReplicationMetadata_helper(
+    const ReplicationExecutor::CallbackArgs& cbData, const ReplicationMetadata& replMetadata) {
+    if (cbData.status == ErrorCodes::CallbackCanceled) {
+        return;
+    }
+
+    _processReplicationMetadata_incallback(replMetadata);
+}
+
+void ReplicationCoordinatorImpl::_processReplicationMetadata_incallback(
+    const ReplicationMetadata& replMetadata) {
+    if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
+        return;
+    }
+    _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
+    if (_updateTerm_incallback(replMetadata.getTerm(), nullptr)) {
+        _topCoord->setPrimaryByMemberId(replMetadata.getPrimaryId());
+    }
+}
+
 bool ReplicationCoordinatorImpl::getMaintenanceMode() {
     bool maintenanceMode(false);
     CBHStatus cbh = _replExecutor.scheduleWork(
@@ -2443,6 +2478,13 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
 
     // Use the index of the minimum quorum in the vector of nodes.
     _lastCommittedOpTime = votingNodesOpTimes[(votingNodesOpTimes.size() - 1) / 2];
+}
+
+void ReplicationCoordinatorImpl::_setLastCommittedOpTime(const OpTime& committedOpTime) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (committedOpTime > _lastCommittedOpTime) {
+        _lastCommittedOpTime = committedOpTime;
+    }
 }
 
 OpTime ReplicationCoordinatorImpl::getLastCommittedOpTime() const {

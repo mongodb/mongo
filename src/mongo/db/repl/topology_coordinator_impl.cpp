@@ -2194,5 +2194,9 @@ void TopologyCoordinatorImpl::voteForMyselfV1() {
     _lastVote.setCandidateId(_selfConfig().getId());
 }
 
+void TopologyCoordinatorImpl::setPrimaryByMemberId(long long memberId) {
+    _currentPrimaryIndex = _rsConfig.findMemberIndexByConfigId(memberId);
+}
+
 }  // namespace repl
 }  // namespace mongo

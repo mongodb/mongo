@@ -185,6 +185,8 @@ public:
 
     virtual void processReplSetGetConfig(BSONObjBuilder* result) override;
 
+    virtual void processReplicationMetadata(const ReplicationMetadata& replMetadata) override;
+
     virtual Status setMaintenanceMode(bool activate) override;
 
     virtual bool getMaintenanceMode() override;
@@ -402,6 +404,12 @@ private:
      */
     PostMemberStateUpdateAction _setCurrentRSConfig_inlock(const ReplicaSetConfig& newConfig,
                                                            int myIndex);
+
+    /**
+     * Updates the last committed OpTime to be "committedOpTime" if it is more recent than the
+     * current last committed OpTime.
+     */
+    void _setLastCommittedOpTime(const OpTime& committedOpTime);
 
     /**
      * Helper to wake waiters in _replicationWaiterList that are doneWaitingForReplication.
@@ -877,7 +885,19 @@ private:
                             long long term,
                             bool* updated,
                             Handle* cbHandle);
+    /**
+     * Returns true if the term increased.
+     */
     bool _updateTerm_incallback(long long term, Handle* cbHandle);
+
+    /**
+     * Callback that processes the ReplicationMetadata returned from a command run against another
+     * replica set member and updates protocol version 1 information (most recent optime that is
+     * committed, member id of the current PRIMARY, the current config version and the current term)
+     */
+    void _processReplicationMetadata_helper(const ReplicationExecutor::CallbackArgs& cbData,
+                                            const ReplicationMetadata& replMetadata);
+    void _processReplicationMetadata_incallback(const ReplicationMetadata& replMetadata);
 
     //
     // All member variables are labeled with one of the following codes indicating the

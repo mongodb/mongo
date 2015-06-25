@@ -198,6 +198,9 @@ void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result)
     // TODO
 }
 
+void ReplicationCoordinatorMock::processReplicationMetadata(
+    const ReplicationMetadata& replMetadata) {}
+
 Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
     return Status::OK();
 }

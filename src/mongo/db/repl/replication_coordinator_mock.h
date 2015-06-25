@@ -128,6 +128,8 @@ public:
 
     virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
+    virtual void processReplicationMetadata(const ReplicationMetadata& replMetadata);
+
     virtual Status setMaintenanceMode(bool activate);
 
     virtual bool getMaintenanceMode();

@@ -215,6 +215,7 @@ public:
     virtual void voteForMyselfV1();
     virtual long long getTerm();
     virtual void prepareForStepDown();
+    virtual void setPrimaryByMemberId(long long memberId);
 
     ////////////////////////////////////////////////////////////
     //
