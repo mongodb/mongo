@@ -442,12 +442,15 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Ensure a transaction ID is allocated prior to sharing it globally */
 	WT_ERR(__wt_txn_id_check(session));
+
 	/*
-	 * Save a copy of the checkpoint transaction ID so that refresh can
-	 * skip the checkpoint IDs. Save a copy of the snap min so that
-	 * visibility checks for the checkpoint use the right ID.
+	 * Save a copy of the checkpoint session ID so that refresh can skip
+	 * the checkpoint transactions. We never do checkpoints in the default
+	 * session with id zero. Save a copy of the snap min so that visibility
+	 * checks for the checkpoint use the right ID.
 	 */
-	txn_global->checkpoint_id = session->txn.id;
+	WT_ASSERT(session, session->id != 0);
+	txn_global->checkpoint_id = session->id;
 	txn_global->checkpoint_snap_min = session->txn.snap_min;
 
 	/*
@@ -476,7 +479,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	__wt_txn_release_snapshot(session);
 
 	/* Clear the global checkpoint transaction IDs */
-	txn_global->checkpoint_id = WT_TXN_NONE;
+	txn_global->checkpoint_id = 0;
 	txn_global->checkpoint_snap_min = WT_TXN_NONE;
 
 	WT_ERR(__checkpoint_verbose_track(session,
@@ -556,7 +559,7 @@ err:	/*
 	}
 
 	/* Ensure the checkpoint IDs are cleared on the error path. */
-	txn_global->checkpoint_id = WT_TXN_NONE;
+	txn_global->checkpoint_id = 0;
 	txn_global->checkpoint_snap_min = WT_TXN_NONE;
 
 	/*

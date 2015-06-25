@@ -105,7 +105,8 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t checkpoint_id, checkpoint_snap_min, oldest_id;
+	uint64_t checkpoint_snap_min, oldest_id;
+	uint32_t checkpoint_id;
 
 	txn_global = &S2C(session)->txn_global;
 	btree = S2BT_SAFE(session);
@@ -129,7 +130,7 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 * then it's safe to ignore the checkpoint ID in the visibility check.
 	 */
 	if (checkpoint_snap_min != WT_TXN_NONE &&
-	    checkpoint_id != session->txn.id && (btree == NULL ||
+	    checkpoint_id != session->id && (btree == NULL ||
 	    btree->checkpoint_gen != txn_global->checkpoint_gen) &&
 	    WT_TXNID_LT(checkpoint_snap_min, oldest_id))
 		/*
