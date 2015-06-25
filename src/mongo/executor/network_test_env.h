@@ -29,9 +29,13 @@
 #pragma once
 
 #include <functional>
+#include <future>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
@@ -46,19 +50,95 @@ class ShardRegistry;
 template <typename T>
 class StatusWith;
 
-namespace repl {
-class ReplicationExecutor;
-}  // namespace repl
-
 namespace executor {
-
-class NetworkInterfaceMock;
 
 /**
  * A network infrastructure for testing.
  */
 class NetworkTestEnv {
 public:
+    /**
+     * Wraps a std::future but will cancel any pending network operations in its destructor if
+     * the future wasn't successfully waited on in the main test thread.
+     * Without this behavior any operations launched asynchronously might never terminate if they
+     * are waiting for network operations to complete.
+     */
+    template <class T>
+    class FutureHandle {
+    public:
+        FutureHandle<T>(std::future<T> future,
+                        executor::TaskExecutor* executor,
+                        executor::NetworkInterfaceMock* network)
+            : _future(std::move(future)), _executor(executor), _network(network) {}
+
+#if defined(_MSC_VER) && _MSC_VER < 1900  // MVSC++ <= 2013 can't generate default move operations
+        FutureHandle(FutureHandle&& other)
+            : _future(std::move(other._future)),
+              _executor(other._executor),
+              _network(other._network) {
+            other._executor = nullptr;
+            other._network = nullptr;
+        }
+
+        FutureHandle& operator=(FutureHandle&& other) {
+            _future = std::move(other._future);
+            _executor = other._executor;
+            _network = other._network;
+
+            other._executor = nullptr;
+            other._network = nullptr;
+
+            return *this;
+        }
+#else
+        FutureHandle(FutureHandle&& other) = default;
+        FutureHandle& operator=(FutureHandle&& other) = default;
+#endif
+
+        ~FutureHandle() {
+            if (_future.valid()) {
+                _network->exitNetwork();
+                _executor->shutdown();
+                _future.wait();
+            }
+        }
+
+        template <class Rep, class Period>
+        std::future_status wait_for(
+            const std::chrono::duration<Rep, Period>& timeout_duration) const {
+            return _future.wait_for(timeout_duration);
+        }
+
+        void wait() const {
+            _future.wait();
+        }
+
+        T get() {
+            return _future.get();
+        }
+
+    private:
+        std::future<T> _future;
+        executor::TaskExecutor* _executor;
+        executor::NetworkInterfaceMock* _network;
+    };
+
+    /**
+     * Helper method for launching an asynchronous task in a way that will guarantees that the
+     * task will finish even if the task depends on network traffic via the mock network and there's
+     * an exception that prevents the main test thread from scheduling responses to the network
+     * operations.  It does this by returning a FutureHandle that wraps std::future and cancels
+     * all pending network operations in its destructor.
+     * Must be defined in the header because of its use of templates.
+     */
+    template <typename Lambda>
+    FutureHandle<typename std::result_of<Lambda()>::type> launchAsync(Lambda&& func) const {
+        auto future = async(std::launch::async, std::forward<Lambda>(func));
+        return NetworkTestEnv::FutureHandle<typename std::result_of<Lambda()>::type>{
+            std::move(future), _executor, _mockNetwork};
+    }
+
+
     using OnCommandFunction = std::function<StatusWith<BSONObj>(const RemoteCommandRequest&)>;
 
     using OnFindCommandFunction =
@@ -67,7 +147,7 @@ public:
     /**
      * Create a new environment based on the given network.
      */
-    NetworkTestEnv(NetworkInterfaceMock* network);
+    NetworkTestEnv(repl::ReplicationExecutor* executor, NetworkInterfaceMock* network);
 
     /**
      * Blocking methods, which receive one message from the network and respond using the
@@ -80,7 +160,7 @@ public:
     /**
      * Starts the executor thread that will process the network tasks.
      */
-    void startUp(repl::ReplicationExecutor* executor);
+    void startUp();
 
     /**
      * Joins the executor thread.
@@ -88,6 +168,9 @@ public:
     void shutDown();
 
 private:
+    // Task executor used for running asynchronous operations.
+    repl::ReplicationExecutor* _executor;
+
     // Mocked out network under the task executor.
     NetworkInterfaceMock* _mockNetwork;
 

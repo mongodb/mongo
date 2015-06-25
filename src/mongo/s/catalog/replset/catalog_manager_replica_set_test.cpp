@@ -31,7 +31,6 @@
 #include "mongo/platform/basic.h"
 
 #include <chrono>
-#include <future>
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
@@ -60,7 +59,6 @@ namespace {
 
 using executor::NetworkInterfaceMock;
 using executor::TaskExecutor;
-using std::async;
 using std::string;
 using std::vector;
 using stdx::chrono::milliseconds;
@@ -79,10 +77,9 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
     expectedColl.setUpdatedAt(Date_t());
     expectedColl.setEpoch(OID::gen());
 
-    auto future = launchAsync(
-                        [this, &expectedColl] {
-                            return assertGet(catalogManager()->getCollection(expectedColl.getNs()));
-                        });
+    auto future = launchAsync([this, &expectedColl] {
+        return assertGet(catalogManager()->getCollection(expectedColl.getNs()));
+    });
 
     onFindCommand([&expectedColl](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -109,11 +106,10 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionNotExisting) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = launchAsync(
-                        [this] {
-                            auto status = catalogManager()->getCollection("NonExistent");
-                            ASSERT_EQUALS(status.getStatus(), ErrorCodes::NamespaceNotFound);
-                        });
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->getCollection("NonExistent");
+        ASSERT_EQUALS(status.getStatus(), ErrorCodes::NamespaceNotFound);
+    });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
@@ -131,10 +127,9 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseExisting) {
     expectedDb.setPrimary("shard0000");
     expectedDb.setSharded(true);
 
-    auto future = launchAsync(
-                        [this, &expectedDb] {
-                            return assertGet(catalogManager()->getDatabase(expectedDb.getName()));
-                        });
+    auto future = launchAsync([this, &expectedDb] {
+        return assertGet(catalogManager()->getDatabase(expectedDb.getName()));
+    });
 
     onFindCommand([&expectedDb](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -159,11 +154,10 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseNotExisting) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = launchAsync(
-                        [this] {
-                            auto dbResult = catalogManager()->getDatabase("NonExistent");
-                            ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NamespaceNotFound);
-                        });
+    auto future = launchAsync([this] {
+        auto dbResult = catalogManager()->getDatabase("NonExistent");
+        ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NamespaceNotFound);
+    });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
@@ -182,12 +176,10 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollection) {
     collection.setEpoch(OID::gen());
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
-    auto future = launchAsync(
-                        [this, collection] {
-                            auto status = catalogManager()->updateCollection(
-                                collection.getNs().toString(), collection);
-                            ASSERT_OK(status);
-                        });
+    auto future = launchAsync([this, collection] {
+        auto status = catalogManager()->updateCollection(collection.getNs().toString(), collection);
+        ASSERT_OK(status);
+    });
 
     onCommand([collection](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("config", request.dbname);
@@ -229,12 +221,10 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMaster) {
     collection.setEpoch(OID::gen());
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
-    auto future = launchAsync(
-                        [this, collection] {
-                            auto status = catalogManager()->updateCollection(
-                                collection.getNs().toString(), collection);
-                            ASSERT_EQUALS(ErrorCodes::NotMaster, status);
-                        });
+    auto future = launchAsync([this, collection] {
+        auto status = catalogManager()->updateCollection(collection.getNs().toString(), collection);
+        ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    });
 
     for (int i = 0; i < 3; ++i) {
         onCommand([](const RemoteCommandRequest& request) {
@@ -263,12 +253,10 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterFromTargeter) 
     collection.setEpoch(OID::gen());
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
-    auto future = launchAsync(
-                        [this, collection] {
-                            auto status = catalogManager()->updateCollection(
-                                collection.getNs().toString(), collection);
-                            ASSERT_EQUALS(ErrorCodes::NotMaster, status);
-                        });
+    auto future = launchAsync([this, collection] {
+        auto status = catalogManager()->updateCollection(collection.getNs().toString(), collection);
+        ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    });
 
     // Now wait for the updateCollection call to return
     future.wait_for(kFutureTimeout);
@@ -288,12 +276,10 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) 
     collection.setEpoch(OID::gen());
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
-    auto future = launchAsync(
-                        [this, collection] {
-                            auto status = catalogManager()->updateCollection(
-                                collection.getNs().toString(), collection);
-                            ASSERT_OK(status);
-                        });
+    auto future = launchAsync([this, collection] {
+        auto status = catalogManager()->updateCollection(collection.getNs().toString(), collection);
+        ASSERT_OK(status);
+    });
 
     onCommand([host1, host2, targeter](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(host1, request.target);
@@ -360,12 +346,11 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsValid) {
 
     const vector<ShardType> expectedShardsList = {s1, s2, s3};
 
-    auto future = launchAsync(
-                        [this] {
-                            vector<ShardType> shards;
-                            ASSERT_OK(catalogManager()->getAllShards(&shards));
-                            return shards;
-                        });
+    auto future = launchAsync([this] {
+        vector<ShardType> shards;
+        ASSERT_OK(catalogManager()->getAllShards(&shards));
+        return shards;
+    });
 
     onFindCommand([&s1, &s2, &s3](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -394,14 +379,13 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsWithInvalidShard) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = launchAsync(
-                        [this] {
-                            vector<ShardType> shards;
-                            Status status = catalogManager()->getAllShards(&shards);
+    auto future = launchAsync([this] {
+        vector<ShardType> shards;
+        Status status = catalogManager()->getAllShards(&shards);
 
-                            ASSERT_EQ(ErrorCodes::FailedToParse, status);
-                            ASSERT_EQ(0U, shards.size());
-                        });
+        ASSERT_EQ(ErrorCodes::FailedToParse, status);
+        ASSERT_EQ(0U, shards.size());
+    });
 
     onFindCommand([](const RemoteCommandRequest& request) {
         // Valid ShardType
@@ -449,14 +433,14 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSWithSortAndLimit) {
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
     auto future = launchAsync([this, &chunksQuery] {
-                            vector<ChunkType> chunks;
+        vector<ChunkType> chunks;
 
-                            ASSERT_OK(catalogManager()->getChunks(
-                                chunksQuery, BSON(ChunkType::version() << -1), 1, &chunks));
-                            ASSERT_EQ(2U, chunks.size());
+        ASSERT_OK(
+            catalogManager()->getChunks(chunksQuery, BSON(ChunkType::version() << -1), 1, &chunks));
+        ASSERT_EQ(2U, chunks.size());
 
-                            return chunks;
-                        });
+        return chunks;
+    });
 
     onFindCommand([&chunksQuery, chunkA, chunkB](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -527,15 +511,13 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
              << ChunkType::DEPRECATED_lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
-    auto future = launchAsync(
-                        [this, &chunksQuery] {
-                            vector<ChunkType> chunks;
-                            Status status = catalogManager()->getChunks(
-                                chunksQuery, BSONObj(), boost::none, &chunks);
+    auto future = launchAsync([this, &chunksQuery] {
+        vector<ChunkType> chunks;
+        Status status = catalogManager()->getChunks(chunksQuery, BSONObj(), boost::none, &chunks);
 
-                            ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-                            ASSERT_EQ(0U, chunks.size());
-                        });
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+        ASSERT_EQ(0U, chunks.size());
+    });
 
     onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
         ChunkType chunkA;
@@ -565,18 +547,17 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommand) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = launchAsync(
-                        [this] {
-                            BSONObjBuilder responseBuilder;
-                            bool ok = catalogManager()->runUserManagementReadCommand(
-                                "test", BSON("usersInfo" << 1), &responseBuilder);
-                            ASSERT_TRUE(ok);
+    auto future = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        bool ok = catalogManager()->runUserManagementReadCommand(
+            "test", BSON("usersInfo" << 1), &responseBuilder);
+        ASSERT_TRUE(ok);
 
-                            BSONObj response = responseBuilder.obj();
-                            ASSERT_TRUE(response["ok"].trueValue());
-                            auto users = response["users"].Array();
-                            ASSERT_EQUALS(0U, users.size());
-                        });
+        BSONObj response = responseBuilder.obj();
+        ASSERT_TRUE(response["ok"].trueValue());
+        auto users = response["users"].Array();
+        ASSERT_EQUALS(0U, users.size());
+    });
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("test", request.dbname);
@@ -645,20 +626,18 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandSuccess) {
         },
         Status::OK());
 
-    auto future =
-        launchAsync(
-              [this] {
-                  BSONObjBuilder responseBuilder;
-                  bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
-                                                                            "test",
-                                                                            BSON("dropUser"
-                                                                                 << "test"),
-                                                                            &responseBuilder);
-                  ASSERT_FALSE(ok);
+    auto future = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
+                                                                  "test",
+                                                                  BSON("dropUser"
+                                                                       << "test"),
+                                                                  &responseBuilder);
+        ASSERT_FALSE(ok);
 
-                  Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
-                  ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
-              });
+        Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+        ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
+    });
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("test", request.dbname);
@@ -691,20 +670,18 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMaster)
         },
         Status::OK());
 
-    auto future =
-        launchAsync(
-              [this] {
-                  BSONObjBuilder responseBuilder;
-                  bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
-                                                                            "test",
-                                                                            BSON("dropUser"
-                                                                                 << "test"),
-                                                                            &responseBuilder);
-                  ASSERT_FALSE(ok);
+    auto future = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
+                                                                  "test",
+                                                                  BSON("dropUser"
+                                                                       << "test"),
+                                                                  &responseBuilder);
+        ASSERT_FALSE(ok);
 
-                  Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
-                  ASSERT_EQUALS(ErrorCodes::NotMaster, commandStatus);
-              });
+        Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+        ASSERT_EQUALS(ErrorCodes::NotMaster, commandStatus);
+    });
 
     for (int i = 0; i < 3; ++i) {
         onCommand([](const RemoteCommandRequest& request) {
@@ -736,20 +713,18 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMasterR
         },
         Status::OK());
 
-    auto future =
-        launchAsync(
-              [this] {
-                  BSONObjBuilder responseBuilder;
-                  bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
-                                                                            "test",
-                                                                            BSON("dropUser"
-                                                                                 << "test"),
-                                                                            &responseBuilder);
-                  ASSERT_TRUE(ok);
+    auto future = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
+                                                                  "test",
+                                                                  BSON("dropUser"
+                                                                       << "test"),
+                                                                  &responseBuilder);
+        ASSERT_TRUE(ok);
 
-                  Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
-                  ASSERT_OK(commandStatus);
-              });
+        Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+        ASSERT_OK(commandStatus);
+    });
 
     onCommand([targeter, host1, host2](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(host1, request.target);
@@ -787,11 +762,9 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsBalancerDoc) {
     st1.setKey(SettingsType::BalancerDocKey);
     st1.setBalancerStopped(true);
 
-    auto future = launchAsync(
-                        [this] {
-                            return assertGet(
-                                catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey));
-                        });
+    auto future = launchAsync([this] {
+        return assertGet(catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey));
+    });
 
     onFindCommand([st1](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -819,11 +792,9 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsChunkSizeDoc) {
     st1.setKey(SettingsType::ChunkSizeDocKey);
     st1.setChunkSizeMB(80);
 
-    auto future = launchAsync(
-                        [this] {
-                            return assertGet(
-                                catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey));
-                        });
+    auto future = launchAsync([this] {
+        return assertGet(catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey));
+    });
 
     onFindCommand([st1](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -846,13 +817,11 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsInvalidDoc) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = launchAsync(
-                        [this] {
-                            const auto balSettings =
-                                catalogManager()->getGlobalSettings("invalidKey");
+    auto future = launchAsync([this] {
+        const auto balSettings = catalogManager()->getGlobalSettings("invalidKey");
 
-                            ASSERT_EQ(balSettings.getStatus(), ErrorCodes::FailedToParse);
-                        });
+        ASSERT_EQ(balSettings.getStatus(), ErrorCodes::FailedToParse);
+    });
 
     onFindCommand([](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -877,14 +846,12 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future =
-        launchAsync(
-              [this] {
-                  const auto chunkSizeSettings =
-                      catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey);
+    auto future = launchAsync([this] {
+        const auto chunkSizeSettings =
+            catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey);
 
-                  ASSERT_EQ(chunkSizeSettings.getStatus(), ErrorCodes::NoMatchingDocument);
-              });
+        ASSERT_EQ(chunkSizeSettings.getStatus(), ErrorCodes::NoMatchingDocument);
+    });
 
     onFindCommand([](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -930,16 +897,14 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsNoDb) {
     coll3.setKeyPattern(KeyPattern{BSON("_id" << 1)});
     ASSERT_OK(coll3.validate());
 
-    auto future = launchAsync(
-                        [this] {
-                            vector<CollectionType> collections;
+    auto future = launchAsync([this] {
+        vector<CollectionType> collections;
 
-                            const auto status =
-                                catalogManager()->getCollections(nullptr, &collections);
+        const auto status = catalogManager()->getCollections(nullptr, &collections);
 
-                            ASSERT_OK(status);
-                            return collections;
-                        });
+        ASSERT_OK(status);
+        return collections;
+    });
 
     onFindCommand([coll1, coll2, coll3](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -980,17 +945,15 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsWithDb) {
     coll2.setEpoch(OID::gen());
     coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
 
-    auto future = launchAsync(
-                        [this] {
-                            string dbName = "test";
-                            vector<CollectionType> collections;
+    auto future = launchAsync([this] {
+        string dbName = "test";
+        vector<CollectionType> collections;
 
-                            const auto status =
-                                catalogManager()->getCollections(&dbName, &collections);
+        const auto status = catalogManager()->getCollections(&dbName, &collections);
 
-                            ASSERT_OK(status);
-                            return collections;
-                        });
+        ASSERT_OK(status);
+        return collections;
+    });
 
     onFindCommand([coll1, coll2](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -1019,17 +982,15 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsInvalidCollectionType) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = launchAsync(
-                        [this] {
-                            string dbName = "test";
-                            vector<CollectionType> collections;
+    auto future = launchAsync([this] {
+        string dbName = "test";
+        vector<CollectionType> collections;
 
-                            const auto status =
-                                catalogManager()->getCollections(&dbName, &collections);
+        const auto status = catalogManager()->getCollections(&dbName, &collections);
 
-                            ASSERT_EQ(ErrorCodes::FailedToParse, status);
-                            ASSERT_EQ(0U, collections.size());
-                        });
+        ASSERT_EQ(ErrorCodes::FailedToParse, status);
+        ASSERT_EQ(0U, collections.size());
+    });
 
     CollectionType validColl;
     validColl.setNs(NamespaceString{"test.system.indexes"});
@@ -1074,15 +1035,13 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardValid) {
     dbt2.setName("db2");
     dbt2.setPrimary("shard0000");
 
-    auto future = launchAsync(
-                        [this] {
-                            vector<string> dbs;
-                            const auto status =
-                                catalogManager()->getDatabasesForShard("shard0000", &dbs);
+    auto future = launchAsync([this] {
+        vector<string> dbs;
+        const auto status = catalogManager()->getDatabasesForShard("shard0000", &dbs);
 
-                            ASSERT_OK(status);
-                            return dbs;
-                        });
+        ASSERT_OK(status);
+        return dbs;
+    });
 
     onFindCommand([dbt1, dbt2](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -1108,15 +1067,13 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardInvalidDoc) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = launchAsync(
-                        [this] {
-                            vector<string> dbs;
-                            const auto status =
-                                catalogManager()->getDatabasesForShard("shard0000", &dbs);
+    auto future = launchAsync([this] {
+        vector<string> dbs;
+        const auto status = catalogManager()->getDatabasesForShard("shard0000", &dbs);
 
-                            ASSERT_EQ(ErrorCodes::TypeMismatch, status);
-                            ASSERT_EQ(0U, dbs.size());
-                        });
+        ASSERT_EQ(ErrorCodes::TypeMismatch, status);
+        ASSERT_EQ(0U, dbs.size());
+    });
 
     onFindCommand([](const RemoteCommandRequest& request) {
         DatabaseType dbt1;
@@ -1149,16 +1106,14 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollection) {
     tagB.setMinKey(BSON("a" << 200));
     tagB.setMaxKey(BSON("a" << 300));
 
-    auto future =
-        async(std::launch::async,
-              [this] {
-                  vector<TagsType> tags;
+    auto future = launchAsync([this] {
+        vector<TagsType> tags;
 
-                  ASSERT_OK(catalogManager()->getTagsForCollection("TestDB.TestColl", &tags));
-                  ASSERT_EQ(2U, tags.size());
+        ASSERT_OK(catalogManager()->getTagsForCollection("TestDB.TestColl", &tags));
+        ASSERT_EQ(2U, tags.size());
 
-                  return tags;
-              });
+        return tags;
+    });
 
     onFindCommand([tagA, tagB](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -1183,16 +1138,14 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionNoTags) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future =
-        async(std::launch::async,
-              [this] {
-                  vector<TagsType> tags;
+    auto future = launchAsync([this] {
+        vector<TagsType> tags;
 
-                  ASSERT_OK(catalogManager()->getTagsForCollection("TestDB.TestColl", &tags));
-                  ASSERT_EQ(0U, tags.size());
+        ASSERT_OK(catalogManager()->getTagsForCollection("TestDB.TestColl", &tags));
+        ASSERT_EQ(0U, tags.size());
 
-                  return tags;
-              });
+        return tags;
+    });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
@@ -1204,15 +1157,13 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionInvalidTag) {
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = async(std::launch::async,
-                        [this] {
-                            vector<TagsType> tags;
-                            Status status =
-                                catalogManager()->getTagsForCollection("TestDB.TestColl", &tags);
+    auto future = launchAsync([this] {
+        vector<TagsType> tags;
+        Status status = catalogManager()->getTagsForCollection("TestDB.TestColl", &tags);
 
-                            ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-                            ASSERT_EQ(0U, tags.size());
-                        });
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+        ASSERT_EQ(0U, tags.size());
+    });
 
     onFindCommand([](const RemoteCommandRequest& request) {
         TagsType tagA;
@@ -1247,8 +1198,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkOneTagFound) {
     chunk.setShard("shard0000");
     ASSERT_OK(chunk.validate());
 
-    auto future = async(
-        std::launch::async,
+    auto future = launchAsync(
         [this, chunk] { return assertGet(catalogManager()->getTagForChunk("test.coll", chunk)); });
 
     onFindCommand([chunk](const RemoteCommandRequest& request) {
@@ -1290,8 +1240,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkNoTagFound) {
     chunk.setShard("shard0000");
     ASSERT_OK(chunk.validate());
 
-    auto future = async(
-        std::launch::async,
+    auto future = launchAsync(
         [this, chunk] { return assertGet(catalogManager()->getTagForChunk("test.coll", chunk)); });
 
     onFindCommand([chunk](const RemoteCommandRequest& request) {
@@ -1327,13 +1276,11 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkInvalidTagDoc) {
     chunk.setShard("shard0000");
     ASSERT_OK(chunk.validate());
 
-    auto future = async(std::launch::async,
-                        [this, chunk] {
-                            const auto tagResult =
-                                catalogManager()->getTagForChunk("test.coll", chunk);
+    auto future = launchAsync([this, chunk] {
+        const auto tagResult = catalogManager()->getTagForChunk("test.coll", chunk);
 
-                            ASSERT_EQ(ErrorCodes::FailedToParse, tagResult.getStatus());
-                        });
+        ASSERT_EQ(ErrorCodes::FailedToParse, tagResult.getStatus());
+    });
 
     onFindCommand([chunk](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -1365,11 +1312,10 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabase) {
     dbt.setPrimary("shard0000");
     dbt.setSharded(true);
 
-    auto future = async(std::launch::async,
-                        [this, dbt] {
-                            auto status = catalogManager()->updateDatabase(dbt.getName(), dbt);
-                            ASSERT_OK(status);
-                        });
+    auto future = launchAsync([this, dbt] {
+        auto status = catalogManager()->updateDatabase(dbt.getName(), dbt);
+        ASSERT_OK(status);
+    });
 
     onCommand([dbt](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("config", request.dbname);
@@ -1409,11 +1355,10 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabaseHostUnreachable) {
     dbt.setPrimary("shard0001");
     dbt.setSharded(false);
 
-    auto future = async(std::launch::async,
-                        [this, dbt] {
-                            auto status = catalogManager()->updateDatabase(dbt.getName(), dbt);
-                            ASSERT_EQ(ErrorCodes::HostUnreachable, status);
-                        });
+    auto future = launchAsync([this, dbt] {
+        auto status = catalogManager()->updateDatabase(dbt.getName(), dbt);
+        ASSERT_EQ(ErrorCodes::HostUnreachable, status);
+    });
 
     onCommand([host1](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(host1, request.target);

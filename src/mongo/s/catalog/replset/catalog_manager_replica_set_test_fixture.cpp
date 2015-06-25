@@ -59,12 +59,12 @@ void CatalogManagerReplSetTestFixture::setUp() {
         stdx::make_unique<executor::NetworkInterfaceMock>());
 
     _mockNetwork = network.get();
-    _networkTestEnv = stdx::make_unique<NetworkTestEnv>(_mockNetwork);
 
     std::unique_ptr<repl::ReplicationExecutor> executor(
         stdx::make_unique<repl::ReplicationExecutor>(network.release(), nullptr, 0));
 
-    _networkTestEnv->startUp(executor.get());
+    _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), _mockNetwork);
+    _networkTestEnv->startUp();
 
     std::unique_ptr<CatalogManagerReplicaSet> cm(stdx::make_unique<CatalogManagerReplicaSet>());
 

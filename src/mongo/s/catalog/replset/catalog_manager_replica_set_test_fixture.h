@@ -28,15 +28,9 @@
 
 #pragma once
 
-#include <functional>
-#include <future>
-#include <type_traits>
-#include <vector>
+#include <utility>
 
 #include "mongo/executor/network_test_env.h"
-#include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -46,99 +40,27 @@ class CatalogManagerReplicaSet;
 class DistLockManagerMock;
 struct RemoteCommandRequest;
 class RemoteCommandRunnerMock;
+class ShardRegistry;
 template <typename T>
 class StatusWith;
+
+namespace executor {
+class NetworkInterfaceMock;
+}  // namespace executor
 
 /**
  * Sets up the mocked out objects for testing the replica-set backed catalog manager.
  */
 class CatalogManagerReplSetTestFixture : public mongo::unittest::Test {
 public:
-
-    /**
-     * Wraps a std::future but will cancel any pending network operations in its destructor if
-     * the future wasn't successfully waited on in the main test thread.
-     * Without this behavior any operations launched asynchronously might never terminate if they
-     * are waiting for network operations to complete.
-     */
-    template <class T>
-    class FutureHandle {
-    public:
-
-        FutureHandle<T>(std::future<T> future,
-                        executor::TaskExecutor* executor,
-                        executor::NetworkInterfaceMock* network) :
-                _future(std::move(future)), _executor(executor), _network(network) {}
-
-#if defined(_MSC_VER) && _MSC_VER < 1900  // MVSC++ <= 2013 can't generate default move operations
-        FutureHandle(FutureHandle&& other) : _future(std::move(other._future)),
-                                             _executor(other._executor),
-                                             _network(other._network) {
-            other._executor = nullptr;
-            other._network = nullptr;
-        }
-
-        FutureHandle& operator=(FutureHandle&& other) {
-            _future = std::move(other._future);
-            _executor = other._executor;
-            _network = other._network;
-
-            other._executor = nullptr;
-            other._network = nullptr;
-
-            return *this;
-        }
-#else
-        FutureHandle(FutureHandle&& other) = default;
-        FutureHandle& operator=(FutureHandle&& other) = default;
-#endif
-
-        ~FutureHandle() {
-            if (_future.valid()) {
-                _network->exitNetwork();
-                _executor->shutdown();
-                _future.wait();
-            }
-        }
-
-        template< class Rep, class Period >
-        std::future_status wait_for(
-                const std::chrono::duration<Rep, Period>& timeout_duration) const {
-            return _future.wait_for(timeout_duration);
-        }
-
-        void wait() const { _future.wait(); }
-
-        T get() { return _future.get(); }
-
-    private:
-
-        std::future<T> _future;
-        executor::TaskExecutor* _executor;
-        executor::NetworkInterfaceMock* _network;
-    };
-
     CatalogManagerReplSetTestFixture();
     ~CatalogManagerReplSetTestFixture();
 
 protected:
-
-    /**
-     * Helper method for launching an asynchronous task in a way that will guarantees that the
-     * task will finish even if the task depends on network traffic via the mock network and there's
-     * an exception that prevents the main test thread from scheduling responses to the network
-     * operations.  It does this by returning a FutureHandle that wraps std::future and cancels
-     * all pending network operations in its destructor.
-     * Must be defined in the header because of its use of templates.
-     */
-    template<typename Lambda>
-    FutureHandle<typename std::result_of<Lambda()>::type>
-    launchAsync(Lambda&& func) const {
-        auto future = async(std::launch::async, func);
-        return CatalogManagerReplSetTestFixture::FutureHandle<
-                typename std::result_of<Lambda()>::type>{std::move(future),
-                                                         shardRegistry()->getExecutor(),
-                                                         network()};
+    template <typename Lambda>
+    executor::NetworkTestEnv::FutureHandle<typename std::result_of<Lambda()>::type> launchAsync(
+        Lambda&& func) const {
+        return _networkTestEnv->launchAsync(std::forward<Lambda>(func));
     }
 
     CatalogManagerReplicaSet* catalogManager() const;

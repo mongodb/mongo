@@ -40,7 +40,8 @@ namespace mongo {
 
 namespace executor {
 
-NetworkTestEnv::NetworkTestEnv(NetworkInterfaceMock* network) : _mockNetwork(network) {}
+NetworkTestEnv::NetworkTestEnv(repl::ReplicationExecutor* executor, NetworkInterfaceMock* network)
+    : _executor(executor), _mockNetwork(network) {}
 
 void NetworkTestEnv::onCommand(OnCommandFunction func) {
     _mockNetwork->enterNetwork();
@@ -87,9 +88,8 @@ void NetworkTestEnv::onFindCommand(OnFindCommandFunction func) {
     });
 }
 
-void NetworkTestEnv::startUp(repl::ReplicationExecutor* executor) {
-    _executorThread = stdx::thread(
-        std::bind([](repl::ReplicationExecutor* executorPtr) { executorPtr->run(); }, executor));
+void NetworkTestEnv::startUp() {
+    _executorThread = stdx::thread([this] { _executor->run(); });
 }
 
 void NetworkTestEnv::shutDown() {
