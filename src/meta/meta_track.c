@@ -255,7 +255,20 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int need_sync, int unroll)
 	if (unroll || ret != 0 || !need_sync || session->meta_dhandle == NULL)
 		return (ret);
 
-	WT_TRET(__wt_metadata_sync(session));
+	/* If we're logging, make sure the metadata update was flushed. */
+	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED)) {
+		if (!FLD_ISSET(S2C(session)->txn_logsync,
+		    WT_LOG_DSYNC | WT_LOG_FSYNC))
+			WT_WITH_DHANDLE(session, session->meta_dhandle,
+			    ret = __wt_txn_checkpoint_log(session,
+			    0, WT_TXN_LOG_CKPT_SYNC, NULL));
+	} else {
+		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		    ret = __wt_checkpoint(session, NULL));
+		WT_RET(ret);
+		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		    ret = __wt_checkpoint_sync(session, NULL));
+	}
 
 	return (ret);
 }
