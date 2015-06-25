@@ -90,14 +90,17 @@ void
 __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
+	txn_global = &S2C(session)->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
 
 	WT_ASSERT(session,
 	    txn_state->snap_min == WT_TXN_NONE ||
 	    session->txn.isolation == WT_ISO_READ_UNCOMMITTED ||
+	    txn_state->snap_min == txn_global->checkpoint_snap_min ||
 	    !__wt_txn_visible_all(session, txn_state->snap_min));
 
 	txn_state->snap_min = WT_TXN_NONE;

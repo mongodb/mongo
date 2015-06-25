@@ -1257,15 +1257,16 @@ __rec_child_deleted(
 			__wt_free(session, ref->addr);
 		}
 		ref->addr = NULL;
-	} else {
-		/*
-		 * There are deleted child pages that we can't discard
-		 * immediately: keep the page dirty so they are eventually
-		 * freed.
-		 */
+	}
+	
+	/*
+	 * If there are deleted child pages that we can't discard immediately,
+	 * keep the page dirty so they are eventually freed.
+	 */
+	if (ref->addr != NULL) {
 		r->leave_dirty = 1;
 
-		/* If this page cannot be evicted, quit now. */
+		/* This page cannot be evicted, quit now. */
 		if (F_ISSET(r, WT_EVICTING))
 			return (EBUSY);
 	}
