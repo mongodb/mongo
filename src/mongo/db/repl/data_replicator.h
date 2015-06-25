@@ -43,6 +43,8 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/queue.h"
@@ -88,6 +90,17 @@ std::string toString(DataReplicatorState s);
 enum class DataReplicatorScope { ReplicateAll, ReplicateDB, ReplicateCollection };
 
 struct DataReplicatorOptions {
+    /**
+     * Function to rollback operations on the current node to a common point with
+     * the sync source.
+     *
+     * In production, this function should invoke syncRollback (rs_rollback.h) using the
+     * OperationContext to create a OplogInterfaceLocal; the HostAndPort to create a
+     * DBClientConnection for the RollbackSourceImpl. The reference to the ReplicationCoordinator
+     * can be provided separately.
+     * */
+    using RollbackFn = stdx::function<Status(OperationContext*, const OpTime&, const HostAndPort&)>;
+
     /** Function to return optime of last operation applied on this node */
     using GetMyLastOptimeFn = stdx::function<OpTime()>;
 
@@ -113,6 +126,7 @@ struct DataReplicatorOptions {
     BSONObj filterCriteria;
 
     Applier::ApplyOperationFn applierFn;
+    RollbackFn rollbackFn;
     ReplicationProgressManager* replicationProgressManager = nullptr;
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
@@ -171,9 +185,16 @@ public:
     // Don't use above methods before these
     TimestampStatus initialSync();
 
-    HostAndPort getSyncSource() const;
     DataReplicatorState getState() const;
+
+    /**
+     * Waits until data replicator state becomes 'state'.
+     */
+    void waitForState(const DataReplicatorState& state);
+
+    HostAndPort getSyncSource() const;
     Timestamp getLastTimestampFetched() const;
+    Timestamp getLastTimestampApplied() const;
 
     /**
      * Number of operations in the oplog buffer.
@@ -188,6 +209,9 @@ public:
     void _setInitialSyncStorageInterface(CollectionCloner::StorageInterface* si);
 
 private:
+    void _setState(const DataReplicatorState& newState);
+    void _setState_inlock(const DataReplicatorState& newState);
+
     // Returns OK when there is a good syncSource at _syncSource.
     Status _ensureGoodSyncSource_inlock();
 
@@ -195,6 +219,7 @@ private:
     void _resumeFinish(CallbackArgs cbData);
     void _onOplogFetchFinish(const QueryResponseStatus& fetchResult,
                              Fetcher::NextAction* nextAction);
+    void _rollbackOperations(const CallbackArgs& cbData);
     void _doNextActions();
     void _doNextActions_InitialSync_inlock();
     void _doNextActions_Rollback_inlock();
@@ -257,6 +282,8 @@ private:
 
     // Protects member data of this DataReplicator.
     mutable stdx::mutex _mutex;  // (S)
+
+    stdx::condition_variable _stateCondition;
     DataReplicatorState _state;  // (MX)
 
     // initial sync state

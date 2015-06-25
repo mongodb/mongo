@@ -516,6 +516,7 @@ DataReplicator::DataReplicator(DataReplicatorOptions opts, ReplicationExecutor* 
       _applierPaused(false),
       _oplogBuffer(kOplogBufferSize, &getSize) {
     uassert(ErrorCodes::BadValue, "invalid applier function", _opts.applierFn);
+    uassert(ErrorCodes::BadValue, "invalid rollback function", _opts.rollbackFn);
     uassert(ErrorCodes::BadValue,
             "invalid replication progress manager",
             _opts.replicationProgressManager);
@@ -536,7 +537,7 @@ Status DataReplicator::start() {
                       str::stream() << "Already started in another state: " << toString(_state));
     }
 
-    _state = DataReplicatorState::Steady;
+    _setState_inlock(DataReplicatorState::Steady);
     _applierPaused = false;
     _fetcherPaused = false;
     _reporterPaused = false;
@@ -553,19 +554,31 @@ Status DataReplicator::pause() {
     return Status::OK();
 }
 
-HostAndPort DataReplicator::getSyncSource() const {
-    LockGuard lk(_mutex);
-    return _syncSource;
-}
-
 DataReplicatorState DataReplicator::getState() const {
     LockGuard lk(_mutex);
     return _state;
 }
 
+void DataReplicator::waitForState(const DataReplicatorState& state) {
+    UniqueLock lk(_mutex);
+    while (_state != state) {
+        _stateCondition.wait(lk);
+    }
+}
+
+HostAndPort DataReplicator::getSyncSource() const {
+    LockGuard lk(_mutex);
+    return _syncSource;
+}
+
 Timestamp DataReplicator::getLastTimestampFetched() const {
     LockGuard lk(_mutex);
     return _lastTimestampFetched;
+}
+
+Timestamp DataReplicator::getLastTimestampApplied() const {
+    LockGuard lk(_mutex);
+    return _lastTimestampApplied;
 }
 
 size_t DataReplicator::getOplogBufferCount() const {
@@ -698,7 +711,7 @@ TimestampStatus DataReplicator::initialSync() {
         }
     }
 
-    _state = DataReplicatorState::InitialSync;
+    _setState_inlock(DataReplicatorState::InitialSync);
 
     // The reporter is paused for the duration of the initial sync, so cancel just in case.
     if (_reporter) {
@@ -900,7 +913,7 @@ void DataReplicator::_doNextActions() {
     if (_onShutdown.isValid()) {
         if (!_anyActiveHandles_inlock()) {
             _exec->signalEvent(_onShutdown);
-            _state = DataReplicatorState::Uninitialized;
+            _setState_inlock(DataReplicatorState::Uninitialized);
         }
         return;
     }
@@ -927,7 +940,7 @@ void DataReplicator::_doNextActions() {
 void DataReplicator::_doNextActions_InitialSync_inlock() {
     if (!_initialSyncState) {
         // TODO: Error case?, reset to uninit'd
-        _state = DataReplicatorState::Uninitialized;
+        _setState_inlock(DataReplicatorState::Uninitialized);
         log() << "_initialSyncState, so resetting state to Uninitialized";
         return;
     }
@@ -942,7 +955,7 @@ void DataReplicator::_doNextActions_InitialSync_inlock() {
                 log() << "Applier done, initial sync done, end timestamp: "
                       << _initialSyncState->stopTimestamp
                       << " , last applier: " << _lastTimestampApplied;
-                _state = DataReplicatorState::Uninitialized;
+                _setState_inlock(DataReplicatorState::Uninitialized);
                 _initialSyncState->setStatus(Status::OK());
                 _exec->signalEvent(_initialSyncState->finishEvent);
             } else {
@@ -954,6 +967,11 @@ void DataReplicator::_doNextActions_InitialSync_inlock() {
 }
 
 void DataReplicator::_doNextActions_Rollback_inlock() {
+    auto s = _ensureGoodSyncSource_inlock();
+    if (!s.isOK()) {
+        warning() << "Valid sync source unavailable for rollback: " << s;
+    }
+    _doNextActions_Steady_inlock();
     // TODO: check rollback state and do next actions
     // move from rollback phase to rollback phase via scheduled work in exec
 }
@@ -978,10 +996,10 @@ void DataReplicator::_doNextActions_Steady_inlock() {
         if (!scheduleResult.isOK()) {
             severe() << "failed to schedule sync source refresh: " << scheduleResult.getStatus()
                      << ". stopping data replicator";
-            _state = DataReplicatorState::Uninitialized;
+            _setState_inlock(DataReplicatorState::Uninitialized);
             return;
         }
-    } else {
+    } else if (!_fetcherPaused) {
         // Check if active fetch, if not start one
         if (!_fetcher || !_fetcher->isActive()) {
             _scheduleFetch_inlock();
@@ -1164,6 +1182,16 @@ Status DataReplicator::_scheduleFetch() {
     return _scheduleFetch_inlock();
 }
 
+void DataReplicator::_setState(const DataReplicatorState& newState) {
+    LockGuard lk(_mutex);
+    _setState_inlock(newState);
+}
+
+void DataReplicator::_setState_inlock(const DataReplicatorState& newState) {
+    _state = newState;
+    _stateCondition.notify_all();
+}
+
 Status DataReplicator::_ensureGoodSyncSource_inlock() {
     if (_syncSource.empty()) {
         _syncSource = _opts.syncSourceSelector->chooseNewSyncSource();
@@ -1293,37 +1321,68 @@ void DataReplicator::_onOplogFetchFinish(const StatusWith<Fetcher::QueryResponse
         // Got an error, now decide what to do...
         switch (status.code()) {
             case ErrorCodes::OplogStartMissing: {
+                _setState(DataReplicatorState::Rollback);
                 // possible rollback
-                _rollbackCommonOptime = findCommonPoint(_syncSource, _lastTimestampApplied);
-                if (_rollbackCommonOptime.isNull()) {
-                    auto s = _opts.setFollowerMode(MemberState::RS_RECOVERING);
-                    if (!s) {
-                        error() << "Failed to transition to RECOVERING when "
-                                   "we couldn't find oplog start position ("
-                                << _fetcher->getStartTimestamp().toString()
-                                << ") from sync source: " << _syncSource.toString();
-                    }
-                    Date_t until{_exec->now() +
-                                 _opts.blacklistSyncSourcePenaltyForOplogStartMissing};
-                    _opts.syncSourceSelector->blacklistSyncSource(_syncSource, until);
-                } else {
-                    // TODO: cleanup state/restart -- set _lastApplied, and other stuff
+                auto scheduleResult = _exec->scheduleDBWork(
+                    stdx::bind(&DataReplicator::_rollbackOperations, this, stdx::placeholders::_1));
+                if (!scheduleResult.isOK()) {
+                    error() << "Failed to schedule rollback work: " << scheduleResult.getStatus();
+                    _setState_inlock(DataReplicatorState::Uninitialized);
+                    return;
                 }
+                LockGuard lk(_mutex);
+                _applierPaused = true;
+                _fetcherPaused = true;
+                _reporterPaused = true;
                 break;
             }
-            case ErrorCodes::InvalidSyncSource:
-            // Error, sync source
-            // fallthrough
-            default:
+            default: {
                 Date_t until{_exec->now() +
                              _opts.blacklistSyncSourcePenaltyForNetworkConnectionError};
                 _opts.syncSourceSelector->blacklistSyncSource(_syncSource, until);
+                LockGuard lk(_mutex);
+                _syncSource = HostAndPort();
+            }
         }
-        LockGuard lk(_mutex);
-        _syncSource = HostAndPort();
     }
 
     _doNextActions();
 }
+
+void DataReplicator::_rollbackOperations(const CallbackArgs& cbData) {
+    if (cbData.status.code() == ErrorCodes::CallbackCanceled) {
+        return;
+    }
+    invariant(cbData.txn);
+
+    OpTime lastOpTimeWritten(getLastTimestampApplied(), OpTime::kDefaultTerm);
+    HostAndPort syncSource = getSyncSource();
+    auto rollbackStatus = _opts.rollbackFn(cbData.txn, lastOpTimeWritten, syncSource);
+    if (!rollbackStatus.isOK()) {
+        error() << "Failed rollback: " << rollbackStatus;
+        Date_t until{_exec->now() + _opts.blacklistSyncSourcePenaltyForOplogStartMissing};
+        _opts.syncSourceSelector->blacklistSyncSource(_syncSource, until);
+        LockGuard lk(_mutex);
+        _syncSource = HostAndPort();
+        _fetcher.reset();
+        _fetcherPaused = false;
+    } else {
+        // Go back to steady sync after a successful rollback.
+        auto s = _opts.setFollowerMode(MemberState::RS_SECONDARY);
+        if (!s) {
+            error() << "Failed to transition to SECONDARY after rolling back from sync source: "
+                    << _syncSource.toString();
+        }
+        // TODO: cleanup state/restart -- set _lastApplied, and other stuff
+        LockGuard lk(_mutex);
+        _applierPaused = false;
+        _fetcherPaused = false;
+        _reporterPaused = false;
+        _setState_inlock(DataReplicatorState::Steady);
+    }
+
+    _doNextActions();
+};
+
 }  // namespace repl
 }  // namespace mongo

@@ -153,6 +153,8 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
 DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCoord) {
     DataReplicatorOptions options;
     options.applierFn = [](OperationContext*, const BSONObj&) -> Status { return Status::OK(); };
+    options.rollbackFn =
+        [](OperationContext*, const OpTime&, const HostAndPort&) { return Status::OK(); };
     options.replicationProgressManager = replCoord;
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastOptime(); };
     options.setMyLastOptime =
