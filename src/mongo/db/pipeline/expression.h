@@ -31,6 +31,9 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
+#include <map>
+#include <string>
+#include <vector>
 
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
@@ -225,7 +228,7 @@ public:
      */
     class ObjectCtx {
     public:
-        ObjectCtx(int options);
+        explicit ObjectCtx(int options);
         static const int DOCUMENT_OK = 0x0001;
         static const int TOP_LEVEL = 0x0002;
         static const int INCLUSION_OK = 0x0004;
@@ -300,10 +303,9 @@ protected:
 /// Inherit from ExpressionVariadic or ExpressionFixedArity instead of directly from this class.
 class ExpressionNary : public Expression {
 public:
-    // virtuals from Expression
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual Value serialize(bool explain) const;
-    virtual void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(bool explain) const override;
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const override;
 
     /*
       Add an operand to the n-ary expression.
@@ -359,7 +361,7 @@ class ExpressionVariadic : public ExpressionNaryBase<SubClass> {};
 template <typename SubClass, int NArgs>
 class ExpressionFixedArity : public ExpressionNaryBase<SubClass> {
 public:
-    virtual void validateArguments(const Expression::ExpressionVector& args) const {
+    void validateArguments(const Expression::ExpressionVector& args) const override {
         uassert(16020,
                 mongoutils::str::stream() << "Expression " << this->getOpName() << " takes exactly "
                                           << NArgs << " arguments. " << args.size()
@@ -375,42 +377,38 @@ class ExpressionAbs final : public ExpressionFixedArity<ExpressionAbs, 1> {
 };
 
 
-class ExpressionAdd : public ExpressionVariadic<ExpressionAdd> {
+class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
 public:
-    // virtuals from Expression
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
-    virtual bool isAssociativeAndCommutative() const {
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+    bool isAssociativeAndCommutative() const final {
         return true;
     }
 };
 
 
-class ExpressionAllElementsTrue : public ExpressionFixedArity<ExpressionAllElementsTrue, 1> {
+class ExpressionAllElementsTrue final : public ExpressionFixedArity<ExpressionAllElementsTrue, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionAnd : public ExpressionVariadic<ExpressionAnd> {
+class ExpressionAnd final : public ExpressionVariadic<ExpressionAnd> {
 public:
-    // virtuals from Expression
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
-    virtual bool isAssociativeAndCommutative() const {
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+    bool isAssociativeAndCommutative() const final {
         return true;
     }
 };
 
 
-class ExpressionAnyElementTrue : public ExpressionFixedArity<ExpressionAnyElementTrue, 1> {
+class ExpressionAnyElementTrue final : public ExpressionFixedArity<ExpressionAnyElementTrue, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
@@ -421,29 +419,29 @@ public:
 };
 
 
-class ExpressionCoerceToBool : public Expression {
+class ExpressionCoerceToBool final : public Expression {
 public:
-    // virtuals from ExpressionNary
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const;
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual Value serialize(bool explain) const;
+    boost::intrusive_ptr<Expression> optimize() final;
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    Value evaluateInternal(Variables* vars) const final;
+    Value serialize(bool explain) const final;
 
     static boost::intrusive_ptr<ExpressionCoerceToBool> create(
         const boost::intrusive_ptr<Expression>& pExpression);
 
 
 private:
-    ExpressionCoerceToBool(const boost::intrusive_ptr<Expression>& pExpression);
+    explicit ExpressionCoerceToBool(const boost::intrusive_ptr<Expression>& pExpression);
 
     boost::intrusive_ptr<Expression> pExpression;
 };
 
 
-class ExpressionCompare : public ExpressionFixedArity<ExpressionCompare, 2> {
+class ExpressionCompare final : public ExpressionFixedArity<ExpressionCompare, 2> {
 public:
-    /** Enumeration of comparison operators. Any changes to these values require adjustment of
-     *  the lookup table in the implementation.
+    /**
+     * Enumeration of comparison operators. Any changes to these values require adjustment of
+     * the lookup table in the implementation.
      */
     enum CmpOp {
         EQ = 0,   // return true for a == b, false otherwise
@@ -455,26 +453,24 @@ public:
         CMP = 6,  // return -1, 0, 1 for a < b, a == b, a > b
     };
 
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement bsonExpr,
                                                   const VariablesParseState& vps,
                                                   CmpOp cmpOp);
 
-    ExpressionCompare(CmpOp cmpOp);
+    explicit ExpressionCompare(CmpOp cmpOp);
 
 private:
     CmpOp cmpOp;
 };
 
 
-class ExpressionConcat : public ExpressionVariadic<ExpressionConcat> {
+class ExpressionConcat final : public ExpressionVariadic<ExpressionConcat> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
@@ -485,26 +481,25 @@ public:
 };
 
 
-class ExpressionCond : public ExpressionFixedArity<ExpressionCond, 3> {
+class ExpressionCond final : public ExpressionFixedArity<ExpressionCond, 3> {
     typedef ExpressionFixedArity<ExpressionCond, 3> Base;
 
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
 };
 
 
-class ExpressionConstant : public Expression {
+class ExpressionConstant final : public Expression {
 public:
-    // virtuals from Expression
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const;
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
-    virtual Value serialize(bool explain) const;
+    boost::intrusive_ptr<Expression> optimize() final;
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    Value evaluateInternal(Variables* vars) const final;
+    Value serialize(bool explain) const final;
+
+    const char* getOpName() const;
 
     static boost::intrusive_ptr<ExpressionConstant> create(const Value& pValue);
     static boost::intrusive_ptr<Expression> parse(BSONElement bsonExpr,
@@ -518,18 +513,17 @@ public:
     Value getValue() const;
 
 private:
-    ExpressionConstant(const Value& pValue);
+    explicit ExpressionConstant(const Value& pValue);
 
     Value pValue;
 };
 
-class ExpressionDateToString : public Expression {
+class ExpressionDateToString final : public Expression {
 public:
-    // virtuals from Expression
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual Value serialize(bool explain) const;
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const;
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+    Value evaluateInternal(Variables* vars) const final;
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
 
@@ -550,11 +544,10 @@ private:
     boost::intrusive_ptr<Expression> _date;
 };
 
-class ExpressionDayOfMonth : public ExpressionFixedArity<ExpressionDayOfMonth, 1> {
+class ExpressionDayOfMonth final : public ExpressionFixedArity<ExpressionDayOfMonth, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     static inline int extract(const tm& tm) {
         return tm.tm_mday;
@@ -562,11 +555,10 @@ public:
 };
 
 
-class ExpressionDayOfWeek : public ExpressionFixedArity<ExpressionDayOfWeek, 1> {
+class ExpressionDayOfWeek final : public ExpressionFixedArity<ExpressionDayOfWeek, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     // MySQL uses 1-7, tm uses 0-6
     static inline int extract(const tm& tm) {
@@ -575,11 +567,10 @@ public:
 };
 
 
-class ExpressionDayOfYear : public ExpressionFixedArity<ExpressionDayOfYear, 1> {
+class ExpressionDayOfYear final : public ExpressionFixedArity<ExpressionDayOfYear, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     // MySQL uses 1-366, tm uses 0-365
     static inline int extract(const tm& tm) {
@@ -588,21 +579,19 @@ public:
 };
 
 
-class ExpressionDivide : public ExpressionFixedArity<ExpressionDivide, 2> {
+class ExpressionDivide final : public ExpressionFixedArity<ExpressionDivide, 2> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionFieldPath : public Expression {
+class ExpressionFieldPath final : public Expression {
 public:
-    // virtuals from Expression
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const;
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual Value serialize(bool explain) const;
+    boost::intrusive_ptr<Expression> optimize() final;
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    Value evaluateInternal(Variables* vars) const final;
+    Value serialize(bool explain) const final;
 
     /*
       Create a field path expression using old semantics (rooted off of CURRENT).
@@ -655,7 +644,6 @@ private:
 
 class ExpressionFilter final : public Expression {
 public:
-    // virtuals from Expression
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluateInternal(Variables* vars) const final;
@@ -680,11 +668,10 @@ private:
 };
 
 
-class ExpressionHour : public ExpressionFixedArity<ExpressionHour, 1> {
+class ExpressionHour final : public ExpressionFixedArity<ExpressionHour, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     static inline int extract(const tm& tm) {
         return tm.tm_hour;
@@ -692,21 +679,19 @@ public:
 };
 
 
-class ExpressionIfNull : public ExpressionFixedArity<ExpressionIfNull, 2> {
+class ExpressionIfNull final : public ExpressionFixedArity<ExpressionIfNull, 2> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionLet : public Expression {
+class ExpressionLet final : public Expression {
 public:
-    // virtuals from Expression
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual Value serialize(bool explain) const;
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const;
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+    Value evaluateInternal(Variables* vars) const final;
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
 
@@ -728,13 +713,12 @@ private:
     boost::intrusive_ptr<Expression> _subExpression;
 };
 
-class ExpressionMap : public Expression {
+class ExpressionMap final : public Expression {
 public:
-    // virtuals from Expression
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual Value serialize(bool explain) const;
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const;
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+    Value evaluateInternal(Variables* vars) const final;
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
 
@@ -751,31 +735,28 @@ private:
     boost::intrusive_ptr<Expression> _each;
 };
 
-class ExpressionMeta : public Expression {
+class ExpressionMeta final : public Expression {
 public:
-    // virtuals from Expression
-    virtual Value serialize(bool explain) const;
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const;
+    Value serialize(bool explain) const final;
+    Value evaluateInternal(Variables* vars) const final;
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
 };
 
-class ExpressionMillisecond : public ExpressionFixedArity<ExpressionMillisecond, 1> {
+class ExpressionMillisecond final : public ExpressionFixedArity<ExpressionMillisecond, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     static int extract(const long long date);
 };
 
 
-class ExpressionMinute : public ExpressionFixedArity<ExpressionMinute, 1> {
+class ExpressionMinute final : public ExpressionFixedArity<ExpressionMinute, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     static int extract(const tm& tm) {
         return tm.tm_min;
@@ -783,30 +764,27 @@ public:
 };
 
 
-class ExpressionMod : public ExpressionFixedArity<ExpressionMod, 2> {
+class ExpressionMod final : public ExpressionFixedArity<ExpressionMod, 2> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionMultiply : public ExpressionVariadic<ExpressionMultiply> {
+class ExpressionMultiply final : public ExpressionVariadic<ExpressionMultiply> {
 public:
-    // virtuals from Expression
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
-    virtual bool isAssociativeAndCommutative() const {
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+    bool isAssociativeAndCommutative() const final {
         return true;
     }
 };
 
 
-class ExpressionMonth : public ExpressionFixedArity<ExpressionMonth, 1> {
+class ExpressionMonth final : public ExpressionFixedArity<ExpressionMonth, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     // MySQL uses 1-12, tm uses 0-11
     static inline int extract(const tm& tm) {
@@ -815,23 +793,21 @@ public:
 };
 
 
-class ExpressionNot : public ExpressionFixedArity<ExpressionNot, 1> {
+class ExpressionNot final : public ExpressionFixedArity<ExpressionNot, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionObject : public Expression {
+class ExpressionObject final : public Expression {
 public:
-    // virtuals from Expression
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual bool isSimple();
-    virtual void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const;
+    boost::intrusive_ptr<Expression> optimize() final;
+    bool isSimple() final;
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
     /** Only evaluates non inclusion expressions.  For inclusions, use addToDocument(). */
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual Value serialize(bool explain) const;
+    Value evaluateInternal(Variables* vars) const final;
+    Value serialize(bool explain) const final;
 
     /// like evaluate(), but return a Document instead of a Value-wrapped Document.
     Document evaluateDocument(Variables* vars) const;
@@ -915,7 +891,7 @@ public:
     }
 
 private:
-    ExpressionObject(bool atRoot);
+    explicit ExpressionObject(bool atRoot);
 
     // Mapping from fieldname to the Expression that generates its value.
     // NULL expression means inclusion from source document.
@@ -930,23 +906,21 @@ private:
 };
 
 
-class ExpressionOr : public ExpressionVariadic<ExpressionOr> {
+class ExpressionOr final : public ExpressionVariadic<ExpressionOr> {
 public:
-    // virtuals from Expression
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
-    virtual bool isAssociativeAndCommutative() const {
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+    bool isAssociativeAndCommutative() const final {
         return true;
     }
 };
 
 
-class ExpressionSecond : public ExpressionFixedArity<ExpressionSecond, 1> {
+class ExpressionSecond final : public ExpressionFixedArity<ExpressionSecond, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     static inline int extract(const tm& tm) {
         return tm.tm_sec;
@@ -954,129 +928,116 @@ public:
 };
 
 
-class ExpressionSetDifference : public ExpressionFixedArity<ExpressionSetDifference, 2> {
+class ExpressionSetDifference final : public ExpressionFixedArity<ExpressionSetDifference, 2> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionSetEquals : public ExpressionVariadic<ExpressionSetEquals> {
+class ExpressionSetEquals final : public ExpressionVariadic<ExpressionSetEquals> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
-    virtual void validateArguments(const ExpressionVector& args) const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+    void validateArguments(const ExpressionVector& args) const final;
 };
 
 
-class ExpressionSetIntersection : public ExpressionVariadic<ExpressionSetIntersection> {
+class ExpressionSetIntersection final : public ExpressionVariadic<ExpressionSetIntersection> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
-    virtual bool isAssociativeAndCommutative() const {
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+    bool isAssociativeAndCommutative() const final {
         return true;
     }
 };
 
 
+// Not final, inherited from for optimizations.
 class ExpressionSetIsSubset : public ExpressionFixedArity<ExpressionSetIsSubset, 2> {
 public:
-    // virtuals from ExpressionNary
-    virtual boost::intrusive_ptr<Expression> optimize();
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value evaluateInternal(Variables* vars) const override;
+    const char* getOpName() const final;
 
 private:
     class Optimized;
 };
 
 
-class ExpressionSetUnion : public ExpressionVariadic<ExpressionSetUnion> {
+class ExpressionSetUnion final : public ExpressionVariadic<ExpressionSetUnion> {
 public:
-    // virtuals from ExpressionNary
-    // virtual intrusive_ptr<Expression> optimize();
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
-    virtual bool isAssociativeAndCommutative() const {
+    // intrusive_ptr<Expression> optimize() final;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+    bool isAssociativeAndCommutative() const final {
         return true;
     }
 };
 
 
-class ExpressionIsArray : public ExpressionFixedArity<ExpressionIsArray, 1> {
+class ExpressionIsArray final : public ExpressionFixedArity<ExpressionIsArray, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionSize : public ExpressionFixedArity<ExpressionSize, 1> {
+class ExpressionSize final : public ExpressionFixedArity<ExpressionSize, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionStrcasecmp : public ExpressionFixedArity<ExpressionStrcasecmp, 2> {
+class ExpressionStrcasecmp final : public ExpressionFixedArity<ExpressionStrcasecmp, 2> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionSubstr : public ExpressionFixedArity<ExpressionSubstr, 3> {
+class ExpressionSubstr final : public ExpressionFixedArity<ExpressionSubstr, 3> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionSubtract : public ExpressionFixedArity<ExpressionSubtract, 2> {
+class ExpressionSubtract final : public ExpressionFixedArity<ExpressionSubtract, 2> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionToLower : public ExpressionFixedArity<ExpressionToLower, 1> {
+class ExpressionToLower final : public ExpressionFixedArity<ExpressionToLower, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionToUpper : public ExpressionFixedArity<ExpressionToUpper, 1> {
+class ExpressionToUpper final : public ExpressionFixedArity<ExpressionToUpper, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 };
 
 
-class ExpressionWeek : public ExpressionFixedArity<ExpressionWeek, 1> {
+class ExpressionWeek final : public ExpressionFixedArity<ExpressionWeek, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     static int extract(const tm& tm);
 };
 
 
-class ExpressionYear : public ExpressionFixedArity<ExpressionYear, 1> {
+class ExpressionYear final : public ExpressionFixedArity<ExpressionYear, 1> {
 public:
-    // virtuals from ExpressionNary
-    virtual Value evaluateInternal(Variables* vars) const;
-    virtual const char* getOpName() const;
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
 
     // tm_year is years since 1990
     static int extract(const tm& tm) {
