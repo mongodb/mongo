@@ -38,12 +38,14 @@
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* TextStage::kStageType = "TEXT";
@@ -177,7 +179,7 @@ vector<PlanStage*> TextStage::getChildren() const {
     return empty;
 }
 
-PlanStageStats* TextStage::getStats() {
+unique_ptr<PlanStageStats> TextStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     // Add a BSON representation of the filter to the stats tree, if there is one.
@@ -187,9 +189,9 @@ PlanStageStats* TextStage::getStats() {
         _commonStats.filter = bob.obj();
     }
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_TEXT));
-    ret->specific.reset(new TextStats(_specificStats));
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_TEXT);
+    ret->specific = make_unique<TextStats>(_specificStats);
+    return ret;
 }
 
 const CommonStats* TextStage::getCommonStats() const {

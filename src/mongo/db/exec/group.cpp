@@ -35,11 +35,13 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 namespace {
 
@@ -278,13 +280,12 @@ vector<PlanStage*> GroupStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* GroupStage::getStats() {
+unique_ptr<PlanStageStats> GroupStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_GROUP));
-    GroupStats* groupStats = new GroupStats(_specificStats);
-    ret->specific.reset(groupStats);
-    ret->children.push_back(_child->getStats());
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_GROUP);
+    ret->specific = make_unique<GroupStats>(_specificStats);
+    ret->children.push_back(_child->getStats().release());
+    return ret;
 }
 
 const CommonStats* GroupStage::getCommonStats() const {

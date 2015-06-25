@@ -89,7 +89,7 @@ public:
     virtual std::vector<PlanStage*> getChildren() const;
 
     virtual StageType stageType() const;
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
     virtual const CommonStats* getCommonStats() const;
     virtual const SpecificStats* getSpecificStats() const;
 

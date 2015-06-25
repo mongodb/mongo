@@ -31,10 +31,13 @@
 #include "mongo/db/exec/eof.h"
 
 #include "mongo/db/exec/scoped_timer.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* EOFStage::kStageType = "EOF";
@@ -71,9 +74,9 @@ vector<PlanStage*> EOFStage::getChildren() const {
     return empty;
 }
 
-PlanStageStats* EOFStage::getStats() {
+unique_ptr<PlanStageStats> EOFStage::getStats() {
     _commonStats.isEOF = isEOF();
-    return new PlanStageStats(_commonStats, STAGE_EOF);
+    return make_unique<PlanStageStats>(_commonStats, STAGE_EOF);
 }
 
 const CommonStats* EOFStage::getCommonStats() const {

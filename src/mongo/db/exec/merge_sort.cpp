@@ -31,14 +31,16 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::list;
 using std::string;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* MergeSortStage::kStageType = "SORT_MERGE";
@@ -267,17 +269,17 @@ vector<PlanStage*> MergeSortStage::getChildren() const {
     return _children;
 }
 
-PlanStageStats* MergeSortStage::getStats() {
+unique_ptr<PlanStageStats> MergeSortStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     _specificStats.sortPattern = _pattern;
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SORT_MERGE));
-    ret->specific.reset(new MergeSortStats(_specificStats));
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_SORT_MERGE);
+    ret->specific = make_unique<MergeSortStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
-        ret->children.push_back(_children[i]->getStats());
+        ret->children.push_back(_children[i]->getStats().release());
     }
-    return ret.release();
+    return ret;
 }
 
 const CommonStats* MergeSortStage::getCommonStats() const {

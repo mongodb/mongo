@@ -83,7 +83,7 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
     // because multi plan runner will need its own stats
     // trees for explain.
     for (size_t i = 0; i < candidates.size(); ++i) {
-        statTrees.push_back(candidates[i].root->getStats());
+        statTrees.push_back(candidates[i].root->getStats().release());
     }
 
     // Holds (score, candidateInndex).

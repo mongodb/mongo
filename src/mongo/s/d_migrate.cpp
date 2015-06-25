@@ -102,6 +102,7 @@ using namespace std::chrono;
 using std::list;
 using std::set;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 namespace {
@@ -495,9 +496,8 @@ public:
             std::lock_guard<std::mutex> sl(_mutex);
 
             invariant(_deleteNotifyExec.get() == NULL);
-            std::unique_ptr<WorkingSet> ws = stdx::make_unique<WorkingSet>();
-            std::unique_ptr<DeleteNotificationStage> dns =
-                stdx::make_unique<DeleteNotificationStage>();
+            unique_ptr<WorkingSet> ws = stdx::make_unique<WorkingSet>();
+            unique_ptr<DeleteNotificationStage> dns = stdx::make_unique<DeleteNotificationStage>();
             // Takes ownership of 'ws' and 'dns'.
             auto statusWithPlanExecutor = PlanExecutor::make(
                 txn, std::move(ws), std::move(dns), collection, PlanExecutor::YIELD_MANUAL);
@@ -509,7 +509,7 @@ public:
             max = Helpers::toKeyFormat(kp.extendRangeBound(_max, false));
         }
 
-        std::unique_ptr<PlanExecutor> exec(
+        unique_ptr<PlanExecutor> exec(
             InternalPlanner::indexScan(txn, collection, idx, min, max, false));
         // We can afford to yield here because any change to the base data that we might
         // miss is already being queued and will migrate in the 'transferMods' stage.
@@ -785,7 +785,7 @@ private:
         virtual void restoreState(OperationContext* opCtx) {
             invariant(false);
         }
-        virtual PlanStageStats* getStats() {
+        virtual unique_ptr<PlanStageStats> getStats() {
             invariant(false);
             return NULL;
         }
@@ -826,7 +826,7 @@ private:
     // Is migration currently in critical section. This can be used to block new writes.
     bool _inCriticalSection;  // (M)
 
-    std::unique_ptr<PlanExecutor> _deleteNotifyExec;  // (M)
+    unique_ptr<PlanExecutor> _deleteNotifyExec;  // (M)
 
     // List of _id of documents that were modified that must be re-cloned.
     list<BSONObj> _reload;  // (M)

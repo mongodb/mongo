@@ -32,11 +32,14 @@
 
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 NearStage::NearStage(OperationContext* txn,
                      WorkingSet* workingSet,
@@ -342,10 +345,10 @@ vector<PlanStage*> NearStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* NearStage::getStats() {
-    PlanStageStats* statsClone = _stats->clone();
+unique_ptr<PlanStageStats> NearStage::getStats() {
+    unique_ptr<PlanStageStats> statsClone(_stats->clone());
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
-        statsClone->children.push_back(_childrenIntervals[i]->covering->getStats());
+        statsClone->children.push_back(_childrenIntervals[i]->covering->getStats().release());
     }
     return statsClone;
 }

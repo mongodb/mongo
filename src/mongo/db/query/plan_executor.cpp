@@ -92,7 +92,7 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
 StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
                                                         unique_ptr<WorkingSet> ws,
                                                         unique_ptr<PlanStage> rt,
-                                                        const std::string& ns,
+                                                        const string& ns,
                                                         YieldPolicy yieldPolicy) {
     return PlanExecutor::make(
         opCtx, std::move(ws), std::move(rt), nullptr, nullptr, nullptr, ns, yieldPolicy);
@@ -134,7 +134,7 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* txn,
                                                         unique_ptr<QuerySolution> qs,
                                                         unique_ptr<CanonicalQuery> cq,
                                                         const Collection* collection,
-                                                        const std::string& ns,
+                                                        const string& ns,
                                                         YieldPolicy yieldPolicy) {
     unique_ptr<PlanExecutor> exec(new PlanExecutor(
         txn, std::move(ws), std::move(rt), std::move(qs), std::move(cq), collection, ns));
@@ -154,7 +154,7 @@ PlanExecutor::PlanExecutor(OperationContext* opCtx,
                            unique_ptr<QuerySolution> qs,
                            unique_ptr<CanonicalQuery> cq,
                            const Collection* collection,
-                           const std::string& ns)
+                           const string& ns)
     : _opCtx(opCtx),
       _collection(collection),
       _cq(std::move(cq)),
@@ -213,7 +213,7 @@ Status PlanExecutor::pickBestPlan(YieldPolicy policy) {
 PlanExecutor::~PlanExecutor() {}
 
 // static
-std::string PlanExecutor::statestr(ExecState s) {
+string PlanExecutor::statestr(ExecState s) {
     if (PlanExecutor::ADVANCED == s) {
         return "ADVANCED";
     } else if (PlanExecutor::IS_EOF == s) {
@@ -238,7 +238,7 @@ CanonicalQuery* PlanExecutor::getCanonicalQuery() const {
     return _cq.get();
 }
 
-PlanStageStats* PlanExecutor::getStats() const {
+unique_ptr<PlanStageStats> PlanExecutor::getStats() const {
     return _root->getStats();
 }
 
@@ -464,7 +464,7 @@ void PlanExecutor::deregisterExec() {
     _safety.reset();
 }
 
-void PlanExecutor::kill(std::string reason) {
+void PlanExecutor::kill(string reason) {
     _killReason = std::move(reason);
     _collection = NULL;
 

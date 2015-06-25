@@ -33,10 +33,13 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/storage/record_fetcher.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 
@@ -51,7 +54,7 @@ MultiIteratorStage::MultiIteratorStage(OperationContext* txn,
     member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
 }
 
-void MultiIteratorStage::addIterator(std::unique_ptr<RecordCursor> it) {
+void MultiIteratorStage::addIterator(unique_ptr<RecordCursor> it) {
     _iterators.push_back(std::move(it));
 }
 
@@ -142,11 +145,11 @@ vector<PlanStage*> MultiIteratorStage::getChildren() const {
     return empty;
 }
 
-PlanStageStats* MultiIteratorStage::getStats() {
-    std::unique_ptr<PlanStageStats> ret(
-        new PlanStageStats(CommonStats(kStageType), STAGE_MULTI_ITERATOR));
-    ret->specific.reset(new CollectionScanStats());
-    return ret.release();
+unique_ptr<PlanStageStats> MultiIteratorStage::getStats() {
+    unique_ptr<PlanStageStats> ret =
+        make_unique<PlanStageStats>(CommonStats(kStageType), STAGE_MULTI_ITERATOR);
+    ret->specific = make_unique<CollectionScanStats>();
+    return ret;
 }
 
 }  // namespace mongo

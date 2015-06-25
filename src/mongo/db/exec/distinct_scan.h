@@ -89,7 +89,7 @@ public:
         return STAGE_DISTINCT_SCAN;
     }
 
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

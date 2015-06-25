@@ -31,11 +31,13 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* CountScan::kStageType = "COUNT_SCAN";
@@ -160,14 +162,14 @@ vector<PlanStage*> CountScan::getChildren() const {
     return empty;
 }
 
-PlanStageStats* CountScan::getStats() {
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT_SCAN));
+unique_ptr<PlanStageStats> CountScan::getStats() {
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_COUNT_SCAN);
 
-    CountScanStats* countStats = new CountScanStats(_specificStats);
+    unique_ptr<CountScanStats> countStats = make_unique<CountScanStats>(_specificStats);
     countStats->keyPattern = _specificStats.keyPattern.getOwned();
-    ret->specific.reset(countStats);
+    ret->specific = std::move(countStats);
 
-    return ret.release();
+    return ret;
 }
 
 const CommonStats* CountScan::getCommonStats() const {

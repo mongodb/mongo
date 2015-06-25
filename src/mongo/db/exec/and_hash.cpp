@@ -32,6 +32,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace {
@@ -46,6 +47,7 @@ namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 const size_t AndHashStage::kLookAheadWorks = 10;
 
@@ -502,19 +504,19 @@ vector<PlanStage*> AndHashStage::getChildren() const {
     return _children;
 }
 
-PlanStageStats* AndHashStage::getStats() {
+unique_ptr<PlanStageStats> AndHashStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     _specificStats.memLimit = _maxMemUsage;
     _specificStats.memUsage = _memUsage;
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_HASH));
-    ret->specific.reset(new AndHashStats(_specificStats));
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_AND_HASH);
+    ret->specific = make_unique<AndHashStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
-        ret->children.push_back(_children[i]->getStats());
+        ret->children.push_back(_children[i]->getStats().release());
     }
 
-    return ret.release();
+    return ret;
 }
 
 const CommonStats* AndHashStage::getCommonStats() const {

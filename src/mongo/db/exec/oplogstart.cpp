@@ -32,10 +32,13 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 const char* OplogStart::kStageType = "OPLOG_START";
 
@@ -209,11 +212,11 @@ void OplogStart::restoreState(OperationContext* opCtx) {
     }
 }
 
-PlanStageStats* OplogStart::getStats() {
-    std::unique_ptr<PlanStageStats> ret(
-        new PlanStageStats(CommonStats(kStageType), STAGE_OPLOG_START));
-    ret->specific.reset(new CollectionScanStats());
-    return ret.release();
+unique_ptr<PlanStageStats> OplogStart::getStats() {
+    unique_ptr<PlanStageStats> ret =
+        make_unique<PlanStageStats>(CommonStats(kStageType), STAGE_OPLOG_START);
+    ret->specific = make_unique<CollectionScanStats>();
+    return ret;
 }
 
 vector<PlanStage*> OplogStart::getChildren() const {

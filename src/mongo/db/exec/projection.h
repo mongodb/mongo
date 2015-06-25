@@ -92,7 +92,7 @@ public:
         return STAGE_PROJECTION;
     }
 
-    PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

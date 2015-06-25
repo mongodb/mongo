@@ -73,7 +73,7 @@ public:
     std::shared_ptr<PlanExecutor> getChildExecutor();
 
     // Returns empty PlanStageStats object
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     // Not used.
     virtual CommonStats* getCommonStats() const {

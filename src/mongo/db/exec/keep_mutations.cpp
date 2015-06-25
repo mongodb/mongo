@@ -30,11 +30,13 @@
 
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* KeepMutationsStage::kStageType = "KEEP_MUTATIONS";
@@ -140,12 +142,12 @@ vector<PlanStage*> KeepMutationsStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* KeepMutationsStage::getStats() {
+unique_ptr<PlanStageStats> KeepMutationsStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_KEEP_MUTATIONS));
-    // Takes ownership of the object returned from _child->getStats().
-    ret->children.push_back(_child->getStats());
-    return ret.release();
+    unique_ptr<PlanStageStats> ret =
+        make_unique<PlanStageStats>(_commonStats, STAGE_KEEP_MUTATIONS);
+    ret->children.push_back(_child->getStats().release());
+    return ret;
 }
 
 const CommonStats* KeepMutationsStage::getCommonStats() const {

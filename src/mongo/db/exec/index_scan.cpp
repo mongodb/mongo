@@ -39,6 +39,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -282,7 +283,7 @@ std::vector<PlanStage*> IndexScan::getChildren() const {
     return {};
 }
 
-PlanStageStats* IndexScan::getStats() {
+std::unique_ptr<PlanStageStats> IndexScan::getStats() {
     // WARNING: this could be called even if the collection was dropped.  Do not access any
     // catalog information here.
 
@@ -302,9 +303,10 @@ PlanStageStats* IndexScan::getStats() {
         _specificStats.direction = _params.direction;
     }
 
-    std::unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IXSCAN));
-    ret->specific.reset(new IndexScanStats(_specificStats));
-    return ret.release();
+    std::unique_ptr<PlanStageStats> ret =
+        stdx::make_unique<PlanStageStats>(_commonStats, STAGE_IXSCAN);
+    ret->specific = stdx::make_unique<IndexScanStats>(_specificStats);
+    return ret;
 }
 
 const CommonStats* IndexScan::getCommonStats() const {

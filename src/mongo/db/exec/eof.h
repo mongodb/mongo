@@ -55,7 +55,7 @@ public:
         return STAGE_EOF;
     }
 
-    PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

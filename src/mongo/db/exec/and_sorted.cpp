@@ -31,6 +31,7 @@
 #include "mongo/db/exec/and_common-inl.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -38,6 +39,7 @@ namespace mongo {
 using std::unique_ptr;
 using std::numeric_limits;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* AndSortedStage::kStageType = "AND_SORTED";
@@ -300,16 +302,16 @@ vector<PlanStage*> AndSortedStage::getChildren() const {
     return _children;
 }
 
-PlanStageStats* AndSortedStage::getStats() {
+unique_ptr<PlanStageStats> AndSortedStage::getStats() {
     _commonStats.isEOF = isEOF();
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_SORTED));
-    ret->specific.reset(new AndSortedStats(_specificStats));
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_AND_SORTED);
+    ret->specific = make_unique<AndSortedStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
-        ret->children.push_back(_children[i]->getStats());
+        ret->children.push_back(_children[i]->getStats().release());
     }
 
-    return ret.release();
+    return ret;
 }
 
 const CommonStats* AndSortedStage::getCommonStats() const {

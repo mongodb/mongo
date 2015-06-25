@@ -59,7 +59,7 @@ public:
         return STAGE_SKIP;
     }
 
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

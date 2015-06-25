@@ -158,7 +158,7 @@ public:
         return STAGE_SORT;
     }
 
-    PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

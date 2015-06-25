@@ -81,7 +81,7 @@ public:
         return STAGE_AND_HASH;
     }
 
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

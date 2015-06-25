@@ -31,12 +31,14 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* OrStage::kStageType = "OR";
@@ -176,7 +178,7 @@ vector<PlanStage*> OrStage::getChildren() const {
     return _children;
 }
 
-PlanStageStats* OrStage::getStats() {
+unique_ptr<PlanStageStats> OrStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     // Add a BSON representation of the filter to the stats tree, if there is one.
@@ -186,13 +188,13 @@ PlanStageStats* OrStage::getStats() {
         _commonStats.filter = bob.obj();
     }
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_OR));
-    ret->specific.reset(new OrStats(_specificStats));
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_OR);
+    ret->specific = make_unique<OrStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
-        ret->children.push_back(_children[i]->getStats());
+        ret->children.push_back(_children[i]->getStats().release());
     }
 
-    return ret.release();
+    return ret;
 }
 
 const CommonStats* OrStage::getCommonStats() const {

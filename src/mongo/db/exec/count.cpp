@@ -33,11 +33,13 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* CountStage::kStageType = "COUNT";
@@ -193,15 +195,14 @@ vector<PlanStage*> CountStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* CountStage::getStats() {
+unique_ptr<PlanStageStats> CountStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT));
-    CountStats* countStats = new CountStats(_specificStats);
-    ret->specific.reset(countStats);
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_COUNT);
+    ret->specific = make_unique<CountStats>(_specificStats);
     if (_child.get()) {
-        ret->children.push_back(_child->getStats());
+        ret->children.push_back(_child->getStats().release());
     }
-    return ret.release();
+    return ret;
 }
 
 const CommonStats* CountStage::getCommonStats() const {

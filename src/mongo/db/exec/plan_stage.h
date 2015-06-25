@@ -252,10 +252,8 @@ public:
      *
      * Creates plan stats tree which has the same topology as the original execution tree,
      * but has a separate lifetime.
-     *
-     * Caller owns returned pointer.
      */
-    virtual PlanStageStats* getStats() = 0;
+    virtual std::unique_ptr<PlanStageStats> getStats() = 0;
 
     /**
      * Get the CommonStats for this stage. The pointer is *not* owned by the caller.

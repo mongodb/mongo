@@ -565,7 +565,7 @@ void Explain::explainStages(PlanExecutor* exec,
     // is high enough and there was a runoff between multiple plans.
     unique_ptr<PlanStageStats> winningStatsTrial;
     if (verbosity >= ExplainCommon::EXEC_ALL_PLANS && NULL != mps) {
-        winningStatsTrial.reset(exec->getStats());
+        winningStatsTrial = std::move(exec->getStats());
         invariant(winningStatsTrial.get());
     }
 

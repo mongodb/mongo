@@ -62,7 +62,7 @@ public:
         return STAGE_KEEP_MUTATIONS;
     }
 
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

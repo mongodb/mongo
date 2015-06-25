@@ -36,14 +36,16 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::endl;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 static const char* kIdField = "_id";
 
@@ -258,16 +260,16 @@ vector<PlanStage*> ProjectionStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* ProjectionStage::getStats() {
+unique_ptr<PlanStageStats> ProjectionStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_PROJECTION));
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_PROJECTION);
 
-    ProjectionStats* projStats = new ProjectionStats(_specificStats);
+    unique_ptr<ProjectionStats> projStats = make_unique<ProjectionStats>(_specificStats);
     projStats->projObj = _projObj;
-    ret->specific.reset(projStats);
+    ret->specific = std::move(projStats);
 
-    ret->children.push_back(_child->getStats());
-    return ret.release();
+    ret->children.push_back(_child->getStats().release());
+    return ret;
 }
 
 const CommonStats* ProjectionStage::getCommonStats() const {

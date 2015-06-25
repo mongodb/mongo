@@ -70,7 +70,7 @@ public:
         return STAGE_FETCH;
     }
 
-    PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

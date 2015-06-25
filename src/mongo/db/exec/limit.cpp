@@ -30,12 +30,14 @@
 
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* LimitStage::kStageType = "LIMIT";
@@ -113,12 +115,12 @@ vector<PlanStage*> LimitStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* LimitStage::getStats() {
+unique_ptr<PlanStageStats> LimitStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_LIMIT));
-    ret->specific.reset(new LimitStats(_specificStats));
-    ret->children.push_back(_child->getStats());
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_LIMIT);
+    ret->specific = make_unique<LimitStats>(_specificStats);
+    ret->children.push_back(_child->getStats().release());
+    return ret;
 }
 
 const CommonStats* LimitStage::getCommonStats() const {

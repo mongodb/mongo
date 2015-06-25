@@ -71,7 +71,7 @@ public:
         return STAGE_AND_SORTED;
     }
 
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

@@ -75,7 +75,7 @@ public:
         return STAGE_CACHED_PLAN;
     }
 
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

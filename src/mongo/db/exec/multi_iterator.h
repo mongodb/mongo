@@ -65,7 +65,7 @@ public:
     virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     // Returns empty PlanStageStats object
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     // Not used.
     virtual CommonStats* getCommonStats() const {

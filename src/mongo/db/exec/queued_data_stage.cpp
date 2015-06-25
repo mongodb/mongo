@@ -30,11 +30,13 @@
 
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 const char* QueuedDataStage::kStageType = "QUEUED_DATA";
 
@@ -80,11 +82,11 @@ void QueuedDataStage::invalidate(OperationContext* txn, const RecordId& dl, Inva
     ++_commonStats.invalidates;
 }
 
-PlanStageStats* QueuedDataStage::getStats() {
+unique_ptr<PlanStageStats> QueuedDataStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_QUEUED_DATA));
-    ret->specific.reset(new MockStats(_specificStats));
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_QUEUED_DATA);
+    ret->specific = make_unique<MockStats>(_specificStats);
+    return ret;
 }
 
 const CommonStats* QueuedDataStage::getCommonStats() const {

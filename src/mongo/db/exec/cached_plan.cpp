@@ -44,6 +44,7 @@
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -327,14 +328,15 @@ std::vector<PlanStage*> CachedPlanStage::getChildren() const {
     return {_root.get()};
 }
 
-PlanStageStats* CachedPlanStage::getStats() {
+std::unique_ptr<PlanStageStats> CachedPlanStage::getStats() {
     _commonStats.isEOF = isEOF();
 
-    std::unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_CACHED_PLAN));
-    ret->specific.reset(new CachedPlanStats(_specificStats));
-    ret->children.push_back(_root->getStats());
+    std::unique_ptr<PlanStageStats> ret =
+        stdx::make_unique<PlanStageStats>(_commonStats, STAGE_CACHED_PLAN);
+    ret->specific = stdx::make_unique<CachedPlanStats>(_specificStats);
+    ret->children.push_back(_root->getStats().release());
 
-    return ret.release();
+    return ret;
 }
 
 const CommonStats* CachedPlanStage::getCommonStats() const {
@@ -346,8 +348,8 @@ const SpecificStats* CachedPlanStage::getSpecificStats() const {
 }
 
 void CachedPlanStage::updatePlanCache() {
-    std::unique_ptr<PlanCacheEntryFeedback> feedback(new PlanCacheEntryFeedback());
-    feedback->stats.reset(getStats());
+    std::unique_ptr<PlanCacheEntryFeedback> feedback = stdx::make_unique<PlanCacheEntryFeedback>();
+    feedback->stats = std::move(getStats());
     feedback->score = PlanRanker::scoreTree(feedback->stats.get());
 
     PlanCache* cache = _collection->infoCache()->getPlanCache();

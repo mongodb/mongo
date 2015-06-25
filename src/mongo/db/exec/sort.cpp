@@ -41,13 +41,15 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::endl;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* SortStage::kStageType = "SORT";
@@ -455,7 +457,7 @@ vector<PlanStage*> SortStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* SortStage::getStats() {
+unique_ptr<PlanStageStats> SortStage::getStats() {
     _commonStats.isEOF = isEOF();
     const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes);
     _specificStats.memLimit = maxBytes;
@@ -463,10 +465,10 @@ PlanStageStats* SortStage::getStats() {
     _specificStats.limit = _limit;
     _specificStats.sortPattern = _pattern.getOwned();
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SORT));
-    ret->specific.reset(new SortStats(_specificStats));
-    ret->children.push_back(_child->getStats());
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_SORT);
+    ret->specific = make_unique<SortStats>(_specificStats);
+    ret->children.push_back(_child->getStats().release());
+    return ret;
 }
 
 const CommonStats* SortStage::getCommonStats() const {

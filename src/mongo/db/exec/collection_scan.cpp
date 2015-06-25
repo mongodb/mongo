@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/record_fetcher.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -48,6 +49,7 @@ namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* CollectionScan::kStageType = "COLLSCAN";
@@ -238,7 +240,7 @@ vector<PlanStage*> CollectionScan::getChildren() const {
     return empty;
 }
 
-PlanStageStats* CollectionScan::getStats() {
+unique_ptr<PlanStageStats> CollectionScan::getStats() {
     // Add a BSON representation of the filter to the stats tree, if there is one.
     if (NULL != _filter) {
         BSONObjBuilder bob;
@@ -246,9 +248,9 @@ PlanStageStats* CollectionScan::getStats() {
         _commonStats.filter = bob.obj();
     }
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COLLSCAN));
-    ret->specific.reset(new CollectionScanStats(_specificStats));
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_COLLSCAN);
+    ret->specific = make_unique<CollectionScanStats>(_specificStats);
+    return ret;
 }
 
 const CommonStats* CollectionScan::getCommonStats() const {

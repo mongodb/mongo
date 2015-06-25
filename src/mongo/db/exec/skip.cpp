@@ -29,12 +29,14 @@
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* SkipStage::kStageType = "SKIP";
@@ -114,13 +116,13 @@ vector<PlanStage*> SkipStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* SkipStage::getStats() {
+unique_ptr<PlanStageStats> SkipStage::getStats() {
     _commonStats.isEOF = isEOF();
     _specificStats.skip = _toSkip;
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SKIP));
-    ret->specific.reset(new SkipStats(_specificStats));
-    ret->children.push_back(_child->getStats());
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_SKIP);
+    ret->specific = make_unique<SkipStats>(_specificStats);
+    ret->children.push_back(_child->getStats().release());
+    return ret;
 }
 
 const CommonStats* SkipStage::getCommonStats() const {

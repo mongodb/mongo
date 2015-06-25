@@ -39,11 +39,13 @@
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/s/d_state.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* IDHackStage::kStageType = "IDHACK";
@@ -244,11 +246,11 @@ vector<PlanStage*> IDHackStage::getChildren() const {
     return empty;
 }
 
-PlanStageStats* IDHackStage::getStats() {
+unique_ptr<PlanStageStats> IDHackStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IDHACK));
-    ret->specific.reset(new IDHackStats(_specificStats));
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_IDHACK);
+    ret->specific = make_unique<IDHackStats>(_specificStats);
+    return ret;
 }
 
 const CommonStats* IDHackStage::getCommonStats() const {

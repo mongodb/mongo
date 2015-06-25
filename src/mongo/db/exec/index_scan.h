@@ -109,7 +109,7 @@ public:
         return STAGE_IXSCAN;
     }
 
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

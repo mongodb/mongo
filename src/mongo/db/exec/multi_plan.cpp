@@ -46,15 +46,17 @@
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/storage/record_fetcher.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::endl;
 using std::list;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* MultiPlanStage::kStageType = "MULTI_PLAN";
@@ -316,8 +318,8 @@ vector<PlanStageStats*> MultiPlanStage::generateCandidateStats() {
             continue;
         }
 
-        PlanStageStats* stats = _candidates[ix].root->getStats();
-        candidateStats.push_back(stats);
+        unique_ptr<PlanStageStats> stats = std::move(_candidates[ix].root->getStats());
+        candidateStats.push_back(stats.release());
     }
 
     return candidateStats.release();
@@ -487,7 +489,7 @@ vector<PlanStage*> MultiPlanStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* MultiPlanStage::getStats() {
+unique_ptr<PlanStageStats> MultiPlanStage::getStats() {
     if (bestPlanChosen()) {
         return _candidates[_bestPlanIdx].root->getStats();
     }
@@ -496,9 +498,7 @@ PlanStageStats* MultiPlanStage::getStats() {
     }
     _commonStats.isEOF = isEOF();
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_MULTI_PLAN));
-
-    return ret.release();
+    return make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_PLAN);
 }
 
 const CommonStats* MultiPlanStage::getCommonStats() const {

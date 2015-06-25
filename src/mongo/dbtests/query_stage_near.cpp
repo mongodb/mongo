@@ -34,13 +34,16 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using namespace mongo;
 using std::shared_ptr;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 /**
  * Stage which takes in an array of BSONObjs and returns them.
@@ -92,8 +95,8 @@ public:
         return STAGE_UNKNOWN;
     }
 
-    virtual PlanStageStats* getStats() {
-        return new PlanStageStats(_stats, STAGE_UNKNOWN);
+    virtual unique_ptr<PlanStageStats> getStats() {
+        return make_unique<PlanStageStats>(_stats, STAGE_UNKNOWN);
     }
 
     virtual const CommonStats* getCommonStats() const {

@@ -217,11 +217,11 @@ public:
 
     /**
      * Generates a tree of stats objects with a separate lifetime from the execution
-     * stage tree wrapped by this PlanExecutor. The caller owns the returned pointer.
+     * stage tree wrapped by this PlanExecutor.
      *
      * This is OK even if we were killed.
      */
-    PlanStageStats* getStats() const;
+    std::unique_ptr<PlanStageStats> getStats() const;
 
     //
     // Methods that just pass down to the PlanStage tree.

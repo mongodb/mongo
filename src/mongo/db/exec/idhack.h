@@ -73,7 +73,7 @@ public:
         return STAGE_IDHACK;
     }
 
-    PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

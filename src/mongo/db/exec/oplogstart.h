@@ -77,7 +77,7 @@ public:
     virtual std::vector<PlanStage*> getChildren() const;
 
     // Returns empty PlanStageStats object
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     //
     // Exec stats -- do not call these for the oplog start stage.

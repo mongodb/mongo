@@ -89,7 +89,7 @@ public:
         return STAGE_SHARDING_FILTER;
     }
 
-    virtual PlanStageStats* getStats();
+    virtual std::unique_ptr<PlanStageStats> getStats();
 
     virtual const CommonStats* getCommonStats() const;
 

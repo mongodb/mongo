@@ -36,6 +36,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/storage/record_fetcher.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -43,6 +44,7 @@ namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* FetchStage::kStageType = "FETCH";
@@ -227,7 +229,7 @@ vector<PlanStage*> FetchStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* FetchStage::getStats() {
+unique_ptr<PlanStageStats> FetchStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     // Add a BSON representation of the filter to the stats tree, if there is one.
@@ -237,10 +239,10 @@ PlanStageStats* FetchStage::getStats() {
         _commonStats.filter = bob.obj();
     }
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_FETCH));
-    ret->specific.reset(new FetchStats(_specificStats));
-    ret->children.push_back(_child->getStats());
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_FETCH);
+    ret->specific = make_unique<FetchStats>(_specificStats);
+    ret->children.push_back(_child->getStats().release());
+    return ret;
 }
 
 const CommonStats* FetchStage::getCommonStats() const {

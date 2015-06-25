@@ -41,14 +41,16 @@
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 namespace mb = mutablebson;
 
@@ -1013,12 +1015,12 @@ vector<PlanStage*> UpdateStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* UpdateStage::getStats() {
+unique_ptr<PlanStageStats> UpdateStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_UPDATE));
-    ret->specific.reset(new UpdateStats(_specificStats));
-    ret->children.push_back(_child->getStats());
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_UPDATE);
+    ret->specific = make_unique<UpdateStats>(_specificStats);
+    ret->children.push_back(_child->getStats().release());
+    return ret;
 }
 
 const CommonStats* UpdateStage::getCommonStats() const {

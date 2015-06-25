@@ -41,13 +41,15 @@
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::endl;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* SubplanStage::kStageType = "SUBPLAN";
@@ -505,11 +507,11 @@ vector<PlanStage*> SubplanStage::getChildren() const {
     return children;
 }
 
-PlanStageStats* SubplanStage::getStats() {
+unique_ptr<PlanStageStats> SubplanStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SUBPLAN));
-    ret->children.push_back(_child->getStats());
-    return ret.release();
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_SUBPLAN);
+    ret->children.push_back(_child->getStats().release());
+    return ret;
 }
 
 bool SubplanStage::branchPlannedFromCache(size_t i) const {
