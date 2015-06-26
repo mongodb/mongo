@@ -1,5 +1,3 @@
-// pipelinetests.cpp : Unit tests for some classes within src/mongo/db/pipeline.
-
 /**
  *    Copyright (C) 2012 10gen Inc.
  *
@@ -34,8 +32,14 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/dbtests/dbtests.h"
+
+namespace mongo {
+bool isMongos() {
+    return false;
+}
+}
 
 namespace PipelineTests {
 
@@ -72,7 +76,7 @@ public:
     virtual ~Base() {}
 
 private:
-    OperationContextImpl _opCtx;
+    OperationContextNoop _opCtx;
 };
 
 class MoveSkipBeforeProject : public Base {
@@ -210,7 +214,7 @@ public:
     virtual ~Base() {}
 
 private:
-    OperationContextImpl _opCtx;
+    OperationContextNoop _opCtx;
 };
 
 // General test to make sure all optimizations support empty pipelines

@@ -36,6 +36,7 @@ env.Library(
         'expression_where_noop.cpp',
         'match_details.cpp',
         'matchable.cpp',
+        "matcher.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/bson',

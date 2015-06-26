@@ -308,10 +308,11 @@ void Pipeline::addRequiredPrivileges(Command* commandTemplate,
                                      const string& db,
                                      BSONObj cmdObj,
                                      vector<Privilege>* out) {
-    ResourcePattern inputResource(commandTemplate->parseResourcePattern(db, cmdObj));
+    NamespaceString inputNs(db, cmdObj.firstElement().str());
+    auto inputResource = ResourcePattern::forExactNamespace(inputNs);
     uassert(17138,
-            mongoutils::str::stream() << "Invalid input resource, " << inputResource.toString(),
-            inputResource.isExactNamespacePattern());
+            mongoutils::str::stream() << "Invalid input namespace, " << inputNs.ns(),
+            inputNs.isValid());
 
     out->push_back(Privilege(inputResource, ActionType::find));
 
