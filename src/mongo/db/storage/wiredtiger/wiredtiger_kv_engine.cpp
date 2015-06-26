@@ -73,10 +73,12 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,
     size_t cacheSizeGB = wiredTigerGlobalOptions.cacheSizeGB;
     if (cacheSizeGB == 0) {
         // Since the user didn't provide a cache size, choose a reasonable default value.
+        // We want to reserve 1GB for the system and binaries, but it's not bad to
+        // leave a fair amount left over for pagecache since that's compressed storage.
         ProcessInfo pi;
-        unsigned long long memSizeMB = pi.getMemSizeMB();
+        double memSizeMB = pi.getMemSizeMB();
         if (memSizeMB > 0) {
-            double cacheMB = memSizeMB / 2;
+            double cacheMB = (memSizeMB - 1024) * 0.6;
             cacheSizeGB = static_cast<size_t>(cacheMB / 1024);
             if (cacheSizeGB < 1)
                 cacheSizeGB = 1;
