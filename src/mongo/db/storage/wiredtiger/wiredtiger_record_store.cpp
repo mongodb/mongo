@@ -575,7 +575,9 @@ bool WiredTigerRecordStore::cappedAndNeedDelete() const {
 
 int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
                                                     const RecordId& justInserted) {
-    dassert(!_isActiveOplog);
+    // We only want to do the checks occasionally as they are expensive.
+    // This variable isn't thread safe, but has loose semantics anyway.
+    dassert(!_isOplog || _cappedMaxDocs == -1);
 
     if (!cappedAndNeedDelete())
         return 0;
