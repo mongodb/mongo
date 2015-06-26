@@ -243,6 +243,16 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 					goto err;
 				continue;
 			}
+			if (STRING_MATCH("truncate", k.str, k.len)) {
+				if ((workp->truncate = v.val) < 0)
+					goto err;
+				continue;
+			}
+			if (STRING_MATCH("truncate_pct", k.str, k.len)) {
+				if ((workp->truncate_pct = v.val) < 0)
+					goto err;
+				continue;
+			}
 			goto err;
 		}
 		if (ret == WT_NOTFOUND)
@@ -253,9 +263,13 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		scan = NULL;
 		if (ret != 0)
 			goto err;
-
-		if (workp->insert == 0 &&
-		    workp->read == 0 && workp->update == 0)
+printf("insert is %lld, read is %lld, update is %lld\n", workp->insert, workp->update, workp->read);
+printf("truncate is %lld, truncate_pct is %lld\n", workp->truncate, workp->truncate_pct);
+		if (workp->insert == 0 && workp->read == 0 &&
+		    workp->update == 0 && workp->truncate == 0)
+			goto err;
+		/* Why run with truncate if we don't want to truncate anything*/
+		if (workp->truncate != 0 && workp->truncate == 0)
 			goto err;
 		cfg->workers_cnt += (u_int)workp->threads;
 	}

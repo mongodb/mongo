@@ -260,6 +260,8 @@ op_name(uint8_t *op)
 		return ("read");
 	case WORKER_UPDATE:
 		return ("update");
+	case WORKER_TRUNCATE
+		return ("truncate")
 	default:
 		return ("unknown");
 	}
@@ -313,6 +315,7 @@ worker_async(void *arg)
 			if (wtperf_value_range(cfg) < next_val)
 				continue;
 			break;
+		case WORKER_TRUNCATE:
 		default:
 			goto err;		/* can't happen */
 		}
@@ -353,6 +356,8 @@ worker_async(void *arg)
 			if ((ret = asyncop->update(asyncop)) == 0)
 				break;
 			goto op_err;
+		case WORKER_TRUNCATE:
+
 		default:
 op_err:			lprintf(cfg, ret, 0,
 			    "%s failed for: %s, range: %"PRIu64,
@@ -486,6 +491,7 @@ worker(void *arg)
 			if (wtperf_value_range(cfg) < next_val)
 				continue;
 			break;
+		case WORKER_TRUNCATE:
 		default:
 			goto err;		/* can't happen */
 		}
@@ -712,7 +718,8 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 	int64_t pct;
 
 	/* Confirm reads, inserts and updates cannot all be zero. */
-	if (workp->insert == 0 && workp->read == 0 && workp->update == 0) {
+	if (workp->insert == 0 && workp->read == 0 &&
+	    workp->update == 0 && workp->truncate == 0) {
 		lprintf(cfg, EINVAL, 0, "no operations scheduled");
 		return (EINVAL);
 	}
@@ -722,14 +729,21 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 	 * update operations (because the default operation for a job-mix is
 	 * read, the subsequent code works fine if only reads are specified).
 	 */
-	if (workp->insert != 0 && workp->read == 0 && workp->update == 0) {
+	if (workp->insert != 0 && workp->read == 0 &&
+	    workp->update == 0 && workp->truncate == 0) {
 		memset(workp->ops,
 		    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT,
 		    sizeof(workp->ops));
 		return (0);
 	}
-	if (workp->insert == 0 && workp->read == 0 && workp->update != 0) {
+	if (workp->insert == 0 && workp->read == 0 &&
+	    workp->truncate == 0 && workp->update != 0) {
 		memset(workp->ops, WORKER_UPDATE, sizeof(workp->ops));
+		return (0);
+	}
+	if (workp->insert == 0 && workp->read == 0 &&
+	    workp->update == 0 && workp->truncate != 0) {
+		memset(workp->ops, WORKER_TRUNCATE, sizeof(workp->ops));
 		return (0);
 	}
 
@@ -753,14 +767,18 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 	memset(workp->ops, WORKER_READ, sizeof(workp->ops));
 
 	pct = (workp->insert * 100) /
-	    (workp->insert + workp->read + workp->update);
+	    (workp->insert + workp->read + workp->update + workp->truncate);
 	if (pct != 0)
 		run_mix_schedule_op(workp,
 		    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT, pct);
 	pct = (workp->update * 100) /
-	    (workp->insert + workp->read + workp->update);
+	    (workp->insert + workp->read + workp->update + workp->truncate);
 	if (pct != 0)
 		run_mix_schedule_op(workp, WORKER_UPDATE, pct);
+	pct = (workp->truncate * 100) /
+	    (workp->insert + workp->read + workp->update + workp->truncate);
+	if (pct != 0)
+		run_mix_schedule_op(workp, WORKER_TRUNCATE, pct);
 	return (0);
 }
 
