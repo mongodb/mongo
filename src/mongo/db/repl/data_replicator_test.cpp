@@ -229,13 +229,11 @@ public:
 
     void run() {
         _thread.reset(new stdx::thread(stdx::bind(&InitialSyncBackgroundRunner::_run, this)));
-        sleepmillis(2);  // sleep to let new thread run initialSync so it schedules work
     }
 
 private:
     void _run() {
         setThreadName("InitialSyncRunner");
-        log() << "starting initial sync";
         _result = _dr->initialSync();  // blocking
     }
 
