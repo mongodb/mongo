@@ -455,7 +455,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
-	uint64_t entries, highest, new;
+	uint64_t entries, highest, tmp;
 
 	cp = __wt_process.cache_pool;
 	entries = 0;
@@ -468,25 +468,26 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 			continue;
 		cache = entry->cache;
 		++entries;
-		new = cache->bytes_read;
+		/* Copy the value out so it doesn't change underneath us */
+		tmp = cache->bytes_read;
 		/* Handle wrapping of eviction requests. */
-		if (new >= cache->cp_saved_read)
-			cache->cp_pass_read = new - cache->cp_saved_read;
+		if (tmp >= cache->cp_saved_read)
+			cache->cp_pass_read = tmp - cache->cp_saved_read;
 		else
-			cache->cp_pass_read = new;
-		cache->cp_saved_read = new;
+			cache->cp_pass_read = tmp;
+		cache->cp_saved_read = tmp;
 
 		/* Update the application eviction count information */
-		new = cache->cp_saved_app_evicts;
+		tmp = cache->cp_saved_app_evicts;
 		cache->cp_pass_app_evicts =
-		    new - cache->cp_pass_app_evicts;
-		cache->cp_saved_app_evicts = new;
+		    tmp - cache->cp_pass_app_evicts;
+		cache->cp_saved_app_evicts = tmp;
 
 		/* Update the eviction wait information */
-		new = cache->cp_saved_app_waits;
+		tmp = cache->cp_saved_app_waits;
 		cache->cp_pass_app_waits =
-		    new - cache->cp_pass_app_waits;
-		cache->cp_saved_app_waits = new;
+		    tmp - cache->cp_pass_app_waits;
+		cache->cp_saved_app_waits = tmp;
 
 		/* Calculate the weighted pressure for this member */
 		cache->cp_pass_pressure =
