@@ -39,10 +39,10 @@ __drop_file(
 		return (ret);
 
 	/*
-	 * Remove the underlying physical file. There is no point tracking this
-	 * operation: there is no going back from here.
+	 * Schedule the remove of the underlying physical file when the drop
+	 * completes.
 	 */
-	WT_TRET(__wt_remove_if_exists(session, filename));
+	WT_TRET(__wt_meta_track_drop(session, filename));
 
 	return (ret);
 }

@@ -76,7 +76,7 @@ __curindex_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 
 	/* Check both cursors are "index:" type. */
 	if (!WT_PREFIX_MATCH(a->uri, "index:") ||
-	    !WT_PREFIX_MATCH(b->uri, "index:"))
+	    strcmp(a->uri, b->uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 

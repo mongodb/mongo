@@ -37,12 +37,13 @@ each of which is ordered by one or more columns.
 <h2>Advanced topics</h2>
 - @subpage async
 - @subpage backup
-- @subpage checkpoint
 - @subpage compact
-- @subpage cursor_log
+- @subpage checkpoint
 - @subpage durability
+- @ref transaction_named_snapshots
 - @subpage shared_cache
 - @subpage statistics
+- @subpage cursor_log
 - @subpage_single upgrade
 
 @m_if{c}

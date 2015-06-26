@@ -60,7 +60,7 @@ __cursor_enter(WT_SESSION_IMPL *session)
 	 * whether the cache is full.
 	 */
 	if (session->ncursors == 0)
-		WT_RET(__wt_cache_full_check(session));
+		WT_RET(__wt_cache_eviction_check(session, 0, NULL));
 	++session->ncursors;
 	return (0);
 }

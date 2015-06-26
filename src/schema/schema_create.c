@@ -108,8 +108,8 @@ __create_file(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * Open the file to check that it was setup correctly.   We don't need
-	 * to pass the configuration, we just wrote the collapsed configuration
+	 * Open the file to check that it was setup correctly. We don't need to
+	 * pass the configuration, we just wrote the collapsed configuration
 	 * into the metadata file, and it's going to be read/used by underlying
 	 * functions.
 	 *

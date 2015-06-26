@@ -51,31 +51,31 @@ test "$reconf" -eq 0 || {
 	run "sh ./reconf" "Rebuilding GNU tools library support")
 }
 
+run "sh ./s_readme $force" "building README file"
 run "python api_config.py" "building WiredTiger API"
 run "python api_err.py" "building WiredTiger error returns"
-
 run "python flags.py" "building flags"
 run "python log.py" "building logging layer"
 run "python stat.py" "building statistics support"
 run "python java_doc.py" "building Java documentation index"
-
 run "sh ./s_typedef -b" "building standard typedefs"
 run "sh ./s_prototypes" "building function prototypes"
-run "sh ./s_readme $force" "building README file"
 run "sh ./s_tags" "building tags files"
 
 run "sh ./s_copyright" "checking copyright notices"
 run "sh ./s_define" "checking for unused #defines"
-run "sh ./s_export" "checking external symbol names"
+run "sh ./s_typedef -c" "checking for unused typedefs"
 run "sh ./s_funcs" "checking for unused functions"
+run "sh ./s_export" "checking external symbol names"
 run "sh ./s_getopt" "checking for incorrect getopt usage"
+run "sh ./s_label" "checking error/return labels"
 run "sh ./s_lang" "checking for SWIG generated name conflicts"
 run "sh ./s_longlines" "checking for long lines"
 run "sh ./s_stat" "checking for unused statistics fields"
 run "sh ./s_string" "checking string spelling"
 run "python style.py" "checking style (pass 1)"
 run "sh ./s_style" "checking style (pass 2)"
-run "sh ./s_typedef -c" "checking for unused typedefs"
+run "sh ./s_python" "checking Python style"
 run "sh ./s_whitespace" "checking whitespace"
 run "sh ./s_win" "checking windows config"
 

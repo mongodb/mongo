@@ -880,6 +880,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "",
 	  NULL, 0
 	},
+	{ "WT_SESSION.reset",
+	  "",
+	  NULL, 0
+	},
 	{ "WT_SESSION.rollback_transaction",
 	  "",
 	  NULL, 0

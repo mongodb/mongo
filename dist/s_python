@@ -1,0 +1,27 @@
+#! /bin/sh
+
+# Python style checks.
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+cd ..
+
+# Check Python coding standards: check for tab characters.
+egrep '	' `find . -name '*.py'` |
+    sed -e 's/:.*//' \
+	-e '/__init__.py/d' \
+	-e '/src\/docs\/tools\/doxypy.py/d' |
+    sort -u |
+    sed 's/^/	/' > $t
+test -s $t && {
+	echo '[tab] characters appear in Python scripts:'
+	cat $t
+}
+# Check Python coding standards: check for trailing semi-colons.
+# Don't check too widely, there are third-party tools that fail this test as
+# well as scripts in this directory that output C code, and so fail the test.
+egrep ';$' `find lang test -name '*.py'`> $t
+test -s $t && {
+	echo 'trailing semi-colons in selected Python code:'
+	cat $t
+}

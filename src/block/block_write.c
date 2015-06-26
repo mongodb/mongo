@@ -250,7 +250,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * turn off checksums and assume corrupted blocks won't decompress
 	 * correctly.  However, if compression failed to shrink the block, the
 	 * block wasn't compressed, in which case our caller will tell us to
-	 * checksum the data to detect corruption.   If compression succeeded,
+	 * checksum the data to detect corruption. If compression succeeded,
 	 * we still need to checksum the first WT_BLOCK_COMPRESS_SKIP bytes
 	 * because they're not compressed, both to give salvage a quick test
 	 * of whether a block is useful and to give us a test so we don't lose

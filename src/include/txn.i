@@ -106,23 +106,31 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
 	uint64_t checkpoint_snap_min, oldest_id;
+	uint32_t checkpoint_id;
 
 	txn_global = &S2C(session)->txn_global;
 	btree = S2BT_SAFE(session);
 
 	/*
-	 * Take a local copy of ID in case they are updated while we are
+	 * Take a local copy of these IDs in case they are updated while we are
 	 * checking visibility.
 	 */
+	checkpoint_id = txn_global->checkpoint_id;
 	checkpoint_snap_min = txn_global->checkpoint_snap_min;
 	oldest_id = txn_global->oldest_id;
 
 	/*
-	 * If there is no active checkpoint or this handle is up to date with
-	 * the active checkpoint it's safe to ignore the checkpoint ID in the
-	 * visibility check.
+	 * Checkpoint transactions often fall behind ordinary application
+	 * threads.  Take special effort to not keep changes pinned in cache
+	 * if they are only required for the checkpoint and it has already
+	 * seen them.
+	 *
+	 * If there is no active checkpoint, this session is doing the
+	 * checkpoint, or this handle is up to date with the active checkpoint
+	 * then it's safe to ignore the checkpoint ID in the visibility check.
 	 */
-	if (checkpoint_snap_min != WT_TXN_NONE && (btree == NULL ||
+	if (checkpoint_snap_min != WT_TXN_NONE &&
+	    checkpoint_id != session->id && (btree == NULL ||
 	    btree->checkpoint_gen != txn_global->checkpoint_gen) &&
 	    WT_TXNID_LT(checkpoint_snap_min, oldest_id))
 		/*
@@ -158,6 +166,7 @@ static inline int
 __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 {
 	WT_TXN *txn;
+	int found;
 
 	txn = &session->txn;
 
@@ -208,8 +217,8 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	if (txn->snapshot_count == 0 || WT_TXNID_LT(id, txn->snap_min))
 		return (1);
 
-	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
-	    sizeof(uint64_t), __wt_txnid_cmp) == NULL);
+	WT_BINARY_SEARCH(id, txn->snapshot, txn->snapshot_count, found);
+	return (!found);
 }
 
 /*
@@ -254,7 +263,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		 * We're about to allocate a snapshot: if we need to block for
 		 * eviction, it's better to do it beforehand.
 		 */
-		WT_RET(__wt_cache_full_check(session));
+		WT_RET(__wt_cache_eviction_check(session, 0, NULL));
 
 		__wt_txn_get_snapshot(session);
 	}
@@ -310,7 +319,7 @@ __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
 	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
-	txn_state = &S2C(session)->txn_global.states[session->id];
+	txn_state = WT_SESSION_TXN_STATE(session);
 
 	/*
 	 * Check the published snap_min because read-uncommitted never sets
@@ -318,7 +327,7 @@ __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
 	 */
 	if (F_ISSET(txn, WT_TXN_RUNNING) &&
 	    !F_ISSET(txn, WT_TXN_HAS_ID) && txn_state->snap_min == WT_TXN_NONE)
-		WT_RET(__wt_cache_full_check(session));
+		WT_RET(__wt_cache_eviction_check(session, 0, NULL));
 
 	return (0);
 }

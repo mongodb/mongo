@@ -234,8 +234,8 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	/*
 	 * !!!
 	 * We ignore the specified uri, that is, all new configuration options
-	 * will be valid for all data sources.   That shouldn't be too bad
-	 * as the worst that can happen is an application might specify some
+	 * will be valid for all data sources. That shouldn't be too bad as
+	 * the worst that can happen is an application might specify some
 	 * configuration option and not get an error -- the option should be
 	 * ignored by the underlying implementation since it's unexpected, so
 	 * there shouldn't be any real problems.  Eventually I expect we will
