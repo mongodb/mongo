@@ -1926,8 +1926,8 @@ err:	if (ret != 0)
 		jcb->jnienv = jenv;
 		jcb->session = connimpl->default_session;
 		(*jenv)->GetJavaVM(jenv, &jcb->javavm);
-		jcb->jcallback = JCALL1(NewGlobalRef, jcb->jnienv, callbackObject);
-		JCALL1(DeleteLocalRef, jcb->jnienv, callbackObject);
+		jcb->jcallback = JCALL1(NewGlobalRef, jenv, callbackObject);
+		JCALL1(DeleteLocalRef, jenv, callbackObject);
 		asyncop->c.lang_private = jcb;
 		asyncop->c.flags |= WT_CURSTD_RAW;
 
