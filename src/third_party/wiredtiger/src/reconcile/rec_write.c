@@ -760,7 +760,7 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 	 * During some big-page evictions we have seen boundary arrays that have
 	 * millions of elements.  That should not be a normal event, but if the
 	 * memory is associated with a random session, it won't be discarded
-	 * until the session is closed.   If there are more than 10,000 boundary
+	 * until the session is closed. If there are more than 10,000 boundary
 	 * structure elements, destroy the boundary array and we'll start over.
 	 */
 	if (destroy || r->bnd_entries > 10 * 1000) {
@@ -1164,7 +1164,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 in_memory:
 	/*
 	 * In-memory states: the child is potentially modified if the page's
-	 * modify structure has been instantiated.   If the modify structure
+	 * modify structure has been instantiated. If the modify structure
 	 * exists and the page has actually been modified, set that state.
 	 * If that's not the case, we would normally use the original cell's
 	 * disk address as our reference, but, if we're forced to instantiate
@@ -1220,10 +1220,6 @@ __rec_child_deleted(
 		if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
 			WT_PANIC_RET(session, EINVAL,
 			    "reconciliation illegally skipped an update");
-
-		/* If this page cannot be evicted, quit now. */
-		if (F_ISSET(r, WT_EVICTING))
-			return (EBUSY);
 	}
 
 	/*
@@ -1261,6 +1257,18 @@ __rec_child_deleted(
 			__wt_free(session, ref->addr);
 		}
 		ref->addr = NULL;
+	}
+
+	/*
+	 * If there are deleted child pages that we can't discard immediately,
+	 * keep the page dirty so they are eventually freed.
+	 */
+	if (ref->addr != NULL) {
+		r->leave_dirty = 1;
+
+		/* This page cannot be evicted, quit now. */
+		if (F_ISSET(r, WT_EVICTING))
+			return (EBUSY);
 	}
 
 	/*
@@ -1411,7 +1419,7 @@ __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 	 * distinguish between the "last key" and "cur key", compressing the
 	 * size of keys on internal nodes.  If we just built an overflow key,
 	 * we're not going to update the "last key", making suffix compression
-	 * impossible for the next key.   Alternatively, we could remember where
+	 * impossible for the next key. Alternatively, we could remember where
 	 * the last key was on the page, detect it's an overflow key, read it
 	 * from disk and do suffix compression, but that's too much work for an
 	 * unlikely event.)
@@ -1647,7 +1655,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	/*
 	 * If we have to split, we want to choose a smaller page size for the
 	 * split pages, because otherwise we could end up splitting one large
-	 * packed page over and over.   We don't want to pick the minimum size
+	 * packed page over and over. We don't want to pick the minimum size
 	 * either, because that penalizes an application that did a bulk load
 	 * and subsequently inserted a few items into packed pages.  Currently
 	 * defaulted to 75%, but I have no empirical evidence that's "correct".
@@ -1819,7 +1827,7 @@ __rec_split_row_promote(
 	 * only need enough bytes in the promoted key to ensure searches go to
 	 * the correct page: the promoted key has to be larger than the last key
 	 * on the leaf page preceding it, but we don't need any more bytes than
-	 * that.   In other words, we can discard any suffix bytes not required
+	 * that. In other words, we can discard any suffix bytes not required
 	 * to distinguish between the key being promoted and the last key on the
 	 * leaf page preceding it.  This can only be done for the first level of
 	 * internal pages, you cannot repeat suffix truncation as you split up
@@ -2267,7 +2275,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	 * First, find out how much space the compress_raw function might need,
 	 * either the value returned from pre_size, or the initial source size.
 	 * Add the compress-skip bytes, and then correct that value for the
-	 * underlying block manager.   As a result, we have a destination buffer
+	 * underlying block manager. As a result, we have a destination buffer
 	 * that's large enough when calling the compress_raw method, and there
 	 * are bytes in the header just for us.
 	 */
@@ -2526,7 +2534,7 @@ __rec_raw_decompress(
 
 	/*
 	 * We skipped an update and we can't write a block, but unfortunately,
-	 * the block has already been compressed.   Decompress the block so we
+	 * the block has already been compressed. Decompress the block so we
 	 * can subsequently re-instantiate it in memory.
 	 */
 	WT_RET(__wt_scr_alloc(session, dsk->mem_size, &tmp));
@@ -3548,7 +3556,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	/*
 	 * Occasionally, salvage needs to discard records from the beginning or
 	 * end of the page, and because the items may be part of a RLE cell, do
-	 * the adjustments here.   It's not a mistake we don't bother telling
+	 * the adjustments here. It's not a mistake we don't bother telling
 	 * our caller we've handled all the records from the page we care about,
 	 * and can quit processing the page: salvage is a rare operation and I
 	 * don't want to complicate our caller's loop.
@@ -4080,7 +4088,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		/*
 		 * There are different paths if the key is an overflow item vs.
-		 * a straight-forward on-page value.   If an overflow item, we
+		 * a straight-forward on-page value. If an overflow item, we
 		 * would have instantiated it, and we can use that fact to set
 		 * things up.
 		 *

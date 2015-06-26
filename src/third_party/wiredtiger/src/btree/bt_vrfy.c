@@ -325,7 +325,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	/*
 	 * The page's physical structure was verified when it was read into
 	 * memory by the read server thread, and then the in-memory version
-	 * of the page was built.   Now we make sure the page and tree are
+	 * of the page was built. Now we make sure the page and tree are
 	 * logically consistent.
 	 *
 	 * !!!

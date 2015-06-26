@@ -210,7 +210,7 @@ __backup_start(
 	 * The hot backup copy is done outside of WiredTiger, which means file
 	 * blocks can't be freed and re-allocated until the backup completes.
 	 * The checkpoint code checks the backup flag, and if a backup cursor
-	 * is open checkpoints aren't discarded.   We release the lock as soon
+	 * is open checkpoints aren't discarded. We release the lock as soon
 	 * as we've set the flag, we don't want to block checkpoints, we just
 	 * want to make sure no checkpoints are deleted.  The checkpoint code
 	 * holds the lock until it's finished the checkpoint, otherwise we

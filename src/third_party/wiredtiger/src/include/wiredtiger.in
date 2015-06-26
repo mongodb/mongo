@@ -442,7 +442,7 @@ struct __wt_cursor {
 	int __F(insert)(WT_CURSOR *cursor);
 
 	/*!
-	 * Update a record and optionally insert an existing record.
+	 * Update an existing record and optionally insert a record.
 	 *
 	 * If the cursor was configured with "overwrite=true" (the default),
 	 * both the key and value must be set; if the record already exists, the
@@ -1259,6 +1259,23 @@ struct __wt_session {
 	 */
 	int __F(rename)(WT_SESSION *session,
 	    const char *uri, const char *newuri, const char *config);
+
+	/*!
+	 * Reset the session handle.
+	 *
+	 * This will reset all cursors associated with this session and clear
+	 * any buffers that each cursor held. After this the buffers associated
+	 * with the session will be discarded. The session can be re-used
+	 * immediately after this call returns. If a transaction is running on
+	 * this session, then this call will take no action and return a busy
+	 * error.
+	 *
+	 * @snippet ex_all.c Reset the session
+	 *
+	 * @param session the session handle
+	 * @ebusy_errors
+	 */
+	int __F(reset)(WT_SESSION *session);
 
 	/*!
 	 * Salvage a file or table
@@ -2243,7 +2260,7 @@ struct __wt_connection {
  * commits., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether to sync the log on every
  * commit by default\, can be overridden by the \c sync setting to
- * WT_SESSION::begin_transaction., a boolean flag; default \c false.}
+ * WT_SESSION::commit_transaction., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;method, the method used to ensure log records
  * are stable on disk\, see @ref tune_durability for more information., a
  * string\, chosen from the following options: \c "dsync"\, \c "fsync"\, \c
@@ -2980,7 +2997,7 @@ struct __wt_compressor {
 	 * encodes none, some or all of the byte strings and copies the encoded
 	 * representation into a destination buffer.  The callback returns the
 	 * number of byte strings encoded and the bytes needed for the encoded
-	 * representation.   The encoded representation has header information
+	 * representation. The encoded representation has header information
 	 * prepended and is written as a block to the underlying file object.
 	 *
 	 * On entry, \c page_max is the configured maximum size for objects of

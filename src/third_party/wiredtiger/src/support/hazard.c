@@ -213,7 +213,7 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 	/*
 	 * Clear any hazard pointers because it's not a correctness problem
 	 * (any hazard pointer we find can't be real because the session is
-	 * being closed when we're called).   We do this work because session
+	 * being closed when we're called). We do this work because session
 	 * close isn't that common that it's an expensive check, and we don't
 	 * want to let a hazard pointer lie around, keeping a page from being
 	 * evicted.

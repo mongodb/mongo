@@ -437,7 +437,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	/*
 	 * Newly created objects can be used for cursor inserts or for bulk
 	 * loads; set a flag that's cleared when a row is inserted into the
-	 * tree.   Objects being bulk-loaded cannot be evicted, we set it
+	 * tree. Objects being bulk-loaded cannot be evicted, we set it
 	 * globally, there's no point in searching empty trees for eviction.
 	 */
 	if (creation) {

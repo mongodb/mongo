@@ -106,9 +106,13 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	conn = S2C(session);
 	log = conn->log;
 	slot_grow_attempts = 0;
+
 find_slot:
-	allocated_slot = WT_SLOT_ACTIVE == 1 ? 0 :
-	    __wt_random(&session->rnd) % WT_SLOT_ACTIVE;
+#if WT_SLOT_ACTIVE == 1
+	allocated_slot = 0;
+#else
+	allocated_slot = __wt_random(&session->rnd) % WT_SLOT_ACTIVE;
+#endif
 	/*
 	 * Get the selected slot.  Use a barrier to prevent the compiler from
 	 * caching this read.

@@ -1650,10 +1650,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret = next_wrap();
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret == 0);
+		valueUnpacker = initValueUnpacker(ret == 0);
 		return ret;
 	}
 
@@ -1667,10 +1665,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret = prev_wrap();
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret == 0);
+		valueUnpacker = initValueUnpacker(ret == 0);
 		return ret;
 	}
 
@@ -1684,10 +1680,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret = search_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret == 0);
+		valueUnpacker = initValueUnpacker(ret == 0);
 		return ret;
 	}
 
@@ -1701,11 +1695,40 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		SearchStatus ret = search_near_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret != SearchStatus.NOTFOUND) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret != SearchStatus.NOTFOUND) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret != SearchStatus.NOTFOUND);
+		valueUnpacker = initValueUnpacker(ret != SearchStatus.NOTFOUND);
 		return ret;
+	}
+
+	/**
+	 * Initialize a key unpacker after an operation that changes
+	 * the cursor position.
+	 *
+	 * \param success Whether the associated operation succeeded.
+	 * \return The key unpacker.
+	 */
+	private PackInputStream initKeyUnpacker(boolean success)
+	throws WiredTigerException {
+		if (!success || keyFormat.equals(""))
+			return null;
+		else
+			return new PackInputStream(keyFormat, get_key_wrap());
+	}
+
+	/**
+	 * Initialize a value unpacker after an operation that changes
+	 * the cursor position.
+	 *
+	 * \param success Whether the associated operation succeeded.
+	 * \return The value unpacker.
+	 */
+	private PackInputStream initValueUnpacker(boolean success)
+	throws WiredTigerException {
+		if (!success || valueFormat.equals(""))
+			return null;
+		else
+			return new PackInputStream(valueFormat,
+			    get_value_wrap());
 	}
 %}
 
