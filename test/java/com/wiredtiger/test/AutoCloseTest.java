@@ -44,6 +44,35 @@ import org.junit.runners.JUnit4;
 public class AutoCloseTest {
 
     /*
+     * Inner class to hold a session and cursor created in
+     * in a thread that may be closed in another thread.
+     */
+    static class OpenSession extends Thread {
+        private final Connection conn;
+        private Session sess;
+        private Cursor cur;
+        private int threadnum;
+        public OpenSession(Connection conn, int threadnum) {
+            this.conn = conn;
+            this.threadnum = threadnum;
+        }
+
+        public void run() {
+            sess = conn.open_session(null);
+            sess.create("table:autoclose", "key_format=S,value_format=S");
+            cur = sess.open_cursor("table:autoclose", null, null);
+            cur.putKeyString("key" + threadnum);
+            cur.putValueString("value" + threadnum);
+            cur.insert();
+        }
+
+        public void close() {
+            cur.close();
+            sess.close(null);
+        }
+    }
+
+    /*
      * Connvalid tells us that we really closed the connection.
      * That allows teardown to reliably clean up so that
      * a single failure in one test does not cascade.
@@ -232,6 +261,7 @@ public class AutoCloseTest {
         assertEquals(caught, true);
     }
 
+    @Test
     public void autoCloseSession03()
     throws WiredTigerPackingException {
         Session s = sessionSetup();
@@ -245,7 +275,8 @@ public class AutoCloseTest {
             s.open_cursor("table:t", null, null);
         }
         catch (NullPointerException iae) {
-            assertEquals(iae.toString().contains("session is null"), true);
+            // The exception message is different, but still informative.
+            assertEquals(iae.toString().contains("self is null"), true);
             caught = true;
         }
         assertEquals(caught, true);
@@ -273,6 +304,60 @@ public class AutoCloseTest {
             caught = true;
         }
         assertEquals(caught, true);
+    }
+
+    public void multithreadedHelper(boolean explicitClose, int nthreads)
+    throws WiredTigerPackingException {
+        Session s = sessionSetup();
+        Cursor c = populate(s);
+
+        OpenSession[] threads = new OpenSession[nthreads];
+        for (int i = 0; i < nthreads; i++) {
+            threads[i] = new OpenSession(conn, i);
+            threads[i].start();
+        }
+
+        for (int i = 0; i < nthreads; i++) {
+            try {
+                threads[i].join();
+                if (explicitClose)
+                    threads[i].close();
+            } catch (InterruptedException e) {
+            }
+        }
+
+        try {
+            conn.close("");
+            connvalid = false;
+        }
+        catch (Exception e) {
+            // nothing
+        }
+        assertEquals(connvalid, false);
+    }
+
+    @Test
+    public void autoCloseConnection02()
+    throws WiredTigerPackingException {
+        multithreadedHelper(false, 2);
+    }
+
+    @Test
+    public void autoCloseConnection03()
+    throws WiredTigerPackingException {
+        multithreadedHelper(true, 2);
+    }
+
+    @Test
+    public void autoCloseConnection04()
+    throws WiredTigerPackingException {
+        multithreadedHelper(false, 10);
+    }
+
+    @Test
+    public void autoCloseConnection05()
+    throws WiredTigerPackingException {
+        multithreadedHelper(true, 10);
     }
 
     @After
