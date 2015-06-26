@@ -1019,8 +1019,6 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
         return Status(ErrorCodes::OperationFailed,
                       str::stream() << "couldn't connect to server " << _serverAddress.toString()
                                     << ", connection attempt failed");
-    } else {
-        LOG(1) << "connected to server " << toString() << endl;
     }
 
 #ifdef MONGO_CONFIG_SSL
@@ -1033,6 +1031,7 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
 #endif
 
     _failed = false;
+    LOG(1) << "connected to server " << toString() << endl;
     return Status::OK();
 }
 
