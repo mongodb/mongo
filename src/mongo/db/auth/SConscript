@@ -4,8 +4,11 @@ Import("env")
 
 env.Library('serverauth', ['mongo_authentication_session.cpp'])
 
-env.Command(['action_type.h', 'action_type.cpp'], ['generate_action_types.py', 'action_types.txt'],
-            '$PYTHON $SOURCES $TARGETS')
+generateActionTypes = env.Command(
+    target=['action_type.h', 'action_type.cpp'],
+    source=['generate_action_types.py', 'action_types.txt'],
+    action='$PYTHON $SOURCES $TARGETS')
+env.Alias('generated-sources', generateActionTypes)
 
 # Just the data structures used
 env.Library('authcore', ['action_set.cpp',

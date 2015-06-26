@@ -116,7 +116,7 @@ else:
     version_parts[3] = 0
 version_parts = [ int(x) for x in version_parts[:4]]
 
-versionInfo = env.Substfile(
+generatedVersionFile = env.Substfile(
     'util/version.cpp.in',
     SUBST_DICT=[
         ('@mongo_version@', env['MONGO_VERSION']),
@@ -139,6 +139,7 @@ versionInfo = env.Substfile(
         ('@buildinfo_cc_version@', get_toolchain_ver('CC')),
         ('@buildinfo_cxx_version@', get_toolchain_ver('CXX')),
     ])
+env.Alias('generated-sources', generatedVersionFile)
 
 config_header_substs = (
     ('@mongo_config_byte_order@', 'MONGO_CONFIG_BYTE_ORDER'),
@@ -164,10 +165,11 @@ def makeConfigHeaderDefine(self, key):
     return val
 env.AddMethod(makeConfigHeaderDefine)
 
-configHeaderFile = env.Substfile(
+generateConfigHeaderFile = env.Substfile(
     'config.h.in',
     SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs]
 )
+env.Alias('generated-sources', generateConfigHeaderFile)
 
 env.Library('version',
             [

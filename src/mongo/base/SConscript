@@ -2,8 +2,11 @@
 
 Import("env")
 
-env.Command(['error_codes.h', 'error_codes.cpp'], ['generate_error_codes.py', 'error_codes.err'],
-            '$PYTHON $SOURCES $TARGETS')
+generateErrorCodes = env.Command(
+    target=['error_codes.h', 'error_codes.cpp'],
+    source=['generate_error_codes.py', 'error_codes.err'],
+    action='$PYTHON $SOURCES $TARGETS')
+env.Alias('generated-sources', generateErrorCodes)
 
 env.Library('base',
             ['data_range.cpp',
