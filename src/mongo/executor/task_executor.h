@@ -102,9 +102,30 @@ public:
     virtual ~TaskExecutor();
 
     /**
-     * Signals to the executor that it should shut down.
+     * Causes the executor to initialize its internal state (start threads if appropriate, create
+     * network sockets, etc). This method may be called at most once for the lifetime of an
+     * executor.
+     */
+    virtual void startup() = 0;
+
+    /**
+     * Signals to the executor that it should shut down. This method should not block. After
+     * calling shutdown, it is illegal to schedule more tasks on the executor and join should be
+     * called to wait for shutdown to complete.
+     *
+     * It is legal to call this method multiple times, but it should only be called after startup
+     * has been called.
      */
     virtual void shutdown() = 0;
+
+    /**
+     * Waits for the shutdown sequence initiated by an earlier call to shutdown to complete. It is
+     * only legal to call this method if startup has been called earlier.
+     *
+     * If startup is ever called, the code must ensure that join is eventually called once and only
+     * once.
+     */
+    virtual void join() = 0;
 
     /**
      * Returns diagnostic information.

@@ -30,14 +30,11 @@
 
 #include <functional>
 #include <future>
-#include <thread>
 #include <type_traits>
 #include <vector>
 
-#include "mongo/executor/network_interface_mock.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/executor/network_interface_mock.h"
 
 namespace mongo {
 
@@ -157,26 +154,12 @@ public:
     void onCommand(OnCommandFunction func);
     void onFindCommand(OnFindCommandFunction func);
 
-    /**
-     * Starts the executor thread that will process the network tasks.
-     */
-    void startUp();
-
-    /**
-     * Joins the executor thread.
-     */
-    void shutDown();
-
 private:
     // Task executor used for running asynchronous operations.
     repl::ReplicationExecutor* _executor;
 
     // Mocked out network under the task executor.
     NetworkInterfaceMock* _mockNetwork;
-
-    // Thread used to execute the task executor's loop. This thread will be busy until the
-    // shutdown is called on the shard registry's task executor.
-    stdx::thread _executorThread;
 };
 
 }  // namespace executor

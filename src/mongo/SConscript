@@ -232,6 +232,8 @@ env.Install(
             'db/conn_pool_options',
             'db/coredb',
             'db/mongodandmongos',
+            'db/repl/replication_executor',
+            'executor/network_interface_impl',
             's/catalog/legacy/catalog_manager_legacy',
             's/catalog/replset/catalog_manager_replica_set',
             's/client/sharding_connection_hook',

@@ -29,7 +29,6 @@
 #pragma once
 
 #include <string>
-#include <thread>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -45,6 +44,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -110,7 +110,9 @@ public:
 
     std::string getDiagnosticString() override;
     Date_t now() override;
+    void startup() override;
     void shutdown() override;
+    void join() override;
     void signalEvent(const EventHandle& event) override;
     StatusWith<EventHandle> makeEvent() override;
     StatusWith<CallbackHandle> onEvent(const EventHandle& event, const CallbackFn& work) override;
@@ -122,9 +124,10 @@ public:
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle) override;
 
-
     /**
-     * Executes the run loop.  May be called up to one time.
+     * Executes the run loop. May be called up to one time.
+     *
+     * Doesn't need to be public, so do not call directly unless from unit-tests.
      *
      * Returns after the executor has been shutdown and is safe to delete.
      */
@@ -300,6 +303,10 @@ private:
 
     std::unique_ptr<executor::NetworkInterface> _networkInterface;
     std::unique_ptr<StorageInterface> _storageInterface;
+
+    // Thread which executes the run method. Started by startup and must be jointed after shutdown.
+    stdx::thread _executorThread;
+
     stdx::mutex _mutex;
     stdx::mutex _terribleExLockSyncMutex;
     stdx::condition_variable _noMoreWaitingThreads;

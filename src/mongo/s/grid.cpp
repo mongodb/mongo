@@ -41,6 +41,9 @@
 
 namespace mongo {
 
+// Global grid instance
+Grid grid;
+
 Grid::Grid() : _allowLocalShard(true) {}
 
 void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
@@ -116,8 +119,9 @@ bool Grid::getConfigShouldBalance() const {
 void Grid::clearForUnitTests() {
     _catalogManager.reset();
     _catalogCache.reset();
+
+    _shardRegistry->shutdown();
     _shardRegistry.reset();
 }
 
-Grid grid;
-}
+}  // namespace mongo

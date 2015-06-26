@@ -49,8 +49,9 @@ Status ReplicationExecutorTest::getDetectableErrorStatus() {
 }
 
 void ReplicationExecutorTest::launchExecutorThread() {
-    ASSERT(!_executorThread);
-    _executorThread.reset(new stdx::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
+    _executor->startup();
+    _executorStarted = true;
+
     postExecutorThreadLaunch();
 }
 
@@ -59,25 +60,30 @@ void ReplicationExecutorTest::postExecutorThreadLaunch() {
 }
 
 void ReplicationExecutorTest::joinExecutorThread() {
-    ASSERT(_executorThread);
-    getNet()->exitNetwork();
-    _executorThread->join();
-    _executorThread.reset();
+    invariant(_executorStarted);
+
+    _net->exitNetwork();
+    _executor->join();
+    _executorStarted = false;
 }
 
 void ReplicationExecutorTest::setUp() {
-    _net = new executor::NetworkInterfaceMock;
-    _storage = new StorageInterfaceMock;
-    _executor.reset(new ReplicationExecutor(_net, _storage, prngSeed));
+    _net = new executor::NetworkInterfaceMock();
+    _storage = new StorageInterfaceMock();
+
+    // Takes ownership of the net and storage
+    _executor = stdx::make_unique<ReplicationExecutor>(_net, _storage, prngSeed);
 }
 
 void ReplicationExecutorTest::tearDown() {
-    if (_executorThread) {
+    if (_executorStarted) {
         _executor->shutdown();
         joinExecutorThread();
+
+        _net = nullptr;
+        _storage = nullptr;
+        _executor.reset();
     }
-    _executor.reset();
-    _net = nullptr;
 }
 
 }  // namespace repl

@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/stdx/thread.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -38,8 +38,6 @@ class NetworkInterfaceMock;
 }  // namespace executor
 
 namespace repl {
-
-using std::unique_ptr;
 
 class ReplicationExecutor;
 class StorageInterfaceMock;
@@ -60,6 +58,7 @@ protected:
     executor::NetworkInterfaceMock* getNet() {
         return _net;
     }
+
     ReplicationExecutor& getExecutor() {
         return *_executor;
     }
@@ -97,12 +96,13 @@ protected:
      */
     void tearDown() override;
 
-
 private:
-    executor::NetworkInterfaceMock* _net;
-    StorageInterfaceMock* _storage;
-    unique_ptr<ReplicationExecutor> _executor;
-    unique_ptr<stdx::thread> _executorThread;
+    // The lifetime of the network and the storage becomes owned by the executor
+    executor::NetworkInterfaceMock* _net{nullptr};
+    StorageInterfaceMock* _storage{nullptr};
+
+    std::unique_ptr<ReplicationExecutor> _executor;
+    bool _executorStarted{false};
 };
 
 }  // namespace repl

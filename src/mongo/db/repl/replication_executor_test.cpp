@@ -154,7 +154,6 @@ private:
     NetworkInterfaceMock* net;
     StorageInterfaceMock* storage;
     ReplicationExecutor executor;
-    stdx::thread executorThread;
     const ReplicationExecutor::EventHandle goEvent;
     const ReplicationExecutor::EventHandle event2;
     const ReplicationExecutor::EventHandle event3;
@@ -176,7 +175,6 @@ EventChainAndWaitingTest::EventChainAndWaitingTest()
     : net(new NetworkInterfaceMock),
       storage(new StorageInterfaceMock),
       executor(net, storage, prngSeed),
-      executorThread(stdx::bind(&ReplicationExecutor::run, &executor)),
       goEvent(unittest::assertGet(executor.makeEvent())),
       event2(unittest::assertGet(executor.makeEvent())),
       event3(unittest::assertGet(executor.makeEvent())),
@@ -185,6 +183,8 @@ EventChainAndWaitingTest::EventChainAndWaitingTest()
       status3(ErrorCodes::InternalError, "Not mutated"),
       status4(ErrorCodes::InternalError, "Not mutated"),
       status5(ErrorCodes::InternalError, "Not mutated") {
+    executor.startup();
+
     triggered2 = stdx::bind(setStatusAndTriggerEvent, stdx::placeholders::_1, &status2, event2);
     triggered3 = stdx::bind(setStatusAndTriggerEvent, stdx::placeholders::_1, &status3, event3);
 }
@@ -204,7 +204,7 @@ void EventChainAndWaitingTest::run() {
         executor.scheduleWork(stdx::bind(setStatusAndShutdown, stdx::placeholders::_1, &status5)));
     executor.wait(shutdownCallback);
     neverSignaledWaiter.join();
-    executorThread.join();
+    executor.join();
     ASSERT_OK(status1);
     ASSERT_OK(status2);
     ASSERT_OK(status3);

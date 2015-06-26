@@ -66,7 +66,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -367,8 +366,7 @@ void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
         return;
     }
 
-    _topCoordDriverThread.reset(
-        new stdx::thread(stdx::bind(&ReplicationExecutor::run, &_replExecutor)));
+    _replExecutor.startup();
 
     bool doneLoadingConfig = _startLoadLocalConfig(txn);
     if (doneLoadingConfig) {
@@ -410,8 +408,9 @@ void ReplicationCoordinatorImpl::shutdown() {
         }
     }
 
+    // joining the replication executor is blocking so it must be run outside of the mutex
     _replExecutor.shutdown();
-    _topCoordDriverThread->join();  // must happen outside _mutex
+    _replExecutor.join();
     _externalState->shutdown();
 }
 

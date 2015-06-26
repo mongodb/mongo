@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
@@ -62,6 +63,8 @@ class TaskExecutor;
  * the respective replica sets for membership changes.
  */
 class ShardRegistry {
+    MONGO_DISALLOW_COPYING(ShardRegistry);
+
 public:
     /**
      * Instantiates a new shard registry.
@@ -79,6 +82,17 @@ public:
                   CatalogManager* catalogManager);
 
     ~ShardRegistry();
+
+    /**
+     * Invokes the executor's startup method, which will start any networking/async execution
+     * threads.
+     */
+    void startup();
+
+    /**
+     * Stops the executor thread and waits for it to join.
+     */
+    void shutdown();
 
     RemoteCommandRunner* getCommandRunner() const {
         return _commandRunner.get();

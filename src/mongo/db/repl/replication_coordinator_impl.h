@@ -48,7 +48,6 @@
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -926,10 +925,6 @@ private:
 
     // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
     std::unique_ptr<ReplicationCoordinatorExternalState> _externalState;  // (PS)
-
-    // Thread that drives actions in the topology coordinator
-    // Set in startReplication() and thereafter accessed in shutdown.
-    std::unique_ptr<stdx::thread> _topCoordDriverThread;  // (I)
 
     // Our RID, used to identify us to our sync source when sending replication progress
     // updates upstream.  Set once in startReplication() and then never modified again.

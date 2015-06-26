@@ -77,6 +77,15 @@ ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targe
 
 ShardRegistry::~ShardRegistry() = default;
 
+void ShardRegistry::startup() {
+    _executor->startup();
+}
+
+void ShardRegistry::shutdown() {
+    _executor->shutdown();
+    _executor->join();
+}
+
 void ShardRegistry::reload() {
     vector<ShardType> shards;
     Status status = _catalogManager->getAllShards(&shards);

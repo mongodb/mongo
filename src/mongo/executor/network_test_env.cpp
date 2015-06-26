@@ -28,13 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/executor/network_test_env.h"
+
 #include "mongo/base/status_with.h"
-#include "mongo/client/remote_command_runner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/cursor_responses.h"
-#include "mongo/db/repl/replication_executor.h"
-#include "mongo/executor/network_test_env.h"
-#include "mongo/executor/network_interface_mock.h"
 
 namespace mongo {
 
@@ -86,14 +84,6 @@ void NetworkTestEnv::onFindCommand(OnFindCommandFunction func) {
 
         return result.obj();
     });
-}
-
-void NetworkTestEnv::startUp() {
-    _executorThread = stdx::thread([this] { _executor->run(); });
-}
-
-void NetworkTestEnv::shutDown() {
-    _executorThread.join();
 }
 
 }  // namespace executor
