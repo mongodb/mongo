@@ -65,6 +65,9 @@ struct __wt_cache {
 	uint64_t pages_dirty;
 	uint64_t bytes_read;		/* Bytes read into memory */
 
+	uint64_t app_evicts;		/* Pages evicted by user threads */
+	uint64_t app_waits;		/* User threads waited for cache */
+
 	uint64_t evict_max_page_size;	/* Largest page seen at eviction */
 
 	/*
@@ -105,8 +108,13 @@ struct __wt_cache {
 	/*
 	 * Cache pool information.
 	 */
-	uint64_t cp_saved_read;		/* Read count from last pass */
-	uint64_t cp_current_read;	/* Read count from current pass */
+	uint64_t cp_saved_app_evicts;	/* User eviction count at last review */
+	uint64_t cp_saved_app_waits;	/* User wait count at last review */
+	uint64_t cp_saved_read;		/* Read count at last review */
+	uint64_t cp_pass_app_evicts;	/* User eviction count from this pass */
+	uint64_t cp_pass_app_waits;	/* User wait count from this pass */
+	uint64_t cp_pass_pressure;	/* Calculated pressure from this pass */
+	uint64_t cp_pass_read;		/* Read count from this pass */
 	uint32_t cp_skip_count;		/* Post change stabilization */
 	uint64_t cp_reserved;		/* Base size for this cache */
 	WT_SESSION_IMPL *cp_session;	/* May be used for cache management */

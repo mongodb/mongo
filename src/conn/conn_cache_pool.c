@@ -26,6 +26,14 @@
 /* Balancing passes after a reduction before a connection is a candidate. */
 #define	WT_CACHE_POOL_REDUCE_SKIPS	5
 
+/*
+ * Constants that control how much influence different metrics have on
+ * the pressure calculation.
+ */
+#define	WT_CACHE_POOL_APP_EVICT_MULTIPLIER	10
+#define	WT_CACHE_POOL_APP_WAIT_MULTIPLIER	50
+#define	WT_CACHE_POOL_READ_MULTIPLIER	1
+
 static int __cache_pool_adjust(WT_SESSION_IMPL *, uint64_t, uint64_t, int *);
 static int __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
 static int __cache_pool_balance(WT_SESSION_IMPL *);
@@ -463,12 +471,33 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 		new = cache->bytes_read;
 		/* Handle wrapping of eviction requests. */
 		if (new >= cache->cp_saved_read)
-			cache->cp_current_read = new - cache->cp_saved_read;
+			cache->cp_pass_read = new - cache->cp_saved_read;
 		else
-			cache->cp_current_read = new;
+			cache->cp_pass_read = new;
 		cache->cp_saved_read = new;
-		if (cache->cp_current_read > highest)
-			highest = cache->cp_current_read;
+
+		/* Update the application eviction count information */
+		new = cache->cp_saved_app_evicts;
+		cache->cp_pass_app_evicts =
+		    new - cache->cp_pass_app_evicts;
+		cache->cp_saved_app_evicts = new;
+
+		/* Update the eviction wait information */
+		new = cache->cp_saved_app_waits;
+		cache->cp_pass_app_waits =
+		    new - cache->cp_pass_app_waits;
+		cache->cp_saved_app_waits = new;
+
+		/* Calculate the weighted pressure for this member */
+		cache->cp_pass_pressure =
+		    (cache->cp_pass_app_evicts *
+		    WT_CACHE_POOL_APP_EVICT_MULTIPLIER) +
+		    (cache->cp_pass_app_waits *
+		    WT_CACHE_POOL_APP_WAIT_MULTIPLIER) +
+		    (cache->cp_pass_read * WT_CACHE_POOL_READ_MULTIPLIER);
+
+		if (cache->cp_pass_pressure > highest)
+			highest = cache->cp_pass_pressure;
 	}
 	WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 	    "Highest eviction count: %" PRIu64 ", entries: %" PRIu64,
@@ -520,7 +549,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 * are to the most active the more cache we should get
 		 * assigned.
 		 */
-		read_pressure = cache->cp_current_read / highest_percentile;
+		read_pressure = cache->cp_pass_read / highest_percentile;
 		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
 		    entry->cache_size, read_pressure, cache->cp_skip_count));
@@ -549,8 +578,8 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 */
 		} else if ((force && entry->cache_size > reserved) ||
 		    (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
-		     highest > 1 && entry->cache_size > reserved &&
-		     cp->currently_used >= cp->size)) {
+		    highest > 1 && entry->cache_size > reserved &&
+		    cp->currently_used >= cp->size)) {
 			grew = 0;
 			/*
 			 * Shrink by a chunk size if that doesn't drop us
@@ -570,10 +599,10 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 *  - Additional cache would benefit the connection
 		 */
 		} else if (entry->cache_size < cp->size &&
-		     cache->bytes_inmem >=
-		     (entry->cache_size * cache->eviction_target) / 100 &&
-		     cp->currently_used < cp->size &&
-		     read_pressure > bump_threshold) {
+		    __wt_cache_bytes_inuse(cache) >=
+		    (entry->cache_size * cache->eviction_target) / 100 &&
+		    cp->currently_used < cp->size &&
+		    read_pressure > bump_threshold) {
 			grew = 1;
 			adjusted = WT_MIN(cp->chunk,
 			    cp->size - cp->currently_used);
