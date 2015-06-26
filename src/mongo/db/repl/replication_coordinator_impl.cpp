@@ -154,7 +154,14 @@ DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCo
     options.applierFn = [](OperationContext*, const BSONObj&) -> Status { return Status::OK(); };
     options.rollbackFn =
         [](OperationContext*, const OpTime&, const HostAndPort&) { return Status::OK(); };
-    options.replicationProgressManager = replCoord;
+    options.prepareReplSetUpdatePositionCommandFn = [replCoord]() -> StatusWith<BSONObj> {
+        BSONObjBuilder bob;
+        if (replCoord->prepareReplSetUpdatePositionCommand(&bob)) {
+            return bob.obj();
+        }
+        return Status(ErrorCodes::OperationFailed,
+                      "unable to prepare replSetUpdatePosition command object");
+    };
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastOptime(); };
     options.setMyLastOptime =
         [replCoord](const OpTime& opTime) { replCoord->setMyLastOptime(opTime); };

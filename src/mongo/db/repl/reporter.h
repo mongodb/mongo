@@ -29,24 +29,28 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
 namespace repl {
 
-class ReplicationProgressManager {
-public:
-    virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
-    virtual ~ReplicationProgressManager() = default;
-};
-
 class Reporter {
     MONGO_DISALLOW_COPYING(Reporter);
 
 public:
+    /**
+     * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
+     * be sent to this node's sync source to update it about our progress in replication.
+     *
+     * The returned status indicates whether or not the command was created.
+     */
+    using PrepareReplSetUpdatePositionCommandFn = stdx::function<StatusWith<BSONObj>()>;
+
     Reporter(ReplicationExecutor* executor,
-             ReplicationProgressManager* replicationProgressManager,
+             PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn,
              const HostAndPort& target);
     virtual ~Reporter();
 
@@ -99,7 +103,9 @@ private:
 
     // Not owned by us.
     ReplicationExecutor* _executor;
-    ReplicationProgressManager* _updatePositionSource;
+
+    // Prepares update command object.
+    PrepareReplSetUpdatePositionCommandFn _prepareReplSetUpdatePositionCommandFn;
 
     // Host to whom the Reporter sends updates.
     HostAndPort _target;

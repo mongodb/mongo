@@ -80,9 +80,7 @@ public:
     HostAndPort _blacklistedSource;
 };
 
-class DataReplicatorTest : public ReplicationExecutorTest,
-                           public ReplicationProgressManager,
-                           public SyncSourceSelector {
+class DataReplicatorTest : public ReplicationExecutorTest, public SyncSourceSelector {
 public:
     DataReplicatorTest() {}
 
@@ -99,12 +97,6 @@ public:
         _myLastOpTime = OpTime();
         _memberState = MemberState::RS_UNKNOWN;
         _syncSourceSelector.reset(new SyncSourceSelectorMock(HostAndPort("localhost", -1)));
-    }
-
-    // ReplicationProgressManager
-    bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) override {
-        cmdBuilder->append("replSetUpdatePosition", 1);
-        return true;
     }
 
     // SyncSourceSelector
@@ -179,7 +171,8 @@ protected:
             return _rollbackFn(txn, lastOpTimeWritten, syncSource);
         };
 
-        options.replicationProgressManager = this;
+        options.prepareReplSetUpdatePositionCommandFn =
+            []() -> StatusWith<BSONObj> { return BSON("replSetUpdatePosition" << 1); };
         options.getMyLastOptime = [this]() { return _myLastOpTime; };
         options.setMyLastOptime = [this](const OpTime& opTime) { _setMyLastOptime(opTime); };
         options.setFollowerMode = [this](const MemberState& state) {

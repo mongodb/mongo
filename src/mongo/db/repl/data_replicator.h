@@ -42,6 +42,7 @@
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/reporter.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -73,7 +74,6 @@ class OplogFetcher;
 struct InitialSyncState;
 struct MemberState;
 class ReplicationProgressManager;
-class Reporter;
 class SyncSourceSelector;
 
 /** State for decision tree */
@@ -127,7 +127,7 @@ struct DataReplicatorOptions {
 
     Applier::ApplyOperationFn applierFn;
     RollbackFn rollbackFn;
-    ReplicationProgressManager* replicationProgressManager = nullptr;
+    Reporter::PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn;
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
     SetFollowerModeFn setFollowerMode;

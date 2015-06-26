@@ -44,7 +44,6 @@
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/reporter.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
@@ -518,8 +517,8 @@ DataReplicator::DataReplicator(DataReplicatorOptions opts, ReplicationExecutor* 
     uassert(ErrorCodes::BadValue, "invalid applier function", _opts.applierFn);
     uassert(ErrorCodes::BadValue, "invalid rollback function", _opts.rollbackFn);
     uassert(ErrorCodes::BadValue,
-            "invalid replication progress manager",
-            _opts.replicationProgressManager);
+            "invalid replSetUpdatePosition command object creation function",
+            _opts.prepareReplSetUpdatePositionCommandFn);
     uassert(ErrorCodes::BadValue, "invalid getMyLastOptime function", _opts.getMyLastOptime);
     uassert(ErrorCodes::BadValue, "invalid setMyLastOptime function", _opts.setMyLastOptime);
     uassert(ErrorCodes::BadValue, "invalid setFollowerMode function", _opts.setFollowerMode);
@@ -1013,7 +1012,8 @@ void DataReplicator::_doNextActions_Steady_inlock() {
 
     if (!_reporterPaused && (!_reporter || !_reporter->getStatus().isOK())) {
         // TODO get reporter in good shape
-        _reporter.reset(new Reporter(_exec, _opts.replicationProgressManager, _syncSource));
+        _reporter.reset(
+            new Reporter(_exec, _opts.prepareReplSetUpdatePositionCommandFn, _syncSource));
     }
 }
 

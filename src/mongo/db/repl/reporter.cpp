@@ -39,16 +39,18 @@ namespace mongo {
 namespace repl {
 
 Reporter::Reporter(ReplicationExecutor* executor,
-                   ReplicationProgressManager* replicationProgressManager,
+                   PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn,
                    const HostAndPort& target)
     : _executor(executor),
-      _updatePositionSource(replicationProgressManager),
+      _prepareReplSetUpdatePositionCommandFn(prepareReplSetUpdatePositionCommandFn),
       _target(target),
       _status(Status::OK()),
       _willRunAgain(false),
       _active(false) {
     uassert(ErrorCodes::BadValue, "null replication executor", executor);
-    uassert(ErrorCodes::BadValue, "null replication progress manager", replicationProgressManager);
+    uassert(ErrorCodes::BadValue,
+            "null function to create replSetUpdatePosition command object",
+            prepareReplSetUpdatePositionCommandFn);
     uassert(ErrorCodes::BadValue, "target name cannot be empty", !target.empty());
 }
 
@@ -101,14 +103,15 @@ Status Reporter::_schedule_inlock() {
 
     LOG(2) << "Reporter scheduling report to : " << _target;
 
-    BSONObjBuilder cmd;
-    if (!_updatePositionSource->prepareReplSetUpdatePositionCommand(&cmd)) {
+    auto prepareResult = _prepareReplSetUpdatePositionCommandFn();
+
+    if (!prepareResult.isOK()) {
         // Returning NodeNotFound because currently this is the only way
         // prepareReplSetUpdatePositionCommand() can fail in production.
         return Status(ErrorCodes::NodeNotFound,
                       "Reporter failed to create replSetUpdatePositionCommand command.");
     }
-    auto cmdObj = cmd.obj();
+    auto cmdObj = prepareResult.getValue();
     StatusWith<ReplicationExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(
             RemoteCommandRequest(_target, "admin", cmdObj),
