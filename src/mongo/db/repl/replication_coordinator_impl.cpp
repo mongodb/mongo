@@ -2490,7 +2490,7 @@ void ReplicationCoordinatorImpl::_processReplSetRequestVotes_finish(
     }
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _topCoord->processReplSetRequestVotes(args, response, getMyLastOptime());
+    _topCoord->processReplSetRequestVotes(args, response, _getMyLastOptime_inlock());
     *result = Status::OK();
 }
 
