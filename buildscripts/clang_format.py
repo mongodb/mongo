@@ -29,7 +29,7 @@ from multiprocessing import cpu_count
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
 from buildscripts.resmokelib.utils import globstar
 from buildscripts import moduleconfig
@@ -189,7 +189,10 @@ class ClangFormat(object):
     and linting/formating an individual file
     """
     def __init__(self, path, cache_dir):
-        clang_format_progname = CLANG_FORMAT_PROGNAME
+        if os.path.exists('/usr/bin/clang-format-3.6'):
+            clang_format_progname = 'clang-format-3.6'
+        else:
+            clang_format_progname = CLANG_FORMAT_PROGNAME
 
         # Initialize clang-format configuration information
         if sys.platform.startswith("linux"):
@@ -315,7 +318,7 @@ def parallel_process(items, func):
     except NotImplementedError:
         cpus = 1
 
-    print("Running across %d cpus" % (cpus))
+    # print("Running across %d cpus" % (cpus))
 
     task_queue = Queue.Queue()
 
@@ -379,9 +382,11 @@ def get_base_dir():
         This script assumes that it is running in buildscripts/, and uses
         that to find the base directory.
     """
-    script_path = os.path.dirname(os.path.realpath(__file__))
-
-    return os.path.dirname(script_path)
+    try:
+        return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).rstrip()
+    except:
+        # We are not in a valid git directory. Use the script path instead.
+        return os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 def get_repos():
     """Get a list of Repos to check clang-format for
