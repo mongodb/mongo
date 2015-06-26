@@ -566,6 +566,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		if (entry->cache_size < reserved) {
 			grew = 1;
 			adjusted = reserved - entry->cache_size;
+
 		/*
 		 * Conditions for reducing the amount of resources for an
 		 * entry:
@@ -596,13 +597,15 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 *  - This entry is using less than the entire cache pool
 		 *  - The connection is using enough cache to require eviction
 		 *  - There is space available in the pool
-		 *  - Additional cache would benefit the connection
+		 *  - Additional cache would benefit the connection OR
+		 *  - The pool is less than half distributed
 		 */
 		} else if (entry->cache_size < cp->size &&
 		    __wt_cache_bytes_inuse(cache) >=
 		    (entry->cache_size * cache->eviction_target) / 100 &&
-		    cp->currently_used < cp->size &&
-		    read_pressure > bump_threshold) {
+		    ((cp->currently_used < cp->size &&
+		    read_pressure > bump_threshold) ||
+		    cp->currently_used < cp->size * 0.5)) {
 			grew = 1;
 			adjusted = WT_MIN(cp->chunk,
 			    cp->size - cp->currently_used);
