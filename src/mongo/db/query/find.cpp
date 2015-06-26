@@ -181,12 +181,12 @@ void beginQueryOp(OperationContext* txn,
                   int ntoreturn,
                   int ntoskip) {
     auto curop = CurOp::get(txn);
+    curop->debug().ns = nss.ns();
     curop->debug().query = queryObj;
     curop->debug().ntoreturn = ntoreturn;
     curop->debug().ntoskip = ntoskip;
     stdx::lock_guard<Client> lk(*txn->getClient());
     curop->setQuery_inlock(queryObj);
-    curop->setNS_inlock(nss.ns());
 }
 
 void endQueryOp(OperationContext* txn,

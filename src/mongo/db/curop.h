@@ -151,6 +151,7 @@ public:
     // basic options
     int op;
     bool iscommand;
+    std::string ns;
     BSONObj query;
     BSONObj updateobj;
 
