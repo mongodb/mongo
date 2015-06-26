@@ -521,7 +521,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
-	uint64_t adjusted, highest_percentile, read_pressure, reserved;
+	uint64_t adjusted, highest_percentile, pressure, reserved;
 	int force, grew;
 
 	*adjustedp = 0;
@@ -535,7 +535,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		WT_RET(__wt_verbose(session,
 		    WT_VERB_SHARED_CACHE, "Cache pool distribution: "));
 		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
-		    "\t" "cache_size, read_pressure, skips: "));
+		    "\t" "cache_size, pressure, skips: "));
 	}
 
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
@@ -550,10 +550,10 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 * are to the most active the more cache we should get
 		 * assigned.
 		 */
-		read_pressure = cache->cp_pass_read / highest_percentile;
+		pressure = cache->cp_pass_pressure / highest_percentile;
 		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
-		    entry->cache_size, read_pressure, cache->cp_skip_count));
+		    entry->cache_size, pressure, cache->cp_skip_count));
 
 		/* Allow to stabilize after changes. */
 		if (cache->cp_skip_count > 0 && --cache->cp_skip_count > 0)
@@ -579,7 +579,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 *    space in the pool.
 		 */
 		} else if ((force && entry->cache_size > reserved) ||
-		    (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
+		    (pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
 		    highest > 1 && entry->cache_size > reserved &&
 		    cp->currently_used >= cp->size)) {
 			grew = 0;
@@ -605,7 +605,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		    __wt_cache_bytes_inuse(cache) >=
 		    (entry->cache_size * cache->eviction_target) / 100 &&
 		    ((cp->currently_used < cp->size &&
-		    read_pressure > bump_threshold) ||
+		    pressure > bump_threshold) ||
 		    cp->currently_used < cp->size * 0.5)) {
 			grew = 1;
 			adjusted = WT_MIN(cp->chunk,
