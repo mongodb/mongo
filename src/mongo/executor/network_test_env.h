@@ -42,7 +42,6 @@ class BSONObj;
 class CatalogManagerReplicaSet;
 class DistLockManagerMock;
 struct RemoteCommandRequest;
-class RemoteCommandRunnerMock;
 class ShardRegistry;
 template <typename T>
 class StatusWith;

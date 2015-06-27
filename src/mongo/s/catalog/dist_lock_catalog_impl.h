@@ -37,7 +37,6 @@
 
 namespace mongo {
 
-class RemoteCommandRunner;
 class RemoteCommandTargeter;
 class ShardRegistry;
 

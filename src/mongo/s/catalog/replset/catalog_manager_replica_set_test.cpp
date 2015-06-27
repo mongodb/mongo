@@ -549,8 +549,8 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommand) {
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        bool ok = catalogManager()->runUserManagementReadCommand(
-            "test", BSON("usersInfo" << 1), &responseBuilder);
+        bool ok =
+            catalogManager()->runReadCommand("test", BSON("usersInfo" << 1), &responseBuilder);
         ASSERT_TRUE(ok);
 
         BSONObj response = responseBuilder.obj();
@@ -566,7 +566,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommand) {
         return BSON("ok" << 1 << "users" << BSONArrayBuilder().arr());
     });
 
-    // Now wait for the runUserManagementReadCommand call to return
+    // Now wait for the runReadCommand call to return
     future.wait_for(kFutureTimeout);
 }
 
@@ -577,8 +577,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommandUnsatisfied
         Status(ErrorCodes::FailedToSatisfyReadPreference, "no nodes up"));
 
     BSONObjBuilder responseBuilder;
-    bool ok = catalogManager()->runUserManagementReadCommand(
-        "test", BSON("usersInfo" << 1), &responseBuilder);
+    bool ok = catalogManager()->runReadCommand("test", BSON("usersInfo" << 1), &responseBuilder);
     ASSERT_FALSE(ok);
 
     Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());

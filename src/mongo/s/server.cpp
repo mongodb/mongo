@@ -38,7 +38,6 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/global_conn_pool.h"
-#include "mongo/client/remote_command_runner_impl.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
@@ -230,7 +229,6 @@ static ExitCode runMongosServer(bool doUpgrade) {
 
     auto shardRegistry(
         stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
-                                         stdx::make_unique<RemoteCommandRunnerImpl>(0),
                                          stdx::make_unique<repl::ReplicationExecutor>(
                                              new executor::NetworkInterfaceImpl(), nullptr, 0),
                                          nullptr,

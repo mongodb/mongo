@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -89,7 +91,12 @@ public:
                 continue;
             }
 
-            BSONObj x = s->runCommand("admin", "fsync");
+            const auto shardHost = uassertStatusOK(
+                s->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
+
+            BSONObj x = uassertStatusOK(
+                grid.shardRegistry()->runCommand(shardHost, "admin", BSON("fsync" << 1)));
+
             sub.append(s->getId(), x);
 
             if (!x["ok"].trueValue()) {
@@ -105,7 +112,7 @@ public:
         return ok;
     }
 
-} fsyncCmd;
+} clusterFsyncCmd;
 
 }  // namespace
 }  // namespace mongo

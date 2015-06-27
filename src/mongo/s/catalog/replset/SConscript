@@ -49,7 +49,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_manager_replica_set',
-        '$BUILD_DIR/mongo/client/remote_command_runner_mock',
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/executor/network_test_env',

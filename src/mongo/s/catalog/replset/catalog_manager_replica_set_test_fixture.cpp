@@ -33,7 +33,6 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
-#include "mongo/client/remote_command_runner_mock.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -73,7 +72,6 @@ void CatalogManagerReplSetTestFixture::setUp() {
 
     auto shardRegistry(
         stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
-                                         stdx::make_unique<RemoteCommandRunnerMock>(),
                                          std::move(executor),
                                          _mockNetwork,
                                          cm.get()));
@@ -99,10 +97,6 @@ CatalogManagerReplicaSet* CatalogManagerReplSetTestFixture::catalogManager() con
 
 ShardRegistry* CatalogManagerReplSetTestFixture::shardRegistry() const {
     return grid.shardRegistry();
-}
-
-RemoteCommandRunnerMock* CatalogManagerReplSetTestFixture::commandRunner() const {
-    return RemoteCommandRunnerMock::get(shardRegistry()->getCommandRunner());
 }
 
 executor::NetworkInterfaceMock* CatalogManagerReplSetTestFixture::network() const {

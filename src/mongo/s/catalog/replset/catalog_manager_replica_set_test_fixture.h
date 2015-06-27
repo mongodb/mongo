@@ -39,7 +39,6 @@ class BSONObj;
 class CatalogManagerReplicaSet;
 class DistLockManagerMock;
 struct RemoteCommandRequest;
-class RemoteCommandRunnerMock;
 class ShardRegistry;
 template <typename T>
 class StatusWith;
@@ -66,8 +65,6 @@ protected:
     CatalogManagerReplicaSet* catalogManager() const;
 
     ShardRegistry* shardRegistry() const;
-
-    RemoteCommandRunnerMock* commandRunner() const;
 
     executor::NetworkInterfaceMock* network() const;
 
