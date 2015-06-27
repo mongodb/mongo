@@ -157,7 +157,9 @@ namespace mongo {
     
     bool MessagingPort::recv(Message& m) {
         try {
+#ifdef MONGO_SSL
 again:
+#endif
             //mmm( log() << "*  recv() sock:" << this->sock << endl; )
             MSGHEADER header;
             int headerLen = sizeof(MSGHEADER);
@@ -173,13 +175,6 @@ again:
                 string s = ss.str();
                 send( s.c_str(), s.size(), "http" );
                 return false;
-            }
-            else if ( len == -1 ) {
-                // Endian check from the client, after connecting, to see what mode server is running in.
-                unsigned foo = 0x10203040;
-                send( (char *) &foo, 4, "endian" );
-                psock->setHandshakeReceived();
-                goto again;
             }
             // If responseTo is not 0 or -1 for first packet assume SSL
             else if (psock->isAwaitingHandshake()) {
