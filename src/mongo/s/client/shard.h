@@ -95,6 +95,12 @@ public:
         return _targeter.get();
     }
 
+    BSONObj runCommand(const std::string& db, const std::string& simple) const;
+    BSONObj runCommand(const std::string& db, const BSONObj& cmd) const;
+
+    bool runCommand(const std::string& db, const std::string& simple, BSONObj& res) const;
+    bool runCommand(const std::string& db, const BSONObj& cmd, BSONObj& res) const;
+
     /**
      * Returns metadata and stats for this shard.
      */

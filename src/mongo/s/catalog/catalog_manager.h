@@ -276,9 +276,7 @@ public:
     virtual bool isShardHost(const ConnectionString& shardConnectionString) = 0;
 
     /**
-     * Runs a user management command on the config servers, potentially synchronizing through
-     * a distributed lock. Do not use for general write command execution.
-     *
+     * Runs a user management command on the config servers.
      * @param commandName: name of command
      * @param dbname: database for which the user management command is invoked
      * @param cmdObj: command obj
@@ -291,11 +289,11 @@ public:
                                                BSONObjBuilder* result) = 0;
 
     /**
-     * Runs a read-only command on a single config server.
+     * Runs a read-only user management command on a single config server.
      */
-    virtual bool runReadCommand(const std::string& dbname,
-                                const BSONObj& cmdObj,
-                                BSONObjBuilder* result) = 0;
+    virtual bool runUserManagementReadCommand(const std::string& dbname,
+                                              const BSONObj& cmdObj,
+                                              BSONObjBuilder* result) = 0;
 
     /**
      * Applies oplog entries to the config servers.

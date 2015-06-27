@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
+#include "mongo/client/remote_command_runner_mock.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
@@ -106,6 +107,7 @@ private:
 
         _shardRegistry =
             stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
+                                             stdx::make_unique<RemoteCommandRunnerMock>(),
                                              std::move(executor),
                                              network,
                                              &_catalogMgr);

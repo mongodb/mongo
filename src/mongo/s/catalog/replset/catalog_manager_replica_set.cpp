@@ -568,9 +568,9 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(const std::string& 
     return Command::getStatusFromCommandResult(response.getValue()).isOK();
 }
 
-bool CatalogManagerReplicaSet::runReadCommand(const std::string& dbname,
-                                              const BSONObj& cmdObj,
-                                              BSONObjBuilder* result) {
+bool CatalogManagerReplicaSet::runUserManagementReadCommand(const std::string& dbname,
+                                                            const BSONObj& cmdObj,
+                                                            BSONObjBuilder* result) {
     auto targeter = grid.shardRegistry()->getShard("config")->getTargeter();
     auto target = targeter->findHost(kConfigReadSelector);
     if (!target.isOK()) {

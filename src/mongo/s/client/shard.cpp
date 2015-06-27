@@ -36,8 +36,10 @@
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_runner.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -59,19 +61,61 @@ ShardPtr Shard::lookupRSName(const string& name) {
     return grid.shardRegistry()->lookupRSName(name);
 }
 
-ShardStatus Shard::getStatus() const {
-    const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
-    auto shardHost = uassertStatusOK(getTargeter()->findHost(readPref));
+BSONObj Shard::runCommand(const std::string& db, const std::string& simple) const {
+    return runCommand(db, BSON(simple << 1));
+}
 
-    // List databases command
-    BSONObj listDatabases = uassertStatusOK(
-        grid.shardRegistry()->runCommand(shardHost, "admin", BSON("listDatabases" << 1)));
+BSONObj Shard::runCommand(const string& db, const BSONObj& cmd) const {
+    BSONObj res;
+    bool ok = runCommand(db, cmd, res);
+    if (!ok) {
+        stringstream ss;
+        ss << "runCommand (" << cmd << ") on shard (" << _id << ") failed : " << res;
+        throw UserException(13136, ss.str());
+    }
+    res = res.getOwned();
+    return res;
+}
+
+bool Shard::runCommand(const std::string& db, const std::string& simple, BSONObj& res) const {
+    return runCommand(db, BSON(simple << 1), res);
+}
+
+bool Shard::runCommand(const string& db, const BSONObj& cmd, BSONObj& res) const {
+    const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
+    auto selectedHost = getTargeter()->findHost(readPref);
+    if (!selectedHost.isOK()) {
+        return false;
+    }
+
+    const RemoteCommandRequest request(selectedHost.getValue(), db, cmd);
+
+    auto statusCommand = grid.shardRegistry()->getCommandRunner()->runCommand(request);
+    if (!statusCommand.isOK()) {
+        return false;
+    }
+
+    res = statusCommand.getValue().data.getOwned();
+
+    return getStatusFromCommandResult(res).isOK();
+}
+
+ShardStatus Shard::getStatus() const {
+    BSONObj listDatabases;
+    uassert(28589,
+            str::stream() << "call to listDatabases on " << getConnString().toString()
+                          << " failed: " << listDatabases,
+            runCommand("admin", BSON("listDatabases" << 1), listDatabases));
+
     BSONElement totalSizeElem = listDatabases["totalSize"];
     uassert(28590, "totalSize field not found in listDatabases", totalSizeElem.isNumber());
 
-    // Server status command
-    BSONObj serverStatus = uassertStatusOK(
-        grid.shardRegistry()->runCommand(shardHost, "admin", BSON("serverStatus" << 1)));
+    BSONObj serverStatus;
+    uassert(28591,
+            str::stream() << "call to serverStatus on " << getConnString().toString()
+                          << " failed: " << serverStatus,
+            runCommand("admin", BSON("serverStatus" << 1), serverStatus));
+
     BSONElement versionElement = serverStatus["version"];
     uassert(28599, "version field not found in serverStatus", versionElement.type() == String);
 

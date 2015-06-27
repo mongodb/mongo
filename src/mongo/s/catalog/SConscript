@@ -128,6 +128,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'catalog_manager_mock',
         'dist_lock_catalog_impl',
+        '$BUILD_DIR/mongo/client/remote_command_runner_mock',
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/executor/network_test_env',

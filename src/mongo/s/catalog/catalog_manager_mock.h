@@ -106,9 +106,9 @@ public:
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder* result) override;
 
-    bool runReadCommand(const std::string& dbname,
-                        const BSONObj& cmdObj,
-                        BSONObjBuilder* result) override;
+    bool runUserManagementReadCommand(const std::string& dbname,
+                                      const BSONObj& cmdObj,
+                                      BSONObjBuilder* result) override;
 
     Status applyChunkOpsDeprecated(const BSONArray& updateOps,
                                    const BSONArray& preCondition) override;

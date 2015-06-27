@@ -34,6 +34,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/client/query_fetcher.h"
+#include "mongo/client/remote_command_runner_impl.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory.h"
 #include "mongo/executor/task_executor.h"
@@ -60,10 +61,12 @@ const Seconds kConfigCommandTimeout{30};
 }  // unnamed namespace
 
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
+                             std::unique_ptr<RemoteCommandRunner> commandRunner,
                              std::unique_ptr<executor::TaskExecutor> executor,
                              executor::NetworkInterface* network,
                              CatalogManager* catalogManager)
     : _targeterFactory(std::move(targeterFactory)),
+      _commandRunner(std::move(commandRunner)),
       _executor(std::move(executor)),
       _network(network),
       _catalogManager(catalogManager) {

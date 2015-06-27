@@ -28,14 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
+
 #include <map>
 #include <string>
 #include <vector>
 
 #include "mongo/client/connpool.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -99,11 +98,7 @@ public:
                 continue;
             }
 
-            const auto shardHost = uassertStatusOK(
-                s->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
-
-            BSONObj x = uassertStatusOK(
-                grid.shardRegistry()->runCommand(shardHost, "admin", BSON("listDatabases" << 1)));
+            BSONObj x = s->runCommand("admin", "listDatabases");
 
             BSONObjIterator j(x["databases"].Obj());
             while (j.more()) {
@@ -158,45 +153,45 @@ public:
             bb.append(temp.obj());
         }
 
-        {
-            // get config db from the config servers
-            BSONObjBuilder builder;
+        // Obtain the cached config shard
+        const auto configShard = grid.shardRegistry()->getShard("config");
 
-            if (!grid.catalogManager()->runReadCommand("config", BSON("dbstats" << 1), &builder)) {
-                bb.append(BSON("name"
-                               << "config"));
-            } else {
-                BSONObj x = builder.obj();
+        {
+            // get config db from the config servers (first one)
+            BSONObj x;
+            if (configShard->runCommand("config", "dbstats", x)) {
                 BSONObjBuilder b;
                 b.append("name", "config");
                 b.appendBool("empty", false);
-                if (x["fileSize"].type()) {
+                if (x["fileSize"].type())
                     b.appendAs(x["fileSize"], "sizeOnDisk");
-                } else {
+                else
                     b.append("sizeOnDisk", 1);
-                }
                 bb.append(b.obj());
+            } else {
+                bb.append(BSON("name"
+                               << "config"));
             }
         }
 
         {
-            // get admin db from the config servers
-            BSONObjBuilder builder;
-
-            if (!grid.catalogManager()->runReadCommand("admin", BSON("dbstats" << 1), &builder)) {
-                bb.append(BSON("name"
-                               << "admin"));
-            } else {
-                BSONObj x = builder.obj();
+            // get admin db from the config servers (first one)
+            BSONObj x;
+            if (configShard->runCommand("admin", "dbstats", x)) {
                 BSONObjBuilder b;
                 b.append("name", "admin");
                 b.appendBool("empty", false);
+
                 if (x["fileSize"].type()) {
                     b.appendAs(x["fileSize"], "sizeOnDisk");
                 } else {
                     b.append("sizeOnDisk", 1);
                 }
+
                 bb.append(b.obj());
+            } else {
+                bb.append(BSON("name"
+                               << "admin"));
             }
         }
 
@@ -205,10 +200,10 @@ public:
         result.appendNumber("totalSize", totalSize);
         result.appendNumber("totalSizeMb", totalSize / (1024 * 1024));
 
-        return true;
+        return 1;
     }
 
-} clusterCmdListDatabases;
+} cmdListDatabases;
 
 }  // namespace
 }  // namespace mongo
