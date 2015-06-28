@@ -53,6 +53,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_impl.h"
 #include "mongo/executor/task_executor.h"
