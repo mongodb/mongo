@@ -30,7 +30,12 @@
 
 #include "third_party/s2/s2regioncoverer.h"
 
+#include "mongo/db/geo/geometry_container.h"
+
 namespace mongo {
+
+// Points will only be indexed at this level
+const int kPointIndexedLevel = S2::kMaxCellLevel;
 
 std::string S2IndexingParams::toString() const {
     std::stringstream ss;
@@ -42,9 +47,17 @@ std::string S2IndexingParams::toString() const {
     return ss.str();
 }
 
-void S2IndexingParams::configureCoverer(S2RegionCoverer* coverer) const {
-    coverer->set_min_level(coarsestIndexedLevel);
-    coverer->set_max_level(finestIndexedLevel);
+void S2IndexingParams::configureCoverer(const GeometryContainer& geoContainer,
+                                        S2RegionCoverer* coverer) const {
+    // Points indexed to the finest level was introduced in version 3
+    // For backwards compatibility, only do this if the version is > 2
+    if (indexVersion >= S2_INDEX_VERSION_3 && geoContainer.isPoint()) {
+        coverer->set_min_level(kPointIndexedLevel);
+        coverer->set_max_level(kPointIndexedLevel);
+    } else {
+        coverer->set_min_level(coarsestIndexedLevel);
+        coverer->set_max_level(finestIndexedLevel);
+    }
 
     // This is advisory; the two above are strict.
     coverer->set_max_cells(maxCellsInCovering);

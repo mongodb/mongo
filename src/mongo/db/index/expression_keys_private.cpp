@@ -95,7 +95,7 @@ Status S2GetKeysForElement(const BSONElement& element,
         return status;
 
     S2RegionCoverer coverer;
-    params.configureCoverer(&coverer);
+    params.configureCoverer(geoContainer, &coverer);
 
     // Don't index big polygon
     if (geoContainer.getNativeCRS() == STRICT_SPHERE) {

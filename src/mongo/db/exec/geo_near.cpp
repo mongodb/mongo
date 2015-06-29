@@ -824,18 +824,31 @@ S2Region* buildS2Region(const R2Annulus& sphereBounds) {
 
     vector<S2Region*> regions;
 
-    S2Cap innerCap = S2Cap::FromAxisAngle(
-        latLng.ToPoint(), S1Angle::Radians(sphereBounds.getInner() / kRadiusOfEarthInMeters));
-    innerCap = innerCap.Complement();
-    regions.push_back(new S2Cap(innerCap));
+    const double inner = sphereBounds.getInner();
+    const double outer = sphereBounds.getOuter();
+
+    if (inner > 0) {
+        // TODO: Currently a workaround to fix occasional floating point errors
+        // in S2, where sometimes points near the axis will not be returned
+        // if inner == 0
+        S2Cap innerCap = S2Cap::FromAxisAngle(latLng.ToPoint(),
+                                              S1Angle::Radians(inner / kRadiusOfEarthInMeters));
+        innerCap = innerCap.Complement();
+        regions.push_back(new S2Cap(innerCap));
+    }
 
     // We only need to max bound if this is not a full search of the Earth
     // Using the constant here is important since we use the min of kMaxEarthDistance
     // and the actual bounds passed in to set up the search area.
-    if (sphereBounds.getOuter() < kMaxEarthDistanceInMeters) {
-        S2Cap outerCap = S2Cap::FromAxisAngle(
-            latLng.ToPoint(), S1Angle::Radians(sphereBounds.getOuter() / kRadiusOfEarthInMeters));
+    if (outer < kMaxEarthDistanceInMeters) {
+        S2Cap outerCap = S2Cap::FromAxisAngle(latLng.ToPoint(),
+                                              S1Angle::Radians(outer / kRadiusOfEarthInMeters));
         regions.push_back(new S2Cap(outerCap));
+    }
+
+    // if annulus is entire world, return a full cap
+    if (regions.empty()) {
+        regions.push_back(new S2Cap(S2Cap::Full()));
     }
 
     // Takes ownership of caps

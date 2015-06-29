@@ -42,6 +42,10 @@ bool GeometryContainer::isSimpleContainer() const {
     return NULL != _point || NULL != _line || NULL != _polygon;
 }
 
+bool GeometryContainer::isPoint() const {
+    return nullptr != _point;
+}
+
 bool GeometryContainer::supportsContains() const {
     return NULL != _polygon || NULL != _box || NULL != _cap || NULL != _multiPolygon ||
         (NULL != _geometryCollection && (_geometryCollection->polygons.vector().size() > 0 ||

@@ -61,6 +61,11 @@ public:
     bool isSimpleContainer() const;
 
     /**
+     * Whether this geometry is a point
+     */
+    bool isPoint() const;
+
+    /**
      * Reports the CRS of the contained geometry.
      * TODO: Rework once we have collections of multiple CRSes
      */
