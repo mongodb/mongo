@@ -662,7 +662,7 @@ extern int WT_CDECL __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force);
-extern int __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_txn_release(WT_SESSION_IMPL *session);
 extern int __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[]);

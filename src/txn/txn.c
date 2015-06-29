@@ -60,6 +60,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 	WT_ASSERT(session,
 	    txn_state->snap_min == WT_TXN_NONE ||
 	    session->txn.isolation == TXN_ISO_READ_UNCOMMITTED ||
+	    session->id == S2C(session)->txn_global.checkpoint_id ||
 	    !__wt_txn_visible_all(session, txn_state->snap_min));
 
 	txn_state->snap_min = WT_TXN_NONE;
@@ -77,9 +78,9 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s, *txn_state;
-	uint64_t ckpt_id, current_id, id;
+	uint64_t current_id, id;
 	uint64_t prev_oldest_id, snap_min;
-	uint32_t i, n, session_cnt;
+	uint32_t ckpt_id, i, n, session_cnt;
 	int32_t count;
 
 	conn = S2C(session);
@@ -121,7 +122,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	ckpt_id = txn_global->checkpoint_id;
 	for (i = n = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 		/* Skip the checkpoint transaction; it is never read from. */
-		if (ckpt_id != WT_TXN_NONE && ckpt_id == s->id)
+		if (i == ckpt_id)
 			continue;
 
 		/*
@@ -181,8 +182,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	WT_SESSION_IMPL *oldest_session;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
-	uint64_t ckpt_id, current_id, id, oldest_id, prev_oldest_id, snap_min;
-	uint32_t i, session_cnt;
+	uint64_t current_id, id, oldest_id, prev_oldest_id, snap_min;
+	uint32_t ckpt_id, i, session_cnt;
 	int32_t count;
 	int last_running_moved;
 
@@ -221,7 +222,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	ckpt_id = txn_global->checkpoint_id;
 	for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 		/* Skip the checkpoint transaction; it is never read from. */
-		if (ckpt_id != WT_TXN_NONE && ckpt_id == s->id)
+		if (i == ckpt_id)
 			continue;
 
 		/*
@@ -271,7 +272,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 			 * Skip the checkpoint transaction; it is never read
 			 * from.
 			 */
-			if (ckpt_id != WT_TXN_NONE && ckpt_id == s->id)
+			if (i == ckpt_id)
 				continue;
 
 			if ((id = s->id) != WT_TXN_NONE &&
@@ -302,11 +303,11 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 }
 
 /*
- * __wt_txn_begin --
- *	Begin a transaction.
+ * __wt_txn_config --
+ *	Configure a transaction.
  */
 int
-__wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_TXN *txn;
@@ -314,9 +315,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
-	if (cval.len == 0)
-		txn->isolation = session->isolation;
-	else
+	if (cval.len != 0)
 		txn->isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
 		    TXN_ISO_SNAPSHOT :
@@ -335,18 +334,11 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	 * !!! This is an unusual use of the config code: the "default" value
 	 * we pass in is inherited from the connection.
 	 */
-	txn->txn_logsync = S2C(session)->txn_logsync;
 	WT_RET(__wt_config_gets_def(session, cfg, "sync",
 	    FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) ? 1 : 0, &cval));
 	if (!cval.val)
 		txn->txn_logsync = 0;
 
-	F_SET(txn, TXN_RUNNING);
-	if (txn->isolation == TXN_ISO_SNAPSHOT) {
-		if (session->ncursors > 0)
-			WT_RET(__wt_session_copy_values(session));
-		__wt_txn_get_snapshot(session);
-	}
 	return (0);
 }
 

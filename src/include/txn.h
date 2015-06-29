@@ -46,14 +46,14 @@ struct __wt_txn_global {
 	volatile int32_t scan_count;
 
 	/*
-	 * Track information about the running checkpoint. The transaction IDs
-	 * used when checkpointing are special. Checkpoints can run for a long
-	 * time so we keep them out of regular visibility checks. Eviction and
-	 * checkpoint operations know when they need to be aware of
-	 * checkpoint IDs.
+	 * Track information about the running checkpoint. The transaction
+	 * snapshot used when checkpointing are special. Checkpoints can run
+	 * for a long time so we keep them out of regular visibility checks.
+	 * Eviction and checkpoint operations know when they need to be aware
+	 * of checkpoint transactions.
 	 */
+	volatile uint32_t checkpoint_id;	/* Checkpoint's session ID */
 	volatile uint64_t checkpoint_gen;
-	volatile uint64_t checkpoint_id;
 	volatile uint64_t checkpoint_snap_min;
 
 	WT_TXN_STATE *states;		/* Per-session transaction states */
