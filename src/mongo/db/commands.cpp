@@ -35,7 +35,6 @@
 
 #include "mongo/db/commands.h"
 
-#include <map>
 #include <string>
 #include <vector>
 
