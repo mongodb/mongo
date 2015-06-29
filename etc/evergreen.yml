@@ -233,7 +233,7 @@ timeout:
       working_dir: src
       script: |
         echo "Calling the hang analyzer..."
-        python buildscripts/hang_analyzer.py
+        PATH=/opt/mongodbtoolchain/bin:$PATH python buildscripts/hang_analyzer.py
 
 #######################################
 #               Tasks                 #
