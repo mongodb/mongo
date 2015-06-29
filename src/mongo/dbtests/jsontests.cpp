@@ -163,6 +163,15 @@ public:
     }
 };
 
+class NumberLongStrictZero {
+public:
+    void run() {
+        BSONObjBuilder b;
+        b.append("a", 0LL);
+        ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"0\" } }", b.done().jsonString(Strict));
+    }
+};
+
 class NumberLongStrict {
 public:
     void run() {
@@ -1698,7 +1707,7 @@ class DateNegative : public Base {
 class NumberLongTest : public Base {
     virtual BSONObj bson() const {
         BSONObjBuilder b;
-        b.appendNumber("a", 20000LL);
+        b.append("a", 20000LL);
         return b.obj();
     }
     virtual string json() const {
@@ -1709,7 +1718,7 @@ class NumberLongTest : public Base {
 class NumberLongMin : public Base {
     virtual BSONObj bson() const {
         BSONObjBuilder b;
-        b.appendNumber("a", std::numeric_limits<long long>::min());
+        b.append("a", std::numeric_limits<long long>::min());
         return b.obj();
     }
     virtual string json() const {
@@ -1735,7 +1744,7 @@ class NumberIntTest : public Base {
 class NumberLongNeg : public Base {
     virtual BSONObj bson() const {
         BSONObjBuilder b;
-        b.appendNumber("a", -20000LL);
+        b.append("a", -20000LL);
         return b.obj();
     }
     virtual string json() const {
@@ -2477,7 +2486,7 @@ public:
 class NumericLongMin : public Base {
     virtual BSONObj bson() const {
         BSONObjBuilder b;
-        b.appendNumber("a", std::numeric_limits<long long>::min());
+        b.append("a", std::numeric_limits<long long>::min());
         return b.obj();
     }
     virtual string json() const {
@@ -2682,6 +2691,7 @@ public:
         add<JsonStringTests::InvalidNumbers>();
         add<JsonStringTests::NumberPrecision>();
         add<JsonStringTests::NegativeNumber>();
+        add<JsonStringTests::NumberLongStrictZero>();
         add<JsonStringTests::NumberLongStrict>();
         add<JsonStringTests::NumberLongStrictLarge>();
         add<JsonStringTests::NumberLongStrictNegative>();

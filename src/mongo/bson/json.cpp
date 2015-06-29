@@ -634,7 +634,7 @@ Status JParse::numberLongObject(StringData fieldName, BSONObjBuilder& builder) {
         return ret;
     }
 
-    builder.appendNumber(fieldName, numberLong);
+    builder.append(fieldName, numberLong);
     return Status::OK();
 }
 
@@ -819,7 +819,7 @@ Status JParse::numberLong(StringData fieldName, BSONObjBuilder& builder) {
     if (!readToken(RPAREN)) {
         return parseError("Expecting ')'");
     }
-    builder.appendNumber(fieldName, static_cast<long long int>(val));
+    builder.append(fieldName, static_cast<long long int>(val));
     return Status::OK();
 }
 

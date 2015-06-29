@@ -79,13 +79,11 @@ Status parseCursorResponse(const BSONObj& obj,
                       str::stream() << "cursor response must contain '" << kCursorFieldName << "."
                                     << kCursorIdFieldName << "' field: " << obj);
     }
-    if (!(cursorIdElement.type() == mongo::NumberLong ||
-          cursorIdElement.type() == mongo::NumberInt)) {
+    if (cursorIdElement.type() != mongo::NumberLong) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << "'" << kCursorFieldName << "." << kCursorIdFieldName
-                          << "' field must be a integral number of type 'int' or 'long' but was a '"
-                          << typeName(cursorIdElement.type()) << "': " << obj);
+                      str::stream() << "'" << kCursorFieldName << "." << kCursorIdFieldName
+                                    << "' field must be a 'long' but was a '"
+                                    << typeName(cursorIdElement.type()) << "': " << obj);
     }
     batchData->cursorId = cursorIdElement.numberLong();
 

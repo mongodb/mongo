@@ -312,12 +312,12 @@ protected:
             const long long cursorId = cmdElem.numberLong();
             if (isGetMore && cursorId == 1LL) {
                 // process getmore requests from the oplog fetcher
-                auto respBSON = fromjson(str::stream()
-                                         << "{ok:1, cursor:{id:1, ns:'local.oplog.rs', nextBatch:["
-                                            "{ts:Timestamp(" << ++c
-                                         << ",1), h:1, ns:'test.a', v:2, op:'u', o2:{_id:" << c
-                                         << "}, o:{$set:{a:1}}}"
-                                            "]}}");
+                auto respBSON =
+                    fromjson(str::stream() << "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs'"
+                                              " , nextBatch:[{ts:Timestamp(" << ++c
+                                           << ",1), h:1, ns:'test.a', v:2, op:'u', o2:{_id:" << c
+                                           << "}, o:{$set:{a:1}}}"
+                                              "]}}");
                 net->scheduleResponse(
                     noi,
                     net->now(),
@@ -354,7 +354,7 @@ protected:
     }
 
     void verifySync(Status s = Status::OK()) {
-        ASSERT_EQ(_isbr->getResult().getStatus(), s) << "status objects differ";
+        verifySync(s.code());
     }
 
     void verifySync(ErrorCodes::Error code) {
@@ -392,12 +392,12 @@ TEST_F(InitialSyncTest, Complete) {
     const std::vector<BSONObj> responses = {
         // get latest oplog ts
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
             "{ts:Timestamp(1,1), h:1, ns:'a.a', v:2, op:'i', o:{_id:1, a:1}}"
             "]}}"),
         // oplog fetcher find
         fromjson(
-            "{ok:1, cursor:{id:1, ns:'local.oplog.rs', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
             "{ts:Timestamp(1,1), h:1, ns:'a.a', v:2, op:'i', o:{_id:1, a:1}}"
             "]}}"),
         // Clone Start
@@ -405,23 +405,23 @@ TEST_F(InitialSyncTest, Complete) {
         fromjson("{ok:1, databases:[{name:'a'}]}"),
         // listCollections for "a"
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'a.$cmd.listCollections', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
             "{name:'a', options:{}} "
             "]}}"),
         // listIndexes:a
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'a.$cmd.listIndexes.a', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
             "{v:1, key:{_id:1}, name:'_id_', ns:'a.a'}"
             "]}}"),
         // find:a
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'a.a', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
             "{_id:1, a:1} "
             "]}}"),
         // Clone Done
         // get latest oplog ts
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
             "{ts:Timestamp(2,2), h:1, ns:'b.c', v:2, op:'i', o:{_id:1, c:1}}"
             "]}}"),
         // Applier starts ...
@@ -445,12 +445,12 @@ TEST_F(InitialSyncTest, MissingDocOnApplyCompletes) {
     const std::vector<BSONObj> responses = {
         // get latest oplog ts
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
             "{ts:Timestamp(1,1), h:1, ns:'a.a', v:2, op:'i', o:{_id:1, a:1}}"
             "]}}"),
         // oplog fetcher find
         fromjson(
-            "{ok:1, cursor:{id:1, ns:'local.oplog.rs', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
             "{ts:Timestamp(1,1), h:1, ns:'a.a', v:2, op:'u', o2:{_id:1}, o:{$set:{a:1}}}"
             "]}}"),
         // Clone Start
@@ -458,26 +458,26 @@ TEST_F(InitialSyncTest, MissingDocOnApplyCompletes) {
         fromjson("{ok:1, databases:[{name:'a'}]}"),
         // listCollections for "a"
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'a.$cmd.listCollections', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
             "{name:'a', options:{}} "
             "]}}"),
         // listIndexes:a
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'a.$cmd.listIndexes.a', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
             "{v:1, key:{_id:1}, name:'_id_', ns:'a.a'}"
             "]}}"),
         // find:a -- empty
-        fromjson("{ok:1, cursor:{id:0, ns:'a.a', firstBatch:[]}}"),
+        fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:[]}}"),
         // Clone Done
         // get latest oplog ts
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
             "{ts:Timestamp(2,2), h:1, ns:'b.c', v:2, op:'i', o:{_id:1, c:1}}"
             "]}}"),
         // Applier starts ...
         // missing doc fetch -- find:a {_id:1}
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'a.a', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
             "{_id:1, a:1} "
             "]}}"),
     };
@@ -521,12 +521,12 @@ TEST_F(InitialSyncTest, FailsOnClone) {
     const std::vector<BSONObj> responses = {
         // get latest oplog ts
         fromjson(
-            "{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
             "{ts:Timestamp(1,1), h:1, ns:'a.a', v:2, op:'i', o:{_id:1, a:1}}"
             "]}}"),
         // oplog fetcher find
         fromjson(
-            "{ok:1, cursor:{id:1, ns:'local.oplog.rs', firstBatch:["
+            "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
             "{ts:Timestamp(1,1), h:1, ns:'a.a', v:2, op:'i', o:{_id:1, a:1}}"
             "]}}"),
         // Clone Start
@@ -728,7 +728,7 @@ TEST_F(SteadyStateTest, ChooseNewSyncSourceAfterFailedNetworkRequest) {
 TEST_F(SteadyStateTest, RemoteOplogEmptyRollbackSucceeded) {
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse =
-        fromjson("{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch: []}}");
+        fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch: []}}");
     _testOplogFetcherFailed(oplogFetcherResponse,
                             Status::OK(),
                             HostAndPort("host-0", -1),  // rollback source
@@ -742,7 +742,7 @@ TEST_F(SteadyStateTest, RemoteOplogEmptyRollbackSucceeded) {
 TEST_F(SteadyStateTest, RemoteOplogEmptyRollbackFailed) {
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse =
-        fromjson("{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch: []}}");
+        fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch: []}}");
     _testOplogFetcherFailed(oplogFetcherResponse,
                             Status(ErrorCodes::OperationFailed, "rollback failed"),
                             HostAndPort("host-0", -1),  // rollback source
@@ -756,7 +756,7 @@ TEST_F(SteadyStateTest, RemoteOplogEmptyRollbackFailed) {
 TEST_F(SteadyStateTest, RemoteOplogFirstOperationMissingTimestampRollbackFailed) {
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse =
-        fromjson("{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch: [{}]}}");
+        fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch: [{}]}}");
     _testOplogFetcherFailed(oplogFetcherResponse,
                             Status(ErrorCodes::OperationFailed, "rollback failed"),
                             HostAndPort("host-0", -1),  // rollback source
@@ -769,8 +769,8 @@ TEST_F(SteadyStateTest, RemoteOplogFirstOperationMissingTimestampRollbackFailed)
 
 TEST_F(SteadyStateTest, RemoteOplogFirstOperationTimestampDoesNotMatchRollbackFailed) {
     _setUpOplogFetcherFailed();
-    auto oplogFetcherResponse =
-        fromjson("{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch: [{ts:Timestamp(1,1)}]}}");
+    auto oplogFetcherResponse = fromjson(
+        "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:[{ts:Timestamp(1,1)}]}}");
     _testOplogFetcherFailed(oplogFetcherResponse,
                             Status(ErrorCodes::OperationFailed, "rollback failed"),
                             HostAndPort("host-0", -1),  // rollback source
@@ -784,7 +784,7 @@ TEST_F(SteadyStateTest, RemoteOplogFirstOperationTimestampDoesNotMatchRollbackFa
 TEST_F(SteadyStateTest, RollbackTwoSyncSourcesBothFailed) {
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse =
-        fromjson("{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch: []}}");
+        fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch: []}}");
 
     _testOplogFetcherFailed(oplogFetcherResponse,
                             Status(ErrorCodes::OperationFailed, "rollback failed"),
@@ -808,7 +808,7 @@ TEST_F(SteadyStateTest, RollbackTwoSyncSourcesBothFailed) {
 TEST_F(SteadyStateTest, RollbackTwoSyncSourcesSecondRollbackSucceeds) {
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse =
-        fromjson("{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch: []}}");
+        fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch: []}}");
 
     _testOplogFetcherFailed(oplogFetcherResponse,
                             Status(ErrorCodes::OperationFailed, "rollback failed"),
