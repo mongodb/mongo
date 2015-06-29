@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <unordered_map>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
@@ -388,9 +389,11 @@ private:
  */
 class TypeMatchExpression : public MatchExpression {
 public:
+    static const std::unordered_map<std::string, BSONType> typeAliasMap;
+
     TypeMatchExpression() : MatchExpression(TYPE_OPERATOR) {}
 
-    Status init(StringData path, int type);
+    Status init(StringData path, BSONType typeInt);
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<TypeMatchExpression> e = stdx::make_unique<TypeMatchExpression>();
@@ -427,7 +430,7 @@ private:
 
     StringData _path;
     ElementPath _elementPath;
-    int _type;
+    BSONType _type;
 };
 
 }  // namespace mongo

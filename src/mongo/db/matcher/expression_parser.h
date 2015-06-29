@@ -134,6 +134,8 @@ private:
 
     Status _parseArrayFilterEntries(ArrayFilterEntries* entries, const BSONObj& theArray);
 
+    StatusWithMatchExpression _parseType(const char* name, const BSONElement& elt);
+
     // arrays
 
     StatusWithMatchExpression _parseElemMatch(const char* name, const BSONElement& e, int level);

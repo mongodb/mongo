@@ -31,6 +31,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 
 #include <cmath>
+#include <unordered_map>
 #include <pcrecpp.h>
 
 #include "mongo/bson/bsonobj.h"
@@ -390,9 +391,31 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 
 // ----
 
-Status TypeMatchExpression::init(StringData path, int type) {
+const std::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMap = {
+    {"double", NumberDouble},
+    {"string", String},
+    {"object", Object},
+    {"array", Array},
+    {"binData", BinData},
+    {"undefined", Undefined},
+    {"objectId", jstOID},
+    {"bool", Bool},
+    {"date", Date},
+    {"null", jstNULL},
+    {"regex", RegEx},
+    {"dbPointer", DBRef},
+    {"javascript", Code},
+    {"symbol", Symbol},
+    {"javascriptWithScope", CodeWScope},
+    {"int", NumberInt},
+    {"timestamp", bsonTimestamp},
+    {"long", NumberLong},
+    {"maxKey", MaxKey},
+    {"minKey", MinKey}};
+
+Status TypeMatchExpression::init(StringData path, BSONType typeInt) {
     _path = path;
-    _type = type;
+    _type = typeInt;
     return _elementPath.init(_path);
 }
 

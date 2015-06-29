@@ -661,4 +661,105 @@ TEST(MatchExpressionParserLeafTest, TypeBad) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_FALSE(result.isOK());
 }
+
+TEST(MatchExpressionParserLeafTest, TypeBadString) {
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: null}}")));
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: true}}")));
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: {}}}}")));
+    ASSERT_NOT_OK(MatchExpressionParser::parse(
+        fromjson("{a: {$type: ObjectId('000000000000000000000000')}}")));
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: []}}")));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
+    StatusWithMatchExpression typeNumberDouble =
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'double'}}"));
+    ASSERT(typeNumberDouble.isOK());
+    TypeMatchExpression* tmeNumberDouble =
+        static_cast<TypeMatchExpression*>(typeNumberDouble.getValue());
+    ASSERT(tmeNumberDouble->getData() == NumberDouble);
+    ASSERT_TRUE(tmeNumberDouble->matchesBSON(fromjson("{a: 5.4}")));
+    ASSERT_FALSE(tmeNumberDouble->matchesBSON(fromjson("{a: NumberInt(5)}")));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeStringnameNumberInt) {
+    StatusWithMatchExpression typeNumberInt =
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'int'}}"));
+    ASSERT(typeNumberInt.isOK());
+    TypeMatchExpression* tmeNumberInt = static_cast<TypeMatchExpression*>(typeNumberInt.getValue());
+    ASSERT(tmeNumberInt->getData() == NumberInt);
+    ASSERT_TRUE(tmeNumberInt->matchesBSON(fromjson("{a: NumberInt(5)}")));
+    ASSERT_FALSE(tmeNumberInt->matchesBSON(fromjson("{a: 5.4}")));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeStringnameNumberLong) {
+    StatusWithMatchExpression typeNumberLong =
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'long'}}"));
+    ASSERT(typeNumberLong.isOK());
+    TypeMatchExpression* tmeNumberLong =
+        static_cast<TypeMatchExpression*>(typeNumberLong.getValue());
+    ASSERT(tmeNumberLong->getData() == NumberLong);
+    ASSERT_TRUE(tmeNumberLong->matchesBSON(BSON("a" << static_cast<long long>(-1))));
+    ASSERT_FALSE(tmeNumberLong->matchesBSON(fromjson("{a: true}")));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeStringnameString) {
+    StatusWithMatchExpression typeString =
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'string'}}"));
+    ASSERT(typeString.isOK());
+    TypeMatchExpression* tmeString = static_cast<TypeMatchExpression*>(typeString.getValue());
+    ASSERT(tmeString->getData() == String);
+    ASSERT_TRUE(tmeString->matchesBSON(fromjson("{a: 'hello world'}")));
+    ASSERT_FALSE(tmeString->matchesBSON(fromjson("{a: 5.4}")));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeStringnamejstOID) {
+    StatusWithMatchExpression typejstOID =
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'objectId'}}"));
+    ASSERT(typejstOID.isOK());
+    TypeMatchExpression* tmejstOID = static_cast<TypeMatchExpression*>(typejstOID.getValue());
+    ASSERT(tmejstOID->getData() == jstOID);
+    ASSERT_TRUE(tmejstOID->matchesBSON(fromjson("{a: ObjectId('000000000000000000000000')}")));
+    ASSERT_FALSE(tmejstOID->matchesBSON(fromjson("{a: 'hello world'}")));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeStringnamejstNULL) {
+    StatusWithMatchExpression typejstNULL =
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'null'}}"));
+    ASSERT(typejstNULL.isOK());
+    TypeMatchExpression* tmejstNULL = static_cast<TypeMatchExpression*>(typejstNULL.getValue());
+    ASSERT(tmejstNULL->getData() == jstNULL);
+    ASSERT_TRUE(tmejstNULL->matchesBSON(fromjson("{a: null}")));
+    ASSERT_FALSE(tmejstNULL->matchesBSON(fromjson("{a: true}")));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeStringnameBool) {
+    StatusWithMatchExpression typeBool =
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'bool'}}"));
+    ASSERT(typeBool.isOK());
+    TypeMatchExpression* tmeBool = static_cast<TypeMatchExpression*>(typeBool.getValue());
+    ASSERT(tmeBool->getData() == Bool);
+    ASSERT_TRUE(tmeBool->matchesBSON(fromjson("{a: true}")));
+    ASSERT_FALSE(tmeBool->matchesBSON(fromjson("{a: null}")));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeStringnameObject) {
+    StatusWithMatchExpression typeObject =
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'object'}}"));
+    ASSERT(typeObject.isOK());
+    TypeMatchExpression* tmeObject = static_cast<TypeMatchExpression*>(typeObject.getValue());
+    ASSERT(tmeObject->getData() == Object);
+    ASSERT_TRUE(tmeObject->matchesBSON(fromjson("{a: {}}")));
+    ASSERT_FALSE(tmeObject->matchesBSON(fromjson("{a: []}")));
+}
+
+TEST(MatchExpressionParserLeafTest, TypeStringnameArray) {
+    StatusWithMatchExpression typeArray =
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'array'}}"));
+    ASSERT(typeArray.isOK());
+    TypeMatchExpression* tmeArray = static_cast<TypeMatchExpression*>(typeArray.getValue());
+    ASSERT(tmeArray->getData() == Array);
+    ASSERT_TRUE(tmeArray->matchesBSON(fromjson("{a: [[]]}")));
+    ASSERT_FALSE(tmeArray->matchesBSON(fromjson("{a: {}}")));
+}
 }

@@ -1361,7 +1361,7 @@ TEST(TypeMatchExpression, InvalidTypeMatchExpressionerand) {
     BSONObj notMatch2 = BSON("a"
                              << "abc");
     TypeMatchExpression type;
-    ASSERT(type.init("", JSTypeMax + 1).isOK());
+    ASSERT(type.init("", BSONType(JSTypeMax + 1)).isOK());
     ASSERT(!type.matchesSingleElement(notMatch1["a"]));
     ASSERT(!type.matchesSingleElement(notMatch2["a"]));
 }
