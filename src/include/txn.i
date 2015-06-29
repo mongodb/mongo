@@ -154,20 +154,20 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 
 	txn = &session->txn;
 
-	/*
-	 * Eviction only sees globally visible updates, or if there is a
-	 * checkpoint transaction running, use its transaction.
-	*/
-	if (txn->isolation == TXN_ISO_EVICTION)
-		return (__wt_txn_visible_all(session, id));
+	/* Changes with no associated transaction are always visible. */
+	if (id == WT_TXN_NONE)
+		return (1);
 
 	/* Nobody sees the results of aborted transactions. */
 	if (id == WT_TXN_ABORTED)
 		return (0);
 
-	/* Changes with no associated transaction are always visible. */
-	if (id == WT_TXN_NONE)
-		return (1);
+	/*
+	 * Eviction only sees globally visible updates, or if there is a
+	 * checkpoint transaction running, use its transaction.
+	 */
+	if (txn->isolation == TXN_ISO_EVICTION)
+		return (__wt_txn_visible_all(session, id));
 
 	/*
 	 * Read-uncommitted transactions see all other changes.
@@ -418,7 +418,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 
 	if (txn->isolation != TXN_ISO_READ_UNCOMMITTED &&
 	    !F_ISSET(txn, TXN_HAS_SNAPSHOT))
-		__wt_txn_refresh(session, 1);
+		__wt_txn_get_snapshot(session);
 }
 
 /*
