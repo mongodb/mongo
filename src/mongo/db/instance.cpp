@@ -634,7 +634,6 @@ void receivedKillCursors(OperationContext* txn, Message& m) {
 void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Message& m, CurOp& op) {
     DbMessage d(m);
     uassertStatusOK(userAllowedWriteNS(nsString));
-    op.debug().ns = nsString.ns();
     int flags = d.pullInt();
     BSONObj query = d.nextJsObj();
 
@@ -648,17 +647,18 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
     bool multi = flags & UpdateOption_Multi;
     bool broadcast = flags & UpdateOption_Broadcast;
 
+    op.debug().query = query;
+    {
+        stdx::lock_guard<Client> lk(*txn->getClient());
+        op.setNS_inlock(nsString.ns());
+        op.setQuery_inlock(query);
+    }
+
     Status status = AuthorizationSession::get(txn->getClient())
                         ->checkAuthForUpdate(nsString, query, toupdate, upsert);
     audit::logUpdateAuthzCheck(
         txn->getClient(), nsString, query, toupdate, upsert, multi, status.code());
     uassertStatusOK(status);
-
-    op.debug().query = query;
-    {
-        stdx::lock_guard<Client> lk(*txn->getClient());
-        op.setQuery_inlock(query);
-    }
 
     UpdateRequest request(nsString);
     request.setUpsert(upsert);
@@ -752,22 +752,22 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
     DbMessage d(m);
     uassertStatusOK(userAllowedWriteNS(nsString));
 
-    op.debug().ns = nsString.ns();
     int flags = d.pullInt();
     bool justOne = flags & RemoveOption_JustOne;
     verify(d.moreJSObjs());
     BSONObj pattern = d.nextJsObj();
 
-    Status status =
-        AuthorizationSession::get(txn->getClient())->checkAuthForDelete(nsString, pattern);
-    audit::logDeleteAuthzCheck(txn->getClient(), nsString, pattern, status.code());
-    uassertStatusOK(status);
-
     op.debug().query = pattern;
     {
         stdx::lock_guard<Client> lk(*txn->getClient());
         op.setQuery_inlock(pattern);
+        op.setNS_inlock(nsString.ns());
     }
+
+    Status status =
+        AuthorizationSession::get(txn->getClient())->checkAuthForDelete(nsString, pattern);
+    audit::logDeleteAuthzCheck(txn->getClient(), nsString, pattern, status.code());
+    uassertStatusOK(status);
 
     DeleteRequest request(nsString);
     request.setQuery(pattern);
@@ -819,9 +819,13 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
     int ntoreturn = d.pullInt();
     long long cursorid = d.pullInt64();
 
-    curop.debug().ns = ns;
     curop.debug().ntoreturn = ntoreturn;
     curop.debug().cursorid = cursorid;
+
+    {
+        stdx::lock_guard<Client>(*txn->getClient());
+        CurOp::get(txn)->setNS_inlock(ns);
+    }
 
     unique_ptr<AssertionException> ex;
     unique_ptr<Timer> timer;
@@ -1059,7 +1063,11 @@ static void insertSystemIndexes(OperationContext* txn, DbMessage& d, CurOp& curO
 void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Message& m, CurOp& op) {
     DbMessage d(m);
     const char* ns = d.getns();
-    op.debug().ns = ns;
+    {
+        stdx::lock_guard<Client>(*txn->getClient());
+        CurOp::get(txn)->setNS_inlock(nsString.ns());
+    }
+
     uassertStatusOK(userAllowedWriteNS(nsString.ns()));
     if (nsString.isSystemDotIndexes()) {
         insertSystemIndexes(txn, d, op);

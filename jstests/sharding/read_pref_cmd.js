@@ -60,7 +60,7 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
         assert(cmdResult.ok);
 
         var testedAtLeastOnce = false;
-        var query = { op: 'command', ns: 'test.$cmd' };
+        var query = { op: 'command' };
         Object.extend(query, profileQuery);
 
         hostList.forEach(function(node) {

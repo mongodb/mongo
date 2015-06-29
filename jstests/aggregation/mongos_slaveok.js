@@ -25,7 +25,7 @@ ReplSetTest.awaitRSClientHosts(st.s, secNode, {ok: true });
 var res = testDB.runCommand({ aggregate: 'user', pipeline: [{ $project: { x: 1 }}]});
 assert(res.ok, 'aggregate command failed: ' + tojson(res));
 
-var profileQuery = { op: 'command', ns: 'test.$cmd', 'command.aggregate': 'user' };
+var profileQuery = { op: 'command', ns: 'test.user', 'command.aggregate': 'user' };
 var profileDoc = secNode.getDB('test').system.profile.findOne(profileQuery);
 
 assert(profileDoc != null);

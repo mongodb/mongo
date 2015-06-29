@@ -483,7 +483,6 @@ static void beginCurrentOp(OperationContext* txn, const BatchItemRef& currWrite)
     currentOp->ensureStarted();
     currentOp->setNS_inlock(currWrite.getRequest()->getNS());
 
-    currentOp->debug().ns = currentOp->getNS();
     currentOp->debug().op = currentOp->getOp();
 
     if (currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert) {
