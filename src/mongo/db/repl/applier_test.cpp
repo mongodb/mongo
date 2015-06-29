@@ -68,7 +68,7 @@ void ApplierTest::setUp() {
     ReplicationExecutorTest::setUp();
     launchExecutorThread();
     auto apply = [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); };
-    _applier.reset(new Applier(&getExecutor(),
+    _applier.reset(new Applier(&getReplExecutor(),
                                {BSON("ts" << Timestamp(Seconds(123), 0))},
                                apply,
                                [this](const StatusWith<Timestamp>&, const Operations&) {
@@ -99,25 +99,26 @@ TEST_F(ApplierTest, InvalidConstruction) {
 
     // Empty list of operations.
     ASSERT_THROWS_CODE(
-        Applier(&getExecutor(), {}, apply, callback), UserException, ErrorCodes::BadValue);
+        Applier(&getReplExecutor(), {}, apply, callback), UserException, ErrorCodes::BadValue);
 
     // Last operation missing timestamp field.
-    ASSERT_THROWS_CODE(Applier(&getExecutor(), {BSONObj()}, apply, callback),
+    ASSERT_THROWS_CODE(Applier(&getReplExecutor(), {BSONObj()}, apply, callback),
                        UserException,
                        ErrorCodes::FailedToParse);
 
     // "ts" field in last operation not a timestamp.
-    ASSERT_THROWS_CODE(Applier(&getExecutor(), {BSON("ts" << 99)}, apply, callback),
+    ASSERT_THROWS_CODE(Applier(&getReplExecutor(), {BSON("ts" << 99)}, apply, callback),
                        UserException,
                        ErrorCodes::TypeMismatch);
 
     // Invalid apply operation function.
-    ASSERT_THROWS_CODE(Applier(&getExecutor(), operations, Applier::ApplyOperationFn(), callback),
-                       UserException,
-                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        Applier(&getReplExecutor(), operations, Applier::ApplyOperationFn(), callback),
+        UserException,
+        ErrorCodes::BadValue);
 
     // Invalid callback function.
-    ASSERT_THROWS_CODE(Applier(&getExecutor(), operations, apply, Applier::CallbackFn()),
+    ASSERT_THROWS_CODE(Applier(&getReplExecutor(), operations, apply, Applier::CallbackFn()),
                        UserException,
                        ErrorCodes::BadValue);
 }
@@ -160,7 +161,7 @@ TEST_F(ApplierTest, WaitWithoutStart) {
 }
 
 TEST_F(ApplierTest, ShutdownBeforeStart) {
-    getExecutor().shutdown();
+    getReplExecutor().shutdown();
     ASSERT_NOT_OK(getApplier()->start());
     ASSERT_FALSE(getApplier()->isActive());
 }
@@ -170,7 +171,7 @@ TEST_F(ApplierTest, CancelBeforeStartingDBWork) {
     // work item before the executor runs it.
     unittest::Barrier barrier(2U);
     using CallbackData = ReplicationExecutor::CallbackArgs;
-    getExecutor().scheduleDBWork([&](const CallbackData& cbd) {
+    getReplExecutor().scheduleDBWork([&](const CallbackData& cbd) {
         barrier.countDownAndWait();  // generation 0
     });
     const BSONObj operation = BSON("ts" << Timestamp(Seconds(123), 0));
@@ -178,7 +179,7 @@ TEST_F(ApplierTest, CancelBeforeStartingDBWork) {
     StatusWith<Timestamp> result = getDetectableErrorStatus();
     Applier::Operations operations;
     _applier.reset(
-        new Applier(&getExecutor(),
+        new Applier(&getReplExecutor(),
                     {operation},
                     [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
                     [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
@@ -207,7 +208,7 @@ TEST_F(ApplierTest, DestroyBeforeStartingDBWork) {
     // before the executor runs the work item.
     unittest::Barrier barrier(2U);
     using CallbackData = ReplicationExecutor::CallbackArgs;
-    getExecutor().scheduleDBWork([&](const CallbackData& cbd) {
+    getReplExecutor().scheduleDBWork([&](const CallbackData& cbd) {
         barrier.countDownAndWait();  // generation 0
         // Give the main thread a head start in invoking the applier destructor.
         sleepmillis(1);
@@ -217,7 +218,7 @@ TEST_F(ApplierTest, DestroyBeforeStartingDBWork) {
     StatusWith<Timestamp> result = getDetectableErrorStatus();
     Applier::Operations operations;
     _applier.reset(
-        new Applier(&getExecutor(),
+        new Applier(&getReplExecutor(),
                     {operation},
                     [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
                     [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
@@ -252,7 +253,7 @@ TEST_F(ApplierTest, WaitForCompletion) {
     StatusWith<Timestamp> result = getDetectableErrorStatus();
     Applier::Operations operations;
     _applier.reset(
-        new Applier(&getExecutor(),
+        new Applier(&getReplExecutor(),
                     {BSON("ts" << timestamp)},
                     [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
                     [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
@@ -278,7 +279,7 @@ TEST_F(ApplierTest, DestroyShouldBlockUntilInactive) {
     StatusWith<Timestamp> result = getDetectableErrorStatus();
     Applier::Operations operations;
     _applier.reset(
-        new Applier(&getExecutor(),
+        new Applier(&getReplExecutor(),
                     {BSON("ts" << timestamp)},
                     [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
                     [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
@@ -330,7 +331,7 @@ TEST_F(ApplierTest, ApplyOperationSuccessful) {
         operationsOnCompletion = theOperations;
     };
 
-    _applier.reset(new Applier(&getExecutor(), operationsToApply, apply, callback));
+    _applier.reset(new Applier(&getReplExecutor(), operationsToApply, apply, callback));
     _applier->start();
     _applier->wait();
 
@@ -377,7 +378,7 @@ void ApplierTest::_testApplyOperationFailed(size_t opIndex, stdx::function<Statu
         operationsOnCompletion = theOperations;
     };
 
-    _applier.reset(new Applier(&getExecutor(), operationsToApply, apply, callback));
+    _applier.reset(new Applier(&getReplExecutor(), operationsToApply, apply, callback));
     _applier->start();
     _applier->wait();
 
@@ -440,7 +441,7 @@ class ApplyUntilAndPauseTest : public ApplierTest {};
 
 TEST_F(ApplyUntilAndPauseTest, EmptyOperations) {
     auto result = applyUntilAndPause(
-        &getExecutor(),
+        &getReplExecutor(),
         {},
         [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
         Timestamp(Seconds(123), 0),
@@ -451,7 +452,7 @@ TEST_F(ApplyUntilAndPauseTest, EmptyOperations) {
 
 TEST_F(ApplyUntilAndPauseTest, NoOperationsInRange) {
     auto result = applyUntilAndPause(
-        &getExecutor(),
+        &getReplExecutor(),
         {
          BSON("ts" << Timestamp(Seconds(456), 0)), BSON("ts" << Timestamp(Seconds(789), 0)),
         },
@@ -464,7 +465,7 @@ TEST_F(ApplyUntilAndPauseTest, NoOperationsInRange) {
 
 TEST_F(ApplyUntilAndPauseTest, OperationMissingTimestampField) {
     auto result = applyUntilAndPause(
-        &getExecutor(),
+        &getReplExecutor(),
         {BSONObj()},
         [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
         Timestamp(Seconds(123), 0),
@@ -491,7 +492,8 @@ TEST_F(ApplyUntilAndPauseTest, ApplyUntilAndPauseSingleOperation) {
         operationsOnCompletion = theOperations;
     };
 
-    auto result = applyUntilAndPause(&getExecutor(), operationsToApply, apply, ts, pause, callback);
+    auto result =
+        applyUntilAndPause(&getReplExecutor(), operationsToApply, apply, ts, pause, callback);
     ASSERT_OK(result.getStatus());
     _applier = std::move(result.getValue().first);
     ASSERT_TRUE(_applier);
@@ -529,7 +531,7 @@ TEST_F(ApplyUntilAndPauseTest, ApplyUntilAndPauseSingleOperationTimestampNotInOp
 
     Timestamp ts2(Seconds(456), 0);
     auto result =
-        applyUntilAndPause(&getExecutor(), operationsToApply, apply, ts2, pause, callback);
+        applyUntilAndPause(&getReplExecutor(), operationsToApply, apply, ts2, pause, callback);
     ASSERT_OK(result.getStatus());
     _applier = std::move(result.getValue().first);
     ASSERT_TRUE(_applier);
@@ -567,7 +569,8 @@ TEST_F(ApplyUntilAndPauseTest, ApplyUntilAndPauseSingleOperationAppliedFailed) {
         operationsOnCompletion = theOperations;
     };
 
-    auto result = applyUntilAndPause(&getExecutor(), operationsToApply, apply, ts, pause, callback);
+    auto result =
+        applyUntilAndPause(&getReplExecutor(), operationsToApply, apply, ts, pause, callback);
     ASSERT_OK(result.getStatus());
     _applier = std::move(result.getValue().first);
     ASSERT_TRUE(_applier);
@@ -640,11 +643,11 @@ void _testApplyUntilAndPauseDiscardOperations(ReplicationExecutor* executor,
 }
 
 TEST_F(ApplyUntilAndPauseTest, ApplyUntilAndPauseDiscardOperationsTimestampInOperations) {
-    _testApplyUntilAndPauseDiscardOperations(&getExecutor(), Timestamp(Seconds(456), 0), true);
+    _testApplyUntilAndPauseDiscardOperations(&getReplExecutor(), Timestamp(Seconds(456), 0), true);
 }
 
 TEST_F(ApplyUntilAndPauseTest, ApplyUntilAndPauseDiscardOperationsTimestampNotInOperations) {
-    _testApplyUntilAndPauseDiscardOperations(&getExecutor(), Timestamp(Seconds(500), 0), false);
+    _testApplyUntilAndPauseDiscardOperations(&getReplExecutor(), Timestamp(Seconds(500), 0), false);
 }
 
 }  // namespace

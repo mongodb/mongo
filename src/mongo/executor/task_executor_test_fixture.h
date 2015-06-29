@@ -26,36 +26,66 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/repl/replication_executor_test_fixture.h"
+#include <memory>
 
-#include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/executor/network_interface_mock.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace repl {
+namespace executor {
 
-namespace {
+class TaskExecutor;
+class NetworkInterface;
+class NetworkInterfaceMock;
 
-const int64_t prngSeed = 1;
+/**
+ * Test fixture for tests that require a TaskExecutor backed by a NetworkInterfaceMock.
+ */
+class TaskExecutorTest : public unittest::Test {
+public:
+    /**
+     * Creates an initial error status suitable for checking if
+     * component has modified the 'status' field in test fixture.
+     */
+    static Status getDetectableErrorStatus();
 
-}  // namespace
+protected:
+    virtual ~TaskExecutorTest();
 
-ReplicationExecutor& ReplicationExecutorTest::getReplExecutor() {
-    return dynamic_cast<ReplicationExecutor&>(getExecutor());
-}
+    executor::NetworkInterfaceMock* getNet() {
+        return _net;
+    }
+    TaskExecutor& getExecutor() {
+        return *_executor;
+    }
 
-void ReplicationExecutorTest::postExecutorThreadLaunch() {
-    getNet()->enterNetwork();
-}
+    /**
+     * Initializes both the NetworkInterfaceMock and TaskExecutor but does not start the executor.
+     */
+    void setUp() override;
 
-std::unique_ptr<executor::TaskExecutor> ReplicationExecutorTest::makeTaskExecutor(
-    std::unique_ptr<executor::NetworkInterface> net) {
-    _storage = new StorageInterfaceMock();
-    return stdx::make_unique<ReplicationExecutor>(net.release(), _storage, prngSeed);
-}
+    /**
+     * Destroys the replication executor.
+     *
+     * Shuts down and joins the running executor.
+     */
+    void tearDown() override;
 
-}  // namespace repl
+    void launchExecutorThread();
+    void joinExecutorThread();
+
+private:
+    virtual std::unique_ptr<TaskExecutor> makeTaskExecutor(
+        std::unique_ptr<NetworkInterface> net) = 0;
+
+    virtual void postExecutorThreadLaunch();
+
+    NetworkInterfaceMock* _net;
+    std::unique_ptr<TaskExecutor> _executor;
+    bool _executorStarted = false;
+    bool _executorJoined = false;
+};
+
+}  // namespace executor
 }  // namespace mongo

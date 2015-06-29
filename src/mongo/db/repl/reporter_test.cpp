@@ -99,7 +99,7 @@ void ReporterTest::setUp() {
         return Status(ErrorCodes::OperationFailed,
                       "unable to prepare replSetUpdatePosition command object");
     };
-    reporter.reset(new Reporter(&getExecutor(),
+    reporter.reset(new Reporter(&getReplExecutor(),
                                 [this]() { return prepareReplSetUpdatePositionCommandFn(); },
                                 HostAndPort("h1")));
     launchExecutorThread();
@@ -129,19 +129,28 @@ void ReporterTest::scheduleNetworkResponse(ErrorCodes::Error code, const std::st
 }
 
 TEST_F(ReporterTest, InvalidConstruction) {
+<<<<<<< HEAD
     // null PrepareReplSetUpdatePositionCommandFn
     ASSERT_THROWS(Reporter(&getExecutor(),
                            Reporter::PrepareReplSetUpdatePositionCommandFn(),
                            HostAndPort("h1")),
                   UserException);
+=======
+    // null ReplicationProgressManager
+    ASSERT_THROWS(Reporter(&getReplExecutor(), nullptr, HostAndPort("h1")), UserException);
+>>>>>>> SERVER-19001 Create common test infrastructure for testing TaskExecutor implementations.
 
     // null ReplicationExecutor
     ASSERT_THROWS(Reporter(nullptr, prepareReplSetUpdatePositionCommandFn, HostAndPort("h1")),
                   UserException);
 
     // empty HostAndPort
+<<<<<<< HEAD
     ASSERT_THROWS(Reporter(&getExecutor(), prepareReplSetUpdatePositionCommandFn, HostAndPort()),
                   UserException);
+=======
+    ASSERT_THROWS(Reporter(&getReplExecutor(), posUpdater.get(), HostAndPort()), UserException);
+>>>>>>> SERVER-19001 Create common test infrastructure for testing TaskExecutor implementations.
 }
 
 TEST_F(ReporterTest, IsActiveOnceScheduled) {

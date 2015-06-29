@@ -60,3 +60,13 @@ env.Library(
         'network_interface_asio',
         'network_interface_impl',
     ])
+
+env.Library('task_executor_test_fixture',
+            [
+                'task_executor_test_common.cpp',
+                'task_executor_test_fixture.cpp'],
+            LIBDEPS=[
+                'network_interface_mock',
+                'task_executor_interface',
+            ])
+

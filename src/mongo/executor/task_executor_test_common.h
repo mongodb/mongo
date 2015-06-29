@@ -26,36 +26,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/repl/replication_executor_test_fixture.h"
+#include <memory>
+#include <string>
 
-#include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/executor/network_interface_mock.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
-namespace repl {
+namespace executor {
 
-namespace {
+class NetworkInterface;
+class TaskExecutor;
 
-const int64_t prngSeed = 1;
+/**
+ * Sets up a unit test suite named "suiteName" that runs a battery of unit tests against executors
+ * returned by "makeExecutor".  These tests should work against any implementation of TaskExecutor.
+ *
+ * The type of makeExecutor is a function that takes *a pointer to a unique_ptr* because of a
+ * shortcoming in boost::function, that it does not know how process movable but not copyable
+ * arguments in some circumstances. When we've switched to std::function on all platforms,
+ * presumably after the release of MSVC2015, the signature can be changed to take the unique_ptr
+ * by value.
+ */
+void addTestsForExecutor(
+    const std::string& suiteName,
+    stdx::function<std::unique_ptr<TaskExecutor>(std::unique_ptr<NetworkInterface>*)> makeExecutor);
 
-}  // namespace
-
-ReplicationExecutor& ReplicationExecutorTest::getReplExecutor() {
-    return dynamic_cast<ReplicationExecutor&>(getExecutor());
-}
-
-void ReplicationExecutorTest::postExecutorThreadLaunch() {
-    getNet()->enterNetwork();
-}
-
-std::unique_ptr<executor::TaskExecutor> ReplicationExecutorTest::makeTaskExecutor(
-    std::unique_ptr<executor::NetworkInterface> net) {
-    _storage = new StorageInterfaceMock();
-    return stdx::make_unique<ReplicationExecutor>(net.release(), _storage, prngSeed);
-}
-
-}  // namespace repl
+}  // namespace executor
 }  // namespace mongo

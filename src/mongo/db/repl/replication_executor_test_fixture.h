@@ -29,12 +29,14 @@
 #pragma once
 
 #include "mongo/stdx/memory.h"
+#include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
 namespace executor {
 class NetworkInterfaceMock;
+class TaskExecutor;
 }  // namespace executor
 
 namespace repl {
@@ -46,59 +48,19 @@ class StorageInterfaceMock;
  * Test fixture for tests that require a ReplicationExecutor backed by
  * a NetworkInterfaceMock.
  */
-class ReplicationExecutorTest : public unittest::Test {
-public:
-    /**
-     * Creates an initial error status suitable for checking if
-     * component has modified the 'status' field in test fixture.
-     */
-    static Status getDetectableErrorStatus();
-
+class ReplicationExecutorTest : public executor::TaskExecutorTest {
 protected:
-    executor::NetworkInterfaceMock* getNet() {
-        return _net;
-    }
-
-    ReplicationExecutor& getExecutor() {
-        return *_executor;
-    }
-    /**
-     * Runs ReplicationExecutor in background.
-     */
-    void launchExecutorThread();
+    ReplicationExecutor& getReplExecutor();
 
     /**
      * Anything that needs to be done after launchExecutorThread should go in here.
      */
-    virtual void postExecutorThreadLaunch();
-
-    /**
-     * Waits for background ReplicationExecutor to stop running.
-     *
-     * The executor should be shutdown prior to calling this function
-     * or the test may block indefinitely.
-     */
-    void joinExecutorThread();
-
-    /**
-     * Initializes both the NetworkInterfaceMock and ReplicationExecutor but
-     * does not run the executor in the background.
-     *
-     * To run the executor in the background, tests should invoke launchExecutorThread() or
-     * override this function() to achieve the same effect.
-     */
-    void setUp() override;
-
-    /**
-     * Destroys the replication executor.
-     *
-     * Shuts down running background executor.
-     */
-    void tearDown() override;
+    void postExecutorThreadLaunch() override;
 
 private:
-    // The lifetime of the network and the storage becomes owned by the executor
-    executor::NetworkInterfaceMock* _net{nullptr};
+    std::unique_ptr<executor::TaskExecutor> makeTaskExecutor(
+        std::unique_ptr<executor::NetworkInterface> net) override;
+
     StorageInterfaceMock* _storage{nullptr};
 
     std::unique_ptr<ReplicationExecutor> _executor;

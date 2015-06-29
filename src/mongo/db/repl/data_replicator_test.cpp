@@ -181,7 +181,7 @@ protected:
         };
         options.syncSourceSelector = this;
         try {
-            _dr.reset(new DataReplicator(options, &(getExecutor())));
+            _dr.reset(new DataReplicator(options, &(getReplExecutor())));
         } catch (...) {
             ASSERT_OK(exceptionToStatus());
         }
@@ -647,7 +647,7 @@ TEST_F(SteadyStateTest, ShutdownAfterStart) {
     net->enterNetwork();
     ASSERT_OK(dr.start());
     ASSERT_TRUE(net->hasReadyRequests());
-    getExecutor().shutdown();
+    getReplExecutor().shutdown();
     ASSERT_EQUALS(toString(DataReplicatorState::Steady), toString(dr.getState()));
     ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr.start().code());
 }
@@ -686,7 +686,7 @@ public:
 };
 
 TEST_F(SteadyStateTest, ScheduleNextActionFailsAfterChoosingEmptySyncSource) {
-    _syncSourceSelector.reset(new ShutdownExecutorSyncSourceSelector(&getExecutor()));
+    _syncSourceSelector.reset(new ShutdownExecutorSyncSourceSelector(&getReplExecutor()));
 
     DataReplicator& dr = getDR();
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
@@ -882,7 +882,7 @@ TEST_F(SteadyStateTest, PauseDataReplicator) {
 
     // Schedule a bogus work item to ensure that the operation applier function
     // is not scheduled.
-    auto& exec = getExecutor();
+    auto& exec = getReplExecutor();
     exec.scheduleWork(
         [&barrier](const executor::TaskExecutor::CallbackArgs&) { barrier.countDownAndWait(); });
 

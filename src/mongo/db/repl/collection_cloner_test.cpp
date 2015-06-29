@@ -59,7 +59,7 @@ void CollectionClonerTest::setUp() {
     options.reset();
     options.storageEngine = BSON("storageEngine1" << BSONObj());
     collectionCloner.reset(new CollectionCloner(
-        &getExecutor(),
+        &getReplExecutor(),
         target,
         nss,
         options,
@@ -79,7 +79,7 @@ BaseCloner* CollectionClonerTest::getCloner() const {
 }
 
 TEST_F(CollectionClonerTest, InvalidConstruction) {
-    ReplicationExecutor& executor = getExecutor();
+    ReplicationExecutor& executor = getReplExecutor();
 
     const auto& cb = [](const Status&) { FAIL("should not reach here"); };
 
@@ -181,7 +181,7 @@ TEST_F(CollectionClonerTest, BeginCollectionCallbackCanceled) {
 
     // Replace scheduleDbWork function so that the callback for beginCollection is canceled
     // immediately after scheduling.
-    auto&& executor = getExecutor();
+    auto&& executor = getReplExecutor();
     collectionCloner->setScheduleDbWorkFn([&](const ReplicationExecutor::CallbackFn& workFn) {
         // Schedule as non-exclusive task to allow us to cancel it before the executor is able
         // to invoke the callback.
@@ -384,7 +384,7 @@ TEST_F(CollectionClonerTest, InsertDocumentsCallbackCanceled) {
 
     // Replace scheduleDbWork function so that the callback for insertDocuments is canceled
     // immediately after scheduling.
-    auto&& executor = getExecutor();
+    auto&& executor = getReplExecutor();
     collectionCloner->setScheduleDbWorkFn([&](const ReplicationExecutor::CallbackFn& workFn) {
         // Schedule as non-exclusive task to allow us to cancel it before the executor is able
         // to invoke the callback.

@@ -69,7 +69,7 @@ void DatabaseClonerTest::setUp() {
     BaseClonerTest::setUp();
     collectionWorkResults.clear();
     databaseCloner.reset(new DatabaseCloner(
-        &getExecutor(),
+        &getReplExecutor(),
         target,
         dbname,
         BSONObj(),
@@ -95,7 +95,7 @@ BaseCloner* DatabaseClonerTest::getCloner() const {
 }
 
 TEST_F(DatabaseClonerTest, InvalidConstruction) {
-    ReplicationExecutor& executor = getExecutor();
+    ReplicationExecutor& executor = getReplExecutor();
 
     const BSONObj filter;
     DatabaseCloner::ListCollectionsPredicateFn pred;
@@ -158,7 +158,7 @@ TEST_F(DatabaseClonerTest, FirstRemoteCommandWithFilter) {
     const BSONObj listCollectionsFilter = BSON("name"
                                                << "coll");
     databaseCloner.reset(new DatabaseCloner(
-        &getExecutor(),
+        &getReplExecutor(),
         target,
         dbname,
         listCollectionsFilter,
@@ -217,7 +217,7 @@ TEST_F(DatabaseClonerTest, ListCollectionsPredicate) {
     DatabaseCloner::ListCollectionsPredicateFn pred =
         [](const BSONObj& info) { return info["name"].String() != "b"; };
     databaseCloner.reset(new DatabaseCloner(
-        &getExecutor(),
+        &getReplExecutor(),
         target,
         dbname,
         BSONObj(),
@@ -367,7 +367,7 @@ TEST_F(DatabaseClonerTest, InvalidCollectionOptions) {
 
 TEST_F(DatabaseClonerTest, ListCollectionsReturnsEmptyCollectionName) {
     databaseCloner.reset(new DatabaseCloner(
-        &getExecutor(),
+        &getReplExecutor(),
         target,
         dbname,
         BSONObj(),
@@ -412,7 +412,7 @@ TEST_F(DatabaseClonerTest, StartSecondCollectionClonerFailed) {
 
     // Replace scheduleDbWork function so that all callbacks (including exclusive tasks)
     // will run through network interface.
-    auto&& executor = getExecutor();
+    auto&& executor = getReplExecutor();
     databaseCloner->setScheduleDbWorkFn([&](const ReplicationExecutor::CallbackFn& workFn) {
         return executor.scheduleWork(workFn);
     });
@@ -445,7 +445,7 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
 
     // Replace scheduleDbWork function so that all callbacks (including exclusive tasks)
     // will run through network interface.
-    auto&& executor = getExecutor();
+    auto&& executor = getReplExecutor();
     databaseCloner->setScheduleDbWorkFn([&](const ReplicationExecutor::CallbackFn& workFn) {
         return executor.scheduleWork(workFn);
     });
@@ -490,7 +490,7 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
 
     // Replace scheduleDbWork function so that all callbacks (including exclusive tasks)
     // will run through network interface.
-    auto&& executor = getExecutor();
+    auto&& executor = getReplExecutor();
     databaseCloner->setScheduleDbWorkFn([&](const ReplicationExecutor::CallbackFn& workFn) {
         return executor.scheduleWork(workFn);
     });

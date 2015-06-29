@@ -119,7 +119,6 @@ void ReplicationExecutor::run() {
 void ReplicationExecutor::startup() {
     // Ensure that thread has not yet been created
     invariant(!_executorThread.joinable());
-    invariant(!_inShutdown);
 
     _executorThread = stdx::thread([this] { run(); });
 }

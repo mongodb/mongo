@@ -28,34 +28,55 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/replication_executor_test_fixture.h"
+#include "mongo/executor/task_executor_test_fixture.h"
 
-#include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/base/status.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
-namespace repl {
+namespace executor {
 
-namespace {
-
-const int64_t prngSeed = 1;
-
-}  // namespace
-
-ReplicationExecutor& ReplicationExecutorTest::getReplExecutor() {
-    return dynamic_cast<ReplicationExecutor&>(getExecutor());
+Status TaskExecutorTest::getDetectableErrorStatus() {
+    return Status(ErrorCodes::InternalError, "Not mutated");
 }
 
-void ReplicationExecutorTest::postExecutorThreadLaunch() {
-    getNet()->enterNetwork();
+TaskExecutorTest::~TaskExecutorTest() = default;
+
+void TaskExecutorTest::setUp() {
+    auto net = stdx::make_unique<NetworkInterfaceMock>();
+    _net = net.get();
+    _executor = makeTaskExecutor(std::move(net));
 }
 
-std::unique_ptr<executor::TaskExecutor> ReplicationExecutorTest::makeTaskExecutor(
-    std::unique_ptr<executor::NetworkInterface> net) {
-    _storage = new StorageInterfaceMock();
-    return stdx::make_unique<ReplicationExecutor>(net.release(), _storage, prngSeed);
+void TaskExecutorTest::tearDown() {
+    if (_executorStarted) {
+        _executor->shutdown();
+        if (!_executorJoined) {
+            joinExecutorThread();
+        }
+    }
+    _executorStarted = false;
+    _executorJoined = false;
+    _executor.reset();
 }
 
-}  // namespace repl
+void TaskExecutorTest::launchExecutorThread() {
+    invariant(!_executorStarted);
+    _executorStarted = true;
+    _executor->startup();
+    postExecutorThreadLaunch();
+}
+
+void TaskExecutorTest::joinExecutorThread() {
+    invariant(_executorStarted);
+    invariant(!_executorJoined);
+    _net->exitNetwork();
+    _executorJoined = true;
+    _executor->join();
+}
+
+void TaskExecutorTest::postExecutorThreadLaunch() {}
+
+}  // namespace executor
 }  // namespace mongo

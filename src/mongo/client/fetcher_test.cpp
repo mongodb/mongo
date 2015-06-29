@@ -43,6 +43,7 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 using executor::NetworkInterfaceMock;
+using executor::TaskExecutor;
 
 const HostAndPort target("localhost", -1);
 const BSONObj findCmdObj = BSON("find"
@@ -120,7 +121,7 @@ void FetcherTest::scheduleNetworkResponse(const BSONObj& obj) {
     ASSERT_TRUE(net->hasReadyRequests());
     Milliseconds millis(0);
     RemoteCommandResponse response(obj, BSONObj(), millis);
-    ReplicationExecutor::ResponseStatus responseStatus(response);
+    TaskExecutor::ResponseStatus responseStatus(response);
     net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
 }
 
@@ -130,7 +131,7 @@ void FetcherTest::scheduleNetworkResponseFor(const BSONObj& filter, const BSONOb
     ASSERT_TRUE(net->hasReadyRequests());
     Milliseconds millis(0);
     RemoteCommandResponse response(obj, BSONObj(), millis);
-    ReplicationExecutor::ResponseStatus responseStatus(response);
+    TaskExecutor::ResponseStatus responseStatus(response);
     auto req = net->getNextReadyRequest();
     ASSERT_EQ(req->getRequest().cmdObj[0], filter[0]);
     net->scheduleResponse(req, net->now(), responseStatus);
@@ -139,7 +140,7 @@ void FetcherTest::scheduleNetworkResponseFor(const BSONObj& filter, const BSONOb
 void FetcherTest::scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason) {
     NetworkInterfaceMock* net = getNet();
     ASSERT_TRUE(net->hasReadyRequests());
-    ReplicationExecutor::ResponseStatus responseStatus(code, reason);
+    TaskExecutor::ResponseStatus responseStatus(code, reason);
     net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
 }
 
@@ -188,7 +189,7 @@ void unusedFetcherCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult
 }
 
 TEST_F(FetcherTest, InvalidConstruction) {
-    ReplicationExecutor& executor = getExecutor();
+    TaskExecutor& executor = getExecutor();
 
     // Null executor.
     ASSERT_THROWS(Fetcher(nullptr, target, "db", findCmdObj, unusedFetcherCallback), UserException);
@@ -208,7 +209,7 @@ TEST_F(FetcherTest, InvalidConstruction) {
 // Command object can refer to any command that returns a cursor. This
 // includes listIndexes and listCollections.
 TEST_F(FetcherTest, NonFindCommand) {
-    ReplicationExecutor& executor = getExecutor();
+    TaskExecutor& executor = getExecutor();
 
     Fetcher(&executor,
             target,
@@ -628,7 +629,7 @@ void shutdownDuringSecondBatch(const StatusWith<Fetcher::QueryResponse>& fetchRe
                                Fetcher::NextAction* nextAction,
                                BSONObjBuilder* getMoreBob,
                                const BSONObj& doc2,
-                               ReplicationExecutor* executor,
+                               TaskExecutor* executor,
                                bool* isShutdownCalled) {
     if (*isShutdownCalled) {
         return;
