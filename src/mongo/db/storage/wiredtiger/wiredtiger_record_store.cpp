@@ -178,6 +178,7 @@ namespace {
               _cappedMaxSize( cappedMaxSize ),
               _cappedMaxSizeSlack( std::min(cappedMaxSize/10, int64_t(16*1024*1024)) ),
               _cappedMaxDocs( cappedMaxDocs ),
+              _cappedFirstRecord(),
               _cappedDeleteCallback( cappedDeleteCallback ),
               _cappedDeleteCheckCount(0),
               _useOplogHack(shouldUseOplogHack(ctx, _uri)),
@@ -461,10 +462,21 @@ namespace {
             WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
             WT_CURSOR *c = curwrap.get();
             RecordId newestOld;
-            int ret = 0;
+            int first = 0, ret = 0;
+            if (_cappedFirstRecord != RecordId()) {
+                c->set_key(c, _makeKey(_cappedFirstRecord));
+                invariantWTOK(WT_OP_CHECK(c->search_near(c, NULL)));
+                first = 1;
+            }
+
             while ((sizeSaved < sizeOverCap || docsRemoved < docsOverCap) &&
-                   (docsRemoved < 20000) &&
-                   (ret = WT_OP_CHECK(c->next(c))) == 0) {
+                   (docsRemoved < 20000)) {
+
+                if (first)
+                    first = 0;
+                else if ((ret = WT_OP_CHECK(c->next(c))) == WT_NOTFOUND)
+                    break;
+                invariantWTOK(ret);
 
                 int64_t key;
                 ret = c->get_key(c, &key);
@@ -493,10 +505,6 @@ namespace {
                 }
             }
 
-            if (ret != WT_NOTFOUND) {
-                invariantWTOK(ret);
-            }
-
             if (docsRemoved > 0) {
                 // if we scanned to the end of the collection or past our insert, go back one
                 if (ret == WT_NOTFOUND || newestOld >= justInserted) {
@@ -505,9 +513,11 @@ namespace {
                 invariantWTOK(ret);
 
                 WiredTigerCursor startWrap( _uri, _instanceId, true, txn);
-                WT_CURSOR* start = startWrap.get();
-                ret = WT_OP_CHECK(start->next(start));
-                invariantWTOK(ret);
+                WT_CURSOR* start = NULL;
+                if (_cappedFirstRecord != RecordId()) {
+                    start = startWrap.get();
+                    start->set_key(start, _makeKey(_cappedFirstRecord));
+                }
 
                 ret = session->truncate(session, NULL, start, c, NULL);
                 if (ret == ENOENT || ret == WT_NOTFOUND) {
@@ -520,6 +530,9 @@ namespace {
                     _changeNumRecords(txn, -docsRemoved);
                     _increaseDataSize(txn, -sizeSaved);
                     wuow.commit();
+
+                    // Update the starting key
+                    _cappedFirstRecord = newestOld;
                 }
             }
         }
