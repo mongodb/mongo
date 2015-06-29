@@ -40,29 +40,29 @@
 
 namespace mongo {
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, int cachePartition, int epoch)
-    : _cachePartition(cachePartition), _epoch(epoch), _session(NULL), _cursorsOut(0) {
-    int ret = conn->open_session(conn, NULL, "isolation=snapshot", &_session);
-    invariantWTOK(ret);
+WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, int epoch)
+    : _epoch(epoch), _session(NULL), _cursorGen(0), _cursorsCached(0), _cursorsOut(0) {
+    invariantWTOK(conn->open_session(conn, NULL, "isolation=snapshot", &_session));
 }
 
 WiredTigerSession::~WiredTigerSession() {
     if (_session) {
-        int ret = _session->close(_session, NULL);
-        invariantWTOK(ret);
+        invariantWTOK(_session->close(_session, NULL));
     }
 }
 
 WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, bool forRecordStore) {
-    {
-        Cursors& cursors = _curmap[id];
-        if (!cursors.empty()) {
-            WT_CURSOR* save = cursors.back();
-            cursors.pop_back();
+    // Find the most recently used cursor
+    for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
+        if (i->_id == id) {
+            WT_CURSOR* c = i->_cursor;
+            _cursors.erase(i);
             _cursorsOut++;
-            return save;
+            _cursorsCached--;
+            return c;
         }
     }
+
     WT_CURSOR* c = NULL;
     int ret = _session->open_cursor(
         _session, uri.c_str(), NULL, forRecordStore ? "" : "overwrite=false", &c);
@@ -78,33 +78,39 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
     invariant(cursor);
     _cursorsOut--;
 
-    Cursors& cursors = _curmap[id];
-    if (cursors.size() > 10u) {
+    invariantWTOK(cursor->reset(cursor));
+
+    // Cursors are pushed to the front of the list and removed from the back
+    _cursors.push_front(WiredTigerCachedCursor(id, _cursorGen++, cursor));
+    _cursorsCached++;
+
+    // "Old" is defined as not used in the last N**2 operations, if we have N cursors cached.
+    // The reasoning here is to imagine a workload with N tables performing operations randomly
+    // across all of them (i.e., each cursor has 1/N chance of used for each operation).  We
+    // would like to cache N cursors in that case, so any given cursor could go N**2 operations
+    // in between use.
+    uint64_t cutoff = std::max(100, _cursorsCached * _cursorsCached);
+    while (_cursorGen - _cursors.back()._gen > cutoff) {
+        cursor = _cursors.back()._cursor;
+        _cursors.pop_back();
         invariantWTOK(cursor->close(cursor));
-    } else {
-        invariantWTOK(cursor->reset(cursor));
-        cursors.push_back(cursor);
     }
 }
 
 void WiredTigerSession::closeAllCursors() {
     invariant(_session);
-    for (CursorMap::iterator i = _curmap.begin(); i != _curmap.end(); ++i) {
-        Cursors& cursors = i->second;
-        for (size_t j = 0; j < cursors.size(); j++) {
-            WT_CURSOR* cursor = cursors[j];
-            if (cursor) {
-                int ret = cursor->close(cursor);
-                invariantWTOK(ret);
-            }
+    for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
+        WT_CURSOR* cursor = i->_cursor;
+        if (cursor) {
+            invariantWTOK(cursor->close(cursor));
         }
     }
-    _curmap.clear();
+    _cursors.clear();
 }
 
 namespace {
 AtomicUInt64 nextCursorId(1);
-AtomicUInt64 cachePartitionGen(0);
+AtomicUInt64 sessionsInCache(0);
 }
 // static
 uint64_t WiredTigerSession::genCursorId() {
@@ -114,10 +120,14 @@ uint64_t WiredTigerSession::genCursorId() {
 // -----------------------
 
 WiredTigerSessionCache::WiredTigerSessionCache(WiredTigerKVEngine* engine)
-    : _engine(engine), _conn(engine->getConnection()), _shuttingDown(0) {}
+    : _engine(engine),
+      _conn(engine->getConnection()),
+      _shuttingDown(0),
+      _sessionsOut(0),
+      _highWaterMark(1) {}
 
 WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn)
-    : _engine(NULL), _conn(conn), _shuttingDown(0) {}
+    : _engine(NULL), _conn(conn), _shuttingDown(0), _sessionsOut(0), _highWaterMark(1) {}
 
 WiredTigerSessionCache::~WiredTigerSessionCache() {
     shuttingDown();
@@ -139,21 +149,17 @@ void WiredTigerSessionCache::shuttingDown() {
 }
 
 void WiredTigerSessionCache::closeAll() {
-    for (int i = 0; i < NumSessionCachePartitions; i++) {
-        SessionPool swapPool;
+    // Increment the epoch as we are now closing all sessions with this epoch
+    SessionCache swap;
 
-        {
-            stdx::unique_lock<SpinLock> scopedLock(_cache[i].lock);
-            _cache[i].pool.swap(swapPool);
-            _cache[i].epoch++;
-        }
+    {
+        stdx::lock_guard<SpinLock> lock(_cacheLock);
+        _epoch++;
+        _sessions.swap(swap);
+    }
 
-        // New sessions will be created if need be outside of the lock
-        for (size_t i = 0; i < swapPool.size(); i++) {
-            delete swapPool[i];
-        }
-
-        swapPool.clear();
+    for (SessionCache::iterator i = swap.begin(); i != swap.end(); i++) {
+        delete (*i);
     }
 }
 
@@ -164,25 +170,25 @@ WiredTigerSession* WiredTigerSessionCache::getSession() {
     // operations should be allowed to start.
     invariant(!_shuttingDown.loadRelaxed());
 
-    // Spread sessions uniformly across the cache partitions
-    const int cachePartition = cachePartitionGen.addAndFetch(1) % NumSessionCachePartitions;
+    // Set the high water mark if we need to
+    if (_sessionsOut.fetchAndAdd(1) > _highWaterMark.load()) {
+        _highWaterMark.store(_sessionsOut.load());
+    }
 
-    int epoch;
-
-    {
-        stdx::unique_lock<SpinLock> cachePartitionLock(_cache[cachePartition].lock);
-        epoch = _cache[cachePartition].epoch;
-
-        if (!_cache[cachePartition].pool.empty()) {
-            WiredTigerSession* cachedSession = _cache[cachePartition].pool.back();
-            _cache[cachePartition].pool.pop_back();
-
+    if (!_sessions.empty()) {
+        stdx::lock_guard<SpinLock> lock(_cacheLock);
+        if (!_sessions.empty()) {
+            // Get the most recently used session so that if we discard sessions, we're
+            // discarding older ones
+            WiredTigerSession* cachedSession = _sessions.back();
+            _sessions.pop_back();
+            sessionsInCache.fetchAndSubtract(1);
             return cachedSession;
         }
     }
 
     // Outside of the cache partition lock, but on release will be put back on the cache
-    return new WiredTigerSession(_conn, cachePartition, epoch);
+    return new WiredTigerSession(_conn, _epoch);
 }
 
 void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
@@ -207,23 +213,28 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         invariant(range == 0);
     }
 
-    const int cachePartition = session->_getCachePartition();
+    _sessionsOut.fetchAndSubtract(1);
+
     bool returnedToCache = false;
+    invariant(session->_getEpoch() <= _epoch);
 
-    if (cachePartition >= 0) {
-        stdx::unique_lock<SpinLock> cachePartitionLock(_cache[cachePartition].lock);
-
-        invariant(session->_getEpoch() <= _cache[cachePartition].epoch);
-
-        if (session->_getEpoch() == _cache[cachePartition].epoch) {
-            _cache[cachePartition].pool.push_back(session);
-            returnedToCache = true;
-        }
+    // Only return sessions until we hit the maximum number of sessions we have ever seen demand
+    // for concurrently. We also want to immediately delete any session that is from a
+    // non-current epoch.
+    if (session->_getEpoch() == _epoch && sessionsInCache.load() < _highWaterMark.load()) {
+        returnedToCache = true;
+        stdx::lock_guard<SpinLock> lock(_cacheLock);
+        _sessions.push_back(session);
     }
 
-    // Do all cleanup outside of the cache partition spinlock.
-    if (!returnedToCache) {
+    if (returnedToCache) {
+        sessionsInCache.fetchAndAdd(1);
+    } else {
         delete session;
+    }
+
+    if (_engine && _engine->haveDropsQueued()) {
+        _engine->dropAllQueued();
     }
 
     if (_engine && _engine->haveDropsQueued()) {
