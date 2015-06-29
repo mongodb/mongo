@@ -35,10 +35,10 @@
 #pragma once
 
 #include <boost/functional/hash.hpp>
+#include <cstdint>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {

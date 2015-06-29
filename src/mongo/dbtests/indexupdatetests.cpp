@@ -28,6 +28,7 @@
  *    then also delete it in the license file.
  */
 
+#include <cstdint>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/platform/cstdint.h"
 
 namespace IndexUpdateTests {
 

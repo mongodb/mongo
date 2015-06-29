@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/encoded_value_storage.h"

@@ -31,6 +31,7 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <cstdint>
 #include <iostream>
 #include <string>
 
@@ -42,7 +43,6 @@
 #endif
 
 #include "mongo/platform/basic.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"

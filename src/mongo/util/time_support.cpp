@@ -29,15 +29,15 @@
 
 #include "mongo/util/time_support.h"
 
+#include <boost/thread/tss.hpp>
+#include <cstdint>
 #include <cstdio>
 #include <string>
 #include <iostream>
-#include <boost/thread/tss.hpp>
 
 #include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"

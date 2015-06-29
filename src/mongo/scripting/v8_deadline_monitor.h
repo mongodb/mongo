@@ -27,8 +27,9 @@
  */
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/disallow_copying.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"

@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/concurrency/mutex.h"
 

@@ -31,12 +31,12 @@
 #include <boost/functional/hash.hpp>
 #include <boost/optional.hpp>
 #include <climits>
+#include <cstdint>
 #include <ostream>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/util/bufreader.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 

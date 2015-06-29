@@ -36,6 +36,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <cstdint>
 #include <string>
 
 #include "mongo/base/init.h"
@@ -44,7 +45,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"

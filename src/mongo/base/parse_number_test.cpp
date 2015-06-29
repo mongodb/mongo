@@ -29,11 +29,11 @@
 #include "mongo/platform/basic.h"
 
 #include <cmath>
+#include <cstdint>
 #include <limits>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/mongoutils/str.h"  // for str::stream()!
 #include "mongo/unittest/unittest.h"
 

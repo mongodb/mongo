@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -36,7 +37,6 @@
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 

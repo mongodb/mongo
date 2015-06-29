@@ -28,12 +28,13 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/unique_message.h"

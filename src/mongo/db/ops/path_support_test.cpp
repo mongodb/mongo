@@ -28,6 +28,7 @@
 
 #include "mongo/db/ops/path_support.h"
 
+#include <cstdint>
 #include <string>
 
 #include "mongo/base/error_codes.h"
@@ -43,7 +44,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 

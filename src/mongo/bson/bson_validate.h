@@ -29,9 +29,10 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 class BSONObj;

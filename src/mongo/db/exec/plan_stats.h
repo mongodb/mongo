@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -35,7 +36,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/net/listen.h"  // for Listener::getElapsedTimeMillis()
 

@@ -28,11 +28,11 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <type_traits>
 
 #include "mongo/base/status_with.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 class BSONObj;

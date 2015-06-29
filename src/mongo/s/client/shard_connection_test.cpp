@@ -25,6 +25,7 @@
  *    then also delete it in the license file.
  */
 
+#include <cstdint>
 #include <vector>
 
 #include "mongo/base/init.h"
@@ -37,7 +38,6 @@
 #include "mongo/db/service_context_noop.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"

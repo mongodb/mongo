@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <iosfwd>
 #include <string>
 #include <utility>
@@ -35,7 +36,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 class BSONObjBuilder;
