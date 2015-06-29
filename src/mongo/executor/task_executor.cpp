@@ -51,10 +51,13 @@ TaskExecutor::EventHandle::EventHandle(std::shared_ptr<EventState> event)
     : _event(std::move(event)) {}
 
 TaskExecutor::CallbackArgs::CallbackArgs(TaskExecutor* theExecutor,
-                                         const CallbackHandle& theHandle,
-                                         const Status& theStatus,
+                                         CallbackHandle theHandle,
+                                         Status theStatus,
                                          OperationContext* theTxn)
-    : executor(theExecutor), myHandle(theHandle), status(theStatus), txn(theTxn) {}
+    : executor(theExecutor),
+      myHandle(std::move(theHandle)),
+      status(std::move(theStatus)),
+      txn(theTxn) {}
 
 
 TaskExecutor::RemoteCommandCallbackArgs::RemoteCommandCallbackArgs(
