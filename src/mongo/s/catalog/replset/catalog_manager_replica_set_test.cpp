@@ -188,8 +188,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollection) {
 
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.cmdObj, &errmsg));
-        ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getCollName());
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getNS().ns());
         auto updates = actualBatchedUpdate.getUpdates();
         ASSERT_EQUALS(1U, updates.size());
         auto update = updates.front();
@@ -302,8 +302,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) 
 
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.cmdObj, &errmsg));
-        ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getCollName());
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getNS().ns());
         auto updates = actualBatchedUpdate.getUpdates();
         ASSERT_EQUALS(1U, updates.size());
         auto update = updates.front();
@@ -1323,8 +1323,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabase) {
 
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.cmdObj, &errmsg));
-        ASSERT_EQUALS(DatabaseType::ConfigNS, actualBatchedUpdate.getCollName());
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(DatabaseType::ConfigNS, actualBatchedUpdate.getNS().ns());
         auto updates = actualBatchedUpdate.getUpdates();
         ASSERT_EQUALS(1U, updates.size());
         auto update = updates.front();
@@ -1549,8 +1549,8 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseSuccess) {
 
         BatchedInsertRequest actualBatchedInsert;
         std::string errmsg;
-        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.cmdObj, &errmsg));
-        ASSERT_EQUALS(DatabaseType::ConfigNS, actualBatchedInsert.getCollName());
+        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(DatabaseType::ConfigNS, actualBatchedInsert.getNS().ns());
         auto inserts = actualBatchedInsert.getDocuments();
         ASSERT_EQUALS(1U, inserts.size());
         auto insert = inserts.front();
@@ -1816,8 +1816,8 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDuplicateKeyOnInsert) {
 
         BatchedInsertRequest actualBatchedInsert;
         std::string errmsg;
-        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.cmdObj, &errmsg));
-        ASSERT_EQUALS(DatabaseType::ConfigNS, actualBatchedInsert.getCollName());
+        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(DatabaseType::ConfigNS, actualBatchedInsert.getNS().ns());
         auto inserts = actualBatchedInsert.getDocuments();
         ASSERT_EQUALS(1U, inserts.size());
         auto insert = inserts.front();

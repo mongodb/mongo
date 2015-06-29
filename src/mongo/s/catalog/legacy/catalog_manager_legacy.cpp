@@ -1234,9 +1234,8 @@ bool CatalogManagerLegacy::runUserManagementWriteCommand(const string& commandNa
                                                          const BSONObj& cmdObj,
                                                          BSONObjBuilder* result) {
     DBClientMultiCommand dispatcher;
-    RawBSONSerializable requestCmdSerial(cmdObj);
     for (const ConnectionString& configServer : _configServers) {
-        dispatcher.addCommand(configServer, dbname, requestCmdSerial);
+        dispatcher.addCommand(configServer, dbname, cmdObj);
     }
 
     auto scopedDistLock = getDistLockManager()->lock("authorizationData", commandName, Seconds{5});

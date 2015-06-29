@@ -34,7 +34,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/bson_serializable.h"
 #include "mongo/s/write_ops/batched_request_metadata.h"
 #include "mongo/s/write_ops/batched_update_document.h"
 
@@ -44,7 +43,7 @@ namespace mongo {
  * This class represents the layout and content of a batched update runCommand,
  * the request side.
  */
-class BatchedUpdateRequest : public BSONSerializable {
+class BatchedUpdateRequest {
     MONGO_DISALLOW_COPYING(BatchedUpdateRequest);
 
 public:
@@ -67,31 +66,23 @@ public:
     //
 
     BatchedUpdateRequest();
-    virtual ~BatchedUpdateRequest();
+    ~BatchedUpdateRequest();
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(BatchedUpdateRequest* other) const;
 
-    //
-    // bson serializable interface implementation
-    //
-
-    virtual bool isValid(std::string* errMsg) const;
-    virtual BSONObj toBSON() const;
-    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-    virtual void clear();
-    virtual std::string toString() const;
+    bool isValid(std::string* errMsg) const;
+    BSONObj toBSON() const;
+    bool parseBSON(StringData dbName, const BSONObj& source, std::string* errMsg);
+    void clear();
+    std::string toString() const;
 
     //
     // individual field accessors
     //
 
-    void setCollName(StringData collName);
-    void setCollNameNS(const NamespaceString& collName);
-    const std::string& getCollName() const;
-    const NamespaceString& getCollNameNS() const;
-
-    const NamespaceString& getTargetingNSS() const;
+    void setNS(NamespaceString ns);
+    const NamespaceString& getNS() const;
 
     void setUpdates(const std::vector<BatchedUpdateDocument*>& updates);
 
@@ -134,8 +125,8 @@ private:
     // Convention: (M)andatory, (O)ptional
 
     // (M)  collection we're updating from
-    NamespaceString _collName;
-    bool _isCollNameSet;
+    NamespaceString _ns;
+    bool _isNSSet;
 
     // (M)  array of individual updates
     std::vector<BatchedUpdateDocument*> _updates;

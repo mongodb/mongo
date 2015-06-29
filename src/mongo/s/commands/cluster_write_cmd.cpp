@@ -95,13 +95,9 @@ public:
         BatchedCommandRequest request(_writeType);
 
         string errMsg;
-        if (!request.parseBSON(cmdObj, &errMsg) || !request.isValid(&errMsg)) {
+        if (!request.parseBSON(dbname, cmdObj, &errMsg) || !request.isValid(&errMsg)) {
             return Status(ErrorCodes::FailedToParse, errMsg);
         }
-
-        // Fixup the namespace to be a full ns internally
-        const NamespaceString nss(dbname, request.getNS());
-        request.setNS(nss.ns());
 
         // We can only explain write batches of size 1.
         if (request.sizeWriteOps() != 1U) {
@@ -145,16 +141,12 @@ public:
             LastError::Disabled disableLastError(cmdLastError);
 
             // TODO: if we do namespace parsing, push this to the type
-            if (!request.parseBSON(cmdObj, &errmsg) || !request.isValid(&errmsg)) {
+            if (!request.parseBSON(dbname, cmdObj, &errmsg) || !request.isValid(&errmsg)) {
                 // Batch parse failure
                 response.setOk(false);
                 response.setErrCode(ErrorCodes::FailedToParse);
                 response.setErrMessage(errmsg);
             } else {
-                // Fixup the namespace to be a full ns internally
-                const NamespaceString nss(dbname, request.getNS());
-                request.setNSS(nss);
-
                 writer.write(request, &response);
             }
 

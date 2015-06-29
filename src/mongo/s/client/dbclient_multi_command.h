@@ -49,13 +49,13 @@ public:
 
     void addCommand(const ConnectionString& endpoint,
                     StringData dbName,
-                    const BSONSerializable& request);
+                    const BSONObj& request) override;
 
-    void sendAll();
+    void sendAll() override;
 
-    int numPending() const;
+    int numPending() const override;
 
-    Status recvAny(ConnectionString* endpoint, BSONSerializable* response);
+    Status recvAny(ConnectionString* endpoint, BSONSerializable* response) override;
 
     void setTimeoutMillis(int milliSecs);
 

@@ -62,8 +62,10 @@ TEST(RoundTrip, Normal) {
 
     string errMsg;
     BatchedInsertRequest request;
-    bool ok = request.parseBSON(origInsertRequestObj, &errMsg);
+    bool ok = request.parseBSON("foo", origInsertRequestObj, &errMsg);
     ASSERT_TRUE(ok);
+
+    ASSERT_EQ("foo.test", request.getNS().ns());
 
     BSONObj genInsertRequestObj = request.toBSON();
     ASSERT_EQUALS(0, genInsertRequestObj.woCompare(origInsertRequestObj));
@@ -73,7 +75,7 @@ TEST(GenID, All) {
     BatchedCommandRequest cmdRequest(BatchedCommandRequest::BatchType_Insert);
     BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
 
-    request.setCollName("foo.bar");
+    request.setNS(NamespaceString("foo.bar"));
     request.setOrdered(false);
 
     BSONObj insertA = BSON("a" << 1);
@@ -86,7 +88,7 @@ TEST(GenID, All) {
     ASSERT(idCmdRequest.get());
 
     BatchedInsertRequest* idRequest = idCmdRequest->getInsertRequest();
-    ASSERT_EQUALS(idRequest->getCollName(), request.getCollName());
+    ASSERT_EQUALS(idRequest->getNS().ns(), request.getNS().ns());
     ASSERT_EQUALS(idRequest->getOrdered(), request.getOrdered());
 
     ASSERT(!idRequest->getDocumentsAt(0)["_id"].eoo());
@@ -99,7 +101,7 @@ TEST(GenID, Partial) {
     BatchedCommandRequest cmdRequest(BatchedCommandRequest::BatchType_Insert);
     BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
 
-    request.setCollName("foo.bar");
+    request.setNS(NamespaceString("foo.bar"));
     request.setOrdered(false);
 
     BSONObj insertA = BSON("a" << 1);
@@ -114,7 +116,7 @@ TEST(GenID, Partial) {
     ASSERT(idCmdRequest.get());
 
     BatchedInsertRequest* idRequest = idCmdRequest->getInsertRequest();
-    ASSERT_EQUALS(idRequest->getCollName(), request.getCollName());
+    ASSERT_EQUALS(idRequest->getNS().ns(), request.getNS().ns());
     ASSERT_EQUALS(idRequest->getOrdered(), request.getOrdered());
 
     ASSERT(!idRequest->getDocumentsAt(0)["_id"].eoo());
@@ -130,7 +132,7 @@ TEST(GenID, None) {
     BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
 
     // We need to check for system.indexes namespace
-    request.setCollName("foo.bar");
+    request.setNS(NamespaceString("foo.bar"));
 
     BSONObj insertA = BSON("_id" << 0 << "a" << 1);
     BSONObj insertB = BSON("b" << 1 << "_id" << 1);

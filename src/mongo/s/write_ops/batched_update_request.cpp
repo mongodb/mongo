@@ -61,7 +61,7 @@ bool BatchedUpdateRequest::isValid(std::string* errMsg) const {
     }
 
     // All the mandatory fields must be present.
-    if (!_isCollNameSet) {
+    if (!_isNSSet) {
         *errMsg = stream() << "missing " << collName.name() << " field";
         return false;
     }
@@ -77,8 +77,8 @@ bool BatchedUpdateRequest::isValid(std::string* errMsg) const {
 BSONObj BatchedUpdateRequest::toBSON() const {
     BSONObjBuilder builder;
 
-    if (_isCollNameSet)
-        builder.append(collName(), _collName);
+    if (_isNSSet)
+        builder.append(collName(), _ns.coll());
 
     if (_isUpdatesSet) {
         BSONArrayBuilder updatesBuilder(builder.subarrayStart(updates()));
@@ -106,7 +106,7 @@ BSONObj BatchedUpdateRequest::toBSON() const {
     return builder.obj();
 }
 
-bool BatchedUpdateRequest::parseBSON(const BSONObj& source, string* errMsg) {
+bool BatchedUpdateRequest::parseBSON(StringData dbName, const BSONObj& source, string* errMsg) {
     clear();
 
     std::string dummy;
@@ -125,8 +125,8 @@ bool BatchedUpdateRequest::parseBSON(const BSONObj& source, string* errMsg) {
             fieldState = FieldParser::extract(elem, collName, &collNameTemp, errMsg);
             if (fieldState == FieldParser::FIELD_INVALID)
                 return false;
-            _collName = NamespaceString(collNameTemp);
-            _isCollNameSet = fieldState == FieldParser::FIELD_SET;
+            _ns = NamespaceString(dbName, collNameTemp);
+            _isNSSet = fieldState == FieldParser::FIELD_SET;
         } else if (fieldName == updates.name()) {
             fieldState = FieldParser::extract(elem, updates, &_updates, errMsg);
             if (fieldState == FieldParser::FIELD_INVALID)
@@ -162,8 +162,8 @@ bool BatchedUpdateRequest::parseBSON(const BSONObj& source, string* errMsg) {
 }
 
 void BatchedUpdateRequest::clear() {
-    _collName = NamespaceString();
-    _isCollNameSet = false;
+    _ns = NamespaceString();
+    _isNSSet = false;
 
     unsetUpdates();
 
@@ -181,8 +181,8 @@ void BatchedUpdateRequest::clear() {
 void BatchedUpdateRequest::cloneTo(BatchedUpdateRequest* other) const {
     other->clear();
 
-    other->_collName = _collName;
-    other->_isCollNameSet = _isCollNameSet;
+    other->_ns = _ns;
+    other->_isNSSet = _isNSSet;
 
     for (std::vector<BatchedUpdateDocument*>::const_iterator it = _updates.begin();
          it != _updates.end();
@@ -209,28 +209,14 @@ std::string BatchedUpdateRequest::toString() const {
     return toBSON().toString();
 }
 
-void BatchedUpdateRequest::setCollName(StringData collName) {
-    _collName = NamespaceString(collName);
-    _isCollNameSet = true;
+void BatchedUpdateRequest::setNS(NamespaceString ns) {
+    _ns = std::move(ns);
+    _isNSSet = true;
 }
 
-const std::string& BatchedUpdateRequest::getCollName() const {
-    dassert(_isCollNameSet);
-    return _collName.ns();
-}
-
-void BatchedUpdateRequest::setCollNameNS(const NamespaceString& collName) {
-    _collName = collName;
-    _isCollNameSet = true;
-}
-
-const NamespaceString& BatchedUpdateRequest::getCollNameNS() const {
-    dassert(_isCollNameSet);
-    return _collName;
-}
-
-const NamespaceString& BatchedUpdateRequest::getTargetingNSS() const {
-    return getCollNameNS();
+const NamespaceString& BatchedUpdateRequest::getNS() const {
+    dassert(_isNSSet);
+    return _ns;
 }
 
 void BatchedUpdateRequest::setUpdates(const std::vector<BatchedUpdateDocument*>& updates) {

@@ -57,8 +57,8 @@ DBClientMultiCommand::PendingCommand::PendingCommand(const ConnectionString& end
 
 void DBClientMultiCommand::addCommand(const ConnectionString& endpoint,
                                       StringData dbName,
-                                      const BSONSerializable& request) {
-    PendingCommand* command = new PendingCommand(endpoint, dbName, request.toBSON());
+                                      const BSONObj& request) {
+    PendingCommand* command = new PendingCommand(endpoint, dbName, request);
     _pendingCommands.push_back(command);
 }
 

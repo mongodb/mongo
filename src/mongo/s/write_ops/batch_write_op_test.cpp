@@ -142,7 +142,7 @@ TEST(WriteOpTests, SingleOp) {
 
     // Do single-target, single doc batch write op
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
     BatchWriteOp batchOp;
@@ -181,7 +181,7 @@ TEST(WriteOpTests, SingleError) {
 
     // Do single-target, single doc batch write op
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getDeleteRequest()->addToDeletes(buildDelete(BSON("x" << 1), 1));
 
     BatchWriteOp batchOp;
@@ -226,7 +226,7 @@ TEST(WriteOpTests, SingleTargetError) {
 
     // Do untargetable delete op
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getDeleteRequest()->addToDeletes(buildDelete(BSON("x" << 1), 1));
 
     BatchWriteOp batchOp;
@@ -267,7 +267,7 @@ TEST(WriteOpTests, SingleWriteConcernErrorOrdered) {
     initTargeterFullRange(nss, endpoint, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
     request.setWriteConcern(BSON("w" << 3));
 
@@ -316,7 +316,7 @@ TEST(WriteOpTests, SingleStaleError) {
     initTargeterFullRange(nss, endpoint, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
     BatchWriteOp batchOp;
@@ -383,7 +383,7 @@ TEST(WriteOpTests, MultiOpSameShardOrdered) {
 
     // Do single-target, multi-doc batch write op
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(true);
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 1), false));
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 2), false));
@@ -426,7 +426,7 @@ TEST(WriteOpTests, MultiOpSameShardUnordered) {
 
     // Do single-target, multi-doc batch write op
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 1), false));
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << 2), false));
@@ -471,7 +471,7 @@ TEST(WriteOpTests, MultiOpTwoShardsOrdered) {
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(true);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
@@ -529,7 +529,7 @@ TEST(WriteOpTests, MultiOpTwoShardsUnordered) {
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
@@ -580,7 +580,7 @@ TEST(WriteOpTests, MultiOpTwoShardsEachOrdered) {
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(true);
     BSONObj queryA = BSON("x" << GTE << -1 << LT << 2);
     request.getDeleteRequest()->addToDeletes(buildDelete(queryA, 0));
@@ -650,7 +650,7 @@ TEST(WriteOpTests, MultiOpTwoShardsEachUnordered) {
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     BSONObj queryA = BSON("x" << GTE << -1 << LT << 2);
     request.getUpdateRequest()->addToUpdates(buildUpdate(queryA, true));
@@ -704,7 +704,7 @@ TEST(WriteOpTests, MultiOpOneOrTwoShardsOrdered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(true);
     // These go to the same shard
     request.getDeleteRequest()->addToDeletes(buildDelete(BSON("x" << -1), 1));
@@ -815,7 +815,7 @@ TEST(WriteOpTests, MultiOpOneOrTwoShardsUnordered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     // These go to the same shard
     request.getUpdateRequest()->addToUpdates(buildUpdate(BSON("x" << -1), false));
@@ -876,7 +876,7 @@ TEST(WriteOpTests, MultiOpSingleShardErrorUnordered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
@@ -939,7 +939,7 @@ TEST(WriteOpTests, MultiOpTwoShardErrorsUnordered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
@@ -1005,7 +1005,7 @@ TEST(WriteOpTests, MultiOpPartialSingleShardErrorUnordered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     BSONObj queryA = BSON("x" << GTE << -1 << LT << 2);
     request.getDeleteRequest()->addToDeletes(buildDelete(queryA, 0));
@@ -1071,7 +1071,7 @@ TEST(WriteOpTests, MultiOpPartialSingleShardErrorOrdered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(true);
     BSONObj queryA = BSON("x" << GTE << -1 << LT << 2);
     request.getDeleteRequest()->addToDeletes(buildDelete(queryA, 0));
@@ -1140,7 +1140,7 @@ TEST(WriteOpTests, MultiOpErrorAndWriteConcernErrorUnordered) {
     initTargeterFullRange(nss, endpoint, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
@@ -1185,7 +1185,7 @@ TEST(WriteOpTests, SingleOpErrorAndWriteConcernErrorOrdered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(true);
     BSONObj query = BSON("x" << GTE << -1 << LT << 2);
     request.getUpdateRequest()->addToUpdates(buildUpdate(query, true));
@@ -1234,7 +1234,7 @@ TEST(WriteOpTests, MultiOpFailedTargetOrdered) {
     initTargeterHalfRange(nss, endpoint, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
     request.getInsertRequest()->addToDocuments(BSON("x" << -2));
@@ -1296,7 +1296,7 @@ TEST(WriteOpTests, MultiOpFailedTargetUnordered) {
     initTargeterHalfRange(nss, endpoint, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
@@ -1353,7 +1353,7 @@ TEST(WriteOpTests, MultiOpFailedBatchOrdered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
     request.getInsertRequest()->addToDocuments(BSON("x" << 3));
@@ -1405,7 +1405,7 @@ TEST(WriteOpTests, MultiOpFailedBatchUnordered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
@@ -1457,7 +1457,7 @@ TEST(WriteOpTests, MultiOpAbortOrdered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
     request.getInsertRequest()->addToDocuments(BSON("x" << 3));
@@ -1506,7 +1506,7 @@ TEST(WriteOpTests, MultiOpAbortUnordered) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << -2));
@@ -1546,7 +1546,7 @@ TEST(WriteOpTests, MultiOpTwoWCErrors) {
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << -1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
     request.setWriteConcern(BSON("w" << 3));
@@ -1600,7 +1600,7 @@ TEST(WriteOpLimitTests, OneBigDoc) {
 
     // Do single-target, single doc batch write op
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1 << "data" << bigString));
 
     BatchWriteOp batchOp;
@@ -1633,7 +1633,7 @@ TEST(WriteOpLimitTests, OneBigOneSmall) {
     string bigString(BSONObjMaxUserSize, 'x');
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     BatchedUpdateDocument* bigUpdateDoc =
         buildUpdate(BSON("x" << 1), BSON("data" << bigString), false);
     request.getUpdateRequest()->addToUpdates(bigUpdateDoc);
@@ -1676,7 +1676,7 @@ TEST(WriteOpLimitTests, TooManyOps) {
     initTargeterFullRange(nss, endpoint, &targeter);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
-    request.setNS(nss.ns());
+    request.setNS(nss);
 
     // Add 2 more than the maximum to the batch
     for (size_t i = 0; i < BatchedCommandRequest::kMaxWriteBatchSize + 2u; ++i) {
@@ -1729,7 +1729,7 @@ TEST(WriteOpLimitTests, UpdateOverheadIncluded) {
                       'x');
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
-    request.setNS(nss.ns());
+    request.setNS(nss);
 
     // Add the maximum number of updates
     int estSizeBytes = 0;

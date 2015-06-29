@@ -71,8 +71,10 @@ TEST(RoundTrip, Normal) {
 
     string errMsg;
     BatchedDeleteRequest request;
-    bool ok = request.parseBSON(origDeleteRequestObj, &errMsg);
+    bool ok = request.parseBSON("foo", origDeleteRequestObj, &errMsg);
     ASSERT_TRUE(ok);
+
+    ASSERT_EQ("foo.test", request.getNS().ns());
 
     BSONObj genDeleteRequestObj = request.toBSON();
     ASSERT_EQUALS(0, genDeleteRequestObj.woCompare(origDeleteRequestObj));

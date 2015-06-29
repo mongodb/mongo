@@ -34,7 +34,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/bson_serializable.h"
 #include "mongo/s/write_ops/batched_request_metadata.h"
 
 namespace mongo {
@@ -43,7 +42,7 @@ namespace mongo {
  * This class represents the layout and content of a batched insert runCommand,
  * the request side.
  */
-class BatchedInsertRequest : public BSONSerializable {
+class BatchedInsertRequest {
     MONGO_DISALLOW_COPYING(BatchedInsertRequest);
 
 public:
@@ -66,31 +65,29 @@ public:
     //
 
     BatchedInsertRequest();
-    virtual ~BatchedInsertRequest();
+    ~BatchedInsertRequest();
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(BatchedInsertRequest* other) const;
 
-    //
-    // bson serializable interface implementation
-    //
-
-    virtual bool isValid(std::string* errMsg) const;
-    virtual BSONObj toBSON() const;
-    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-    virtual void clear();
-    virtual std::string toString() const;
+    bool isValid(std::string* errMsg) const;
+    BSONObj toBSON() const;
+    bool parseBSON(StringData dbName, const BSONObj& source, std::string* errMsg);
+    void clear();
+    std::string toString() const;
 
     //
     // individual field accessors
     //
 
-    void setCollName(StringData collName);
-    void setCollNameNS(const NamespaceString& collName);
-    const std::string& getCollName() const;
-    const NamespaceString& getCollNameNS() const;
+    void setNS(NamespaceString collName);
+    const NamespaceString& getNS() const;
 
-    const NamespaceString& getTargetingNSS() const;
+    /**
+     * Returns the ns for the index being created. Valid only if this is a index
+     * insert request.
+     */
+    const NamespaceString& getIndexTargetingNS() const;
 
     void addToDocuments(const BSONObj& documents);
     bool isDocumentsSet() const;
@@ -128,8 +125,8 @@ private:
     // Convention: (M)andatory, (O)ptional
 
     // (M)  collection we're inserting on
-    NamespaceString _collName;
-    bool _isCollNameSet;
+    NamespaceString _ns;
+    bool _isNSSet;
 
     // (M)  array of documents to be inserted
     std::vector<BSONObj> _documents;

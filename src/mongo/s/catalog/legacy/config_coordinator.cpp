@@ -310,7 +310,7 @@ bool ConfigCoordinator::_checkConfigString(BatchedCommandResponse* clientRespons
 
     for (const HostAndPort& server : _configServerConnectionString.getServers()) {
         SSVRequest ssvRequest(_configServerConnectionString.toString());
-        _dispatcher->addCommand(ConnectionString(server), "admin", ssvRequest);
+        _dispatcher->addCommand(ConnectionString(server), "admin", ssvRequest.toBSON());
     }
 
     _dispatcher->sendAll();
@@ -374,9 +374,7 @@ void ConfigCoordinator::executeBatch(const BatchedCommandRequest& clientRequest,
     {
         for (const HostAndPort& server : _configServerConnectionString.getServers()) {
             _dispatcher->addCommand(
-                ConnectionString(server),
-                "admin",
-                RawBSONSerializable(BSON("getLastError" << true << "fsync" << true)));
+                ConnectionString(server), "admin", BSON("getLastError" << true << "fsync" << true));
         }
 
         _dispatcher->sendAll();
@@ -426,7 +424,7 @@ void ConfigCoordinator::executeBatch(const BatchedCommandRequest& clientRequest,
 
     BatchedCommandRequest configRequest(clientRequest.getBatchType());
     clientRequest.cloneTo(&configRequest);
-    configRequest.setNS(nss.coll());
+    configRequest.setNS(nss);
 
     OwnedPointerVector<ConfigResponse> responsesOwned;
     vector<ConfigResponse*>& responses = responsesOwned.mutableVector();
@@ -437,7 +435,7 @@ void ConfigCoordinator::executeBatch(const BatchedCommandRequest& clientRequest,
 
     // Get as many batches as we can at once
     for (const HostAndPort& server : _configServerConnectionString.getServers()) {
-        _dispatcher->addCommand(ConnectionString(server), nss.db(), configRequest);
+        _dispatcher->addCommand(ConnectionString(server), nss.db(), configRequest.toBSON());
     }
 
     // Send them all out

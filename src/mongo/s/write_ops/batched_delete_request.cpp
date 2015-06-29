@@ -60,7 +60,7 @@ bool BatchedDeleteRequest::isValid(std::string* errMsg) const {
     }
 
     // All the mandatory fields must be present.
-    if (!_isCollNameSet) {
+    if (!_isNSSet) {
         *errMsg = stream() << "missing " << collName.name() << " field";
         return false;
     }
@@ -76,8 +76,8 @@ bool BatchedDeleteRequest::isValid(std::string* errMsg) const {
 BSONObj BatchedDeleteRequest::toBSON() const {
     BSONObjBuilder builder;
 
-    if (_isCollNameSet)
-        builder.append(collName(), _collName);
+    if (_isNSSet)
+        builder.append(collName(), _ns.coll());
 
     if (_isDeletesSet) {
         BSONArrayBuilder deletesBuilder(builder.subarrayStart(deletes()));
@@ -102,7 +102,7 @@ BSONObj BatchedDeleteRequest::toBSON() const {
     return builder.obj();
 }
 
-bool BatchedDeleteRequest::parseBSON(const BSONObj& source, string* errMsg) {
+bool BatchedDeleteRequest::parseBSON(StringData dbName, const BSONObj& source, string* errMsg) {
     clear();
 
     std::string dummy;
@@ -114,8 +114,8 @@ bool BatchedDeleteRequest::parseBSON(const BSONObj& source, string* errMsg) {
     fieldState = FieldParser::extract(source, collName, &collNameTemp, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
         return false;
-    _collName = NamespaceString(collNameTemp);
-    _isCollNameSet = fieldState == FieldParser::FIELD_SET;
+    _ns = NamespaceString(dbName, collNameTemp);
+    _isNSSet = fieldState == FieldParser::FIELD_SET;
 
     fieldState = FieldParser::extract(source, deletes, &_deletes, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
@@ -148,8 +148,8 @@ bool BatchedDeleteRequest::parseBSON(const BSONObj& source, string* errMsg) {
 }
 
 void BatchedDeleteRequest::clear() {
-    _collName = NamespaceString();
-    _isCollNameSet = false;
+    _ns = NamespaceString();
+    _isNSSet = false;
 
     unsetDeletes();
 
@@ -165,8 +165,8 @@ void BatchedDeleteRequest::clear() {
 void BatchedDeleteRequest::cloneTo(BatchedDeleteRequest* other) const {
     other->clear();
 
-    other->_collName = _collName;
-    other->_isCollNameSet = _isCollNameSet;
+    other->_ns = _ns;
+    other->_isNSSet = _isNSSet;
 
     for (std::vector<BatchedDeleteDocument*>::const_iterator it = _deletes.begin();
          it != _deletes.end();
@@ -193,28 +193,14 @@ std::string BatchedDeleteRequest::toString() const {
     return toBSON().toString();
 }
 
-void BatchedDeleteRequest::setCollName(StringData collName) {
-    _collName = NamespaceString(collName);
-    _isCollNameSet = true;
+void BatchedDeleteRequest::setNS(NamespaceString ns) {
+    _ns = std::move(ns);
+    _isNSSet = true;
 }
 
-const std::string& BatchedDeleteRequest::getCollName() const {
-    dassert(_isCollNameSet);
-    return _collName.ns();
-}
-
-void BatchedDeleteRequest::setCollNameNS(const NamespaceString& collName) {
-    _collName = collName;
-    _isCollNameSet = true;
-}
-
-const NamespaceString& BatchedDeleteRequest::getCollNameNS() const {
-    dassert(_isCollNameSet);
-    return _collName;
-}
-
-const NamespaceString& BatchedDeleteRequest::getTargetingNSS() const {
-    return getCollNameNS();
+const NamespaceString& BatchedDeleteRequest::getNS() const {
+    dassert(_isNSSet);
+    return _ns;
 }
 
 void BatchedDeleteRequest::setDeletes(const std::vector<BatchedDeleteDocument*>& deletes) {

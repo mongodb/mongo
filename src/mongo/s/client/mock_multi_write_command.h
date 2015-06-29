@@ -97,15 +97,15 @@ public:
 
     void addCommand(const ConnectionString& endpoint,
                     StringData dbName,
-                    const BSONSerializable& request) {
+                    const BSONObj& request) override {
         _pending.push_back(endpoint);
     }
 
-    void sendAll() {
+    void sendAll() override {
         // No-op
     }
 
-    int numPending() const {
+    int numPending() const override {
         return static_cast<int>(_pending.size());
     }
 
@@ -113,7 +113,7 @@ public:
      * Returns an error response if the next pending endpoint returned has a corresponding
      * MockEndpoint.
      */
-    Status recvAny(ConnectionString* endpoint, BSONSerializable* response) {
+    Status recvAny(ConnectionString* endpoint, BSONSerializable* response) override {
         BatchedCommandResponse* batchResponse =  //
             static_cast<BatchedCommandResponse*>(response);
 

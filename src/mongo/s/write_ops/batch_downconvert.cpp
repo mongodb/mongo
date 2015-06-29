@@ -228,9 +228,7 @@ Status enforceLegacyWriteConcern(MultiCommandDispatch* dispatcher,
                << " at opTime " << opTime.toStringPretty() << " with electionID " << electionId;
 
         BSONObj gleCmd = buildGLECmdWithOpTime(options, opTime, electionId);
-
-        RawBSONSerializable gleCmdSerial(gleCmd);
-        dispatcher->addCommand(shardEndpoint, dbName, gleCmdSerial);
+        dispatcher->addCommand(shardEndpoint, dbName, gleCmd);
     }
 
     dispatcher->sendAll();

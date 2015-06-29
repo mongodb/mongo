@@ -74,8 +74,10 @@ TEST(RoundTrip, Normal) {
 
     string errMsg;
     BatchedUpdateRequest request;
-    bool ok = request.parseBSON(origUpdateRequestObj, &errMsg);
+    bool ok = request.parseBSON("foo", origUpdateRequestObj, &errMsg);
     ASSERT_TRUE(ok);
+
+    ASSERT_EQ("foo.test", request.getNS().ns());
 
     BSONObj genUpdateRequestObj = request.toBSON();
     ASSERT_EQUALS(0, genUpdateRequestObj.woCompare(origUpdateRequestObj));

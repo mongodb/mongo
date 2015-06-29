@@ -72,8 +72,8 @@ public:
 
             BatchedInsertRequest actualBatchedInsert;
             std::string errmsg;
-            ASSERT_TRUE(actualBatchedInsert.parseBSON(request.cmdObj, &errmsg));
-            ASSERT_EQUALS(ActionLogType::ConfigNS, actualBatchedInsert.getCollName());
+            ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+            ASSERT_EQUALS(ActionLogType::ConfigNS, actualBatchedInsert.getNS().ns());
             auto inserts = actualBatchedInsert.getDocuments();
             ASSERT_EQUALS(1U, inserts.size());
             BSONObj insert = inserts.front();

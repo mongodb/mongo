@@ -51,7 +51,6 @@ using std::vector;
 void msgToBatchRequests(const Message& msg, vector<BatchedCommandRequest*>* requests) {
     int opType = msg.operation();
 
-    unique_ptr<BatchedCommandRequest> request;
     if (opType == dbInsert) {
         msgToBatchInserts(msg, requests);
     } else if (opType == dbUpdate) {
@@ -93,7 +92,7 @@ void msgToBatchInserts(const Message& insertMsg, vector<BatchedCommandRequest*>*
         // No exceptions from here on
         BatchedCommandRequest* request =
             new BatchedCommandRequest(BatchedCommandRequest::BatchType_Insert);
-        request->setNSS(nss);
+        request->setNS(nss);
         for (vector<BSONObj>::const_iterator it = docs.begin(); it != docs.end(); ++it) {
             request->getInsertRequest()->addToDocuments(*it);
         }
@@ -123,7 +122,7 @@ BatchedCommandRequest* msgToBatchUpdate(const Message& updateMsg) {
 
     BatchedCommandRequest* request =
         new BatchedCommandRequest(BatchedCommandRequest::BatchType_Update);
-    request->setNSS(nss);
+    request->setNS(nss);
     request->getUpdateRequest()->addToUpdates(updateDoc);
     request->setWriteConcern(WriteConcernOptions::Acknowledged);
 
@@ -145,7 +144,7 @@ BatchedCommandRequest* msgToBatchDelete(const Message& deleteMsg) {
 
     BatchedCommandRequest* request =
         new BatchedCommandRequest(BatchedCommandRequest::BatchType_Delete);
-    request->setNSS(nss);
+    request->setNS(nss);
     request->getDeleteRequest()->addToDeletes(deleteDoc);
     request->setWriteConcern(WriteConcernOptions::Acknowledged);
 

@@ -169,7 +169,7 @@ static void noteInCriticalSection(WriteErrorDetail* staleError) {
 // static
 Status WriteBatchExecutor::validateBatch(const BatchedCommandRequest& request) {
     // Validate namespace
-    const NamespaceString& nss = request.getNSS();
+    const NamespaceString& nss = request.getNS();
     if (!nss.isValid()) {
         return Status(ErrorCodes::InvalidNamespace, nss.ns() + " is not a valid namespace");
     }
@@ -481,7 +481,7 @@ static void beginCurrentOp(OperationContext* txn, const BatchItemRef& currWrite)
     CurOp* const currentOp = CurOp::get(txn);
     currentOp->setOp_inlock(getOpCode(currWrite));
     currentOp->ensureStarted();
-    currentOp->setNS_inlock(currWrite.getRequest()->getNS());
+    currentOp->setNS_inlock(currWrite.getRequest()->getNS().ns());
 
     currentOp->debug().op = currentOp->getOp();
 
@@ -927,7 +927,7 @@ bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* resu
     if (request->isInsertIndexRequest())
         intentLock = false;  // can't build indexes in intent mode
 
-    const NamespaceString& nss = request->getNSS();
+    const NamespaceString& nss = request->getNS();
     invariant(!_collLock);
     invariant(!_dbLock);
     _dbLock =
@@ -1289,7 +1289,7 @@ static void multiUpdate(OperationContext* txn,
 static void multiRemove(OperationContext* txn,
                         const BatchItemRef& removeItem,
                         WriteOpResult* result) {
-    const NamespaceString& nss = removeItem.getRequest()->getNSS();
+    const NamespaceString& nss = removeItem.getRequest()->getNS();
     DeleteRequest request(nss);
     request.setQuery(removeItem.getDelete()->getQuery());
     request.setMulti(removeItem.getDelete()->getLimit() != 1);

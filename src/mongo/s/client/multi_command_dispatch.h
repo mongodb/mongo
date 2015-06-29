@@ -50,13 +50,13 @@ public:
 
     /**
      * Adds a command to this multi-command dispatch.  Commands are registered with a
-     * ConnectionString endpoint and a serializable request.
+     * ConnectionString endpoint and a BSON request object.
      *
      * Commands are not sent immediately, they are sent on sendAll.
      */
     virtual void addCommand(const ConnectionString& endpoint,
                             StringData dbName,
-                            const BSONSerializable& request) = 0;
+                            const BSONObj& request) = 0;
 
     /**
      * Sends all the commands in this dispatch to their endpoints, in undefined order and

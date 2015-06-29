@@ -93,7 +93,7 @@ TEST(BatchWriteExecTests, SingleOp) {
     MockSingleShardBackend backend(nss);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write op
@@ -126,7 +126,7 @@ TEST(BatchWriteExecTests, SingleOpError) {
     backend.setMockResults(mockResults);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write op
@@ -158,7 +158,7 @@ TEST(BatchWriteExecTests, StaleOp) {
 
     // Insert request
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write op
@@ -192,7 +192,7 @@ TEST(BatchWriteExecTests, MultiStaleOp) {
 
     // Insert request
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write op
@@ -230,7 +230,7 @@ TEST(BatchWriteExecTests, TooManyStaleOp) {
 
     // Insert request
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write ops
@@ -269,7 +269,7 @@ TEST(BatchWriteExecTests, ManyStaleOpWithMigration) {
 
     // Insert request
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.setOrdered(false);
     request.setWriteConcern(BSONObj());
     // Do single-target, single doc batch write op

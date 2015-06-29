@@ -60,7 +60,7 @@ TEST(WriteOpTests, BasicError) {
     //
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS("foo.bar");
+    request.setNS(NamespaceString("foo.bar"));
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
     WriteOp writeOp(BatchItemRef(&request, 0));
@@ -90,7 +90,7 @@ TEST(WriteOpTests, TargetSingle) {
     mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
     // Do single-target write op
@@ -151,7 +151,7 @@ TEST(WriteOpTests, TargetMultiOneShard) {
     mockRanges.push_back(new MockRange(endpointC, nss, BSON("x" << 10), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     // Only hits first shard
     BSONObj query = BSON("x" << GTE << -2 << LT << -1);
     request.getDeleteRequest()->addToDeletes(buildDeleteDoc(BSON("q" << query)));
@@ -193,7 +193,7 @@ TEST(WriteOpTests, TargetMultiAllShards) {
     mockRanges.push_back(new MockRange(endpointC, nss, BSON("x" << 10), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     BSONObj query = BSON("x" << GTE << -1 << LT << 1);
     request.getDeleteRequest()->addToDeletes(buildDeleteDoc(BSON("q" << query)));
 
@@ -240,7 +240,7 @@ TEST(WriteOpTests, ErrorSingle) {
     mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
     // Do single-target write op
@@ -285,7 +285,7 @@ TEST(WriteOpTests, CancelSingle) {
     mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
     // Do single-target write op
@@ -327,7 +327,7 @@ TEST(WriteOpTests, RetrySingleOp) {
     mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
-    request.setNS(nss.ns());
+    request.setNS(nss);
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
     // Do single-target write op

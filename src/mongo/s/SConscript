@@ -91,6 +91,7 @@ env.Library(
 env.CppUnitTest(
     target='batch_write_types_test',
     source=[
+        'write_ops/batched_command_request_test.cpp',
         'write_ops/batched_command_response_test.cpp',
         'write_ops/batched_delete_request_test.cpp',
         'write_ops/batched_insert_request_test.cpp',

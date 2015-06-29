@@ -218,12 +218,12 @@ void BatchWriteExec::executeBatch(const BatchedCommandRequest& clientRequest,
                 // Internally we use full namespaces for request/response, but we send the
                 // command to a database with the collection name in the request.
                 NamespaceString nss(request.getNS());
-                request.setNS(nss.coll());
+                request.setNS(nss);
 
                 LOG(4) << "sending write batch to " << shardHost.toString() << ": "
                        << request.toString() << endl;
 
-                _dispatcher->addCommand(shardHost, nss.db(), request);
+                _dispatcher->addCommand(shardHost, nss.db(), request.toBSON());
 
                 // Indicate we're done by setting the batch to NULL
                 // We'll only get duplicate hostEndpoints if we have broadcast and non-broadcast
@@ -338,7 +338,7 @@ void BatchWriteExec::executeBatch(const BatchedCommandRequest& clientRequest,
 
         if (numRoundsWithoutProgress > kMaxRoundsWithoutProgress) {
             stringstream msg;
-            msg << "no progress was made executing batch write op in " << clientRequest.getNS()
+            msg << "no progress was made executing batch write op in " << clientRequest.getNS().ns()
                 << " after " << kMaxRoundsWithoutProgress << " rounds (" << numCompletedOps
                 << " ops completed in " << rounds << " rounds total)";
 

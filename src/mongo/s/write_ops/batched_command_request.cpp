@@ -87,7 +87,7 @@ BatchedDeleteRequest* BatchedCommandRequest::getDeleteRequest() const {
 bool BatchedCommandRequest::isInsertIndexRequest() const {
     if (_batchType != BatchedCommandRequest::BatchType_Insert)
         return false;
-    return getNSS().isSystemDotIndexes();
+    return getNS().isSystemDotIndexes();
 }
 
 static bool extractUniqueIndex(const BSONObj& indexDesc) {
@@ -117,7 +117,7 @@ bool BatchedCommandRequest::isValidIndexRequest(string* errMsg) const {
         return false;
     }
 
-    const NamespaceString& reqNSS = getNSS();
+    const NamespaceString& reqNSS = getNS();
     if (reqNSS.db().compare(targetNSS.db()) != 0) {
         *errMsg =
             targetNSS.ns() + " namespace is not in the request database " + reqNSS.db().toString();
@@ -133,8 +133,9 @@ string BatchedCommandRequest::getTargetingNS() const {
 
 const NamespaceString& BatchedCommandRequest::getTargetingNSS() const {
     if (!isInsertIndexRequest())
-        return getNSS();
-    INVOKE(getTargetingNSS);
+        return getNS();
+
+    return _insertReq->getIndexTargetingNS();
 }
 
 static BSONObj extractIndexKeyPattern(const BSONObj& indexDesc) {
@@ -191,8 +192,10 @@ BSONObj BatchedCommandRequest::toBSON() const {
     INVOKE(toBSON);
 }
 
-bool BatchedCommandRequest::parseBSON(const BSONObj& source, std::string* errMsg) {
-    INVOKE(parseBSON, source, errMsg);
+bool BatchedCommandRequest::parseBSON(StringData dbName,
+                                      const BSONObj& source,
+                                      std::string* errMsg) {
+    INVOKE(parseBSON, dbName, source, errMsg);
 }
 
 void BatchedCommandRequest::clear() {
@@ -203,20 +206,12 @@ std::string BatchedCommandRequest::toString() const {
     INVOKE(toString);
 }
 
-void BatchedCommandRequest::setNSS(const NamespaceString& nss) {
-    INVOKE(setCollNameNS, nss);
+void BatchedCommandRequest::setNS(NamespaceString ns) {
+    INVOKE(setNS, std::move(ns));
 }
 
-void BatchedCommandRequest::setNS(StringData collName) {
-    INVOKE(setCollName, collName);
-}
-
-const std::string& BatchedCommandRequest::getNS() const {
-    INVOKE(getCollName);
-}
-
-const NamespaceString& BatchedCommandRequest::getNSS() const {
-    INVOKE(getCollNameNS);
+const NamespaceString& BatchedCommandRequest::getNS() const {
+    INVOKE(getNS);
 }
 
 std::size_t BatchedCommandRequest::sizeWriteOps() const {

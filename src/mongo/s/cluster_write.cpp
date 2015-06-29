@@ -164,7 +164,7 @@ Status clusterCreateIndex(const string& ns,
     insert->addToDocuments(indexDoc);
 
     BatchedCommandRequest request(insert.release());
-    request.setNS(nss.getSystemIndexesCollection());
+    request.setNS(NamespaceString(nss.getSystemIndexesCollection()));
     request.setWriteConcern(WriteConcernOptions::Acknowledged);
 
     BatchedCommandResponse dummyResponse;
@@ -204,7 +204,7 @@ void ClusterWriter::write(const BatchedCommandRequest& origRequest,
     unique_ptr<BatchedCommandRequest> idRequest(BatchedCommandRequest::cloneWithIds(origRequest));
     const BatchedCommandRequest& request = NULL != idRequest.get() ? *idRequest : origRequest;
 
-    const NamespaceString& nss = request.getNSS();
+    const NamespaceString& nss = request.getNS();
     if (!nss.isValid()) {
         toBatchError(Status(ErrorCodes::InvalidNamespace, nss.ns() + " is not a valid namespace"),
                      response);
@@ -260,7 +260,7 @@ void ClusterWriter::write(const BatchedCommandRequest& origRequest,
         exec.executeBatch(request, response);
 
         if (_autoSplit) {
-            splitIfNeeded(request.getNSS(), *targeter.getStats());
+            splitIfNeeded(request.getNS(), *targeter.getStats());
         }
 
         _stats->setShardStats(exec.releaseStats());

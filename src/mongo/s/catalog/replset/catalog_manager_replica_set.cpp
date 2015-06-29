@@ -609,7 +609,7 @@ DistLockManager* CatalogManagerReplicaSet::getDistLockManager() const {
 
 void CatalogManagerReplicaSet::writeConfigServerDirect(const BatchedCommandRequest& batchRequest,
                                                        BatchedCommandResponse* batchResponse) {
-    std::string dbname = batchRequest.getNSS().db().toString();
+    std::string dbname = batchRequest.getNS().db().toString();
     invariant(dbname == "config" || dbname == "admin");
     const BSONObj cmdObj = batchRequest.toBSON();
 

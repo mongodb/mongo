@@ -92,7 +92,7 @@ Status CatalogManager::insert(const string& ns,
     insert->addToDocuments(doc);
 
     BatchedCommandRequest request(insert.release());
-    request.setNS(ns);
+    request.setNS(NamespaceString(ns));
     request.setWriteConcern(WriteConcernOptions::Majority);
 
     BatchedCommandResponse dummyResponse;
@@ -125,7 +125,7 @@ Status CatalogManager::update(const string& ns,
     updateRequest->setWriteConcern(WriteConcernOptions::Majority);
 
     BatchedCommandRequest request(updateRequest.release());
-    request.setNS(ns);
+    request.setNS(NamespaceString(ns));
 
     BatchedCommandResponse dummyResponse;
     if (response == NULL) {
@@ -149,7 +149,7 @@ Status CatalogManager::remove(const string& ns,
     deleteRequest->setWriteConcern(WriteConcernOptions::Majority);
 
     BatchedCommandRequest request(deleteRequest.release());
-    request.setNS(ns);
+    request.setNS(NamespaceString(ns));
 
     BatchedCommandResponse dummyResponse;
     if (response == NULL) {
