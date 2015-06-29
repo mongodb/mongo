@@ -107,7 +107,7 @@ StatusWith<BSONObj> extractFindAndModifyNewObj(const BSONObj& responseObj) {
         return newDocElem.Obj();
     }
 
-    return {ErrorCodes::LockStateChangeFailed,
+    return {ErrorCodes::UnsupportedFormat,
             str::stream() << "no '" << kFindAndModifyResponseResultDocField
                           << "' in findAndModify response"};
 }
@@ -263,15 +263,9 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
         return findAndModifyStatus.getStatus();
     }
 
-    BSONObj newDoc(findAndModifyStatus.getValue());
-
-    if (newDoc.isEmpty()) {
-        return LocksType();
-    }
-
     LocksType lockDoc;
     string errMsg;
-    if (!lockDoc.parseBSON(newDoc, &errMsg)) {
+    if (!lockDoc.parseBSON(findAndModifyStatus.getValue(), &errMsg)) {
         return {ErrorCodes::FailedToParse, errMsg};
     }
 
@@ -320,15 +314,9 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
         return findAndModifyStatus.getStatus();
     }
 
-    BSONObj newDoc(findAndModifyStatus.getValue());
-
-    if (newDoc.isEmpty()) {
-        return LocksType();
-    }
-
     LocksType lockDoc;
     string errMsg;
-    if (!lockDoc.parseBSON(newDoc, &errMsg)) {
+    if (!lockDoc.parseBSON(findAndModifyStatus.getValue(), &errMsg)) {
         return {ErrorCodes::FailedToParse, errMsg};
     }
 

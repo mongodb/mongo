@@ -347,18 +347,7 @@ void ReplSetDistLockManager::unlock(const DistLockHandle& lockSessionID) {
 }
 
 Status ReplSetDistLockManager::checkStatus(const DistLockHandle& lockHandle) {
-    auto lockStatus = _catalog->getLockByTS(lockHandle);
-
-    if (!lockStatus.isOK()) {
-        return lockStatus.getStatus();
-    }
-
-    auto lockDoc = lockStatus.getValue();
-    if (!lockDoc.isValid(nullptr)) {
-        return {ErrorCodes::LockNotFound, "lock owner changed"};
-    }
-
-    return Status::OK();
+    return _catalog->getLockByTS(lockHandle).getStatus();
 }
 
 void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID) {

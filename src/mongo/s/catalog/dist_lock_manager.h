@@ -70,7 +70,6 @@ public:
         MONGO_DISALLOW_COPYING(ScopedDistLock);
 
     public:
-        ScopedDistLock();  // TODO: SERVER-18007
         ScopedDistLock(DistLockHandle lockHandle, DistLockManager* lockManager);
         ~ScopedDistLock();
 
