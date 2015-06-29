@@ -2,9 +2,6 @@ selector:
   js_test:
     roots:
     - jstests/ssl/*.js
-    exclude_files:
-      # SERVER-19113
-    - jstests/ssl/ssl_crl.js
 
 # ssl tests start their own mongod's.
 executor:

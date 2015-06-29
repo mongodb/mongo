@@ -2,9 +2,6 @@ selector:
   js_test:
     roots:
     - jstests/sslSpecial/*.js
-    exclude_files:
-      # SERVER-19113
-    - jstests/sslSpecial/ssl_mixedmode.js
 
 # ssl tests start their own mongod's.
 executor:
