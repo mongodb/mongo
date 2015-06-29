@@ -40,7 +40,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
-#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -391,95 +390,6 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
     logChange(txn->getClient()->clientAddress(true), "shardCollection", ns, finishDetail.obj());
 
     return Status::OK();
-}
-
-StatusWith<string> CatalogManagerLegacy::addShard(OperationContext* txn,
-                                                  const std::string* shardProposedName,
-                                                  const ConnectionString& shardConnectionString,
-                                                  const long long maxSize) {
-    // Validate the specified connection string may serve as shard at all
-    auto shardStatus =
-        validateHostAsShard(grid.shardRegistry(), shardConnectionString, shardProposedName);
-    if (!shardStatus.isOK()) {
-        // TODO: This is a workaround for the case were we could have some bad shard being requested
-        // to be added and we put that bad connection string on the global replica set monitor
-        // registry. It needs to be cleaned up so that when a correct replica set is added, it will
-        // be recreated.
-        ReplicaSetMonitor::remove(shardConnectionString.getSetName());
-        return shardStatus.getStatus();
-    }
-
-    ShardType& shardType = shardStatus.getValue();
-
-    auto dbNamesStatus = getDBNamesListFromShard(grid.shardRegistry(), shardConnectionString);
-    if (!dbNamesStatus.isOK()) {
-        // TODO: This is a workaround for the case were we could have some bad shard being requested
-        // to be added and we put that bad connection string on the global replica set monitor
-        // registry. It needs to be cleaned up so that when a correct replica set is added, it will
-        // be recreated.
-        ReplicaSetMonitor::remove(shardConnectionString.getSetName());
-        return dbNamesStatus.getStatus();
-    }
-
-    // Check that none of the existing shard candidate's dbs exist already
-    for (const string& dbName : dbNamesStatus.getValue()) {
-        StatusWith<DatabaseType> dbt = getDatabase(dbName);
-        if (dbt.isOK()) {
-            return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "can't add shard "
-                                        << "'" << shardConnectionString.toString() << "'"
-                                        << " because a local database '" << dbName
-                                        << "' exists in another " << dbt.getValue().getPrimary());
-        }
-    }
-
-    // If a name for a shard wasn't provided, generate one
-    if (shardType.getName().empty()) {
-        StatusWith<string> result = _getNewShardName();
-        if (!result.isOK()) {
-            return Status(ErrorCodes::OperationFailed, "error generating new shard name");
-        }
-
-        shardType.setName(result.getValue());
-    }
-
-    if (maxSize > 0) {
-        shardType.setMaxSizeMB(maxSize);
-    }
-
-    log() << "going to add shard: " << shardType.toString();
-
-    Status result = insert(ShardType::ConfigNS, shardType.toBSON(), NULL);
-    if (!result.isOK()) {
-        log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
-        return result;
-    }
-
-    // Make sure the new shard is visible
-    Shard::reloadShardInfo();
-
-    // Add all databases from the new shard
-    for (const string& dbName : dbNamesStatus.getValue()) {
-        DatabaseType dbt;
-        dbt.setName(dbName);
-        dbt.setPrimary(shardType.getName());
-        dbt.setSharded(false);
-
-        Status status = updateDatabase(dbName, dbt);
-        if (!status.isOK()) {
-            log() << "adding shard " << shardConnectionString.toString()
-                  << " even though could not add database " << dbName;
-        }
-    }
-
-    // Record in changelog
-    BSONObjBuilder shardDetails;
-    shardDetails.append("name", shardType.getName());
-    shardDetails.append("host", shardConnectionString.toString());
-
-    logChange(txn->getClient()->clientAddress(true), "addShard", "", shardDetails.obj());
-
-    return shardType.getName();
 }
 
 StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationContext* txn,
@@ -1208,7 +1118,7 @@ Status CatalogManagerLegacy::_checkDbDoesNotExist(const std::string& dbName,
     return Status::OK();
 }
 
-StatusWith<string> CatalogManagerLegacy::_getNewShardName() const {
+StatusWith<string> CatalogManagerLegacy::_generateNewShardName() const {
     BSONObj o;
     {
         ScopedDbConnection conn(_configServerConnectionString, 30);

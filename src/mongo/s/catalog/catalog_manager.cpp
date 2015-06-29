@@ -36,6 +36,9 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
@@ -52,8 +55,8 @@
 #include "mongo/s/write_ops/batched_delete_request.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_document.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -86,7 +89,301 @@ Status getStatus(const BatchedCommandResponse& response) {
     return Status::OK();
 }
 
+/**
+ * Validates that the specified connection string can serve as a shard server. In particular,
+ * this function checks that the shard can be contacted, that it is not already member of
+ * another sharded cluster and etc.
+ *
+ * @param shardRegistry Shard registry to use for opening connections to the shards.
+ * @param connectionString Connection string to be attempted as a shard host.
+ * @param shardProposedName Optional proposed name for the shard. Can be omitted in which case
+ *      a unique name for the shard will be generated from the shard's connection string. If it
+ *      is not omitted, the value cannot be the empty string.
+ *
+ * On success returns a partially initialized shard type object corresponding to the requested
+ * shard. It will have the hostName field set and optionally the name, if the name could be
+ * generated from either the proposed name or the connection string set name. The returned
+ * shard's name should be checked and if empty, one should be generated using some uniform
+ * algorithm.
+ */
+StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
+                                          const ConnectionString& connectionString,
+                                          const std::string* shardProposedName) {
+    if (connectionString.type() == ConnectionString::SYNC) {
+        return {ErrorCodes::BadValue,
+                "can't use sync cluster as a shard; for a replica set, "
+                "you have to use <setname>/<server1>,<server2>,..."};
+    }
+
+    if (shardProposedName && shardProposedName->empty()) {
+        return {ErrorCodes::BadValue, "shard name cannot be empty"};
+    }
+
+    auto shardConn = shardRegistry->createConnection(connectionString);
+    invariant(shardConn);
+
+    auto shardHostStatus =
+        shardConn->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
+    if (!shardHostStatus.isOK()) {
+        return shardHostStatus.getStatus();
+    }
+
+    const HostAndPort& shardHost = shardHostStatus.getValue();
+
+    StatusWith<BSONObj> cmdStatus{ErrorCodes::InternalError, "uninitialized value"};
+
+    // Is it mongos?
+    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("isdbgrid" << 1));
+    if (!cmdStatus.isOK()) {
+        return cmdStatus.getStatus();
+    }
+
+    // (ok == 1) implies that it is a mongos
+    if (getStatusFromCommandResult(cmdStatus.getValue()).isOK()) {
+        return {ErrorCodes::BadValue, "can't add a mongos process as a shard"};
+    }
+
+    // Is it a replica set?
+    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("isMaster" << 1));
+    if (!cmdStatus.isOK()) {
+        return cmdStatus.getStatus();
+    }
+
+    BSONObj resIsMaster = cmdStatus.getValue();
+
+    const string providedSetName = connectionString.getSetName();
+    const string foundSetName = resIsMaster["setName"].str();
+
+    // Make sure the specified replica set name (if any) matches the actual shard's replica set
+    if (providedSetName.empty() && !foundSetName.empty()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "host is part of set " << foundSetName << "; "
+                              << "use replica set url format "
+                              << "<setname>/<server1>,<server2>, ..."};
+    }
+
+    if (!providedSetName.empty() && foundSetName.empty()) {
+        return {ErrorCodes::OperationFailed,
+                str::stream() << "host did not return a set name; "
+                              << "is the replica set still initializing? " << resIsMaster};
+    }
+
+    // Make sure the set name specified in the connection string matches the one where its hosts
+    // belong into
+    if (!providedSetName.empty() && (providedSetName != foundSetName)) {
+        return {ErrorCodes::OperationFailed,
+                str::stream() << "the provided connection string (" << connectionString.toString()
+                              << ") does not match the actual set name " << foundSetName};
+    }
+
+    // Is it a mongos config server?
+    if (foundSetName.empty()) {
+        cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("replSetGetStatus" << 1));
+        if (!cmdStatus.isOK()) {
+            return cmdStatus.getStatus();
+        }
+
+        BSONObj res = cmdStatus.getValue();
+
+        if (!getStatusFromCommandResult(res).isOK() && (res["info"].type() == String) &&
+            (res["info"].String() == "configsvr")) {
+            return {ErrorCodes::BadValue,
+                    "the specified mongod is a legacy-style config "
+                    "server and cannot be used as a shard server"};
+        }
+    }
+
+    // If the shard is part of a replica set, make sure all the hosts mentioned in the connection
+    // string are part of the set. It is fine if not all members of the set are mentioned in the
+    // connection string, though.
+    if (!providedSetName.empty()) {
+        std::set<string> hostSet;
+
+        BSONObjIterator iter(resIsMaster["hosts"].Obj());
+        while (iter.more()) {
+            hostSet.insert(iter.next().String());  // host:port
+        }
+
+        if (resIsMaster["passives"].isABSONObj()) {
+            BSONObjIterator piter(resIsMaster["passives"].Obj());
+            while (piter.more()) {
+                hostSet.insert(piter.next().String());  // host:port
+            }
+        }
+
+        if (resIsMaster["arbiters"].isABSONObj()) {
+            BSONObjIterator piter(resIsMaster["arbiters"].Obj());
+            while (piter.more()) {
+                hostSet.insert(piter.next().String());  // host:port
+            }
+        }
+
+        vector<HostAndPort> hosts = connectionString.getServers();
+        for (size_t i = 0; i < hosts.size(); i++) {
+            const string host = hosts[i].toString();  // host:port
+            if (hostSet.find(host) == hostSet.end()) {
+                return {ErrorCodes::OperationFailed,
+                        str::stream() << "in seed list " << connectionString.toString() << ", host "
+                                      << host << " does not belong to replica set "
+                                      << foundSetName};
+            }
+        }
+    }
+
+    string actualShardName;
+
+    if (shardProposedName) {
+        actualShardName = *shardProposedName;
+    } else if (!foundSetName.empty()) {
+        // Default it to the name of the replica set
+        actualShardName = foundSetName;
+    }
+
+    // Disallow adding shard replica set with name 'config'
+    if (actualShardName == "config") {
+        return {ErrorCodes::BadValue, "use of shard replica set with name 'config' is not allowed"};
+    }
+
+    // Retrieve the most up to date connection string that we know from the replica set monitor (if
+    // this is a replica set shard, otherwise it will be the same value as connectionString).
+    ConnectionString actualShardConnStr = shardConn->getTargeter()->connectionString();
+
+    ShardType shard;
+    shard.setName(actualShardName);
+    shard.setHost(actualShardConnStr.toString());
+
+    return shard;
+}
+
+/**
+ * Runs the listDatabases command on the specified host and returns the names of all databases
+ * it returns excluding those named local and admin, since they serve administrative purpose.
+ */
+StatusWith<std::vector<std::string>> getDBNamesListFromShard(
+    ShardRegistry* shardRegistry, const ConnectionString& connectionString) {
+    auto shardConn = shardRegistry->createConnection(connectionString);
+    invariant(shardConn);
+
+    auto shardHostStatus =
+        shardConn->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
+    if (!shardHostStatus.isOK()) {
+        return shardHostStatus.getStatus();
+    }
+
+    const HostAndPort& shardHost = shardHostStatus.getValue();
+
+    auto cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("listDatabases" << 1));
+    if (!cmdStatus.isOK()) {
+        return cmdStatus.getStatus();
+    }
+
+    const BSONObj& cmdResult = cmdStatus.getValue();
+
+    Status cmdResultStatus = getStatusFromCommandResult(cmdResult);
+    if (!cmdResultStatus.isOK()) {
+        return cmdResultStatus;
+    }
+
+    vector<string> dbNames;
+
+    for (const auto& dbEntry : cmdResult["databases"].Obj()) {
+        const string& dbName = dbEntry["name"].String();
+
+        if (!(dbName == "local" || dbName == "admin")) {
+            dbNames.push_back(dbName);
+        }
+    }
+
+    return dbNames;
+}
+
 }  // namespace
+
+StatusWith<string> CatalogManager::addShard(OperationContext* txn,
+                                            const std::string* shardProposedName,
+                                            const ConnectionString& shardConnectionString,
+                                            const long long maxSize) {
+    // Validate the specified connection string may serve as shard at all
+    auto shardStatus =
+        validateHostAsShard(grid.shardRegistry(), shardConnectionString, shardProposedName);
+    if (!shardStatus.isOK()) {
+        // TODO: This is a workaround for the case were we could have some bad shard being
+        // requested to be added and we put that bad connection string on the global replica set
+        // monitor registry. It needs to be cleaned up so that when a correct replica set is added,
+        // it will be recreated.
+        ReplicaSetMonitor::remove(shardConnectionString.getSetName());
+        return shardStatus.getStatus();
+    }
+
+    ShardType& shardType = shardStatus.getValue();
+
+    auto dbNamesStatus = getDBNamesListFromShard(grid.shardRegistry(), shardConnectionString);
+    if (!dbNamesStatus.isOK()) {
+        return dbNamesStatus.getStatus();
+    }
+
+    // Check that none of the existing shard candidate's dbs exist already
+    for (const string& dbName : dbNamesStatus.getValue()) {
+        StatusWith<DatabaseType> dbt = getDatabase(dbName);
+        if (dbt.isOK()) {
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "can't add shard "
+                                        << "'" << shardConnectionString.toString() << "'"
+                                        << " because a local database '" << dbName
+                                        << "' exists in another " << dbt.getValue().getPrimary());
+        } else if (dbt != ErrorCodes::DatabaseNotFound) {
+            return dbt.getStatus();
+        }
+    }
+
+    // If a name for a shard wasn't provided, generate one
+    if (shardType.getName().empty()) {
+        StatusWith<string> result = _generateNewShardName();
+        if (!result.isOK()) {
+            return Status(ErrorCodes::OperationFailed, "error generating new shard name");
+        }
+
+        shardType.setName(result.getValue());
+    }
+
+    if (maxSize > 0) {
+        shardType.setMaxSizeMB(maxSize);
+    }
+
+    log() << "going to add shard: " << shardType.toString();
+
+    Status result = insert(ShardType::ConfigNS, shardType.toBSON(), NULL);
+    if (!result.isOK()) {
+        log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
+        return result;
+    }
+
+    // Make sure the new shard is visible
+    grid.shardRegistry()->reload();
+
+    // Add all databases which were discovered on the new shard
+    for (const string& dbName : dbNamesStatus.getValue()) {
+        DatabaseType dbt;
+        dbt.setName(dbName);
+        dbt.setPrimary(shardType.getName());
+        dbt.setSharded(false);
+
+        Status status = updateDatabase(dbName, dbt);
+        if (!status.isOK()) {
+            log() << "adding shard " << shardConnectionString.toString()
+                  << " even though could not add database " << dbName;
+        }
+    }
+
+    // Record in changelog
+    BSONObjBuilder shardDetails;
+    shardDetails.append("name", shardType.getName());
+    shardDetails.append("host", shardConnectionString.toString());
+
+    logChange(txn->getClient()->clientAddress(true), "addShard", "", shardDetails.obj());
+
+    return shardType.getName();
+}
 
 Status CatalogManager::insert(const string& ns,
                               const BSONObj& doc,
@@ -283,193 +580,6 @@ StatusWith<ShardId> CatalogManager::selectShardForNewDatabase(ShardRegistry* sha
     }
 
     return candidateShardId;
-}
-
-StatusWith<ShardType> CatalogManager::validateHostAsShard(ShardRegistry* shardRegistry,
-                                                          const ConnectionString& connectionString,
-                                                          const std::string* shardProposedName) {
-    if (connectionString.type() == ConnectionString::SYNC) {
-        return {ErrorCodes::BadValue,
-                "can't use sync cluster as a shard; for a replica set, "
-                "you have to use <setname>/<server1>,<server2>,..."};
-    }
-
-    if (shardProposedName && shardProposedName->empty()) {
-        return {ErrorCodes::BadValue, "shard name cannot be empty"};
-    }
-
-    auto shardConn = shardRegistry->createConnection(connectionString);
-    invariant(shardConn);
-
-    auto shardHostStatus =
-        shardConn->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
-    if (!shardHostStatus.isOK()) {
-        return shardHostStatus.getStatus();
-    }
-
-    const HostAndPort& shardHost = shardHostStatus.getValue();
-
-    StatusWith<BSONObj> cmdStatus{ErrorCodes::InternalError, "uninitialized value"};
-
-    // Is it mongos?
-    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("isdbgrid" << 1));
-    if (!cmdStatus.isOK()) {
-        return cmdStatus.getStatus();
-    }
-
-    // (ok == 1) implies that it is a mongos
-    if (getStatusFromCommandResult(cmdStatus.getValue()).isOK()) {
-        return {ErrorCodes::BadValue, "can't add a mongos process as a shard"};
-    }
-
-    // Is it a replica set?
-    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("isMaster" << 1));
-    if (!cmdStatus.isOK()) {
-        return cmdStatus.getStatus();
-    }
-
-    BSONObj resIsMaster = cmdStatus.getValue();
-
-    const string providedSetName = connectionString.getSetName();
-    const string foundSetName = resIsMaster["setName"].str();
-
-    // Make sure the specified replica set name (if any) matches the actual shard's replica set
-    if (providedSetName.empty() && !foundSetName.empty()) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "host is part of set " << foundSetName << "; "
-                              << "use replica set url format "
-                              << "<setname>/<server1>,<server2>, ..."};
-    }
-
-    if (!providedSetName.empty() && foundSetName.empty()) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "host did not return a set name; "
-                              << "is the replica set still initializing? " << resIsMaster};
-    }
-
-    // Make sure the set name specified in the connection string matches the one where its hosts
-    // belong into
-    if (!providedSetName.empty() && (providedSetName != foundSetName)) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "the provided connection string (" << connectionString.toString()
-                              << ") does not match the actual set name " << foundSetName};
-    }
-
-    // Is it a mongos config server?
-    if (foundSetName.empty()) {
-        cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("replSetGetStatus" << 1));
-        if (!cmdStatus.isOK()) {
-            return cmdStatus.getStatus();
-        }
-
-        BSONObj res = cmdStatus.getValue();
-
-        if (!getStatusFromCommandResult(res).isOK() && (res["info"].type() == String) &&
-            (res["info"].String() == "configsvr")) {
-            return {ErrorCodes::BadValue,
-                    "the specified mongod is a legacy-style config "
-                    "server and cannot be used as a shard server"};
-        }
-    }
-
-    // If the shard is part of a replica set, make sure all the hosts mentioned in the connection
-    // string are part of the set. It is fine if not all members of the set are mentioned in the
-    // connection string, though.
-    if (!providedSetName.empty()) {
-        std::set<string> hostSet;
-
-        BSONObjIterator iter(resIsMaster["hosts"].Obj());
-        while (iter.more()) {
-            hostSet.insert(iter.next().String());  // host:port
-        }
-
-        if (resIsMaster["passives"].isABSONObj()) {
-            BSONObjIterator piter(resIsMaster["passives"].Obj());
-            while (piter.more()) {
-                hostSet.insert(piter.next().String());  // host:port
-            }
-        }
-
-        if (resIsMaster["arbiters"].isABSONObj()) {
-            BSONObjIterator piter(resIsMaster["arbiters"].Obj());
-            while (piter.more()) {
-                hostSet.insert(piter.next().String());  // host:port
-            }
-        }
-
-        vector<HostAndPort> hosts = connectionString.getServers();
-        for (size_t i = 0; i < hosts.size(); i++) {
-            const string host = hosts[i].toString();  // host:port
-            if (hostSet.find(host) == hostSet.end()) {
-                return {ErrorCodes::OperationFailed,
-                        str::stream() << "in seed list " << connectionString.toString() << ", host "
-                                      << host << " does not belong to replica set "
-                                      << foundSetName};
-            }
-        }
-    }
-
-    string actualShardName;
-
-    if (shardProposedName) {
-        actualShardName = *shardProposedName;
-    } else if (!foundSetName.empty()) {
-        // Default it to the name of the replica set
-        actualShardName = foundSetName;
-    }
-
-    // Disallow adding shard replica set with name 'config'
-    if (actualShardName == "config") {
-        return {ErrorCodes::BadValue, "use of shard replica set with name 'config' is not allowed"};
-    }
-
-    // Retrieve the most up to date connection string that we know from the replica set monitor (if
-    // this is a replica set shard, otherwise it will be the same value as connectionString).
-    ConnectionString actualShardConnStr = shardConn->getTargeter()->connectionString();
-
-    ShardType shard;
-    shard.setName(actualShardName);
-    shard.setHost(actualShardConnStr.toString());
-
-    return shard;
-}
-
-StatusWith<vector<string>> CatalogManager::getDBNamesListFromShard(
-    ShardRegistry* shardRegistry, const ConnectionString& connectionString) {
-    auto shardConn = shardRegistry->createConnection(connectionString);
-    invariant(shardConn);
-
-    auto shardHostStatus =
-        shardConn->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
-    if (!shardHostStatus.isOK()) {
-        return shardHostStatus.getStatus();
-    }
-
-    const HostAndPort& shardHost = shardHostStatus.getValue();
-
-    auto cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("listDatabases" << 1));
-    if (!cmdStatus.isOK()) {
-        cmdStatus.getStatus();
-    }
-
-    const BSONObj& cmdResult = cmdStatus.getValue();
-
-    Status cmdResultStatus = getStatusFromCommandResult(cmdResult);
-    if (!cmdResultStatus.isOK()) {
-        return cmdResultStatus;
-    }
-
-    vector<string> dbNames;
-
-    for (const auto& dbEntry : cmdResult["databases"].Obj()) {
-        const string& dbName = dbEntry["name"].String();
-
-        if (!(dbName == "local" || dbName == "admin")) {
-            dbNames.push_back(dbName);
-        }
-    }
-
-    return dbNames;
 }
 
 Status CatalogManager::enableSharding(const std::string& dbName) {

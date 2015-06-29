@@ -140,13 +140,6 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
     return notYetImplemented;
 }
 
-StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
-                                                      const std::string* shardProposedName,
-                                                      const ConnectionString& shardConnectionString,
-                                                      const long long maxSize) {
-    return notYetImplemented;
-}
-
 StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationContext* txn,
                                                                       const std::string& name) {
     const auto configShard = grid.shardRegistry()->getShard("config");
@@ -806,6 +799,49 @@ Status CatalogManagerReplicaSet::_checkDbDoesNotExist(const string& dbName,
     return Status(ErrorCodes::DatabaseDifferCase,
                   str::stream() << "can't have 2 databases that just differ on case "
                                 << " have: " << actualDbName << " want to add: " << dbName);
+}
+
+StatusWith<std::string> CatalogManagerReplicaSet::_generateNewShardName() const {
+    const auto configShard = grid.shardRegistry()->getShard("config");
+    const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
+    if (!readHost.isOK()) {
+        return readHost.getStatus();
+    }
+
+    BSONObjBuilder shardNameRegex;
+    shardNameRegex.appendRegex(ShardType::name(), "/^shard/");
+
+    auto findStatus = grid.shardRegistry()->exhaustiveFind(readHost.getValue(),
+                                                           NamespaceString(ShardType::ConfigNS),
+                                                           shardNameRegex.obj(),
+                                                           BSON(ShardType::name() << -1),
+                                                           1);
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    const auto& docs = findStatus.getValue();
+
+    int count = 0;
+    if (!docs.empty()) {
+        const auto shardStatus = ShardType::fromBSON(docs.front());
+        if (!shardStatus.isOK()) {
+            return shardStatus.getStatus();
+        }
+
+        std::istringstream is(shardStatus.getValue().getName().substr(5));
+        is >> count;
+        count++;
+    }
+
+    // TODO fix so that we can have more than 10000 automatically generated shard names
+    if (count < 9999) {
+        std::stringstream ss;
+        ss << "shard" << std::setfill('0') << std::setw(4) << count;
+        return ss.str();
+    }
+
+    return Status(ErrorCodes::OperationFailed, "unable to generate new shard name");
 }
 
 StatusWith<long long> CatalogManagerReplicaSet::_runCountCommand(const HostAndPort& target,

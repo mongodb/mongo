@@ -174,4 +174,8 @@ Status CatalogManagerMock::_checkDbDoesNotExist(const std::string& dbName, Datab
     return Status::OK();
 }
 
+StatusWith<std::string> CatalogManagerMock::_generateNewShardName() const {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
 }  // namespace mongo

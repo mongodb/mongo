@@ -64,11 +64,6 @@ public:
                            std::vector<BSONObj>* initPoints,
                            std::set<ShardId>* initShardIds) override;
 
-    StatusWith<std::string> addShard(OperationContext* txn,
-                                     const std::string* shardProposedName,
-                                     const ConnectionString& shardConnectionString,
-                                     const long long maxSize) override;
-
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
@@ -130,6 +125,8 @@ public:
 private:
     Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const override;
 
+    StatusWith<std::string> _generateNewShardName() const override;
+
     /**
      * Updates the config server's metadata to the current version.
      */
@@ -140,12 +137,6 @@ private:
      * Note: this is not thread safe and can only be called once for the lifetime.
      */
     Status _startConfigServerChecker();
-
-    /**
-     * Generates a new shard name "shard<xxxx>"
-     * where <xxxx> is an autoincrementing value and <xxxx> < 10000
-     */
-    StatusWith<std::string> _getNewShardName() const;
 
     /**
      * Returns the number of shards recognized by the config servers

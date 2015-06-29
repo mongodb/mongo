@@ -122,6 +122,8 @@ public:
 private:
     Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const override;
 
+    StatusWith<std::string> _generateNewShardName() const override;
+
     std::unique_ptr<DistLockManagerMock> _mockDistLockMgr;
 };
 

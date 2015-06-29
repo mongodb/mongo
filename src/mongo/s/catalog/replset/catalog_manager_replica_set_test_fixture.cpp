@@ -174,6 +174,12 @@ void CatalogManagerReplSetTestFixture::setupShards(const std::vector<ShardType>&
 
     auto future = launchAsync([this] { shardRegistry()->reload(); });
 
+    expectGetShards(shards);
+
+    future.timed_get(kFutureTimeout);
+}
+
+void CatalogManagerReplSetTestFixture::expectGetShards(const std::vector<ShardType>& shards) {
     onFindCommand([&shards](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
@@ -197,8 +203,6 @@ void CatalogManagerReplSetTestFixture::setupShards(const std::vector<ShardType>&
 
         return shardsToReturn;
     });
-
-    future.timed_get(kFutureTimeout);
 }
 
 void CatalogManagerReplSetTestFixture::expectInserts(const NamespaceString nss,

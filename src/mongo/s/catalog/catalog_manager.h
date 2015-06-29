@@ -149,7 +149,7 @@ public:
     virtual StatusWith<std::string> addShard(OperationContext* txn,
                                              const std::string* shardProposedName,
                                              const ConnectionString& shardConnectionString,
-                                             const long long maxSize) = 0;
+                                             const long long maxSize);
 
     /**
      * Tries to remove a shard. To completely remove a shard from a sharded cluster,
@@ -410,34 +410,6 @@ protected:
      */
     static StatusWith<ShardId> selectShardForNewDatabase(ShardRegistry* shardRegistry);
 
-    /**
-     * Validates that the specified connection string can serve as a shard server. In particular,
-     * this function checks that the shard can be contacted, that it is not already member of
-     * another sharded cluster and etc.
-     *
-     * @param shardRegistry Shard registry to use for opening connections to the shards.
-     * @param connectionString Connection string to be attempted as a shard host.
-     * @param shardProposedName Optional proposed name for the shard. Can be omitted in which case
-     *      a unique name for the shard will be generated from the shard's connection string. If it
-     *      is not omitted, the value cannot be the empty string.
-     *
-     * On success returns a partially initialized shard type object corresponding to the requested
-     * shard. It will have the hostName field set and optionally the name, if the name could be
-     * generated from either the proposed name or the connection string set name. The returned
-     * shard's name should be checked and if empty, one should be generated using some uniform
-     * algorithm.
-     */
-    static StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
-                                                     const ConnectionString& connectionString,
-                                                     const std::string* shardProposedName);
-
-    /**
-     * Runs the listDatabases command on the specified host and returns the names of all databases
-     * it returns excluding those named local and admin, since they serve administrative purpose.
-     */
-    static StatusWith<std::vector<std::string>> getDBNamesListFromShard(
-        ShardRegistry* shardRegistry, const ConnectionString& connectionString);
-
 private:
     /**
      * Checks that the given database name doesn't already exist in the config.databases
@@ -450,6 +422,11 @@ private:
      *  DatabaseDifferCase if it exists under different casing.
      */
     virtual Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const = 0;
+
+    /**
+     * Generates a unique name to be given to a newly added shard.
+     */
+    virtual StatusWith<std::string> _generateNewShardName() const = 0;
 };
 
 }  // namespace mongo

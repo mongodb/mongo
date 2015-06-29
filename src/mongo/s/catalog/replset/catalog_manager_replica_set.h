@@ -66,11 +66,6 @@ public:
                            std::vector<BSONObj>* initPoints,
                            std::set<ShardId>* initShardsIds = nullptr) override;
 
-    StatusWith<std::string> addShard(OperationContext* txn,
-                                     const std::string* shardProposedName,
-                                     const ConnectionString& shardConnectionString,
-                                     const long long maxSize) override;
-
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
@@ -129,6 +124,8 @@ public:
 
 private:
     Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const override;
+
+    StatusWith<std::string> _generateNewShardName() const override;
 
     /**
      * Helper for running commands against the config server with logic for retargeting and
