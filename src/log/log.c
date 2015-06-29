@@ -1077,7 +1077,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * Signal the close thread if needed.
 	 */
 	if (F_ISSET(slot, SLOT_CLOSEFH))
-		WT_ERR(__wt_cond_signal(session, conn->log_close_cond));
+		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
 
 	/*
 	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock

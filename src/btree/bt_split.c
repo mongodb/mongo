@@ -1028,8 +1028,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * are holding it locked.
 	 */
 	if (ret == 0 && !exclusive &&
-	    __split_should_deepen(session, parent_ref))
-		ret = __split_deepen(session, parent);
+	    __split_should_deepen(session, parent_ref, &children))
+		ret = __split_deepen(session, parent, children);
 
 err:	if (!complete)
 		for (i = 0; i < parent_entries; ++i) {
