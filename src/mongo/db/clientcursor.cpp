@@ -326,7 +326,7 @@ namespace mongo {
     // TODO: remove this for 3.0
     class CmdCursorInfo : public Command {
     public:
-        CmdCursorInfo() : Command( "cursorInfo" ) {}
+        CmdCursorInfo() : Command( "cursorInfo", true ) {}
         virtual bool slaveOk() const { return true; }
         virtual void help( stringstream& help ) const {
             help << " example: { cursorInfo : 1 }, deprecated";

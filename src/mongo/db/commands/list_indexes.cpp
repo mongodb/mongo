@@ -81,7 +81,7 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern( dbname, cmdObj ), actions));
         }
 
-        CmdListIndexes() : Command( "listIndexes" ) {}
+        CmdListIndexes() : Command( "listIndexes", true ) {}
 
         bool run(OperationContext* txn,
                  const string& dbname,

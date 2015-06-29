@@ -69,7 +69,7 @@ namespace mongo {
             return checkAuthForListCollectionsCommand(client, dbname, cmdObj);
         }
 
-        CmdListCollections() : Command( "listCollections" ) {}
+        CmdListCollections() : Command( "listCollections", true ) {}
 
         bool run(OperationContext* txn,
                  const string& dbname,
