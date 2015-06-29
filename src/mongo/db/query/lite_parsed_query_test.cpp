@@ -42,8 +42,10 @@ namespace {
 using std::unique_ptr;
 using unittest::assertGet;
 
+static const NamespaceString testns("testdb.testcoll");
+
 TEST(LiteParsedQueryTest, InitSortOrder) {
-    ASSERT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+    ASSERT_OK(LiteParsedQuery::makeAsOpQuery(testns,
                                              0,
                                              1,
                                              0,
@@ -59,7 +61,7 @@ TEST(LiteParsedQueryTest, InitSortOrder) {
 }
 
 TEST(LiteParsedQueryTest, InitSortOrderString) {
-    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery(testns,
                                                  0,
                                                  1,
                                                  0,
@@ -75,7 +77,7 @@ TEST(LiteParsedQueryTest, InitSortOrderString) {
 }
 
 TEST(LiteParsedQueryTest, GetFilter) {
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery("testns",
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(testns,
                                                                              5,
                                                                              6,
                                                                              9,
@@ -92,7 +94,7 @@ TEST(LiteParsedQueryTest, GetFilter) {
 }
 
 TEST(LiteParsedQueryTest, NumToReturn) {
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery("testns",
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(testns,
                                                                              5,
                                                                              6,
                                                                              9,
@@ -110,7 +112,7 @@ TEST(LiteParsedQueryTest, NumToReturn) {
 }
 
 TEST(LiteParsedQueryTest, NumToReturnNegative) {
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery("testns",
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(testns,
                                                                              5,
                                                                              -6,
                                                                              9,
@@ -128,7 +130,7 @@ TEST(LiteParsedQueryTest, NumToReturnNegative) {
 }
 
 TEST(LiteParsedQueryTest, MinFieldsNotPrefixOfMax) {
-    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery(testns,
                                                  0,
                                                  0,
                                                  0,
@@ -144,7 +146,7 @@ TEST(LiteParsedQueryTest, MinFieldsNotPrefixOfMax) {
 }
 
 TEST(LiteParsedQueryTest, MinFieldsMoreThanMax) {
-    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery(testns,
                                                  0,
                                                  0,
                                                  0,
@@ -160,7 +162,7 @@ TEST(LiteParsedQueryTest, MinFieldsMoreThanMax) {
 }
 
 TEST(LiteParsedQueryTest, MinFieldsLessThanMax) {
-    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery(testns,
                                                  0,
                                                  0,
                                                  0,
@@ -178,7 +180,7 @@ TEST(LiteParsedQueryTest, MinFieldsLessThanMax) {
 // Helper function which returns the Status of creating a LiteParsedQuery object with the given
 // parameters.
 void assertLiteParsedQuerySuccess(const BSONObj& query, const BSONObj& proj, const BSONObj& sort) {
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery("testns",
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(testns,
                                                                              0,
                                                                              0,
                                                                              0,
@@ -205,7 +207,7 @@ TEST(LiteParsedQueryTest, ValidSortProj) {
 }
 
 TEST(LiteParsedQueryTest, ForbidNonMetaSortOnFieldWithMetaProject) {
-    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery(testns,
                                                  0,
                                                  0,
                                                  0,
@@ -224,7 +226,7 @@ TEST(LiteParsedQueryTest, ForbidNonMetaSortOnFieldWithMetaProject) {
 }
 
 TEST(LiteParsedQueryTest, ForbidMetaSortOnFieldWithoutMetaProject) {
-    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery(testns,
                                                  0,
                                                  0,
                                                  0,
@@ -238,7 +240,7 @@ TEST(LiteParsedQueryTest, ForbidMetaSortOnFieldWithoutMetaProject) {
                                                  false)  // explain
                       .getStatus());
 
-    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+    ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery(testns,
                                                  0,
                                                  0,
                                                  0,
@@ -938,7 +940,7 @@ TEST(LiteParsedQueryTest, ParseCommandIsFromFindCommand) {
 
 TEST(LiteParsedQueryTest, ParseCommandNotFromFindCommand) {
     std::unique_ptr<LiteParsedQuery> lpq(
-        assertGet(LiteParsedQuery::makeAsOpQuery("testns",
+        assertGet(LiteParsedQuery::makeAsOpQuery(testns,
                                                  5,
                                                  6,
                                                  9,

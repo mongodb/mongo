@@ -32,10 +32,10 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
-class NamespaceString;
 class QueryMessage;
 class Status;
 template <typename T>
@@ -54,13 +54,14 @@ public:
      * Returns a heap allocated LiteParsedQuery on success or an error if 'cmdObj' is not well
      * formed.
      */
-    static StatusWith<std::unique_ptr<LiteParsedQuery>> makeFromFindCommand(
-        const NamespaceString& nss, const BSONObj& cmdObj, bool isExplain);
+    static StatusWith<std::unique_ptr<LiteParsedQuery>> makeFromFindCommand(NamespaceString nss,
+                                                                            const BSONObj& cmdObj,
+                                                                            bool isExplain);
 
     /**
      * Constructs a LiteParseQuery object as though it is from a legacy QueryMessage.
      */
-    static StatusWith<std::unique_ptr<LiteParsedQuery>> makeAsOpQuery(const std::string& ns,
+    static StatusWith<std::unique_ptr<LiteParsedQuery>> makeAsOpQuery(NamespaceString nss,
                                                                       int ntoskip,
                                                                       int ntoreturn,
                                                                       int queryoptions,
@@ -77,7 +78,7 @@ public:
      * Constructs a LiteParseQuery object that can be used to serialize to find command
      * BSON object.
      */
-    static StatusWith<std::unique_ptr<LiteParsedQuery>> makeAsFindCmd(const NamespaceString& ns,
+    static StatusWith<std::unique_ptr<LiteParsedQuery>> makeAsFindCmd(NamespaceString nss,
                                                                       const BSONObj& query,
                                                                       const BSONObj& sort,
                                                                       boost::optional<int> limit);
@@ -138,8 +139,11 @@ public:
     static const std::string metaRecordId;
     static const std::string metaIndexKey;
 
+    const NamespaceString& nss() const {
+        return _nss;
+    }
     const std::string& ns() const {
-        return _ns;
+        return _nss.ns();
     }
 
     const BSONObj& getFilter() const {
@@ -247,7 +251,7 @@ public:
         const QueryMessage& qm);
 
 private:
-    LiteParsedQuery() = default;
+    LiteParsedQuery(NamespaceString nss);
 
     /**
      * Parsing code calls this after construction of the LPQ is complete. There are additional
@@ -255,8 +259,7 @@ private:
      */
     Status validate() const;
 
-    Status init(const std::string& ns,
-                int ntoskip,
+    Status init(int ntoskip,
                 int ntoreturn,
                 int queryOptions,
                 const BSONObj& queryObj,
@@ -294,7 +297,7 @@ private:
      */
     Status validateFindCmd();
 
-    std::string _ns;
+    const NamespaceString _nss;
 
     BSONObj _filter;
     BSONObj _proj;

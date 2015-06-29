@@ -152,9 +152,11 @@ public:
      */
     static bool isSimpleIdQuery(const BSONObj& query);
 
-    // What namespace is this query over?
+    const NamespaceString& nss() const {
+        return _pq->nss();
+    }
     const std::string& ns() const {
-        return _pq->ns();
+        return _pq->nss().ns();
     }
 
     //

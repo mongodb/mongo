@@ -38,7 +38,7 @@ using std::string;
 using std::unique_ptr;
 using unittest::assertGet;
 
-static const char* ns = "somebogusns";
+static const NamespaceString nss("testdb.testcoll");
 
 /**
  * Helper function to parse the given BSON object as a MatchExpression, checks the status,
@@ -97,7 +97,7 @@ void assertNotEquivalent(const char* queryStr,
 TEST(CanonicalQueryTest, IsValidText) {
     // Passes in default values for LiteParsedQuery.
     // Filter inside LiteParsedQuery is not used.
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
                                                                              0,
                                                                              0,
                                                                              0,
@@ -164,7 +164,7 @@ TEST(CanonicalQueryTest, IsValidText) {
 TEST(CanonicalQueryTest, IsValidGeo) {
     // Passes in default values for LiteParsedQuery.
     // Filter inside LiteParsedQuery is not used.
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
                                                                              0,
                                                                              0,
                                                                              0,
@@ -241,7 +241,7 @@ TEST(CanonicalQueryTest, IsValidGeo) {
 TEST(CanonicalQueryTest, IsValidTextAndGeo) {
     // Passes in default values for LiteParsedQuery.
     // Filter inside LiteParsedQuery is not used.
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
                                                                              0,
                                                                              0,
                                                                              0,
@@ -274,7 +274,7 @@ TEST(CanonicalQueryTest, IsValidTextAndNaturalAscending) {
     // Passes in default values for LiteParsedQuery except for sort order.
     // Filter inside LiteParsedQuery is not used.
     BSONObj sort = fromjson("{$natural: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
                                                                              0,
                                                                              0,
                                                                              0,
@@ -295,7 +295,7 @@ TEST(CanonicalQueryTest, IsValidTextAndNaturalDescending) {
     // Passes in default values for LiteParsedQuery except for sort order.
     // Filter inside LiteParsedQuery is not used.
     BSONObj sort = fromjson("{$natural: -1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
                                                                              0,
                                                                              0,
                                                                              0,
@@ -316,7 +316,7 @@ TEST(CanonicalQueryTest, IsValidTextAndHint) {
     // Passes in default values for LiteParsedQuery except for hint.
     // Filter inside LiteParsedQuery is not used.
     BSONObj hint = fromjson("{a: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
                                                                              0,
                                                                              0,
                                                                              0,
@@ -338,7 +338,7 @@ TEST(CanonicalQueryTest, IsValidGeoNearNaturalSort) {
     // Passes in default values for LiteParsedQuery except for sort order.
     // Filter inside LiteParsedQuery is not used.
     BSONObj sort = fromjson("{$natural: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
                                                                              0,
                                                                              0,
                                                                              0,
@@ -360,7 +360,7 @@ TEST(CanonicalQueryTest, IsValidGeoNearNaturalHint) {
     // Passes in default values for LiteParsedQuery except for the hint.
     // Filter inside LiteParsedQuery is not used.
     BSONObj hint = fromjson("{$natural: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
                                                                              0,
                                                                              0,
                                                                              0,
@@ -381,7 +381,7 @@ TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
     // Passes in default values for LiteParsedQuery except for snapshot.
     // Filter inside LiteParsedQuery is not used.
     bool snapshot = true;
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
                                                                              0,
                                                                              0,
                                                                              0,
@@ -463,7 +463,7 @@ TEST(CanonicalQueryTest, SortTreeNumChildrenComparison) {
  */
 unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
     BSONObj queryObj = fromjson(queryStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj);
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj);
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -474,7 +474,7 @@ std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj);
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj, sortObj, projObj);
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }

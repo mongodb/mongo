@@ -41,8 +41,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
 const string LiteParsedQuery::cmdOptionMaxTimeMS("maxTimeMS");
 const string LiteParsedQuery::queryOptionMaxTimeMS("$maxTimeMS");
@@ -93,11 +93,13 @@ const char kPartialField[] = "partial";
 
 }  // namespace
 
+LiteParsedQuery::LiteParsedQuery(NamespaceString nss) : _nss(std::move(nss)) {}
+
 // static
-StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(
-    const NamespaceString& nss, const BSONObj& cmdObj, bool isExplain) {
-    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
-    pq->_ns = nss.ns();
+StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(NamespaceString nss,
+                                                                             const BSONObj& cmdObj,
+                                                                             bool isExplain) {
+    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
     pq->_fromCommand = true;
     pq->_explain = isExplain;
 
@@ -350,7 +352,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(
 }
 
 // static
-StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsOpQuery(const string& ns,
+StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsOpQuery(NamespaceString nss,
                                                                        int ntoskip,
                                                                        int ntoreturn,
                                                                        int queryOptions,
@@ -362,7 +364,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsOpQuery(const str
                                                                        const BSONObj& maxObj,
                                                                        bool snapshot,
                                                                        bool explain) {
-    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
     pq->_sort = sort.getOwned();
     pq->_hint = hint.getOwned();
     pq->_min = minObj.getOwned();
@@ -370,7 +372,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsOpQuery(const str
     pq->_snapshot = snapshot;
     pq->_explain = explain;
 
-    Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, proj, false);
+    Status status = pq->init(ntoskip, ntoreturn, queryOptions, query, proj, false);
     if (!status.isOK()) {
         return status;
     }
@@ -379,14 +381,13 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsOpQuery(const str
 }
 
 // static
-StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(const NamespaceString& ns,
+StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(NamespaceString nss,
                                                                        const BSONObj& query,
                                                                        const BSONObj& sort,
                                                                        boost::optional<int> limit) {
-    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
 
     pq->_fromCommand = true;
-    pq->_ns = ns.ns();
     pq->_filter = query.getOwned();
     pq->_sort = sort.getOwned();
 
@@ -411,8 +412,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(const Nam
 BSONObj LiteParsedQuery::asFindCommand() const {
     BSONObjBuilder bob;
 
-    const NamespaceString nss(_ns);
-    bob.append(kCmdName, nss.coll());
+    bob.append(kCmdName, _nss.coll());
 
     if (!_filter.isEmpty()) {
         bob.append(kFilterField, _filter);
@@ -696,10 +696,9 @@ bool LiteParsedQuery::isQueryIsolated(const BSONObj& query) {
 // static
 StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::fromLegacyQueryMessage(
     const QueryMessage& qm) {
-    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(NamespaceString(qm.ns)));
 
-    Status status =
-        pq->init(qm.ns, qm.ntoskip, qm.ntoreturn, qm.queryOptions, qm.query, qm.fields, true);
+    Status status = pq->init(qm.ntoskip, qm.ntoreturn, qm.queryOptions, qm.query, qm.fields, true);
     if (!status.isOK()) {
         return status;
     }
@@ -707,14 +706,12 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::fromLegacyQueryMessage(
     return std::move(pq);
 }
 
-Status LiteParsedQuery::init(const string& ns,
-                             int ntoskip,
+Status LiteParsedQuery::init(int ntoskip,
                              int ntoreturn,
                              int queryOptions,
                              const BSONObj& queryObj,
                              const BSONObj& proj,
                              bool fromQueryMessage) {
-    _ns = ns;
     _skip = ntoskip;
     _proj = proj.getOwned();
 

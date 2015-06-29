@@ -107,7 +107,7 @@ public:
 
         // Parse the command BSON to a LiteParsedQuery.
         bool isExplain = true;
-        auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
+        auto lpqStatus = LiteParsedQuery::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
         if (!lpqStatus.isOK()) {
             return lpqStatus.getStatus();
         }
