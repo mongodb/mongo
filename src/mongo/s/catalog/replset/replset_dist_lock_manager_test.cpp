@@ -65,7 +65,8 @@ using std::map;
 using std::string;
 using std::vector;
 
-const Seconds kUnlockTimeout(30);
+// Max duration to wait to satisfy test invariant before joining with main test thread.
+const Seconds kJoinTimeout(30);
 const Milliseconds kPingInterval(2);
 const Seconds kLockExpiration(10);
 
@@ -439,7 +440,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
     {
         stdx::unique_lock<stdx::mutex> lk(unlockMutex);
         if (unlockCallCount == 0) {
-            didTimeout = unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::timeout;
+            didTimeout = unlockCV.wait_for(lk, kJoinTimeout) == stdx::cv_status::timeout;
         }
     }
 
@@ -580,7 +581,7 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
     {
         stdx::unique_lock<stdx::mutex> lk(unlockMutex);
         if (unlockCallCount == 0) {
-            didTimeout = unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::timeout;
+            didTimeout = unlockCV.wait_for(lk, kJoinTimeout) == stdx::cv_status::timeout;
         }
     }
 
@@ -630,7 +631,7 @@ TEST_F(ReplSetDistLockManagerFixture, LockPinging) {
     {
         stdx::unique_lock<stdx::mutex> lk(testMutex);
         if (processIDList.size() < 3) {
-            didTimeout = ping3TimesCV.wait_for(lk, Milliseconds(50)) == stdx::cv_status::timeout;
+            didTimeout = ping3TimesCV.wait_for(lk, kJoinTimeout) == stdx::cv_status::timeout;
         }
     }
 
@@ -713,7 +714,7 @@ TEST_F(ReplSetDistLockManagerFixture, UnlockUntilNoError) {
     {
         stdx::unique_lock<stdx::mutex> lk(unlockMutex);
         if (lockSessionIDPassed.size() < kUnlockErrorCount) {
-            didTimeout = unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::timeout;
+            didTimeout = unlockCV.wait_for(lk, kJoinTimeout) == stdx::cv_status::timeout;
         }
     }
 
@@ -809,7 +810,7 @@ TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
         stdx::unique_lock<stdx::mutex> lk(testMutex);
 
         if (unlockIDMap.size() < 2 || !mapEntriesGreaterThanTwo(unlockIDMap)) {
-            didTimeout = unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::timeout;
+            didTimeout = unlockCV.wait_for(lk, kJoinTimeout) == stdx::cv_status::timeout;
         }
     }
 
@@ -1597,7 +1598,7 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingResultsInError) {
     {
         stdx::unique_lock<stdx::mutex> lk(unlockMutex);
         if (!unlockSessionIDPassed.isSet()) {
-            didTimeout = unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::timeout;
+            didTimeout = unlockCV.wait_for(lk, kJoinTimeout) == stdx::cv_status::timeout;
         }
     }
 
