@@ -349,6 +349,41 @@ tasks:
           set -o verbose
           ${scons|scons} ${compile_flags|} lint
 
+## jstestfuzz ##
+- name: jstestfuzz
+  depends_on:
+  - name: compile
+  commands:
+    - func: "do setup"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          git clone git@github.com:10gen/jstestfuzz.git || true
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          curl -s -m 600 http://nodejs.org/dist/v0.12.4/node-v0.12.4-linux-x64.tar.gz --output node.tar.gz || true
+          ${decompress} node.tar.gz || true
+    - command: shell.exec
+      params:
+        working_dir: src/jstestfuzz
+        script: |
+          set -o errexit
+          set -o verbose
+
+          export PATH="$PATH":${workdir}/src/node-v0.12.4-linux-x64/bin
+
+          npm install || true
+          npm start || true
+
 ## integration test suites ##
 
 - <<: *task_template
@@ -1805,6 +1840,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: multiversion
