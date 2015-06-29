@@ -260,8 +260,8 @@ op_name(uint8_t *op)
 		return ("read");
 	case WORKER_UPDATE:
 		return ("update");
-	case WORKER_TRUNCATE
-		return ("truncate")
+	case WORKER_TRUNCATE:
+		return ("truncate");
 	default:
 		return ("unknown");
 	}
@@ -316,6 +316,7 @@ worker_async(void *arg)
 				continue;
 			break;
 		case WORKER_TRUNCATE:
+			break;
 		default:
 			goto err;		/* can't happen */
 		}
@@ -357,7 +358,7 @@ worker_async(void *arg)
 				break;
 			goto op_err;
 		case WORKER_TRUNCATE:
-
+			break;
 		default:
 op_err:			lprintf(cfg, ret, 0,
 			    "%s failed for: %s, range: %"PRIu64,
@@ -388,15 +389,16 @@ worker(void *arg)
 	CONFIG_THREAD *thread;
 	TRACK *trk;
 	WT_CONNECTION *conn;
-	WT_CURSOR **cursors, *cursor, *tmp_cursor;
+	WT_CURSOR **cursors, *cursor, *tmp_cursor, truncate_cursor;
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
-	size_t i;
-	uint64_t next_val, usecs;
+	size_t i, item_count;
+	uint64_t next_val, usecs, truncate_counter, truncate_point_end;
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
-	char *value_buf, *key_buf, *value;
+	char *value_buf, *key_buf, *value, *truncate_key;
 	char buf[512];
+	double truncation_percentage;
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
@@ -460,6 +462,21 @@ worker(void *arg)
 		lprintf(cfg, ret, 0, "First transaction begin failed");
 		goto err;
 	}
+	/* Setup truncate values */
+	if (thread->workload->truncate > 0) {
+		/**
+		 * We need to capture 2 points, the point at which to truncate
+		 * and the point at which we know the collection is sizable
+		 * enough to warrant truncation.
+		 */
+		truncation_percentage =
+		    (double)thread->workload->truncate_pct / 100;
+		truncate_point_end =
+		    thread->workload->truncate_count*truncation_percentage;
+		truncation_percentage = (double)1-truncation_percentage;
+		truncate_counter =
+		    thread->workload->truncate_count*truncation_percentage;
+	}
 
 	while (!cfg->stop) {
 		/*
@@ -492,6 +509,8 @@ worker(void *arg)
 				continue;
 			break;
 		case WORKER_TRUNCATE:
+			item_count = 0;
+			break;
 		default:
 			goto err;		/* can't happen */
 		}
@@ -594,6 +613,40 @@ op_err:			lprintf(cfg, ret, 0,
 			    "%s failed for: %s, range: %"PRIu64,
 			    op_name(op), key_buf, wtperf_value_range(cfg));
 			goto err;
+		case WORKER_TRUNCATE:
+			if ((ret = cursor->reset(cursor)) != 0) {
+				lprintf(cfg, ret, 0, "Cursor reset failed");
+				goto err;
+			}
+
+			while ((ret = cursor->next(cursor)) == 0) {
+				item_count++;
+				/* Save the value at the truncate point */
+				if (item_count == truncate_point_end) {
+					ret = cursor->get_key(cursor,
+					    &truncate_key);
+				}
+				if (item_count >= truncate_counter) {
+					cursor->set_key(cursor, truncate_key);
+					ret = cursor->search(cursor);
+					ret = session->truncate(session,
+					    NULL, NULL, cursor, NULL);
+					if ( ret != 0) {
+						lprintf(cfg, ret, 0,
+						    "Truncate failed");
+						goto err;
+					}
+					break;
+				}
+			}
+
+			if (item_count >= truncate_counter) {
+				trk = &thread->truncate;
+			} else {
+				trk = &thread->truncate_sleep;
+				(void)usleep(10000);
+			}
+			break;
 		default:
 			goto err;		/* can't happen */
 		}

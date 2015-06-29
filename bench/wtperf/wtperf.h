@@ -92,12 +92,13 @@ typedef struct {
 	int64_t ops_per_txn;
 	int64_t truncate;		/* Truncate ratio */
 	int64_t truncate_pct;		/* Truncate Percent */
+	int64_t truncate_count;		/* Truncate Percent */
 
 #define	WORKER_INSERT		1	/* Insert */
 #define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */
 #define	WORKER_READ		3	/* Read */
 #define	WORKER_UPDATE		4	/* Update */
-#define WORKER_TRUNCATE		5	/* Truncate */
+#define	WORKER_TRUNCATE		5	/* Truncate */
 	uint8_t ops[100];		/* Operation schedule */
 } WORKLOAD;
 
@@ -226,6 +227,9 @@ struct __config_thread {		/* Per-thread structure */
 	TRACK insert;			/* Insert operations */
 	TRACK read;			/* Read operations */
 	TRACK update;			/* Update operations */
+	TRACK truncate;			/* Truncate operations */
+	TRACK truncate_sleep;		/* Truncate sleep operations */
+
 };
 
 int	 config_assign(CONFIG *, const CONFIG *);
