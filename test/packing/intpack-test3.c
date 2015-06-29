@@ -57,7 +57,7 @@ test_value(int64_t val)
 	/* Ensure that decoding used the correct amount of buffer */
 	if (cp != p) {
 		fprintf(stderr,
-		    "Unpack consumed wrong size for %" PRId64 
+		    "Unpack consumed wrong size for %" PRId64
 		    ", expected %" PRIu64 ", got %" PRIu64 "\n",
 		    sinput, used_len, cp > p ?
 		    used_len + (size_t)(cp - p) : /* More than buf used */
@@ -82,7 +82,7 @@ test_value(int64_t val)
 	/* Ensure that decoding used the correct amount of buffer */
 	if (cp != p) {
 		fprintf(stderr,
-		    "Unpack consumed wrong size for %" PRId64 
+		    "Unpack consumed wrong size for %" PRId64
 		    ", expected %" PRIu64 ", got %" PRIu64 "\n",
 		    sinput, used_len, cp > p ?
 		    used_len + (size_t)(cp - p) :
