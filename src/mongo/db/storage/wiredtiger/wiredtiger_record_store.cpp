@@ -35,7 +35,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
-#include <boost/shared_array.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/base/checked_cast.h"
@@ -833,7 +832,7 @@ StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
                                                          bool enforceQuota) {
     const int len = doc->documentSize();
 
-    boost::shared_array<char> buf(new char[len]);
+    std::unique_ptr<char[]> buf(new char[len]);
     doc->writeDocument(buf.get());
 
     return insertRecord(txn, buf.get(), len, enforceQuota);
