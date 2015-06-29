@@ -209,7 +209,7 @@ namespace mongo {
 
         // Just enough to break a tie. Must be small enough to ensure that a more productive
         // plan doesn't lose to a less productive plan due to tie breaking.
-        static const double epsilon = std::min(1.0 / static_cast<double>(10 * workUnits), 1e-4);
+        const double epsilon = std::min(1.0 / static_cast<double>(10 * workUnits), 1e-4);
 
         // We prefer covered projections.
         //
