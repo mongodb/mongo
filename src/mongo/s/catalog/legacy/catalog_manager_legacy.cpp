@@ -1009,11 +1009,15 @@ void CatalogManagerLegacy::logAction(const ActionLogType& actionLog) {
             conn.done();
 
             _actionLogCollectionCreated.store(1);
-        } catch (const DBException& e) {
-            LOG(1) << "couldn't create actionlog collection: " << e;
-            // If we couldn't create the collection don't attempt the insert otherwise we might
-            // implicitly create the collection without it being capped.
-            return;
+        } catch (const DBException& ex) {
+            if (ex.toStatus() == ErrorCodes::NamespaceExists) {
+                _actionLogCollectionCreated.store(1);
+            } else {
+                LOG(1) << "couldn't create actionlog collection: " << ex;
+                // If we couldn't create the collection don't attempt the insert otherwise we might
+                // implicitly create the collection without it being capped.
+                return;
+            }
         }
     }
 
@@ -1036,11 +1040,15 @@ void CatalogManagerLegacy::logChange(const string& clientAddress,
             conn.done();
 
             _changeLogCollectionCreated.store(1);
-        } catch (const UserException& e) {
-            LOG(1) << "couldn't create changelog collection: " << e;
-            // If we couldn't create the collection don't attempt the insert otherwise we might
-            // implicitly create the collection without it being capped.
-            return;
+        } catch (const DBException& ex) {
+            if (ex.toStatus() == ErrorCodes::NamespaceExists) {
+                _changeLogCollectionCreated.store(1);
+            } else {
+                LOG(1) << "couldn't create changelog collection: " << ex;
+                // If we couldn't create the collection don't attempt the insert otherwise we might
+                // implicitly create the collection without it being capped.
+                return;
+            }
         }
     }
 
