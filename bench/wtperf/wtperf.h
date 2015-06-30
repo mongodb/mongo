@@ -97,8 +97,8 @@ typedef struct {
 #define	WORKER_INSERT		1	/* Insert */
 #define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */
 #define	WORKER_READ		3	/* Read */
-#define	WORKER_UPDATE		4	/* Update */
-#define	WORKER_TRUNCATE		5	/* Truncate */
+#define	WORKER_TRUNCATE		4	/* Truncate */
+#define	WORKER_UPDATE		5	/* Update */
 	uint8_t ops[100];		/* Operation schedule */
 } WORKLOAD;
 

@@ -1,4 +1,4 @@
-/*-
+	/*-
  * Public Domain 2014-2015 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
@@ -258,10 +258,10 @@ op_name(uint8_t *op)
 		return ("insert_rmw");
 	case WORKER_READ:
 		return ("read");
-	case WORKER_UPDATE:
-		return ("update");
 	case WORKER_TRUNCATE:
 		return ("truncate");
+	case WORKER_UPDATE:
+		return ("update");
 	default:
 		return ("unknown");
 	}
@@ -351,6 +351,8 @@ worker_async(void *arg)
 			if ((ret = asyncop->insert(asyncop)) == 0)
 				break;
 			goto op_err;
+		case WORKER_TRUNCATE:
+			break;
 		case WORKER_UPDATE:
 			if (cfg->random_value)
 				randomize_value(thread, value_buf);
@@ -358,8 +360,6 @@ worker_async(void *arg)
 			if ((ret = asyncop->update(asyncop)) == 0)
 				break;
 			goto op_err;
-		case WORKER_TRUNCATE:
-			break;
 		default:
 op_err:			lprintf(cfg, ret, 0,
 			    "%s failed for: %s, range: %"PRIu64,
@@ -394,10 +394,10 @@ worker(void *arg)
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
 	size_t i, item_count;
-	uint64_t next_val, usecs, truncate_counter, truncate_point_end;
+	uint64_t next_val, truncate_counter, truncate_point_end, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
-	char *value_buf, *key_buf, *value, *truncate_key;
+	char *value_buf, *key_buf, *truncate_key, *value;
 	char buf[512];
 	double truncation_percentage;
 
@@ -577,6 +577,40 @@ worker(void *arg)
 			if ((ret = cursor->insert(cursor)) == 0)
 				break;
 			goto op_err;
+		case WORKER_TRUNCATE:
+			if ((ret = cursor->reset(cursor)) != 0) {
+				lprintf(cfg, ret, 0, "Cursor reset failed");
+				goto err;
+			}
+
+			while ((ret = cursor->next(cursor)) == 0) {
+				item_count++;
+				/* Save the value at the truncate point */
+				if (item_count == truncate_point_end) {
+					ret = cursor->get_key(cursor,
+					    &truncate_key);
+				}
+				if (item_count >= truncate_counter) {
+					cursor->set_key(cursor, truncate_key);
+					ret = cursor->search(cursor);
+					ret = session->truncate(session,
+					    NULL, NULL, cursor, NULL);
+					if ( ret != 0) {
+						lprintf(cfg, ret, 0,
+						    "Truncate failed");
+						goto err;
+					}
+					break;
+				}
+			}
+
+			if (item_count >= truncate_counter) {
+				trk = &thread->truncate;
+			} else {
+				trk = &thread->truncate_sleep;
+				(void)usleep(10000);
+			}
+			break;
 		case WORKER_UPDATE:
 			if ((ret = cursor->search(cursor)) == 0) {
 				if ((ret = cursor->get_value(
@@ -617,40 +651,6 @@ op_err:			lprintf(cfg, ret, 0,
 			    "%s failed for: %s, range: %"PRIu64,
 			    op_name(op), key_buf, wtperf_value_range(cfg));
 			goto err;
-		case WORKER_TRUNCATE:
-			if ((ret = cursor->reset(cursor)) != 0) {
-				lprintf(cfg, ret, 0, "Cursor reset failed");
-				goto err;
-			}
-
-			while ((ret = cursor->next(cursor)) == 0) {
-				item_count++;
-				/* Save the value at the truncate point */
-				if (item_count == truncate_point_end) {
-					ret = cursor->get_key(cursor,
-					    &truncate_key);
-				}
-				if (item_count >= truncate_counter) {
-					cursor->set_key(cursor, truncate_key);
-					ret = cursor->search(cursor);
-					ret = session->truncate(session,
-					    NULL, NULL, cursor, NULL);
-					if ( ret != 0) {
-						lprintf(cfg, ret, 0,
-						    "Truncate failed");
-						goto err;
-					}
-					break;
-				}
-			}
-
-			if (item_count >= truncate_counter) {
-				trk = &thread->truncate;
-			} else {
-				trk = &thread->truncate_sleep;
-				(void)usleep(10000);
-			}
-			break;
 		default:
 			goto err;		/* can't happen */
 		}
