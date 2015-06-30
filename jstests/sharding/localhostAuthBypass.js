@@ -6,7 +6,6 @@
 var replSetName = "replsets_server-6591";
 var keyfile = "jstests/libs/key1";
 var numShards = 2;
-var numConfigs = 3;
 var username = "foo";
 var password = "bar";
 
@@ -171,7 +170,6 @@ var start = function() {
         keyFile: keyfile, 
         shards: numShards, 
         chunksize: 1, 
-        config: numConfigs, 
         other : { 
             nopreallocj: 1, 
             useHostname: false // Must use localhost to take advantage of the localhost auth bypass

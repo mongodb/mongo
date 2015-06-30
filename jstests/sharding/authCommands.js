@@ -1,12 +1,10 @@
-// TODO: move back to sharding suite after SERVER-13402 is fixed
-
 /**
  * This tests using DB commands with authentication enabled when sharded.
  */
 var doTest = function() {
 
 var rsOpts = { oplogSize: 10, useHostname : false };
-var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunksize : 2, config : 3,
+var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunksize : 2,
                             rs : rsOpts, other : { nopreallocj : 1, useHostname : false }});
 
 var mongos = st.s;

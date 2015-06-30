@@ -157,7 +157,8 @@ jsTestOptions = function(){
                               authPassword : TestData.keyFileData,
                               authMechanism : TestData.authMechanism,
                               adminUser : TestData.adminUser || "admin",
-                              adminPassword : TestData.adminPassword || "password"});
+                              adminPassword : TestData.adminPassword || "password",
+                              useLegacyConfigServers: TestData.useLegacyConfigServers || false });
     }
     return _jsTestOptions;
 }

@@ -20,7 +20,6 @@
         name : baseName,
         mongos : 1,
         shards : 1,
-        config : 3,
         rs : { nodes : 3 },
         other : { manualAddShard : true }
     };

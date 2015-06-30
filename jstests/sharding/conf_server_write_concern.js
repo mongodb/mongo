@@ -22,9 +22,8 @@ function writeToConfigTest(){
  * Test write concern with w parameter will not cause an error when writes to mongos
  * would trigger writes to config servers (in this test, split chunks is used).
  */
-function configTest( sync ){
-    var st = new ShardingTest({ shards: 1, sync: sync,
-          rs: { oplogSize: 10 }, other: { chunkSize: 1 }});
+function configTest(){
+    var st = new ShardingTest({ shards: 1, rs: { oplogSize: 10 }, other: { chunkSize: 1 }});
      
     var mongos = st.s;
     var testDB = mongos.getDB( 'test' );
@@ -51,6 +50,5 @@ function configTest( sync ){
 }
 
 writeToConfigTest();
-configTest( false );
-configTest( true ); // sync cluster config servers
+configTest();
 

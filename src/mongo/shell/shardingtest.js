@@ -260,6 +260,14 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         rsConn.rs = rs
     }
 
+    // Default to using 3-node legacy config servers if jsTestOptions().useLegacyOptions is true
+    // and the user didn't explicity specify a different config server configuration
+    if (jsTestOptions().useLegacyConfigServers &&
+            otherParams.sync !== false &&
+            (typeof otherParams.config === 'undefined' || numConfigs === 3)) {
+        otherParams.sync = true;
+    }
+
     if (numConfigs == 3) {
         // TODO(spencer): Remove this once we support 3 node config server replica sets
         otherParams.sync = true;

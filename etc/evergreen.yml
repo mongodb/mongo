@@ -971,6 +971,14 @@ tasks:
       resmoke_args: --suites=sharding_auth
 
 - <<: *task_template
+  name: sharding_legacy
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_legacy
+
+- <<: *task_template
   name: snmp
   commands:
   - func: "do setup"
@@ -1513,6 +1521,7 @@ buildvariants:
   - name: replication_WT
   - name: replication_auth
   - name: sharding
+  - name: sharding_legacy
   - name: sharding_WT
   - name: sharding_auth
   - name: slow1
@@ -1589,6 +1598,7 @@ buildvariants:
   - name: replication_WT
   - name: replication_auth
   - name: sharding
+  - name: sharding_legacy
   - name: sharding_WT
   - name: sharding_auth
   - name: slow1

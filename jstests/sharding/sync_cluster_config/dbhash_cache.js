@@ -2,7 +2,7 @@
 * Test that split/move chunk update the dbhash on the config server
 */
 
-st = new ShardingTest({ name: "dbhash", shards : 2, mongos : 2, verbose : 2 });
+st = new ShardingTest({ name: "dbhash", shards : 2, mongos : 2, verbose : 2, sync: true });
 st.stopBalancer();
 
 var mongos = st.s0;

@@ -4,7 +4,7 @@
 // Note: Test uses only 2.0 compatible features to make backport easier.
 //
 
-var st = new ShardingTest({ shards : 2, mongos : 1 })
+var st = new ShardingTest({ shards : 2, mongos : 1, sync : false })
 
 var mongos = st.s
 var coll = mongos.getCollection( "foo.bar" )

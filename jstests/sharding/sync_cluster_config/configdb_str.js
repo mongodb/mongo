@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-var st = new ShardingTest({ shards: 1, config: 3 });
+var st = new ShardingTest({ shards: 1, config: 3, sync: true });
 st.stopBalancer();
 
 var badConfStr = st.c1.name + ',' + st.c0.name + ',' + st.c2.name;

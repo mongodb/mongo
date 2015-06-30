@@ -1,6 +1,6 @@
 // Test that dropping the config database is completely disabled via
 // mongos and via mongod, if started with --configsvr
-var st = new ShardingTest({ shards : 2, config : 1 });
+var st = new ShardingTest({ shards : 2 });
 var mongos = st.s;
 var config = st._configServers[0].getDB('config');
 
