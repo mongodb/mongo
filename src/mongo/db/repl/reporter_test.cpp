@@ -129,28 +129,20 @@ void ReporterTest::scheduleNetworkResponse(ErrorCodes::Error code, const std::st
 }
 
 TEST_F(ReporterTest, InvalidConstruction) {
-<<<<<<< HEAD
     // null PrepareReplSetUpdatePositionCommandFn
-    ASSERT_THROWS(Reporter(&getExecutor(),
+    ASSERT_THROWS(Reporter(&getReplExecutor(),
                            Reporter::PrepareReplSetUpdatePositionCommandFn(),
                            HostAndPort("h1")),
                   UserException);
-=======
-    // null ReplicationProgressManager
-    ASSERT_THROWS(Reporter(&getReplExecutor(), nullptr, HostAndPort("h1")), UserException);
->>>>>>> SERVER-19001 Create common test infrastructure for testing TaskExecutor implementations.
 
     // null ReplicationExecutor
     ASSERT_THROWS(Reporter(nullptr, prepareReplSetUpdatePositionCommandFn, HostAndPort("h1")),
                   UserException);
 
     // empty HostAndPort
-<<<<<<< HEAD
-    ASSERT_THROWS(Reporter(&getExecutor(), prepareReplSetUpdatePositionCommandFn, HostAndPort()),
-                  UserException);
-=======
-    ASSERT_THROWS(Reporter(&getReplExecutor(), posUpdater.get(), HostAndPort()), UserException);
->>>>>>> SERVER-19001 Create common test infrastructure for testing TaskExecutor implementations.
+    ASSERT_THROWS(
+        Reporter(&getReplExecutor(), prepareReplSetUpdatePositionCommandFn, HostAndPort()),
+        UserException);
 }
 
 TEST_F(ReporterTest, IsActiveOnceScheduled) {
