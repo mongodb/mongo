@@ -59,6 +59,9 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 
 	conn = S2C(session);
 
+	/* Checkpoints should never do eviction. */
+	WT_ASSERT(session, !WT_SESSION_IS_CHECKPOINT(session));
+
 	page = ref->page;
 	forced_eviction = page->read_gen == WT_READGEN_OLDEST;
 	inmem_split = 0;

@@ -838,6 +838,7 @@ static inline int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_INSERT *ins, WT_ROW *rip, WT_CELL_UNPACK *vpack, WT_UPDATE **updp)
 {
+	WT_DECL_RET;
 	WT_ITEM ovfl;
 	WT_PAGE *page;
 	WT_UPDATE *upd, *upd_list, *upd_ovfl;
@@ -976,8 +977,11 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 */
 	if (vpack != NULL && vpack->raw == WT_CELL_VALUE_OVFL_RM &&
 	    !__wt_txn_visible_all(session, min_txn)) {
-		WT_RET(__wt_ovfl_txnc_search(
-		    page, vpack->data, vpack->size, &ovfl));
+		if ((ret = __wt_ovfl_txnc_search(
+		    page, vpack->data, vpack->size, &ovfl)) != 0)
+			WT_PANIC_RET(session, ret,
+			    "cached overflow item discarded early");
+
 		/*
 		 * Create an update structure with an impossibly low transaction
 		 * ID and append it to the update list we're about to save.

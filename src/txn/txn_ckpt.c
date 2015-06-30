@@ -349,6 +349,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
+	WT_TXN_STATE *txn_state;
 	void *saved_meta_next;
 	u_int i;
 	int full, fullckpt_logging, idle, tracking;
@@ -358,6 +359,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
+	txn_state = WT_SESSION_TXN_STATE(session);
 	saved_isolation = session->isolation;
 	full = fullckpt_logging = idle = tracking = 0;
 
@@ -451,7 +453,15 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_ASSERT(session, session->id != 0);
 	txn_global->checkpoint_id = session->id;
-	txn_global->checkpoint_snap_min = session->txn.snap_min;
+	txn_global->checkpoint_pinned =
+	    WT_MIN(txn_state->id, txn_state->snap_min);
+
+	/*
+	 * Now clear the checkpoint transaction from the global state table so
+	 * other threads don't wait for it.
+	 */
+	WT_FULL_BARRIER();
+	txn_state->id = txn_state->snap_min = WT_TXN_NONE;
 
 	/*
 	 * No need for this to be atomic it is only written while holding the
@@ -477,10 +487,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Release the snapshot so we aren't pinning pages in cache. */
 	__wt_txn_release_snapshot(session);
-
-	/* Clear the global checkpoint transaction IDs */
-	txn_global->checkpoint_id = 0;
-	txn_global->checkpoint_snap_min = WT_TXN_NONE;
 
 	WT_ERR(__checkpoint_verbose_track(session,
 	    "committing transaction", &verb_timer));
@@ -557,10 +563,6 @@ err:	/*
 		session->dhandle = NULL;
 		WT_TRET(__wt_txn_rollback(session, NULL));
 	}
-
-	/* Ensure the checkpoint IDs are cleared on the error path. */
-	txn_global->checkpoint_id = 0;
-	txn_global->checkpoint_snap_min = WT_TXN_NONE;
 
 	/*
 	 * Tell logging that we have finished a database checkpoint.  Do not
