@@ -129,13 +129,13 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 */
 #if 0
 	if (WT_SESSION_IS_CHECKPOINT(session))
-                return (oldest_id);
+		return (oldest_id);
 #endif
 	if (checkpoint_pinned == WT_TXN_NONE ||
 	    WT_TXNID_LT(oldest_id, checkpoint_pinned) ||
 	    (btree != NULL &&
 	    btree->checkpoint_gen == txn_global->checkpoint_gen))
-                return (oldest_id);
+		return (oldest_id);
 
 	return (checkpoint_pinned);
 }
