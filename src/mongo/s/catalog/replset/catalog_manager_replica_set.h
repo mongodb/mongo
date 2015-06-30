@@ -79,8 +79,6 @@ public:
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
-    Status createDatabase(const std::string& dbName) override;
-
     StatusWith<DatabaseType> getDatabase(const std::string& dbName) override;
 
     StatusWith<CollectionType> getCollection(const std::string& collNs) override;
@@ -135,6 +133,8 @@ public:
     DistLockManager* getDistLockManager() const override;
 
 private:
+    Status _checkDbDoesNotExist(const std::string& dbName) const override;
+
     /**
      * Helper for running commands against the config server with logic for retargeting and
      * retrying the command in the event of a NotMaster response.

@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/catalog/catalog_manager.h"
@@ -35,9 +37,11 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -46,6 +50,7 @@
 #include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_document.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -191,6 +196,52 @@ Status CatalogManager::updateDatabase(const std::string& dbName, const DatabaseT
     }
 
     return Status::OK();
+}
+
+Status CatalogManager::createDatabase(const std::string& dbName) {
+    invariant(nsIsDbOnly(dbName));
+
+    // The admin and config databases should never be explicitly created. They "just exist",
+    // i.e. getDatabase will always return an entry for them.
+    invariant(dbName != "admin");
+    invariant(dbName != "config");
+
+    // Lock the database globally to prevent conflicts with simultaneous database creation.
+    auto scopedDistLock =
+        getDistLockManager()->lock(dbName, "createDatabase", Seconds{5000}, Milliseconds{500});
+    if (!scopedDistLock.isOK()) {
+        return scopedDistLock.getStatus();
+    }
+
+    // check for case sensitivity violations
+    Status status = _checkDbDoesNotExist(dbName);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // Database does not exist, pick a shard and create a new entry
+    auto newShardIdStatus = selectShardForNewDatabase(grid.shardRegistry());
+    if (!newShardIdStatus.isOK()) {
+        return newShardIdStatus.getStatus();
+    }
+
+    const ShardId& newShardId = newShardIdStatus.getValue();
+
+    log() << "Placing [" << dbName << "] on: " << newShardId;
+
+    DatabaseType db;
+    db.setName(dbName);
+    db.setPrimary(newShardId);
+    db.setSharded(false);
+
+    BatchedCommandResponse response;
+    status = insert(DatabaseType::ConfigNS, db.toBSON(), &response);
+
+    if (status.code() == ErrorCodes::DuplicateKey) {
+        return Status(ErrorCodes::NamespaceExists, "database " + dbName + " already exists");
+    }
+
+    return status;
 }
 
 // static

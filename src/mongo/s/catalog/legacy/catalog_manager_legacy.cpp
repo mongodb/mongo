@@ -576,57 +576,6 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
     return Status::OK();
 }
 
-Status CatalogManagerLegacy::createDatabase(const std::string& dbName) {
-    invariant(nsIsDbOnly(dbName));
-
-    // The admin and config databases should never be explicitly created. They "just exist",
-    // i.e. getDatabase will always return an entry for them.
-    invariant(dbName != "admin");
-    invariant(dbName != "config");
-
-    // Lock the database globally to prevent conflicts with simultaneous database creation.
-    auto scopedDistLock =
-        getDistLockManager()->lock(dbName, "createDatabase", Seconds{5}, Milliseconds{500});
-    if (!scopedDistLock.isOK()) {
-        return scopedDistLock.getStatus();
-    }
-
-    // Check for case sensitivity violations
-    auto status = _checkDbDoesNotExist(dbName);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // Database does not exist, pick a shard and create a new entry
-    auto newShardIdStatus = selectShardForNewDatabase(grid.shardRegistry());
-    if (!newShardIdStatus.isOK()) {
-        return newShardIdStatus.getStatus();
-    }
-
-    const ShardId& newShardId = newShardIdStatus.getValue();
-
-    log() << "Placing [" << dbName << "] on: " << newShardId;
-
-    DatabaseType db;
-    db.setName(dbName);
-    db.setPrimary(newShardId);
-    db.setSharded(false);
-
-    BatchedCommandResponse response;
-    status = insert(DatabaseType::ConfigNS, db.toBSON(), &response);
-    if (status.isOK()) {
-        return status;
-    }
-
-    if (status.code() == ErrorCodes::DuplicateKey) {
-        return Status(ErrorCodes::NamespaceExists, "database " + dbName + " already exists");
-    }
-
-    return Status(status.code(),
-                  str::stream() << "database metadata write failed for " << dbName
-                                << ". Error: " << response.toBSON());
-}
-
 StatusWith<string> CatalogManagerLegacy::addShard(OperationContext* txn,
                                                   const string& name,
                                                   const ConnectionString& shardConnectionString,

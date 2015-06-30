@@ -77,8 +77,6 @@ public:
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
-    Status createDatabase(const std::string& dbName) override;
-
     StatusWith<DatabaseType> getDatabase(const std::string& dbName) override;
 
     StatusWith<CollectionType> getCollection(const std::string& collNs) override;
@@ -135,6 +133,8 @@ public:
     DistLockManager* getDistLockManager() const override;
 
 private:
+    Status _checkDbDoesNotExist(const std::string& dbName) const override;
+
     /**
      * Updates the config server's metadata to the current version.
      */
@@ -145,12 +145,6 @@ private:
      * Note: this is not thread safe and can only be called once for the lifetime.
      */
     Status _startConfigServerChecker();
-
-    /**
-     * Direct network check to see if a particular database does not already exist with the
-     * same name or different case.
-     */
-    Status _checkDbDoesNotExist(const std::string& dbName) const;
 
     /**
      * Generates a new shard name "shard<xxxx>"
