@@ -275,14 +275,19 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        BSONObjBuilder b(result.subobjStart("commands"));
-        for (CommandMap::const_iterator i = _commands->begin(); i != _commands->end(); ++i) {
-            Command* c = i->second;
-
+        // sort the commands before building the result BSON
+        std::vector<Command*> commands;
+        for (CommandMap::const_iterator it = _commands->begin(); it != _commands->end(); ++it) {
             // don't show oldnames
-            if (i->first != c->name)
-                continue;
+            if (it->first == it->second->name)
+                commands.push_back(it->second);
+        }
+        std::sort(commands.begin(),
+                  commands.end(),
+                  [](Command* lhs, Command* rhs) { return (lhs->name) < (rhs->name); });
 
+        BSONObjBuilder b(result.subobjStart("commands"));
+        for (const auto& c : commands) {
             BSONObjBuilder temp(b.subobjStart(c->name));
 
             {
