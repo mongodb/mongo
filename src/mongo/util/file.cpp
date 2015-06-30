@@ -29,7 +29,6 @@
 
 #include "mongo/util/file.h"
 
-#include <boost/cstdint.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <cstdint>
 #include <iostream>

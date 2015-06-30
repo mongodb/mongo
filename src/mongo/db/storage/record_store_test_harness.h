@@ -30,9 +30,10 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_noop.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
