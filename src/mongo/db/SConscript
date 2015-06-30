@@ -597,7 +597,7 @@ serveronlyEnv = env.Clone()
 serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 serveronlyLibdeps = [
     "$BUILD_DIR/mongo/client/parallel",
-    "$BUILD_DIR/mongo/executor/network_interface_impl",
+    "$BUILD_DIR/mongo/executor/network_interface_factory",
     "$BUILD_DIR/mongo/s/batch_write_types",
     "$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy",
     "$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set",

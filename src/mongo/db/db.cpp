@@ -91,7 +91,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
-#include "mongo/executor/network_interface_impl.h"
+#include "mongo/executor/network_interface_factory.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
@@ -738,7 +738,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnviro
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         getGlobalReplSettings(),
         new repl::ReplicationCoordinatorExternalStateImpl,
-        new executor::NetworkInterfaceImpl{},
+        executor::makeNetworkInterface().release(),
         new repl::StorageInterfaceImpl{},
         new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)),
         static_cast<int64_t>(curTimeMillis64()));

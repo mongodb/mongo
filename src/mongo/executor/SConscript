@@ -47,6 +47,16 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/repl/replication_executor',
-        '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/third_party/shim_asio',
+    ])
+
+env.Library(
+    target='network_interface_factory',
+    source=[
+        'network_interface_factory.cpp',
+    ],
+    LIBDEPS=[
+        'network_interface',
+        'network_interface_asio',
+        'network_interface_impl',
     ])

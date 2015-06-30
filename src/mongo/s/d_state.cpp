@@ -55,7 +55,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/executor/network_interface_impl.h"
+#include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/client/shard_connection.h"
@@ -480,12 +480,12 @@ void ShardingState::_initialize(const string& server) {
     auto catalogManager = stdx::make_unique<CatalogManagerLegacy>();
     uassertStatusOK(catalogManager->init(configServerCS));
 
-    auto shardRegistry(
-        stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
-                                         stdx::make_unique<repl::ReplicationExecutor>(
-                                             new executor::NetworkInterfaceImpl(), nullptr, 0),
-                                         nullptr,
-                                         catalogManager.get()));
+    auto shardRegistry(stdx::make_unique<ShardRegistry>(
+        stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
+        stdx::make_unique<repl::ReplicationExecutor>(
+            executor::makeNetworkInterface().release(), nullptr, 0),
+        nullptr,
+        catalogManager.get()));
     shardRegistry->startup();
 
     grid.init(std::move(catalogManager), std::move(shardRegistry));
