@@ -316,6 +316,7 @@ worker_async(void *arg)
 				continue;
 			break;
 		case WORKER_TRUNCATE:
+			next_val = wtperf_rand(thread);
 			break;
 		default:
 			goto err;		/* can't happen */
@@ -389,7 +390,7 @@ worker(void *arg)
 	CONFIG_THREAD *thread;
 	TRACK *trk;
 	WT_CONNECTION *conn;
-	WT_CURSOR **cursors, *cursor, *tmp_cursor, truncate_cursor;
+	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
 	size_t i, item_count;
@@ -409,6 +410,8 @@ worker(void *arg)
 	session = NULL;
 	trk = NULL;
 	throttle_ops = 0;
+	item_count = 0;
+	truncate_counter = truncate_point_end = 0;
 
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
@@ -510,6 +513,7 @@ worker(void *arg)
 			break;
 		case WORKER_TRUNCATE:
 			item_count = 0;
+			next_val = wtperf_rand(thread);
 			break;
 		default:
 			goto err;		/* can't happen */
