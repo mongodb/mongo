@@ -1388,12 +1388,10 @@ TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecated) {
                                         << BSON("precondition2"
                                                 << "second precondition"));
 
-    auto future = async(stdx::launch::async,
-                        [this, updateOps, preCondition] {
-                            auto status =
-                                catalogManager()->applyChunkOpsDeprecated(updateOps, preCondition);
-                            ASSERT_OK(status);
-                        });
+    auto future = launchAsync([this, updateOps, preCondition] {
+        auto status = catalogManager()->applyChunkOpsDeprecated(updateOps, preCondition);
+        ASSERT_OK(status);
+    });
 
     onCommand([updateOps, preCondition](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("config", request.dbname);
@@ -1421,12 +1419,10 @@ TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecatedCommandFailed) {
                                         << BSON("precondition2"
                                                 << "second precondition"));
 
-    auto future = async(stdx::launch::async,
-                        [this, updateOps, preCondition] {
-                            auto status =
-                                catalogManager()->applyChunkOpsDeprecated(updateOps, preCondition);
-                            ASSERT_EQUALS(ErrorCodes::BadValue, status);
-                        });
+    auto future = launchAsync([this, updateOps, preCondition] {
+        auto status = catalogManager()->applyChunkOpsDeprecated(updateOps, preCondition);
+        ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    });
 
     onCommand([updateOps, preCondition](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("config", request.dbname);

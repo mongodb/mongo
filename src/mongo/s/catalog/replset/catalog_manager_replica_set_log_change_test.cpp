@@ -129,13 +129,12 @@ TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
     expectedChangeLog.setWhat("moved a chunk");
     expectedChangeLog.setDetails(BSON("min" << 3 << "max" << 4));
 
-    auto future = async(stdx::launch::async,
-                        [this, &expectedChangeLog] {
-                            catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                                        expectedChangeLog.getWhat(),
-                                                        expectedChangeLog.getNS(),
-                                                        expectedChangeLog.getDetails());
-                        });
+    auto future = launchAsync([this, &expectedChangeLog] {
+        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
+                                    expectedChangeLog.getWhat(),
+                                    expectedChangeLog.getNS(),
+                                    expectedChangeLog.getDetails());
+    });
 
     expectChangeLogCreate(BSON("ok" << 1));
     expectChangeLogInsert(expectedChangeLog);
@@ -144,13 +143,12 @@ TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
     future.wait_for(kFutureTimeout);
 
     // Now log another change and confirm that we don't re-attempt to create the collection
-    future = async(stdx::launch::async,
-                   [this, &expectedChangeLog] {
-                       catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                                   expectedChangeLog.getWhat(),
-                                                   expectedChangeLog.getNS(),
-                                                   expectedChangeLog.getDetails());
-                   });
+    future = launchAsync([this, &expectedChangeLog] {
+        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
+                                    expectedChangeLog.getWhat(),
+                                    expectedChangeLog.getNS(),
+                                    expectedChangeLog.getDetails());
+    });
 
     expectChangeLogInsert(expectedChangeLog);
 
@@ -171,13 +169,12 @@ TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
     expectedChangeLog.setWhat("moved a chunk");
     expectedChangeLog.setDetails(BSON("min" << 3 << "max" << 4));
 
-    auto future = async(stdx::launch::async,
-                        [this, &expectedChangeLog] {
-                            catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                                        expectedChangeLog.getWhat(),
-                                                        expectedChangeLog.getNS(),
-                                                        expectedChangeLog.getDetails());
-                        });
+    auto future = launchAsync([this, &expectedChangeLog] {
+        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
+                                    expectedChangeLog.getWhat(),
+                                    expectedChangeLog.getNS(),
+                                    expectedChangeLog.getDetails());
+    });
 
     BSONObjBuilder createResponseBuilder;
     Command::appendCommandStatus(createResponseBuilder,
@@ -189,13 +186,12 @@ TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
     future.wait_for(kFutureTimeout);
 
     // Now log another change and confirm that we don't re-attempt to create the collection
-    future = async(stdx::launch::async,
-                   [this, &expectedChangeLog] {
-                       catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                                   expectedChangeLog.getWhat(),
-                                                   expectedChangeLog.getNS(),
-                                                   expectedChangeLog.getDetails());
-                   });
+    future = launchAsync([this, &expectedChangeLog] {
+        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
+                                    expectedChangeLog.getWhat(),
+                                    expectedChangeLog.getNS(),
+                                    expectedChangeLog.getDetails());
+    });
 
     expectChangeLogInsert(expectedChangeLog);
 
@@ -216,13 +212,12 @@ TEST_F(LogChangeTest, LogActionCreateFailure) {
     expectedChangeLog.setWhat("moved a chunk");
     expectedChangeLog.setDetails(BSON("min" << 3 << "max" << 4));
 
-    auto future = async(stdx::launch::async,
-                        [this, &expectedChangeLog] {
-                            catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                                        expectedChangeLog.getWhat(),
-                                                        expectedChangeLog.getNS(),
-                                                        expectedChangeLog.getDetails());
-                        });
+    auto future = launchAsync([this, &expectedChangeLog] {
+        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
+                                    expectedChangeLog.getWhat(),
+                                    expectedChangeLog.getNS(),
+                                    expectedChangeLog.getDetails());
+    });
 
     BSONObjBuilder createResponseBuilder;
     Command::appendCommandStatus(createResponseBuilder,
@@ -233,13 +228,12 @@ TEST_F(LogChangeTest, LogActionCreateFailure) {
     future.wait_for(kFutureTimeout);
 
     // Now log another change and confirm that we *do* attempt to create the collection
-    future = async(stdx::launch::async,
-                   [this, &expectedChangeLog] {
-                       catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                                   expectedChangeLog.getWhat(),
-                                                   expectedChangeLog.getNS(),
-                                                   expectedChangeLog.getDetails());
-                   });
+    future = launchAsync([this, &expectedChangeLog] {
+        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
+                                    expectedChangeLog.getWhat(),
+                                    expectedChangeLog.getNS(),
+                                    expectedChangeLog.getDetails());
+    });
 
     expectChangeLogCreate(BSON("ok" << 1));
     expectChangeLogInsert(expectedChangeLog);
