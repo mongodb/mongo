@@ -300,7 +300,6 @@ __wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
 		*xp = (int64_t)(GET_BITS(*p++, 5, 0) << 8);
 		*xp |= *p++;
 		*xp += NEG_2BYTE_MIN;
-		p += 2;
 		break;
 	case NEG_1BYTE_MARKER:
 	case NEG_1BYTE_MARKER | 0x10:
