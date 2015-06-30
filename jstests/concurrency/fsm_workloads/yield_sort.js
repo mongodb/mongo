@@ -5,8 +5,9 @@
  *
  * Intersperse queries which use the SORT stage with updates and deletes of documents they may
  * match.
- * This workload is blacklisted until SERVER-17011 is resolved. Updates during sort stage can
- * cause docs to be returned out of order if it's an unindexed query with non-default batch sizes.
+ * This workload is blacklisted until SERVER-15176 is resolved, which allows the query system to
+ * distinguish between batchSize and limit. Updates during sort stage can cause docs to be returned
+ * out of order if it's an unindexed query with non-default batch sizes.
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
 load('jstests/concurrency/fsm_workloads/yield_sort_merge.js'); // for $config
