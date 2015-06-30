@@ -41,6 +41,7 @@ class BSONObj;
 class CatalogManagerReplicaSet;
 class DistLockManagerMock;
 struct RemoteCommandRequest;
+class RemoteCommandTargeterFactoryMock;
 class ShardRegistry;
 template <typename T>
 class StatusWith;
@@ -68,6 +69,8 @@ protected:
 
     ShardRegistry* shardRegistry() const;
 
+    RemoteCommandTargeterFactoryMock* targeterFactory() const;
+
     executor::NetworkInterfaceMock* network() const;
 
     MessagingPortMock* getMessagingPort() const;
@@ -93,6 +96,8 @@ private:
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<MessagingPortMock> _messagePort;
+
+    RemoteCommandTargeterFactoryMock* _targeterFactory;
 
     executor::NetworkInterfaceMock* _mockNetwork;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
