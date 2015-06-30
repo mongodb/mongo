@@ -989,10 +989,6 @@ public:
     const char* getOpName() const final;
 };
 
-class ExpressionSqrt final : public ExpressionFixedArity<ExpressionSqrt, 1> {
-    Value evaluateInternal(Variables* vars) const final;
-    const char* getOpName() const final;
-};
 
 class ExpressionStrcasecmp final : public ExpressionFixedArity<ExpressionStrcasecmp, 2> {
 public:
