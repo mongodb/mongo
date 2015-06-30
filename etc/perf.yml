@@ -37,7 +37,7 @@ functions:
           chmod +x mongo
           git clone https://github.com/mongodb/mongo-perf perf
           cd perf
-          git checkout evergreen
+          git checkout r20150702
     - command: shell.exec
       params:
         background: true
@@ -72,7 +72,7 @@ functions:
           cd perf
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
-          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t 1 2 4 8 16 --trialCount 7 -f testcases/*.js --testFilter '${filter}' --out perf.json
+          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 7 -f testcases/*.js --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
     - command: "json.send"
       params:
         name: "perf"
@@ -123,7 +123,10 @@ tasks:
     - func: "start server"
     - func: "run perf tests"
       vars:
-        filter: "core-query"
+        includeFilter1: "query"
+        includeFilter2 : "core regression" 
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
 - name: update
   depends_on:
   - name: compile
@@ -131,7 +134,10 @@ tasks:
     - func: "start server"
     - func: "run perf tests"
       vars:
-        filter: "core-update"
+        includeFilter1: "update"
+        includeFilter2 : "core regression" 
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
 - name: insert
   depends_on:
   - name: compile
@@ -139,7 +145,43 @@ tasks:
     - func: "start server"
     - func: "run perf tests"
       vars:
-        filter: "core-insert"
+        includeFilter1: "insert"
+        includeFilter2 : "core regression" 
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
+- name: geo
+  depends_on:
+  - name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "geo"
+        includeFilter2 : "core regression" 
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
+- name: misc
+  depends_on:
+  - name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "command multi remove mixed"
+        includeFilter2 : "core regression" 
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
+- name: singleThreaded
+  depends_on:
+  - name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "single_threaded"
+        includeFilter2 : "core regression" 
+        excludeFilter : "none"
+        threads : "1"
 
 buildvariants:
 - name: linux-wt-standalone
@@ -159,6 +201,9 @@ buildvariants:
   - name: query
   - name: update
   - name: insert
+  - name: geo
+  - name: misc
+  - name: singleThreaded
 
 - name: linux-wt-repl
   display_name: Linux WT 1-Node ReplSet
@@ -176,3 +221,6 @@ buildvariants:
     - rhel55
   - name: update
   - name: insert
+  - name: geo
+  - name: misc
+  - name: singleThreaded
