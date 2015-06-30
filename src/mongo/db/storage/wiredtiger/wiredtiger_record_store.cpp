@@ -179,6 +179,7 @@ public:
         data.makeOwned();  // TODO delete this line once safe.
 
         _lastReturnedId = id;
+        _eof = false;
         return {{id, std::move(data)}};
     }
 
