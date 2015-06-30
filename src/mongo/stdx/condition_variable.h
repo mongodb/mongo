@@ -28,14 +28,14 @@
 
 #pragma once
 
-#include <boost/thread/condition_variable.hpp>
+#include <condition_variable>
 
 namespace mongo {
 namespace stdx {
 
-using condition_variable = boost::condition_variable;          // NOLINT
-using condition_variable_any = boost::condition_variable_any;  // NOLINT
-using cv_status = boost::cv_status;                            // NOLINT
+using condition_variable = ::std::condition_variable;          // NOLINT
+using condition_variable_any = ::std::condition_variable_any;  // NOLINT
+using cv_status = ::std::cv_status;                            // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo

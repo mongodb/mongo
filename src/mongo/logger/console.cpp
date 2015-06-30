@@ -228,6 +228,8 @@ std::ostream* windowsOutputStream = getWindowsOutputStream();
 }  // namespace
 
 Console::Console() : _consoleLock() {
+    const std::ios_base::Init initializeCout;
+
     if (consoleMutex) {
         stdx::unique_lock<stdx::mutex> lk(*consoleMutex);
         lk.swap(_consoleLock);

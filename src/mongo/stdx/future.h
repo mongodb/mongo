@@ -28,17 +28,17 @@
 
 #pragma once
 
-#include <boost/thread/future.hpp>
+#include <future>
 
 namespace mongo {
 namespace stdx {
 
-using boost::async;          // NOLINT
-using boost::future;         // NOLINT
-using boost::future_status;  // NOLINT
-using boost::launch;         // NOLINT
-using boost::packaged_task;  // NOLINT
-using boost::promise;        // NOLINT
+using ::std::async;          // NOLINT
+using ::std::future;         // NOLINT
+using ::std::future_status;  // NOLINT
+using ::std::launch;         // NOLINT
+using ::std::packaged_task;  // NOLINT
+using ::std::promise;        // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo

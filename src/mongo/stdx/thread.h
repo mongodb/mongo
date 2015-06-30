@@ -28,13 +28,13 @@
 
 #pragma once
 
-#include <boost/thread.hpp>
+#include <thread>
 
 namespace mongo {
 namespace stdx {
 
-using thread = boost::thread;                // NOLINT
-namespace this_thread = boost::this_thread;  // NOLINT
+using thread = ::std::thread;                // NOLINT
+namespace this_thread = ::std::this_thread;  // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo

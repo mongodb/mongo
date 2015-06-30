@@ -28,12 +28,12 @@
 
 #pragma once
 
-#include <boost/chrono.hpp>
+#include <chrono>
 
 namespace mongo {
 namespace stdx {
 
-namespace chrono = boost::chrono;  // NOLINT
+namespace chrono = ::std::chrono;  // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo

@@ -28,23 +28,21 @@
 
 #pragma once
 
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/recursive_mutex.hpp>
+#include <mutex>
 
 namespace mongo {
 namespace stdx {
 
-using boost::mutex;            // NOLINT
-using boost::timed_mutex;      // NOLINT
-using boost::recursive_mutex;  // NOLINT
+using ::std::mutex;            // NOLINT
+using ::std::timed_mutex;      // NOLINT
+using ::std::recursive_mutex;  // NOLINT
 
-using boost::adopt_lock_t;   // NOLINT
-using boost::defer_lock_t;   // NOLINT
-using boost::try_to_lock_t;  // NOLINT
+using ::std::adopt_lock_t;   // NOLINT
+using ::std::defer_lock_t;   // NOLINT
+using ::std::try_to_lock_t;  // NOLINT
 
-using boost::lock_guard;   // NOLINT
-using boost::unique_lock;  // NOLINT
+using ::std::lock_guard;   // NOLINT
+using ::std::unique_lock;  // NOLINT
 
 #if _MSC_VER < 1900
 #define MONGO_STDX_CONSTEXPR const

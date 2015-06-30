@@ -513,14 +513,16 @@ const int kStopWaitHintMillis = 30000;
 // On client OSes, SERVICE_CONTROL_SHUTDOWN has a 5 second timeout configured in
 // HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control
 static void serviceStop() {
-    stdx::packaged_task<void()> exitCleanlyTask([] {
+    // VS2013 Doesn't support future<void>, so fake it with a bool.
+    stdx::packaged_task<bool()> exitCleanlyTask([] {
         Client::initThread("serviceStopWorker");
         // Stop the process
         // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
         // the "terminate process" functionality in exitCleanly.
         exitCleanly(EXIT_WINDOWS_SERVICE_STOP);
+        return true;
     });
-    stdx::future<void> exitedCleanly = exitCleanlyTask.get_future();
+    stdx::future<bool> exitedCleanly = exitCleanlyTask.get_future();
 
     // Launch the packaged task in a thread. We needn't ever join it,
     // so it doesn't even need a name.

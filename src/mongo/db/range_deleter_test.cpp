@@ -41,23 +41,10 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
+namespace mongo {
 namespace {
 
 using std::string;
-
-using mongo::BSONObj;
-using mongo::CursorId;
-using mongo::DeletedRange;
-using mongo::FieldParser;
-using mongo::KeyRange;
-using mongo::Notification;
-using mongo::OperationContext;
-using mongo::RangeDeleter;
-using mongo::RangeDeleterMockEnv;
-using mongo::RangeDeleterOptions;
-using mongo::MakeGuard;
-
-namespace stdx = mongo::stdx;
 
 OperationContext* const noTxn = NULL;  // MockEnv doesn't need txn XXX SERVER-13931
 
@@ -188,9 +175,12 @@ TEST(ImmediateDelete, ShouldWaitCursor) {
         KeyRange(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1)));
     deleterOption.waitForOpenCursors = true;
 
-    stdx::packaged_task<void()> deleterTask(
-        [&] { deleter.deleteNow(noTxn, deleterOption, &errMsg); });
-    stdx::future<void> deleterFuture = deleterTask.get_future();
+    // VS2013 Doesn't support future<void>, so fake it with a bool.
+    stdx::packaged_task<bool()> deleterTask([&] {
+        deleter.deleteNow(noTxn, deleterOption, &errMsg);
+        return true;
+    });
+    stdx::future<bool> deleterFuture = deleterTask.get_future();
     stdx::thread deleterThread(std::move(deleterTask));
 
     auto guard = MakeGuard([&] {
@@ -243,9 +233,12 @@ TEST(ImmediateDelete, StopWhileWaitingCursor) {
         KeyRange(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1)));
     deleterOption.waitForOpenCursors = true;
 
-    stdx::packaged_task<void()> deleterTask(
-        [&] { deleter.deleteNow(noTxn, deleterOption, &errMsg); });
-    stdx::future<void> deleterFuture = deleterTask.get_future();
+    // VS2013 Doesn't support future<void>, so fake it with a bool.
+    stdx::packaged_task<bool()> deleterTask([&] {
+        deleter.deleteNow(noTxn, deleterOption, &errMsg);
+        return true;
+    });
+    stdx::future<bool> deleterFuture = deleterTask.get_future();
     stdx::thread deleterThread(std::move(deleterTask));
 
     auto join_thread_guard = MakeGuard([&] { deleterThread.join(); });
@@ -370,3 +363,4 @@ TEST(MixedDeletes, MultipleDeletes) {
 }
 
 }  // unnamed namespace
+}  // namespace mongo
