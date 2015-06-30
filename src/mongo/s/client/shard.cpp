@@ -66,8 +66,4 @@ void Shard::reloadShardInfo() {
     grid.shardRegistry()->reload();
 }
 
-void Shard::removeShard(const ShardId& id) {
-    grid.shardRegistry()->remove(id);
-}
-
 }  // namespace mongo

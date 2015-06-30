@@ -115,14 +115,6 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     dassert(response->isValid(NULL));
 }
 
-BSONObj buildRemoveLogEntry(const string& shardName, bool isDraining) {
-    BSONObjBuilder details;
-    details.append("shard", shardName);
-    details.append("isDraining", isDraining);
-
-    return details.obj();
-}
-
 }  // namespace
 
 
@@ -554,27 +546,12 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
             return status;
         }
 
-        BSONObj primaryLocalDoc = BSON(DatabaseType::name("local") << DatabaseType::primary(name));
-        log() << "primaryLocalDoc: " << primaryLocalDoc;
-        if (conn->count(DatabaseType::ConfigNS, primaryLocalDoc)) {
-            log() << "This shard is listed as primary of local db. Removing entry.";
-
-            Status status =
-                remove(DatabaseType::ConfigNS, BSON(DatabaseType::name("local")), 0, NULL);
-            if (!status.isOK()) {
-                log() << "error removing local db: " << status.reason();
-                return status;
-            }
-        }
-
         Shard::reloadShardInfo();
         conn.done();
 
         // Record start in changelog
-        logChange(txn->getClient()->clientAddress(true),
-                  "removeShard.start",
-                  "",
-                  buildRemoveLogEntry(name, true));
+        logChange(
+            txn->getClient()->clientAddress(true), "removeShard.start", "", BSON("shard" << name));
         return ShardDrainingStatus::STARTED;
     }
 
@@ -586,7 +563,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
                     BSON(DatabaseType::name.ne("local") << DatabaseType::primary(name)));
     if (chunkCount == 0 && dbCount == 0) {
         log() << "going to remove shard: " << name;
-        audit::logRemoveShard(ClientBasic::getCurrent(), name);
+        audit::logRemoveShard(txn->getClient(), name);
 
         Status status = remove(ShardType::ConfigNS, searchDoc, 0, NULL);
         if (!status.isOK()) {
@@ -596,18 +573,11 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
         }
 
         grid.shardRegistry()->remove(name);
-
-        shardConnectionPool.removeHost(name);
-        ReplicaSetMonitor::remove(name);
-
         Shard::reloadShardInfo();
         conn.done();
 
         // Record finish in changelog
-        logChange(txn->getClient()->clientAddress(true),
-                  "removeShard",
-                  "",
-                  buildRemoveLogEntry(name, false));
+        logChange(txn->getClient()->clientAddress(true), "removeShard", "", BSON("shard" << name));
         return ShardDrainingStatus::COMPLETED;
     }
 

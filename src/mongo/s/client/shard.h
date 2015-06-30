@@ -81,8 +81,6 @@ public:
 
     static void reloadShardInfo();
 
-    static void removeShard(const ShardId& id);
-
 private:
     /**
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).

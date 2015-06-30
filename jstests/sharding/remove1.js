@@ -2,9 +2,6 @@ s = new ShardingTest( "remove_shard1", 2 );
 
 assert.eq( 2, s.config.shards.count() , "initial server count wrong" );
 
-assert.writeOK(s.config.databases.insert({ _id: 'local',
-                                           partitioned: false,
-                                           primary: 'shard0000'}));
 assert.writeOK(s.config.databases.insert({ _id: 'needToMove',
                                            partitioned: false,
                                            primary: 'shard0000'}));
@@ -18,8 +15,6 @@ assert( s.admin.runCommand( { removeshard: "shard0000" } ).ok , "failed to remov
 assert.eq( 1, s.config.shards.count() , "removed server still appears in count" );
 
 assert( !s.admin.runCommand( { removeshard: "shard0001" } ).ok , "allowed removing last shard" );
-
-assert.isnull( s.config.databases.findOne({_id: 'local'}), 'should have removed local db');
 
 // should create a shard0002 shard
 var conn = MongoRunner.runMongod({});

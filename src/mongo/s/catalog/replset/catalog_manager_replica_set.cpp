@@ -40,6 +40,8 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/audit.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -151,7 +153,104 @@ StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
 
 StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationContext* txn,
                                                                       const std::string& name) {
-    return notYetImplemented;
+    const auto configShard = grid.shardRegistry()->getShard("config");
+    const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
+    if (!readHost.isOK()) {
+        return readHost.getStatus();
+    }
+
+    // Check preconditions for removing the shard
+    auto countStatus =
+        _runCountCommand(readHost.getValue(),
+                         NamespaceString(ShardType::ConfigNS),
+                         BSON(ShardType::name() << NE << name << ShardType::draining(true)));
+    if (!countStatus.isOK()) {
+        return countStatus.getStatus();
+    }
+    if (countStatus.getValue() > 0) {
+        return Status(ErrorCodes::ConflictingOperationInProgress,
+                      "Can't have more than one draining shard at a time");
+    }
+
+    countStatus = _runCountCommand(readHost.getValue(),
+                                   NamespaceString(ShardType::ConfigNS),
+                                   BSON(ShardType::name() << NE << name));
+    if (!countStatus.isOK()) {
+        return countStatus.getStatus();
+    }
+    if (countStatus.getValue() == 0) {
+        return Status(ErrorCodes::IllegalOperation, "Can't remove last shard");
+    }
+
+    // Figure out if shard is already draining
+    countStatus = _runCountCommand(readHost.getValue(),
+                                   NamespaceString(ShardType::ConfigNS),
+                                   BSON(ShardType::name() << name << ShardType::draining(true)));
+    if (!countStatus.isOK()) {
+        return countStatus.getStatus();
+    }
+    if (countStatus.getValue() == 0) {
+        log() << "going to start draining shard: " << name;
+
+        Status status = update(ShardType::ConfigNS,
+                               BSON(ShardType::name() << name),
+                               BSON("$set" << BSON(ShardType::draining(true))),
+                               false,  // upsert
+                               false,  // multi
+                               NULL);
+        if (!status.isOK()) {
+            log() << "error starting removeShard: " << name << "; err: " << status.reason();
+            return status;
+        }
+
+        grid.shardRegistry()->reload();
+
+        // Record start in changelog
+        logChange(
+            txn->getClient()->clientAddress(true), "removeShard.start", "", BSON("shard" << name));
+        return ShardDrainingStatus::STARTED;
+    }
+
+    // Draining has already started, now figure out how many chunks and databases are still on the
+    // shard.
+    countStatus = _runCountCommand(
+        readHost.getValue(), NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(name)));
+    if (!countStatus.isOK()) {
+        return countStatus.getStatus();
+    }
+    const long long chunkCount = countStatus.getValue();
+
+    countStatus = _runCountCommand(readHost.getValue(),
+                                   NamespaceString(DatabaseType::ConfigNS),
+                                   BSON(DatabaseType::primary(name)));
+    if (!countStatus.isOK()) {
+        return countStatus.getStatus();
+    }
+    const long long databaseCount = countStatus.getValue();
+
+    if (chunkCount > 0 || databaseCount > 0) {
+        // Still more draining to do
+        return ShardDrainingStatus::ONGOING;
+    }
+
+    // Draining is done, now finish removing the shard.
+    log() << "going to remove shard: " << name;
+    audit::logRemoveShard(txn->getClient(), name);
+
+    Status status = remove(ShardType::ConfigNS, BSON(ShardType::name() << name), 0, NULL);
+    if (!status.isOK()) {
+        log() << "Error concluding removeShard operation on: " << name
+              << "; err: " << status.reason();
+        return status;
+    }
+
+    grid.shardRegistry()->remove(name);
+    grid.shardRegistry()->reload();
+
+    // Record finish in changelog
+    logChange(txn->getClient()->clientAddress(true), "removeShard", "", BSON("shard" << name));
+
+    return ShardDrainingStatus::COMPLETED;
 }
 
 StatusWith<DatabaseType> CatalogManagerReplicaSet::getDatabase(const std::string& dbName) {
@@ -699,6 +798,30 @@ Status CatalogManagerReplicaSet::_checkDbDoesNotExist(const string& dbName) cons
     return Status(ErrorCodes::DatabaseDifferCase,
                   str::stream() << "can't have 2 databases that just differ on case "
                                 << " have: " << actualDbName << " want to add: " << dbName);
+}
+
+StatusWith<long long> CatalogManagerReplicaSet::_runCountCommand(const HostAndPort& target,
+                                                                 const NamespaceString& ns,
+                                                                 BSONObj query) {
+    BSONObj countCmd = BSON("count" << ns.coll() << "query" << query);
+    auto responseStatus = grid.shardRegistry()->runCommand(target, ns.db().toString(), countCmd);
+    if (!responseStatus.isOK()) {
+        return responseStatus.getStatus();
+    }
+
+    auto responseObj = responseStatus.getValue();
+    Status status = Command::getStatusFromCommandResult(responseObj);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    long long result;
+    status = bsonExtractIntegerField(responseObj, "n", &result);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return result;
 }
 
 }  // namespace mongo
