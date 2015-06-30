@@ -489,6 +489,9 @@ wts_verify(const char *tag)
 	WT_SESSION *session;
 	int ret;
 
+	if (g.c_verify == 0)
+		return;
+
 	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
 

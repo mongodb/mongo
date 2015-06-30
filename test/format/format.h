@@ -217,6 +217,7 @@ typedef struct {
 	uint32_t c_reverse;
 	uint32_t c_rows;
 	uint32_t c_runs;
+	uint32_t c_salvage;
 	uint32_t c_split_pct;
 	uint32_t c_statistics;
 	uint32_t c_statistics_server;
@@ -224,6 +225,7 @@ typedef struct {
 	uint32_t c_timer;
 	uint32_t c_value_max;
 	uint32_t c_value_min;
+	uint32_t c_verify;
 	uint32_t c_write_pct;
 
 #define	FIX				1	
