@@ -1321,7 +1321,6 @@ void ExpressionObject::addToDocument(MutableDocument& out,
         if (dynamic_cast<ExpressionObject*>(it->second.get()) && pValue.getDocument().empty())
             continue;
 
-
         out.addField(fieldName, pValue);
     }
 }
@@ -2407,7 +2406,6 @@ intrusive_ptr<Expression> ExpressionSetIsSubset::optimize() {
 
         return new Optimized(arrayToSet(rhs), vpOperand);
     }
-
     return optimized;
 }
 
@@ -2468,6 +2466,30 @@ Value ExpressionSize::evaluateInternal(Variables* vars) const {
 REGISTER_EXPRESSION("$size", ExpressionSize::parse);
 const char* ExpressionSize::getOpName() const {
     return "$size";
+}
+
+/* ----------------------- ExpressionSqrt ---------------------------- */
+
+Value ExpressionSqrt::evaluateInternal(Variables* vars) const {
+    Value argVal = vpOperand[0]->evaluateInternal(vars);
+    if (argVal.nullish())
+        return Value(BSONNULL);
+
+    uassert(28713,
+            str::stream() << "$sqrt only supports numeric types, not "
+                          << typeName(argVal.getType()),
+            argVal.numeric());
+
+    double argDouble = argVal.coerceToDouble();
+    uassert(28714,
+            "$sqrt's argument must be greater than or equal to 0",
+            argDouble >= 0 || isnan(argDouble));
+    return Value(sqrt(argDouble));
+}
+
+REGISTER_EXPRESSION("$sqrt", ExpressionSqrt::parse);
+const char* ExpressionSqrt::getOpName() const {
+    return "$sqrt";
 }
 
 /* ----------------------- ExpressionStrcasecmp ---------------------------- */
