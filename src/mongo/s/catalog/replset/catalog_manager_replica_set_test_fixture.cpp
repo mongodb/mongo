@@ -34,7 +34,9 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/db/client.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
@@ -54,6 +56,10 @@ CatalogManagerReplSetTestFixture::CatalogManagerReplSetTestFixture() = default;
 CatalogManagerReplSetTestFixture::~CatalogManagerReplSetTestFixture() = default;
 
 void CatalogManagerReplSetTestFixture::setUp() {
+    _service = stdx::make_unique<ServiceContextNoop>();
+    _client = _service->makeClient("CatalogManagerReplSetTestFixture");
+    _opCtx = _client->makeOperationContext();
+
     auto network(stdx::make_unique<executor::NetworkInterfaceMock>());
 
     _mockNetwork = network.get();
@@ -86,6 +92,10 @@ void CatalogManagerReplSetTestFixture::tearDown() {
     // This call will shut down the shard registry, which will terminate the underlying executor
     // and its threads.
     grid.clearForUnitTests();
+
+    _opCtx.reset();
+    _client.reset();
+    _service.reset();
 }
 
 CatalogManagerReplicaSet* CatalogManagerReplSetTestFixture::catalogManager() const {
@@ -108,6 +118,12 @@ DistLockManagerMock* CatalogManagerReplSetTestFixture::distLock() const {
     invariant(distLock);
 
     return distLock;
+}
+
+OperationContext* CatalogManagerReplSetTestFixture::operationContext() const {
+    invariant(_opCtx);
+
+    return _opCtx.get();
 }
 
 void CatalogManagerReplSetTestFixture::onCommand(NetworkTestEnv::OnCommandFunction func) {

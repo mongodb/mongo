@@ -30,6 +30,7 @@
 
 #include <utility>
 
+#include "mongo/db/service_context.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/unittest/unittest.h"
 
@@ -70,6 +71,8 @@ protected:
 
     DistLockManagerMock* distLock() const;
 
+    OperationContext* operationContext() const;
+
     /**
      * Blocking methods, which receive one message from the network and respond using the
      * responses returned from the input function. This is a syntactic sugar for simple,
@@ -81,6 +84,11 @@ protected:
     void setUp() override;
 
     void tearDown() override;
+
+private:
+    std::unique_ptr<ServiceContext> _service;
+    ServiceContext::UniqueClient _client;
+    ServiceContext::UniqueOperationContext _opCtx;
 
     executor::NetworkInterfaceMock* _mockNetwork;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
