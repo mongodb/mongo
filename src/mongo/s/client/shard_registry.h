@@ -108,16 +108,6 @@ public:
     std::shared_ptr<Shard> getShard(const ShardId& shardId);
 
     /**
-     * Instantiates a new detached shard connection, which does not appear in the list of shards
-     * tracked by the registry and as a result will not be returned by getAllShardIds.
-     *
-     * The caller owns the returned shard object and is responsible for disposing of it when done.
-     *
-     * @param connStr Connection string to the shard.
-     */
-    std::unique_ptr<Shard> createConnection(const ConnectionString& connStr) const;
-
-    /**
      * Lookup shard by replica set name. Returns nullptr if the name can't be found.
      * Note: this doesn't refresh the table if the name isn't found, so it's possible that a
      * newly added shard/Replica Set may not be found.

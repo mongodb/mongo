@@ -47,16 +47,8 @@ RemoteCommandTargeterMock* RemoteCommandTargeterMock::get(RemoteCommandTargeter*
     return mock;
 }
 
-ConnectionString RemoteCommandTargeterMock::connectionString() {
-    return _connectionStringReturnValue;
-}
-
 StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(const ReadPreferenceSetting& readPref) {
     return _findHostReturnValue;
-}
-
-void RemoteCommandTargeterMock::setConnectionStringReturnValue(const ConnectionString returnValue) {
-    _connectionStringReturnValue = std::move(returnValue);
 }
 
 void RemoteCommandTargeterMock::setFindHostReturnValue(StatusWith<HostAndPort> returnValue) {

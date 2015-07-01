@@ -38,6 +38,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
@@ -59,6 +60,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -147,7 +149,7 @@ Status CatalogManagerReplicaSet::createDatabase(const std::string& dbName) {
 }
 
 StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
-                                                      const std::string* shardProposedName,
+                                                      const string& name,
                                                       const ConnectionString& shardConnectionString,
                                                       const long long maxSize) {
     return notYetImplemented;

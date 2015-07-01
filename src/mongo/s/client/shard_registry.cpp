@@ -124,11 +124,6 @@ shared_ptr<Shard> ShardRegistry::getShard(const ShardId& shardId) {
     return _findUsingLookUp(shardId);
 }
 
-unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& connStr) const {
-    return stdx::make_unique<Shard>(
-        "<unnamed>", connStr, std::move(_targeterFactory->create(connStr)));
-}
-
 shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     ShardMap::const_iterator i = _rsLookup.find(name);

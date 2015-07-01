@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/read_preference.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog/catalog_manager.h"

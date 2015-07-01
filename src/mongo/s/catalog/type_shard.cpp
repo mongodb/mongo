@@ -155,6 +155,7 @@ std::string ShardType::toString() const {
 }
 
 void ShardType::setName(const std::string& name) {
+    invariant(!name.empty());
     _name = name;
 }
 

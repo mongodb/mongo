@@ -50,8 +50,6 @@ public:
      */
     RemoteCommandTargeterRS(const std::string& rsName, const std::vector<HostAndPort>& seedHosts);
 
-    ConnectionString connectionString() override;
-
     StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
 
 private:
