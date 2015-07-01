@@ -43,6 +43,10 @@ class TargeterProxy final : public RemoteCommandTargeter {
 public:
     TargeterProxy(std::shared_ptr<RemoteCommandTargeter> mock) : _mock(mock) {}
 
+    ConnectionString connectionString() override {
+        return _mock->connectionString();
+    }
+
     StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override {
         return _mock->findHost(readPref);
     }

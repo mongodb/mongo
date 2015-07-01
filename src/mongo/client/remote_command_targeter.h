@@ -32,6 +32,7 @@
 
 namespace mongo {
 
+class ConnectionString;
 struct ReadPreferenceSetting;
 struct HostAndPort;
 template <typename T>
@@ -45,6 +46,14 @@ class RemoteCommandTargeter {
 
 public:
     virtual ~RemoteCommandTargeter() = default;
+
+    /**
+     * Retrieves the full connection string for the replica set or standalone host which are
+     * represented by this targeter. This value is always constant for a standalone host and may
+     * vary for replica sets as hosts are added, discovered and removed during the lifetime of the
+     * set.
+     */
+    virtual ConnectionString connectionString() = 0;
 
     /**
      * Obtains a host, which matches the read preferences specified by readPref.

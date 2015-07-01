@@ -26,13 +26,14 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/catalog/catalog_manager_mock.h"
 
 #include "mongo/base/status.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -72,7 +73,7 @@ Status CatalogManagerMock::shardCollection(OperationContext* txn,
 }
 
 StatusWith<string> CatalogManagerMock::addShard(OperationContext* txn,
-                                                const string& name,
+                                                const std::string* shardProposedName,
                                                 const ConnectionString& shardConnectionString,
                                                 const long long maxSize) {
     return Status::OK();

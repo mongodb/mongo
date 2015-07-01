@@ -28,14 +28,10 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 
 namespace mongo {
-
-class Query;
 
 /**
  * A dummy implementation of CatalogManager for testing purposes.
@@ -61,7 +57,7 @@ public:
                            std::set<ShardId>* initShardIds = nullptr) override;
 
     StatusWith<std::string> addShard(OperationContext* txn,
-                                     const std::string& name,
+                                     const std::string* shardProposedName,
                                      const ConnectionString& shardConnectionString,
                                      const long long maxSize) override;
 

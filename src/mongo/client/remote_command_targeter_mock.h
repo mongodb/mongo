@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -44,10 +45,20 @@ public:
     static RemoteCommandTargeterMock* get(RemoteCommandTargeter* targeter);
 
     /**
+     * Returns the value last set by setConnectionStringReturnValue.
+     */
+    ConnectionString connectionString() override;
+
+    /**
      * Returns the return value last set by setFindHostReturnValue.
      * Returns ErrorCodes::InternalError if setFindHostReturnValue was never called.
      */
     StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
+
+    /**
+     * Sets the return value for the next call to connectionString.
+     */
+    void setConnectionStringReturnValue(const ConnectionString returnValue);
 
     /**
      * Sets the return value for the next call to findHost.
@@ -55,6 +66,7 @@ public:
     void setFindHostReturnValue(StatusWith<HostAndPort> returnValue);
 
 private:
+    ConnectionString _connectionStringReturnValue;
     StatusWith<HostAndPort> _findHostReturnValue;
 };
 
