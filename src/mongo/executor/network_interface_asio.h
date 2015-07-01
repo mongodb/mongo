@@ -105,8 +105,6 @@ private:
 
         const TaskExecutor::CallbackHandle& cbHandle() const;
 
-        void complete(Date_t now);
-
         AsyncConnection* connection();
 
         void connect(ConnectionPool* const pool, asio::io_service* service, Date_t now);
@@ -117,8 +115,6 @@ private:
         MSGHEADER::Value* header();
 
         const RemoteCommandRequest& request() const;
-
-        void setOutput(const BSONObj& bson);
 
         Date_t start() const;
 
@@ -154,8 +150,6 @@ private:
         Message _toRecv;
         MSGHEADER::Value _header;
 
-        BSONObj _output;
-
         const int _id;
     };
 
@@ -167,7 +161,9 @@ private:
 
     void _completedWriteCallback(AsyncOp* op);
     void _networkErrorCallback(AsyncOp* op, const std::error_code& ec);
-    void _completeOperation(AsyncOp* op);
+
+    void _completeOperation(AsyncOp* op, const TaskExecutor::ResponseStatus& resp);
+
     void _keepAlive(AsyncOp* op);
     void _recvMessageHeader(AsyncOp* op);
     void _recvMessageBody(AsyncOp* op);

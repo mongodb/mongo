@@ -125,6 +125,10 @@ std::string NetworkInterfaceASIO::AsyncOp::toString() const {
     return output;
 }
 
+namespace {
+const auto kCanceledStatus = Status(ErrorCodes::CallbackCanceled, "Callback canceled");
+}  // namespace
+
 void NetworkInterfaceASIO::AsyncOp::cancel() {
     // An operation may be in mid-flight when it is canceled, so we
     // do not disconnect immediately upon cancellation.
@@ -148,15 +152,6 @@ bool NetworkInterfaceASIO::AsyncOp::connected() const {
 
 void NetworkInterfaceASIO::AsyncOp::finish(const ResponseStatus& status) {
     _onFinish(status);
-}
-
-void NetworkInterfaceASIO::AsyncOp::complete(Date_t now) {
-    if (canceled()) {
-        finish(ResponseStatus(ErrorCodes::CallbackCanceled, "Callback canceled"));
-    } else {
-        finish(ResponseStatus(Response(_output, BSONObj(), Milliseconds(now - start()))));
-    }
-
     _state = OpState::kCompleted;
 }
 
@@ -166,10 +161,6 @@ MSGHEADER::Value* NetworkInterfaceASIO::AsyncOp::header() {
 
 const RemoteCommandRequest& NetworkInterfaceASIO::AsyncOp::request() const {
     return _request;
-}
-
-void NetworkInterfaceASIO::AsyncOp::setOutput(const BSONObj& bson) {
-    _output = bson;
 }
 
 Date_t NetworkInterfaceASIO::AsyncOp::start() const {
@@ -229,11 +220,14 @@ void NetworkInterfaceASIO::_asyncSendSimpleMessage(AsyncOp* op, const asio::cons
     asio::async_write(*(op->connection()->sock()),
                       asio::buffer(buf),
                       [this, op](std::error_code ec, std::size_t bytes) {
-                          if (ec)
-                              return _networkErrorCallback(op, ec);
 
-                          if (op->canceled())
-                              return _completeOperation(op);
+                          if (op->canceled()) {
+                              return _completeOperation(op, kCanceledStatus);
+                          }
+
+                          if (ec) {
+                              return _networkErrorCallback(op, ec);
+                          }
 
                           _receiveResponse(op);
                       });
@@ -288,13 +282,15 @@ void NetworkInterfaceASIO::_recvMessageBody(AsyncOp* op) {
     asio::async_read(*(op->connection()->sock()),
                      asio::buffer(mdView.data(), bodyLength),
                      [this, op, mdView](asio::error_code ec, size_t bytes) {
+
+                         if (op->canceled()) {
+                             return _completeOperation(op, kCanceledStatus);
+                         }
+
                          if (ec) {
                              LOG(3) << "error receiving message body";
                              return _networkErrorCallback(op, ec);
                          }
-
-                         if (op->canceled())
-                             return _completeOperation(op);
 
                          return _completedWriteCallback(op);
                      });
@@ -304,42 +300,44 @@ void NetworkInterfaceASIO::_recvMessageHeader(AsyncOp* op) {
     asio::async_read(*(op->connection()->sock()),
                      asio::buffer(reinterpret_cast<char*>(op->header()), sizeof(MSGHEADER::Value)),
                      [this, op](asio::error_code ec, size_t bytes) {
+
+                         if (op->canceled()) {
+                             return _completeOperation(op, kCanceledStatus);
+                         }
+
                          if (ec) {
                              LOG(3) << "error receiving header";
                              return _networkErrorCallback(op, ec);
                          }
-
-                         if (op->canceled())
-                             return _completeOperation(op);
-
                          _recvMessageBody(op);
                      });
 }
 
 void NetworkInterfaceASIO::_completedWriteCallback(AsyncOp* op) {
     // If we were told to send an empty message, toRecv will be empty here.
+
+    // TODO: handle metadata SERVER-19156
+    BSONObj commandReply;
     if (op->toRecv()->empty()) {
-        op->setOutput(BSONObj());
         LOG(3) << "received an empty message";
     } else {
         QueryResult::View qr = op->toRecv()->singleData().view2ptr();
         // unavoidable copy
-        op->setOutput(BSONObj(qr.data()).getOwned());
+        commandReply = BSONObj(qr.data()).getOwned();
     }
-    _completeOperation(op);
+    _completeOperation(
+        op, RemoteCommandResponse(std::move(commandReply), BSONObj(), now() - op->start()));
 }
 
 void NetworkInterfaceASIO::_networkErrorCallback(AsyncOp* op, const std::error_code& ec) {
     LOG(3) << "networking error occurred";
-    // TODO: Perhaps we should set this to a specific 'network error' value.
-    op->setOutput(BSONObj());
-    _completeOperation(op);
+    _completeOperation(op, Status(ErrorCodes::HostUnreachable, ec.message()));
 }
 
 // NOTE: This method may only be called by ASIO threads
 // (do not call from methods entered by ReplicationExecutor threads)
-void NetworkInterfaceASIO::_completeOperation(AsyncOp* op) {
-    op->complete(now());
+void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus& resp) {
+    op->finish(resp);
 
     {
         // NOTE: op will be deleted in the call to erase() below.
@@ -442,20 +440,32 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
                 return;
             }
 
-            ResponseStatus status(exceptionToStatus());
-            asio::post(_io_service, [this, op, status]() { return _completeOperation(op); });
+            auto status = exceptionToStatus();
+
+            asio::post(_io_service,
+                       [this, op, status]() {
+
+                           if (op->canceled()) {
+                               return _completeOperation(op, kCanceledStatus);
+                           }
+
+                           return _completeOperation(op, status);
+                       });
             return;
         }
 
         // send control back to main thread(pool)
         asio::post(_io_service,
                    [this, op]() {
+
+                       if (op->canceled()) {
+                           return _completeOperation(op, kCanceledStatus);
+                       }
+
                        Message* toSend = op->toSend();
                        _messageFromRequest(op->request(), toSend);
                        if (toSend->empty()) {
                            _completedWriteCallback(op);
-                       } else if (op->canceled()) {
-                           return _completeOperation(op);
                        } else {
                            // TODO: Some day we may need to support vector messages.
                            fassert(28708, toSend->buf() != 0);
