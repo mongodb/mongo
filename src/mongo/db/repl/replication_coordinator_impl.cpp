@@ -2060,6 +2060,34 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         _externalState->forceSnapshotCreation();
     }
 
+    if (newState.rollback()) {
+        // When we start rollback, we need to drop all snapshots since we may need to create
+        // out-of-order snapshots. This would be necessary even if the SnapshotName was completely
+        // monotonically increasing because we don't necessarily have a snapshot of every write.
+        // If we didn't drop all snapshots on rollback it could lead to the following situation:
+        //
+        //  |--------|-------------|-------------|
+        //  | OpTime | HasSnapshot | Committed   |
+        //  |--------|-------------|-------------|
+        //  | (0, 1) | *           | *           |
+        //  | (0, 2) | *           | ROLLED BACK |
+        //  | (1, 2) |             | *           |
+        //  |--------|-------------|-------------|
+        //
+        // When we try to make (1,2) the commit point, we'd find (0,2) as the newest snapshot
+        // before the commit point, but it would be invalid to mark it as the committed snapshot
+        // since it was never committed.
+        //
+        // TODO SERVER-19209 We also need to clear snapshots before a resync.
+        _dropAllSnapshots_inlock();
+    }
+
+    if (_memberState.rollback()) {
+        // Ensure that no snapshots were created while we were in rollback.
+        invariant(!_currentCommittedSnapshot);
+        invariant(_uncommittedSnapshots.empty());
+    }
+
     _memberState = newState;
     log() << "transition to " << newState.toString() << rsLog;
     return result;
@@ -2490,25 +2518,32 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     std::sort(votingNodesOpTimes.begin(), votingNodesOpTimes.end());
 
     // Use the index of the minimum quorum in the vector of nodes.
-    auto newCommittedOpTime = votingNodesOpTimes[(votingNodesOpTimes.size() - 1) / 2];
-    if (newCommittedOpTime != _lastCommittedOpTime) {
-        _lastCommittedOpTime = newCommittedOpTime;
-        // TODO SERVER-19208 Also need to updateCommittedSnapshot on secondaries.
-        if (auto newSnapshotTs = _externalState->updateCommittedSnapshot(newCommittedOpTime)) {
-            // TODO use this Timestamp for the following things:
-            // * SERVER-19206 make w:majority writes block until they are in the committed snapshot.
-            // * SERVER-19211 make readCommitted + afterOptime block until the optime is in the
-            //   committed view.
-            // * SERVER-19212 make new indexes not be used for any queries until the index is in the
-            //   committed view.
-        }
-    }
+    _setLastCommittedOpTime_inlock(votingNodesOpTimes[(votingNodesOpTimes.size() - 1) / 2]);
 }
 
 void ReplicationCoordinatorImpl::_setLastCommittedOpTime(const OpTime& committedOpTime) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (committedOpTime > _lastCommittedOpTime) {
-        _lastCommittedOpTime = committedOpTime;
+    _setLastCommittedOpTime_inlock(committedOpTime);
+}
+
+void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& committedOpTime) {
+    if (committedOpTime <= _lastCommittedOpTime)
+        return;  // This may have come from an out-of-order heartbeat. Ignore it.
+
+    _lastCommittedOpTime = committedOpTime;
+
+    if (!_uncommittedSnapshots.empty() && _uncommittedSnapshots.front() <= committedOpTime) {
+        // At least one uncommitted snapshot is ready to be blessed as committed.
+
+        // Seek to the first entry > the commit point. Previous element must be <=.
+        const auto onePastCommitPoint = std::upper_bound(
+            _uncommittedSnapshots.begin(), _uncommittedSnapshots.end(), committedOpTime);
+        const auto newSnapshot = *std::prev(onePastCommitPoint);
+
+        // Forget about all snapshots <= the new commit point.
+        _uncommittedSnapshots.erase(_uncommittedSnapshots.begin(), onePastCommitPoint);
+
+        _updateCommittedSnapshot_inlock(newSnapshot);
     }
 }
 
@@ -2805,6 +2840,53 @@ bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, Handle* 
         }
     }
     return updated;
+}
+
+void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    invariant(_memberState.readable());  // Snapshots can only be taken in a readable state.
+
+    if (timeOfSnapshot <= _lastCommittedOpTime) {
+        // This snapshot is ready to be marked as committed.
+        invariant(_uncommittedSnapshots.empty());
+        _updateCommittedSnapshot_inlock(timeOfSnapshot);
+        return;
+    }
+
+    if (!_uncommittedSnapshots.empty()) {
+        if (timeOfSnapshot == _uncommittedSnapshots.back()) {
+            // This is already in the set. Don't want to double add.
+            return;
+        }
+        invariant(timeOfSnapshot > _uncommittedSnapshots.back());
+    }
+    _uncommittedSnapshots.push_back(timeOfSnapshot);
+}
+
+void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(OpTime newCommittedSnapshot) {
+    invariant(!newCommittedSnapshot.isNull());
+    invariant(newCommittedSnapshot <= _lastCommittedOpTime);
+    if (_currentCommittedSnapshot)
+        invariant(newCommittedSnapshot > *_currentCommittedSnapshot);
+    if (!_uncommittedSnapshots.empty())
+        invariant(newCommittedSnapshot < _uncommittedSnapshots.front());
+
+    _currentCommittedSnapshot = newCommittedSnapshot;
+
+    _externalState->updateCommittedSnapshot(newCommittedSnapshot);
+
+    // TODO use _currentCommittedSnapshot for the following things:
+    // * SERVER-19206 make w:majority writes block until they are in the committed snapshot.
+    // * SERVER-19211 make readCommitted + afterOptime block until the optime is in the
+    //   committed view.
+    // * SERVER-19212 make new indexes not be used for any queries until the index is in the
+    //   committed view.
+}
+
+void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
+    _uncommittedSnapshots.clear();
+    _currentCommittedSnapshot = {};
+    _externalState->dropAllSnapshots();
 }
 
 }  // namespace repl

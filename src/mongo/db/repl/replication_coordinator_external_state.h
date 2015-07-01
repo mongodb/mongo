@@ -182,11 +182,16 @@ public:
     virtual void dropAllTempCollections(OperationContext* txn) = 0;
 
     /**
-     * Updates the committed snapshot to the newest possible view before or on newCommitPoint.
-     *
-     * If this changes the snapshot, returns the Timestamp for the new snapshot.
+     * Drops all snapshots and clears the "committed" snapshot.
      */
-    virtual boost::optional<Timestamp> updateCommittedSnapshot(OpTime newCommitPoint) = 0;
+    virtual void dropAllSnapshots() = 0;
+
+    /**
+     * Updates the committed snapshot to the newCommitPoint, and deletes older snapshots.
+     *
+     * It is illegal to call with a newCommitPoint that does not name an existing snapshot.
+     */
+    virtual void updateCommittedSnapshot(OpTime newCommitPoint) = 0;
 
     /**
      * Signals the SnapshotThread, if running, to take a forced snapshot even if the global

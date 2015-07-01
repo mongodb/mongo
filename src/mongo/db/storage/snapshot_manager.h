@@ -82,7 +82,8 @@ private:
 /**
  * Manages snapshots that can be read from at a later time.
  *
- * Implementations must be able to handle concurrent access to any methods.
+ * Implementations must be able to handle concurrent access to any methods. No methods are allowed
+ * to acquire locks from the LockManager.
  */
 class SnapshotManager {
 public:

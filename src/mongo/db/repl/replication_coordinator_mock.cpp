@@ -351,5 +351,7 @@ Status ReplicationCoordinatorMock::updateTerm(long long term) {
     return Status::OK();
 }
 
+void ReplicationCoordinatorMock::onSnapshotCreate(OpTime timeOfSnapshot) {}
+
 }  // namespace repl
 }  // namespace mongo

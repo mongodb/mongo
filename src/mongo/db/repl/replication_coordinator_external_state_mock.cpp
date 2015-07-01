@@ -184,10 +184,9 @@ OperationContext* ReplicationCoordinatorExternalStateMock::createOperationContex
 
 void ReplicationCoordinatorExternalStateMock::dropAllTempCollections(OperationContext* txn) {}
 
-boost::optional<Timestamp> ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(
-    OpTime newCommitPoint) {
-    return {};
-}
+void ReplicationCoordinatorExternalStateMock::dropAllSnapshots() {}
+
+void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(OpTime newCommitPoint) {}
 
 void ReplicationCoordinatorExternalStateMock::forceSnapshotCreation() {}
 

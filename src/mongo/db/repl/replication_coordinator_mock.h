@@ -202,6 +202,8 @@ public:
 
     virtual Status updateTerm(long long term);
 
+    virtual void onSnapshotCreate(OpTime timeOfSnapshot);
+
 private:
     const ReplSettings _settings;
     MemberState _memberState;

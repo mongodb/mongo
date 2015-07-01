@@ -267,6 +267,8 @@ public:
 
     virtual Status updateTerm(long long term) override;
 
+    virtual void onSnapshotCreate(OpTime timeOfSnapshot) override;
+
     // ================== Test support API ===================
 
     /**
@@ -410,6 +412,7 @@ private:
      * current last committed OpTime.
      */
     void _setLastCommittedOpTime(const OpTime& committedOpTime);
+    void _setLastCommittedOpTime_inlock(const OpTime& committedOpTime);
 
     /**
      * Helper to wake waiters in _replicationWaiterList that are doneWaitingForReplication.
@@ -899,6 +902,16 @@ private:
                                             const ReplicationMetadata& replMetadata);
     void _processReplicationMetadata_incallback(const ReplicationMetadata& replMetadata);
 
+    /**
+     * Blesses a snapshot to be used for new committed reads.
+     */
+    void _updateCommittedSnapshot_inlock(OpTime newCommittedSnapshot);
+
+    /**
+     * Drops all snapshots and clears the "committed" snapshot.
+     */
+    void _dropAllSnapshots_inlock();
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -1039,6 +1052,13 @@ private:
 
     // Data Replicator used to replicate data
     DataReplicator _dr;  // (S)
+
+    // The OpTimes for all snapshots newer than the current commit point, kept in sorted order.
+    std::deque<OpTime> _uncommittedSnapshots;  // (M)
+
+    // The non-null OpTime of the current snapshot used for committed reads, if there is one. When
+    // engaged, this must be <= _lastCommittedOpTime and < _uncommittedSnapshots.front().
+    boost::optional<OpTime> _currentCommittedSnapshot;  // (M)
 };
 
 }  // namespace repl

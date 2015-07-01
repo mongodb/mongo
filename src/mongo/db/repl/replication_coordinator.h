@@ -630,6 +630,11 @@ public:
      */
     virtual Status updateTerm(long long term) = 0;
 
+    /**
+     * Called when a new snapshot is created.
+     */
+    virtual void onSnapshotCreate(OpTime timeOfSnapshot) = 0;
+
 protected:
     ReplicationCoordinator();
 };

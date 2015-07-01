@@ -47,18 +47,12 @@ class SnapshotThread {
     MONGO_DISALLOW_COPYING(SnapshotThread);
 
 public:
-    using Callback = stdx::function<void(SnapshotName)>;
-
     /**
      * Starts a thread to take periodic snapshots if supported by the storageEngine.
      *
      * If the current storage engine doesn't support snapshots, a null pointer will be returned.
-     *
-     * The passed-in callback will be called every time a snapshot is created. It will be called
-     * with the global lock held in MODE_IS continuously since creating the snapshot.
      */
-    static std::unique_ptr<SnapshotThread> start(ServiceContext* service,
-                                                 Callback onSnapshotCreate);
+    static std::unique_ptr<SnapshotThread> start(ServiceContext* service);
 
     /**
      * Signals the thread to stop and waits for it to finish.
@@ -74,13 +68,12 @@ public:
     void forceSnapshot();
 
 private:
-    SnapshotThread(SnapshotManager* manager, Callback&& onSnapshotCreate);
+    explicit SnapshotThread(SnapshotManager* manager);
     void run();
 
     SnapshotManager* const _manager;
     bool _inShutdown = false;             // guarded by newOpMutex in oplog.cpp.
     bool _forcedSnapshotPending = false;  // guarded by newOpMutex in oplog.cpp.
-    const Callback _onSnapshotCreate;
     stdx::thread _thread;
 };
 

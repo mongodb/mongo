@@ -69,14 +69,13 @@ public:
     virtual void signalApplierToChooseNewSyncSource();
     virtual OperationContext* createOperationContext(const std::string& threadName);
     virtual void dropAllTempCollections(OperationContext* txn);
-    boost::optional<Timestamp> updateCommittedSnapshot(OpTime newCommitPoint) final;
+    void dropAllSnapshots() final;
+    void updateCommittedSnapshot(OpTime newCommitPoint) final;
     void forceSnapshotCreation() final;
 
     std::string getNextOpContextThreadName();
 
 private:
-    void startSnapshotThread();
-
     // Guards starting threads and setting _startedThreads
     stdx::mutex _threadMutex;
 
@@ -103,9 +102,6 @@ private:
     long long _nextThreadId;
 
     std::unique_ptr<SnapshotThread> _snapshotThread;
-
-    stdx::mutex _snapshotsMutex;          // guards _snapshots.
-    std::deque<SnapshotName> _snapshots;  // kept in sorted order.
 };
 
 }  // namespace repl

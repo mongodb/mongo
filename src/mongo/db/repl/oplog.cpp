@@ -862,15 +862,14 @@ void oplogCheckCloseDatabase(OperationContext* txn, Database* db) {
     _localOplogCollection = nullptr;
 }
 
-SnapshotThread::SnapshotThread(SnapshotManager* manager, Callback&& onSnapshotCreate)
-    : _manager(manager),
-      _onSnapshotCreate(std::move(onSnapshotCreate)),
-      _thread([this] { run(); }) {}
+SnapshotThread::SnapshotThread(SnapshotManager* manager)
+    : _manager(manager), _thread([this] { run(); }) {}
 
 void SnapshotThread::run() {
     Client::initThread("SnapshotThread");
     auto& client = cc();
     auto serviceContext = client.getServiceContext();
+    auto replCoord = ReplicationCoordinator::get(serviceContext);
 
     Timestamp lastTimestamp = {};
     while (true) {
@@ -894,7 +893,7 @@ void SnapshotThread::run() {
             auto txn = client.makeOperationContext();
             Lock::GlobalLock globalLock(txn->lockState(), MODE_IS, UINT_MAX);
 
-            if (!ReplicationCoordinator::get(serviceContext)->getMemberState().readable()) {
+            if (!replCoord->getMemberState().readable()) {
                 // If our MemberState isn't readable, we may not be in a consistent state so don't
                 // take snapshots. When we transition into a readable state from a non-readable
                 // state, a snapshot is forced to ensure we don't miss the latest write. This must
@@ -910,23 +909,23 @@ void SnapshotThread::run() {
                 _manager->prepareForCreateSnapshot(txn.get());
             }
 
-            Timestamp thisSnapshot = {};
+            auto opTimeOfSnapshot = OpTime();
             {
                 AutoGetCollectionForRead oplog(txn.get(), rsOplogName);
                 invariant(oplog.getCollection());
                 // Read the latest op from the oplog.
-                auto record =
-                    oplog.getCollection()->getCursor(txn.get(), /*forward*/ false)->next();
+                auto cursor = oplog.getCollection()->getCursor(txn.get(), /*forward*/ false);
+                auto record = cursor->next();
                 if (!record)
                     continue;  // oplog is completely empty.
 
                 const auto op = record->data.releaseToBson();
-                thisSnapshot = op["ts"].timestamp();
-                invariant(!thisSnapshot.isNull());
+                opTimeOfSnapshot = extractOpTime(op);
+                invariant(!opTimeOfSnapshot.isNull());
             }
 
-            _manager->createSnapshot(txn.get(), SnapshotName(thisSnapshot));
-            _onSnapshotCreate(SnapshotName(thisSnapshot));
+            _manager->createSnapshot(txn.get(), SnapshotName(opTimeOfSnapshot.getTimestamp()));
+            replCoord->onSnapshotCreate(opTimeOfSnapshot);
         } catch (const WriteConflictException& wce) {
             log() << "skipping storage snapshot pass due to write conflict";
             continue;
@@ -951,13 +950,11 @@ void SnapshotThread::forceSnapshot() {
     newTimestampNotifier.notify_all();
 }
 
-std::unique_ptr<SnapshotThread> SnapshotThread::start(ServiceContext* service,
-                                                      Callback onSnapshotCreate) {
-    auto manager = service->getGlobalStorageEngine()->getSnapshotManager();
-    if (!manager)
-        return {};
-    return std::unique_ptr<SnapshotThread>(
-        new SnapshotThread(manager, std::move(onSnapshotCreate)));
+std::unique_ptr<SnapshotThread> SnapshotThread::start(ServiceContext* service) {
+    if (auto manager = service->getGlobalStorageEngine()->getSnapshotManager()) {
+        return std::unique_ptr<SnapshotThread>(new SnapshotThread(manager));
+    }
+    return {};
 }
 
 }  // namespace repl
