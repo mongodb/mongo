@@ -91,6 +91,9 @@ using std::vector;
  * whether the lock was eventually overtaken and this is only valid if the LockPinger frequency
  * is faster than takeoverMS.
  *
+ * Note: Running concurrent instances of this command is not recommended as it can result in
+ * more frequent pings. And this effectively weakens the stress test.
+ *
  * {
  *   _testDistLockWithSkew: 1,
  *
@@ -137,6 +140,7 @@ public:
     void runThread(ConnectionString& hostConn,
                    unsigned threadId,
                    unsigned seed,
+                   LegacyDistLockPinger* pinger,
                    BSONObj& cmdObj,
                    BSONObjBuilder& result) {
         stringstream ss;
@@ -207,7 +211,7 @@ public:
         bool errors = false;
         BSONObj lockObj;
         while (keepGoing.loadRelaxed()) {
-            Status pingStatus = _pinger.startPing(
+            Status pingStatus = pinger->startPing(
                 *myLock, stdx::chrono::milliseconds(takeoverMS / LOCK_SKEW_FACTOR));
 
             if (!pingStatus.isOK()) {
@@ -246,7 +250,7 @@ public:
                         myLock->unlock(lockObj["ts"].OID());
                     } else {
                         log() << "**** Not unlocking for thread " << threadId << endl;
-                        _pinger.stopPing(myLock->getRemoteConnection(), myLock->getProcessId());
+                        pinger->stopPing(myLock->getRemoteConnection(), myLock->getProcessId());
                         // We're simulating a crashed process...
                         break;
                     }
@@ -302,6 +306,8 @@ public:
             return false;
         }
 
+        LegacyDistLockPinger pinger;
+
         count.store(0);
         keepGoing.store(true);
 
@@ -315,6 +321,7 @@ public:
                                             hostConn,
                                             (unsigned)i,
                                             seed + i,
+                                            &pinger,
                                             boost::ref(cmdObj),
                                             boost::ref(*(results[i].get()))))));
         }
@@ -331,6 +338,8 @@ public:
         result.append("count", count.loadRelaxed());
         result.append("errors", errors);
         result.append("timeMS", t.millis());
+
+        pinger.shutdown();
 
         return !errors;
     }
@@ -380,10 +389,8 @@ public:
     boost::thread_specific_ptr<DistributedLock> lock;
     AtomicUInt32 count;
     AtomicWord<bool> keepGoing;
-
-private:
-    LegacyDistLockPinger _pinger;
 };
+
 MONGO_INITIALIZER(RegisterDistLockWithSkewCmd)(InitializerContext* context) {
     if (Command::testCommandsEnabled) {
         // Leaked intentionally: a Command registers itself when constructed.

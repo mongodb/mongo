@@ -51,6 +51,8 @@ public:
 
     /**
      * Starts pinging the process id for the given lock.
+     * Note: this pinger does not support calling startPing on a lock that has previously
+     * been stopped by a call to stopPing on its underlying processId.
      */
     Status startPing(const DistributedLock& lock, Milliseconds sleepTime);
 
