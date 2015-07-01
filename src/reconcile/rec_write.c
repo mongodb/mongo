@@ -917,15 +917,15 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		r->max_txn = max_txn;
 
 	/*
-	 * If all updates are globally visible and no updates were skipped, the
+	 * If no updates were skipped and all updates are globally visible, the
 	 * page can be marked clean and we're done, regardless of whether we're
 	 * evicting or checkpointing.
 	 *
-	 * The oldest transaction ID may have moved while we were scanning the
-	 * page, so it is possible to skip an update but then find that by the
-	 * end of the scan, all updates are stable.
+	 * We have to check both: the oldest transaction ID may have moved while
+	 * we were scanning the update list, so it is possible to skip an update
+	 * but then find that by the end of the scan, all updates are stable.
 	 */
-	if (__wt_txn_visible_all(session, max_txn) && !skipped)
+	if (!skipped && __wt_txn_visible_all(session, max_txn))
 		return (0);
 
 	/*
