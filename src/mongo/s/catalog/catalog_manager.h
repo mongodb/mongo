@@ -412,6 +412,11 @@ private:
     /**
      * Checks that the given database name doesn't already exist in the config.databases
      * collection, including under different casing.
+     *
+     * Returns OK status if the db does not exist.
+     * Some known errors include:
+     *  NamespaceExists if it exists with the same casing
+     *  DatabaseDifferCase if it exists under different casing.
      */
     virtual Status _checkDbDoesNotExist(const std::string& dbName) const = 0;
 };

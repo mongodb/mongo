@@ -68,8 +68,6 @@ public:
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
-    Status createDatabase(const std::string& dbName) override;
-
     Status updateDatabase(const std::string& dbName, const DatabaseType& db) override;
 
     StatusWith<DatabaseType> getDatabase(const std::string& dbName) override;
@@ -128,6 +126,8 @@ public:
     DistLockManager* getDistLockManager() const override;
 
 private:
+    Status _checkDbDoesNotExist(const std::string& dbName) const override;
+
     std::unique_ptr<DistLockManagerMock> _mockDistLockMgr;
 };
 

@@ -83,10 +83,6 @@ StatusWith<ShardDrainingStatus> CatalogManagerMock::removeShard(OperationContext
     return ShardDrainingStatus::COMPLETED;
 }
 
-Status CatalogManagerMock::createDatabase(const string& dbName) {
-    return Status::OK();
-}
-
 Status CatalogManagerMock::updateDatabase(const string& dbName, const DatabaseType& db) {
     return Status::OK();
 }
@@ -175,6 +171,10 @@ void CatalogManagerMock::writeConfigServerDirect(const BatchedCommandRequest& re
 
 DistLockManager* CatalogManagerMock::getDistLockManager() const {
     return _mockDistLockMgr.get();
+}
+
+Status CatalogManagerMock::_checkDbDoesNotExist(const std::string& dbName) const {
+    return Status::OK();
 }
 
 }  // namespace mongo
