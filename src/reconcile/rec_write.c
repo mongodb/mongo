@@ -363,6 +363,19 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 		WT_STAT_FAST_DATA_INCR(session, rec_pages_eviction);
 	}
 
+#ifdef HAVE_DIAGNOSTIC
+	{
+	/*
+	 * Check that transaction time always moves forward for a given page.
+	 * If this check fails, reconciliation can free something that a future
+	 * reconciliation will need.
+	 */
+	uint64_t oldest_id = __wt_txn_oldest_id(session);
+	WT_ASSERT(session, WT_TXNID_LE(mod->last_oldest_id, oldest_id));
+	mod->last_oldest_id = oldest_id;
+	}
+#endif
+
 	/* Record the most recent transaction ID we will *not* write. */
 	mod->disk_snap_min = session->txn.snap_min;
 

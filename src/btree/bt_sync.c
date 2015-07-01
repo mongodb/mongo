@@ -190,6 +190,18 @@ err:	/* On error, clear any left-over tree walk. */
 
 	if (btree->checkpointing) {
 		/*
+		 * Update the checkpoint generation for this handle so visible
+		 * updates newer than the checkpoint can be evicted.
+		 *
+		 * This has to be published before eviction is enabled again,
+		 * so that eviction knows that the checkpoint has completed.
+		 */
+		WT_PUBLISH(btree->checkpoint_gen,
+		    S2C(session)->txn_global.checkpoint_gen);
+		WT_STAT_FAST_DATA_SET(session,
+		    btree_checkpoint_generation, btree->checkpoint_gen);
+
+		/*
 		 * Clear the checkpoint flag and push the change; not required,
 		 * but publishing the change means stalled eviction gets moving
 		 * as soon as possible.

@@ -106,6 +106,7 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
 	uint64_t checkpoint_pinned, oldest_id;
+	uint32_t checkpoint_gen;
 
 	txn_global = &S2C(session)->txn_global;
 	btree = S2BT_SAFE(session);
@@ -114,8 +115,9 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 * Take a local copy of these IDs in case they are updated while we are
 	 * checking visibility.
 	 */
-	checkpoint_pinned = txn_global->checkpoint_pinned;
-	oldest_id = txn_global->oldest_id;
+	WT_ORDERED_READ(oldest_id, txn_global->oldest_id);
+	WT_ORDERED_READ(checkpoint_gen, txn_global->checkpoint_gen);
+	WT_ORDERED_READ(checkpoint_pinned, txn_global->checkpoint_pinned);
 
 	/*
 	 * Checkpoint transactions often fall behind ordinary application
@@ -127,14 +129,10 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 * checkpoint, or this handle is up to date with the active checkpoint
 	 * then it's safe to ignore the checkpoint ID in the visibility check.
 	 */
-#if 0
-	if (WT_SESSION_IS_CHECKPOINT(session))
-		return (oldest_id);
-#endif
 	if (checkpoint_pinned == WT_TXN_NONE ||
 	    WT_TXNID_LT(oldest_id, checkpoint_pinned) ||
-	    (btree != NULL &&
-	    btree->checkpoint_gen == txn_global->checkpoint_gen))
+	    WT_SESSION_IS_CHECKPOINT(session) ||
+	    (btree != NULL && btree->checkpoint_gen == checkpoint_gen))
 		return (oldest_id);
 
 	return (checkpoint_pinned);
