@@ -5096,7 +5096,13 @@ err:			__wt_scr_free(session, &tkey);
 		btree->modified = 1;
 		WT_FULL_BARRIER();
 	} else {
+		/*
+		 * Set the highest transaction ID for the page, and track the
+		 * highest transaction ID for the tree.
+		 */
 		mod->rec_max_txn = r->max_txn;
+		if (WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
+			btree->rec_max_txn = r->max_txn;
 
 		if (WT_ATOMIC_CAS4(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
