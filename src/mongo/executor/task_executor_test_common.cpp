@@ -450,14 +450,15 @@ COMMON_EXECUTOR_TEST(RemoteCommandWithTimeout) {
 
 COMMON_EXECUTOR_TEST(CallbackHandleComparison) {
     TaskExecutor& executor = getExecutor();
-    Status status(ErrorCodes::InternalError, "");
+    auto status1 = getDetectableErrorStatus();
+    auto status2 = getDetectableErrorStatus();
     const RemoteCommandRequest request(HostAndPort("lazy", 27017), "admin", BSON("cmd" << 1));
     TaskExecutor::CallbackHandle cbHandle1 = unittest::assertGet(executor.scheduleRemoteCommand(
         request,
-        stdx::bind(setStatusOnRemoteCommandCompletion, stdx::placeholders::_1, request, &status)));
+        stdx::bind(setStatusOnRemoteCommandCompletion, stdx::placeholders::_1, request, &status1)));
     TaskExecutor::CallbackHandle cbHandle2 = unittest::assertGet(executor.scheduleRemoteCommand(
         request,
-        stdx::bind(setStatusOnRemoteCommandCompletion, stdx::placeholders::_1, request, &status)));
+        stdx::bind(setStatusOnRemoteCommandCompletion, stdx::placeholders::_1, request, &status2)));
 
     // test equality
     ASSERT_TRUE(cbHandle1 == cbHandle1);
