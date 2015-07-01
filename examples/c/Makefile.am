@@ -30,8 +30,9 @@ ex_encrypt_LDFLAGS = -rdynamic
 TESTS = $(noinst_PROGRAMS)
 
 AM_TESTS_ENVIRONMENT = WIREDTIGER_HOME=`mktemp -d WT_HOME.XXXX` ; export WIREDTIGER_HOME ; rm -rf $$WIREDTIGER_HOME ; mkdir $$WIREDTIGER_HOME ;
-# automake 1.11 compatibility
-TESTS_ENVIRONMENT = $(AM_TESTS_ENVIRONMENT)
+
+# Inject valgrind or similar
+LOG_COMPILER = $(TEST_WRAPPER)
 
 clean-local:
 	rm -rf WT_HOME* *.core backup_full.* backup_incr.*

@@ -1,12 +1,13 @@
-#! /bin/sh
+#!/bin/sh
+
+set -e
 
 # Smoke-test format as part of running "make check".
+$TEST_WRAPPER ./t -t f
+$TEST_WRAPPER ./t -S -F -t f
 
-./t -t f || exit 1
-./t -S -F -t f || exit 1
+$TEST_WRAPPER ./t -t r
+$TEST_WRAPPER ./t -S -F -t r
 
-./t -t r || exit 1
-./t -S -F -t r || exit 1
-
-./t -t v || exit 1
-./t -S -F -t v || exit 1
+$TEST_WRAPPER ./t -t v
+$TEST_WRAPPER ./t -S -F -t v
