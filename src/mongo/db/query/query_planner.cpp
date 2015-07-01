@@ -52,6 +52,7 @@ namespace mongo {
 
     using std::auto_ptr;
     using std::numeric_limits;
+    using std::unique_ptr;
 
     // Copied verbatim from db/index.h
     static bool isIdIndex( const BSONObj &pattern ) {
@@ -374,7 +375,7 @@ namespace mongo {
         // cases, and we proceed by using the PlanCacheIndexTree to tag the query tree.
 
         // Create a copy of the expression tree.  We use cachedSoln to annotate this with indices.
-        MatchExpression* clone = query.root()->shallowClone();
+        unique_ptr<MatchExpression> clone(query.root()->shallowClone());
 
         QLOG() << "Tagging the match expression according to cache data: " << endl
                << "Filter:" << endl << clone->toString()
@@ -390,19 +391,22 @@ namespace mongo {
             QLOG() << "Index " << i << ": " << ie.keyPattern.toString() << endl;
         }
 
-        Status s = tagAccordingToCache(clone, cacheData.tree.get(), indexMap);
+        Status s = tagAccordingToCache(clone.get(), cacheData.tree.get(), indexMap);
         if (!s.isOK()) {
             return s;
         }
 
         // The planner requires a defined sort order.
-        sortUsingTags(clone);
+        sortUsingTags(clone.get());
 
         QLOG() << "Tagged tree:" << endl << clone->toString();
 
-        // Use the cached index assignments to build solnRoot.  Takes ownership of clone.
-        QuerySolutionNode* solnRoot =
-            QueryPlannerAccess::buildIndexedDataAccess(query, clone, false, params.indices, params);
+        // Use the cached index assignments to build solnRoot.
+        QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(query,
+                                                                                 clone.release(),
+                                                                                 false,
+                                                                                 params.indices,
+                                                                                 params);
 
         if (NULL != solnRoot) {
             // Takes ownership of 'solnRoot'.
