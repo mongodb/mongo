@@ -864,12 +864,17 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	page = r->page;
 
 	/*
-	 * If we're called with an WT_INSERT reference, use its WT_UPDATE
-	 * list, else is an on-page row-store WT_UPDATE list.
+	 * If called with a WT_INSERT item, use its WT_UPDATE list (which must
+	 * exist), otherwise check for an on-page row-store WT_UPDATE list
+	 * (which may not exist). Return immediately if the item has no updates.
 	 */
-	upd_list = ins == NULL ? WT_ROW_UPDATE(page, rip) : ins->upd;
-	skipped = 0;
+	if (ins == NULL) {
+		if ((upd_list = WT_ROW_UPDATE(page, rip)) == NULL)
+			return (0);
+	} else
+		upd_list = ins->upd;
 
+	skipped = 0;
 	for (max_txn = WT_TXN_NONE, min_txn = UINT64_MAX, upd = upd_list;
 	    upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
