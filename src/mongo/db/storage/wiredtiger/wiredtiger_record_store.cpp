@@ -462,11 +462,15 @@ namespace {
             WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
             WT_CURSOR *c = curwrap.get();
             RecordId newestOld;
+            int64_t firstKey = 0;
             int first = 0, ret = 0;
             if (_cappedFirstRecord != RecordId()) {
                 c->set_key(c, _makeKey(_cappedFirstRecord));
-                invariantWTOK(WT_OP_CHECK(c->search_near(c, NULL)));
-                first = 1;
+                if ((ret = WT_OP_CHECK(c->search(c))) != WT_NOTFOUND) {
+                    invariantWTOK(ret);
+                    invariantWTOK(c->get_key(c, &firstKey));
+                    first = 1;
+                }
             }
 
             while ((sizeSaved < sizeOverCap || docsRemoved < docsOverCap) &&
@@ -514,9 +518,9 @@ namespace {
 
                 WiredTigerCursor startWrap( _uri, _instanceId, true, txn);
                 WT_CURSOR* start = NULL;
-                if (_cappedFirstRecord != RecordId()) {
+                if (firstKey != 0) {
                     start = startWrap.get();
-                    start->set_key(start, _makeKey(_cappedFirstRecord));
+                    start->set_key(start, firstKey);
                 }
 
                 ret = session->truncate(session, NULL, start, c, NULL);
