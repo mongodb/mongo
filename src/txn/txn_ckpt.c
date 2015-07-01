@@ -484,6 +484,13 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    WT_TXNID_LE(txn_global->oldest_id, txn_state->id) &&
 	    WT_TXNID_LE(txn_global->oldest_id, txn_state->snap_min));
 
+	/*
+	 * Clear our entry from the global transaction session table. Any
+	 * operation that needs to know about the ID for this checkpoint will
+	 * consider the checkpoint ID in the global structure. Most operations
+	 * can safely ignore the checkpoint ID (see the visible all check for
+	 * details).
+	 */
 	txn_state->id = txn_state->snap_min = WT_TXN_NONE;
 
 	/* Tell logging that we have started a database checkpoint. */
