@@ -1479,7 +1479,7 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 	 * to make sure there is free space in the cache.
 	 */
 	txn_global = &S2C(session)->txn_global;
-	txn_state = &txn_global->states[session->id];
+	txn_state = WT_SESSION_TXN_STATE(session);
 	busy = txn_state->id != WT_TXN_NONE ||
 	    session->nhazard > 0 ||
 	    (txn_state->snap_min != WT_TXN_NONE &&

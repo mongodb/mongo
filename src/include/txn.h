@@ -25,6 +25,9 @@
 
 #define	WT_SESSION_TXN_STATE(s) (&S2C(s)->txn_global.states[(s)->id])
 
+#define	WT_SESSION_IS_CHECKPOINT(s)					\
+	((s)->id != 0 && (s)->id == S2C(s)->txn_global.checkpoint_id)
+
 struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_txn_state {
 	volatile uint64_t id;
 	volatile uint64_t snap_min;
@@ -54,7 +57,7 @@ struct __wt_txn_global {
 	 */
 	volatile uint32_t checkpoint_id;	/* Checkpoint's session ID */
 	volatile uint64_t checkpoint_gen;
-	volatile uint64_t checkpoint_snap_min;
+	volatile uint64_t checkpoint_pinned;
 
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };
