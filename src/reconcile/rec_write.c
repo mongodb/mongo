@@ -29,7 +29,7 @@ typedef struct {
 
 	/* Track whether all changes to the page are written. */
 	uint64_t max_txn;
-	uint64_t skipped_txn;
+	uint64_t first_dirty_txn;
 	uint32_t orig_write_gen;
 
 	/*
@@ -702,7 +702,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	 * Running transactions may update the page after we write it, so
 	 * this is the highest ID we can be confident we will see.
 	 */
-	r->skipped_txn = S2C(session)->txn_global.last_running;
+	r->first_dirty_txn = S2C(session)->txn_global.last_running;
 
 	return (0);
 }
@@ -880,9 +880,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			max_txn = txnid;
 		if (WT_TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
-		if (WT_TXNID_LT(txnid, r->skipped_txn) &&
+		if (WT_TXNID_LT(txnid, r->first_dirty_txn) &&
 		    !__wt_txn_visible_all(session, txnid))
-			r->skipped_txn = txnid;
+			r->first_dirty_txn = txnid;
 
 		/*
 		 * Record whether any updates were skipped on the way to finding
@@ -5091,7 +5091,7 @@ err:			__wt_scr_free(session, &tkey);
 	 * discarded.
 	 */
 	if (r->leave_dirty) {
-		mod->first_dirty_txn = r->skipped_txn;
+		mod->first_dirty_txn = r->first_dirty_txn;
 
 		btree->modified = 1;
 		WT_FULL_BARRIER();
