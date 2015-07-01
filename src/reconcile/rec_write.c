@@ -162,7 +162,7 @@ typedef struct {
 		 * be evicted as new, in-memory pages, restoring the updates on
 		 * those pages.
 		 */
-		WT_UPD_SKIPPED *skip;		/* Skipped updates */
+		WT_UPD_SKIPPED *skip;	/* Skipped updates */
 		uint32_t	skip_next;
 		size_t		skip_allocated;
 
