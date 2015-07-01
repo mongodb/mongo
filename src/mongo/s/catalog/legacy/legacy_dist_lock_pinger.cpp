@@ -34,8 +34,8 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/s/catalog/legacy/distlock.h"
-#include "mongo/s/type_lockpings.h"
-#include "mongo/s/type_locks.h"
+#include "mongo/s/catalog/type_lockpings.h"
+#include "mongo/s/catalog/type_locks.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"

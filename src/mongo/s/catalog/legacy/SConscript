@@ -30,7 +30,7 @@ env.Library(
         'mongo_version_range.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/base',
+        '$BUILD_DIR/mongo/s/catalog/catalog_types',
     ]
 )
 

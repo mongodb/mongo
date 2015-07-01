@@ -28,7 +28,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
-#include "mongo/s/type_config_version.h"
+#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/unittest/unittest.h"
 
 /**

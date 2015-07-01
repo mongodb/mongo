@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/s/type_mongos.h"
+#include "mongo/s/catalog/type_mongos.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 

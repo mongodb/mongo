@@ -43,6 +43,8 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_lockpings.h"
+#include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -51,8 +53,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/type_locks.h"
-#include "mongo/s/type_lockpings.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

@@ -16,7 +16,11 @@ env.Library(
         'type_changelog.cpp',
         'type_chunk.cpp',
         'type_collection.cpp',
+        'type_config_version.cpp',
         'type_database.cpp',
+        'type_lockpings.cpp',
+        'type_locks.cpp',
+        'type_mongos.cpp',
         'type_settings.cpp',
         'type_shard.cpp',
         'type_tags.cpp',
@@ -63,7 +67,11 @@ env.CppUnitTest(
         'type_changelog_test.cpp',
         'type_chunk_test.cpp',
         'type_collection_test.cpp',
+        'type_config_version_test.cpp',
         'type_database_test.cpp',
+        'type_lockpings_test.cpp',
+        'type_locks_test.cpp',
+        'type_mongos_test.cpp',
         'type_settings_test.cpp',
         'type_shard_test.cpp',
         'type_tags_test.cpp',
@@ -109,13 +117,13 @@ env.Library(
         'dist_lock_catalog_impl.cpp',
     ],
     LIBDEPS=[
+        'catalog_types',
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/client/remote_command_targeter',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/s/base',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/util/net/hostandport',
         'dist_lock_catalog_interface',
@@ -146,7 +154,6 @@ env.Library(
     LIBDEPS=[
         'catalog_types',
         'dist_lock_catalog_interface',
-        '$BUILD_DIR/mongo/s/base',
     ]
 )
 

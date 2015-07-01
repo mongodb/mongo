@@ -32,7 +32,7 @@
 
 #include "mongo/s/catalog/legacy/legacy_dist_lock_manager.h"
 
-#include "mongo/s/type_locks.h"
+#include "mongo/s/catalog/type_locks.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"

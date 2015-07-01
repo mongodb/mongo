@@ -35,7 +35,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/config_upgrade_helpers.h"
-#include "mongo/s/type_config_version.h"
+#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

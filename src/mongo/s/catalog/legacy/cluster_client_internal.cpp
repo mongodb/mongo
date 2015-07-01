@@ -37,8 +37,8 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/type_mongos.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 
