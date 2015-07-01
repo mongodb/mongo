@@ -363,6 +363,19 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 		WT_STAT_FAST_DATA_INCR(session, rec_pages_eviction);
 	}
 
+#ifdef HAVE_DIAGNOSTIC
+	{
+	/*
+	 * Check that transaction time always moves forward for a given page.
+	 * If this check fails, reconciliation can free something that a future
+	 * reconciliation will need.
+	 */
+	uint64_t oldest_id = __wt_txn_oldest_id(session);
+	WT_ASSERT(session, WT_TXNID_LE(mod->last_oldest_id, oldest_id));
+	mod->last_oldest_id = oldest_id;
+	}
+#endif
+
 	/* Record the most recent transaction ID we will *not* write. */
 	mod->disk_snap_min = session->txn.snap_min;
 
@@ -838,6 +851,7 @@ static inline int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_INSERT *ins, WT_ROW *rip, WT_CELL_UNPACK *vpack, WT_UPDATE **updp)
 {
+	WT_DECL_RET;
 	WT_ITEM ovfl;
 	WT_PAGE *page;
 	WT_UPDATE *upd, *upd_list, *upd_ovfl;
@@ -976,8 +990,11 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 */
 	if (vpack != NULL && vpack->raw == WT_CELL_VALUE_OVFL_RM &&
 	    !__wt_txn_visible_all(session, min_txn)) {
-		WT_RET(__wt_ovfl_txnc_search(
-		    page, vpack->data, vpack->size, &ovfl));
+		if ((ret = __wt_ovfl_txnc_search(
+		    page, vpack->data, vpack->size, &ovfl)) != 0)
+			WT_PANIC_RET(session, ret,
+			    "cached overflow item discarded early");
+
 		/*
 		 * Create an update structure with an impossibly low transaction
 		 * ID and append it to the update list we're about to save.
