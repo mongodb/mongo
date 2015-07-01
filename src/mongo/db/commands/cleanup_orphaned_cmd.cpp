@@ -113,7 +113,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
 
         return CleanupResult_Done;
     }
-    orphanRange.ns = ns;
+    orphanRange.ns = ns.ns();
     *stoppedAtKey = orphanRange.maxKey;
 
     // We're done with this metadata now, no matter what happens

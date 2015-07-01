@@ -246,7 +246,7 @@ Status prepareExecution(OperationContext* opCtx,
         // Might have to filter out orphaned docs.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             *rootOut = new ShardFilterStage(
-                shardingState.getCollectionMetadata(collection->ns()), ws, *rootOut);
+                shardingState.getCollectionMetadata(collection->ns().ns()), ws, *rootOut);
         }
 
         // There might be a projection. The idhack stage will always fetch the full
@@ -452,7 +452,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutor(OperationContext* txn,
         !collection->getIndexCatalog()->findIdIndex(txn)) {
         const WhereCallbackReal whereCallback(txn, collection->ns().db());
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(collection->ns(), unparsedQuery, whereCallback);
+            CanonicalQuery::canonicalize(collection->ns().ns(), unparsedQuery, whereCallback);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -471,7 +471,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutor(OperationContext* txn,
     // Might have to filter out orphaned docs.
     if (plannerOptions & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
         root = make_unique<ShardFilterStage>(
-            shardingState.getCollectionMetadata(collection->ns()), ws.get(), root.release());
+            shardingState.getCollectionMetadata(collection->ns().ns()), ws.get(), root.release());
     }
 
     return PlanExecutor::make(txn, std::move(ws), std::move(root), collection, yieldPolicy);

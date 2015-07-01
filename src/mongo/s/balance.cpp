@@ -357,15 +357,15 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
     // For each collection, check if the balancing policy recommends moving anything around.
     for (const auto& coll : collections) {
         // Skip collections for which balancing is disabled
-        const NamespaceString& ns = coll.getNs();
+        const NamespaceString& nss = coll.getNs();
 
         if (!coll.getAllowBalance()) {
-            LOG(1) << "Not balancing collection " << ns << "; explicitly disabled.";
+            LOG(1) << "Not balancing collection " << nss << "; explicitly disabled.";
             continue;
         }
 
         std::vector<ChunkType> allNsChunks;
-        grid.catalogManager()->getChunks(BSON(ChunkType::ns(ns)),
+        grid.catalogManager()->getChunks(BSON(ChunkType::ns(nss.ns())),
                                          BSON(ChunkType::min() << 1),
                                          boost::none,  // all chunks
                                          &allNsChunks);
@@ -381,7 +381,7 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
         }
 
         if (shardToChunksMap.empty()) {
-            LOG(1) << "skipping empty collection (" << ns << ")";
+            LOG(1) << "skipping empty collection (" << nss.ns() << ")";
             continue;
         }
 
@@ -399,20 +399,19 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
 
         {
             vector<TagsType> collectionTags;
-            uassertStatusOK(
-                grid.catalogManager()->getTagsForCollection(ns.toString(), &collectionTags));
+            uassertStatusOK(grid.catalogManager()->getTagsForCollection(nss.ns(), &collectionTags));
             for (const auto& tt : collectionTags) {
                 ranges.push_back(
                     TagRange(tt.getMinKey().getOwned(), tt.getMaxKey().getOwned(), tt.getTag()));
                 uassert(16356,
-                        str::stream() << "tag ranges not valid for: " << ns.toString(),
+                        str::stream() << "tag ranges not valid for: " << nss.ns(),
                         status.addTagRange(ranges.back()));
             }
         }
 
-        auto statusGetDb = grid.catalogCache()->getDatabase(ns.db().toString());
+        auto statusGetDb = grid.catalogCache()->getDatabase(nss.db().toString());
         if (!statusGetDb.isOK()) {
-            warning() << "could not load db config to balance collection [" << ns
+            warning() << "could not load db config to balance collection [" << nss.ns()
                       << "]: " << statusGetDb.getStatus();
             continue;
         }
@@ -421,9 +420,9 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
 
         // This line reloads the chunk manager once if this process doesn't know the collection
         // is sharded yet.
-        shared_ptr<ChunkManager> cm = cfg->getChunkManagerIfExists(ns, true);
+        shared_ptr<ChunkManager> cm = cfg->getChunkManagerIfExists(nss.ns(), true);
         if (!cm) {
-            warning() << "could not load chunks to balance " << ns << " collection";
+            warning() << "could not load chunks to balance " << nss.ns() << " collection";
             continue;
         }
 
@@ -440,7 +439,7 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
 
             didAnySplits = true;
 
-            log() << "ns: " << ns << " need to split on " << min
+            log() << "nss: " << nss.ns() << " need to split on " << min
                   << " because there is a range there";
 
             ChunkPtr c = cm->findIntersectingChunk(min);
@@ -463,7 +462,7 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
             continue;
         }
 
-        shared_ptr<MigrateInfo> migrateInfo(_policy->balance(ns, status, _balancedLastTime));
+        shared_ptr<MigrateInfo> migrateInfo(_policy->balance(nss.ns(), status, _balancedLastTime));
         if (migrateInfo) {
             candidateChunks->push_back(migrateInfo);
         }

@@ -128,25 +128,24 @@ Status wrappedRun(OperationContext* txn,
 }  // namespace
 
 Status dropIndexes(OperationContext* txn,
-                   const NamespaceString& ns,
+                   const NamespaceString& nss,
                    const BSONObj& idxDescriptor,
                    BSONObjBuilder* result) {
-    StringData dbName = ns.db();
+    StringData dbName = nss.db();
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_IX);
         AutoGetDb autoDb(txn, dbName, MODE_X);
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns);
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while dropping indexes in "
-                                        << ns.toString());
+                          str::stream() << "Not primary while dropping indexes in " << nss.ns());
         }
 
         WriteUnitOfWork wunit(txn);
-        Status status = wrappedRun(txn, dbName, ns, autoDb.getDb(), idxDescriptor, result);
+        Status status = wrappedRun(txn, dbName, nss.ns(), autoDb.getDb(), idxDescriptor, result);
         if (!status.isOK()) {
             return status;
         }

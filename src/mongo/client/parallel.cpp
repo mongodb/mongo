@@ -508,13 +508,13 @@ void ParallelSortClusteredCursor::_markStaleNS(const NamespaceString& staleNS,
                                                bool& fullReload) {
     fullReload = e.requiresFullReload();
 
-    if (_staleNSMap.find(staleNS) == _staleNSMap.end())
-        _staleNSMap[staleNS] = 1;
+    if (_staleNSMap.find(staleNS.ns()) == _staleNSMap.end())
+        _staleNSMap[staleNS.ns()] = 1;
 
-    int tries = ++_staleNSMap[staleNS];
+    int tries = ++_staleNSMap[staleNS.ns()];
 
     if (tries >= 5) {
-        throw SendStaleConfigException(staleNS,
+        throw SendStaleConfigException(staleNS.ns(),
                                        str::stream() << "too many retries of stale version info",
                                        e.getVersionReceived(),
                                        e.getVersionWanted());
@@ -528,7 +528,7 @@ void ParallelSortClusteredCursor::_handleStaleNS(const NamespaceString& staleNS,
                                                  bool fullReload) {
     auto status = grid.catalogCache()->getDatabase(staleNS.db().toString());
     if (!status.isOK()) {
-        warning() << "cannot reload database info for stale namespace " << staleNS;
+        warning() << "cannot reload database info for stale namespace " << staleNS.ns();
         return;
     }
 
@@ -541,10 +541,10 @@ void ParallelSortClusteredCursor::_handleStaleNS(const NamespaceString& staleNS,
     }
 
     if (!config) {
-        warning() << "cannot reload database info for stale namespace " << staleNS;
+        warning() << "cannot reload database info for stale namespace " << staleNS.ns();
     } else {
         // Reload chunk manager, potentially forcing the namespace
-        config->getChunkManagerIfExists(staleNS, true, forceReload);
+        config->getChunkManagerIfExists(staleNS.ns(), true, forceReload);
     }
 }
 
@@ -565,7 +565,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(PCStatePtr state,
     // Setup conn
     if (!state->conn) {
         const auto shard = grid.shardRegistry()->getShard(shardId);
-        state->conn.reset(new ShardConnection(shard->getConnString(), ns, manager));
+        state->conn.reset(new ShardConnection(shard->getConnString(), ns.ns(), manager));
     }
 
     const DBClientBase* rawConn = state->conn->getRawConn();
@@ -631,7 +631,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(PCStatePtr state,
 
 void ParallelSortClusteredCursor::startInit() {
     const bool returnPartial = (_qSpec.options() & QueryOption_PartialResults);
-    const NamespaceString ns(!_cInfo.isEmpty() ? _cInfo.versionedNS : _qSpec.ns());
+    const NamespaceString nss(!_cInfo.isEmpty() ? _cInfo.versionedNS : _qSpec.ns());
 
     shared_ptr<ChunkManager> manager;
     shared_ptr<Shard> primary;
@@ -652,10 +652,10 @@ void ParallelSortClusteredCursor::startInit() {
     {
         shared_ptr<DBConfig> config;
 
-        auto status = grid.catalogCache()->getDatabase(ns.db().toString());
+        auto status = grid.catalogCache()->getDatabase(nss.db().toString());
         if (status.isOK()) {
             config = status.getValue();
-            config->getChunkManagerOrPrimary(ns, manager, primary);
+            config->getChunkManagerOrPrimary(nss.ns(), manager, primary);
         }
     }
 
@@ -737,7 +737,7 @@ void ParallelSortClusteredCursor::startInit() {
             mdata.pcState.reset(new PCState());
             PCStatePtr state = mdata.pcState;
 
-            setupVersionAndHandleSlaveOk(state, shardId, primary, ns, vinfo, manager);
+            setupVersionAndHandleSlaveOk(state, shardId, primary, nss, vinfo, manager);
 
             const string& ns = _qSpec.ns();
 
@@ -837,7 +837,7 @@ void ParallelSortClusteredCursor::startInit() {
 
             // For legacy reasons, this may not be set in the exception :-(
             if (staleNS.size() == 0)
-                staleNS = ns;  // ns is the *versioned* namespace, be careful of this
+                staleNS = nss;  // ns is the *versioned* namespace, be careful of this
 
             // Probably need to retry fully
             bool forceReload, fullReload;
@@ -849,8 +849,8 @@ void ParallelSortClusteredCursor::startInit() {
                                << ", full : " << fullReload << causedBy(e) << endl;
 
             // This is somewhat strange
-            if (staleNS != ns)
-                warning() << "versioned ns " << ns << " doesn't match stale config namespace "
+            if (staleNS != nss)
+                warning() << "versioned ns " << nss.ns() << " doesn't match stale config namespace "
                           << staleNS << endl;
 
             _handleStaleNS(staleNS, forceReload, fullReload);

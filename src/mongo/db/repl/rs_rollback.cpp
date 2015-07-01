@@ -234,7 +234,7 @@ Status refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
 
                 if (modification == "validator" || modification == "usePowerOf2Sizes" ||
                     modification == "noPadding") {
-                    fixUpInfo.collectionsToResyncMetadata.insert(ns);
+                    fixUpInfo.collectionsToResyncMetadata.insert(ns.ns());
                     continue;
                 }
 

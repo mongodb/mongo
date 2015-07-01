@@ -262,7 +262,7 @@ Status insertAuthzDocument(OperationContext* txn,
                            const BSONObj& writeConcern) {
     try {
         DBDirectClient client(txn);
-        client.insert(collectionName, document);
+        client.insert(collectionName.ns(), document);
 
         // Handle write concern
         BSONObjBuilder gleBuilder;
@@ -299,7 +299,7 @@ Status updateAuthzDocuments(OperationContext* txn,
                             int* nMatched) {
     try {
         DBDirectClient client(txn);
-        client.update(collectionName, query, updatePattern, upsert, multi);
+        client.update(collectionName.ns(), query, updatePattern, upsert, multi);
 
         // Handle write concern
         BSONObjBuilder gleBuilder;
@@ -362,7 +362,7 @@ Status removeAuthzDocuments(OperationContext* txn,
                             int* numRemoved) {
     try {
         DBDirectClient client(txn);
-        client.remove(collectionName, query);
+        client.remove(collectionName.ns(), query);
 
         // Handle write concern
         BSONObjBuilder gleBuilder;

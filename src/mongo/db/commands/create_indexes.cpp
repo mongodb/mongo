@@ -82,7 +82,7 @@ public:
 
     BSONObj _addNsToSpec(const NamespaceString& ns, const BSONObj& obj) {
         BSONObjBuilder b;
-        b.append("ns", ns);
+        b.append("ns", ns.ns());
         b.appendElements(obj);
         return b.obj();
     }

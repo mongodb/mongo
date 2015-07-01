@@ -127,7 +127,7 @@ void splitIfNeeded(const NamespaceString& nss, const TargeterStats& stats) {
 
     ChunkManagerPtr chunkManager;
     ShardPtr dummyShard;
-    config->getChunkManagerOrPrimary(nss, chunkManager, dummyShard);
+    config->getChunkManagerOrPrimary(nss.ns(), chunkManager, dummyShard);
 
     if (!chunkManager) {
         return;

@@ -151,7 +151,7 @@ public:
         }
 
         // This refreshes the chunk metadata if stale.
-        ChunkManagerPtr manager = config->getChunkManagerIfExists(nss, true);
+        ChunkManagerPtr manager = config->getChunkManagerIfExists(nss.ns(), true);
         if (!manager) {
             return appendCommandStatus(
                 result,

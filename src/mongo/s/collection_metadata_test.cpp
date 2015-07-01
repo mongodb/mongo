@@ -76,7 +76,7 @@ protected:
         // Need a chunk on another shard, otherwise the chunks are invalid in general and we
         // can't load metadata
         ChunkType chunkType;
-        chunkType.setNS(NamespaceString{"test.foo"});
+        chunkType.setNS(NamespaceString{"test.foo"}.ns());
         chunkType.setShard("shard0001");
         chunkType.setMin(BSON("a" << MINKEY));
         chunkType.setMax(BSON("a" << MAXKEY));

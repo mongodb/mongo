@@ -167,7 +167,7 @@ TEST_F(MetadataLoaderFixture, BadChunk) {
     dummyConfig.insert(CollectionType::ConfigNS, collInfo.toBSON());
 
     ChunkType chunkInfo;
-    chunkInfo.setNS(NamespaceString{"test.foo"});
+    chunkInfo.setNS(NamespaceString{"test.foo"}.ns());
     chunkInfo.setVersion(ChunkVersion(1, 0, collInfo.getEpoch()));
     ASSERT(!chunkInfo.validate().isOK());
 

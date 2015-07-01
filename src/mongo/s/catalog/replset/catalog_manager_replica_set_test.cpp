@@ -78,18 +78,18 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
     expectedColl.setEpoch(OID::gen());
 
     auto future = launchAsync([this, &expectedColl] {
-        return assertGet(catalogManager()->getCollection(expectedColl.getNs()));
+        return assertGet(catalogManager()->getCollection(expectedColl.getNs().ns()));
     });
 
     onFindCommand([&expectedColl](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), CollectionType::ConfigNS);
+        ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
         // Ensure the query is correct
         ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSON(CollectionType::fullNs(expectedColl.getNs())));
+        ASSERT_EQ(query->getFilter(), BSON(CollectionType::fullNs(expectedColl.getNs().ns())));
         ASSERT_EQ(query->getSort(), BSONObj());
         ASSERT_EQ(query->getLimit().get(), 1);
 
@@ -129,7 +129,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseExisting) {
 
     onFindCommand([&expectedDb](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
+        ASSERT_EQ(nss.ns(), DatabaseType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -338,7 +338,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsValid) {
 
     onFindCommand([&s1, &s2, &s3](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
+        ASSERT_EQ(nss.ns(), ShardType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -424,7 +424,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSWithSortAndLimit) {
 
     onFindCommand([&chunksQuery, chunkA, chunkB](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
+        ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -462,7 +462,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSNoSortNoLimit) {
 
     onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
+        ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -731,7 +731,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsBalancerDoc) {
 
     onFindCommand([st1](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), SettingsType::ConfigNS);
+        ASSERT_EQ(nss.ns(), SettingsType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -759,7 +759,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsChunkSizeDoc) {
 
     onFindCommand([st1](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), SettingsType::ConfigNS);
+        ASSERT_EQ(nss.ns(), SettingsType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -784,7 +784,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsInvalidDoc) {
 
     onFindCommand([](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), SettingsType::ConfigNS);
+        ASSERT_EQ(nss.ns(), SettingsType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -812,7 +812,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
 
     onFindCommand([](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), SettingsType::ConfigNS);
+        ASSERT_EQ(nss.ns(), SettingsType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -863,7 +863,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsNoDb) {
 
     onFindCommand([coll1, coll2, coll3](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), CollectionType::ConfigNS);
+        ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -910,7 +910,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsWithDb) {
 
     onFindCommand([coll1, coll2](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), CollectionType::ConfigNS);
+        ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -953,7 +953,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsInvalidCollectionType) {
 
     onFindCommand([validColl](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), CollectionType::ConfigNS);
+        ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -994,7 +994,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardValid) {
 
     onFindCommand([dbt1, dbt2](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
+        ASSERT_EQ(nss.ns(), DatabaseType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -1062,7 +1062,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollection) {
 
     onFindCommand([tagA, tagB](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), TagsType::ConfigNS);
+        ASSERT_EQ(nss.ns(), TagsType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -1142,7 +1142,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkOneTagFound) {
 
     onFindCommand([chunk](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), TagsType::ConfigNS);
+        ASSERT_EQ(nss.ns(), TagsType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -1182,7 +1182,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkNoTagFound) {
 
     onFindCommand([chunk](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), TagsType::ConfigNS);
+        ASSERT_EQ(nss.ns(), TagsType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -1219,7 +1219,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkInvalidTagDoc) {
 
     onFindCommand([chunk](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), TagsType::ConfigNS);
+        ASSERT_EQ(nss.ns(), TagsType::ConfigNS);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -1429,7 +1429,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseSuccess) {
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(DatabaseType::ConfigNS, nss.toString());
+        ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
         return vector<BSONObj>{};
     });
 
@@ -1605,7 +1605,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseNoShards) {
     // Report no databases with the same name already exist
     onFindCommand([dbname](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(DatabaseType::ConfigNS, nss.toString());
+        ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
         return vector<BSONObj>{};
     });
 
@@ -1687,7 +1687,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDuplicateKeyOnInsert) {
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(DatabaseType::ConfigNS, nss.toString());
+        ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
         return vector<BSONObj>{};
     });
 

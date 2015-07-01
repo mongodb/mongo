@@ -88,9 +88,9 @@ Value DocumentSourceMergeCursors::serialize(bool explain) const {
 }
 
 DocumentSourceMergeCursors::CursorAndConnection::CursorAndConnection(ConnectionString host,
-                                                                     NamespaceString ns,
+                                                                     NamespaceString nss,
                                                                      CursorId id)
-    : connection(host), cursor(connection.get(), ns, id, 0, 0) {}
+    : connection(host), cursor(connection.get(), nss.ns(), id, 0, 0) {}
 
 vector<DBClientCursor*> DocumentSourceMergeCursors::getCursors() {
     verify(_unstarted);

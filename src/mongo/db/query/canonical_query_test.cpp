@@ -463,7 +463,7 @@ TEST(CanonicalQueryTest, SortTreeNumChildrenComparison) {
  */
 unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
     BSONObj queryObj = fromjson(queryStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj);
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss.ns(), queryObj);
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -474,7 +474,7 @@ std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj, sortObj, projObj);
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss.ns(), queryObj, sortObj, projObj);
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }

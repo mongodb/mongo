@@ -269,7 +269,7 @@ void Cloner::copy(OperationContext* txn,
     {
         Lock::TempRelease tempRelease(txn->lockState());
         _conn->query(stdx::function<void(DBClientCursorBatchIterator&)>(f),
-                     from_collection,
+                     from_collection.ns(),
                      query,
                      0,
                      options);
@@ -298,7 +298,7 @@ void Cloner::copyIndexes(OperationContext* txn,
     {
         Lock::TempRelease tempRelease(txn->lockState());
         list<BSONObj> sourceIndexes =
-            _conn->getIndexSpecs(from_collection, slaveOk ? QueryOption_SlaveOk : 0);
+            _conn->getIndexSpecs(from_collection.ns(), slaveOk ? QueryOption_SlaveOk : 0);
         for (list<BSONObj>::const_iterator it = sourceIndexes.begin(); it != sourceIndexes.end();
              ++it) {
             indexesToBuild.push_back(fixindex(to_collection.db().toString(), *it));

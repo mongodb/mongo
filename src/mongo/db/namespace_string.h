@@ -94,9 +94,6 @@ public:
         return _ns;
     }
 
-    operator const std::string&() const {
-        return ns();
-    }
     const std::string& toString() const {
         return ns();
     }

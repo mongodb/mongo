@@ -161,7 +161,7 @@ ChunkManager::ChunkManager(const string& ns, const ShardKeyPattern& pattern, boo
       _chunkRanges() {}
 
 ChunkManager::ChunkManager(const CollectionType& coll)
-    : _ns(coll.getNs()),
+    : _ns(coll.getNs().ns()),
       _keyPattern(coll.getKeyPattern()),
       _unique(coll.getUnique()),
       _sequenceNumber(NextSequenceNumber.addAndFetch(1)),

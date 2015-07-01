@@ -91,7 +91,7 @@ void DocumentSourceOut::prepTempCollection() {
     }
 
     // copy indexes on _outputNs to _tempNs
-    const std::list<BSONObj> indexes = conn->getIndexSpecs(_outputNs);
+    const std::list<BSONObj> indexes = conn->getIndexSpecs(_outputNs.ns());
     for (std::list<BSONObj>::const_iterator it = indexes.begin(); it != indexes.end(); ++it) {
         MutableDocument index((Document(*it)));
         index.remove("_id");  // indexes shouldn't have _ids but some existing ones do

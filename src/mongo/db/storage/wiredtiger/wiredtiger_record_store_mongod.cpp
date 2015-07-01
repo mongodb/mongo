@@ -97,7 +97,7 @@ public:
                 return 0;
             }
 
-            OldClientContext ctx(&txn, _ns, false);
+            OldClientContext ctx(&txn, _ns.ns(), false);
             WiredTigerRecordStore* rs =
                 checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
             WriteUnitOfWork wuow(&txn);

@@ -223,35 +223,35 @@ public:
 
         ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite globalWriteLock(txn.lockState());
-        OldClientContext ctx(&txn, source);
+        OldClientContext ctx(&txn, source.ns());
 
         {
             WriteUnitOfWork uow(&txn);
-            ASSERT(!collectionExists(&ctx, source));
-            ASSERT(!collectionExists(&ctx, target));
+            ASSERT(!collectionExists(&ctx, source.ns()));
+            ASSERT(!collectionExists(&ctx, target.ns()));
             ASSERT_OK(userCreateNS(&txn, ctx.db(), source.ns(), BSONObj(), defaultIndexes));
             uow.commit();
         }
-        ASSERT(collectionExists(&ctx, source));
-        ASSERT(!collectionExists(&ctx, target));
+        ASSERT(collectionExists(&ctx, source.ns()));
+        ASSERT(!collectionExists(&ctx, target.ns()));
 
         // END OF SETUP / START OF TEST
 
         {
             WriteUnitOfWork uow(&txn);
             ASSERT_OK(renameCollection(&txn, source, target));
-            ASSERT(!collectionExists(&ctx, source));
-            ASSERT(collectionExists(&ctx, target));
+            ASSERT(!collectionExists(&ctx, source.ns()));
+            ASSERT(collectionExists(&ctx, target.ns()));
             if (!rollback) {
                 uow.commit();
             }
         }
         if (rollback) {
-            ASSERT(collectionExists(&ctx, source));
-            ASSERT(!collectionExists(&ctx, target));
+            ASSERT(collectionExists(&ctx, source.ns()));
+            ASSERT(!collectionExists(&ctx, target.ns()));
         } else {
-            ASSERT(!collectionExists(&ctx, source));
-            ASSERT(collectionExists(&ctx, target));
+            ASSERT(!collectionExists(&ctx, source.ns()));
+            ASSERT(collectionExists(&ctx, target.ns()));
         }
     }
 };
@@ -269,7 +269,7 @@ public:
 
         ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite globalWriteLock(txn.lockState());
-        OldClientContext ctx(&txn, source);
+        OldClientContext ctx(&txn, source.ns());
 
         BSONObj sourceDoc = BSON("_id"
                                  << "source");
@@ -278,8 +278,8 @@ public:
 
         {
             WriteUnitOfWork uow(&txn);
-            ASSERT(!collectionExists(&ctx, source));
-            ASSERT(!collectionExists(&ctx, target));
+            ASSERT(!collectionExists(&ctx, source.ns()));
+            ASSERT(!collectionExists(&ctx, target.ns()));
             ASSERT_OK(userCreateNS(&txn, ctx.db(), source.ns(), BSONObj(), defaultIndexes));
             ASSERT_OK(userCreateNS(&txn, ctx.db(), target.ns(), BSONObj(), defaultIndexes));
 
@@ -288,8 +288,8 @@ public:
 
             uow.commit();
         }
-        ASSERT(collectionExists(&ctx, source));
-        ASSERT(collectionExists(&ctx, target));
+        ASSERT(collectionExists(&ctx, source.ns()));
+        ASSERT(collectionExists(&ctx, target.ns()));
         assertOnlyRecord(&txn, source, sourceDoc);
         assertOnlyRecord(&txn, target, targetDoc);
 
@@ -299,21 +299,21 @@ public:
             WriteUnitOfWork uow(&txn);
             ASSERT_OK(ctx.db()->dropCollection(&txn, target.ns()));
             ASSERT_OK(renameCollection(&txn, source, target));
-            ASSERT(!collectionExists(&ctx, source));
-            ASSERT(collectionExists(&ctx, target));
+            ASSERT(!collectionExists(&ctx, source.ns()));
+            ASSERT(collectionExists(&ctx, target.ns()));
             assertOnlyRecord(&txn, target, sourceDoc);
             if (!rollback) {
                 uow.commit();
             }
         }
         if (rollback) {
-            ASSERT(collectionExists(&ctx, source));
-            ASSERT(collectionExists(&ctx, target));
+            ASSERT(collectionExists(&ctx, source.ns()));
+            ASSERT(collectionExists(&ctx, target.ns()));
             assertOnlyRecord(&txn, source, sourceDoc);
             assertOnlyRecord(&txn, target, targetDoc);
         } else {
-            ASSERT(!collectionExists(&ctx, source));
-            ASSERT(collectionExists(&ctx, target));
+            ASSERT(!collectionExists(&ctx, source.ns()));
+            ASSERT(collectionExists(&ctx, target.ns()));
             assertOnlyRecord(&txn, target, sourceDoc);
         }
     }
@@ -329,7 +329,7 @@ public:
 
         ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock dbXLock(txn.lockState(), nss.db(), MODE_X);
-        OldClientContext ctx(&txn, nss);
+        OldClientContext ctx(&txn, nss.ns());
 
         BSONObj oldDoc = BSON("_id"
                               << "old");
@@ -338,12 +338,12 @@ public:
 
         {
             WriteUnitOfWork uow(&txn);
-            ASSERT(!collectionExists(&ctx, nss));
+            ASSERT(!collectionExists(&ctx, nss.ns()));
             ASSERT_OK(userCreateNS(&txn, ctx.db(), nss.ns(), BSONObj(), defaultIndexes));
             insertRecord(&txn, nss, oldDoc);
             uow.commit();
         }
-        ASSERT(collectionExists(&ctx, nss));
+        ASSERT(collectionExists(&ctx, nss.ns()));
         assertOnlyRecord(&txn, nss, oldDoc);
 
         // END OF SETUP / START OF TEST
@@ -351,16 +351,16 @@ public:
         {
             WriteUnitOfWork uow(&txn);
             ASSERT_OK(ctx.db()->dropCollection(&txn, nss.ns()));
-            ASSERT(!collectionExists(&ctx, nss));
+            ASSERT(!collectionExists(&ctx, nss.ns()));
             ASSERT_OK(userCreateNS(&txn, ctx.db(), nss.ns(), BSONObj(), defaultIndexes));
-            ASSERT(collectionExists(&ctx, nss));
+            ASSERT(collectionExists(&ctx, nss.ns()));
             insertRecord(&txn, nss, newDoc);
             assertOnlyRecord(&txn, nss, newDoc);
             if (!rollback) {
                 uow.commit();
             }
         }
-        ASSERT(collectionExists(&ctx, nss));
+        ASSERT(collectionExists(&ctx, nss.ns()));
         if (rollback) {
             assertOnlyRecord(&txn, nss, oldDoc);
         } else {
@@ -379,28 +379,28 @@ public:
 
         ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock dbXLock(txn.lockState(), nss.db(), MODE_X);
-        OldClientContext ctx(&txn, nss);
+        OldClientContext ctx(&txn, nss.ns());
 
         BSONObj doc = BSON("_id"
                            << "example string");
 
-        ASSERT(!collectionExists(&ctx, nss));
+        ASSERT(!collectionExists(&ctx, nss.ns()));
         {
             WriteUnitOfWork uow(&txn);
 
             ASSERT_OK(userCreateNS(&txn, ctx.db(), nss.ns(), BSONObj(), defaultIndexes));
-            ASSERT(collectionExists(&ctx, nss));
+            ASSERT(collectionExists(&ctx, nss.ns()));
             insertRecord(&txn, nss, doc);
             assertOnlyRecord(&txn, nss, doc);
 
             ASSERT_OK(ctx.db()->dropCollection(&txn, nss.ns()));
-            ASSERT(!collectionExists(&ctx, nss));
+            ASSERT(!collectionExists(&ctx, nss.ns()));
 
             if (!rollback) {
                 uow.commit();
             }
         }
-        ASSERT(!collectionExists(&ctx, nss));
+        ASSERT(!collectionExists(&ctx, nss.ns()));
     }
 };
 
@@ -414,17 +414,17 @@ public:
 
         ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock dbXLock(txn.lockState(), nss.db(), MODE_X);
-        OldClientContext ctx(&txn, nss);
+        OldClientContext ctx(&txn, nss.ns());
 
         BSONObj doc = BSON("_id"
                            << "foo");
 
-        ASSERT(!collectionExists(&ctx, nss));
+        ASSERT(!collectionExists(&ctx, nss.ns()));
         {
             WriteUnitOfWork uow(&txn);
 
             ASSERT_OK(userCreateNS(&txn, ctx.db(), nss.ns(), BSONObj(), defaultIndexes));
-            ASSERT(collectionExists(&ctx, nss));
+            ASSERT(collectionExists(&ctx, nss.ns()));
             insertRecord(&txn, nss, doc);
             assertOnlyRecord(&txn, nss, doc);
             uow.commit();
@@ -437,14 +437,14 @@ public:
             WriteUnitOfWork uow(&txn);
 
             ASSERT_OK(truncateCollection(&txn, nss));
-            ASSERT(collectionExists(&ctx, nss));
+            ASSERT(collectionExists(&ctx, nss.ns()));
             assertEmpty(&txn, nss);
 
             if (!rollback) {
                 uow.commit();
             }
         }
-        ASSERT(collectionExists(&ctx, nss));
+        ASSERT(collectionExists(&ctx, nss.ns()));
         if (rollback) {
             assertOnlyRecord(&txn, nss, doc);
         } else {

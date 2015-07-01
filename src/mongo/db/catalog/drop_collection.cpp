@@ -68,7 +68,7 @@ Status dropCollection(OperationContext* txn,
         if (!db || !coll) {
             return Status(ErrorCodes::NamespaceNotFound, "ns not found");
         }
-        OldClientContext context(txn, collectionName);
+        OldClientContext context(txn, collectionName.ns());
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
             !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionName);
@@ -86,7 +86,7 @@ Status dropCollection(OperationContext* txn,
         WriteUnitOfWork wunit(txn);
         Status s = db->dropCollection(txn, collectionName.ns());
 
-        result.append("ns", collectionName);
+        result.append("ns", collectionName.ns());
 
         if (!s.isOK()) {
             return s;

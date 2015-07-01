@@ -438,10 +438,10 @@ bool DBConfig::_load() {
 
     for (const auto& coll : collections) {
         if (coll.getDropped()) {
-            _collections.erase(coll.getNs());
+            _collections.erase(coll.getNs().ns());
             numCollsErased++;
         } else {
-            _collections[coll.getNs()] = CollectionInfo(coll);
+            _collections[coll.getNs().ns()] = CollectionInfo(coll);
             numCollsSharded++;
         }
     }

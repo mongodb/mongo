@@ -41,29 +41,29 @@
 
 namespace mongo {
 Status collMod(OperationContext* txn,
-               const NamespaceString& ns,
+               const NamespaceString& nss,
                const BSONObj& cmdObj,
                BSONObjBuilder* result) {
-    StringData dbName = ns.db();
+    StringData dbName = nss.db();
     ScopedTransaction transaction(txn, MODE_IX);
     AutoGetDb autoDb(txn, dbName, MODE_X);
     Database* const db = autoDb.getDb();
-    Collection* coll = db ? db->getCollection(ns) : NULL;
+    Collection* coll = db ? db->getCollection(nss) : NULL;
 
     // If db/collection does not exist, short circuit and return.
     if (!db || !coll) {
         return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");
     }
 
-    OldClientContext ctx(txn, ns);
+    OldClientContext ctx(txn, nss.ns());
 
     bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns);
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
                       str::stream() << "Not primary while setting collection options on "
-                                    << ns.toString());
+                                    << nss.ns());
     }
 
     WriteUnitOfWork wunit(txn);
@@ -102,7 +102,7 @@ Status collMod(OperationContext* txn,
             if (idx == NULL) {
                 errorStatus = Status(ErrorCodes::InvalidOptions,
                                      str::stream() << "cannot find index " << keyPattern
-                                                   << " for ns " << ns.toString());
+                                                   << " for ns " << nss.ns());
                 continue;
             }
             BSONElement oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");

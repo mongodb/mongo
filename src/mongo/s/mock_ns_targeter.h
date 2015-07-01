@@ -46,7 +46,7 @@ struct MockRange {
               const NamespaceString nss,
               const BSONObj& minKey,
               const BSONObj& maxKey)
-        : endpoint(endpoint), range(nss, minKey, maxKey, getKeyPattern(minKey)) {}
+        : endpoint(endpoint), range(nss.ns(), minKey, maxKey, getKeyPattern(minKey)) {}
 
     MockRange(const ShardEndpoint& endpoint, const KeyRange& range)
         : endpoint(endpoint), range(range) {}

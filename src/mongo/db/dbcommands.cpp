@@ -888,7 +888,7 @@ public:
             return false;
         }
 
-        result.append("ns", nss);
+        result.append("ns", nss.ns());
 
         long long size = collection->dataSize(txn) / scale;
         long long numRecords = collection->numRecords(txn);

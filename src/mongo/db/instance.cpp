@@ -685,7 +685,7 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
             }
             Lock::CollectionLock collLock(
                 txn->lockState(), nsString.ns(), parsedUpdate.isIsolated() ? MODE_X : MODE_IX);
-            OldClientContext ctx(txn, nsString);
+            OldClientContext ctx(txn, nsString.ns());
 
             //  The common case: no implicit collection creation
             if (!upsert || ctx.db()->getCollection(nsString) != NULL) {
@@ -720,7 +720,7 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
 
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_X);
-        OldClientContext ctx(txn, nsString);
+        OldClientContext ctx(txn, nsString.ns());
         uassert(ErrorCodes::NotMaster,
                 str::stream() << "Not primary while performing update on " << nsString.ns(),
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString));
@@ -789,7 +789,7 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
 
             Lock::CollectionLock collLock(
                 txn->lockState(), nsString.ns(), parsedDelete.isIsolated() ? MODE_X : MODE_IX);
-            OldClientContext ctx(txn, nsString);
+            OldClientContext ctx(txn, nsString.ns());
 
             unique_ptr<PlanExecutor> exec = uassertStatusOK(
                 getExecutorDelete(txn, ctx.db()->getCollection(nsString), &parsedDelete));
