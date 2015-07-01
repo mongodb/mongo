@@ -28,60 +28,35 @@
 
 #include "mongo/platform/basic.h"
 
+#include <string>
+
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-using std::vector;
+using Factory = Accumulator::Factory;
 
-REGISTER_ACCUMULATOR(addToSet, AccumulatorAddToSet::create);
+namespace {
+// Used to keep track of which Accumulators are registered under which name.
+static StringMap<Factory> factoryMap;
+}  // namespace
 
-const char* AccumulatorAddToSet::getOpName() const {
-    return "$addToSet";
+void Accumulator::registerAccumulator(std::string name, Factory factory) {
+    auto it = factoryMap.find(name);
+    massert(28722,
+            str::stream() << "Duplicate accumulator (" << name << ") registered.",
+            it == factoryMap.end());
+    factoryMap[name] = factory;
 }
 
-void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
-    if (!merging) {
-        if (!input.missing()) {
-            bool inserted = set.insert(input).second;
-            if (inserted) {
-                _memUsageBytes += input.getApproximateSize();
-            }
-        }
-    } else {
-        // If we're merging, we need to take apart the arrays we
-        // receive and put their elements into the array we are collecting.
-        // If we didn't, then we'd get an array of arrays, with one array
-        // from each merge source.
-        verify(input.getType() == Array);
-
-        const vector<Value>& array = input.getArray();
-        for (size_t i = 0; i < array.size(); i++) {
-            bool inserted = set.insert(array[i]).second;
-            if (inserted) {
-                _memUsageBytes += array[i].getApproximateSize();
-            }
-        }
-    }
+Factory Accumulator::getFactory(StringData name) {
+    auto it = factoryMap.find(name);
+    uassert(
+        15952, str::stream() << "unknown group operator '" << name << "'", it != factoryMap.end());
+    return it->second;
 }
 
-Value AccumulatorAddToSet::getValue(bool toBeMerged) const {
-    return Value(vector<Value>(set.begin(), set.end()));
-}
-
-AccumulatorAddToSet::AccumulatorAddToSet() {
-    _memUsageBytes = sizeof(*this);
-}
-
-void AccumulatorAddToSet::reset() {
-    SetType().swap(set);
-    _memUsageBytes = sizeof(*this);
-}
-
-intrusive_ptr<Accumulator> AccumulatorAddToSet::create() {
-    return new AccumulatorAddToSet();
-}
-}
+}  // namespace mongo

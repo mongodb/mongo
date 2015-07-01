@@ -35,6 +35,12 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+REGISTER_ACCUMULATOR(first, AccumulatorFirst::create);
+
+const char* AccumulatorFirst::getOpName() const {
+    return "$first";
+}
+
 void AccumulatorFirst::processInternal(const Value& input, bool merging) {
     /* only remember the first value seen */
     if (!_haveFirst) {
@@ -62,9 +68,5 @@ void AccumulatorFirst::reset() {
 
 intrusive_ptr<Accumulator> AccumulatorFirst::create() {
     return new AccumulatorFirst();
-}
-
-const char* AccumulatorFirst::getOpName() const {
-    return "$first";
 }
 }

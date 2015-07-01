@@ -37,6 +37,12 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::vector;
 
+REGISTER_ACCUMULATOR(push, AccumulatorPush::create);
+
+const char* AccumulatorPush::getOpName() const {
+    return "$push";
+}
+
 void AccumulatorPush::processInternal(const Value& input, bool merging) {
     if (!merging) {
         if (!input.missing()) {
@@ -74,9 +80,5 @@ void AccumulatorPush::reset() {
 
 intrusive_ptr<Accumulator> AccumulatorPush::create() {
     return new AccumulatorPush();
-}
-
-const char* AccumulatorPush::getOpName() const {
-    return "$push";
 }
 }

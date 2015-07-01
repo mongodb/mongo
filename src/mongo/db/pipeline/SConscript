@@ -66,6 +66,7 @@ env.Library(
 env.Library(
     target='accumulator',
     source=[
+        'accumulator.cpp',
         'accumulator_add_to_set.cpp',
         'accumulator_avg.cpp',
         'accumulator_first.cpp',

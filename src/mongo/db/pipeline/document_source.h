@@ -44,6 +44,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -57,7 +58,6 @@
 
 namespace mongo {
 
-class Accumulator;
 class Document;
 class Expression;
 class ExpressionFieldPath;
@@ -68,10 +68,13 @@ class PlanExecutor;
 /**
  * Registers a DocumentSource to have the name 'key'. When a stage with name '$key' is found,
  * 'parser' will be called to construct a DocumentSource.
+ *
+ * As an example, if your document source looks like {"$foo": <args>}, with a parsing function
+ * 'createFromBson', you would add this line:
+ * REGISTER_EXPRESSION(foo, DocumentSourceFoo::createFromBson);
  */
 #define REGISTER_DOCUMENT_SOURCE(key, parser)                               \
     MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) { \
-        /* Prevent duplicate document sources with the same name. */        \
         DocumentSource::registerParser("$" #key, (parser));                 \
         return Status::OK();                                                \
     }
@@ -499,7 +502,7 @@ public:
             group field
      */
     void addAccumulator(const std::string& fieldName,
-                        boost::intrusive_ptr<Accumulator>(*pAccumulatorFactory)(),
+                        Accumulator::Factory accumulatorFactory,
                         const boost::intrusive_ptr<Expression>& pExpression);
 
     /// Tell this source if it is doing a merge from shards. Defaults to false.
@@ -577,7 +580,7 @@ private:
       These three vectors parallel each other.
     */
     std::vector<std::string> vFieldName;
-    std::vector<boost::intrusive_ptr<Accumulator>(*)()> vpAccumulatorFactory;
+    std::vector<Accumulator::Factory> vpAccumulatorFactory;
     std::vector<boost::intrusive_ptr<Expression>> vpExpression;
 
 

@@ -35,6 +35,12 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+REGISTER_ACCUMULATOR(last, AccumulatorLast::create);
+
+const char* AccumulatorLast::getOpName() const {
+    return "$last";
+}
+
 void AccumulatorLast::processInternal(const Value& input, bool merging) {
     /* always remember the last value seen */
     _last = input;
@@ -56,9 +62,5 @@ void AccumulatorLast::reset() {
 
 intrusive_ptr<Accumulator> AccumulatorLast::create() {
     return new AccumulatorLast();
-}
-
-const char* AccumulatorLast::getOpName() const {
-    return "$last";
 }
 }

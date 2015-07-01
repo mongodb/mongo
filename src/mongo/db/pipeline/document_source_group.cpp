@@ -206,41 +206,12 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
       _maxMemoryUsageBytes(100 * 1024 * 1024) {}
 
 void DocumentSourceGroup::addAccumulator(const std::string& fieldName,
-                                         intrusive_ptr<Accumulator>(*pAccumulatorFactory)(),
+                                         Accumulator::Factory accumulatorFactory,
                                          const intrusive_ptr<Expression>& pExpression) {
     vFieldName.push_back(fieldName);
-    vpAccumulatorFactory.push_back(pAccumulatorFactory);
+    vpAccumulatorFactory.push_back(accumulatorFactory);
     vpExpression.push_back(pExpression);
 }
-
-
-struct GroupOpDesc {
-    const char* name;
-    intrusive_ptr<Accumulator>(*factory)();
-};
-
-static int GroupOpDescCmp(const void* pL, const void* pR) {
-    return strcmp(((const GroupOpDesc*)pL)->name, ((const GroupOpDesc*)pR)->name);
-}
-
-/*
-  Keep these sorted alphabetically so we can bsearch() them using
-  GroupOpDescCmp() above.
-*/
-static const GroupOpDesc GroupOpTable[] = {
-    {"$addToSet", AccumulatorAddToSet::create},
-    {"$avg", AccumulatorAvg::create},
-    {"$first", AccumulatorFirst::create},
-    {"$last", AccumulatorLast::create},
-    {"$max", AccumulatorMinMax::createMax},
-    {"$min", AccumulatorMinMax::createMin},
-    {"$push", AccumulatorPush::create},
-    {"$stdDevPop", AccumulatorStdDev::createPop},
-    {"$stdDevSamp", AccumulatorStdDev::createSamp},
-    {"$sum", AccumulatorSum::create},
-};
-
-static const size_t NGroupOp = sizeof(GroupOpTable) / sizeof(GroupOpTable[0]);
 
 intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
@@ -292,29 +263,22 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
             for (; subIterator.more(); ++subCount) {
                 BSONElement subElement(subIterator.next());
 
-                /* look for the specified operator */
-                GroupOpDesc key;
-                key.name = subElement.fieldName();
-                const GroupOpDesc* pOp = (const GroupOpDesc*)bsearch(
-                    &key, GroupOpTable, NGroupOp, sizeof(GroupOpDesc), GroupOpDescCmp);
-
-                uassert(15952, str::stream() << "unknown group operator '" << key.name << "'", pOp);
-
+                auto name = subElement.fieldNameStringData();
+                Accumulator::Factory factory = Accumulator::getFactory(name);
                 intrusive_ptr<Expression> pGroupExpr;
-
                 BSONType elementType = subElement.type();
                 if (elementType == Object) {
                     Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
                     pGroupExpr = Expression::parseObject(subElement.Obj(), &oCtx, vps);
                 } else if (elementType == Array) {
                     uasserted(15953,
-                              str::stream() << "aggregating group operators are unary (" << key.name
+                              str::stream() << "aggregating group operators are unary (" << name
                                             << ")");
                 } else { /* assume its an atomic single operand */
                     pGroupExpr = Expression::parseOperand(subElement, vps);
                 }
 
-                pGroup->addAccumulator(pFieldName, pOp->factory, pGroupExpr);
+                pGroup->addAccumulator(pFieldName, factory, pGroupExpr);
             }
 
             uassert(15954,

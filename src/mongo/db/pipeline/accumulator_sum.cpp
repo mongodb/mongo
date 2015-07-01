@@ -35,6 +35,12 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+REGISTER_ACCUMULATOR(sum, AccumulatorSum::create);
+
+const char* AccumulatorSum::getOpName() const {
+    return "$sum";
+}
+
 void AccumulatorSum::processInternal(const Value& input, bool merging) {
     // do nothing with non numeric types
     if (!input.numeric())
@@ -81,9 +87,5 @@ void AccumulatorSum::reset() {
     totalType = NumberInt;
     longTotal = 0;
     doubleTotal = 0;
-}
-
-const char* AccumulatorSum::getOpName() const {
-    return "$sum";
 }
 }

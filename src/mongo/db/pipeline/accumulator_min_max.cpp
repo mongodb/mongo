@@ -35,6 +35,15 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+REGISTER_ACCUMULATOR(max, AccumulatorMinMax::createMax);
+REGISTER_ACCUMULATOR(min, AccumulatorMinMax::createMin);
+
+const char* AccumulatorMinMax::getOpName() const {
+    if (_sense == 1)
+        return "$min";
+    return "$max";
+}
+
 void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
     // nullish values should have no impact on result
     if (!input.nullish()) {
@@ -66,11 +75,5 @@ intrusive_ptr<Accumulator> AccumulatorMinMax::createMin() {
 
 intrusive_ptr<Accumulator> AccumulatorMinMax::createMax() {
     return new AccumulatorMinMax(Sense::MAX);
-}
-
-const char* AccumulatorMinMax::getOpName() const {
-    if (_sense == 1)
-        return "$min";
-    return "$max";
 }
 }

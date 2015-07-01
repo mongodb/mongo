@@ -36,6 +36,13 @@
 namespace mongo {
 using boost::intrusive_ptr;
 
+REGISTER_ACCUMULATOR(stdDevPop, AccumulatorStdDev::createPop);
+REGISTER_ACCUMULATOR(stdDevSamp, AccumulatorStdDev::createSamp);
+
+const char* AccumulatorStdDev::getOpName() const {
+    return (_isSamp ? "$stdDevSamp" : "$stdDevPop");
+}
+
 void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
     if (!merging) {
         // non numeric types have no impact on standard deviation
@@ -100,9 +107,5 @@ void AccumulatorStdDev::reset() {
     _count = 0;
     _mean = 0;
     _m2 = 0;
-}
-
-const char* AccumulatorStdDev::getOpName() const {
-    return (_isSamp ? "$stdDevSamp" : "$stdDevPop");
 }
 }

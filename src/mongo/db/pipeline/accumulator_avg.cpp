@@ -37,6 +37,12 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+REGISTER_ACCUMULATOR(avg, AccumulatorAvg::create);
+
+const char* AccumulatorAvg::getOpName() const {
+    return "$avg";
+}
+
 namespace {
 const char subTotalName[] = "subTotal";
 const char countName[] = "count";
@@ -82,9 +88,5 @@ AccumulatorAvg::AccumulatorAvg() : _total(0), _count(0) {
 void AccumulatorAvg::reset() {
     _total = 0;
     _count = 0;
-}
-
-const char* AccumulatorAvg::getOpName() const {
-    return "$avg";
 }
 }

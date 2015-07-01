@@ -35,10 +35,12 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
@@ -49,6 +51,18 @@ class BSONArrayBuilder;
 class BSONElement;
 class BSONObjBuilder;
 class DocumentSource;
+
+/**
+ * Registers an Parser so it can be called from parseExpression and friends.
+ *
+ * As an example, if your expression looks like {"$foo": [1,2,3]} you would add this line:
+ * REGISTER_EXPRESSION(foo, ExpressionFoo::parse);
+ */
+#define REGISTER_EXPRESSION(key, parser)                                     \
+    MONGO_INITIALIZER(addToExpressionParserMap_##key)(InitializerContext*) { \
+        Expression::registerExpression("$" #key, (parser));                  \
+        return Status::OK();                                                 \
+    }
 
 // TODO: Look into merging with ExpressionContext and possibly ObjectCtx.
 /// The state used as input and working space for Expressions.
@@ -157,6 +171,9 @@ private:
 
 class Expression : public IntrusiveCounterUnsigned {
 public:
+    using Parser =
+        stdx::function<boost::intrusive_ptr<Expression>(BSONElement, const VariablesParseState&)>;
+
     virtual ~Expression(){};
 
     /*
@@ -294,6 +311,14 @@ public:
      *  this function on each other.
      */
     virtual Value evaluateInternal(Variables* vars) const = 0;
+
+    /**
+     * Registers an Parser so it can be called from parseExpression and friends.
+     *
+     * DO NOT call this method directly. Instead, use the REGISTER_EXPRESSION macro defined in this
+     * file.
+     */
+    static void registerExpression(std::string key, Parser parser);
 
 protected:
     typedef std::vector<boost::intrusive_ptr<Expression>> ExpressionVector;
