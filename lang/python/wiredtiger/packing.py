@@ -108,6 +108,16 @@ def unpack(fmt, s):
                 size = 1
             result.append(ord(s[0:1]))
             s = s[1:]
+        elif f in 'Bb':
+            # byte type
+            if not havesize:
+                size = 1
+            for i in xrange(size):
+                v = ord(s[0:1])
+                if f != 'B':
+                    v -= 0x80
+                result.append(v)
+                s = s[1:]
         else:
             # integral type
             if not havesize:
@@ -177,6 +187,19 @@ def pack(fmt, *values):
             if (mask & val) != val:
                 raise ValueError("value out of range for 't' encoding")
             result += chr(val)
+        elif f in 'Bb':
+            # byte type
+            if not havesize:
+                size = 1
+            for i in xrange(size):
+                if f == 'B':
+                    v = val
+                else:
+                    # Translate to maintain ordering with the sign bit.
+                    v = val + 0x80
+                if v > 255 or v < 0:
+                    raise ValueError("value out of range for 'B' encoding")
+                result += chr(v)
         else:
             # integral type
             result += pack_int(val)
