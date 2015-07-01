@@ -117,7 +117,7 @@ main(void)
 	test_spread(INT32_MAX, 1025, 1025);
 	test_spread(INT64_MAX, 1025, 1025);
 	/* Test bigger numbers */
-	for (i = INT64_MAX; i > 0; i >>= 1)
+	for (i = INT64_MAX; i > 0; i = i / 2)
 		test_spread(i, 1025, 1025);
 	printf("\n");
 
