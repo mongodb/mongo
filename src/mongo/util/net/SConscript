@@ -59,6 +59,15 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='message_port_mock',
+    source=[
+        "message_port_mock.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
 env.CppUnitTest(
     target='sock_test',
     source=[

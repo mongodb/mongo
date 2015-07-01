@@ -57,7 +57,8 @@ CatalogManagerReplSetTestFixture::~CatalogManagerReplSetTestFixture() = default;
 
 void CatalogManagerReplSetTestFixture::setUp() {
     _service = stdx::make_unique<ServiceContextNoop>();
-    _client = _service->makeClient("CatalogManagerReplSetTestFixture");
+    _messagePort = stdx::make_unique<MessagingPortMock>();
+    _client = _service->makeClient("CatalogManagerReplSetTestFixture", _messagePort.get());
     _opCtx = _client->makeOperationContext();
 
     auto network(stdx::make_unique<executor::NetworkInterfaceMock>());
@@ -111,6 +112,10 @@ ShardRegistry* CatalogManagerReplSetTestFixture::shardRegistry() const {
 
 executor::NetworkInterfaceMock* CatalogManagerReplSetTestFixture::network() const {
     return _mockNetwork;
+}
+
+MessagingPortMock* CatalogManagerReplSetTestFixture::getMessagingPort() const {
+    return _messagePort.get();
 }
 
 DistLockManagerMock* CatalogManagerReplSetTestFixture::distLock() const {
