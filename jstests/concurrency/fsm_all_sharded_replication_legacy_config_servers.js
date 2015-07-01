@@ -27,6 +27,7 @@ var blacklist = [
     'auth_drop_role.js',
     'auth_drop_user.js', // SERVER-16739 OpenSSL libcrypto crash
 
+    'agg_base.js', // SERVER-18878 previous workload has not finished executing on the secondaries
     'agg_group_external.js', // uses >100MB of data, and is flaky
     'agg_sort_external.js', // uses >100MB of data, and is flaky
     'compact.js', // compact can only be run against a standalone mongod
@@ -60,11 +61,11 @@ var blacklist = [
     'update_simple_eval_nolock.js', // eval doesn't work with sharded collections
     'update_upsert_multi.js', // our update queries lack shard keys
     'update_upsert_multi_noindex.js', // our update queries lack shard keys
+    'upsert_where.js', // cannot use upsert command with $where with sharded collections
     'yield_and_hashed.js', // stagedebug can only be run against a standalone mongod
     'yield_and_sorted.js', // stagedebug can only be run against a standalone mongod
 ].map(function(file) { return dir + '/' + file; });
 
-// SERVER-16196 re-enable executing workloads against sharded clusters
-// runWorkloadsSerially(ls(dir).filter(function(file) {
-//     return !Array.contains(blacklist, file);
-// }), { sharded: true, useLegacyConfigServers: false });
+runWorkloadsSerially(ls(dir).filter(function(file) {
+    return !Array.contains(blacklist, file);
+}), { sharded: true, replication: true, useLegacyConfigServers: true });

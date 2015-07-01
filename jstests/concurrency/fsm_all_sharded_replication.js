@@ -67,4 +67,4 @@ var blacklist = [
 
 runWorkloadsSerially(ls(dir).filter(function(file) {
     return !Array.contains(blacklist, file);
-}), { sharded: true, replication: true });
+}), { sharded: true, replication: true, useLegacyConfigServers: false });

@@ -17,6 +17,7 @@ var Cluster = function(options) {
             'sameDB',
             'setupFunctions',
             'sharded',
+            'useLegacyConfigServers'
             ];
 
         Object.keys(options).forEach(function(option) {
@@ -39,6 +40,13 @@ var Cluster = function(options) {
 
         options.sharded = options.sharded || false;
         assert.eq('boolean', typeof options.sharded);
+
+        if (typeof options.useLegacyConfigServers !== 'undefined') {
+            assert(options.sharded, "Must be sharded if 'useLegacyConfigServers' is specified");
+        }
+
+        options.useLegacyConfigServers = options.useLegacyConfigServers || false;
+        assert.eq('boolean', typeof options.useLegacyConfigServers);
 
         options.setupFunctions = options.setupFunctions || {};
         assert.eq('object', typeof options.setupFunctions);
@@ -83,6 +91,8 @@ var Cluster = function(options) {
             var shardConfig = {
                 shards: 2,
                 mongos: 2,
+                // Legacy config servers are pre-3.2 style, 3-node non-replica-set config servers
+                sync: options.useLegacyConfigServers,
                 verbose: verbosityLevel
             };
 
