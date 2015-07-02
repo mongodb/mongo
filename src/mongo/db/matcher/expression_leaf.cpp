@@ -391,6 +391,8 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 
 // ----
 
+const std::string TypeMatchExpression::kMatchesAllNumbersAlias = "number";
+
 const std::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMap = {
     {"double", NumberDouble},
     {"string", String},
@@ -413,13 +415,23 @@ const std::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMa
     {"maxKey", MaxKey},
     {"minKey", MinKey}};
 
-Status TypeMatchExpression::init(StringData path, BSONType typeInt) {
+Status TypeMatchExpression::initWithBSONType(StringData path, BSONType type) {
     _path = path;
-    _type = typeInt;
+    _type = type;
+    return _elementPath.init(_path);
+}
+
+Status TypeMatchExpression::initAsMatchingAllNumbers(StringData path) {
+    _path = path;
+    _matchesAllNumbers = true;
     return _elementPath.init(_path);
 }
 
 bool TypeMatchExpression::matchesSingleElement(const BSONElement& e) const {
+    if (_matchesAllNumbers) {
+        return e.isNumber();
+    }
+
     return e.type() == _type;
 }
 
@@ -475,7 +487,16 @@ bool TypeMatchExpression::equivalent(const MatchExpression* other) const {
         return false;
 
     const TypeMatchExpression* realOther = static_cast<const TypeMatchExpression*>(other);
-    return _path == realOther->_path && _type == realOther->_type;
+
+    if (_path != realOther->_path) {
+        return false;
+    }
+
+    if (_matchesAllNumbers) {
+        return realOther->_matchesAllNumbers;
+    }
+
+    return _type == realOther->_type;
 }
 
 

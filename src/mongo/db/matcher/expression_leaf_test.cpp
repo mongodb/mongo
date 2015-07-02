@@ -1339,7 +1339,7 @@ TEST(TypeMatchExpression, MatchesElementStringType) {
                          << "abc");
     BSONObj notMatch = BSON("a" << 5);
     TypeMatchExpression type;
-    ASSERT(type.init("", String).isOK());
+    ASSERT(type.initWithBSONType("", String).isOK());
     ASSERT(type.matchesSingleElement(match["a"]));
     ASSERT(!type.matchesSingleElement(notMatch["a"]));
 }
@@ -1349,9 +1349,28 @@ TEST(TypeMatchExpression, MatchesElementNullType) {
     BSONObj notMatch = BSON("a"
                             << "abc");
     TypeMatchExpression type;
-    ASSERT(type.init("", jstNULL).isOK());
+    ASSERT(type.initWithBSONType("", jstNULL).isOK());
     ASSERT(type.matchesSingleElement(match["a"]));
     ASSERT(!type.matchesSingleElement(notMatch["a"]));
+}
+
+TEST(TypeMatchExpression, MatchesElementNumber) {
+    BSONObj match1 = BSON("a" << 1);
+    BSONObj match2 = BSON("a" << 1LL);
+    BSONObj match3 = BSON("a" << 2.5);
+    BSONObj notMatch = BSON("a"
+                            << "abc");
+    ASSERT_EQ(BSONType::NumberInt, match1["a"].type());
+    ASSERT_EQ(BSONType::NumberLong, match2["a"].type());
+    ASSERT_EQ(BSONType::NumberDouble, match3["a"].type());
+
+    TypeMatchExpression type;
+    ASSERT_OK(type.initAsMatchingAllNumbers("a"));
+    ASSERT_EQ("a", type.path());
+    ASSERT_TRUE(type.matchesSingleElement(match1["a"]));
+    ASSERT_TRUE(type.matchesSingleElement(match2["a"]));
+    ASSERT_TRUE(type.matchesSingleElement(match3["a"]));
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
 }
 
 TEST(TypeMatchExpression, InvalidTypeMatchExpressionerand) {
@@ -1361,21 +1380,21 @@ TEST(TypeMatchExpression, InvalidTypeMatchExpressionerand) {
     BSONObj notMatch2 = BSON("a"
                              << "abc");
     TypeMatchExpression type;
-    ASSERT(type.init("", BSONType(JSTypeMax + 1)).isOK());
+    ASSERT(type.initWithBSONType("", BSONType(JSTypeMax + 1)).isOK());
     ASSERT(!type.matchesSingleElement(notMatch1["a"]));
     ASSERT(!type.matchesSingleElement(notMatch2["a"]));
 }
 
 TEST(TypeMatchExpression, MatchesScalar) {
     TypeMatchExpression type;
-    ASSERT(type.init("a", Bool).isOK());
+    ASSERT(type.initWithBSONType("a", Bool).isOK());
     ASSERT(type.matchesBSON(BSON("a" << true), NULL));
     ASSERT(!type.matchesBSON(BSON("a" << 1), NULL));
 }
 
 TEST(TypeMatchExpression, MatchesArray) {
     TypeMatchExpression type;
-    ASSERT(type.init("a", NumberInt).isOK());
+    ASSERT(type.initWithBSONType("a", NumberInt).isOK());
     ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(4)), NULL));
     ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(4 << "a")), NULL));
     ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY("a" << 4)), NULL));
@@ -1385,7 +1404,7 @@ TEST(TypeMatchExpression, MatchesArray) {
 
 TEST(TypeMatchExpression, MatchesOuterArray) {
     TypeMatchExpression type;
-    ASSERT(type.init("a", Array).isOK());
+    ASSERT(type.initWithBSONType("a", Array).isOK());
     // The outer array is not matched.
     ASSERT(!type.matchesBSON(BSON("a" << BSONArray()), NULL));
     ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY(4 << "a")), NULL));
@@ -1397,42 +1416,42 @@ TEST(TypeMatchExpression, MatchesOuterArray) {
 
 TEST(TypeMatchExpression, MatchesObject) {
     TypeMatchExpression type;
-    ASSERT(type.init("a", Object).isOK());
+    ASSERT(type.initWithBSONType("a", Object).isOK());
     ASSERT(type.matchesBSON(BSON("a" << BSON("b" << 1)), NULL));
     ASSERT(!type.matchesBSON(BSON("a" << 1), NULL));
 }
 
 TEST(TypeMatchExpression, MatchesDotNotationFieldObject) {
     TypeMatchExpression type;
-    ASSERT(type.init("a.b", Object).isOK());
+    ASSERT(type.initWithBSONType("a.b", Object).isOK());
     ASSERT(type.matchesBSON(BSON("a" << BSON("b" << BSON("c" << 1))), NULL));
     ASSERT(!type.matchesBSON(BSON("a" << BSON("b" << 1)), NULL));
 }
 
 TEST(TypeMatchExpression, MatchesDotNotationArrayElementArray) {
     TypeMatchExpression type;
-    ASSERT(type.init("a.0", Array).isOK());
+    ASSERT(type.initWithBSONType("a.0", Array).isOK());
     ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(1))), NULL));
     ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY("b")), NULL));
 }
 
 TEST(TypeMatchExpression, MatchesDotNotationArrayElementScalar) {
     TypeMatchExpression type;
-    ASSERT(type.init("a.0", String).isOK());
+    ASSERT(type.initWithBSONType("a.0", String).isOK());
     ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY("b")), NULL));
     ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY(1)), NULL));
 }
 
 TEST(TypeMatchExpression, MatchesDotNotationArrayElementObject) {
     TypeMatchExpression type;
-    ASSERT(type.init("a.0", Object).isOK());
+    ASSERT(type.initWithBSONType("a.0", Object).isOK());
     ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 1))), NULL));
     ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY(1)), NULL));
 }
 
 TEST(TypeMatchExpression, MatchesNull) {
     TypeMatchExpression type;
-    ASSERT(type.init("a", jstNULL).isOK());
+    ASSERT(type.initWithBSONType("a", jstNULL).isOK());
     ASSERT(type.matchesBSON(BSON("a" << BSONNULL), NULL));
     ASSERT(!type.matchesBSON(BSON("a" << 4), NULL));
     ASSERT(!type.matchesBSON(BSONObj(), NULL));
@@ -1440,7 +1459,7 @@ TEST(TypeMatchExpression, MatchesNull) {
 
 TEST(TypeMatchExpression, ElemMatchKey) {
     TypeMatchExpression type;
-    ASSERT(type.init("a.b", String).isOK());
+    ASSERT(type.initWithBSONType("a.b", String).isOK());
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!type.matchesBSON(BSON("a" << 1), &details));
@@ -1462,9 +1481,9 @@ TEST(TypeMatchExpression, Equivalent) {
     TypeMatchExpression e1;
     TypeMatchExpression e2;
     TypeMatchExpression e3;
-    e1.init("a", String);
-    e2.init("a", NumberDouble);
-    e3.init("b", String);
+    e1.initWithBSONType("a", String);
+    e2.initWithBSONType("a", NumberDouble);
+    e3.initWithBSONType("b", String);
 
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));

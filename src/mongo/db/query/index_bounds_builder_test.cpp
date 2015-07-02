@@ -622,6 +622,33 @@ TEST(IndexBoundsBuilderTest, TranslateGteBinData) {
 }
 
 //
+// $type
+//
+
+TEST(IndexBoundsBuilderTest, TypeNumber) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$type: 'number'}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+
+    // Build the expected interval.
+    BSONObjBuilder bob;
+    BSONType type = BSONType::NumberInt;
+    bob.appendMinForType("", type);
+    bob.appendMaxForType("", type);
+    BSONObj expectedInterval = bob.obj();
+
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(expectedInterval, true, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+//
 // $exists tests
 //
 

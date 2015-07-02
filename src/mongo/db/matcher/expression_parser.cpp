@@ -598,8 +598,8 @@ Status MatchExpressionParser::_parseArrayFilterEntries(ArrayFilterEntries* entri
 
 StatusWithMatchExpression MatchExpressionParser::_parseType(const char* name,
                                                             const BSONElement& elt) {
-    if (!elt.isNumber() && elt.type() != String) {
-        return {Status(ErrorCodes::TypeMismatch, "argument to $type is not a number or a string")};
+    if (!elt.isNumber() && elt.type() != BSONType::String) {
+        return Status(ErrorCodes::TypeMismatch, "argument to $type is not a number or a string");
     }
 
     std::unique_ptr<TypeMatchExpression> temp = stdx::make_unique<TypeMatchExpression>();
@@ -609,12 +609,22 @@ StatusWithMatchExpression MatchExpressionParser::_parseType(const char* name,
     // The element can be a number (the BSON type number) or a string representing the name
     // of the type.
     if (elt.isNumber()) {
-        typeInt = (BSONType)elt.numberInt();
+        typeInt = static_cast<BSONType>(elt.numberInt());
         if (elt.type() != NumberInt && typeInt != elt.number()) {
             typeInt = static_cast<BSONType>(-1);
         }
     } else {
+        invariant(elt.type() == BSONType::String);
         std::string typeAlias = elt.str();
+
+        // If typeAlias is 'number', initialize as matching against all number types.
+        if (typeAlias == TypeMatchExpression::kMatchesAllNumbersAlias) {
+            Status s = temp->initAsMatchingAllNumbers(name);
+            if (!s.isOK()) {
+                return s;
+            }
+            return {std::move(temp)};
+        }
 
         // Search the string-int map for the typeAlias (case-sensitive).
         std::unordered_map<std::string, BSONType>::const_iterator it =
@@ -622,12 +632,12 @@ StatusWithMatchExpression MatchExpressionParser::_parseType(const char* name,
         if (it == TypeMatchExpression::typeAliasMap.end()) {
             std::stringstream ss;
             ss << "unknown string alias for $type: " << typeAlias;
-            return {Status(ErrorCodes::BadValue, ss.str())};
+            return Status(ErrorCodes::BadValue, ss.str());
         }
         typeInt = it->second;
     }
 
-    Status s = temp->init(name, typeInt);
+    Status s = temp->initWithBSONType(name, typeInt);
     if (!s.isOK()) {
         return s;
     }
