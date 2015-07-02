@@ -78,8 +78,9 @@ public:
             ASSERT_EQUALS(1U, inserts.size());
             BSONObj insert = inserts.front();
 
-            ActionLogType actualActionLog;
-            ASSERT_TRUE(actualActionLog.parseBSON(insert, &errmsg));
+            auto actualActionLogRes = ActionLogType::fromBSON(insert);
+            ASSERT_OK(actualActionLogRes.getStatus());
+            const ActionLogType& actualActionLog = actualActionLogRes.getValue();
 
             ASSERT_EQUALS(expectedActionLog.toBSON(), actualActionLog.toBSON());
 
@@ -98,6 +99,7 @@ TEST_F(LogActionTest, LogActionNoRetryAfterSuccessfulCreate) {
     expectedActionLog.setServer("server1");
     expectedActionLog.setTime(network()->now());
     expectedActionLog.setWhat("moved a chunk");
+    expectedActionLog.setDetails(boost::none, 0, 1, 1);
 
     auto future =
         launchAsync([this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
@@ -125,6 +127,7 @@ TEST_F(LogActionTest, LogActionNoRetryCreateIfAlreadyExists) {
     expectedActionLog.setServer("server1");
     expectedActionLog.setTime(network()->now());
     expectedActionLog.setWhat("moved a chunk");
+    expectedActionLog.setDetails(boost::none, 0, 1, 1);
 
     auto future =
         launchAsync([this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
@@ -155,6 +158,7 @@ TEST_F(LogActionTest, LogActionCreateFailure) {
     expectedActionLog.setServer("server1");
     expectedActionLog.setTime(network()->now());
     expectedActionLog.setWhat("moved a chunk");
+    expectedActionLog.setDetails(boost::none, 0, 1, 1);
 
     auto future =
         launchAsync([this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });

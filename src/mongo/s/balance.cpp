@@ -208,46 +208,6 @@ void Balancer::_ping(bool waiting) {
         NULL);
 }
 
-/*
-* Builds the details object for the actionlog.
-* Current formats for detail are:
-* Success: {
-*           "candidateChunks" : ,
-*           "chunksMoved" : ,
-*           "executionTimeMillis" : ,
-*           "errorOccured" : false
-*          }
-* Failure: {
-*           "executionTimeMillis" : ,
-*           "errmsg" : ,
-*           "errorOccured" : true
-*          }
-* @param didError, did this round end in an error?
-* @param executionTime, the time this round took to run
-* @param candidateChunks, the number of chunks identified to be moved
-* @param chunksMoved, the number of chunks moved
-* @param errmsg, the error message for this round
-*/
-
-static BSONObj _buildDetails(bool didError,
-                             int executionTime,
-                             int candidateChunks,
-                             int chunksMoved,
-                             const std::string& errmsg) {
-    BSONObjBuilder builder;
-    builder.append("executionTimeMillis", executionTime);
-    builder.append("errorOccured", didError);
-
-    if (didError) {
-        builder.append("errmsg", errmsg);
-    } else {
-        builder.append("candidateChunks", candidateChunks);
-        builder.append("chunksMoved", chunksMoved);
-    }
-
-    return builder.obj();
-}
-
 bool Balancer::_checkOIDs() {
     vector<ShardId> all;
     grid.shardRegistry()->getAllShardIds(&all);
@@ -597,11 +557,10 @@ void Balancer::run() {
                         _moveChunks(candidateChunks, writeConcern.get(), waitForDelete);
                 }
 
-                actionLog.setDetails(_buildDetails(false,
-                                                   balanceRoundTimer.millis(),
-                                                   static_cast<int>(candidateChunks.size()),
-                                                   _balancedLastTime,
-                                                   ""));
+                actionLog.setDetails(boost::none,
+                                     balanceRoundTimer.millis(),
+                                     static_cast<int>(candidateChunks.size()),
+                                     _balancedLastTime);
                 actionLog.setTime(jsTime());
 
                 grid.catalogManager()->logAction(actionLog);
@@ -620,7 +579,7 @@ void Balancer::run() {
             LOG(1) << "*** End of balancing round";
 
             // This round failed, tell the world!
-            actionLog.setDetails(_buildDetails(true, balanceRoundTimer.millis(), 0, 0, e.what()));
+            actionLog.setDetails(string(e.what()), balanceRoundTimer.millis(), 0, 0);
             actionLog.setTime(jsTime());
 
             grid.catalogManager()->logAction(actionLog);

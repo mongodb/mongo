@@ -28,11 +28,11 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -40,31 +40,9 @@ namespace mongo {
  * This class represents the layout and contents of documents contained in the
  * config.actionlog collection. All manipulation of documents coming from that
  * collection should be done with this class.
- *
- * Usage Example:
- *
- *     // Contact the config. 'conn' has been obtained before.
- *     DBClientBase* conn;
- *     BSONObj query = QUERY(ActionLogType::exampleField("exampleFieldName"));
- *     exampleDoc = conn->findOne(ActionLogType::ConfigNS, query);
- *
- *     // Process the response.
- *     ActionLogType exampleType;
- *     std::string errMsg;
- *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
- *         // Can't use 'exampleType'. Take action.
- *     }
- *     // use 'exampleType'
- *
  */
 class ActionLogType {
-    MONGO_DISALLOW_COPYING(ActionLogType);
-
 public:
-    //
-    // schema declarations
-    //
-
     // Name of the actionlog collection in the config server.
     static const std::string ConfigNS;
 
@@ -81,139 +59,78 @@ public:
     static const BSONField<long long> executionTimeMicros;
     static const BSONField<std::string> errmsg;
 
-
-    //
-    // actionlog type methods
-    //
-
-    ActionLogType();
-    ~ActionLogType();
+    /**
+     * Constructs a new ActionLogType object from BSON.
+     * Also does validation of the contents.
+     */
+    static StatusWith<ActionLogType> fromBSON(const BSONObj& source);
 
     /**
-     * Returns true if all the mandatory fields are present and have valid
-     * representations. Otherwise returns false and fills in the optional 'errMsg' string.
+     * Returns OK if all fiels have been set. Otherwise, returns NoSuchKey
+     * and information about the first field that is missing.
      */
-    bool isValid(std::string* errMsg) const;
+    Status validate() const;
 
     /**
      * Returns the BSON representation of the entry.
      */
     BSONObj toBSON() const;
 
-    void buildDetails();
-
-    /**
-     * Clears and populates the internal state using the 'source' BSON object if the
-     * latter contains valid values. Otherwise sets errMsg and returns false.
-     */
-    bool parseBSON(const BSONObj& source, std::string* errMsg);
-
-    /**
-     * Clears the internal state.
-     */
-    void clear();
-
-    /**
-     * Copies all the fields present in 'this' to 'other'.
-     */
-    void cloneTo(ActionLogType* other) const;
-
     /**
      * Returns a std::string representation of the current internal state.
      */
     std::string toString() const;
 
-    //
-    // individual field accessors
-    //
-
-    void setServer(StringData server) {
-        _server = server.toString();
-        _isServerSet = true;
-    }
-
-    void unsetServer() {
-        _isServerSet = false;
-    }
-
-    bool isServerSet() const {
-        return _isServerSet;
-    }
-
-    // Calling get*() methods when the member is not set results in undefined behavior
     const std::string& getServer() const {
-        dassert(_isServerSet);
-        return _what;
+        return _server.get();
     }
+    void setServer(const std::string& server);
 
-    void setWhat(StringData what) {
-        _what = what.toString();
-        _isWhatSet = true;
-    }
-
-    void unsetWhat() {
-        _isWhatSet = false;
-    }
-
-    bool isWhatSet() const {
-        return _isWhatSet;
-    }
-
-    // Calling get*() methods when the member is not set results in undefined behavior
     const std::string& getWhat() const {
-        dassert(_isWhatSet);
-        return _what;
+        return _what.get();
     }
+    void setWhat(const std::string& what);
 
-    void setTime(const Date_t time) {
-        _time = time;
-        _isTimeSet = true;
+    const Date_t& getTime() const {
+        return _time.get();
     }
+    void setTime(const Date_t& time);
 
-    void unsetTime() {
-        _isTimeSet = false;
-    }
-
-    bool isTimeSet() const {
-        return _isTimeSet;
-    }
-
-    // Calling get*() methods when the member is not set results in undefined behavior
-    const Date_t getTime() const {
-        dassert(_isTimeSet);
-        return _time;
-    }
-
-    void setDetails(const BSONObj& details) {
-        _details = details.getOwned();
-        _isDetailsSet = true;
-    }
-
-    void unsetDetails() {
-        _isDetailsSet = false;
-    }
-
-    bool isDetailsSet() const {
-        return _isDetailsSet;
-    }
-
-    // Calling get*() methods when the member is not set results in undefined behavior
-    const BSONObj getDetails() const {
-        dassert(_isDetailsSet);
-        return _details;
-    }
+    /*
+     * Builds the details object for the actionlog.
+     * Current formats for detail are:
+     * Success: {
+     *           "candidateChunks" : ,
+     *           "chunksMoved" : ,
+     *           "executionTimeMillis" : ,
+     *           "errorOccured" : false
+     *          }
+     * Failure: {
+     *           "executionTimeMillis" : ,
+     *           "errmsg" : ,
+     *           "errorOccured" : true
+     *          }
+     * @param errMsg: set if a balancer round resulted in an error
+     * @param executionTime: the time this round took to run
+     * @param candidateChunks: the number of chunks identified to be moved
+     * @param chunksMoved: the number of chunks moved
+     */
+    void setDetails(const boost::optional<std::string>& errMsg,
+                    int executionTime,
+                    int candidateChunks,
+                    int chunksMoved);
 
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-    std::string _server;  // (M)  hostname of server that we are making the change on.
-                          // Does not include port.
-    bool _isServerSet;
-    std::string _what;  // (M)  what the action being performed was.
-    bool _isWhatSet;
-    Date_t _time;  // (M)  time this change was made
-    bool _isTimeSet;
-    BSONObj _details;  // (M)  A BSONObj containing extra information about some operations
-    bool _isDetailsSet;
+
+    // (M) hostname of server that we are making the change on. Does not include the port.
+    boost::optional<std::string> _server;
+    // (M) what the action being performed is.
+    boost::optional<std::string> _what;
+    // (M) time this change was made.
+    boost::optional<Date_t> _time;
+    // (M) A BSON document containing extra information about some operations
+    boost::optional<BSONObj> _details;
 };
 
 }  // namespace mongo
