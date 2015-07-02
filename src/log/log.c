@@ -768,7 +768,7 @@ err:	WT_TRET(__wt_close(session, &log_fh));
  */
 int
 __wt_log_allocfile(
-    WT_SESSION_IMPL *session, uint32_t lognum, const char *dest, int prealloc)
+    WT_SESSION_IMPL *session, uint32_t lognum, int preparing)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(from_path);
@@ -776,38 +776,45 @@ __wt_log_allocfile(
 	WT_DECL_RET;
 	WT_FH *log_fh;
 	WT_LOG *log;
+	const char *create_name;
 
 	conn = S2C(session);
+	create_name = preparing ? WT_LOG_PREPNAME : WT_LOG_TMPNAME;
 	log = conn->log;
 	log_fh = NULL;
+
 	/*
 	 * Preparing a log file entails creating a temporary file:
 	 * - Writing the header.
 	 * - Truncating to the offset of the first record.
-	 * - Pre-allocating the file if needed.
-	 * - Renaming it to the pre-allocated file name.
+	 * - Pre-allocating the file if needed (we don't make application
+	 *   threads wait to pre-allocate).
+	 * - Renaming it to the desired file name.
 	 */
-	WT_RET(__wt_scr_alloc(session, 0, &from_path));
-	WT_ERR(__wt_scr_alloc(session, 0, &to_path));
-	WT_ERR(__log_filename(session, lognum, WT_LOG_TMPNAME, from_path));
-	WT_ERR(__log_filename(session, lognum, dest, to_path));
-	/*
-	 * Set up the temporary file.
-	 */
-	WT_ERR(__log_openfile(session, 1, &log_fh, WT_LOG_TMPNAME, lognum));
+	WT_ERR(__log_openfile(session, 1, &log_fh, create_name, lognum));
 	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
 	WT_ERR(__wt_ftruncate(session, log_fh, WT_LOG_FIRST_RECORD));
-	if (prealloc)
+	if (preparing)
 		WT_ERR(__log_prealloc(session, log_fh));
 	WT_ERR(__wt_fsync(session, log_fh));
 	WT_ERR(__wt_close(session, &log_fh));
-	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-	    "log_prealloc: rename %s to %s",
-	    (char *)from_path->data, (char *)to_path->data));
+
 	/*
-	 * Rename it into place and make it available.
+	 * If we are allocating a file for real, rename it into place and make
+	 * it available.  Don't do this when preparing, or we could race
+	 * on the name of the temporary file.
 	 */
-	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
+	if (!preparing) {
+		WT_ERR(__wt_scr_alloc(session, 0, &from_path));
+		WT_ERR(__wt_scr_alloc(session, 0, &to_path));
+		WT_ERR(__log_filename(session, lognum, create_name, from_path));
+		WT_ERR(__log_filename(
+		    session, lognum, WT_LOG_FILENAME, to_path));
+		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+		    "log_prealloc: rename %s to %s",
+		    (char *)from_path->data, (char *)to_path->data));
+		WT_ERR(__wt_rename(session, from_path->data, to_path->data));
+	}
 
 err:	__wt_scr_free(session, &from_path);
 	__wt_scr_free(session, &to_path);
@@ -1246,8 +1253,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 */
 	if (create_log) {
 		log->prep_missed++;
-		if ((ret = __wt_log_allocfile(
-		    session, log->fileid, WT_LOG_FILENAME, 0)) != 0)
+		if ((ret = __wt_log_allocfile(session, log->fileid, 0)) != 0)
 			return (ret);
 	}
 	WT_RET(__log_openfile(session,
