@@ -69,9 +69,7 @@ using unittest::assertGet;
 static const stdx::chrono::seconds kFutureTimeout{5};
 
 TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType expectedColl;
     expectedColl.setNs(NamespaceString("TestDB.TestNS"));
@@ -104,9 +102,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetCollectionNotExisting) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
         auto status = catalogManager()->getCollection("NonExistent");
@@ -120,9 +116,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionNotExisting) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseExisting) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     DatabaseType expectedDb;
     expectedDb.setName("bigdata");
@@ -152,9 +146,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseExisting) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseNotExisting) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
         auto dbResult = catalogManager()->getDatabase("NonExistent");
@@ -167,9 +159,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseNotExisting) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateCollection) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType collection;
     collection.setNs(NamespaceString("db.coll"));
@@ -212,9 +202,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollection) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMaster) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType collection;
     collection.setNs(NamespaceString("db.coll"));
@@ -244,9 +232,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMaster) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterFromTargeter) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(Status(ErrorCodes::NotMaster, "not master"));
+    configTargeter()->setFindHostReturnValue(Status(ErrorCodes::NotMaster, "not master"));
 
     CollectionType collection;
     collection.setNs(NamespaceString("db.coll"));
@@ -265,11 +251,9 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterFromTargeter) 
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     HostAndPort host1("TestHost1");
     HostAndPort host2("TestHost2");
-    targeter->setFindHostReturnValue(host1);
+    configTargeter()->setFindHostReturnValue(host1);
 
     CollectionType collection;
     collection.setNs(NamespaceString("db.coll"));
@@ -283,7 +267,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) 
         ASSERT_OK(status);
     });
 
-    onCommand([host1, host2, targeter](const RemoteCommandRequest& request) {
+    onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(host1, request.target);
 
         BatchedCommandResponse response;
@@ -293,7 +277,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) 
 
         // Ensure that when the catalog manager tries to retarget after getting the
         // NotMaster response, it will get back a new target.
-        targeter->setFindHostReturnValue(host2);
+        configTargeter()->setFindHostReturnValue(host2);
         return response.toBSON();
     });
 
@@ -326,9 +310,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) 
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsValid) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ShardType s1;
     s1.setName("shard0000");
@@ -377,9 +359,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsValid) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsWithInvalidShard) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
         vector<ShardType> shards;
@@ -405,9 +385,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsWithInvalidShard) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSWithSortAndLimit) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     OID oid = OID::gen();
 
@@ -464,9 +442,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSWithSortAndLimit) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSNoSortNoLimit) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkVersion queryChunkVersion({1, 2, OID::gen()});
 
@@ -502,9 +478,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSNoSortNoLimit) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkVersion queryChunkVersion({1, 2, OID::gen()});
 
@@ -545,9 +519,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommand) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
@@ -573,9 +545,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommand) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommandUnsatisfiedReadPref) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(
+    configTargeter()->setFindHostReturnValue(
         Status(ErrorCodes::FailedToSatisfyReadPreference, "no nodes up"));
 
     BSONObjBuilder responseBuilder;
@@ -587,9 +557,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommandUnsatisfied
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandDistLockHeld) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     distLock()->expectLock(
         [](StringData name,
@@ -613,9 +581,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandDistLockHe
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandSuccess) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     distLock()->expectLock(
         [](StringData name,
@@ -657,9 +623,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandSuccess) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMaster) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     distLock()->expectLock(
         [](StringData name,
@@ -700,9 +664,9 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMaster)
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMasterRetrySuccess) {
     HostAndPort host1("TestHost1");
     HostAndPort host2("TestHost2");
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(host1);
+
+
+    configTargeter()->setFindHostReturnValue(host1);
 
     distLock()->expectLock(
         [](StringData name,
@@ -727,7 +691,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMasterR
         ASSERT_OK(commandStatus);
     });
 
-    onCommand([targeter, host1, host2](const RemoteCommandRequest& request) {
+    onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(host1, request.target);
 
         BSONObjBuilder responseBuilder;
@@ -735,7 +699,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMasterR
 
         // Ensure that when the catalog manager tries to retarget after getting the
         // NotMaster response, it will get back a new target.
-        targeter->setFindHostReturnValue(host2);
+        configTargeter()->setFindHostReturnValue(host2);
         return responseBuilder.obj();
     });
 
@@ -754,9 +718,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMasterR
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsBalancerDoc) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     // sample balancer doc
     SettingsType st1;
@@ -784,9 +746,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsBalancerDoc) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsChunkSizeDoc) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     // sample chunk size doc
     SettingsType st1;
@@ -814,9 +774,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsChunkSizeDoc) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsInvalidDoc) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
         const auto balSettings = catalogManager()->getGlobalSettings("invalidKey");
@@ -843,9 +801,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsInvalidDoc) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
         const auto chunkSizeSettings =
@@ -870,9 +826,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsNoDb) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType coll1;
     coll1.setNs(NamespaceString{"test.system.indexes"});
@@ -928,9 +882,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsNoDb) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsWithDb) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType coll1;
     coll1.setNs(NamespaceString{"test.system.indexes"});
@@ -979,9 +931,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsWithDb) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsInvalidCollectionType) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
         string dbName = "test";
@@ -1024,9 +974,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsInvalidCollectionType) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardValid) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     DatabaseType dbt1;
     dbt1.setName("db1");
@@ -1064,9 +1012,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardValid) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardInvalidDoc) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
         vector<string> dbs;
@@ -1091,9 +1037,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardInvalidDoc) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollection) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     TagsType tagA;
     tagA.setNS("TestDB.TestColl");
@@ -1135,9 +1079,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollection) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionNoTags) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
         vector<TagsType> tags;
@@ -1154,9 +1096,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionNoTags) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionInvalidTag) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
         vector<TagsType> tags;
@@ -1186,9 +1126,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionInvalidTag) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkOneTagFound) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkType chunk;
     chunk.setName("chunk0000");
@@ -1228,9 +1166,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkOneTagFound) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkNoTagFound) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkType chunk;
     chunk.setName("chunk0000");
@@ -1264,9 +1200,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkNoTagFound) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkInvalidTagDoc) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkType chunk;
     chunk.setName("chunk0000");
@@ -1304,9 +1238,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkInvalidTagDoc) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabase) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     DatabaseType dbt;
     dbt.setName("test");
@@ -1346,10 +1278,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabase) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabaseHostUnreachable) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
     HostAndPort host1("TestHost1");
-    targeter->setFindHostReturnValue(host1);
+    configTargeter()->setFindHostReturnValue(host1);
 
     DatabaseType dbt;
     dbt.setName("test");
@@ -1377,9 +1307,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabaseHostUnreachable) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecated) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArray updateOps = BSON_ARRAY(BSON("update1"
                                           << "first update")
@@ -1408,9 +1336,7 @@ TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecated) {
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecatedCommandFailed) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArray updateOps = BSON_ARRAY(BSON("update1"
                                           << "first update")
@@ -1444,9 +1370,7 @@ TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecatedCommandFailed) {
 TEST_F(CatalogManagerReplSetTestFixture, createDatabaseSuccess) {
     const string dbname = "databaseToCreate";
     const HostAndPort configHost("TestHost1");
-
-    RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter())
-        ->setFindHostReturnValue(configHost);
+    configTargeter()->setFindHostReturnValue(configHost);
 
     ShardType s0;
     s0.setName("shard0000");
@@ -1478,10 +1402,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseSuccess) {
 
     future.wait_for(kFutureTimeout);
 
-    // Set up all the target mocks return values.  Have to redo this for the config shard because
-    // shardRegistry()->reload() re-creates the config shard entry and its targeter
-    RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter())
-        ->setFindHostReturnValue(configHost);
+    // Set up all the target mocks return values.
     RemoteCommandTargeterMock::get(shardRegistry()->getShard(s0.getName())->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s0.getHost()));
     RemoteCommandTargeterMock::get(shardRegistry()->getShard(s1.getName())->getTargeter())
@@ -1575,9 +1496,8 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseSuccess) {
 TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDistLockHeld) {
     const string dbname = "databaseToCreate";
 
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     distLock()->expectLock(
         [dbname](StringData name,
@@ -1596,9 +1516,8 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDistLockHeld) {
 TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDBExists) {
     const string dbname = "databaseToCreate";
 
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     distLock()->expectLock([dbname](StringData name,
                                     StringData whyMessage,
@@ -1633,9 +1552,8 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDBExistsDifferentCase) {
     const string dbname = "databaseToCreate";
     const string dbnameDiffCase = "databasetocreate";
 
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     distLock()->expectLock([dbname](StringData name,
                                     StringData whyMessage,
@@ -1669,9 +1587,8 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDBExistsDifferentCase) {
 TEST_F(CatalogManagerReplSetTestFixture, createDatabaseNoShards) {
     const string dbname = "databaseToCreate";
 
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     distLock()->expectLock([dbname](StringData name,
                                     StringData whyMessage,
@@ -1711,9 +1628,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseNoShards) {
 TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDuplicateKeyOnInsert) {
     const string dbname = "databaseToCreate";
     const HostAndPort configHost("TestHost1");
-
-    RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter())
-        ->setFindHostReturnValue(configHost);
+    configTargeter()->setFindHostReturnValue(configHost);
 
     ShardType s0;
     s0.setName("shard0000");
@@ -1745,10 +1660,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDuplicateKeyOnInsert) {
 
     future.wait_for(kFutureTimeout);
 
-    // Set up all the target mocks return values.  Have to redo this for the config shard because
-    // shardRegistry()->reload() re-creates the config shard entry and its targeter
-    RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter())
-        ->setFindHostReturnValue(configHost);
+    // Set up all the target mocks return values.
     RemoteCommandTargeterMock::get(shardRegistry()->getShard(s0.getName())->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s0.getHost()));
     RemoteCommandTargeterMock::get(shardRegistry()->getShard(s1.getName())->getTargeter())

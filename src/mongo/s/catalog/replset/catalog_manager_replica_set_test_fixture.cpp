@@ -34,6 +34,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/service_context_noop.h"
@@ -79,6 +80,10 @@ void CatalogManagerReplSetTestFixture::setUp() {
                                         {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}}),
         stdx::make_unique<DistLockManagerMock>()));
 
+    auto configTargeter(stdx::make_unique<RemoteCommandTargeterMock>());
+    _configTargeter = configTargeter.get();
+    _targeterFactory->addTargeterToReturn(cm->connectionString(), std::move(configTargeter));
+
     auto shardRegistry(stdx::make_unique<ShardRegistry>(
         std::move(targeterFactory), std::move(executor), _mockNetwork, cm.get()));
     shardRegistry->startup();
@@ -115,6 +120,12 @@ RemoteCommandTargeterFactoryMock* CatalogManagerReplSetTestFixture::targeterFact
     invariant(_targeterFactory);
 
     return _targeterFactory;
+}
+
+RemoteCommandTargeterMock* CatalogManagerReplSetTestFixture::configTargeter() const {
+    invariant(_configTargeter);
+
+    return _configTargeter;
 }
 
 executor::NetworkInterfaceMock* CatalogManagerReplSetTestFixture::network() const {

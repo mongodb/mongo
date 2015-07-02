@@ -117,9 +117,7 @@ public:
 };
 
 TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChangelogType expectedChangeLog;
     expectedChangeLog.setServer(network()->getHostName());
@@ -157,9 +155,7 @@ TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
 }
 
 TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChangelogType expectedChangeLog;
     expectedChangeLog.setServer(network()->getHostName());
@@ -200,9 +196,7 @@ TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
 }
 
 TEST_F(LogChangeTest, LogActionCreateFailure) {
-    RemoteCommandTargeterMock* targeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
-    targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChangelogType expectedChangeLog;
     expectedChangeLog.setServer(network()->getHostName());

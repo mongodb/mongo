@@ -42,6 +42,7 @@ class CatalogManagerReplicaSet;
 class DistLockManagerMock;
 struct RemoteCommandRequest;
 class RemoteCommandTargeterFactoryMock;
+class RemoteCommandTargeterMock;
 class ShardRegistry;
 template <typename T>
 class StatusWith;
@@ -71,6 +72,8 @@ protected:
 
     RemoteCommandTargeterFactoryMock* targeterFactory() const;
 
+    RemoteCommandTargeterMock* configTargeter() const;
+
     executor::NetworkInterfaceMock* network() const;
 
     MessagingPortMock* getMessagingPort() const;
@@ -98,6 +101,7 @@ private:
     std::unique_ptr<MessagingPortMock> _messagePort;
 
     RemoteCommandTargeterFactoryMock* _targeterFactory;
+    RemoteCommandTargeterMock* _configTargeter;
 
     executor::NetworkInterfaceMock* _mockNetwork;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
