@@ -455,6 +455,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
+	uint64_t app_evicts, app_waits, reads;
 	uint64_t entries, highest, tmp;
 
 	cp = __wt_process.cache_pool;
@@ -468,37 +469,50 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 			continue;
 		cache = entry->cache;
 		++entries;
-		/* Copy the value out so it doesn't change underneath us */
+
+		/*
+		 * Figure out a delta since the last time we did an assessment
+		 * for each metric we are tracking.  Watch out for wrapping
+		 * of values.
+		 */
 		tmp = cache->bytes_read;
-		/* Handle wrapping of eviction requests. */
 		if (tmp >= cache->cp_saved_read)
-			cache->cp_pass_read = tmp - cache->cp_saved_read;
+			reads = tmp - cache->cp_saved_read;
 		else
-			cache->cp_pass_read = tmp;
+			reads = (UINT64_MAX - cache->cp_saved_read) + tmp;
 		cache->cp_saved_read = tmp;
 
 		/* Update the application eviction count information */
-		tmp = cache->cp_saved_app_evicts;
-		cache->cp_pass_app_evicts =
-		    tmp - cache->cp_pass_app_evicts;
+		tmp = cache->app_evicts;
+		if (tmp >= cache->cp_saved_app_evicts)
+			app_evicts = tmp - cache->cp_saved_app_evicts;
+		else
+			app_evicts =
+			    (UINT64_MAX - cache->cp_saved_app_evicts) + tmp;
 		cache->cp_saved_app_evicts = tmp;
 
 		/* Update the eviction wait information */
-		tmp = cache->cp_saved_app_waits;
-		cache->cp_pass_app_waits =
-		    tmp - cache->cp_pass_app_waits;
+		tmp = cache->app_waits;
+		if (tmp >= cache->cp_saved_app_waits)
+			app_waits = tmp - cache->cp_saved_app_waits;
+		else
+			app_waits =
+			    (UINT64_MAX - cache->cp_saved_app_waits) + tmp;
 		cache->cp_saved_app_waits = tmp;
 
 		/* Calculate the weighted pressure for this member */
 		cache->cp_pass_pressure =
-		    (cache->cp_pass_app_evicts *
-		    WT_CACHE_POOL_APP_EVICT_MULTIPLIER) +
-		    (cache->cp_pass_app_waits *
-		    WT_CACHE_POOL_APP_WAIT_MULTIPLIER) +
-		    (cache->cp_pass_read * WT_CACHE_POOL_READ_MULTIPLIER);
+		    (app_evicts * WT_CACHE_POOL_APP_EVICT_MULTIPLIER) +
+		    (app_waits * WT_CACHE_POOL_APP_WAIT_MULTIPLIER) +
+		    (reads * WT_CACHE_POOL_READ_MULTIPLIER);
 
 		if (cache->cp_pass_pressure > highest)
 			highest = cache->cp_pass_pressure;
+
+		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
+		    "Assess entry. reads: %" PRIu64 ", app evicts: %" PRIu64
+		    ", app waits: %" PRIu64 ", pressure: %" PRIu64,
+		    reads, app_evicts, app_waits, cache->cp_pass_pressure));
 	}
 	WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 	    "Highest eviction count: %" PRIu64 ", entries: %" PRIu64,

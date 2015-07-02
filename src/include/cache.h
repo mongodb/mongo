@@ -108,17 +108,15 @@ struct __wt_cache {
 	/*
 	 * Cache pool information.
 	 */
+	uint64_t cp_pass_pressure;	/* Calculated pressure from this pass */
+	uint64_t cp_reserved;		/* Base size for this cache */
+	WT_SESSION_IMPL *cp_session;	/* May be used for cache management */
+	uint32_t cp_skip_count;		/* Post change stabilization */
+	wt_thread_t cp_tid;		/* Thread ID for cache pool manager */
+	/* State seen at the last pass of the shared cache manager */
 	uint64_t cp_saved_app_evicts;	/* User eviction count at last review */
 	uint64_t cp_saved_app_waits;	/* User wait count at last review */
 	uint64_t cp_saved_read;		/* Read count at last review */
-	uint64_t cp_pass_app_evicts;	/* User eviction count from this pass */
-	uint64_t cp_pass_app_waits;	/* User wait count from this pass */
-	uint64_t cp_pass_pressure;	/* Calculated pressure from this pass */
-	uint64_t cp_pass_read;		/* Read count from this pass */
-	uint32_t cp_skip_count;		/* Post change stabilization */
-	uint64_t cp_reserved;		/* Base size for this cache */
-	WT_SESSION_IMPL *cp_session;	/* May be used for cache management */
-	wt_thread_t cp_tid;		/* Thread ID for cache pool manager */
 
 	/*
 	 * Flags.
