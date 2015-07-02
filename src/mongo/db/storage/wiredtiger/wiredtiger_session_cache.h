@@ -152,7 +152,7 @@ private:
     AtomicUInt32 _shuttingDown;         // Used as boolean - 0 = false, 1 = true
 
     SpinLock _cacheLock;
-    typedef std::list<WiredTigerSession*> SessionCache;
+    typedef std::vector<WiredTigerSession*> SessionCache;
     SessionCache _sessions;
 
     // Bumped when all open sessions need to be closed
