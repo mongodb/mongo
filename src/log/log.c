@@ -776,25 +776,28 @@ __wt_log_allocfile(
 	WT_DECL_RET;
 	WT_FH *log_fh;
 	WT_LOG *log;
+	uint32_t tmp_id;
 
 	conn = S2C(session);
 	log = conn->log;
 	log_fh = NULL;
+
 	/*
 	 * Preparing a log file entails creating a temporary file:
 	 * - Writing the header.
 	 * - Truncating to the offset of the first record.
 	 * - Pre-allocating the file if needed.
-	 * - Renaming it to the pre-allocated file name.
+	 * - Renaming it to the desired file name.
 	 */
 	WT_RET(__wt_scr_alloc(session, 0, &from_path));
 	WT_ERR(__wt_scr_alloc(session, 0, &to_path));
-	WT_ERR(__log_filename(session, lognum, WT_LOG_TMPNAME, from_path));
+	tmp_id = WT_ATOMIC_ADD4(log->tmp_fileid, 1);
+	WT_ERR(__log_filename(session, tmp_id, WT_LOG_TMPNAME, from_path));
 	WT_ERR(__log_filename(session, lognum, dest, to_path));
 	/*
 	 * Set up the temporary file.
 	 */
-	WT_ERR(__log_openfile(session, 1, &log_fh, WT_LOG_TMPNAME, lognum));
+	WT_ERR(__log_openfile(session, 1, &log_fh, WT_LOG_TMPNAME, tmp_id));
 	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
 	WT_ERR(__wt_ftruncate(session, log_fh, WT_LOG_FIRST_RECORD));
 	if (prealloc)

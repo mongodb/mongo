@@ -117,6 +117,7 @@ typedef struct {
 	 */
 	uint32_t	 fileid;	/* Current log file number */
 	uint32_t	 prep_fileid;	/* Pre-allocated file number */
+	uint32_t	 tmp_fileid;	/* Temporary file number */
 	uint32_t	 prep_missed;	/* Pre-allocated file misses */
 	WT_FH           *log_fh;	/* Logging file handle */
 	WT_FH           *log_close_fh;	/* Logging file handle to close */
