@@ -30,17 +30,21 @@
 
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
@@ -55,6 +59,8 @@ using std::vector;
 CatalogManagerReplSetTestFixture::CatalogManagerReplSetTestFixture() = default;
 
 CatalogManagerReplSetTestFixture::~CatalogManagerReplSetTestFixture() = default;
+
+const stdx::chrono::seconds CatalogManagerReplSetTestFixture::kFutureTimeout{5};
 
 void CatalogManagerReplSetTestFixture::setUp() {
     _service = stdx::make_unique<ServiceContextNoop>();
@@ -157,6 +163,38 @@ void CatalogManagerReplSetTestFixture::onCommand(NetworkTestEnv::OnCommandFuncti
 
 void CatalogManagerReplSetTestFixture::onFindCommand(NetworkTestEnv::OnFindCommandFunction func) {
     _networkTestEnv->onFindCommand(func);
+}
+
+void CatalogManagerReplSetTestFixture::setupShards(const std::vector<ShardType>& shards) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    auto future = launchAsync([this] { shardRegistry()->reload(); });
+
+    onFindCommand([&shards](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
+
+        auto queryResult = LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false);
+        ASSERT_OK(queryResult.getStatus());
+
+        const auto& query = queryResult.getValue();
+        ASSERT_EQ(query->ns(), ShardType::ConfigNS);
+
+        ASSERT_EQ(query->getFilter(), BSONObj());
+        ASSERT_EQ(query->getSort(), BSONObj());
+        ASSERT_FALSE(query->getLimit().is_initialized());
+
+        vector<BSONObj> shardsToReturn;
+
+        std::transform(shards.begin(),
+                       shards.end(),
+                       std::back_inserter(shardsToReturn),
+                       [](const ShardType& shard) { return shard.toBSON(); });
+
+        return shardsToReturn;
+    });
+
+    future.timed_get(kFutureTimeout);
 }
 
 }  // namespace mongo

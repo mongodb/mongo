@@ -33,6 +33,7 @@
 #include <pcrecpp.h>
 
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -65,8 +66,6 @@ using std::string;
 using std::vector;
 using stdx::chrono::milliseconds;
 using unittest::assertGet;
-
-static const stdx::chrono::seconds kFutureTimeout{5};
 
 TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
@@ -1748,6 +1747,243 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDuplicateKeyOnInsert) {
 
         return response.toBSON();
     });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, EnableShardingNoDBExists) {
+    vector<ShardType> shards;
+    ShardType shard;
+    shard.setName("shard0");
+    shard.setHost("shard0:12");
+
+    setupShards(vector<ShardType>{shard});
+
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    RemoteCommandTargeterMock* shardTargeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("shard0")->getTargeter());
+    shardTargeter->setFindHostReturnValue(HostAndPort("shard0:12"));
+
+    distLock()->expectLock(
+        [](StringData name,
+           StringData whyMessage,
+           stdx::chrono::milliseconds,
+           stdx::chrono::milliseconds) {
+            ASSERT_EQ("test", name);
+            ASSERT_FALSE(whyMessage.empty());
+        },
+        Status::OK());
+
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->enableSharding("test");
+        ASSERT_OK(status);
+    });
+
+    // Query to find if db already exists in config.
+    onFindCommand([](const RemoteCommandRequest& request) {
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(DatabaseType::ConfigNS, nss.toString());
+
+        auto queryResult = LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false);
+        ASSERT_OK(queryResult.getStatus());
+
+        const auto& query = queryResult.getValue();
+        BSONObj expectedQuery(fromjson(R"({ _id: { $regex: "^test$", $options: "i" }})"));
+
+        ASSERT_EQ(DatabaseType::ConfigNS, query->ns());
+        ASSERT_EQ(expectedQuery, query->getFilter());
+        ASSERT_EQ(BSONObj(), query->getSort());
+        ASSERT_EQ(1, query->getLimit().get());
+
+        return vector<BSONObj>{};
+    });
+
+    // list databases for checking shard size.
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQ(HostAndPort("shard0:12"), request.target);
+        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
+
+        return fromjson(R"({
+                databases: [],
+                totalSize: 1,
+                ok: 1
+            })");
+    });
+
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        BSONObj expectedCmd(fromjson(R"({
+            update: "databases",
+            updates: [{
+                q: { _id: "test" },
+                u: { _id: "test", primary: "shard0", partitioned: true },
+                multi: false,
+                upsert: true
+            }],
+            writeConcern: { w: "majority" }
+        })"));
+
+        ASSERT_EQ(expectedCmd, request.cmdObj);
+
+        return fromjson(R"({
+                nModified: 0,
+                n: 1,
+                upserted: [
+                    { _id: "test", primary: "shard0", partitioned: true }
+                ],
+                ok: 1
+            })");
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, EnableShardingLockBusy) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    distLock()->expectLock(
+        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
+        {ErrorCodes::LockBusy, "lock taken"});
+
+    auto status = catalogManager()->enableSharding("test");
+    ASSERT_EQ(ErrorCodes::LockBusy, status.code());
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, EnableShardingDBExistsWithDifferentCase) {
+    vector<ShardType> shards;
+    ShardType shard;
+    shard.setName("shard0");
+    shard.setHost("shard0:12");
+
+    setupShards(vector<ShardType>{shard});
+
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    distLock()->expectLock(
+        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
+        Status::OK());
+
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->enableSharding("test");
+        ASSERT_EQ(ErrorCodes::DatabaseDifferCase, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    // Query to find if db already exists in config.
+    onFindCommand([](const RemoteCommandRequest& request) {
+        BSONObj existingDoc(fromjson(R"({ _id: "Test", primary: "shard0", partitioned: true })"));
+        return vector<BSONObj>{existingDoc};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, EnableShardingDBExists) {
+    vector<ShardType> shards;
+    ShardType shard;
+    shard.setName("shard0");
+    shard.setHost("shard0:12");
+
+    setupShards(vector<ShardType>{shard});
+
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    distLock()->expectLock(
+        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
+        Status::OK());
+
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->enableSharding("test");
+        ASSERT_OK(status);
+    });
+
+    // Query to find if db already exists in config.
+    onFindCommand([](const RemoteCommandRequest& request) {
+        BSONObj existingDoc(fromjson(R"({ _id: "test", primary: "shard2", partitioned: false })"));
+        return vector<BSONObj>{existingDoc};
+    });
+
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        BSONObj expectedCmd(fromjson(R"({
+            update: "databases",
+            updates: [{
+                q: { _id: "test" },
+                u: { _id: "test", primary: "shard2", partitioned: true },
+                multi: false,
+                upsert: true
+            }],
+            writeConcern: { w: "majority" }
+        })"));
+
+        ASSERT_EQ(expectedCmd, request.cmdObj);
+
+        return fromjson(R"({
+                nModified: 0,
+                n: 1,
+                upserted: [
+                    { _id: "test", primary: "shard2", partitioned: true }
+                ],
+                ok: 1
+            })");
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, EnableShardingDBExistsInvalidFormat) {
+    vector<ShardType> shards;
+    ShardType shard;
+    shard.setName("shard0");
+    shard.setHost("shard0:12");
+
+    setupShards(vector<ShardType>{shard});
+
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    distLock()->expectLock(
+        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
+        Status::OK());
+
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->enableSharding("test");
+        ASSERT_EQ(ErrorCodes::TypeMismatch, status.code());
+    });
+
+    // Query to find if db already exists in config.
+    onFindCommand([](const RemoteCommandRequest& request) {
+        // Bad type for primary field.
+        BSONObj existingDoc(fromjson(R"({ _id: "test", primary: 12, partitioned: false })"));
+        return vector<BSONObj>{existingDoc};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, EnableShardingNoDBExistsNoShards) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    distLock()->expectLock(
+        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
+        Status::OK());
+
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->enableSharding("test");
+        ASSERT_EQ(ErrorCodes::ShardNotFound, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    // Query to find if db already exists in config.
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+
+    // Query for config.shards reload.
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
     future.timed_get(kFutureTimeout);
 }

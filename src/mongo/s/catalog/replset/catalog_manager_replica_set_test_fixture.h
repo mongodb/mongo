@@ -44,6 +44,7 @@ struct RemoteCommandRequest;
 class RemoteCommandTargeterFactoryMock;
 class RemoteCommandTargeterMock;
 class ShardRegistry;
+class ShardType;
 template <typename T>
 class StatusWith;
 
@@ -60,6 +61,8 @@ public:
     ~CatalogManagerReplSetTestFixture();
 
 protected:
+    static const stdx::chrono::seconds kFutureTimeout;
+
     template <typename Lambda>
     executor::NetworkTestEnv::FutureHandle<typename std::result_of<Lambda()>::type> launchAsync(
         Lambda&& func) const {
@@ -89,6 +92,11 @@ protected:
      */
     void onCommand(executor::NetworkTestEnv::OnCommandFunction func);
     void onFindCommand(executor::NetworkTestEnv::OnFindCommandFunction func);
+
+    /**
+     * Setup the shard registry to contain the given shards until the next reload.
+     */
+    void setupShards(const std::vector<ShardType>& shards);
 
     void setUp() override;
 

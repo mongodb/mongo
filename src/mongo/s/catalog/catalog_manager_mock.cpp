@@ -59,10 +59,6 @@ Status CatalogManagerMock::startup(bool upgrade) {
 
 void CatalogManagerMock::shutDown() {}
 
-Status CatalogManagerMock::enableSharding(const string& dbName) {
-    return Status::OK();
-}
-
 Status CatalogManagerMock::shardCollection(OperationContext* txn,
                                            const string& ns,
                                            const ShardKeyPattern& fieldsAndOrder,
@@ -174,7 +170,7 @@ DistLockManager* CatalogManagerMock::getDistLockManager() const {
     return _mockDistLockMgr.get();
 }
 
-Status CatalogManagerMock::_checkDbDoesNotExist(const std::string& dbName) const {
+Status CatalogManagerMock::_checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const {
     return Status::OK();
 }
 

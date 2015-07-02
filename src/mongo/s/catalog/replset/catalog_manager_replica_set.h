@@ -59,8 +59,6 @@ public:
 
     void shutDown() override;
 
-    Status enableSharding(const std::string& dbName) override;
-
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,
@@ -130,7 +128,7 @@ public:
     DistLockManager* getDistLockManager() const override;
 
 private:
-    Status _checkDbDoesNotExist(const std::string& dbName) const override;
+    Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const override;
 
     /**
      * Helper for running commands against the config server with logic for retargeting and

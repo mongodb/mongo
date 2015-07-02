@@ -131,10 +131,6 @@ void CatalogManagerReplicaSet::shutDown() {
     _distLockManager->shutDown();
 }
 
-Status CatalogManagerReplicaSet::enableSharding(const std::string& dbName) {
-    return notYetImplemented;
-}
-
 Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
                                                  const string& ns,
                                                  const ShardKeyPattern& fieldsAndOrder,
@@ -763,7 +759,8 @@ StatusWith<BSONObj> CatalogManagerReplicaSet::_runConfigServerCommandWithNotMast
     MONGO_UNREACHABLE;
 }
 
-Status CatalogManagerReplicaSet::_checkDbDoesNotExist(const string& dbName) const {
+Status CatalogManagerReplicaSet::_checkDbDoesNotExist(const string& dbName,
+                                                      DatabaseType* db) const {
     BSONObjBuilder queryBuilder;
     queryBuilder.appendRegex(
         DatabaseType::name(), (string) "^" + pcrecpp::RE::QuoteMeta(dbName) + "$", "i");
@@ -791,6 +788,15 @@ Status CatalogManagerReplicaSet::_checkDbDoesNotExist(const string& dbName) cons
     BSONObj dbObj = docs.front();
     std::string actualDbName = dbObj[DatabaseType::name()].String();
     if (actualDbName == dbName) {
+        if (db) {
+            auto parseDBStatus = DatabaseType::fromBSON(dbObj);
+            if (!parseDBStatus.isOK()) {
+                return parseDBStatus.getStatus();
+            }
+
+            *db = parseDBStatus.getValue();
+        }
+
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "database " << dbName << " already exists");
     }

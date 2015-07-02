@@ -110,7 +110,7 @@ public:
      *  - DatabaseDifferCase - database already exists, but with a different case
      *  - ShardNotFound - could not find a shard to place the DB on
      */
-    virtual Status enableSharding(const std::string& dbName) = 0;
+    Status enableSharding(const std::string& dbName);
 
     /**
      * Shards a collection. Assumes that the database is enabled for sharding.
@@ -441,14 +441,15 @@ protected:
 private:
     /**
      * Checks that the given database name doesn't already exist in the config.databases
-     * collection, including under different casing.
+     * collection, including under different casing. Optional db can be passed and will
+     * be set with the database details if the given dbName exists.
      *
      * Returns OK status if the db does not exist.
      * Some known errors include:
      *  NamespaceExists if it exists with the same casing
      *  DatabaseDifferCase if it exists under different casing.
      */
-    virtual Status _checkDbDoesNotExist(const std::string& dbName) const = 0;
+    virtual Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const = 0;
 };
 
 }  // namespace mongo

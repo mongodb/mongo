@@ -211,13 +211,13 @@ Status CatalogManager::createDatabase(const std::string& dbName) {
 
     // Lock the database globally to prevent conflicts with simultaneous database creation.
     auto scopedDistLock =
-        getDistLockManager()->lock(dbName, "createDatabase", Seconds{5000}, Milliseconds{500});
+        getDistLockManager()->lock(dbName, "createDatabase", Seconds{5}, Milliseconds{500});
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
 
     // check for case sensitivity violations
-    Status status = _checkDbDoesNotExist(dbName);
+    Status status = _checkDbDoesNotExist(dbName, nullptr);
     if (!status.isOK()) {
         return status;
     }
@@ -470,6 +470,47 @@ StatusWith<vector<string>> CatalogManager::getDBNamesListFromShard(
     }
 
     return dbNames;
+}
+
+Status CatalogManager::enableSharding(const std::string& dbName) {
+    invariant(nsIsDbOnly(dbName));
+
+    DatabaseType db;
+
+    // Lock the database globally to prevent conflicts with simultaneous database
+    // creation/modification.
+    auto scopedDistLock =
+        getDistLockManager()->lock(dbName, "enableSharding", Seconds{5}, Milliseconds{500});
+    if (!scopedDistLock.isOK()) {
+        return scopedDistLock.getStatus();
+    }
+
+    // Check for case sensitivity violations
+    Status status = _checkDbDoesNotExist(dbName, &db);
+    if (status.isOK()) {
+        // Database does not exist, create a new entry
+        auto newShardIdStatus = selectShardForNewDatabase(grid.shardRegistry());
+        if (!newShardIdStatus.isOK()) {
+            return newShardIdStatus.getStatus();
+        }
+
+        const ShardId& newShardId = newShardIdStatus.getValue();
+
+        log() << "Placing [" << dbName << "] on: " << newShardId;
+
+        db.setName(dbName);
+        db.setPrimary(newShardId);
+        db.setSharded(true);
+    } else if (status.code() == ErrorCodes::NamespaceExists) {
+        // Database exists, so just update it
+        db.setSharded(true);
+    } else {
+        return status;
+    }
+
+    log() << "Enabling sharding for database [" << dbName << "] in config db";
+
+    return updateDatabase(dbName, db);
 }
 
 }  // namespace mongo

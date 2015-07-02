@@ -276,46 +276,6 @@ void CatalogManagerLegacy::shutDown() {
     _distLockManager->shutDown();
 }
 
-Status CatalogManagerLegacy::enableSharding(const std::string& dbName) {
-    invariant(nsIsDbOnly(dbName));
-
-    DatabaseType db;
-
-    // Check for case sensitivity violations
-    Status status = _checkDbDoesNotExist(dbName);
-    if (status.isOK()) {
-        // Database does not exist, create a new entry
-        auto newShardIdStatus = selectShardForNewDatabase(grid.shardRegistry());
-        if (!newShardIdStatus.isOK()) {
-            return newShardIdStatus.getStatus();
-        }
-
-        const ShardId& newShardId = newShardIdStatus.getValue();
-
-        log() << "Placing [" << dbName << "] on: " << newShardId;
-
-        db.setName(dbName);
-        db.setPrimary(newShardId);
-        db.setSharded(true);
-    } else if (status.code() == ErrorCodes::NamespaceExists) {
-        // Database exists, so just update it
-        StatusWith<DatabaseType> dbStatus = getDatabase(dbName);
-        if (!dbStatus.isOK()) {
-            return dbStatus.getStatus();
-        }
-
-        db = dbStatus.getValue();
-        db.setSharded(true);
-    } else {
-        // Some fatal error
-        return status;
-    }
-
-    log() << "Enabling sharding for database [" << dbName << "] in config db";
-
-    return updateDatabase(dbName, db);
-}
-
 Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
                                              const string& ns,
                                              const ShardKeyPattern& fieldsAndOrder,
@@ -1213,7 +1173,8 @@ void CatalogManagerLegacy::writeConfigServerDirect(const BatchedCommandRequest& 
     exec.executeBatch(request, response);
 }
 
-Status CatalogManagerLegacy::_checkDbDoesNotExist(const std::string& dbName) const {
+Status CatalogManagerLegacy::_checkDbDoesNotExist(const std::string& dbName,
+                                                  DatabaseType* db) const {
     ScopedDbConnection conn(_configServerConnectionString, 30);
 
     BSONObjBuilder b;
@@ -1225,6 +1186,15 @@ Status CatalogManagerLegacy::_checkDbDoesNotExist(const std::string& dbName) con
     // If our name is exactly the same as the name we want, try loading
     // the database again.
     if (!dbObj.isEmpty() && dbObj[DatabaseType::name()].String() == dbName) {
+        if (db) {
+            auto parseDBStatus = DatabaseType::fromBSON(dbObj);
+            if (!parseDBStatus.isOK()) {
+                return parseDBStatus.getStatus();
+            }
+
+            *db = parseDBStatus.getValue();
+        }
+
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "database " << dbName << " already exists");
     }
