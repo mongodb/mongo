@@ -106,7 +106,7 @@ TEST_F(LogActionTest, LogActionNoRetryAfterSuccessfulCreate) {
     expectActionLogInsert(expectedActionLog);
 
     // Now wait for the logAction call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 
     // Now log another action and confirm that we don't re-attempt to create the collection
     future =
@@ -115,7 +115,7 @@ TEST_F(LogActionTest, LogActionNoRetryAfterSuccessfulCreate) {
     expectActionLogInsert(expectedActionLog);
 
     // Now wait for the logAction call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(LogActionTest, LogActionNoRetryCreateIfAlreadyExists) {
@@ -136,7 +136,7 @@ TEST_F(LogActionTest, LogActionNoRetryCreateIfAlreadyExists) {
     expectActionLogInsert(expectedActionLog);
 
     // Now wait for the logAction call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 
     // Now log another action and confirm that we don't re-attempt to create the collection
     future =
@@ -145,7 +145,7 @@ TEST_F(LogActionTest, LogActionNoRetryCreateIfAlreadyExists) {
     expectActionLogInsert(expectedActionLog);
 
     // Now wait for the logAction call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(LogActionTest, LogActionCreateFailure) {
@@ -166,7 +166,7 @@ TEST_F(LogActionTest, LogActionCreateFailure) {
     // If creating the collection fails we won't perform the insert
 
     // Now wait for the logAction call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 
     // Now log another action and confirm that we *do* attempt to re-create the collection
     future =
@@ -176,7 +176,7 @@ TEST_F(LogActionTest, LogActionCreateFailure) {
     expectActionLogInsert(expectedActionLog);
 
     // Now wait for the logAction call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 }  // namespace

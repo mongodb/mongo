@@ -97,7 +97,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
     });
 
     // Now wait for the getCollection call to return
-    const auto& actualColl = future.get();
+    const auto& actualColl = future.timed_get(kFutureTimeout);
     ASSERT_EQ(expectedColl.toBSON(), actualColl.toBSON());
 }
 
@@ -112,7 +112,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionNotExisting) {
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
     // Now wait for the getCollection call to return
-    future.wait();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseExisting) {
@@ -141,7 +141,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseExisting) {
         return vector<BSONObj>{expectedDb.toBSON()};
     });
 
-    const auto& actualDb = future.get();
+    const auto& actualDb = future.timed_get(kFutureTimeout);
     ASSERT_EQ(expectedDb.toBSON(), actualDb.toBSON());
 }
 
@@ -155,7 +155,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseNotExisting) {
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    future.wait();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateCollection) {
@@ -198,7 +198,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollection) {
     });
 
     // Now wait for the updateCollection call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMaster) {
@@ -228,7 +228,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMaster) {
     }
 
     // Now wait for the updateCollection call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterFromTargeter) {
@@ -247,7 +247,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterFromTargeter) 
     });
 
     // Now wait for the updateCollection call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) {
@@ -306,7 +306,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) 
     });
 
     // Now wait for the updateCollection call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsValid) {
@@ -350,7 +350,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsValid) {
         return vector<BSONObj>{s1.toBSON(), s2.toBSON(), s3.toBSON()};
     });
 
-    const vector<ShardType> actualShardsList = future.get();
+    const vector<ShardType> actualShardsList = future.timed_get(kFutureTimeout);
     ASSERT_EQ(actualShardsList.size(), expectedShardsList.size());
 
     for (size_t i = 0; i < actualShardsList.size(); ++i) {
@@ -381,7 +381,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsWithInvalidShard) {
         };
     });
 
-    future.wait();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSWithSortAndLimit) {
@@ -436,7 +436,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSWithSortAndLimit) {
         return vector<BSONObj>{chunkA.toBSON(), chunkB.toBSON()};
     });
 
-    const auto& chunks = future.get();
+    const auto& chunks = future.timed_get(kFutureTimeout);
     ASSERT_EQ(chunkA.toBSON(), chunks[0].toBSON());
     ASSERT_EQ(chunkB.toBSON(), chunks[1].toBSON());
 }
@@ -474,7 +474,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSNoSortNoLimit) {
         return vector<BSONObj>{};
     });
 
-    future.wait();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
@@ -515,7 +515,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
         return vector<BSONObj>{chunkA.toBSON(), chunkB.toBSON()};
     });
 
-    future.wait();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommand) {
@@ -541,7 +541,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommand) {
     });
 
     // Now wait for the runReadCommand call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementReadCommandUnsatisfiedReadPref) {
@@ -619,7 +619,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandSuccess) {
     });
 
     // Now wait for the runUserManagementWriteCommand call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMaster) {
@@ -658,7 +658,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMaster)
     }
 
     // Now wait for the runUserManagementWriteCommand call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMasterRetrySuccess) {
@@ -714,7 +714,7 @@ TEST_F(CatalogManagerReplSetTestFixture, RunUserManagementWriteCommandNotMasterR
     });
 
     // Now wait for the runUserManagementWriteCommand call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsBalancerDoc) {
@@ -741,7 +741,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsBalancerDoc) {
         return vector<BSONObj>{st1.toBSON()};
     });
 
-    const auto& actualBalSettings = future.get();
+    const auto& actualBalSettings = future.timed_get(kFutureTimeout);
     ASSERT_EQ(actualBalSettings.toBSON(), st1.toBSON());
 }
 
@@ -769,7 +769,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsChunkSizeDoc) {
         return vector<BSONObj>{st1.toBSON()};
     });
 
-    const auto& actualBalSettings = future.get();
+    const auto& actualBalSettings = future.timed_get(kFutureTimeout);
     ASSERT_EQ(actualBalSettings.toBSON(), st1.toBSON());
 }
 
@@ -797,7 +797,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsInvalidDoc) {
         };
     });
 
-    future.wait();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
@@ -822,7 +822,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
         return vector<BSONObj>{};
     });
 
-    future.wait();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsNoDb) {
@@ -874,7 +874,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsNoDb) {
         return vector<BSONObj>{coll1.toBSON(), coll2.toBSON(), coll3.toBSON()};
     });
 
-    const auto& actualColls = future.get();
+    const auto& actualColls = future.timed_get(kFutureTimeout);
     ASSERT_EQ(3U, actualColls.size());
     ASSERT_EQ(coll1.toBSON(), actualColls[0].toBSON());
     ASSERT_EQ(coll2.toBSON(), actualColls[1].toBSON());
@@ -924,7 +924,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsValidResultsWithDb) {
         return vector<BSONObj>{coll1.toBSON(), coll2.toBSON()};
     });
 
-    const auto& actualColls = future.get();
+    const auto& actualColls = future.timed_get(kFutureTimeout);
     ASSERT_EQ(2U, actualColls.size());
     ASSERT_EQ(coll1.toBSON(), actualColls[0].toBSON());
     ASSERT_EQ(coll2.toBSON(), actualColls[1].toBSON());
@@ -970,7 +970,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetCollectionsInvalidCollectionType) {
         };
     });
 
-    future.wait();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardValid) {
@@ -1005,7 +1005,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardValid) {
         return vector<BSONObj>{dbt1.toBSON(), dbt2.toBSON()};
     });
 
-    const auto& actualDbNames = future.get();
+    const auto& actualDbNames = future.timed_get(kFutureTimeout);
     ASSERT_EQ(2U, actualDbNames.size());
     ASSERT_EQ(dbt1.getName(), actualDbNames[0]);
     ASSERT_EQ(dbt2.getName(), actualDbNames[1]);
@@ -1033,7 +1033,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetDatabasesForShardInvalidDoc) {
         };
     });
 
-    future.wait();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollection) {
@@ -1073,7 +1073,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollection) {
         return vector<BSONObj>{tagA.toBSON(), tagB.toBSON()};
     });
 
-    const auto& tags = future.get();
+    const auto& tags = future.timed_get(kFutureTimeout);
     ASSERT_EQ(tagA.toBSON(), tags[0].toBSON());
     ASSERT_EQ(tagB.toBSON(), tags[1].toBSON());
 }
@@ -1092,7 +1092,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionNoTags) {
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionInvalidTag) {
@@ -1122,7 +1122,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagsForCollectionInvalidTag) {
         return vector<BSONObj>{tagA.toBSON(), tagB.toBSON()};
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkOneTagFound) {
@@ -1161,7 +1161,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkOneTagFound) {
         return vector<BSONObj>{tt.toBSON()};
     });
 
-    const string& tagStr = future.get();
+    const string& tagStr = future.timed_get(kFutureTimeout);
     ASSERT_EQ("tag", tagStr);
 }
 
@@ -1195,7 +1195,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkNoTagFound) {
         return vector<BSONObj>{};
     });
 
-    const string& tagStr = future.get();
+    const string& tagStr = future.timed_get(kFutureTimeout);
     ASSERT_EQ("", tagStr);  // empty string returned when tag document not found
 }
 
@@ -1234,7 +1234,7 @@ TEST_F(CatalogManagerReplSetTestFixture, GetTagForChunkInvalidTagDoc) {
                                                                << TagsType::max(BSON("a" << 20)))};
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabase) {
@@ -1274,7 +1274,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabase) {
     });
 
     // Now wait for the updateDatabase call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabaseHostUnreachable) {
@@ -1303,7 +1303,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateDatabaseHostUnreachable) {
     });
 
     // Now wait for the updateDatabase call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecated) {
@@ -1332,7 +1332,7 @@ TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecated) {
     });
 
     // Now wait for the applyChunkOpsDeprecated call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecatedCommandFailed) {
@@ -1364,7 +1364,7 @@ TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecatedCommandFailed) {
     });
 
     // Now wait for the applyChunkOpsDeprecated call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, createDatabaseSuccess) {
@@ -1400,7 +1400,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseSuccess) {
         return vector<BSONObj>{s0.toBSON(), s1.toBSON(), s2.toBSON()};
     });
 
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 
     // Set up all the target mocks return values.
     RemoteCommandTargeterMock::get(shardRegistry()->getShard(s0.getName())->getTargeter())
@@ -1490,7 +1490,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseSuccess) {
         return response.toBSON();
     });
 
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDistLockHeld) {
@@ -1545,7 +1545,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDBExists) {
         return vector<BSONObj>{BSON("_id" << dbname)};
     });
 
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDBExistsDifferentCase) {
@@ -1581,7 +1581,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDBExistsDifferentCase) {
         return vector<BSONObj>{BSON("_id" << dbnameDiffCase)};
     });
 
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, createDatabaseNoShards) {
@@ -1622,7 +1622,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseNoShards) {
         return vector<BSONObj>{};
     });
 
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDuplicateKeyOnInsert) {
@@ -1658,7 +1658,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDuplicateKeyOnInsert) {
         return vector<BSONObj>{s0.toBSON(), s1.toBSON(), s2.toBSON()};
     });
 
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 
     // Set up all the target mocks return values.
     RemoteCommandTargeterMock::get(shardRegistry()->getShard(s0.getName())->getTargeter())
@@ -1680,7 +1680,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDuplicateKeyOnInsert) {
 
     future = launchAsync([this, dbname] {
         Status status = catalogManager()->createDatabase(dbname);
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, status);
+        ASSERT_EQUALS(ErrorCodes::NamespaceExists, status);
     });
 
     // Report no databases with the same name already exist
@@ -1749,7 +1749,7 @@ TEST_F(CatalogManagerReplSetTestFixture, createDatabaseDuplicateKeyOnInsert) {
         return response.toBSON();
     });
 
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 }  // namespace

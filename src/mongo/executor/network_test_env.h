@@ -36,6 +36,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
@@ -101,16 +102,10 @@ public:
         }
 
         template <class Rep, class Period>
-        stdx::future_status wait_for(
-            const stdx::chrono::duration<Rep, Period>& timeout_duration) const {
-            return _future.wait_for(timeout_duration);
-        }
+        T timed_get(const stdx::chrono::duration<Rep, Period>& timeout_duration) {
+            auto status = _future.wait_for(timeout_duration);
+            ASSERT(status == stdx::future_status::ready);
 
-        void wait() const {
-            _future.wait();
-        }
-
-        T get() {
             return _future.get();
         }
 

@@ -138,7 +138,7 @@ TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
     expectChangeLogInsert(expectedChangeLog);
 
     // Now wait for the logChange call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 
     // Now log another change and confirm that we don't re-attempt to create the collection
     future = launchAsync([this, &expectedChangeLog] {
@@ -151,7 +151,7 @@ TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
     expectChangeLogInsert(expectedChangeLog);
 
     // Now wait for the logChange call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
@@ -179,7 +179,7 @@ TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
     expectChangeLogInsert(expectedChangeLog);
 
     // Now wait for the logAction call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 
     // Now log another change and confirm that we don't re-attempt to create the collection
     future = launchAsync([this, &expectedChangeLog] {
@@ -192,7 +192,7 @@ TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
     expectChangeLogInsert(expectedChangeLog);
 
     // Now wait for the logChange call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(LogChangeTest, LogActionCreateFailure) {
@@ -219,7 +219,7 @@ TEST_F(LogChangeTest, LogActionCreateFailure) {
     expectChangeLogCreate(createResponseBuilder.obj());
 
     // Now wait for the logAction call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 
     // Now log another change and confirm that we *do* attempt to create the collection
     future = launchAsync([this, &expectedChangeLog] {
@@ -233,7 +233,7 @@ TEST_F(LogChangeTest, LogActionCreateFailure) {
     expectChangeLogInsert(expectedChangeLog);
 
     // Now wait for the logChange call to return
-    future.wait_for(kFutureTimeout);
+    future.timed_get(kFutureTimeout);
 }
 
 }  // namespace

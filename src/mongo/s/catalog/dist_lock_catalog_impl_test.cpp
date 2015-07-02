@@ -62,6 +62,7 @@ namespace {
 
 const HostAndPort dummyHost("dummy", 123);
 const Milliseconds kWTimeout(100);
+static const stdx::chrono::seconds kFutureTimeout{5};
 
 /**
  * Sets up the mocked out objects for testing the replica-set backed catalog manager.
@@ -169,7 +170,7 @@ TEST_F(DistLockCatalogFixture, BasicPing) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, PingTargetError) {
@@ -201,7 +202,7 @@ TEST_F(DistLockCatalogFixture, PingCommandError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, PingWriteError) {
@@ -219,7 +220,7 @@ TEST_F(DistLockCatalogFixture, PingWriteError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, PingWriteConcernError) {
@@ -240,7 +241,7 @@ TEST_F(DistLockCatalogFixture, PingWriteConcernError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, PingUnsupportedWriteConcernResponse) {
@@ -262,7 +263,7 @@ TEST_F(DistLockCatalogFixture, PingUnsupportedWriteConcernResponse) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, PingUnsupportedResponseFormat) {
@@ -276,7 +277,7 @@ TEST_F(DistLockCatalogFixture, PingUnsupportedResponseFormat) {
                          << "NaN");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockNoOp) {
@@ -316,7 +317,7 @@ TEST_F(DistLockCatalogFixture, GrabLockNoOp) {
         return fromjson("{ ok: 1, value: null }");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockWithNewDoc) {
@@ -378,7 +379,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWithNewDoc) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockWithBadLockDoc) {
@@ -410,7 +411,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWithBadLockDoc) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockTargetError) {
@@ -442,7 +443,7 @@ TEST_F(DistLockCatalogFixture, GrabLockCommandError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockWriteError) {
@@ -460,7 +461,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWriteError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockWriteConcernError) {
@@ -481,7 +482,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWriteConcernError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockWriteConcernErrorBadType) {
@@ -500,7 +501,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWriteConcernErrorBadType) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockResponseMissingValueField) {
@@ -516,7 +517,7 @@ TEST_F(DistLockCatalogFixture, GrabLockResponseMissingValueField) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockUnsupportedWriteConcernResponse) {
@@ -538,7 +539,7 @@ TEST_F(DistLockCatalogFixture, GrabLockUnsupportedWriteConcernResponse) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockUnsupportedResponseFormat) {
@@ -552,7 +553,7 @@ TEST_F(DistLockCatalogFixture, GrabLockUnsupportedResponseFormat) {
                          << "NaN");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, OvertakeLockNoOp) {
@@ -599,7 +600,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockNoOp) {
         return fromjson("{ ok: 1, value: null }");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, OvertakeLockWithNewDoc) {
@@ -667,7 +668,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWithNewDoc) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, OvertakeLockWithBadLockDoc) {
@@ -700,7 +701,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWithBadLockDoc) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, OvertakeLockTargetError) {
@@ -733,7 +734,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockCommandError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, OvertakeLockWriteError) {
@@ -752,7 +753,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWriteError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, OvertakeLockWriteConcernError) {
@@ -774,7 +775,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWriteConcernError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, OvertakeLockUnsupportedWriteConcernResponse) {
@@ -797,7 +798,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockUnsupportedWriteConcernResponse) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, OvertakeLockUnsupportedResponseFormat) {
@@ -812,7 +813,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockUnsupportedResponseFormat) {
                          << "NaN");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, BasicUnlock) {
@@ -844,7 +845,7 @@ TEST_F(DistLockCatalogFixture, BasicUnlock) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, UnlockWithNoNewDoc) {
@@ -872,7 +873,7 @@ TEST_F(DistLockCatalogFixture, UnlockWithNoNewDoc) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, UnlockTargetError) {
@@ -904,7 +905,7 @@ TEST_F(DistLockCatalogFixture, UnlockCommandError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, UnlockWriteError) {
@@ -922,7 +923,7 @@ TEST_F(DistLockCatalogFixture, UnlockWriteError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, UnlockWriteConcernError) {
@@ -943,7 +944,7 @@ TEST_F(DistLockCatalogFixture, UnlockWriteConcernError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, UnlockUnsupportedWriteConcernResponse) {
@@ -965,7 +966,7 @@ TEST_F(DistLockCatalogFixture, UnlockUnsupportedWriteConcernResponse) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, UnlockUnsupportedResponseFormat) {
@@ -979,7 +980,7 @@ TEST_F(DistLockCatalogFixture, UnlockUnsupportedResponseFormat) {
                          << "NaN");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, BasicGetServerInfo) {
@@ -1009,7 +1010,7 @@ TEST_F(DistLockCatalogFixture, BasicGetServerInfo) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetServerTargetError) {
@@ -1041,7 +1042,7 @@ TEST_F(DistLockCatalogFixture, GetServerCommandError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetServerBadElectionId) {
@@ -1063,7 +1064,7 @@ TEST_F(DistLockCatalogFixture, GetServerBadElectionId) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetServerBadLocalTime) {
@@ -1085,7 +1086,7 @@ TEST_F(DistLockCatalogFixture, GetServerBadLocalTime) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetServerNoGLEStats) {
@@ -1102,7 +1103,7 @@ TEST_F(DistLockCatalogFixture, GetServerNoGLEStats) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetServerNoElectionId) {
@@ -1123,7 +1124,7 @@ TEST_F(DistLockCatalogFixture, GetServerNoElectionId) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, BasicStopPing) {
@@ -1154,7 +1155,7 @@ TEST_F(DistLockCatalogFixture, BasicStopPing) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, StopPingTargetError) {
@@ -1186,7 +1187,7 @@ TEST_F(DistLockCatalogFixture, StopPingCommandError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, StopPingWriteError) {
@@ -1204,7 +1205,7 @@ TEST_F(DistLockCatalogFixture, StopPingWriteError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, StopPingWriteConcernError) {
@@ -1225,7 +1226,7 @@ TEST_F(DistLockCatalogFixture, StopPingWriteConcernError) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, StopPingUnsupportedWriteConcernResponse) {
@@ -1247,7 +1248,7 @@ TEST_F(DistLockCatalogFixture, StopPingUnsupportedWriteConcernResponse) {
             })");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, StopPingUnsupportedResponseFormat) {
@@ -1261,7 +1262,7 @@ TEST_F(DistLockCatalogFixture, StopPingUnsupportedResponseFormat) {
                          << "NaN");
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, BasicGetPing) {
@@ -1298,7 +1299,7 @@ TEST_F(DistLockCatalogFixture, BasicGetPing) {
         return result;
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetPingTargetError) {
@@ -1325,7 +1326,7 @@ TEST_F(DistLockCatalogFixture, GetPingNotFound) {
     onFindCommand([](const RemoteCommandRequest& request)
                       -> StatusWith<vector<BSONObj>> { return std::vector<BSONObj>(); });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetPingUnsupportedFormat) {
@@ -1348,7 +1349,7 @@ TEST_F(DistLockCatalogFixture, GetPingUnsupportedFormat) {
         return result;
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, BasicGetLockByTS) {
@@ -1385,7 +1386,7 @@ TEST_F(DistLockCatalogFixture, BasicGetLockByTS) {
         return result;
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetLockByTSTargetError) {
@@ -1411,7 +1412,7 @@ TEST_F(DistLockCatalogFixture, GetLockByTSNotFound) {
     onFindCommand([](const RemoteCommandRequest& request)
                       -> StatusWith<vector<BSONObj>> { return std::vector<BSONObj>(); });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetLockByTSUnsupportedFormat) {
@@ -1434,7 +1435,7 @@ TEST_F(DistLockCatalogFixture, GetLockByTSUnsupportedFormat) {
         return result;
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, BasicGetLockByName) {
@@ -1471,7 +1472,7 @@ TEST_F(DistLockCatalogFixture, BasicGetLockByName) {
         return result;
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetLockByNameTargetError) {
@@ -1498,7 +1499,7 @@ TEST_F(DistLockCatalogFixture, GetLockByNameNotFound) {
     onFindCommand([](const RemoteCommandRequest& request)
                       -> StatusWith<vector<BSONObj>> { return std::vector<BSONObj>(); });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DistLockCatalogFixture, GetLockByNameUnsupportedFormat) {
@@ -1521,7 +1522,7 @@ TEST_F(DistLockCatalogFixture, GetLockByNameUnsupportedFormat) {
         return result;
     });
 
-    future.get();
+    future.timed_get(kFutureTimeout);
 }
 
 }  // unnamed namespace
