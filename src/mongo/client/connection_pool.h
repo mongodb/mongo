@@ -96,6 +96,12 @@ public:
          */
         ~ConnectionPtr();
 
+        // We need to provide user defined move operations as we need to set the pool
+        // pointer to nullptr on the moved-from object.
+        ConnectionPtr(ConnectionPtr&&);
+
+        ConnectionPtr& operator=(ConnectionPtr&&);
+
         /**
          * Obtains the underlying connection which can be used for making calls to the server.
          */
@@ -110,7 +116,7 @@ public:
 
     private:
         ConnectionPool* _pool;
-        const ConnectionList::iterator _connInfo;
+        ConnectionList::iterator _connInfo;
     };
 
 

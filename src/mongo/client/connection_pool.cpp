@@ -223,6 +223,18 @@ ConnectionPool::ConnectionPtr::~ConnectionPtr() {
     }
 }
 
+ConnectionPool::ConnectionPtr::ConnectionPtr(ConnectionPtr&& other)
+    : _pool(std::move(other._pool)), _connInfo(std::move(other._connInfo)) {
+    other._pool = nullptr;
+}
+
+ConnectionPool::ConnectionPtr& ConnectionPool::ConnectionPtr::operator=(ConnectionPtr&& other) {
+    _pool = std::move(other._pool);
+    _connInfo = std::move(other._connInfo);
+    other._pool = nullptr;
+    return *this;
+}
+
 void ConnectionPool::ConnectionPtr::done(Date_t now) {
     _pool->releaseConnection(_connInfo, now);
     _pool = NULL;

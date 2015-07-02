@@ -30,6 +30,7 @@
 
 #include <asio.hpp>
 #include <atomic>
+#include <boost/optional.hpp>
 #include <system_error>
 #include <thread>
 #include <unordered_map>
@@ -72,6 +73,22 @@ private:
     enum class State { kReady, kRunning, kShutdown };
 
     /**
+     * AsyncConnection encapsulates the per-connection state we maintain.
+     */
+    class AsyncConnection {
+    public:
+        AsyncConnection(
+            ConnectionPool::ConnectionPtr&& booststrapConn,
+            asio::ip::tcp::socket&& sock);
+
+        asio::ip::tcp::socket* sock();
+
+    private:
+        ConnectionPool::ConnectionPtr _bootstrapConn;
+        asio::ip::tcp::socket _sock;
+    };
+
+    /**
      * Helper object to manage individual network operations.
      */
     class AsyncOp {
@@ -91,6 +108,8 @@ private:
 
         void complete(Date_t now);
 
+        AsyncConnection* connection();
+
         void connect(ConnectionPool* const pool, asio::io_service* service, Date_t now);
         bool connected() const;
 
@@ -101,8 +120,6 @@ private:
         const RemoteCommandRequest& request() const;
 
         void setOutput(const BSONObj& bson);
-
-        asio::ip::tcp::socket* sock();
 
         Date_t start() const;
 
@@ -123,14 +140,16 @@ private:
         RemoteCommandRequest _request;
         RemoteCommandCompletionFn _onFinish;
 
+        /**
+         * The connection state used to service this request. We wrap it in an optional
+         * as it is instantiated at some point after the AsyncOp is created.
+         */
+        boost::optional<AsyncConnection> _connection;
+
         const Date_t _start;
 
         OpState _state;
         AtomicUInt64 _canceled;
-
-        std::unique_ptr<ConnectionPool::ConnectionPtr> _conn;
-
-        std::unique_ptr<asio::ip::tcp::socket> _sock;
 
         Message _toSend;
         Message _toRecv;
