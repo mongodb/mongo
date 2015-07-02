@@ -76,7 +76,7 @@ NetworkInterfaceASIO::AsyncOp::AsyncOp(const TaskExecutor::CallbackHandle& cbHan
 void NetworkInterfaceASIO::AsyncOp::connect(ConnectionPool* const pool,
                                             asio::io_service* service,
                                             Date_t now) {
-    // TODO, why is this hardcoded to 1 second? That seems too low.
+    // TODO(amidvidy): why is this hardcoded to 1 second? That seems too low.
     ConnectionPool::ConnectionPtr conn(pool, _request.target, now, Milliseconds(1000));
 
     _state = OpState::kConnectionAcquired;
