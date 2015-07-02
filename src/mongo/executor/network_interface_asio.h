@@ -77,9 +77,8 @@ private:
      */
     class AsyncConnection {
     public:
-        AsyncConnection(
-            ConnectionPool::ConnectionPtr&& booststrapConn,
-            asio::ip::tcp::socket&& sock);
+        AsyncConnection(ConnectionPool::ConnectionPtr&& booststrapConn,
+                        asio::ip::tcp::socket&& sock);
 
         asio::ip::tcp::socket* sock();
 
