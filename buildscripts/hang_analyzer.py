@@ -73,13 +73,18 @@ def callo(a = []):
 
 def find_program(prog, paths):
     """Finds the specified program in env PATH, or tries a set of paths """
+    loc = spawn.find_executable(prog)
+
+    if(loc != None):
+        return loc
 
     for loc in paths:
         p = os.path.join(loc, prog)
         if os.path.exists(p):
             return p
 
-    return spawn.find_executable(prog)
+    return None
+
 
 class WindowsDumper(object):
 
@@ -235,7 +240,7 @@ class GDBDumper(object):
 
     def __find_debugger(self):
         """Finds the installed debugger"""
-        return find_program('gdb', ['/opt/mongodbtoolchain/bin'])
+        return find_program('gdb', ['/usr/bin'])
 
     def dump_info(self, pid, stream):
         dbg = self.__find_debugger()
