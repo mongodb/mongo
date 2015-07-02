@@ -126,7 +126,8 @@ Listener::Listener(const string& name, const string& ip, int port, bool logConne
       _ip(ip),
       _setupSocketsSuccessful(false),
       _logConnect(logConnect),
-      _elapsedTime(0) {
+      _elapsedTime(0),
+      _ready(false) {
 #ifdef MONGO_CONFIG_SSL
     _ssl = getSSLManager();
 #endif
