@@ -249,9 +249,14 @@ void AsyncClusterClientCursor::handleBatchResponse(
         // promise not to touch any members of this class because 'this' could become invalid as
         // soon as we signal the event.
         if (!haveOutstandingBatchRequests_inlock()) {
-            scheduleKillCursors_inlock();
+            // If the event handle is invalid, then the executor is in the middle of shutting down,
+            // and we can't schedule any more work for it to complete.
+            if (_killCursorsScheduledEvent.isValid()) {
+                scheduleKillCursors_inlock();
+                _executor->signalEvent(_killCursorsScheduledEvent);
+            }
+
             _lifecycleState = kKillComplete;
-            _executor->signalEvent(_killCursorsScheduledEvent);
         }
         return;
     }
@@ -364,9 +369,16 @@ executor::TaskExecutor::EventHandle AsyncClusterClientCursor::kill() {
 
     // Make '_killCursorsScheduledEvent', which we will signal as soon as we have scheduled a
     // killCursors command to run on all the remote shards.
-    auto eventStatus = _executor->makeEvent();
-    fassertStatusOK(28716, eventStatus);
-    _killCursorsScheduledEvent = eventStatus.getValue();
+    auto statusWithEvent = _executor->makeEvent();
+    if (statusWithEvent.getStatus().code() == ErrorCodes::ShutdownInProgress) {
+        // The underlying task executor is shutting down.
+        if (!haveOutstandingBatchRequests_inlock()) {
+            _lifecycleState = kKillComplete;
+        }
+        return executor::TaskExecutor::EventHandle();
+    }
+    fassertStatusOK(28716, statusWithEvent);
+    _killCursorsScheduledEvent = statusWithEvent.getValue();
 
     // If we're not waiting for responses from remotes, we can schedule killCursors commands on the
     // remotes now. Otherwise, we have to wait until all responses are back, and then we can kill

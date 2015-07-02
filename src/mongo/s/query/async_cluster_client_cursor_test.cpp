@@ -101,9 +101,19 @@ protected:
             ASSERT_TRUE(net->hasReadyRequests());
             Milliseconds millis(0);
             RemoteCommandResponse response(obj, BSONObj(), millis);
-            repl::ReplicationExecutor::ResponseStatus responseStatus(response);
+            executor::TaskExecutor::ResponseStatus responseStatus(response);
             net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
         }
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+    }
+
+    void scheduleErrorResponse(Status status) {
+        invariant(!status.isOK());
+        executor::NetworkInterfaceMock* net = getNet();
+        net->enterNetwork();
+        ASSERT_TRUE(net->hasReadyRequests());
+        net->scheduleResponse(net->getNextReadyRequest(), net->now(), status);
         net->runReadyNetworkOperations();
         net->exitNetwork();
     }
@@ -111,6 +121,7 @@ protected:
     void blackHoleNextRequest() {
         executor::NetworkInterfaceMock* net = getNet();
         net->enterNetwork();
+        ASSERT_TRUE(net->hasReadyRequests());
         net->blackHole(net->getNextReadyRequest());
         net->exitNetwork();
     }
@@ -429,7 +440,7 @@ TEST_F(AsyncClusterClientCursorTest, ErrorOnMismatchedCursorIds) {
     executor->waitForEvent(killEvent);
 }
 
-TEST_F(AsyncClusterClientCursorTest, ErrorReceivedFromShard) {
+TEST_F(AsyncClusterClientCursorTest, BadResponseReceivedFromShard) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
     makeCursorFromFindCmd(findCmd, _remotes);
 
@@ -439,7 +450,7 @@ TEST_F(AsyncClusterClientCursorTest, ErrorReceivedFromShard) {
 
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
     BSONObj response1 = GetMoreResponse(_nss, CursorId(123), batch1).toBSON();
-    BSONObj response2 = fromjson("{ok: 0, code: 999, errmsg: 'bad thing happened'}");
+    BSONObj response2 = fromjson("{foo: 'bar'}");
     std::vector<BSONObj> batch3 = {fromjson("{_id: 4}"), fromjson("{_id: 5}")};
     BSONObj response3 = GetMoreResponse(_nss, CursorId(456), batch3).toBSON();
     scheduleNetworkResponseObjs({response1, response2, response3});
@@ -448,7 +459,34 @@ TEST_F(AsyncClusterClientCursorTest, ErrorReceivedFromShard) {
     ASSERT_TRUE(accc->ready());
     auto statusWithNext = accc->nextReady();
     ASSERT(!statusWithNext.isOK());
-    ASSERT_EQ(statusWithNext.getStatus().code(), 999);
+
+    // Required to kill the 'accc' on error before destruction.
+    auto killEvent = accc->kill();
+    executor->waitForEvent(killEvent);
+}
+
+TEST_F(AsyncClusterClientCursorTest, ErrorReceivedFromShard) {
+    BSONObj findCmd = fromjson("{find: 'testcoll'}");
+    makeCursorFromFindCmd(findCmd, _remotes);
+
+    ASSERT_FALSE(accc->ready());
+    auto readyEvent = unittest::assertGet(accc->nextEvent());
+    ASSERT_FALSE(accc->ready());
+
+    std::vector<GetMoreResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+    responses.emplace_back(_nss, CursorId(1), batch1);
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
+    responses.emplace_back(_nss, CursorId(2), batch2);
+    scheduleNetworkResponses(responses);
+
+    scheduleErrorResponse({ErrorCodes::BadValue, "bad thing happened"});
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(accc->ready());
+    auto statusWithNext = accc->nextReady();
+    ASSERT(!statusWithNext.isOK());
+    ASSERT_EQ(statusWithNext.getStatus().code(), ErrorCodes::BadValue);
     ASSERT_EQ(statusWithNext.getStatus().reason(), "bad thing happened");
 
     // Required to kill the 'accc' on error before destruction.
@@ -482,6 +520,31 @@ TEST_F(AsyncClusterClientCursorTest, ErrorCantScheduleEventBeforeLastSignaled) {
     // Required to kill the 'accc' on error before destruction.
     auto killEvent = accc->kill();
     executor->waitForEvent(killEvent);
+}
+
+TEST_F(AsyncClusterClientCursorTest, NextEventAfterTaskExecutorShutdown) {
+    BSONObj findCmd = fromjson("{find: 'testcoll'}");
+    makeCursorFromFindCmd(findCmd, _remotes);
+    executor->shutdown();
+    ASSERT_NOT_OK(accc->nextEvent().getStatus());
+    auto killEvent = accc->kill();
+    ASSERT_FALSE(killEvent.isValid());
+}
+
+TEST_F(AsyncClusterClientCursorTest, KillAfterTaskExecutorShutdownWithOutstandingBatches) {
+    BSONObj findCmd = fromjson("{find: 'testcoll'}");
+    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+
+    // Make a request to the shard that will never get answered.
+    ASSERT_FALSE(accc->ready());
+    auto readyEvent = unittest::assertGet(accc->nextEvent());
+    ASSERT_FALSE(accc->ready());
+    blackHoleNextRequest();
+
+    // Executor shuts down before a response is received.
+    executor->shutdown();
+    auto killEvent = accc->kill();
+    ASSERT_FALSE(killEvent.isValid());
 }
 
 TEST_F(AsyncClusterClientCursorTest, KillNoBatchesRequested) {
@@ -546,6 +609,38 @@ TEST_F(AsyncClusterClientCursorTest, KillTwoOutstandingBatches) {
     // results to be ready.
     executor->waitForEvent(readyEvent);
     executor->waitForEvent(killedEvent);
+}
+
+TEST_F(AsyncClusterClientCursorTest, NextEventErrorsAfterKill) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
+    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+
+    ASSERT_FALSE(accc->ready());
+    auto readyEvent = unittest::assertGet(accc->nextEvent());
+    ASSERT_FALSE(accc->ready());
+
+    std::vector<GetMoreResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+    responses.emplace_back(_nss, CursorId(1), batch1);
+    scheduleNetworkResponses(responses);
+
+    auto killedEvent = accc->kill();
+
+    // Attempting to schedule more network operations on a killed ACCC is an error.
+    ASSERT_NOT_OK(accc->nextEvent().getStatus());
+
+    executor->waitForEvent(killedEvent);
+}
+
+TEST_F(AsyncClusterClientCursorTest, KillCalledTwice) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
+    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    auto killedEvent1 = accc->kill();
+    ASSERT(killedEvent1.isValid());
+    auto killedEvent2 = accc->kill();
+    ASSERT(killedEvent2.isValid());
+    executor->waitForEvent(killedEvent1);
+    executor->waitForEvent(killedEvent2);
 }
 
 }  // namespace

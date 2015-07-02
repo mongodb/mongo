@@ -131,6 +131,9 @@ public:
      * Starts shutting down this ACCC. Returns a handle to an event which is signaled when this
      * cursor is safe to destroy.
      *
+     * Returns an invalid handle if the underlying task executor is shutting down. In this case, it
+     * is legal to destroy the cursor only after the task executor shutdown process is complete.
+     *
      * An ACCC can only be destroyed if either 1) all its results have been exhausted or 2) the kill
      * event returned by this method has been signaled.
      *
