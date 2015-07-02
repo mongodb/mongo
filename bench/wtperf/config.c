@@ -271,11 +271,12 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		if (workp->insert == 0 && workp->read == 0 &&
 		    workp->update == 0 && workp->truncate == 0)
 			goto err;
-		/* Why run with truncate if we don't want to truncate anything*/
+		/* Why run with truncate if we don't want any truncation */
 		if (workp->truncate != 0 &&
 		    workp->truncate_pct == 0 && workp->truncate_count == 0)
 			goto err;
-		if (workp->truncate_pct < 1 && workp->truncate_pct > 99)
+		if (workp->truncate != 0 &&
+		    (workp->truncate_pct < 1 || workp->truncate_pct > 99))
 			goto err;
 		cfg->workers_cnt += (u_int)workp->threads;
 	}

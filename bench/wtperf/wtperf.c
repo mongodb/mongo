@@ -1,4 +1,4 @@
-	/*-
+/*-
  * Public Domain 2014-2015 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
@@ -315,9 +315,6 @@ worker_async(void *arg)
 			if (wtperf_value_range(cfg) < next_val)
 				continue;
 			break;
-		case WORKER_TRUNCATE:
-			next_val = wtperf_rand(thread);
-			break;
 		default:
 			goto err;		/* can't happen */
 		}
@@ -351,8 +348,6 @@ worker_async(void *arg)
 			if ((ret = asyncop->insert(asyncop)) == 0)
 				break;
 			goto op_err;
-		case WORKER_TRUNCATE:
-			break;
 		case WORKER_UPDATE:
 			if (cfg->random_value)
 				randomize_value(thread, value_buf);
@@ -466,8 +461,8 @@ worker(void *arg)
 		goto err;
 	}
 	/* Setup truncate values */
-	if (thread->workload->truncate > 0) {
-		/**
+	if (thread->workload->truncate != 0) {
+		/*
 		 * We need to capture 2 points, the point at which to truncate
 		 * and the point at which we know the collection is sizable
 		 * enough to warrant truncation.
@@ -2143,8 +2138,12 @@ main(int argc, char *argv[])
 	 * If the user wants compaction, then we also enable async for
 	 * the compact operation, but not for the workloads.
 	 */
-	if (cfg->async_threads > 0)
+	if (cfg->async_threads > 0) {
+		if (cfg->workload->truncate > 0) {
+			goto err;
+		}
 		cfg->use_asyncops = 1;
+	}
 	if (cfg->compact && cfg->async_threads == 0)
 		cfg->async_threads = 2;
 	if (cfg->async_threads > 0) {
