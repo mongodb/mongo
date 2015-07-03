@@ -575,7 +575,7 @@ worker(void *arg)
 		case WORKER_TRUNCATE:
 			if ((ret = cursor->reset(cursor)) != 0) {
 				lprintf(cfg, ret, 0, "Cursor reset failed");
-				goto err;
+				goto op_err;
 			}
 
 			while ((ret = cursor->next(cursor)) == 0) {
@@ -593,7 +593,7 @@ worker(void *arg)
 					if ( ret != 0) {
 						lprintf(cfg, ret, 0,
 						    "Truncate failed");
-						goto err;
+						goto op_err;
 					}
 					break;
 				}
@@ -2139,9 +2139,8 @@ main(int argc, char *argv[])
 	 * the compact operation, but not for the workloads.
 	 */
 	if (cfg->async_threads > 0) {
-		if (cfg->workload->truncate > 0) {
+		if (cfg->workload->truncate > 0)
 			goto err;
-		}
 		cfg->use_asyncops = 1;
 	}
 	if (cfg->compact && cfg->async_threads == 0)
