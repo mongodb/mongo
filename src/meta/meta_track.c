@@ -412,7 +412,6 @@ __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
 	WT_ERR(ret);
 	return (0);
 
-
 err:	__meta_track_err(session);
 	return (ret);
 }
