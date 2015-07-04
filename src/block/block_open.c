@@ -180,7 +180,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint64_t bucket, hash;
 
-	WT_TRET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
+	WT_RET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
 
 	conn = S2C(session);
 	*blockp = NULL;
@@ -197,7 +197,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	}
 
 	/* Basic structure allocation, initialization. */
-	WT_ERR(__wt_calloc_one(session, &block));
+	WT_RET(__wt_calloc_one(session, &block));
 	block->ref = 1;
 	WT_CONN_BLOCK_INSERT(conn, block, bucket);
 
