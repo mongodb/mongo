@@ -27,6 +27,7 @@
  */
 
 #include "wtperf.h"
+#include "../src/include/queue.h"
 
 /* Default values. */
 static const CONFIG default_cfg = {
@@ -62,6 +63,15 @@ static const CONFIG default_cfg = {
 #include "wtperf_opt.i"
 #undef OPT_DEFINE_DEFAULT
 };
+
+/* Queue entry for use with the Truncate Logic */
+struct truncate_queue_entry {
+        char *key;
+        STAILQ_ENTRY(truncate_queue_entry) entries;
+};
+
+/* Queue head for use with the Truncate Logic */
+STAILQ_HEAD(, truncate_queue_entry) truncate_stone_head;
 
 static const char * const debug_cconfig = "";
 static const char * const debug_tconfig = "";
@@ -381,6 +391,7 @@ static void *
 worker(void *arg)
 {
 	struct timespec start, stop, interval;
+	struct truncate_queue_entry *item;
 	CONFIG *cfg;
 	CONFIG_THREAD *thread;
 	TRACK *trk;
@@ -389,7 +400,8 @@ worker(void *arg)
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
 	size_t i, item_count;
-	uint64_t next_val, truncate_counter, truncate_point_end, usecs;
+	uint64_t needed_milestones, next_val, last_key, starting_point;
+	uint64_t truncate_milestone_gap, truncate_counter, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
 	char *value_buf, *key_buf, *truncate_key, *value;
@@ -400,13 +412,16 @@ worker(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	cursors = NULL;
+	item_count = 0;
+	needed_milestones = 0;
 	ops = 0;
 	ops_per_txn = thread->workload->ops_per_txn;
+	last_key = 0;
 	session = NULL;
+	starting_point = 0;
 	trk = NULL;
 	throttle_ops = 0;
-	item_count = 0;
-	truncate_counter = truncate_point_end = 0;
+	truncate_milestone_gap = 0;
 
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
@@ -460,20 +475,44 @@ worker(void *arg)
 		lprintf(cfg, ret, 0, "First transaction begin failed");
 		goto err;
 	}
-	/* Setup truncate values */
+
+	/* Setup for truncate */
 	if (thread->workload->truncate != 0) {
-		/*
-		 * We need to capture 2 points, the point at which to truncate
-		 * and the point at which we know the collection is sizable
-		 * enough to warrant truncation.
-		 */
+
+		STAILQ_INIT(&truncate_stone_head);
+
+		/* Truncation % value. eg 10% is 0.1 */
 		truncation_percentage =
 		    (double)thread->workload->truncate_pct / 100;
-		truncate_point_end =
+		/* How wide each milestone is */
+		truncate_milestone_gap =
 		    thread->workload->truncate_count*truncation_percentage;
-		truncation_percentage = (double)1-truncation_percentage;
-		truncate_counter =
-		    thread->workload->truncate_count*truncation_percentage;
+		/* How many milestones we need */
+		needed_milestones = thread->workload->truncate_count /
+		    truncate_milestone_gap;
+
+		/* Setup the initial milestones if we have data */
+		if (cfg->insert_key != 0) {
+			starting_point = 0;
+			/* Shouldn't happen */
+			if (cfg->insert_key > thread->workload->truncate_count)
+				starting_point = cfg->insert_key -
+				    thread->workload->truncate_count;
+			for (i = 0; i < needed_milestones; i++) {
+				truncate_key = malloc(cfg->key_sz);
+				item = malloc(sizeof(item));
+				if (item == NULL) {
+					printf("malloc failed\n");
+		                }
+				generate_key(cfg, truncate_key,
+				    starting_point +
+				    (truncate_milestone_gap * (i+1)));
+				item->key = truncate_key;
+				STAILQ_INSERT_TAIL(&truncate_stone_head, item, entries);
+				last_key = starting_point +
+				    (truncate_milestone_gap * (i+1));
+			}
+		}
 	}
 
 	while (!cfg->stop) {
@@ -507,7 +546,6 @@ worker(void *arg)
 				continue;
 			break;
 		case WORKER_TRUNCATE:
-			item_count = 0;
 			next_val = wtperf_rand(thread);
 			break;
 		default:
@@ -577,31 +615,26 @@ worker(void *arg)
 				lprintf(cfg, ret, 0, "Cursor reset failed");
 				goto op_err;
 			}
-
-			while ((ret = cursor->next(cursor)) == 0) {
-				item_count++;
-				/* Save the value at the truncate point */
-				if (item_count == truncate_point_end) {
-					ret = cursor->get_key(cursor,
-					    &truncate_key);
+			trk = &thread->truncate;
+			while (cfg->insert_key > thread->workload->truncate_count) {
+				item_count = cfg->insert_key - truncate_milestone_gap;
+				/* We add more truncation points as needed */
+				item = STAILQ_FIRST(&truncate_stone_head);
+				STAILQ_REMOVE_HEAD(&truncate_stone_head, entries);
+				cursor->set_key(cursor, item->key);
+				ret = session->truncate(session,
+				    NULL, NULL, cursor, NULL);
+				if ( ret != 0) {
+					lprintf(cfg, ret, 0,
+					    "Truncate failed");
+					goto op_err;
 				}
-				if (item_count >= truncate_counter) {
-					cursor->set_key(cursor, truncate_key);
-					ret = cursor->search(cursor);
-					ret = session->truncate(session,
-					    NULL, NULL, cursor, NULL);
-					if ( ret != 0) {
-						lprintf(cfg, ret, 0,
-						    "Truncate failed");
-						goto op_err;
-					}
-					break;
-				}
+				WT_ATOMIC_SUB8(cfg->insert_key, truncate_milestone_gap);
+				last_key = last_key + truncate_milestone_gap;
+				generate_key(cfg, item->key, last_key);
+				STAILQ_INSERT_TAIL(&truncate_stone_head, item, entries);
 			}
-
-			if (item_count >= truncate_counter) {
-				trk = &thread->truncate;
-			} else {
+			if (cfg->insert_key <= thread->workload->truncate_count) {
 				trk = &thread->truncate_sleep;
 				(void)usleep(10000);
 			}
@@ -2162,6 +2195,10 @@ main(int argc, char *argv[])
 		    cfg->async_threads);
 	}
 	if ((ret = config_compress(cfg)) != 0)
+		goto err;
+
+	/* You can't have truncate on a random collection */
+	if (cfg->workload->truncate && cfg->random_range)
 		goto err;
 
 	/* Build the URI from the table name. */
