@@ -182,6 +182,18 @@ public:
     }
 
     /**
+     * Returns true if the DocumentSource needs to be run on the primary shard.
+     */
+    virtual bool needsPrimaryShard() const {
+        return false;
+    }
+
+    /**
+     * If DocumentSource uses additional collections, it adds the namespaces to the input vector.
+     */
+    virtual void addInvolvedCollections(std::vector<NamespaceString>* collections) const {}
+
+    /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */
     static boost::intrusive_ptr<DocumentSource> parse(
@@ -660,6 +672,9 @@ public:
     const char* getSourceName() const final;
     Value serialize(bool explain = false) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
+    bool needsPrimaryShard() const final {
+        return true;
+    }
 
     // Virtuals for SplittableDocumentSource
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
@@ -1057,6 +1072,10 @@ public:
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    std::string getUnwindPath() {
+        return _unwindPath->getPath(false);
+    }
 
 private:
     explicit DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

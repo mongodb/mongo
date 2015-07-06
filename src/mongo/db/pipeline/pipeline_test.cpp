@@ -200,11 +200,11 @@ public:
         intrusive_ptr<ExpressionContext> ctx =
             new ExpressionContext(&_opCtx, NamespaceString("a.collection"));
         string errmsg;
-        intrusive_ptr<Pipeline> mergePipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
+        mergePipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
         ASSERT_EQUALS(errmsg, "");
         ASSERT(mergePipe != NULL);
 
-        intrusive_ptr<Pipeline> shardPipe = mergePipe->splitForSharded();
+        shardPipe = mergePipe->splitForSharded();
         ASSERT(shardPipe != NULL);
 
         ASSERT_EQUALS(Value(shardPipe->writeExplainOps()), Value(shardPipeExpected["pipeline"]));
@@ -212,6 +212,10 @@ public:
     }
 
     virtual ~Base() {}
+
+protected:
+    intrusive_ptr<Pipeline> mergePipe;
+    intrusive_ptr<Pipeline> shardPipe;
 
 private:
     OperationContextNoop _opCtx;
@@ -400,6 +404,50 @@ class ShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj : public Base {
 };
 
 }  // namespace limitFieldsSentFromShardsToMerger
+
+
+namespace needsPrimaryShardMerger {
+class needsPrimaryShardMergerBase : public Base {
+public:
+    void run() override {
+        Base::run();
+        ASSERT_EQUALS(mergePipe->needsPrimaryShardMerger(), needsPrimaryShardMerger());
+        ASSERT(!shardPipe->needsPrimaryShardMerger());
+    }
+    virtual bool needsPrimaryShardMerger() = 0;
+};
+
+class Out : public needsPrimaryShardMergerBase {
+    bool needsPrimaryShardMerger() {
+        return true;
+    }
+    string inputPipeJson() {
+        return "[{$out: 'outColl'}]";
+    }
+    string shardPipeJson() {
+        return "[]";
+    }
+    string mergePipeJson() {
+        return "[{$out: 'outColl'}]";
+    }
+};
+
+class Project : public needsPrimaryShardMergerBase {
+    bool needsPrimaryShardMerger() {
+        return false;
+    }
+    string inputPipeJson() {
+        return "[{$project: {a : 1}}]";
+    }
+    string shardPipeJson() {
+        return "[{$project: {a: true}}]";
+    }
+    string mergePipeJson() {
+        return "[]";
+    }
+};
+
+}  // namespace needsPrimaryShardMerger
 }  // namespace Sharded
 }  // namespace Optimizations
 
@@ -429,6 +477,9 @@ public:
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
                 ShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj>();
+        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
+        add<Optimizations::Sharded::needsPrimaryShardMerger::Out>();
+        add<Optimizations::Sharded::needsPrimaryShardMerger::Project>();
     }
 };
 

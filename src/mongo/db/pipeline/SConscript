@@ -131,6 +131,7 @@ env.Library(
         'dependencies',
         'document_source',
         'document_value',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/auth/authcore',
     ]
 )
@@ -156,6 +157,7 @@ env.CppUnitTest(
     source='pipeline_test.cpp',
     LIBDEPS=[
         'pipeline',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context',
         ],
     )

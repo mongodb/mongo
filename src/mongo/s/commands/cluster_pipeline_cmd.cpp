@@ -86,10 +86,10 @@ public:
     }
 
     // virtuals from Command
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        Pipeline::addRequiredPrivileges(this, dbname, cmdObj, out);
+    Status checkAuthForCommand(ClientBasic* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        return Pipeline::checkAuthForCommand(client, dbname, cmdObj);
     }
 
     virtual bool run(OperationContext* txn,
@@ -107,9 +107,7 @@ public:
 
         shared_ptr<DBConfig> conf = status.getValue();
 
-        // If the system isn't running sharded, or the target collection isn't sharded, pass
-        // this on to a mongod.
-        if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
+        if (!conf->isShardingEnabled()) {
             return aggPassthrough(conf, cmdObj, result, options);
         }
 
@@ -125,6 +123,14 @@ public:
             return false;
         }
 
+        for (auto&& ns : pipeline->getInvolvedCollections()) {
+            uassert(28769, str::stream() << ns.ns() << " cannot be sharded", !conf->isSharded(ns.ns()));
+        }
+
+        if (!conf->isSharded(fullns)) {
+            return aggPassthrough(conf, cmdObj, result, options);
+        }
+
         // If the first $match stage is an exact match on the shard key, we only have to send it
         // to one shard, so send the command to that shard.
         BSONObj firstMatchQuery = pipeline->getInitialQuery();
@@ -132,10 +138,9 @@ public:
         BSONObj shardKeyMatches = uassertStatusOK(
             chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(firstMatchQuery));
 
-        // Don't need to split pipeline if the first $match is an exact match on shard key, but
-        // we can't send the entire pipeline to one shard if there is a $out stage, since that
-        // shard may not be the primary shard for the database.
-        bool needSplit = shardKeyMatches.isEmpty() || pipeline->hasOutStage();
+        // Don't need to split pipeline if the first $match is an exact match on shard key, unless
+        // there is a stage that needs to be run on the primary shard.
+        bool needSplit = shardKeyMatches.isEmpty() || pipeline->needsPrimaryShardMerger();
 
         // Split the pipeline into pieces for mongod(s) and this mongos. If needSplit is true,
         // 'pipeline' will become the merger side.

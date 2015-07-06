@@ -32,6 +32,7 @@
 
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
@@ -39,6 +40,7 @@
 namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
+class ClientBasic;
 class Command;
 struct DepsTracker;
 class DocumentSource;
@@ -62,11 +64,10 @@ public:
         const BSONObj& cmdObj,
         const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
-    /// Helper to implement Command::addRequiredPrivileges
-    static void addRequiredPrivileges(Command* commandTemplate,
+    /// Helper to implement Command::checkAuthForCommand
+    static Status checkAuthForCommand(ClientBasic* client,
                                       const std::string& dbname,
-                                      BSONObj cmdObj,
-                                      std::vector<Privilege>* out);
+                                      const BSONObj& cmdObj);
 
     const boost::intrusive_ptr<ExpressionContext>& getContext() const {
         return pCtx;
@@ -89,9 +90,15 @@ public:
     BSONObj getInitialQuery() const;
 
     /**
-     * Returns true if the pipeline contains a $out stage, and false otherwise.
+     * Returns whether or not any DocumentSource in the pipeline needs the primary shard.
      */
-    bool hasOutStage() const;
+    bool needsPrimaryShardMerger() const;
+
+    /**
+     * Returns any other collections involved in the pipeline in addition to the collection the
+     * aggregation is run on.
+     */
+    std::vector<NamespaceString> getInvolvedCollections() const;
 
     /**
       Write the Pipeline as a BSONObj command.  This should be the

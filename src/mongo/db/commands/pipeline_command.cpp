@@ -171,10 +171,10 @@ public:
              << "See http://dochub.mongodb.org/core/aggregation for more details.";
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        Pipeline::addRequiredPrivileges(this, dbname, cmdObj, out);
+    Status checkAuthForCommand(ClientBasic* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        return Pipeline::checkAuthForCommand(client, dbname, cmdObj);
     }
 
     virtual bool run(OperationContext* txn,
