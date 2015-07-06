@@ -81,16 +81,10 @@ individual memory page grows to be larger than the configured \c
 memory_page_max (see the configuration in WT_SESSION::create).
 
 If a cursor is active on a page being considered for eviction, the eviction
-will defer until the cursor is moved. In the specific cases with multiple
-active cursors on a memory page that has reached maximum size, the
-WiredTiger library will never have simultaneous control over both cursors to
-move them to smaller, split pages.  This may prevent a large page from ever
-being split and may potentially slow down the application.
-
-To avoid this situation, or any situation where eviction must be deferred,
-applications should call WT_CURSOR::reset during times that it does not need
-to keep a cursor positioned.  A cursor that has been reset is not active and
-cannot inhibit eviction.
+will defer until the cursor is moved. To avoid this, and to keep resources
+freed in general, an application should call WT_CURSOR::reset during times
+that it does not need to keep a cursor positioned.  A cursor that has been
+reset is not active and cannot inhibit eviction.
 
 @section cursor_raw Raw mode
 
