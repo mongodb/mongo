@@ -63,6 +63,7 @@ namespace {
 } // namespace
 
     MONGO_FP_DECLARE(rsBgSyncProduce);
+    MONGO_FP_DECLARE(stepDownWhileDrainingFailPoint);
 
     BackgroundSync* BackgroundSync::s_instance = 0;
     boost::mutex BackgroundSync::s_mutex;
@@ -214,11 +215,9 @@ namespace {
                 return;
             }
 
-            // Wait until we've applied the ops we have before we choose a sync target
-            while (!_appliedBuffer && !inShutdownStrict()) {
-                _appliedBufferCondition.wait(lock);
-            }
-            if (inShutdownStrict()) {
+            if (_replCoord->isWaitingForApplierToDrain() ||
+                    _replCoord->getMemberState().primary() ||
+                    inShutdownStrict()) {
                 return;
             }
         }
@@ -338,6 +337,11 @@ namespace {
             // of the oplogreader cursor.
             BSONObj o = _syncSourceReader.nextSafe().getOwned();
             opsReadStats.increment();
+
+ 
+             if (MONGO_FAIL_POINT(stepDownWhileDrainingFailPoint)) {
+                 sleepsecs(20);
+             }
 
             {
                 boost::unique_lock<boost::mutex> lock(_mutex);

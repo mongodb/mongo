@@ -1930,7 +1930,6 @@ namespace {
                 info->master = false;
                 info->condVar->notify_all();
             }
-            _isWaitingForDrainToComplete = false;
             _canAcceptNonLocalWrites = false;
             result = kActionCloseAllConnections;
         }
