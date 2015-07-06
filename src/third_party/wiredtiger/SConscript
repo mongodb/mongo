@@ -12,12 +12,14 @@ env.Append(CPPPATH=[
         "src/include",
     ])
 
-# Enable asserts, and optional rich logging in debug builds
+# Enable asserts in debug builds
 if debugBuild:
     env.Append(CPPDEFINES=[
         "HAVE_DIAGNOSTIC",
-        "HAVE_VERBOSE",
         ])
+
+# Enable optional rich logging
+env.Append(CPPDEFINES=["HAVE_VERBOSE"])
 
 conf = Configure(env)
 if conf.CheckFunc("fallocate"):
