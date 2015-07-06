@@ -141,9 +141,8 @@ WiredTigerSessionCache::~WiredTigerSessionCache() {
 }
 
 void WiredTigerSessionCache::shuttingDown() {
-    if (_shuttingDown.load())
+    if (_shuttingDown.compareAndSwap(0, 1))
         return;
-    _shuttingDown.store(1);
 
     {
         // This ensures that any calls, which are currently inside of getSession/releaseSession
