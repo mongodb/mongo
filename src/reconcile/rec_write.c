@@ -5086,14 +5086,6 @@ err:			__wt_scr_free(session, &tkey);
 	 * be set before a subsequent checkpoint reads it, and because the
 	 * current checkpoint is waiting on this reconciliation to complete,
 	 * there's no risk of that happening).
-	 *
-	 * Otherwise, if no updates were skipped, we have a new maximum
-	 * transaction written for the page (used to decide if a clean page can
-	 * be evicted).  The page only might be clean; if the write generation
-	 * is unchanged since reconciliation started, clear it and update cache
-	 * dirty statistics, if the write generation changed, then the page has
-	 * been written since we started reconciliation, it cannot be
-	 * discarded.
 	 */
 	if (r->leave_dirty) {
 		mod->first_dirty_txn = r->first_dirty_txn;
@@ -5101,8 +5093,30 @@ err:			__wt_scr_free(session, &tkey);
 		btree->modified = 1;
 		WT_FULL_BARRIER();
 	} else {
+		/*
+		 * If no updates were skipped, we have a new maximum transaction
+		 * written for the page (used to decide if a clean page can be
+		 * evicted). Set the highest transaction ID for the page.
+		 *
+		 * Track the highest transaction ID for the tree (used to decide
+		 * if it's safe to discard all of the pages in the tree without
+		 * further checking). Reconciliation in the service of eviction
+		 * is multi-threaded, only update the tree's maximum transaction
+		 * ID when doing a checkpoint. That's sufficient, we only care
+		 * about the highest transaction ID of any update currently in
+		 * the tree, and checkpoint visits every dirty page in the tree.
+		 */
 		mod->rec_max_txn = r->max_txn;
+		if (!F_ISSET(r, WT_EVICTING) &&
+		    !WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
+			btree->rec_max_txn = r->max_txn;
 
+		/*
+		 * The page only might be clean; if the write generation is
+		 * unchanged since reconciliation started, it's clean. If the
+		 * write generation changed, the page has been written since
+		 * we started reconciliation and remains dirty.
+		 */
 		if (WT_ATOMIC_CAS4(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
 	}
