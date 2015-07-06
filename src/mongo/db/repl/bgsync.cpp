@@ -66,6 +66,7 @@ const int BatchIsSmallish = 40000;  // bytes
 }  // namespace
 
 MONGO_FP_DECLARE(rsBgSyncProduce);
+MONGO_FP_DECLARE(stepDownWhileDrainingFailPoint);
 
 BackgroundSync* BackgroundSync::s_instance = 0;
 stdx::mutex BackgroundSync::s_mutex;
@@ -209,11 +210,8 @@ void BackgroundSync::_produce(OperationContext* txn, executor::TaskExecutor* tas
             return;
         }
 
-        // Wait until we've applied the ops we have before we choose a sync target
-        while (!_appliedBuffer && !inShutdownStrict()) {
-            _appliedBufferCondition.wait(lock);
-        }
-        if (inShutdownStrict()) {
+        if (_replCoord->isWaitingForApplierToDrain() || _replCoord->getMemberState().primary() ||
+            inShutdownStrict()) {
             return;
         }
     }
@@ -332,6 +330,10 @@ void BackgroundSync::_produce(OperationContext* txn, executor::TaskExecutor* tas
         // of the oplogreader cursor.
         BSONObj o = syncSourceReader.nextSafe().getOwned();
         opsReadStats.increment();
+
+        if (MONGO_FAIL_POINT(stepDownWhileDrainingFailPoint)) {
+            sleepsecs(20);
+        }
 
         {
             stdx::unique_lock<stdx::mutex> lock(_mutex);
