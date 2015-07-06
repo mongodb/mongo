@@ -389,7 +389,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
         lk.unlock();
 
-        _externalState->startThreads();
+        _externalState->startThreads(&_replExecutor);
     }
 
     const stdx::function<void(const ReplicationExecutor::CallbackArgs&)> reconfigFinishFn(

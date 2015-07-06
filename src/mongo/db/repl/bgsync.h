@@ -29,19 +29,26 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/queue.h"
 
 namespace mongo {
 
 class OperationContext;
 
+namespace executor {
+
+class TaskExecutor;
+
+}  // namespace executor
+
 namespace repl {
 
 class Member;
+class OplogReader;
 class ReplicationCoordinator;
 
 // This interface exists to facilitate easier testing;
@@ -90,7 +97,7 @@ public:
     virtual ~BackgroundSync() {}
 
     // starts the producer thread
-    void producerThread();
+    void producerThread(executor::TaskExecutor* taskExecutor);
     // starts the sync target notifying thread
     void notifierThread();
 
@@ -135,7 +142,6 @@ private:
 
     // Production thread
     BlockingQueue<BSONObj> _buffer;
-    OplogReader _syncSourceReader;
 
     // _mutex protects all of the class variables except _syncSourceReader and _buffer
     mutable stdx::mutex _mutex;
@@ -161,14 +167,13 @@ private:
     BackgroundSync operator=(const BackgroundSync& s);
 
     // Production thread
-    void _producerThread();
-    // Adds elements to the list, up to maxSize.
-    void produce(OperationContext* txn);
+    void _producerThread(executor::TaskExecutor* taskExecutor);
+    void _produce(OperationContext* txn, executor::TaskExecutor* taskExecutor);
     // Checks the criteria for rolling back and executes a rollback if warranted.
     bool _rollbackIfNeeded(OperationContext* txn, OplogReader& r);
 
     // Evaluate if the current sync target is still good
-    bool shouldChangeSyncSource();
+    bool _shouldChangeSyncSource(const HostAndPort& syncSource);
 
     // restart syncing
     void start(OperationContext* txn);

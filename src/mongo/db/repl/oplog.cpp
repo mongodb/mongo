@@ -71,6 +71,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"

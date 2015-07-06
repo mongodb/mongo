@@ -55,6 +55,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator_global.h"

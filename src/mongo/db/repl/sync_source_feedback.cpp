@@ -42,6 +42,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context.h"

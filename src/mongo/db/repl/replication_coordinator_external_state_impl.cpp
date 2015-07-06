@@ -51,7 +51,6 @@
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/server_parameters.h"
@@ -91,7 +90,7 @@ ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl
     : _startedThreads(false), _nextThreadId(0) {}
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
-void ReplicationCoordinatorExternalStateImpl::startThreads() {
+void ReplicationCoordinatorExternalStateImpl::startThreads(executor::TaskExecutor* taskExecutor) {
     stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_startedThreads) {
         return;
@@ -99,7 +98,8 @@ void ReplicationCoordinatorExternalStateImpl::startThreads() {
     log() << "Starting replication applier threads";
     _applierThread.reset(new stdx::thread(runSyncThread));
     BackgroundSync* bgsync = BackgroundSync::get();
-    _producerThread.reset(new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync)));
+    _producerThread.reset(
+        new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync, taskExecutor)));
     _syncSourceFeedbackThread.reset(
         new stdx::thread(stdx::bind(&SyncSourceFeedback::run, &_syncSourceFeedback)));
     if (enableReplSnapshotThread) {
