@@ -466,9 +466,9 @@ func TestMongoDumpBSON(t *testing.T) {
 			So(err, ShouldBeNil)
 			jsonQueryBytes, err := json.Marshal(jsonQuery)
 			So(err, ShouldBeNil)
-			md.InputOptions.Query = string(jsonQueryBytes)
 
-			Convey("for all the collections in the database", func() {
+			Convey("using --query for all the collections in the database", func() {
+				md.InputOptions.Query = string(jsonQueryBytes)
 				md.ToolOptions.Namespace.DB = testDB
 				md.OutputOptions.Out = "dump"
 
@@ -516,6 +516,56 @@ func TestMongoDumpBSON(t *testing.T) {
 
 			})
 
+			Convey("using --queryFile for all the collections in the database", func() {
+				ioutil.WriteFile("example.json", jsonQueryBytes, 0777)
+				md.InputOptions.QueryFile = "example.json"
+				md.ToolOptions.Namespace.DB = testDB
+				md.OutputOptions.Out = "dump"
+
+				origDB := session.DB(testDB)
+				restoredDB := session.DB(testRestoreDB)
+
+				// we can only dump using query per collection
+				for _, testCollName := range testCollectionNames {
+					md.ToolOptions.Namespace.Collection = testCollName
+
+					err = md.Init()
+					So(err, ShouldBeNil)
+
+					err = md.Dump()
+					So(err, ShouldBeNil)
+				}
+
+				path, err := os.Getwd()
+				So(err, ShouldBeNil)
+
+				dumpDir := util.ToUniversalPath(filepath.Join(path, "dump"))
+				dumpDBDir := util.ToUniversalPath(filepath.Join(dumpDir, testDB))
+				So(fileDirExists(dumpDir), ShouldBeTrue)
+				So(fileDirExists(dumpDBDir), ShouldBeTrue)
+
+				err = readBSONIntoDatabase(dumpDBDir, testRestoreDB)
+				So(err, ShouldBeNil)
+
+				for _, testCollName := range testCollectionNames {
+					// count filtered docs
+					numDocs1, err := origDB.C(testCollName).Find(bsonQuery).Count()
+					So(err, ShouldBeNil)
+
+					// count number of all restored documents
+					numDocs2, err := restoredDB.C(testCollName).Find(nil).Count()
+					So(err, ShouldBeNil)
+
+					So(numDocs1, ShouldEqual, numDocs2)
+				}
+
+				Reset(func() {
+					So(session.DB(testRestoreDB).DropDatabase(), ShouldBeNil)
+					So(os.RemoveAll(dumpDir), ShouldBeNil)
+					So(os.Remove("example.json"), ShouldBeNil)
+				})
+
+			})
 		})
 
 		Reset(func() {

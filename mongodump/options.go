@@ -1,4 +1,8 @@
 package mongodump
+import (
+	"fmt"
+	"io/ioutil"
+)
 
 var Usage = `<options>
 
@@ -10,13 +14,32 @@ See http://docs.mongodb.org/manual/reference/program/mongodump/ for more informa
 
 // InputOptions defines the set of options to use in retrieving data from the server.
 type InputOptions struct {
-	Query     string `long:"query" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
-	TableScan bool   `long:"forceTableScan" description:"force a table scan"`
+	Query     	string `long:"query" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
+	QueryFile	string `long:"queryFile" description:"query filter, as a JSON file"`
+	TableScan 	bool   `long:"forceTableScan" description:"force a table scan"`
 }
 
 // Name returns a human-readable group name for input options.
 func (_ *InputOptions) Name() string {
 	return "query"
+}
+
+func (inputOptions *InputOptions) HasQuery() (bool){
+	return inputOptions.Query != "" || inputOptions.QueryFile != ""
+}
+
+func (inputOptions *InputOptions) GetQuery() ([]byte, error) {
+	if inputOptions.Query != "" {
+		return []byte(inputOptions.Query), nil
+	} else if inputOptions.QueryFile != "" {
+		content, err := ioutil.ReadFile(inputOptions.QueryFile)
+		if err != nil{
+			fmt.Errorf("error reading queryFile: %v", err)
+		}
+		return content, err
+	} else {
+		return nil, fmt.Errorf("GetQuery can return valid values only for query or queryFile input")
+	}
 }
 
 // OutputOptions defines the set of options for writing dump data.
