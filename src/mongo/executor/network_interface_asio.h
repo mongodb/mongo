@@ -29,10 +29,8 @@
 #pragma once
 
 #include <asio.hpp>
-#include <atomic>
 #include <boost/optional.hpp>
 #include <system_error>
-#include <thread>
 #include <unordered_map>
 
 #include "mongo/client/connection_pool.h"
@@ -153,12 +151,25 @@ private:
         const int _id;
     };
 
+    void _asyncRunCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                          const RemoteCommandRequest& request,
+                          const RemoteCommandCompletionFn& onFinish);
+
     void _messageFromRequest(const RemoteCommandRequest& request,
                              Message* toSend,
                              bool useOpCommand = false);
 
     void _asyncSendSimpleMessage(AsyncOp* op, const asio::const_buffer& buf);
 
+    // Connection
+    void _connectASIO(AsyncOp* op);
+    void _connectWithDBClientConnection(AsyncOp* op);
+    void _setupSocket(AsyncOp* op, const asio::ip::tcp::resolver::iterator& endpoints);
+    void _authenticate(AsyncOp* op);
+    void _sslHandshake(AsyncOp* op);
+
+    // Communication state machine
+    void _beginCommunication(AsyncOp* op);
     void _completedWriteCallback(AsyncOp* op);
     void _networkErrorCallback(AsyncOp* op, const std::error_code& ec);
 
@@ -168,6 +179,7 @@ private:
     void _recvMessageHeader(AsyncOp* op);
     void _recvMessageBody(AsyncOp* op);
     void _receiveResponse(AsyncOp* op);
+
     void _signalWorkAvailable_inlock();
 
     asio::io_service _io_service;

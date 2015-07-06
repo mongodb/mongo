@@ -32,13 +32,13 @@
 
 #include "mongo/executor/network_interface_asio.h"
 
-#include <chrono>
 #include <utility>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
@@ -405,26 +405,7 @@ Date_t NetworkInterfaceASIO::now() {
     return Date_t::now();
 }
 
-void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                        const RemoteCommandRequest& request,
-                                        const RemoteCommandCompletionFn& onFinish) {
-    LOG(3) << "running command " << request.cmdObj << " against database " << request.dbname
-           << " across network to " << request.target.toString();
-
-    if (inShutdown()) {
-        return;
-    }
-
-    auto ownedOp =
-        stdx::make_unique<AsyncOp>(cbHandle, request, onFinish, now(), _numOps.fetchAndAdd(1));
-
-    AsyncOp* op = ownedOp.get();
-
-    {
-        stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-        _inProgress.emplace(op, std::move(ownedOp));
-    }
-
+void NetworkInterfaceASIO::_connectWithDBClientConnection(AsyncOp* op) {
     // connect in a separate thread to avoid blocking the rest of the system
     stdx::thread t([this, op]() {
         try {
@@ -455,26 +436,76 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         }
 
         // send control back to main thread(pool)
-        asio::post(_io_service,
-                   [this, op]() {
-
-                       if (op->canceled()) {
-                           return _completeOperation(op, kCanceledStatus);
-                       }
-
-                       Message* toSend = op->toSend();
-                       _messageFromRequest(op->request(), toSend);
-                       if (toSend->empty()) {
-                           _completedWriteCallback(op);
-                       } else {
-                           // TODO: Some day we may need to support vector messages.
-                           fassert(28708, toSend->buf() != 0);
-                           asio::const_buffer buf(toSend->buf(), toSend->size());
-                           return _asyncSendSimpleMessage(op, buf);
-                       }
-                   });
+        asio::post(_io_service, [this, op]() { _beginCommunication(op); });
     });
+
     t.detach();
+}
+
+void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
+    if (op->canceled()) {
+        return _completeOperation(op, kCanceledStatus);
+    }
+
+    Message* toSend = op->toSend();
+    _messageFromRequest(op->request(), toSend);
+
+    if (toSend->empty())
+        return _completedWriteCallback(op);
+
+    // TODO: Some day we may need to support vector messages.
+    fassert(28708, toSend->buf() != 0);
+    asio::const_buffer buf(toSend->buf(), toSend->size());
+    return _asyncSendSimpleMessage(op, buf);
+}
+
+void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
+    // TODO: Implement asynchronous authentication, SERVER-19155
+    asio::post(_io_service, [this, op]() { _beginCommunication(op); });
+}
+
+void NetworkInterfaceASIO::_sslHandshake(AsyncOp* op) {
+    // TODO: Implement asynchronous SSL, SERVER-19221
+    _authenticate(op);
+}
+
+void NetworkInterfaceASIO::_setupSocket(AsyncOp* op,
+                                        asio::ip::basic_resolver_iterator<tcp> endpoints) {
+    // TODO: Implement ASIO-based socket setup, SERVER-19220
+}
+
+void NetworkInterfaceASIO::_connectASIO(AsyncOp* op) {
+    // TODO: Implement asynchronous DNS resolution, SERVER-19220
+}
+
+void NetworkInterfaceASIO::_asyncRunCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                            const RemoteCommandRequest& request,
+                                            const RemoteCommandCompletionFn& onFinish) {
+    LOG(3) << "running command " << request.cmdObj << " against database " << request.dbname
+           << " across network to " << request.target.toString();
+
+    if (inShutdown()) {
+        return;
+    }
+
+    auto ownedOp =
+        stdx::make_unique<AsyncOp>(cbHandle, request, onFinish, now(), _numOps.fetchAndAdd(1));
+
+    AsyncOp* op = ownedOp.get();
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+        _inProgress.emplace(op, std::move(ownedOp));
+    }
+
+    // _connect...() will continue the state machine.
+    _connectWithDBClientConnection(op);
+}
+
+void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                        const RemoteCommandRequest& request,
+                                        const RemoteCommandCompletionFn& onFinish) {
+    _asyncRunCommand(cbHandle, request, onFinish);
 }
 
 void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {
