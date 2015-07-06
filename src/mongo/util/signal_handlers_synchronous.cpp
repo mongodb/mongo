@@ -165,7 +165,7 @@ void myTerminate() {
     MallocFreeOStreamGuard lk{};
 
     // In c++11 we can recover the current exception to print it.
-    if (std::exception_ptr eptr = std::current_exception()) {
+    if (std::current_exception()) {
         mallocFreeOStream << "terminate() called. An exception is active;"
                           << " attempting to gather more information";
         writeMallocFreeStreamToLog();
@@ -173,7 +173,7 @@ void myTerminate() {
         const std::type_info* typeInfo = nullptr;
         try {
             try {
-                std::rethrow_exception(eptr);
+                throw;
             } catch (const DBException& ex) {
                 typeInfo = &typeid(ex);
                 mallocFreeOStream << "DBException::toString(): " << ex.toString() << '\n';
@@ -206,21 +206,35 @@ void myTerminate() {
 
     printStackTrace(mallocFreeOStream);
     writeMallocFreeStreamToLog();
-
+    breakpoint();
 #if defined(_WIN32)
     doMinidump();
-#endif
-
-    breakpoint();
     quickExit(EXIT_ABRUPT);
+#else
+    {
+        // Clear our handler for SIGABRT so the OS one (which dumps core) can execute.
+        struct sigaction defaultedSignals;
+        memset(&defaultedSignals, 0, sizeof(defaultedSignals));
+        defaultedSignals.sa_handler = SIG_DFL;
+        sigemptyset(&defaultedSignals.sa_mask);
+
+        invariant(sigaction(SIGABRT, &defaultedSignals, nullptr) == 0);
+        raise(SIGABRT);
+    }
+#endif
+    MONGO_UNREACHABLE;
 }
 
 void abruptQuit(int signalNum) {
     MallocFreeOStreamGuard lk{};
     printSignalAndBacktrace(signalNum);
-
-    // Don't go through normal shutdown procedure. It may make things worse.
+    breakpoint();
+#ifdef _WIN32
+    doMinidump();
     quickExit(EXIT_ABRUPT);
+#else
+    raise(signalNum);
+#endif
 }
 
 #if defined(_WIN32)
@@ -233,9 +247,6 @@ void myInvalidParameterHandler(const wchar_t* expression,
     severe() << "Invalid parameter detected in function " << toUtf8String(function)
              << " File: " << toUtf8String(file) << " Line: " << line;
     severe() << "Expression: " << toUtf8String(expression);
-
-    doMinidump();
-
     severe() << "immediate exit due to invalid parameter";
 
     abruptQuit(SIGABRT);
@@ -243,11 +254,7 @@ void myInvalidParameterHandler(const wchar_t* expression,
 
 void myPureCallHandler() {
     severe() << "Pure call handler invoked";
-
-    doMinidump();
-
     severe() << "immediate exit due to invalid pure call";
-
     abruptQuit(SIGABRT);
 }
 
@@ -278,7 +285,7 @@ void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void*) {
         writeMallocFreeStreamToLog();
     }
 #endif
-    quickExit(EXIT_ABRUPT);
+    raise(signalNum);
 }
 
 #endif
@@ -289,32 +296,45 @@ void setupSynchronousSignalHandlers() {
     std::set_terminate(myTerminate);
     std::set_new_handler(reportOutOfMemoryErrorAndExit);
 
-    // SIGABRT is the only signal we want handled by signal handlers on both windows and posix.
-    invariant(signal(SIGABRT, abruptQuit) != SIG_ERR);
-
 #if defined(_WIN32)
+    invariant(signal(SIGABRT, abruptQuit) != SIG_ERR);
     _set_purecall_handler(myPureCallHandler);
     _set_invalid_parameter_handler(myInvalidParameterHandler);
     setWindowsUnhandledExceptionFilter();
 #else
-    invariant(signal(SIGHUP, SIG_IGN) != SIG_ERR);
-    invariant(signal(SIGUSR2, SIG_IGN) != SIG_ERR);
-    invariant(signal(SIGPIPE, SIG_IGN) != SIG_ERR);
+    {
+        struct sigaction ignoredSignals;
+        memset(&ignoredSignals, 0, sizeof(ignoredSignals));
+        ignoredSignals.sa_handler = SIG_IGN;
+        sigemptyset(&ignoredSignals.sa_mask);
 
-    struct sigaction addrSignals;
-    memset(&addrSignals, 0, sizeof(struct sigaction));
-    addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
-    sigemptyset(&addrSignals.sa_mask);
-    addrSignals.sa_flags = SA_SIGINFO;
+        invariant(sigaction(SIGHUP, &ignoredSignals, nullptr) == 0);
+        invariant(sigaction(SIGUSR2, &ignoredSignals, nullptr) == 0);
+        invariant(sigaction(SIGPIPE, &ignoredSignals, nullptr) == 0);
+    }
+    {
+        struct sigaction plainSignals;
+        memset(&plainSignals, 0, sizeof(plainSignals));
+        plainSignals.sa_handler = abruptQuit;
+        sigemptyset(&plainSignals.sa_mask);
+        plainSignals.sa_flags = SA_RESETHAND;
 
-    // ^\ is the stronger ^C. Log and quit hard without waiting for cleanup.
-    invariant(signal(SIGQUIT, abruptQuit) != SIG_ERR);
+        // ^\ is the stronger ^C. Log and quit hard without waiting for cleanup.
+        invariant(sigaction(SIGQUIT, &plainSignals, nullptr) == 0);
+        invariant(sigaction(SIGABRT, &plainSignals, nullptr) == 0);
+    }
+    {
+        struct sigaction addrSignals;
+        memset(&addrSignals, 0, sizeof(addrSignals));
+        addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
+        sigemptyset(&addrSignals.sa_mask);
+        addrSignals.sa_flags = SA_SIGINFO | SA_RESETHAND;
 
-    invariant(sigaction(SIGSEGV, &addrSignals, 0) == 0);
-    invariant(sigaction(SIGBUS, &addrSignals, 0) == 0);
-    invariant(sigaction(SIGILL, &addrSignals, 0) == 0);
-    invariant(sigaction(SIGFPE, &addrSignals, 0) == 0);
-
+        invariant(sigaction(SIGSEGV, &addrSignals, nullptr) == 0);
+        invariant(sigaction(SIGBUS, &addrSignals, nullptr) == 0);
+        invariant(sigaction(SIGILL, &addrSignals, nullptr) == 0);
+        invariant(sigaction(SIGFPE, &addrSignals, nullptr) == 0);
+    }
     setupSIGTRAPforGDB();
 #endif
 }

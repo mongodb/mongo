@@ -354,6 +354,17 @@ env.Library(
     ],
 )
 
+if not env.TargetOSIs('windows'):
+    env.CppUnitTest(
+        target='signal_handlers_synchronous_test',
+        source=[
+            'signal_handlers_synchronous_test.cpp',
+        ],
+        LIBDEPS=[
+            'signal_handlers_synchronous',
+        ],
+    )
+
 env.Library(
     target="signal_handlers",
     source=[
