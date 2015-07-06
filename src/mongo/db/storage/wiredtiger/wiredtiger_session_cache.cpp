@@ -223,16 +223,17 @@ namespace mongo {
         _sessionsOut.fetchAndSubtract(1);
  
         bool returnedToCache = false;
-
         invariant(session->_getEpoch() <= _epoch);
 
         // Only return sessions until we hit the maximum number of sessions we have ever seen demand
         // for concurrently. We also want to immediately delete any session that is from a
         // non-current epoch.
-        if (session->_getEpoch() == _epoch && sessionsInCache.load() < _highWaterMark.load()) {
-            returnedToCache = true;
+        if (sessionsInCache.load() < _highWaterMark.load()) {
             boost::lock_guard<SpinLock> lock(_cacheLock);
-            _sessions.push_back(session);
+            if (session->_getEpoch() == _epoch) {
+                returnedToCache = true;
+                _sessions.push_back(session);
+            }
         }
 
         if (returnedToCache) {
