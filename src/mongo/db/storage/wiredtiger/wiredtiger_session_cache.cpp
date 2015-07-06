@@ -182,7 +182,7 @@ namespace mongo {
             _highWaterMark.store(_sessionsOut.load());
         }
 
-        if (!_sessions.empty()) {
+        {
             boost::lock_guard<SpinLock> lock(_cacheLock);
             if (!_sessions.empty()) {
                 // Get the most recently used session so that if we discard sessions, we're
