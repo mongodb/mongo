@@ -144,10 +144,6 @@ uint64_t OperationContextImpl::getRemainingMaxTimeMicros() const {
 MONGO_FP_DECLARE(checkForInterruptFail);
 
 namespace {
-
-// Global state for checkForInterrupt fail point.
-PseudoRandom checkForInterruptPRNG(static_cast<int64_t>(time(NULL)));
-
 // Helper function for checkForInterrupt fail point.  Decides whether the operation currently
 // being run by the given Client meet the (probabilistic) conditions for interruption as
 // specified in the fail point info.
@@ -163,7 +159,7 @@ bool opShouldFail(const OperationContextImpl* opCtx, const BSONObj& failPointInf
     }
 
     // Return true with (approx) probability p = "chance".  Recall: 0 <= chance <= 1.
-    double next = static_cast<double>(std::abs(checkForInterruptPRNG.nextInt64()));
+    double next = static_cast<double>(std::abs(opCtx->getClient()->getPrng().nextInt64()));
     double upperBound =
         std::numeric_limits<int64_t>::max() * failPointInfo["chance"].numberDouble();
     if (next > upperBound) {

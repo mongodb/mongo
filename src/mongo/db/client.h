@@ -40,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/random.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/spin_lock.h"
@@ -137,6 +138,10 @@ public:
         return _connectionId > 0;
     }
 
+    PseudoRandom& getPrng() {
+        return _prng;
+    }
+
 private:
     friend class ServiceContext;
     Client(std::string desc, ServiceContext* serviceContext, AbstractMessagingPort* p = 0);
@@ -159,6 +164,8 @@ private:
 
     // If != NULL, then contains the currently active OperationContext
     OperationContext* _txn = nullptr;
+
+    PseudoRandom _prng;
 };
 
 /** get the Client object for this thread. */

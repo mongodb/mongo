@@ -36,6 +36,7 @@
 
 #include "mongo/db/client.h"
 
+#include <boost/functional/hash.hpp>
 #include <string>
 #include <vector>
 
@@ -88,11 +89,21 @@ void Client::initThread(const char* desc, ServiceContext* service, AbstractMessa
     *currentClient.get() = service->makeClient(fullDesc, mp);
 }
 
+namespace {
+int64_t generateSeed(const std::string& desc) {
+    size_t seed = 0;
+    boost::hash_combine(seed, Date_t::now().asInt64());
+    boost::hash_combine(seed, desc);
+    return seed;
+}
+}  // namespace
+
 Client::Client(std::string desc, ServiceContext* serviceContext, AbstractMessagingPort* p)
     : ClientBasic(serviceContext, p),
       _desc(std::move(desc)),
       _threadId(stdx::this_thread::get_id()),
-      _connectionId(p ? p->connectionId() : 0) {}
+      _connectionId(p ? p->connectionId() : 0),
+      _prng(generateSeed(_desc)) {}
 
 void Client::reportState(BSONObjBuilder& builder) {
     builder.append("desc", desc());
