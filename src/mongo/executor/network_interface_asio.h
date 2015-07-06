@@ -39,6 +39,7 @@
 #include "mongo/client/remote_command_runner.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -77,14 +78,13 @@ private:
      */
     class AsyncConnection {
     public:
-        AsyncConnection(ConnectionPool::ConnectionPtr&& booststrapConn,
-                        asio::ip::tcp::socket&& sock);
+        AsyncConnection(asio::ip::tcp::socket&& sock, rpc::ProtocolSet protocols);
 
         asio::ip::tcp::socket* sock();
 
     private:
-        ConnectionPool::ConnectionPtr _bootstrapConn;
         asio::ip::tcp::socket _sock;
+        rpc::ProtocolSet _protocols;
     };
 
     /**

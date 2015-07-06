@@ -51,9 +51,9 @@ using ResponseStatus = TaskExecutor::ResponseStatus;
 using asio::ip::tcp;
 using RemoteCommandCompletionFn = stdx::function<void(const ResponseStatus&)>;
 
-NetworkInterfaceASIO::AsyncConnection::AsyncConnection(
-    ConnectionPool::ConnectionPtr&& bootstrapConn, asio::ip::tcp::socket&& sock)
-    : _bootstrapConn{std::move(bootstrapConn)}, _sock(std::move(sock)) {}
+NetworkInterfaceASIO::AsyncConnection::AsyncConnection(asio::ip::tcp::socket&& sock,
+                                                       rpc::ProtocolSet protocols)
+    : _sock(std::move(sock)), _protocols(protocols) {}
 
 tcp::socket* NetworkInterfaceASIO::AsyncConnection::sock() {
     return &_sock;
@@ -92,7 +92,7 @@ void NetworkInterfaceASIO::AsyncOp::connect(ConnectionPool* const pool,
     tcp::socket sock{
         *service, protocol == AF_INET ? tcp::v4() : tcp::v6(), conn.get()->port().psock->rawFD()};
 
-    _connection.emplace(std::move(conn), std::move(sock));
+    _connection.emplace(std::move(sock), conn.get()->getServerRPCProtocols());
 
     _state = OpState::kConnected;
 }
