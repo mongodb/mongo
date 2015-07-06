@@ -826,7 +826,7 @@ void CatalogManagerLegacy::logChange(const string& clientAddress,
     if (_changeLogCollectionCreated.load() == 0) {
         try {
             ScopedDbConnection conn(_configServerConnectionString, 30.0);
-            conn->createCollection(ChangelogType::ConfigNS, 1024 * 1024 * 10, true);
+            conn->createCollection(ChangeLogType::ConfigNS, 1024 * 1024 * 10, true);
             conn.done();
 
             _changeLogCollectionCreated.store(1);
@@ -842,26 +842,30 @@ void CatalogManagerLegacy::logChange(const string& clientAddress,
         }
     }
 
-    // Store this entry's ID so we can use on the exception code path too
-    StringBuilder changeIdBuilder;
-    changeIdBuilder << getHostNameCached() << "-" << Date_t::now().toString() << "-" << OID::gen();
+    ChangeLogType changeLog;
+    {
+        // Store this entry's ID so we can use on the exception code path too
+        StringBuilder changeIdBuilder;
+        changeIdBuilder << getHostNameCached() << "-" << Date_t::now().toString() << "-"
+                        << OID::gen();
+        changeLog.setChangeId(changeIdBuilder.str());
+    }
+    changeLog.setServer(getHostNameCached());
+    changeLog.setClientAddr(clientAddress);
+    changeLog.setTime(Date_t::now());
+    changeLog.setWhat(what);
+    changeLog.setNS(ns);
+    changeLog.setDetails(detail);
 
-    const string changeID = changeIdBuilder.str();
-
+    BSONObj changeLogBSON = changeLog.toBSON();
     // Send a copy of the message to the local log in case it doesn't manage to reach
     // config.changelog
-    BSONObj msg = BSON(ChangelogType::changeID(changeID)
-                       << ChangelogType::server(getHostNameCached())
-                       << ChangelogType::clientAddr(clientAddress)
-                       << ChangelogType::time(Date_t::now()) << ChangelogType::what(what)
-                       << ChangelogType::ns(ns) << ChangelogType::details(detail));
+    log() << "about to log metadata event: " << changeLogBSON;
 
-    log() << "about to log metadata event: " << msg;
-
-    Status result = insert(ChangelogType::ConfigNS, msg, NULL);
+    Status result = insert(ChangeLogType::ConfigNS, changeLogBSON, NULL);
     if (!result.isOK()) {
-        warning() << "Error encountered while logging config change with ID " << changeID << ": "
-                  << result;
+        warning() << "Error encountered while logging config change with ID "
+                  << changeLog.getChangeId() << ": " << result;
     }
 }
 

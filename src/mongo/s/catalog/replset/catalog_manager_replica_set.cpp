@@ -297,7 +297,7 @@ void CatalogManagerReplicaSet::logChange(const string& clientAddress,
                                          const string& ns,
                                          const BSONObj& detail) {
     if (_changeLogCollectionCreated.load() == 0) {
-        BSONObj createCmd = BSON("create" << ChangelogType::ConfigNS << "capped" << true << "size"
+        BSONObj createCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true << "size"
                                           << kChangeLogCollectionSize);
         auto result = _runConfigServerCommandWithNotMasterRetries("config", createCmd);
         if (!result.isOK()) {
@@ -316,10 +316,10 @@ void CatalogManagerReplicaSet::logChange(const string& clientAddress,
 
     Date_t now = grid.shardRegistry()->getExecutor()->now();
     std::string hostName = grid.shardRegistry()->getNetwork()->getHostName();
-    const string changeID = str::stream() << hostName << "-" << now.toString() << "-" << OID::gen();
+    const string changeId = str::stream() << hostName << "-" << now.toString() << "-" << OID::gen();
 
-    ChangelogType changeLog;
-    changeLog.setChangeID(changeID);
+    ChangeLogType changeLog;
+    changeLog.setChangeId(changeId);
     changeLog.setServer(hostName);
     changeLog.setClientAddr(clientAddress);
     changeLog.setTime(now);
@@ -330,9 +330,9 @@ void CatalogManagerReplicaSet::logChange(const string& clientAddress,
     BSONObj changeLogBSON = changeLog.toBSON();
     log() << "about to log metadata event: " << changeLogBSON;
 
-    Status result = insert(ChangelogType::ConfigNS, changeLogBSON, NULL);
+    Status result = insert(ChangeLogType::ConfigNS, changeLogBSON, NULL);
     if (!result.isOK()) {
-        warning() << "Error encountered while logging config change with ID " << changeID << ": "
+        warning() << "Error encountered while logging config change with ID " << changeId << ": "
                   << result;
     }
 }

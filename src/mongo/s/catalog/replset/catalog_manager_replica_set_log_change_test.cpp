@@ -63,7 +63,7 @@ public:
     void expectChangeLogCreate(const BSONObj& response) {
         onCommand([&response](const RemoteCommandRequest& request) {
             ASSERT_EQUALS("config", request.dbname);
-            BSONObj expectedCreateCmd = BSON("create" << ChangelogType::ConfigNS << "capped" << true
+            BSONObj expectedCreateCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true
                                                       << "size" << 1024 * 1024 * 10);
             ASSERT_EQUALS(expectedCreateCmd, request.cmdObj);
 
@@ -71,20 +71,21 @@ public:
         });
     }
 
-    void expectChangeLogInsert(const ChangelogType& expectedChangeLog) {
+    void expectChangeLogInsert(const ChangeLogType& expectedChangeLog) {
         onCommand([&expectedChangeLog](const RemoteCommandRequest& request) {
             ASSERT_EQUALS("config", request.dbname);
 
             BatchedInsertRequest actualBatchedInsert;
             std::string errmsg;
             ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
-            ASSERT_EQUALS(ChangelogType::ConfigNS, actualBatchedInsert.getNS().ns());
+            ASSERT_EQUALS(ChangeLogType::ConfigNS, actualBatchedInsert.getNS().ns());
             auto inserts = actualBatchedInsert.getDocuments();
             ASSERT_EQUALS(1U, inserts.size());
             BSONObj insert = inserts.front();
 
-            ChangelogType actualChangeLog;
-            ASSERT_TRUE(actualChangeLog.parseBSON(insert, &errmsg));
+            auto changeLogResult = ChangeLogType::fromBSON(insert);
+            ASSERT_OK(changeLogResult.getStatus());
+            ChangeLogType& actualChangeLog = changeLogResult.getValue();
 
             ASSERT_EQUALS(expectedChangeLog.getClientAddr(), actualChangeLog.getClientAddr());
             ASSERT_EQUALS(expectedChangeLog.getDetails(), actualChangeLog.getDetails());
@@ -93,13 +94,13 @@ public:
             ASSERT_EQUALS(expectedChangeLog.getTime(), actualChangeLog.getTime());
             ASSERT_EQUALS(expectedChangeLog.getWhat(), actualChangeLog.getWhat());
 
-            // Handle changeID specially because there's no way to know what OID was generated
-            std::string changeID = actualChangeLog.getChangeID();
-            size_t firstDash = changeID.find("-");
-            size_t lastDash = changeID.rfind("-");
-            std::string serverPiece = changeID.substr(0, firstDash);
-            std::string timePiece = changeID.substr(firstDash + 1, lastDash - firstDash - 1);
-            std::string oidPiece = changeID.substr(lastDash + 1);
+            // Handle changeId specially because there's no way to know what OID was generated
+            std::string changeId = actualChangeLog.getChangeId();
+            size_t firstDash = changeId.find("-");
+            size_t lastDash = changeId.rfind("-");
+            std::string serverPiece = changeId.substr(0, firstDash);
+            std::string timePiece = changeId.substr(firstDash + 1, lastDash - firstDash - 1);
+            std::string oidPiece = changeId.substr(lastDash + 1);
 
             ASSERT_EQUALS(serverPiece, expectedChangeLog.getServer());
             ASSERT_EQUALS(timePiece, expectedChangeLog.getTime().toString());
@@ -119,7 +120,7 @@ public:
 TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    ChangelogType expectedChangeLog;
+    ChangeLogType expectedChangeLog;
     expectedChangeLog.setServer(network()->getHostName());
     expectedChangeLog.setClientAddr("client");
     expectedChangeLog.setTime(network()->now());
@@ -157,7 +158,7 @@ TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
 TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    ChangelogType expectedChangeLog;
+    ChangeLogType expectedChangeLog;
     expectedChangeLog.setServer(network()->getHostName());
     expectedChangeLog.setClientAddr("client");
     expectedChangeLog.setTime(network()->now());
@@ -198,7 +199,7 @@ TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
 TEST_F(LogChangeTest, LogActionCreateFailure) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    ChangelogType expectedChangeLog;
+    ChangeLogType expectedChangeLog;
     expectedChangeLog.setServer(network()->getHostName());
     expectedChangeLog.setClientAddr("client");
     expectedChangeLog.setTime(network()->now());
