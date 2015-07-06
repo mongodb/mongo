@@ -244,18 +244,12 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				continue;
 			}
 			if (STRING_MATCH("truncate", k.str, k.len)) {
-				if ((workp->truncate = v.val) < 0)
-					goto err;
 				continue;
 			}
 			if (STRING_MATCH("truncate_pct", k.str, k.len)) {
-				if ((workp->truncate_pct = v.val) < 0)
-					goto err;
 				continue;
 			}
 			if (STRING_MATCH("truncate_count", k.str, k.len)) {
-				if ((workp->truncate_count = v.val) < 0)
-					goto err;
 				continue;
 			}
 			goto err;

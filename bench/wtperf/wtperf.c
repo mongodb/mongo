@@ -399,9 +399,9 @@ worker(void *arg)
 	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
-	size_t i, item_count;
+	size_t i;
 	uint64_t needed_milestones, next_val, last_key, starting_point;
-	uint64_t truncate_milestone_gap, truncate_counter, usecs;
+	uint64_t truncate_milestone_gap, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
 	char *value_buf, *key_buf, *truncate_key, *value;
@@ -412,7 +412,6 @@ worker(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	cursors = NULL;
-	item_count = 0;
 	needed_milestones = 0;
 	ops = 0;
 	ops_per_txn = thread->workload->ops_per_txn;
@@ -619,8 +618,6 @@ worker(void *arg)
 			trk = &thread->truncate;
 			while (cfg->insert_key >
 			    thread->workload->truncate_count) {
-				item_count =
-				    cfg->insert_key - truncate_milestone_gap;
 				/* We add more truncation points as needed */
 				item = STAILQ_FIRST(&truncate_stone_head);
 				STAILQ_REMOVE_HEAD(&truncate_stone_head, q);
