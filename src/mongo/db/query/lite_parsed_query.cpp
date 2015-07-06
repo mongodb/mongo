@@ -44,6 +44,8 @@ namespace mongo {
 using std::string;
 using std::unique_ptr;
 
+const char* LiteParsedQuery::kFindCommandReadPrefField("$readPreference");
+
 const string LiteParsedQuery::cmdOptionMaxTimeMS("maxTimeMS");
 const string LiteParsedQuery::queryOptionMaxTimeMS("$maxTimeMS");
 
@@ -265,7 +267,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_snapshot = el.boolean();
-        } else if (str::equals(fieldName, "$readPreference")) {
+        } else if (str::equals(fieldName, kFindCommandReadPrefField)) {
             pq->_hasReadPref = true;
         } else if (str::equals(fieldName, kTailableField)) {
             Status status = checkFieldType(el, Bool);

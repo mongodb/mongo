@@ -129,6 +129,9 @@ public:
      */
     static bool isQueryIsolated(const BSONObj& query);
 
+    // Name of the find command parameter used to pass read preference.
+    static const char* kFindCommandReadPrefField;
+
     // Names of the maxTimeMS command and query option.
     static const std::string cmdOptionMaxTimeMS;
     static const std::string queryOptionMaxTimeMS;

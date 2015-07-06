@@ -5,9 +5,10 @@ Import("env")
 env.Library(
     target="cluster_query",
     source=[
+        "cluster_find.cpp",
     ],
     LIBDEPS=[
-        "cluster_client_cursor"
+        "cluster_client_cursor",
     ],
 )
 

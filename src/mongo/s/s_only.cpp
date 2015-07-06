@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
@@ -116,6 +117,10 @@ void Command::execCommandClientBasic(OperationContext* txn,
     }
 
     c->_commandsExecuted.increment();
+
+    if (c->shouldAffectCommandCounter()) {
+        globalOpCounters.gotCommand();
+    }
 
     std::string errmsg;
     bool ok;

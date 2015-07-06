@@ -113,8 +113,6 @@ void Request::process(int attempt) {
         } else {
             Strategy::queryOp(*this);
         }
-
-        globalOpCounters.gotOp(op, iscmd);
     } else if (op == dbGetMore) {
         Strategy::getMore(*this);
         globalOpCounters.gotOp(op, iscmd);

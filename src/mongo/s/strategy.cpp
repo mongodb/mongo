@@ -149,6 +149,8 @@ void Strategy::queryOp(Request& r) {
 
     Timer queryTimer;
 
+    globalOpCounters.gotQuery();
+
     QueryMessage q(r.d());
 
     NamespaceString ns(q.ns);
