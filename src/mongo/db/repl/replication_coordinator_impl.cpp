@@ -1521,8 +1521,15 @@ void ReplicationCoordinatorImpl::appendSlaveInfoData(BSONObjBuilder* result) {
              ++itr) {
             BSONObjBuilder entry(replicationProgress.subobjStart());
             entry.append("rid", itr->rid);
-            // TODO(siyuan) Output term of OpTime
-            entry.append("optime", itr->opTime.getTimestamp());
+            if (isV1ElectionProtocol()) {
+                BSONObjBuilder opTime(entry.subobjStart("optime"));
+                opTime.append("ts", itr->opTime.getTimestamp());
+                opTime.append("term", itr->opTime.getTerm());
+                opTime.done();
+            }
+            else {
+                entry.append("optime", itr->opTime.getTimestamp());
+            }
             entry.append("host", itr->hostAndPort.toString());
             if (getReplicationMode() == modeReplSet) {
                 if (_selfIndex == -1) {

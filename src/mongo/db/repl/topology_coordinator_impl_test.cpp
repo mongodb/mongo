@@ -1004,7 +1004,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState::RS_DOWN, member0Status["state"].numberInt());
     ASSERT_EQUALS("(not reachable/healthy)", member0Status["stateStr"].str());
     ASSERT_EQUALS(0, member0Status["uptime"].numberInt());
-    ASSERT_EQUALS(Timestamp(), Timestamp(member0Status["optime"]["ts"].timestampValue()));
+    ASSERT_EQUALS(Timestamp(), Timestamp(member0Status["optime"].timestampValue()));
     ASSERT_TRUE(member0Status.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(Timestamp().getSecs() * 1000ULL),
                   member0Status["optimeDate"].Date());
@@ -1020,7 +1020,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
                   member1Status["stateStr"].String());
     ASSERT_EQUALS(uptimeSecs.count(), member1Status["uptime"].numberInt());
     ASSERT_EQUALS(oplogProgress.getTimestamp(),
-                  Timestamp(member1Status["optime"]["ts"].timestampValue()));
+                  Timestamp(member1Status["optime"].timestampValue()));
     ASSERT_TRUE(member1Status.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
                   member1Status["optimeDate"].Date());
@@ -1051,7 +1051,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(), selfStatus["stateStr"].str());
     ASSERT_EQUALS(uptimeSecs.count(), selfStatus["uptime"].numberInt());
     ASSERT_EQUALS(oplogProgress.getTimestamp(),
-                  Timestamp(selfStatus["optime"]["ts"].timestampValue()));
+                  Timestamp(selfStatus["optime"].timestampValue()));
     ASSERT_TRUE(selfStatus.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
                   selfStatus["optimeDate"].Date());

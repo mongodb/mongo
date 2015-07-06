@@ -12,8 +12,7 @@ db.foo.insert({a:1});
 var statusBefore = db.runCommand({replSetGetStatus: 1});
 assert.commandWorked(db.runCommand({appendOplogNote: 1, data: {a: 1}}));
 var statusAfter = db.runCommand({replSetGetStatus: 1});
-assert.lte(statusBefore.members[0].optime.term, statusAfter.members[0].optime.term);
-assert.lt(statusBefore.members[0].optime.ts, statusAfter.members[0].optime.ts);
+assert.lt(statusBefore.members[0].optime, statusAfter.members[0].optime);
 
 // Make sure note written successfully
 var op = db.getSiblingDB('local').oplog.rs.find().sort({$natural: -1}).limit(1).next();
