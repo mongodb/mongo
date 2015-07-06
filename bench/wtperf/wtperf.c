@@ -66,8 +66,8 @@ static const CONFIG default_cfg = {
 
 /* Queue entry for use with the Truncate Logic */
 struct truncate_queue_entry {
-        char *key;
-        STAILQ_ENTRY(truncate_queue_entry) entries;
+	char *key;
+	STAILQ_ENTRY(truncate_queue_entry) q;
 };
 
 /* Queue head for use with the Truncate Logic */
@@ -503,12 +503,13 @@ worker(void *arg)
 				item = malloc(sizeof(item));
 				if (item == NULL) {
 					printf("malloc failed\n");
-		                }
+				}
 				generate_key(cfg, truncate_key,
 				    starting_point +
 				    (truncate_milestone_gap * (i+1)));
 				item->key = truncate_key;
-				STAILQ_INSERT_TAIL(&truncate_stone_head, item, entries);
+				STAILQ_INSERT_TAIL(
+				    &truncate_stone_head, item, q);
 				last_key = starting_point +
 				    (truncate_milestone_gap * (i+1));
 			}
@@ -616,27 +617,33 @@ worker(void *arg)
 				goto op_err;
 			}
 			trk = &thread->truncate;
-			while (cfg->insert_key > thread->workload->truncate_count) {
-				item_count = cfg->insert_key - truncate_milestone_gap;
+			while (cfg->insert_key >
+			    thread->workload->truncate_count) {
+				item_count =
+				    cfg->insert_key - truncate_milestone_gap;
 				/* We add more truncation points as needed */
 				item = STAILQ_FIRST(&truncate_stone_head);
-				STAILQ_REMOVE_HEAD(&truncate_stone_head, entries);
+				STAILQ_REMOVE_HEAD(&truncate_stone_head, q);
 				cursor->set_key(cursor, item->key);
 				ret = session->truncate(session,
 				    NULL, NULL, cursor, NULL);
 				if ( ret != 0) {
 					lprintf(cfg, ret, 0,
-					    "Truncate failed");
+					    "Truncate failed with end key %s",
+					    item->key);
 					goto op_err;
 				}
-				WT_ATOMIC_SUB8(cfg->insert_key, truncate_milestone_gap);
+				WT_ATOMIC_SUB8(
+				    cfg->insert_key, truncate_milestone_gap);
 				last_key = last_key + truncate_milestone_gap;
 				generate_key(cfg, item->key, last_key);
-				STAILQ_INSERT_TAIL(&truncate_stone_head, item, entries);
+				STAILQ_INSERT_TAIL(
+				    &truncate_stone_head, item, q);
 			}
-			if (cfg->insert_key <= thread->workload->truncate_count) {
+			if (cfg->insert_key <=
+			    thread->workload->truncate_count) {
 				trk = &thread->truncate_sleep;
-				(void)usleep(10000);
+				(void)usleep(1000);
 			}
 			break;
 		case WORKER_UPDATE:
