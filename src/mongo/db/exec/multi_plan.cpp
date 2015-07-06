@@ -388,7 +388,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
     return !doneWorking;
 }
 
-void MultiPlanStage::doRestoreState(OperationContext* opCtx) {
+void MultiPlanStage::doReattachToOperationContext(OperationContext* opCtx) {
     _txn = opCtx;
 }
 

@@ -160,16 +160,26 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
 }
 
 void FetchStage::doSaveState() {
-    _txn = NULL;
     if (_cursor)
         _cursor->saveUnpositioned();
 }
 
-void FetchStage::doRestoreState(OperationContext* opCtx) {
+void FetchStage::doRestoreState() {
+    if (_cursor)
+        _cursor->restore();
+}
+
+void FetchStage::doDetachFromOperationContext() {
+    _txn = NULL;
+    if (_cursor)
+        _cursor->detachFromOperationContext();
+}
+
+void FetchStage::doReattachToOperationContext(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
     if (_cursor)
-        _cursor->restore(opCtx);
+        _cursor->reattachToOperationContext(opCtx);
 }
 
 void FetchStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

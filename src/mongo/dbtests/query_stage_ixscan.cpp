@@ -195,7 +195,7 @@ public:
         ixscan->saveState();
         insert(fromjson("{_id: 4, x: 10}"));
         insert(fromjson("{_id: 5, x: 11}"));
-        ixscan->restoreState(&_txn);
+        ixscan->restoreState();
 
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::LOC_AND_IDX, member->getState());
@@ -228,7 +228,7 @@ public:
         // Save state and insert an indexed doc.
         ixscan->saveState();
         insert(fromjson("{_id: 4, x: 7}"));
-        ixscan->restoreState(&_txn);
+        ixscan->restoreState();
 
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::LOC_AND_IDX, member->getState());
@@ -261,7 +261,7 @@ public:
         // Save state and insert an indexed doc.
         ixscan->saveState();
         insert(fromjson("{_id: 4, x: 10}"));
-        ixscan->restoreState(&_txn);
+        ixscan->restoreState();
 
         // Ensure that we're EOF and we don't erroneously return {'': 12}.
         WorkingSetID id;
@@ -295,7 +295,7 @@ public:
         ixscan->saveState();
         insert(fromjson("{_id: 4, x: 6}"));
         insert(fromjson("{_id: 5, x: 9}"));
-        ixscan->restoreState(&_txn);
+        ixscan->restoreState();
 
         // Ensure that we don't erroneously return {'': 9} or {'':3}.
         member = getNext(ixscan.get());

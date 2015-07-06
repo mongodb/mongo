@@ -207,7 +207,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
         //  transaction in which they are created, and a WriteUnitOfWork is a
         //  transaction, make sure to restore the state outside of the WritUnitOfWork.
         try {
-            child()->restoreState(_txn);
+            child()->restoreState();
         } catch (const WriteConflictException& wce) {
             // Note we don't need to retry anything in this case since the delete already
             // was committed. However, we still need to return the deleted document
@@ -257,13 +257,16 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
     return status;
 }
 
-void DeleteStage::doRestoreState(OperationContext* opCtx) {
-    _txn = opCtx;
+void DeleteStage::doRestoreState() {
     const NamespaceString& ns(_collection->ns());
     massert(28537,
             str::stream() << "Demoted from primary while removing from " << ns.ns(),
             !_params.shouldCallLogOp ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns));
+}
+
+void DeleteStage::doReattachToOperationContext(OperationContext* opCtx) {
+    _txn = opCtx;
 }
 
 unique_ptr<PlanStageStats> DeleteStage::getStats() {

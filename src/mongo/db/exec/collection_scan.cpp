@@ -215,21 +215,31 @@ void CollectionScan::doInvalidate(OperationContext* txn,
 }
 
 void CollectionScan::doSaveState() {
-    _txn = NULL;
     if (_cursor) {
         _cursor->savePositioned();
     }
 }
 
-void CollectionScan::doRestoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
+void CollectionScan::doRestoreState() {
     if (_cursor) {
-        if (!_cursor->restore(opCtx)) {
-            warning() << "Could not restore RecordCursor for CollectionScan: " << opCtx->getNS();
+        if (!_cursor->restore()) {
+            warning() << "Could not restore RecordCursor for CollectionScan: " << _txn->getNS();
             _isDead = true;
         }
     }
+}
+
+void CollectionScan::doDetachFromOperationContext() {
+    _txn = NULL;
+    if (_cursor)
+        _cursor->detachFromOperationContext();
+}
+
+void CollectionScan::doReattachToOperationContext(OperationContext* opCtx) {
+    invariant(_txn == NULL);
+    _txn = opCtx;
+    if (_cursor)
+        _cursor->reattachToOperationContext(opCtx);
 }
 
 unique_ptr<PlanStageStats> CollectionScan::getStats() {

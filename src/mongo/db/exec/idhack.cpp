@@ -200,16 +200,26 @@ PlanStage::StageState IDHackStage::advance(WorkingSetID id,
 }
 
 void IDHackStage::doSaveState() {
-    _txn = NULL;
     if (_recordCursor)
         _recordCursor->saveUnpositioned();
 }
 
-void IDHackStage::doRestoreState(OperationContext* opCtx) {
+void IDHackStage::doRestoreState() {
+    if (_recordCursor)
+        _recordCursor->restore();
+}
+
+void IDHackStage::doDetachFromOperationContext() {
+    _txn = NULL;
+    if (_recordCursor)
+        _recordCursor->detachFromOperationContext();
+}
+
+void IDHackStage::doReattachToOperationContext(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
     if (_recordCursor)
-        _recordCursor->restore(opCtx);
+        _recordCursor->reattachToOperationContext(opCtx);
 }
 
 void IDHackStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

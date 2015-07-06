@@ -359,7 +359,7 @@ TEST(SortedDataInterface, CursorIterate1WithSaveRestore) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << n), RecordId(5, n * 2)));
             n++;
             cursor->savePositioned();
-            cursor->restore(opCtx.get());
+            cursor->restore();
         }
         ASSERT_EQUALS(N, n);
     }
@@ -388,7 +388,7 @@ TEST(SortedDataInterface, CursorIterateAllDupKeysWithSaveRestore) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << 5), RecordId(5, n * 2)));
             n++;
             cursor->savePositioned();
-            cursor->restore(opCtx.get());
+            cursor->restore();
         }
         ASSERT_EQUALS(N, n);
     }

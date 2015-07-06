@@ -157,7 +157,7 @@ public:
         deregisterExecutor(run.get());
 
         // And clean up anything that happened before.
-        run->restoreState(&_opCtx);
+        run->restoreState();
 
         // Make sure that the runner moved forward over the deleted data.  We don't see foo==10
         // or foo==11.
@@ -192,7 +192,7 @@ public:
 
         // Unregister and restore state.
         deregisterExecutor(run.get());
-        run->restoreState(&_opCtx);
+        run->restoreState();
 
         ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
         ASSERT_EQUALS(10, obj["foo"].numberInt());
@@ -206,7 +206,7 @@ public:
 
         // Unregister and restore state.
         deregisterExecutor(run.get());
-        run->restoreState(&_opCtx);
+        run->restoreState();
 
         // PlanExecutor was killed.
         ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
@@ -237,7 +237,7 @@ public:
 
         // Unregister and restore state.
         deregisterExecutor(run.get());
-        run->restoreState(&_opCtx);
+        run->restoreState();
 
         // PlanExecutor was killed.
         ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
@@ -268,7 +268,7 @@ public:
 
         // Unregister and restore state.
         deregisterExecutor(run.get());
-        run->restoreState(&_opCtx);
+        run->restoreState();
 
         // PlanExecutor was killed.
         ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
@@ -300,7 +300,7 @@ public:
 
         // Unregister and restore state.
         deregisterExecutor(run.get());
-        run->restoreState(&_opCtx);
+        run->restoreState();
 
         ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
         ASSERT_EQUALS(10, obj["foo"].numberInt());
@@ -316,7 +316,7 @@ public:
 
         // Unregister and restore state.
         deregisterExecutor(run.get());
-        run->restoreState(&_opCtx);
+        run->restoreState();
         _ctx.reset();
 
         // PlanExecutor was killed.

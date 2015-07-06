@@ -77,7 +77,7 @@ public:
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doReattachToOperationContext(OperationContext* opCtx);
 
     virtual StageType stageType() const {
         return STAGE_SUBPLAN;

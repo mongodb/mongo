@@ -47,9 +47,11 @@ public:
         return {};
     }
     void savePositioned() final {}
-    bool restore(OperationContext* txn) final {
+    bool restore() final {
         return true;
     }
+    void detachFromOperationContext() final {}
+    void reattachToOperationContext(OperationContext* txn) final {}
 };
 
 class DevNullRecordStore : public RecordStore {

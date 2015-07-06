@@ -112,7 +112,7 @@ private:
 class InMemoryRecordStore::Cursor final : public RecordCursor {
 public:
     Cursor(OperationContext* txn, const InMemoryRecordStore& rs)
-        : _txn(txn), _records(rs._data->records), _isCapped(rs.isCapped()) {}
+        : _records(rs._data->records), _isCapped(rs.isCapped()) {}
 
     boost::optional<Record> next() final {
         if (_needFirstSeek) {
@@ -138,18 +138,15 @@ public:
     }
 
     void savePositioned() final {
-        _txn = nullptr;
         if (!_needFirstSeek && !_lastMoveWasRestore)
             _savedId = _it == _records.end() ? RecordId() : _it->first;
     }
 
     void saveUnpositioned() final {
-        _txn = nullptr;
         _savedId = RecordId();
     }
 
-    bool restore(OperationContext* txn) final {
-        _txn = txn;
+    bool restore() final {
         if (_savedId.isNull()) {
             _it = _records.end();
             return true;
@@ -162,8 +159,10 @@ public:
         return !(_isCapped && _lastMoveWasRestore);
     }
 
+    void detachFromOperationContext() final {}
+    void reattachToOperationContext(OperationContext* txn) final {}
+
 private:
-    unowned_ptr<OperationContext> _txn;
     Records::const_iterator _it;
     bool _needFirstSeek = true;
     bool _lastMoveWasRestore = false;
@@ -176,7 +175,7 @@ private:
 class InMemoryRecordStore::ReverseCursor final : public RecordCursor {
 public:
     ReverseCursor(OperationContext* txn, const InMemoryRecordStore& rs)
-        : _txn(txn), _records(rs._data->records), _isCapped(rs.isCapped()) {}
+        : _records(rs._data->records), _isCapped(rs.isCapped()) {}
 
     boost::optional<Record> next() final {
         if (_needFirstSeek) {
@@ -212,18 +211,15 @@ public:
     }
 
     void savePositioned() final {
-        _txn = nullptr;
         if (!_needFirstSeek && !_lastMoveWasRestore)
             _savedId = _it == _records.rend() ? RecordId() : _it->first;
     }
 
     void saveUnpositioned() final {
-        _txn = nullptr;
         _savedId = RecordId();
     }
 
-    bool restore(OperationContext* txn) final {
-        _txn = txn;
+    bool restore() final {
         if (_savedId.isNull()) {
             _it = _records.rend();
             return true;
@@ -239,8 +235,10 @@ public:
         return !(_isCapped && _lastMoveWasRestore);
     }
 
+    void detachFromOperationContext() final {}
+    void reattachToOperationContext(OperationContext* txn) final {}
+
 private:
-    unowned_ptr<OperationContext> _txn;
     Records::const_reverse_iterator _it;
     bool _needFirstSeek = true;
     bool _lastMoveWasRestore = false;

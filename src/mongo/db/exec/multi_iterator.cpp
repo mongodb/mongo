@@ -107,19 +107,31 @@ void MultiIteratorStage::kill() {
 }
 
 void MultiIteratorStage::doSaveState() {
-    _txn = NULL;
-    for (size_t i = 0; i < _iterators.size(); i++) {
-        _iterators[i]->savePositioned();
+    for (auto&& iterator : _iterators) {
+        iterator->savePositioned();
     }
 }
 
-void MultiIteratorStage::doRestoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
-    for (size_t i = 0; i < _iterators.size(); i++) {
-        if (!_iterators[i]->restore(opCtx)) {
+void MultiIteratorStage::doRestoreState() {
+    for (auto&& iterator : _iterators) {
+        if (!iterator->restore()) {
             kill();
         }
+    }
+}
+
+void MultiIteratorStage::doDetachFromOperationContext() {
+    _txn = NULL;
+    for (auto&& iterator : _iterators) {
+        iterator->detachFromOperationContext();
+    }
+}
+
+void MultiIteratorStage::doReattachToOperationContext(OperationContext* opCtx) {
+    invariant(_txn == NULL);
+    _txn = opCtx;
+    for (auto&& iterator : _iterators) {
+        iterator->reattachToOperationContext(opCtx);
     }
 }
 

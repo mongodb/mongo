@@ -197,7 +197,7 @@ Status cloneCollectionAsCapped(OperationContext* txn,
             // around call to abandonSnapshot.
             exec->saveState();
             txn->recoveryUnit()->abandonSnapshot();
-            exec->restoreState(txn);  // Handles any WCEs internally.
+            exec->restoreState();  // Handles any WCEs internally.
         }
     }
 

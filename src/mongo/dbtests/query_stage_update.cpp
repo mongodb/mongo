@@ -318,7 +318,7 @@ public:
             BSONObj targetDoc = coll->docFor(&_txn, locs[targetDocIndex]).value();
             ASSERT(!targetDoc.isEmpty());
             remove(targetDoc);
-            updateStage->restoreState(&_txn);
+            updateStage->restoreState();
 
             // Do the remaining updates.
             while (!updateStage->isEOF()) {

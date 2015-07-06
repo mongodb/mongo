@@ -66,7 +66,7 @@ public:
 
     virtual StageState work(WorkingSetID* out);
 
-    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doReattachToOperationContext(OperationContext* opCtx);
 
     virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 

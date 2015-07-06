@@ -530,7 +530,7 @@ PlanStage::StageState SubplanStage::work(WorkingSetID* out) {
     return state;
 }
 
-void SubplanStage::doRestoreState(OperationContext* opCtx) {
+void SubplanStage::doReattachToOperationContext(OperationContext* opCtx) {
     _txn = opCtx;
 }
 

@@ -181,22 +181,33 @@ void OplogStart::doInvalidate(OperationContext* txn, const RecordId& dl, Invalid
 }
 
 void OplogStart::doSaveState() {
-    _txn = NULL;
     for (size_t i = 0; i < _subIterators.size(); i++) {
         _subIterators[i]->savePositioned();
     }
 }
 
-void OplogStart::doRestoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
-
+void OplogStart::doRestoreState() {
     for (size_t i = 0; i < _subIterators.size(); i++) {
-        if (!_subIterators[i]->restore(opCtx)) {
+        if (!_subIterators[i]->restore()) {
             _subIterators.erase(_subIterators.begin() + i);
             // need to hit same i on next pass through loop
             i--;
         }
+    }
+}
+
+void OplogStart::doDetachFromOperationContext() {
+    _txn = NULL;
+    for (auto&& iterator : _subIterators) {
+        iterator->detachFromOperationContext();
+    }
+}
+
+void OplogStart::doReattachToOperationContext(OperationContext* opCtx) {
+    invariant(_txn == NULL);
+    _txn = opCtx;
+    for (auto&& iterator : _subIterators) {
+        iterator->reattachToOperationContext(opCtx);
     }
 }
 

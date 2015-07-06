@@ -1048,7 +1048,7 @@ void State::finalReduce(CurOp* op, ProgressMeterHolder& pm) {
         prev = o;
         all.push_back(o);
 
-        if (!exec->restoreState(_txn)) {
+        if (!exec->restoreState()) {
             break;
         }
 
@@ -1429,7 +1429,7 @@ public:
                         scopedXact.reset(new ScopedTransaction(txn, MODE_IS));
                         scopedAutoDb.reset(new AutoGetDb(txn, nss.db(), MODE_S));
 
-                        exec->restoreState(txn);
+                        exec->restoreState();
 
                         // Need to reload the database, in case it was dropped after we
                         // released the lock

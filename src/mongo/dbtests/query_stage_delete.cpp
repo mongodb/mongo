@@ -168,7 +168,7 @@ public:
         BSONObj targetDoc = coll->docFor(&_txn, locs[targetDocIndex]).value();
         ASSERT(!targetDoc.isEmpty());
         remove(targetDoc);
-        deleteStage.restoreState(&_txn);
+        deleteStage.restoreState();
 
         // Remove the rest.
         while (!deleteStage.isEOF()) {

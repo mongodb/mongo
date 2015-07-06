@@ -163,7 +163,7 @@ PlanStage::StageState CountStage::work(WorkingSetID* out) {
     return PlanStage::NEED_TIME;
 }
 
-void CountStage::doRestoreState(OperationContext* opCtx) {
+void CountStage::doReattachToOperationContext(OperationContext* opCtx) {
     _txn = opCtx;
 }
 

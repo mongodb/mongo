@@ -286,7 +286,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
             // around call to abandonSnapshot.
             exec->saveState();
             _txn->recoveryUnit()->abandonSnapshot();
-            exec->restoreState(_txn);  // Handles any WCEs internally.
+            exec->restoreState();  // Handles any WCEs internally.
         }
     }
 

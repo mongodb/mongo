@@ -84,7 +84,8 @@ public:
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doRestoreState();
+    virtual void doReattachToOperationContext(OperationContext* opCtx);
 
     virtual StageType stageType() const {
         return STAGE_UPDATE;
@@ -163,7 +164,7 @@ private:
     /**
      * Helper for restoring the state of this update.
      */
-    Status restoreUpdateState(OperationContext* opCtx);
+    Status restoreUpdateState();
 
     // Transactional context.  Not owned by us.
     OperationContext* _txn;

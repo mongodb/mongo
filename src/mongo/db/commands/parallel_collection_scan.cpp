@@ -39,7 +39,7 @@
 #include "mongo/db/query/cursor_responses.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/touch_pages.h"
+#include "mongo/base/checked_cast.h"
 
 namespace mongo {
 
@@ -111,7 +111,7 @@ public:
             numCursors = iterators.size();
         }
 
-        OwnedPointerVector<PlanExecutor> execs;
+        std::vector<std::unique_ptr<PlanExecutor>> execs;
         for (size_t i = 0; i < numCursors; i++) {
             unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
             unique_ptr<MultiIteratorStage> mis =
@@ -121,50 +121,35 @@ public:
             auto statusWithPlanExecutor = PlanExecutor::make(
                 txn, std::move(ws), std::move(mis), collection, PlanExecutor::YIELD_AUTO);
             invariant(statusWithPlanExecutor.isOK());
-            unique_ptr<PlanExecutor> curExec = std::move(statusWithPlanExecutor.getValue());
-
-            // The PlanExecutor was registered on construction due to the YIELD_AUTO policy.
-            // We have to deregister it, as it will be registered with ClientCursor.
-            curExec->deregisterExec();
-
-            // Need to save state while yielding locks between now and getMore().
-            curExec->saveState();
-
-            execs.push_back(curExec.release());
+            execs.push_back(std::move(statusWithPlanExecutor.getValue()));
         }
 
         // transfer iterators to executors using a round-robin distribution.
         // TODO consider using a common work queue once invalidation issues go away.
         for (size_t i = 0; i < iterators.size(); i++) {
-            PlanExecutor* theExec = execs[i % execs.size()];
-            MultiIteratorStage* mis = static_cast<MultiIteratorStage*>(theExec->getRootStage());
-
-            // This wasn't called above as they weren't assigned yet
-            iterators[i]->savePositioned();
-
+            auto& planExec = execs[i % execs.size()];
+            MultiIteratorStage* mis = checked_cast<MultiIteratorStage*>(planExec->getRootStage());
             mis->addIterator(std::move(iterators[i]));
         }
 
         {
             BSONArrayBuilder bucketsBuilder;
-            for (size_t i = 0; i < execs.size(); i++) {
+            for (auto&& exec : execs) {
+                // The PlanExecutor was registered on construction due to the YIELD_AUTO policy.
+                // We have to deregister it, as it will be registered with ClientCursor.
+                exec->deregisterExec();
+
+                // Need to save state while yielding locks between now and getMore().
+                exec->saveState();
+                exec->detachFromOperationContext();
+
                 // transfer ownership of an executor to the ClientCursor (which manages its own
                 // lifetime).
                 ClientCursor* cc =
-                    new ClientCursor(collection->getCursorManager(), execs.releaseAt(i), ns.ns());
-
-                if (cmdObj["$readMajorityTemporaryName"].trueValue()) {
-                    // Need to make RecoveryUnits for each cursor so that the getMores know to
-                    // use readMajority. This will need to be replaced with a setting on the
-                    // client cursor once we resolve SERVER-17364.
-                    StorageEngine* storageEngine =
-                        getGlobalServiceContext()->getGlobalStorageEngine();
-                    std::unique_ptr<RecoveryUnit> newRu(storageEngine->newRecoveryUnit());
-                    // Wouldn't have entered run() if not supported.
-                    invariantOK(newRu->setReadFromMajorityCommittedSnapshot());
-
-                    cc->setOwnedRecoveryUnit(newRu.release());
-                }
+                    new ClientCursor(collection->getCursorManager(),
+                                     exec.release(),
+                                     ns.ns(),
+                                     txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
 
                 BSONObjBuilder threadResult;
                 appendCursorResponseObject(cc->cursorid(), ns.ns(), BSONArray(), &threadResult);

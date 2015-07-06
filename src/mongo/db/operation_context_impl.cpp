@@ -99,8 +99,6 @@ RecoveryUnit* OperationContextImpl::recoveryUnit() const {
 }
 
 RecoveryUnit* OperationContextImpl::releaseRecoveryUnit() {
-    if (_recovery.get())
-        _recovery->beingReleasedFromOperationContext();
     return _recovery.release();
 }
 
@@ -109,8 +107,6 @@ OperationContext::RecoveryUnitState OperationContextImpl::setRecoveryUnit(Recove
     _recovery.reset(unit);
     RecoveryUnitState oldState = _ruState;
     _ruState = state;
-    if (unit)
-        unit->beingSetOnOperationContext();
     return oldState;
 }
 

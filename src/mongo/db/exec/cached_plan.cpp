@@ -292,7 +292,7 @@ PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
 }
 
 
-void CachedPlanStage::doRestoreState(OperationContext* opCtx) {
+void CachedPlanStage::doReattachToOperationContext(OperationContext* opCtx) {
     _txn = opCtx;
 }
 

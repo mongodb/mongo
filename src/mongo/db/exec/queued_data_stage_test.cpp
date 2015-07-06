@@ -91,7 +91,7 @@ TEST(QueuedDataStageTest, validateStats) {
     ASSERT_EQUALS(stats->yields, 1U);
 
     // unyields
-    mock->restoreState(NULL);
+    mock->restoreState();
     ASSERT_EQUALS(stats->unyields, 1U);
 
     // invalidates

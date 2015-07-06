@@ -79,18 +79,28 @@ bool TextOrStage::isEOF() {
 }
 
 void TextOrStage::doSaveState() {
-    _txn = NULL;
     if (_recordCursor) {
         _recordCursor->saveUnpositioned();
     }
 }
 
-void TextOrStage::doRestoreState(OperationContext* opCtx) {
+void TextOrStage::doRestoreState() {
+    if (_recordCursor) {
+        invariant(_recordCursor->restore());
+    }
+}
+
+void TextOrStage::doDetachFromOperationContext() {
+    _txn = NULL;
+    if (_recordCursor)
+        _recordCursor->detachFromOperationContext();
+}
+
+void TextOrStage::doReattachToOperationContext(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
-    if (_recordCursor) {
-        invariant(_recordCursor->restore(opCtx));
-    }
+    if (_recordCursor)
+        _recordCursor->reattachToOperationContext(opCtx);
 }
 
 void TextOrStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

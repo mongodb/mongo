@@ -55,11 +55,10 @@ public:
     virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     //
-    // Manage our OperationContext. We intentionally don't propagate to the child
-    // Runner as that is handled by DocumentSourceCursor as it needs to.
+    // Manage our OperationContext.
     //
-    virtual void doSaveState();
-    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doDetachFromOperationContext();
+    virtual void doReattachToOperationContext(OperationContext* opCtx);
 
     /**
      * Make obj the next object returned by getNext().

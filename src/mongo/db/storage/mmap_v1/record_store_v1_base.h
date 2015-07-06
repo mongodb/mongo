@@ -336,8 +336,14 @@ public:
     boost::optional<Record> seekExact(const RecordId& id) final;
     void invalidate(const RecordId& dl) final;
     void savePositioned() final {}
-    bool restore(OperationContext* txn) final {
+    bool restore() final {
         return true;
+    }
+    void detachFromOperationContext() final {
+        _txn = nullptr;
+    }
+    void reattachToOperationContext(OperationContext* txn) final {
+        _txn = txn;
     }
     std::unique_ptr<RecordFetcher> fetcherForNext() const final;
 

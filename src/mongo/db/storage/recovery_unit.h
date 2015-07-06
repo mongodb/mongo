@@ -53,9 +53,6 @@ public:
 
     virtual void reportState(BSONObjBuilder* b) const {}
 
-    virtual void beingReleasedFromOperationContext() {}
-    virtual void beingSetOnOperationContext() {}
-
     /**
      * These should be called through WriteUnitOfWork rather than directly.
      *
@@ -107,6 +104,13 @@ public:
     virtual Status setReadFromMajorityCommittedSnapshot() {
         return {ErrorCodes::CommandNotSupported,
                 "Current storage engine does not support $readMajorityTemporaryName"};
+    }
+
+    /**
+     * Returns true if setReadFromMajorityCommittedSnapshot() has been called.
+     */
+    virtual bool isReadingFromMajorityCommittedSnapshot() {
+        return false;
     }
 
     virtual SnapshotId getSnapshotId() const = 0;

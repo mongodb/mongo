@@ -121,21 +121,30 @@ bool CountScan::isEOF() {
 }
 
 void CountScan::doSaveState() {
-    _txn = NULL;
     if (_cursor)
         _cursor->savePositioned();
 }
 
-void CountScan::doRestoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
-
+void CountScan::doRestoreState() {
     if (_cursor)
-        _cursor->restore(opCtx);
+        _cursor->restore();
 
     // This can change during yielding.
     // TODO this isn't sufficient. See SERVER-17678.
     _shouldDedup = _descriptor->isMultikey(_txn);
+}
+
+void CountScan::doDetachFromOperationContext() {
+    _txn = NULL;
+    if (_cursor)
+        _cursor->detachFromOperationContext();
+}
+
+void CountScan::doReattachToOperationContext(OperationContext* opCtx) {
+    invariant(_txn == NULL);
+    _txn = opCtx;
+    if (_cursor)
+        _cursor->reattachToOperationContext(opCtx);
 }
 
 void CountScan::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

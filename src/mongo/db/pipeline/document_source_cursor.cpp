@@ -88,7 +88,7 @@ void DocumentSourceCursor::loadBatch() {
     const NamespaceString nss(_ns);
     AutoGetCollectionForRead autoColl(pExpCtx->opCtx, nss);
 
-    _exec->restoreState(pExpCtx->opCtx);
+    _exec->restoreState();
 
     int memUsageBytes = 0;
     BSONObj obj;
@@ -172,7 +172,7 @@ Value DocumentSourceCursor::serialize(bool explain) const {
 
         massert(17392, "No _exec. Were we disposed before explained?", _exec);
 
-        _exec->restoreState(pExpCtx->opCtx);
+        _exec->restoreState();
         Explain::explainStages(_exec.get(), ExplainCommon::QUERY_PLANNER, &explainBuilder);
         _exec->saveState();
     }

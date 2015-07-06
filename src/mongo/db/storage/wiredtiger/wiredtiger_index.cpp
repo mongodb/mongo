@@ -595,8 +595,9 @@ namespace {
 class WiredTigerIndexCursorBase : public SortedDataInterface::Cursor {
 public:
     WiredTigerIndexCursorBase(const WiredTigerIndex& idx, OperationContext* txn, bool forward)
-        : _txn(txn), _cursor(idx.uri(), idx.tableId(), false, txn), _idx(idx), _forward(forward) {}
-
+        : _txn(txn), _idx(idx), _forward(forward) {
+        _cursor.emplace(_idx.uri(), _idx.tableId(), false, _txn);
+    }
     boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
         // Advance on a cursor at the end is a no-op
         if (_eof)
@@ -654,24 +655,16 @@ public:
     }
 
     void savePositioned() override {
-        if (!_txn)
-            return;  // still saved
-
-        _savedForCheck = _txn->recoveryUnit();
-
-        if (!wt_keeptxnopen()) {
-            try {
-                _cursor.reset();
-            } catch (const WriteConflictException& wce) {
-                // Ignore since this is only called when we are about to kill our transaction
-                // anyway.
-            }
-
-            // Our saved position is wherever we were when we last called updatePosition().
-            // Any partially completed repositions should not effect our saved position.
+        try {
+            if (_cursor)
+                _cursor->reset();
+        } catch (const WriteConflictException& wce) {
+            // Ignore since this is only called when we are about to kill our transaction
+            // anyway.
         }
 
-        _txn = NULL;
+        // Our saved position is wherever we were when we last called updatePosition().
+        // Any partially completed repositions should not effect our saved position.
     }
 
     void saveUnpositioned() override {
@@ -679,19 +672,28 @@ public:
         _eof = true;
     }
 
-    void restore(OperationContext* txn) override {
-        // Update the session handle with our new operation context.
-        invariant(_savedForCheck == txn->recoveryUnit());
-        _txn = txn;
-
-        if (!wt_keeptxnopen()) {
-            if (!_eof) {
-                // Ensure an active session exists, so any restored cursors will bind to it
-                WiredTigerRecoveryUnit::get(txn)->getSession(txn);
-                _lastMoveWasRestore = !seekWTCursor(_key);
-                TRACE_CURSOR << "restore _lastMoveWasRestore:" << _lastMoveWasRestore;
-            }
+    void restore() override {
+        if (!_cursor) {
+            _cursor.emplace(_idx.uri(), _idx.tableId(), false, _txn);
         }
+
+        // Ensure an active session exists, so any restored cursors will bind to it
+        invariant(WiredTigerRecoveryUnit::get(_txn)->getSession(_txn) == _cursor->getSession());
+
+        if (!_eof) {
+            _lastMoveWasRestore = !seekWTCursor(_key);
+            TRACE_CURSOR << "restore _lastMoveWasRestore:" << _lastMoveWasRestore;
+        }
+    }
+
+    void detachFromOperationContext() final {
+        _txn = nullptr;
+        _cursor = {};
+    }
+
+    void reattachToOperationContext(OperationContext* txn) final {
+        _txn = txn;
+        // _cursor recreated in restore() to avoid risk of WT_ROLLBACK issues.
     }
 
 protected:
@@ -738,7 +740,7 @@ protected:
     }
 
     void advanceWTCursor() {
-        WT_CURSOR* c = _cursor.get();
+        WT_CURSOR* c = _cursor->get();
         int ret = WT_OP_CHECK(_forward ? c->next(c) : c->prev(c));
         if (ret == WT_NOTFOUND) {
             _cursorAtEof = true;
@@ -750,7 +752,7 @@ protected:
 
     // Seeks to query. Returns true on exact match.
     bool seekWTCursor(const KeyString& query) {
-        WT_CURSOR* c = _cursor.get();
+        WT_CURSOR* c = _cursor->get();
 
         int cmp = -1;
         const WiredTigerItem keyItem(query.getBuffer(), query.getSize());
@@ -795,7 +797,7 @@ protected:
 
         _eof = false;
 
-        WT_CURSOR* c = _cursor.get();
+        WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
         invariantWTOK(c->get_key(c, &item));
         _key.resetFromBuffer(item.data, item.size);
@@ -809,12 +811,9 @@ protected:
     }
 
     OperationContext* _txn;
-    WiredTigerCursor _cursor;
+    boost::optional<WiredTigerCursor> _cursor;
     const WiredTigerIndex& _idx;  // not owned
     const bool _forward;
-
-    // Ensures we have the same RU at restore time.
-    RecoveryUnit* _savedForCheck;
 
     // These are where this cursor instance is. They are not changed in the face of a failing
     // next().
@@ -844,7 +843,7 @@ public:
     void updateLocAndTypeBits() override {
         _loc = KeyString::decodeRecordIdAtEnd(_key.getBuffer(), _key.getSize());
 
-        WT_CURSOR* c = _cursor.get();
+        WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
         invariantWTOK(c->get_value(c, &item));
         BufReader br(item.data, item.size);
@@ -857,8 +856,8 @@ public:
     WiredTigerIndexUniqueCursor(const WiredTigerIndex& idx, OperationContext* txn, bool forward)
         : WiredTigerIndexCursorBase(idx, txn, forward) {}
 
-    void restore(OperationContext* txn) override {
-        WiredTigerIndexCursorBase::restore(txn);
+    void restore() override {
+        WiredTigerIndexCursorBase::restore();
 
         // In addition to seeking to the correct key, we also need to make sure that the loc is
         // on the correct side of _loc.
@@ -869,7 +868,7 @@ public:
 
         // If we get here we need to look at the actual RecordId for this key and make sure we
         // are supposed to see it.
-        WT_CURSOR* c = _cursor.get();
+        WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
         invariantWTOK(c->get_value(c, &item));
 
@@ -893,7 +892,7 @@ public:
         // We assume that cursors can only ever see unique indexes in their "pristine" state,
         // where no duplicates are possible. The cases where dups are allowed should hold
         // sufficient locks to ensure that no cursor ever sees them.
-        WT_CURSOR* c = _cursor.get();
+        WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
         invariantWTOK(c->get_value(c, &item));
 
@@ -912,7 +911,7 @@ public:
         _query.resetToKey(stripFieldNames(key), _idx.ordering());
         const WiredTigerItem keyItem(_query.getBuffer(), _query.getSize());
 
-        WT_CURSOR* c = _cursor.get();
+        WT_CURSOR* c = _cursor->get();
         c->set_key(c, keyItem.Get());
 
         // Using search rather than search_near.

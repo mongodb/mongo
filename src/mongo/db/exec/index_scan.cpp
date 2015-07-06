@@ -234,12 +234,6 @@ bool IndexScan::isEOF() {
 }
 
 void IndexScan::doSaveState() {
-    if (!_txn) {
-        // We were already saved. Nothing to do.
-        return;
-    }
-    _txn = NULL;
-
     if (!_indexCursor)
         return;
 
@@ -251,11 +245,22 @@ void IndexScan::doSaveState() {
     _indexCursor->savePositioned();
 }
 
-void IndexScan::doRestoreState(OperationContext* opCtx) {
+void IndexScan::doRestoreState() {
+    if (_indexCursor)
+        _indexCursor->restore();
+}
+
+void IndexScan::doDetachFromOperationContext() {
+    _txn = NULL;
+    if (_indexCursor)
+        _indexCursor->detachFromOperationContext();
+}
+
+void IndexScan::doReattachToOperationContext(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
     if (_indexCursor)
-        _indexCursor->restore(opCtx);
+        _indexCursor->reattachToOperationContext(opCtx);
 }
 
 void IndexScan::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

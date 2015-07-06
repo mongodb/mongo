@@ -99,12 +99,9 @@ void CappedRecordStoreV1Iterator::invalidate(const RecordId& id) {
     }
 }
 
-void CappedRecordStoreV1Iterator::savePositioned() {
-    _txn = nullptr;
-}
+void CappedRecordStoreV1Iterator::savePositioned() {}
 
-bool CappedRecordStoreV1Iterator::restore(OperationContext* txn) {
-    _txn = txn;
+bool CappedRecordStoreV1Iterator::restore() {
     return !_killedByInvalidate;
 }
 

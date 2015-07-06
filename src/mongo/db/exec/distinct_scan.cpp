@@ -129,19 +129,27 @@ bool DistinctScan::isEOF() {
 }
 
 void DistinctScan::doSaveState() {
-    _txn = NULL;
-
     // We always seek, so we don't care where the cursor is.
     if (_cursor)
         _cursor->saveUnpositioned();
 }
 
-void DistinctScan::doRestoreState(OperationContext* opCtx) {
+void DistinctScan::doRestoreState() {
+    if (_cursor)
+        _cursor->restore();
+}
+
+void DistinctScan::doDetachFromOperationContext() {
+    _txn = NULL;
+    if (_cursor)
+        _cursor->detachFromOperationContext();
+}
+
+void DistinctScan::doReattachToOperationContext(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
-
     if (_cursor)
-        _cursor->restore(opCtx);
+        _cursor->reattachToOperationContext(opCtx);
 }
 
 unique_ptr<PlanStageStats> DistinctScan::getStats() {

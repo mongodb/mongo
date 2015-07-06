@@ -329,7 +329,7 @@ public:
         count.saveState();
 
         // Recover from yield
-        count.restoreState(&_txn);
+        count.restoreState();
 
         // finish counting
         while (PlanStage::IS_EOF != countState) {
@@ -385,7 +385,7 @@ public:
         remove(BSON("a" << GTE << 5));
 
         // Recover from yield
-        count.restoreState(&_txn);
+        count.restoreState();
 
         // finish counting
         while (PlanStage::IS_EOF != countState) {
@@ -444,7 +444,7 @@ public:
         insert(BSON("a" << 6.5));
 
         // Recover from yield
-        count.restoreState(&_txn);
+        count.restoreState();
 
         // finish counting
         while (PlanStage::IS_EOF != countState) {
@@ -500,7 +500,7 @@ public:
         insert(BSON("a" << BSON_ARRAY(10 << 11)));
 
         // Recover from yield
-        count.restoreState(&_txn);
+        count.restoreState();
 
         // finish counting
         while (PlanStage::IS_EOF != countState) {
@@ -623,7 +623,7 @@ public:
         remove(BSON("a" << 1 << "b" << 5));
 
         // Recover from yield
-        count.restoreState(&_txn);
+        count.restoreState();
 
         // finish counting
         while (PlanStage::IS_EOF != countState) {

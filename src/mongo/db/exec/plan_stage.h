@@ -221,7 +221,28 @@ public:
      *
      * Propagates to all children, then calls doRestoreState().
      */
-    void restoreState(OperationContext* opCtx);
+    void restoreState();
+
+    /**
+     * Detaches from the OperationContext and releases any storage-engine state.
+     *
+     * It is only legal to call this when in a "saved" state. While in the "detached" state, it is
+     * only legal to call reattachToOperationContext or the destructor. It is not legal to call
+     * detachFromOperationContext() while already in the detached state.
+     *
+     * Propagates to all children, then calls doDetachFromOperationContext().
+     */
+    void detachFromOperationContext();
+
+    /**
+     * Reattaches to the OperationContext and reacquires any storage-engine state.
+     *
+     * It is only legal to call this in the "detached" state. On return, the cursor is left in a
+     * "saved" state, so callers must still call restoreState to use this object.
+     *
+     * Propagates to all children, then calls doReattachToOperationContext().
+     */
+    void reattachToOperationContext(OperationContext* opCtx);
 
     /**
      * Notifies a stage that a RecordId is going to be deleted (or in-place updated) so that the
@@ -297,11 +318,22 @@ protected:
 
     /**
      * Restores any stage-specific saved state and prepares to handle calls to work().
+     */
+    virtual void doRestoreState() {}
+
+    /**
+     * Does stage-specific detaching.
+     */
+    virtual void doDetachFromOperationContext() {}
+
+    /**
+     * Does stage-specific attaching.
      *
      * If the stage needs an OperationContext during its execution, it may keep a handle to the
-     * provided OperationContext (which is valid until the next call to saveState()).
+     * provided OperationContext (which is valid until the next call to
+     * doDetachFromOperationContext()).
      */
-    virtual void doRestoreState(OperationContext* txn) {}
+    virtual void doReattachToOperationContext(OperationContext* opCtx) {}
 
     /**
      * Does the stage-specific invalidation work.

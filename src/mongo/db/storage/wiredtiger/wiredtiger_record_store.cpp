@@ -93,16 +93,13 @@ const std::string kWiredTigerEngineName = "wiredTiger";
 
 class WiredTigerRecordStore::Cursor final : public RecordCursor {
 public:
-    Cursor(OperationContext* txn,
-           const WiredTigerRecordStore& rs,
-           bool forward = true,
-           bool forParallelCollectionScan = false)
+    Cursor(OperationContext* txn, const WiredTigerRecordStore& rs, bool forward = true)
         : _rs(rs),
           _txn(txn),
           _forward(forward),
-          _forParallelCollectionScan(forParallelCollectionScan),
-          _cursor(new WiredTigerCursor(rs.getURI(), rs.tableId(), true, txn)),
-          _readUntilForOplog(WiredTigerRecoveryUnit::get(txn)->getOplogReadTill()) {}
+          _readUntilForOplog(WiredTigerRecoveryUnit::get(txn)->getOplogReadTill()) {
+        _cursor.emplace(rs.getURI(), rs.tableId(), true, txn);
+    }
 
     boost::optional<Record> next() final {
         if (_eof)
@@ -186,27 +183,13 @@ public:
     }
 
     void savePositioned() final {
-        // It must be safe to call save() twice in a row without calling restore().
-        if (!_txn)
-            return;
-
-        // the cursor and recoveryUnit are valid on restore
-        // so we just record the recoveryUnit to make sure
-        _savedRecoveryUnit = _txn->recoveryUnit();
-        if (_cursor && !wt_keeptxnopen()) {
-            try {
+        try {
+            if (_cursor)
                 _cursor->reset();
-            } catch (const WriteConflictException& wce) {
-                // Ignore since this is only called when we are about to kill our transaction
-                // anyway.
-            }
+        } catch (const WriteConflictException& wce) {
+            // Ignore since this is only called when we are about to kill our transaction
+            // anyway.
         }
-
-        if (_forParallelCollectionScan) {
-            // Delete the cursor since we may come back to a different RecoveryUnit
-            _cursor.reset();
-        }
-        _txn = nullptr;
     }
 
     void saveUnpositioned() final {
@@ -214,30 +197,19 @@ public:
         _lastReturnedId = RecordId();
     }
 
-    bool restore(OperationContext* txn) final {
-        _txn = txn;
+    bool restore() final {
+        if (!_cursor)
+            _cursor.emplace(_rs.getURI(), _rs.tableId(), true, _txn);
+
+        // This will ensure an active session exists, so any restored cursors will bind to it
+        invariant(WiredTigerRecoveryUnit::get(_txn)->getSession(_txn) == _cursor->getSession());
 
         // If we've hit EOF, then this iterator is done and need not be restored.
         if (_eof)
             return true;
 
-        bool needRestore = false;
-
-        if (_forParallelCollectionScan) {
-            needRestore = true;
-            _savedRecoveryUnit = txn->recoveryUnit();
-            _cursor.reset(new WiredTigerCursor(_rs.getURI(), _rs.tableId(), true, txn));
-            _forParallelCollectionScan = false;  // we only do this the first time
-        }
-        invariant(_savedRecoveryUnit == txn->recoveryUnit());
-
-        if (!needRestore && wt_keeptxnopen())
-            return true;
         if (_lastReturnedId.isNull())
             return true;
-
-        // This will ensure an active session exists, so any restored cursors will bind to it
-        invariant(WiredTigerRecoveryUnit::get(txn)->getSession(txn) == _cursor->getSession());
 
         WT_CURSOR* c = _cursor->get();
         c->set_key(c, _makeKey(_lastReturnedId));
@@ -276,6 +248,16 @@ public:
         return true;
     }
 
+    void detachFromOperationContext() final {
+        _txn = nullptr;
+        _cursor = {};
+    }
+
+    void reattachToOperationContext(OperationContext* txn) final {
+        _txn = txn;
+        // _cursor recreated in restore() to avoid risk of WT_ROLLBACK issues.
+    }
+
 private:
     bool isVisible(const RecordId& id) {
         if (!_rs._isCapped)
@@ -297,10 +279,8 @@ private:
 
     const WiredTigerRecordStore& _rs;
     OperationContext* _txn;
-    RecoveryUnit* _savedRecoveryUnit;  // only used to sanity check between save/restore.
     const bool _forward;
-    bool _forParallelCollectionScan;  // This can go away once SERVER-17364 is resolved.
-    std::unique_ptr<WiredTigerCursor> _cursor;
+    boost::optional<WiredTigerCursor> _cursor;
     bool _eof = false;
     RecordId _lastReturnedId;  // If null, need to seek to first/last record.
     const RecordId _readUntilForOplog;
@@ -906,10 +886,7 @@ std::unique_ptr<RecordCursor> WiredTigerRecordStore::getCursor(OperationContext*
 std::vector<std::unique_ptr<RecordCursor>> WiredTigerRecordStore::getManyCursors(
     OperationContext* txn) const {
     std::vector<std::unique_ptr<RecordCursor>> cursors(1);
-    cursors[0] = stdx::make_unique<Cursor>(txn,
-                                           *this,
-                                           /*forward=*/true,
-                                           /*forParallelCollectionScan=*/true);
+    cursors[0] = stdx::make_unique<Cursor>(txn, *this, /*forward=*/true);
     return cursors;
 }
 

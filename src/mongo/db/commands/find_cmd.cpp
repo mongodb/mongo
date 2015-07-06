@@ -285,11 +285,13 @@ public:
 
         // Create a ClientCursor containing this plan executor. We don't have to worry
         // about leaking it as it's inserted into a global map by its ctor.
-        ClientCursor* cursor = new ClientCursor(collection->getCursorManager(),
-                                                exec.release(),
-                                                nss.ns(),
-                                                pq.getOptions(),
-                                                pq.getFilter());
+        ClientCursor* cursor =
+            new ClientCursor(collection->getCursorManager(),
+                             exec.release(),
+                             nss.ns(),
+                             txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                             pq.getOptions(),
+                             pq.getFilter());
         CursorId cursorId = cursor->cursorid();
         ClientCursorPin ccPin(collection->getCursorManager(), cursorId);
 
@@ -335,20 +337,10 @@ public:
         if (shouldSaveCursor(txn, collection, state, cursorExec)) {
             // State will be restored on getMore.
             cursorExec->saveState();
+            cursorExec->detachFromOperationContext();
 
             cursor->setLeftoverMaxTimeMicros(CurOp::get(txn)->getRemainingMaxTimeMicros());
             cursor->setPos(numResults);
-
-            // Don't stash the RU for tailable cursors at EOF, let them get a new RU on their
-            // next getMore.
-            if (!(pq.isTailable() && state == PlanExecutor::IS_EOF)) {
-                // We stash away the RecoveryUnit in the ClientCursor. It's used for
-                // subsequent getMore requests. The calling OpCtx gets a fresh RecoveryUnit.
-                txn->recoveryUnit()->abandonSnapshot();
-                cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-                StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
-                txn->setRecoveryUnit(engine->newRecoveryUnit(), OperationContext::kNotInUnitOfWork);
-            }
         } else {
             cursorId = 0;
         }

@@ -73,36 +73,6 @@ const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
 // Failpoint for checking whether we've received a getmore.
 MONGO_FP_DECLARE(failReceivedGetmore);
 
-ScopedRecoveryUnitSwapper::ScopedRecoveryUnitSwapper(ClientCursor* cc, OperationContext* txn)
-    : _cc(cc), _txn(txn), _dismissed(false) {
-    // Save this for later.  We restore it upon destruction.
-    _txn->recoveryUnit()->abandonSnapshot();
-    _txnPreviousRecoveryUnit.reset(txn->releaseRecoveryUnit());
-
-    // Transfer ownership of the RecoveryUnit from the ClientCursor to the OpCtx.
-    RecoveryUnit* ccRecoveryUnit = cc->releaseOwnedRecoveryUnit();
-    _txnPreviousRecoveryUnitState =
-        txn->setRecoveryUnit(ccRecoveryUnit, OperationContext::kNotInUnitOfWork);
-}
-
-void ScopedRecoveryUnitSwapper::dismiss() {
-    _dismissed = true;
-}
-
-ScopedRecoveryUnitSwapper::~ScopedRecoveryUnitSwapper() {
-    _txn->recoveryUnit()->abandonSnapshot();
-
-    if (_dismissed) {
-        // Just clean up the recovery unit which we originally got from the ClientCursor.
-        delete _txn->releaseRecoveryUnit();
-    } else {
-        // Swap the RU back into the ClientCursor for subsequent getMores.
-        _cc->setOwnedRecoveryUnit(_txn->releaseRecoveryUnit());
-    }
-
-    _txn->setRecoveryUnit(_txnPreviousRecoveryUnit.release(), _txnPreviousRecoveryUnitState);
-}
-
 /**
  * If ntoreturn is zero, we stop generating additional results as soon as we have either 101
  * documents or at least 1MB of data. On subsequent getmores, there is no limit on the number
@@ -359,16 +329,6 @@ QueryResult::View getMore(OperationContext* txn,
     // CC, so don't delete it.
     ClientCursorPin ccPin(cursorManager, cursorid);
     ClientCursor* cc = ccPin.c();
-
-    // If we're not being called from DBDirectClient we want to associate the RecoveryUnit
-    // used to create the execution machinery inside the cursor with our OperationContext.
-    // If we throw or otherwise exit this method in a disorderly fashion, we must ensure
-    // that further calls to getMore won't fail, and that the provided OperationContext
-    // has a valid RecoveryUnit.  As such, we use RAII to accomplish this.
-    //
-    // This must be destroyed before the ClientCursor is destroyed.
-    unique_ptr<ScopedRecoveryUnitSwapper> ruSwapper;
-
     // These are set in the QueryResult msg we return.
     int resultFlags = ResultFlag_AwaitCapable;
 
@@ -392,19 +352,8 @@ QueryResult::View getMore(OperationContext* txn,
                 ns == cc->ns());
         *isCursorAuthorized = true;
 
-        // Restore the RecoveryUnit if we need to.
-        if (txn->getClient()->isInDirectClient()) {
-            if (cc->hasRecoveryUnit())
-                invariant(txn->recoveryUnit() == cc->getUnownedRecoveryUnit());
-        } else {
-            if (!cc->hasRecoveryUnit()) {
-                // Start using a new RecoveryUnit
-                cc->setOwnedRecoveryUnit(
-                    getGlobalServiceContext()->getGlobalStorageEngine()->newRecoveryUnit());
-            }
-            // Swap RecoveryUnit(s) between the ClientCursor and OperationContext.
-            ruSwapper = make_unique<ScopedRecoveryUnitSwapper>(cc, txn);
-        }
+        if (cc->isReadCommitted())
+            uassertStatusOK(txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
         // Reset timeout timer on the cursor since the cursor is still in use.
         cc->setIdleTime(0);
@@ -436,7 +385,8 @@ QueryResult::View getMore(OperationContext* txn,
         startingResult = cc->pos();
 
         PlanExecutor* exec = cc->getExecutor();
-        exec->restoreState(txn);
+        exec->reattachToOperationContext(txn);
+        exec->restoreState();
 
         PlanExecutor::ExecState state;
 
@@ -463,7 +413,7 @@ QueryResult::View getMore(OperationContext* txn,
 
             // Reacquiring locks.
             ctx = make_unique<AutoGetCollectionForRead>(txn, nss);
-            exec->restoreState(txn);
+            exec->restoreState();
 
             // We woke up because either the timed_wait expired, or there was more data. Either
             // way, attempt to generate another batch of results.
@@ -485,7 +435,6 @@ QueryResult::View getMore(OperationContext* txn,
         //    pin.  Because our ClientCursorPin is declared after our lock is declared, this
         //    will happen under the lock.
         if (!shouldSaveCursorGetMore(state, exec, isCursorTailable(cc))) {
-            ruSwapper.reset();
             ccPin.deleteUnderlying();
 
             // cc is now invalid, as is the executor
@@ -499,15 +448,9 @@ QueryResult::View getMore(OperationContext* txn,
             // Continue caching the ClientCursor.
             cc->incPos(numResults);
             exec->saveState();
+            exec->detachFromOperationContext();
             LOG(5) << "getMore saving client cursor ended with state "
                    << PlanExecutor::statestr(state) << endl;
-
-            if (PlanExecutor::IS_EOF == state && isCursorTailable(cc)) {
-                if (!txn->getClient()->isInDirectClient()) {
-                    // Don't stash the RU. Get a new one on the next getMore.
-                    ruSwapper->dismiss();
-                }
-            }
 
             // Possibly note slave's position in the oplog.
             if ((cc->queryOptions() & QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
@@ -698,31 +641,18 @@ std::string runQuery(OperationContext* txn,
     if (shouldSaveCursor(txn, collection, state, exec.get())) {
         // We won't use the executor until it's getMore'd.
         exec->saveState();
+        exec->detachFromOperationContext();
 
         // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
         // inserted into a global map by its ctor.
-        ClientCursor* cc = new ClientCursor(collection->getCursorManager(),
-                                            exec.release(),
-                                            nss.ns(),
-                                            pq.getOptions(),
-                                            pq.getFilter());
+        ClientCursor* cc =
+            new ClientCursor(collection->getCursorManager(),
+                             exec.release(),
+                             nss.ns(),
+                             txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                             pq.getOptions(),
+                             pq.getFilter());
         ccId = cc->cursorid();
-
-        if (txn->getClient()->isInDirectClient()) {
-            cc->setUnownedRecoveryUnit(txn->recoveryUnit());
-        } else if (state == PlanExecutor::IS_EOF && pq.isTailable()) {
-            // Don't stash the RU for tailable cursors at EOF, let them get a new RU on their
-            // next getMore.
-        } else {
-            // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
-            // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
-            txn->recoveryUnit()->abandonSnapshot();
-            cc->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-            invariant(txn->setRecoveryUnit(storageEngine->newRecoveryUnit(),
-                                           OperationContext::kNotInUnitOfWork) ==
-                      OperationContext::kNotInUnitOfWork);
-        }
 
         LOG(5) << "caching executor with cursorid " << ccId << " after returning " << numResults
                << " results" << endl;

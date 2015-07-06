@@ -301,7 +301,7 @@ public:
         scan->saveState();
         scan->invalidate(&_txn, locs[count], INVALIDATION_DELETION);
         remove(coll->docFor(&_txn, locs[count]).value());
-        scan->restoreState(&_txn);
+        scan->restoreState();
 
         // Skip over locs[count].
         ++count;
@@ -362,7 +362,7 @@ public:
         scan->saveState();
         scan->invalidate(&_txn, locs[count], INVALIDATION_DELETION);
         remove(coll->docFor(&_txn, locs[count]).value());
-        scan->restoreState(&_txn);
+        scan->restoreState();
 
         // Skip over locs[count].
         ++count;

@@ -735,7 +735,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorRollover) {
     }
 
     // cursor should now be dead
-    ASSERT_FALSE(cursor->restore(cursorCtx.get()));
+    ASSERT_FALSE(cursor->restore());
     ASSERT(!cursor->next());
 }
 
@@ -871,7 +871,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorYieldFirst) {
     // See that things work if you yield before you first call getNext().
     cursor->savePositioned();
     cursorCtx->recoveryUnit()->abandonSnapshot();
-    ASSERT_TRUE(cursor->restore(cursorCtx.get()));
+    ASSERT_TRUE(cursor->restore());
     auto record = cursor->next();
     ASSERT_EQ(loc1, record->id);
     ASSERT(!cursor->next());

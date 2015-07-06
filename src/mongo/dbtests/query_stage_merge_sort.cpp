@@ -587,7 +587,7 @@ public:
         // Invalidate locs[11].  Should force a fetch.  We don't get it back.
         ms->saveState();
         ms->invalidate(&_txn, *it, INVALIDATION_DELETION);
-        ms->restoreState(&_txn);
+        ms->restoreState();
 
         // Make sure locs[11] was fetched for us.
         {

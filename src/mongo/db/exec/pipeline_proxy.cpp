@@ -100,13 +100,19 @@ void PipelineProxyStage::doInvalidate(OperationContext* txn,
     }
 }
 
-void PipelineProxyStage::doSaveState() {
+void PipelineProxyStage::doDetachFromOperationContext() {
     _pipeline->getContext()->opCtx = NULL;
+    if (auto child = getChildExecutor()) {
+        child->detachFromOperationContext();
+    }
 }
 
-void PipelineProxyStage::doRestoreState(OperationContext* opCtx) {
+void PipelineProxyStage::doReattachToOperationContext(OperationContext* opCtx) {
     invariant(_pipeline->getContext()->opCtx == NULL);
     _pipeline->getContext()->opCtx = opCtx;
+    if (auto child = getChildExecutor()) {
+        child->reattachToOperationContext(opCtx);
+    }
 }
 
 void PipelineProxyStage::pushBack(const BSONObj& obj) {

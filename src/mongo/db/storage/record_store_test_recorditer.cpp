@@ -316,7 +316,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
         ASSERT_OK(res.getStatus());
         uow.commit();
 
-        ASSERT(cursor->restore(opCtx.get()));
+        ASSERT(cursor->restore());
 
         // Iterator should still be EOF.
         ASSERT(!cursor->next());
@@ -369,7 +369,7 @@ TEST(RecordStoreTestHarness, RecordIteratorSavePositionedRestore) {
         for (int i = 0; i < nToInsert; i++) {
             cursor->savePositioned();
             cursor->savePositioned();  // It is legal to save twice in a row.
-            cursor->restore(opCtx.get());
+            cursor->restore();
 
             const auto record = cursor->next();
             ASSERT(record);
@@ -379,7 +379,7 @@ TEST(RecordStoreTestHarness, RecordIteratorSavePositionedRestore) {
 
         cursor->savePositioned();
         cursor->savePositioned();  // It is legal to save twice in a row.
-        cursor->restore(opCtx.get());
+        cursor->restore();
 
         ASSERT(!cursor->next());
     }

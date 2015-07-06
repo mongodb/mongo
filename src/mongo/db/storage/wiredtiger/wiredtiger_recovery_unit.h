@@ -65,9 +65,6 @@ public:
 
     virtual void registerChange(Change*);
 
-    virtual void beingReleasedFromOperationContext();
-    virtual void beingSetOnOperationContext();
-
     virtual void abandonSnapshot();
 
     // un-used API
@@ -80,6 +77,9 @@ public:
     virtual SnapshotId getSnapshotId() const;
 
     Status setReadFromMajorityCommittedSnapshot() final;
+    bool isReadingFromMajorityCommittedSnapshot() final {
+        return _readFromMajorityCommittedSnapshot;
+    }
 
     // ---- WT STUFF
 

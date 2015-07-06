@@ -87,7 +87,9 @@ public:
     StageState work(WorkingSetID* out) final;
 
     void doSaveState() final;
-    void doRestoreState(OperationContext* opCtx) final;
+    void doRestoreState() final;
+    void doDetachFromOperationContext() final;
+    void doReattachToOperationContext(OperationContext* opCtx) final;
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {

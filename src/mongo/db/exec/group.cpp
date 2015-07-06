@@ -257,7 +257,7 @@ bool GroupStage::isEOF() {
     return _groupState == GroupState_Done;
 }
 
-void GroupStage::doRestoreState(OperationContext* opCtx) {
+void GroupStage::doReattachToOperationContext(OperationContext* opCtx) {
     _txn = opCtx;
 }
 

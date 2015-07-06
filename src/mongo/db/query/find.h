@@ -41,27 +41,6 @@ namespace mongo {
 class NamespaceString;
 class OperationContext;
 
-class ScopedRecoveryUnitSwapper {
-public:
-    ScopedRecoveryUnitSwapper(ClientCursor* cc, OperationContext* txn);
-
-    ~ScopedRecoveryUnitSwapper();
-
-    /**
-     * Dismissing the RU swapper causes it to simply free the recovery unit rather than swapping
-     * it back into the ClientCursor.
-     */
-    void dismiss();
-
-private:
-    ClientCursor* _cc;
-    OperationContext* _txn;
-    bool _dismissed;
-
-    std::unique_ptr<RecoveryUnit> _txnPreviousRecoveryUnit;
-    OperationContext::RecoveryUnitState _txnPreviousRecoveryUnitState;
-};
-
 /**
  * Returns true if enough results have been prepared to stop adding more to the first batch.
  *

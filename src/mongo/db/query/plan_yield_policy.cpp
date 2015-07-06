@@ -97,7 +97,7 @@ bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
                 QueryYield::yieldAllLocks(opCtx, fetcher);
             }
 
-            return _planYielding->restoreStateWithoutRetrying(opCtx);
+            return _planYielding->restoreStateWithoutRetrying();
         } catch (const WriteConflictException& wce) {
             CurOp::get(opCtx)->debug().writeConflicts++;
             WriteConflictException::logAndBackoff(

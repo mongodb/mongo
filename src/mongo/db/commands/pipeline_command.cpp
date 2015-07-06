@@ -130,22 +130,10 @@ static bool handleCursorCommand(OperationContext* txn,
 
         CurOp::get(txn)->debug().cursorid = cursor->cursorid();
 
-        if (txn->getClient()->isInDirectClient()) {
-            cursor->setUnownedRecoveryUnit(txn->recoveryUnit());
-        } else {
-            // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
-            // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
-            txn->recoveryUnit()->abandonSnapshot();
-            cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-            invariant(txn->setRecoveryUnit(storageEngine->newRecoveryUnit(),
-                                           OperationContext::kNotInUnitOfWork) ==
-                      OperationContext::kNotInUnitOfWork);
-        }
-
         // Cursor needs to be in a saved state while we yield locks for getmore. State
         // will be restored in getMore().
         exec->saveState();
+        exec->detachFromOperationContext();
     }
 
     const long long cursorId = cursor ? cursor->cursorid() : 0LL;
@@ -263,12 +251,14 @@ public:
 
             if (collection) {
                 const bool isAggCursor = true;  // enable special locking behavior
-                ClientCursor* cursor = new ClientCursor(collection->getCursorManager(),
-                                                        exec.release(),
-                                                        nss.ns(),
-                                                        0,
-                                                        cmdObj.getOwned(),
-                                                        isAggCursor);
+                ClientCursor* cursor =
+                    new ClientCursor(collection->getCursorManager(),
+                                     exec.release(),
+                                     nss.ns(),
+                                     txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                                     0,
+                                     cmdObj.getOwned(),
+                                     isAggCursor);
                 pin.reset(new ClientCursorPin(collection->getCursorManager(), cursor->cursorid()));
                 // Don't add any code between here and the start of the try block.
             }

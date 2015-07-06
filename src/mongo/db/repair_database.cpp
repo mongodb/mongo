@@ -143,7 +143,7 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
                 rs->deleteRecord(txn, id);
                 wunit.commit();
             }
-            cursor->restore(txn);
+            cursor->restore();
             continue;
         }
 

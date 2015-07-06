@@ -178,6 +178,7 @@ PlanExecutor::PlanExecutor(OperationContext* opCtx,
 }
 
 Status PlanExecutor::pickBestPlan(YieldPolicy policy) {
+    invariant(_currentState == kUsable);
     // For YIELD_AUTO, this will both set an auto yield policy on the PlanExecutor and
     // register it to receive notifications.
     this->setYieldPolicy(policy);
@@ -251,6 +252,7 @@ OperationContext* PlanExecutor::getOpCtx() const {
 }
 
 void PlanExecutor::saveState() {
+    invariant(_currentState == kUsable || _currentState == kSaved);
     if (!killed()) {
         _root->saveState();
     }
@@ -264,12 +266,12 @@ void PlanExecutor::saveState() {
         WorkingSetCommon::prepareForSnapshotChange(_workingSet.get());
     }
 
-    _opCtx = NULL;
+    _currentState = kSaved;
 }
 
-bool PlanExecutor::restoreState(OperationContext* opCtx) {
+bool PlanExecutor::restoreState() {
     try {
-        return restoreStateWithoutRetrying(opCtx);
+        return restoreStateWithoutRetrying();
     } catch (const WriteConflictException& wce) {
         if (!_yieldPolicy->allowedToYield())
             throw;
@@ -279,21 +281,33 @@ bool PlanExecutor::restoreState(OperationContext* opCtx) {
     }
 }
 
-bool PlanExecutor::restoreStateWithoutRetrying(OperationContext* opCtx) {
-    invariant(NULL == _opCtx);
-    invariant(opCtx);
-
-    _opCtx = opCtx;
-
+bool PlanExecutor::restoreStateWithoutRetrying() {
+    invariant(_currentState == kSaved);
     // We're restoring after a yield or getMore now. If we're a yielding plan executor, reset
     // the yield timer in order to prevent from yielding again right away.
     _yieldPolicy->resetTimer();
 
     if (!killed()) {
-        _root->restoreState(opCtx);
+        _root->restoreState();
     }
 
+    _currentState = kUsable;
     return !killed();
+}
+
+void PlanExecutor::detachFromOperationContext() {
+    invariant(_currentState == kSaved);
+    _opCtx = nullptr;
+    _root->detachFromOperationContext();
+    _currentState = kDetached;
+    _everDetachedFromOperationContext = true;
+}
+
+void PlanExecutor::reattachToOperationContext(OperationContext* txn) {
+    invariant(_currentState == kDetached);
+    _opCtx = txn;
+    _root->reattachToOperationContext(txn);
+    _currentState = kSaved;
 }
 
 void PlanExecutor::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
@@ -304,7 +318,7 @@ void PlanExecutor::invalidate(OperationContext* txn, const RecordId& dl, Invalid
 
 PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, RecordId* dlOut) {
     Snapshotted<BSONObj> snapshotted;
-    ExecState state = getNextSnapshotted(objOut ? &snapshotted : NULL, dlOut);
+    ExecState state = getNextImpl(objOut ? &snapshotted : NULL, dlOut);
 
     if (objOut) {
         *objOut = snapshotted.value();
@@ -315,6 +329,13 @@ PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, RecordId* dlOut) 
 
 PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* objOut,
                                                          RecordId* dlOut) {
+    // Detaching from the OperationContext means that the returned snapshot ids could be invalid.
+    invariant(!_everDetachedFromOperationContext);
+    return getNextImpl(objOut, dlOut);
+}
+
+PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, RecordId* dlOut) {
+    invariant(_currentState == kUsable);
     if (killed()) {
         if (NULL != objOut) {
             Status status(ErrorCodes::OperationFailed,
@@ -453,6 +474,7 @@ PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* o
 }
 
 bool PlanExecutor::isEOF() {
+    invariant(_currentState == kUsable);
     return killed() || (_stash.empty() && _root->isEOF());
 }
 
@@ -493,6 +515,7 @@ void PlanExecutor::kill(string reason) {
 }
 
 Status PlanExecutor::executePlan() {
+    invariant(_currentState == kUsable);
     BSONObj obj;
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
     while (PlanExecutor::ADVANCED == state) {

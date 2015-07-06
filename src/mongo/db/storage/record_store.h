@@ -196,7 +196,24 @@ public:
      *
      * This handles restoring after either savePositioned() or saveUnpositioned().
      */
-    virtual bool restore(OperationContext* txn) = 0;
+    virtual bool restore() = 0;
+
+    /**
+     * Detaches from the OperationContext and releases any storage-engine state.
+     *
+     * It is only legal to call this when in a "saved" state. While in the "detached" state, it is
+     * only legal to call reattachToOperationContext or the destructor. It is not legal to call
+     * detachFromOperationContext() while already in the detached state.
+     */
+    virtual void detachFromOperationContext() = 0;
+
+    /**
+     * Reattaches to the OperationContext and reacquires any storage-engine state.
+     *
+     * It is only legal to call this in the "detached" state. On return, the cursor is left in a
+     * "saved" state, so callers must still call restoreState to use this object.
+     */
+    virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
 
     /**
      * Inform the cursor that this id is being invalidated.

@@ -304,7 +304,7 @@ private:
                     }
                     ++numDeleted;
                     ttlDeletedDocuments.increment();
-                    if (!exec->restoreState(txn)) {
+                    if (!exec->restoreState()) {
                         return true;
                     }
                 }

@@ -80,14 +80,15 @@ long long ClientCursor::totalOpen() {
 ClientCursor::ClientCursor(CursorManager* cursorManager,
                            PlanExecutor* exec,
                            const std::string& ns,
+                           bool isReadCommitted,
                            int qopts,
                            const BSONObj query,
                            bool isAggCursor)
     : _ns(ns),
+      _isReadCommitted(isReadCommitted),
       _cursorManager(cursorManager),
       _countedYet(false),
-      _isAggCursor(isAggCursor),
-      _unownedRU(NULL) {
+      _isAggCursor(isAggCursor) {
     _exec.reset(exec);
     _query = query;
     _queryOptions = qopts;
@@ -99,11 +100,11 @@ ClientCursor::ClientCursor(CursorManager* cursorManager,
 
 ClientCursor::ClientCursor(const Collection* collection)
     : _ns(collection->ns().ns()),
+      _isReadCommitted(false),
       _cursorManager(collection->getCursorManager()),
       _countedYet(false),
       _queryOptions(QueryOption_NoCursorTimeout),
-      _isAggCursor(false),
-      _unownedRU(NULL) {
+      _isAggCursor(false) {
     init();
 }
 
@@ -194,30 +195,6 @@ void ClientCursor::updateSlaveLocation(OperationContext* txn) {
         return;
 
     repl::getGlobalReplicationCoordinator()->setLastOptimeForSlave(rid, _slaveReadTill);
-}
-
-//
-// Storage engine state for getMore.
-//
-
-void ClientCursor::setUnownedRecoveryUnit(RecoveryUnit* ru) {
-    invariant(!_unownedRU);
-    invariant(!_ownedRU.get());
-    _unownedRU = ru;
-}
-
-RecoveryUnit* ClientCursor::getUnownedRecoveryUnit() const {
-    return _unownedRU;
-}
-
-void ClientCursor::setOwnedRecoveryUnit(RecoveryUnit* ru) {
-    invariant(!_unownedRU);
-    invariant(!_ownedRU.get());
-    _ownedRU.reset(ru);
-}
-
-RecoveryUnit* ClientCursor::releaseOwnedRecoveryUnit() {
-    return _ownedRU.release();
 }
 
 //

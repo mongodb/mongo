@@ -108,12 +108,9 @@ void SimpleRecordStoreV1Iterator::invalidate(const RecordId& dl) {
     }
 }
 
-void SimpleRecordStoreV1Iterator::savePositioned() {
-    _txn = nullptr;
-}
+void SimpleRecordStoreV1Iterator::savePositioned() {}
 
-bool SimpleRecordStoreV1Iterator::restore(OperationContext* txn) {
-    _txn = txn;
+bool SimpleRecordStoreV1Iterator::restore() {
     // if the collection is dropped, then the cursor should be destroyed
     return true;
 }

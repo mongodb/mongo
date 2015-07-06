@@ -80,7 +80,9 @@ public:
     virtual StageState work(WorkingSetID* out);
     virtual bool isEOF();
     virtual void doSaveState();
-    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doRestoreState();
+    virtual void doDetachFromOperationContext();
+    virtual void doReattachToOperationContext(OperationContext* opCtx);
 
     virtual StageType stageType() const {
         return STAGE_DISTINCT_SCAN;

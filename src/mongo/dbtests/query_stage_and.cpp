@@ -223,7 +223,7 @@ public:
             }
         }
         size_t memUsageAfter = ah->getMemUsage();
-        ah->restoreState(&_txn);
+        ah->restoreState();
 
         // Invalidating a read object should decrease memory usage.
         ASSERT_LESS_THAN(memUsageAfter, memUsageBefore);
@@ -331,7 +331,7 @@ public:
         // Look ahead results do not count towards memory usage.
         ASSERT_EQUALS(memUsageBefore, memUsageAfter);
 
-        ah->restoreState(&_txn);
+        ah->restoreState();
 
         // The deleted obj should show up in flagged.
         ASSERT_EQUALS(size_t(1), flagged.size());
@@ -1056,7 +1056,7 @@ public:
         ah->saveState();
         ah->invalidate(&_txn, *data.begin(), INVALIDATION_DELETION);
         remove(coll->docFor(&_txn, *data.begin()).value());
-        ah->restoreState(&_txn);
+        ah->restoreState();
 
         // Make sure the nuked obj is actually in the flagged data.
         ASSERT_EQUALS(ws.getFlagged().size(), size_t(1));
@@ -1099,7 +1099,7 @@ public:
         ah->saveState();
         ah->invalidate(&_txn, *it, INVALIDATION_DELETION);
         remove(coll->docFor(&_txn, *it).value());
-        ah->restoreState(&_txn);
+        ah->restoreState();
 
         // Get all results aside from the two we killed.
         while (!ah->isEOF()) {

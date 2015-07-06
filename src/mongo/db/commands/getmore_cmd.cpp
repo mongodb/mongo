@@ -244,14 +244,8 @@ public:
         // On early return, get rid of the cursor.
         ScopeGuard cursorFreer = MakeGuard(&GetMoreCmd::cleanupCursor, txn, &ccPin, request);
 
-        if (!cursor->hasRecoveryUnit()) {
-            // Start using a new RecoveryUnit.
-            cursor->setOwnedRecoveryUnit(
-                getGlobalServiceContext()->getGlobalStorageEngine()->newRecoveryUnit());
-        }
-
-        // Swap RecoveryUnit(s) between the ClientCursor and OperationContext.
-        ScopedRecoveryUnitSwapper ruSwapper(cursor, txn);
+        if (cursor->isReadCommitted())
+            uassertStatusOK(txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
         // Reset timeout timer on the cursor since the cursor is still in use.
         cursor->setIdleTime(0);
@@ -270,7 +264,8 @@ public:
         }
 
         PlanExecutor* exec = cursor->getExecutor();
-        exec->restoreState(txn);
+        exec->reattachToOperationContext(txn);
+        exec->restoreState();
 
         // If we're tailing a capped collection, retrieve a monotonically increasing insert
         // counter.
@@ -309,7 +304,7 @@ public:
             notifier.reset();
 
             ctx.reset(new AutoGetCollectionForRead(txn, request.nss));
-            exec->restoreState(txn);
+            exec->restoreState();
 
             // We woke up because either the timed_wait expired, or there was more data. Either
             // way, attempt to generate another batch of results.
@@ -323,6 +318,7 @@ public:
             respondWithId = request.cursorid;
 
             exec->saveState();
+            exec->detachFromOperationContext();
 
             // If maxTimeMS was set directly on the getMore rather than being rolled over
             // from a previous find, then don't roll remaining micros over to the next
@@ -332,12 +328,6 @@ public:
             }
 
             cursor->incPos(numResults);
-
-            if (isCursorTailable(cursor) && state == PlanExecutor::IS_EOF) {
-                // Rather than swapping their existing RU into the client cursor, tailable
-                // cursors should get a new recovery unit.
-                ruSwapper.dismiss();
-            }
         } else {
             CurOp::get(txn)->debug().cursorExhausted = true;
         }

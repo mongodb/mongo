@@ -182,7 +182,7 @@ public:
             }
 
             // resume from yield
-            count_stage.restoreState(&_txn);
+            count_stage.restoreState();
         }
 
         return static_cast<const CountStats*>(count_stage.getSpecificStats());

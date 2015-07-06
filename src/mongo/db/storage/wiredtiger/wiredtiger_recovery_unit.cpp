@@ -378,19 +378,6 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
     _active = true;
 }
 
-void WiredTigerRecoveryUnit::beingReleasedFromOperationContext() {
-    LOG(2) << "WiredTigerRecoveryUnit::beingReleased";
-    _currentlySquirreled = true;
-    if (_active == false && !wt_keeptxnopen()) {
-        _commit();
-    }
-}
-void WiredTigerRecoveryUnit::beingSetOnOperationContext() {
-    LOG(2) << "WiredTigerRecoveryUnit::broughtBack";
-    _currentlySquirreled = false;
-}
-
-
 // ---------------------
 
 WiredTigerCursor::WiredTigerCursor(const std::string& uri,

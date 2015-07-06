@@ -902,7 +902,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
         // As restoreState may restore (recreate) cursors, make sure to restore the
         // state outside of the WritUnitOfWork.
         try {
-            child()->restoreState(_txn);
+            child()->restoreState();
         } catch (const WriteConflictException& wce) {
             // Note we don't need to retry updating anything in this case since the update
             // already was committed. However, we still need to return the updated document
@@ -958,12 +958,12 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
     return status;
 }
 
-Status UpdateStage::restoreUpdateState(OperationContext* opCtx) {
+Status UpdateStage::restoreUpdateState() {
     const UpdateRequest& request = *_params.request;
     const NamespaceString& nsString(request.getNamespaceString());
 
     // We may have stepped down during the yield.
-    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+    bool userInitiatedWritesAndNotPrimary = _txn->writesAreReplicated() &&
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 
     if (userInitiatedWritesAndNotPrimary) {
@@ -982,17 +982,19 @@ Status UpdateStage::restoreUpdateState(OperationContext* opCtx) {
                           17270);
         }
 
-        _params.driver->refreshIndexKeys(lifecycle->getIndexKeys(opCtx));
+        _params.driver->refreshIndexKeys(lifecycle->getIndexKeys(_txn));
     }
 
     return Status::OK();
 }
 
-void UpdateStage::doRestoreState(OperationContext* opCtx) {
-    _txn = opCtx;
-    uassertStatusOK(restoreUpdateState(opCtx));
+void UpdateStage::doRestoreState() {
+    uassertStatusOK(restoreUpdateState());
 }
 
+void UpdateStage::doReattachToOperationContext(OperationContext* opCtx) {
+    _txn = opCtx;
+}
 
 unique_ptr<PlanStageStats> UpdateStage::getStats() {
     _commonStats.isEOF = isEOF();

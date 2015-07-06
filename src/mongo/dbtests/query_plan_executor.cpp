@@ -419,7 +419,7 @@ public:
         PlanExecutor* exec = makeCollScanExec(coll, filterObj);
 
         // Make a client cursor from the runner.
-        new ClientCursor(coll->getCursorManager(), exec, ns(), 0, BSONObj());
+        new ClientCursor(coll->getCursorManager(), exec, ns(), false, 0, BSONObj());
 
         // There should be one cursor before invalidation,
         // and zero cursors after invalidation.
@@ -446,7 +446,7 @@ public:
 
         // Make a client cursor from the runner.
         ClientCursor* cc =
-            new ClientCursor(collection->getCursorManager(), exec, ns(), 0, BSONObj());
+            new ClientCursor(collection->getCursorManager(), exec, ns(), false, 0, BSONObj());
         ClientCursorPin ccPin(collection->getCursorManager(), cc->cursorid());
 
         // If the cursor is pinned, it sticks around,
@@ -490,7 +490,7 @@ public:
             PlanExecutor* exec = makeCollScanExec(collection, filterObj);
 
             // Make a client cursor from the runner.
-            new ClientCursor(collection->getCursorManager(), exec, ns(), 0, BSONObj());
+            new ClientCursor(collection->getCursorManager(), exec, ns(), false, 0, BSONObj());
         }
 
         // There should be one cursor before timeout,

@@ -43,13 +43,13 @@ void PlanStage::saveState() {
     doSaveState();
 }
 
-void PlanStage::restoreState(OperationContext* opCtx) {
+void PlanStage::restoreState() {
     ++_commonStats.unyields;
     for (auto&& child : _children) {
-        child->restoreState(opCtx);
+        child->restoreState();
     }
 
-    doRestoreState(opCtx);
+    doRestoreState();
 }
 
 void PlanStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
@@ -59,6 +59,22 @@ void PlanStage::invalidate(OperationContext* txn, const RecordId& dl, Invalidati
     }
 
     doInvalidate(txn, dl, type);
+}
+
+void PlanStage::detachFromOperationContext() {
+    for (auto&& child : _children) {
+        child->detachFromOperationContext();
+    }
+
+    doDetachFromOperationContext();
+}
+
+void PlanStage::reattachToOperationContext(OperationContext* opCtx) {
+    for (auto&& child : _children) {
+        child->reattachToOperationContext(opCtx);
+    }
+
+    doReattachToOperationContext(opCtx);
 }
 
 }  // namespace mongo

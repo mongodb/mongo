@@ -71,7 +71,9 @@ public:
 
     virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
     virtual void doSaveState();
-    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doRestoreState();
+    virtual void doDetachFromOperationContext();
+    virtual void doReattachToOperationContext(OperationContext* opCtx);
 
     // Returns empty PlanStageStats object
     virtual std::unique_ptr<PlanStageStats> getStats();

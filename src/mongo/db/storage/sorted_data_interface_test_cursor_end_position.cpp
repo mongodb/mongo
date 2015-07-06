@@ -144,7 +144,7 @@ void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
 
     cursor->saveUnpositioned();
     removeFromIndex(opCtx, sorted, {{key3, loc1}});
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->seek(key2, true), boost::none);
     ASSERT_EQ(cursor->seek(key3, true), boost::none);
@@ -192,7 +192,7 @@ void testSetEndPosition_Seek_Reverse(bool unique, bool inclusive) {
 
     cursor->saveUnpositioned();
     removeFromIndex(opCtx, sorted, {{key2, loc1}});
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->seek(key3, true), boost::none);
     ASSERT_EQ(cursor->seek(key2, true), boost::none);
@@ -226,7 +226,7 @@ void testSetEndPosition_Restore_Forward(bool unique) {
     ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
     cursor->savePositioned();
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
 
@@ -236,7 +236,7 @@ void testSetEndPosition_Restore_Forward(bool unique) {
                     {
                      {key2, loc1}, {key3, loc1},
                     });
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->next(), boost::none);
 }
@@ -262,7 +262,7 @@ void testSetEndPosition_Restore_Reverse(bool unique) {
     ASSERT_EQ(cursor->seek(key4, true), IndexKeyEntry(key4, loc1));
 
     cursor->savePositioned();
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
 
@@ -272,7 +272,7 @@ void testSetEndPosition_Restore_Reverse(bool unique) {
                     {
                      {key2, loc1}, {key3, loc1},
                     });
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->next(), boost::none);
 }
@@ -309,7 +309,7 @@ void testSetEndPosition_RestoreEndCursor_Forward(bool unique) {
                    {key2, loc1},  // in range
                    {key3, loc1},  // out of range
                   });
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
@@ -342,7 +342,7 @@ void testSetEndPosition_RestoreEndCursor_Reverse(bool unique) {
                    {key2, loc1},  // in range
                    {key3, loc1},  // out of range
                   });
-    cursor->restore(opCtx.get());  // must restore end cursor even with saveUnpositioned().
+    cursor->restore();  // must restore end cursor even with saveUnpositioned().
 
     ASSERT_EQ(cursor->seek(key4, true), IndexKeyEntry(key4, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));

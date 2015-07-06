@@ -284,7 +284,7 @@ bool NearStage::isEOF() {
     return SearchState_Finished == _searchState;
 }
 
-void NearStage::doRestoreState(OperationContext* opCtx) {
+void NearStage::doReattachToOperationContext(OperationContext* opCtx) {
     _txn = opCtx;
 }
 
