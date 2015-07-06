@@ -78,7 +78,16 @@ private:
     public:
         AsyncConnection(asio::ip::tcp::socket&& sock, rpc::ProtocolSet protocols);
 
-        asio::ip::tcp::socket* sock();
+        asio::ip::tcp::socket& sock();
+
+// Explicit move construction and assignment to support MSVC
+#if defined(_MSC_VER) && _MSC_VER < 1900
+        AsyncConnection(AsyncConnection&&);
+        AsyncConnection& operator=(AsyncConnection&&);
+#else
+        AsyncConnection(AsyncConnection&&) = default;
+        AsyncConnection& operator=(AsyncConnection&&) = default;
+#endif
 
     private:
         asio::ip::tcp::socket _sock;
@@ -106,6 +115,7 @@ private:
         AsyncConnection* connection();
 
         void connect(ConnectionPool* const pool, asio::io_service* service, Date_t now);
+        void setConnection(AsyncConnection&& conn);
         bool connected() const;
 
         void finish(const TaskExecutor::ResponseStatus& status);
@@ -151,9 +161,7 @@ private:
         const int _id;
     };
 
-    void _asyncRunCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                          const RemoteCommandRequest& request,
-                          const RemoteCommandCompletionFn& onFinish);
+    void _asyncRunCommand(AsyncOp* op);
 
     void _messageFromRequest(const RemoteCommandRequest& request,
                              Message* toSend,
@@ -184,6 +192,8 @@ private:
 
     asio::io_service _io_service;
     stdx::thread _serviceRunner;
+
+    asio::ip::tcp::resolver _resolver;
 
     std::atomic<State> _state;
 
