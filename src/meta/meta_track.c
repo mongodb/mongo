@@ -15,7 +15,7 @@
  */
 typedef struct __wt_meta_track {
 	enum {
-		WT_ST_EMPTY,		/* Unused slot */
+		WT_ST_EMPTY = 0,	/* Unused slot */
 		WT_ST_CHECKPOINT,	/* Complete a checkpoint */
 		WT_ST_DROP_COMMIT,	/* Drop post commit */
 		WT_ST_FILEOP,		/* File operation */
