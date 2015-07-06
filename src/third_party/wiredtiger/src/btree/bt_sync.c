@@ -71,7 +71,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			    __wt_txn_visible_all(
 			    session, page->modify->update_txn)) {
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
-					__wt_txn_refresh(session, 1);
+					__wt_txn_get_snapshot(session);
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
 				WT_ERR(__wt_reconcile(session, walk, NULL, 0));
@@ -189,6 +189,18 @@ err:	/* On error, clear any left-over tree walk. */
 		__wt_txn_release_snapshot(session);
 
 	if (btree->checkpointing) {
+		/*
+		 * Update the checkpoint generation for this handle so visible
+		 * updates newer than the checkpoint can be evicted.
+		 *
+		 * This has to be published before eviction is enabled again,
+		 * so that eviction knows that the checkpoint has completed.
+		 */
+		WT_PUBLISH(btree->checkpoint_gen,
+		    S2C(session)->txn_global.checkpoint_gen);
+		WT_STAT_FAST_DATA_SET(session,
+		    btree_checkpoint_generation, btree->checkpoint_gen);
+
 		/*
 		 * Clear the checkpoint flag and push the change; not required,
 		 * but publishing the change means stalled eviction gets moving

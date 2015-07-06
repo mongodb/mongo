@@ -49,6 +49,9 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/* Trigger eviction on the next page release. */
 	__wt_page_evict_soon(page);
 
+	/* Bump the oldest ID, we're about to do some visibility checks. */
+	__wt_txn_update_oldest(session, 0);
+
 	/* If eviction cannot succeed, don't try. */
 	return (__wt_page_can_evict(session, page, 1));
 }
@@ -168,7 +171,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    page->read_gen != WT_READGEN_OLDEST &&
 			    page->read_gen < __wt_cache_read_gen(session))
 				page->read_gen =
-				    __wt_cache_read_gen_set(session);
+				    __wt_cache_read_gen_bump(session);
 
 			return (0);
 		WT_ILLEGAL_VALUE(session);

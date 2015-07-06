@@ -493,6 +493,14 @@ __evict_pass(WT_SESSION_IMPL *session)
 			    session, cache->evict_waiter_cond));
 		}
 
+		/*
+		 * Increment the shared read generation.  We do this
+		 * occasionally even if eviction is not currently required, so
+		 * that pages have some relative read generation when the
+		 * eviction server does need to do some work.
+		 */
+		__wt_cache_read_gen_incr(session);
+
 		WT_RET(__evict_has_work(session, &flags));
 		if (flags == 0)
 			break;
@@ -681,7 +689,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * before evicting, using a special "eviction" isolation level, where
 	 * only globally visible updates can be evicted.
 	 */
-	__wt_txn_update_oldest(session);
+	__wt_txn_update_oldest(session, 1);
 	txn = &session->txn;
 	saved_iso = txn->isolation;
 	txn->isolation = TXN_ISO_EVICTION;
@@ -838,6 +846,9 @@ __evict_lru_walk(WT_SESSION_IMPL *session, uint32_t flags)
 
 	WT_ASSERT(session, cache->evict[0].ref != NULL);
 
+	/* Track the oldest read generation we have in the queue. */
+	cache->read_gen_oldest = cache->evict[0].ref->page->read_gen;
+
 	if (LF_ISSET(WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK))
 		/*
 		 * Take all candidates if we only gathered pages with an oldest
@@ -933,16 +944,13 @@ __evict_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	incr = dhandle_locked = 0;
 	retries = 0;
 
-	/* Increment the shared read generation. */
-	__wt_cache_read_gen_incr(session);
-
 	/*
 	 * Update the oldest ID: we use it to decide whether pages are
 	 * candidates for eviction.  Without this, if all threads are blocked
 	 * after a long-running transaction (such as a checkpoint) completes,
 	 * we may never start evicting again.
 	 */
-	__wt_txn_update_oldest(session);
+	__wt_txn_update_oldest(session, 1);
 
 	if (cache->evict_current == NULL)
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
@@ -1222,15 +1230,11 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 
 		/*
-		 * If this page has never been considered for eviction,
-		 * set its read generation to a little bit in the
-		 * future and move on, give readers a chance to start
-		 * updating the read generation.
+		 * If this page has never been considered for eviction, set its
+		 * read generation to somewhere in the middle of the LRU list.
 		 */
-		if (page->read_gen == WT_READGEN_NOTSET) {
-			page->read_gen = __wt_cache_read_gen_set(session);
-			continue;
-		}
+		if (page->read_gen == WT_READGEN_NOTSET)
+			page->read_gen = __wt_cache_read_gen_new(session);
 
 fast:		/* If the page can't be evicted, give up. */
 		if (!__wt_page_can_evict(session, page, 1))
@@ -1424,7 +1428,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server)
 	 */
 	page = ref->page;
 	if (page->read_gen != WT_READGEN_OLDEST)
-		page->read_gen = __wt_cache_read_gen_set(session);
+		page->read_gen = __wt_cache_read_gen_bump(session);
 
 	/*
 	 * If we are evicting in a dead tree, don't write dirty pages.
@@ -1475,7 +1479,7 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 	 * to make sure there is free space in the cache.
 	 */
 	txn_global = &S2C(session)->txn_global;
-	txn_state = &txn_global->states[session->id];
+	txn_state = WT_SESSION_TXN_STATE(session);
 	busy = txn_state->id != WT_TXN_NONE ||
 	    session->nhazard > 0 ||
 	    (txn_state->snap_min != WT_TXN_NONE &&
@@ -1524,7 +1528,7 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 		 * are not busy.
 		 */
 		if (busy) {
-			__wt_txn_update_oldest(session);
+			__wt_txn_update_oldest(session, 0);
 			if (txn_state->id == txn_global->oldest_id ||
 			    txn_state->snap_min == txn_global->oldest_id)
 				return (0);

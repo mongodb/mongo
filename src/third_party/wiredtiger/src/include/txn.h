@@ -25,6 +25,9 @@
 
 #define	WT_SESSION_TXN_STATE(s) (&S2C(s)->txn_global.states[(s)->id])
 
+#define	WT_SESSION_IS_CHECKPOINT(s)					\
+	((s)->id != 0 && (s)->id == S2C(s)->txn_global.checkpoint_id)
+
 struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_txn_state {
 	volatile uint64_t id;
 	volatile uint64_t snap_min;
@@ -42,22 +45,19 @@ struct __wt_txn_global {
 	 */
 	volatile uint64_t oldest_id;
 
-	/* The oldest session found in the last scan. */
-	uint32_t oldest_session;
-
 	/* Count of scanning threads, or -1 for exclusive access. */
 	volatile int32_t scan_count;
 
 	/*
-	 * Track information about the running checkpoint. The transaction IDs
-	 * used when checkpointing are special. Checkpoints can run for a long
-	 * time so we keep them out of regular visibility checks. Eviction and
-	 * checkpoint operations know when they need to be aware of
-	 * checkpoint IDs.
+	 * Track information about the running checkpoint. The transaction
+	 * snapshot used when checkpointing are special. Checkpoints can run
+	 * for a long time so we keep them out of regular visibility checks.
+	 * Eviction and checkpoint operations know when they need to be aware
+	 * of checkpoint transactions.
 	 */
+	volatile uint32_t checkpoint_id;	/* Checkpoint's session ID */
 	volatile uint64_t checkpoint_gen;
-	volatile uint64_t checkpoint_id;
-	volatile uint64_t checkpoint_snap_min;
+	volatile uint64_t checkpoint_pinned;
 
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };

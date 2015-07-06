@@ -715,22 +715,22 @@ methods = {
         type='boolean', undoc=True),
     Config('statistics', '', r'''
         Specify the statistics to be gathered.  Choosing "all" gathers
-        statistics regardless of cost and may include traversing
-        on-disk files; "fast" gathers a subset of relatively
-        inexpensive statistics.  The selection must agree with the
-        database \c statistics configuration specified to
-        ::wiredtiger_open or WT_CONNECTION::reconfigure.  For example,
-        "all" or "fast" can be configured when the database is
-        configured with "all", but the cursor open will fail if "all"
-        is specified when the database is configured with "fast",
-        and the cursor open will fail in all cases when the database
-        is configured with "none".  If \c statistics is not configured,
-        the default configuration is the database configuration.
-        The "clear" configuration resets statistics after gathering
-        them, where appropriate (for example, a cache size statistic
-        is not cleared, while the count of cursor insert operations
-        will be cleared).  See @ref statistics for more information''',
-        type='list', choices=['all', 'fast', 'clear']),
+        statistics regardless of cost and may include traversing on-disk files;
+        "fast" gathers a subset of relatively inexpensive statistics.  The
+        selection must agree with the database \c statistics configuration
+        specified to ::wiredtiger_open or WT_CONNECTION::reconfigure.  For
+        example, "all" or "fast" can be configured when the database is
+        configured with "all", but the cursor open will fail if "all" is
+        specified when the database is configured with "fast", and the cursor
+        open will fail in all cases when the database is configured with
+        "none".  If "size" is configured, only the underlying size of the
+        object on disk is filled in and the object is not opened.  If \c
+        statistics is not configured, the default configuration is the database
+        configuration.  The "clear" configuration resets statistics after
+        gathering them, where appropriate (for example, a cache size statistic
+        is not cleared, while the count of cursor insert operations will be
+        cleared).  See @ref statistics for more information''',
+        type='list', choices=['all', 'fast', 'clear', 'size']),
     Config('target', '', r'''
         if non-empty, backup the list of objects; valid only for a
         backup data source''',
@@ -767,6 +767,11 @@ methods = {
     Config('dump_shape', 'false', r'''
         Display the shape of the tree after verification,
         using the application's message handler, intended for debugging''',
+        type='boolean'),
+    Config('strict', 'false', r'''
+        Treat any verification problem as an error; by default, verify will
+        warn, but not fail, in the case of errors that won't affect future
+        behavior (for example, a leaked block)''',
         type='boolean')
 ]),
 

@@ -48,6 +48,20 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 
 	conn = S2C(session);
 	log = conn->log;
+
+	/*
+	 * We need to wait for the previous log file to get written
+	 * to disk before we sync out the current one and advance
+	 * the LSN.  Signal the worker thread because we know the
+	 * LSN has moved into a later log file and there should be a
+	 * log file ready to close.
+	 */
+	while (log->sync_lsn.file < min_lsn->file) {
+		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
+		WT_ERR(__wt_cond_wait(
+		    session, log->log_sync_cond, 10000));
+	}
+
 	__wt_spin_lock(session, &log->log_sync_lock);
 	WT_ASSERT(session, log->log_dir_fh != NULL);
 	/*
@@ -1063,7 +1077,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * Signal the close thread if needed.
 	 */
 	if (F_ISSET(slot, SLOT_CLOSEFH))
-		WT_ERR(__wt_cond_signal(session, conn->log_close_cond));
+		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
 
 	/*
 	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock

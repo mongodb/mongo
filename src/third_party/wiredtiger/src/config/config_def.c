@@ -312,7 +312,7 @@ static const WT_CONFIG_CHECK confchk_session_open_cursor[] = {
 	{ "readonly", "boolean", NULL, NULL, NULL },
 	{ "skip_sort_check", "boolean", NULL, NULL, NULL },
 	{ "statistics", "list",
-	    NULL, "choices=[\"all\",\"fast\",\"clear\"]",
+	    NULL, "choices=[\"all\",\"fast\",\"clear\",\"size\"]",
 	    NULL },
 	{ "target", "list", NULL, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
@@ -337,6 +337,7 @@ static const WT_CONFIG_CHECK confchk_session_verify[] = {
 	{ "dump_offsets", "list", NULL, NULL, NULL },
 	{ "dump_pages", "boolean", NULL, NULL, NULL },
 	{ "dump_shape", "boolean", NULL, NULL, NULL },
+	{ "strict", "boolean", NULL, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -780,7 +781,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "session.verify",
 	  "dump_address=0,dump_blocks=0,dump_offsets=,dump_pages=0,"
-	  "dump_shape=0",
+	  "dump_shape=0,strict=0",
 	  confchk_session_verify
 	},
 	{ "table.meta",
