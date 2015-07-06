@@ -1365,8 +1365,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
             opTime.append("ts", lastOpApplied.getTimestamp());
             opTime.append("term", lastOpApplied.getTerm());
             opTime.done();
-        }
-        else {
+        } else {
             response->append("optime", lastOpApplied.getTimestamp());
         }
 
@@ -1401,8 +1400,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
                     opTime.append("ts", lastOpApplied.getTimestamp());
                     opTime.append("term", lastOpApplied.getTerm());
                     opTime.done();
-                }
-                else {
+                } else {
                     bb.append("optime", lastOpApplied.getTimestamp());
                 }
 
@@ -1457,8 +1455,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
                     opTime.append("ts", it->getOpTime().getTimestamp());
                     opTime.append("term", it->getOpTime().getTerm());
                     opTime.done();
-                }
-                else {
+                } else {
                     bb.append("optime", it->getOpTime().getTimestamp());
                 }
 

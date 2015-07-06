@@ -1526,8 +1526,7 @@ void ReplicationCoordinatorImpl::appendSlaveInfoData(BSONObjBuilder* result) {
                 opTime.append("ts", itr->opTime.getTimestamp());
                 opTime.append("term", itr->opTime.getTerm());
                 opTime.done();
-            }
-            else {
+            } else {
                 entry.append("optime", itr->opTime.getTimestamp());
             }
             entry.append("host", itr->hostAndPort.toString());
