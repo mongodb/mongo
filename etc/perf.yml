@@ -221,6 +221,5 @@ buildvariants:
     - rhel55
   - name: update
   - name: insert
-  - name: geo
   - name: misc
   - name: singleThreaded
