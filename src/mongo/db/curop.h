@@ -324,7 +324,8 @@ public:
     uint64_t getRemainingMaxTimeMicros() const;
 
     //
-    // Methods for getting/setting elapsed time.
+    // Methods for getting/setting elapsed time. Note that the observed elapsed time may be
+    // negative, if the system time has been reset during the course of this operation.
     //
 
     void ensureStarted();

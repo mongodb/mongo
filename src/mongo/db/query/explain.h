@@ -172,9 +172,8 @@ private:
      *
      * The 'totalTimeMillis' value passed here will be added to the top level of
      * the execution stats section, but will not affect the reporting of timing for
-     * individual stages. If 'totalTimeMillis' is not specified, then the default
-     * value of -1 indicates that we should only use the approximate timing information
-     * collected by the stages.
+     * individual stages. If 'totalTimeMillis' is not set, we use the approximate timing
+     * information collected by the stages.
      *
      * Stats are generated at the verbosity specified by 'verbosity'.
      *
@@ -183,7 +182,7 @@ private:
     static void generateExecStats(PlanStageStats* stats,
                                   ExplainCommon::Verbosity verbosity,
                                   BSONObjBuilder* out,
-                                  long long totalTimeMillis = -1);
+                                  boost::optional<long long> totalTimeMillis);
 
     /**
      * Adds the 'serverInfo' explain section to the BSON object being build

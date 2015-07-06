@@ -506,12 +506,12 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
 void Explain::generateExecStats(PlanStageStats* stats,
                                 ExplainCommon::Verbosity verbosity,
                                 BSONObjBuilder* out,
-                                long long totalTimeMillis) {
+                                boost::optional<long long> totalTimeMillis) {
     out->appendNumber("nReturned", stats->common.advanced);
 
     // Time elapsed could might be either precise or approximate.
-    if (totalTimeMillis >= 0) {
-        out->appendNumber("executionTimeMillis", totalTimeMillis);
+    if (totalTimeMillis) {
+        out->appendNumber("executionTimeMillis", *totalTimeMillis);
     } else {
         out->appendNumber("executionTimeMillisEstimate", stats->common.executionTimeMillis);
     }
@@ -627,7 +627,7 @@ void Explain::explainStages(PlanExecutor* exec,
             BSONArrayBuilder allPlansBob(execBob.subarrayStart("allPlansExecution"));
             for (size_t i = 0; i < allPlansStats.size(); ++i) {
                 BSONObjBuilder planBob(allPlansBob.subobjStart());
-                generateExecStats(allPlansStats[i], verbosity, &planBob);
+                generateExecStats(allPlansStats[i], verbosity, &planBob, boost::none);
                 planBob.doneFast();
             }
             allPlansBob.doneFast();
