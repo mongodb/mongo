@@ -265,7 +265,7 @@ StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort
                                                                const NamespaceString& nss,
                                                                const BSONObj& query,
                                                                const BSONObj& sort,
-                                                               boost::optional<int> limit) {
+                                                               boost::optional<long long> limit) {
     // If for some reason the callback never gets invoked, we will return this status
     Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
     vector<BSONObj> results;
@@ -289,7 +289,7 @@ StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort
     };
 
     unique_ptr<LiteParsedQuery> findCmd(
-        fassertStatusOK(28688, LiteParsedQuery::makeAsFindCmd(nss, query, sort, std::move(limit))));
+        fassertStatusOK(28688, LiteParsedQuery::makeAsFindCmd(nss, query, sort, limit)));
 
     QueryFetcher fetcher(_executor.get(), host, nss, findCmd->asFindCommand(), fetcherCallback);
 

@@ -515,8 +515,10 @@ Status CatalogManagerReplicaSet::getChunks(const BSONObj& query,
         return readHostStatus.getStatus();
     }
 
+    // Convert boost::optional<int> to boost::optional<long long>.
+    auto longLimit = limit ? boost::optional<long long>(*limit) : boost::none;
     auto findStatus = grid.shardRegistry()->exhaustiveFind(
-        readHostStatus.getValue(), NamespaceString(ChunkType::ConfigNS), query, sort, limit);
+        readHostStatus.getValue(), NamespaceString(ChunkType::ConfigNS), query, sort, longLimit);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }

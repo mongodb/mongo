@@ -271,7 +271,7 @@ public:
         BSONArrayBuilder nextBatch;
         BSONObj obj;
         PlanExecutor::ExecState state;
-        int numResults = 0;
+        long long numResults = 0;
         Status batchStatus = generateBatch(cursor, request, &nextBatch, &state, &numResults);
         if (!batchStatus.isOK()) {
             return appendCommandStatus(result, batchStatus);
@@ -361,7 +361,7 @@ public:
                          const GetMoreRequest& request,
                          BSONArrayBuilder* nextBatch,
                          PlanExecutor::ExecState* state,
-                         int* numResults) {
+                         long long* numResults) {
         PlanExecutor* exec = cursor->getExecutor();
         const bool isAwaitData = isCursorAwaitData(cursor);
 

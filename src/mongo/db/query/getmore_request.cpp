@@ -54,7 +54,7 @@ GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 
 GetMoreRequest::GetMoreRequest(NamespaceString namespaceString,
                                CursorId id,
-                               boost::optional<int> sizeOfBatch,
+                               boost::optional<long long> sizeOfBatch,
                                boost::optional<long long> term)
     : nss(std::move(namespaceString)), cursorid(id), batchSize(sizeOfBatch), term(term) {}
 
@@ -95,7 +95,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
     boost::optional<std::string> fullns;
 
     // Optional fields.
-    boost::optional<int> batchSize;
+    boost::optional<long long> batchSize;
     boost::optional<long long> term;
 
     for (BSONElement el : cmdObj) {
@@ -121,7 +121,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                         str::stream() << "Field 'batchSize' must be a number in: " << cmdObj};
             }
 
-            batchSize = el.numberInt();
+            batchSize = el.numberLong();
         } else if (str::equals(fieldName, kMaxTimeMSField)) {
             // maxTimeMS is parsed by the command handling code, so we don't repeat the parsing
             // here.

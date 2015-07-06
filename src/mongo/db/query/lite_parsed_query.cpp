@@ -53,7 +53,7 @@ const string LiteParsedQuery::metaGeoNearPoint("geoNearPoint");
 const string LiteParsedQuery::metaRecordId("recordId");
 const string LiteParsedQuery::metaIndexKey("indexKey");
 
-const int LiteParsedQuery::kDefaultBatchSize = 101;
+const long long LiteParsedQuery::kDefaultBatchSize = 101;
 
 namespace {
 
@@ -161,7 +161,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return Status(ErrorCodes::FailedToParse, ss);
             }
 
-            int skip = el.numberInt();
+            long long skip = el.numberLong();
             if (skip < 0) {
                 return Status(ErrorCodes::BadValue, "skip value must be non-negative");
             }
@@ -175,7 +175,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return Status(ErrorCodes::FailedToParse, ss);
             }
 
-            int limit = el.numberInt();
+            long long limit = el.numberLong();
             if (limit <= 0) {
                 return Status(ErrorCodes::BadValue, "limit value must be positive");
             }
@@ -189,7 +189,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return Status(ErrorCodes::FailedToParse, ss);
             }
 
-            int batchSize = el.numberInt();
+            long long batchSize = el.numberLong();
             if (batchSize < 0) {
                 return Status(ErrorCodes::BadValue, "batchSize value must be non-negative");
             }
@@ -388,10 +388,11 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsOpQuery(Namespace
 }
 
 // static
-StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(NamespaceString nss,
-                                                                       const BSONObj& query,
-                                                                       const BSONObj& sort,
-                                                                       boost::optional<int> limit) {
+StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(
+    NamespaceString nss,
+    const BSONObj& query,
+    const BSONObj& sort,
+    boost::optional<long long> limit) {
     unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
 
     pq->_fromCommand = true;
@@ -399,7 +400,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(Namespace
     pq->_sort = sort.getOwned();
 
     if (limit) {
-        if (limit <= 0) {
+        if (*limit <= 0) {
             return Status(ErrorCodes::BadValue, "limit value must be positive");
         }
 

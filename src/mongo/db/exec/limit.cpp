@@ -42,7 +42,7 @@ using stdx::make_unique;
 // static
 const char* LimitStage::kStageType = "LIMIT";
 
-LimitStage::LimitStage(int limit, WorkingSet* ws, PlanStage* child)
+LimitStage::LimitStage(long long limit, WorkingSet* ws, PlanStage* child)
     : _ws(ws), _child(child), _numToReturn(limit), _commonStats(kStageType) {
     _specificStats.limit = _numToReturn;
 }

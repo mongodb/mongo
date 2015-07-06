@@ -142,7 +142,7 @@ public:
                                                     const NamespaceString& nss,
                                                     const BSONObj& query,
                                                     const BSONObj& sort,
-                                                    boost::optional<int> limit);
+                                                    boost::optional<long long> limit);
 
     /**
      * Runs a command against the specified host and returns the result.

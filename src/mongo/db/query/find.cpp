@@ -112,14 +112,14 @@ ScopedRecoveryUnitSwapper::~ScopedRecoveryUnitSwapper() {
  * If ntoreturn is non-zero, the we stop building the first batch once we either have ntoreturn
  * results, or when the result set exceeds 4 MB.
  */
-bool enoughForFirstBatch(const LiteParsedQuery& pq, int numDocs, int bytesBuffered) {
+bool enoughForFirstBatch(const LiteParsedQuery& pq, long long numDocs, int bytesBuffered) {
     if (!pq.getBatchSize()) {
         return (bytesBuffered > 1024 * 1024) || numDocs >= LiteParsedQuery::kDefaultBatchSize;
     }
     return numDocs >= *pq.getBatchSize() || bytesBuffered > MaxBytesToReturnToClientAtOnce;
 }
 
-bool enoughForGetMore(int ntoreturn, int numDocs, int bytesBuffered) {
+bool enoughForGetMore(long long ntoreturn, long long numDocs, int bytesBuffered) {
     return (ntoreturn && numDocs >= ntoreturn) || (bytesBuffered > MaxBytesToReturnToClientAtOnce);
 }
 
@@ -178,8 +178,8 @@ bool shouldSaveCursorGetMore(PlanExecutor::ExecState finalState,
 void beginQueryOp(OperationContext* txn,
                   const NamespaceString& nss,
                   const BSONObj& queryObj,
-                  int ntoreturn,
-                  int ntoskip) {
+                  long long ntoreturn,
+                  long long ntoskip) {
     auto curop = CurOp::get(txn);
     curop->debug().query = queryObj;
     curop->debug().ntoreturn = ntoreturn;
@@ -192,7 +192,7 @@ void beginQueryOp(OperationContext* txn,
 void endQueryOp(OperationContext* txn,
                 const PlanExecutor& exec,
                 int dbProfilingLevel,
-                int numResults,
+                long long numResults,
                 CursorId cursorId) {
     auto curop = CurOp::get(txn);
 

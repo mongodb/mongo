@@ -43,7 +43,7 @@ namespace mongo {
  */
 class SkipStage : public PlanStage {
 public:
-    SkipStage(int toSkip, WorkingSet* ws, PlanStage* child);
+    SkipStage(long long toSkip, WorkingSet* ws, PlanStage* child);
     virtual ~SkipStage();
 
     virtual bool isEOF();
@@ -72,7 +72,7 @@ private:
     std::unique_ptr<PlanStage> _child;
 
     // We drop the first _toSkip results that we would have returned.
-    int _toSkip;
+    long long _toSkip;
 
     // Stats
     CommonStats _commonStats;

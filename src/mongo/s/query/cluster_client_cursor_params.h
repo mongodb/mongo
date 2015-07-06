@@ -53,16 +53,16 @@ struct ClusterClientCursorParams {
 
     // The number of results to skip. Optional. Should not be forwarded to the remote hosts in
     // 'cmdObj'.
-    boost::optional<int> skip;
+    boost::optional<long long> skip;
 
     // The number of results per batch. Optional. If specified, will be specified as the batch for
     // each
     // getMore.
-    boost::optional<int> batchSize;
+    boost::optional<long long> batchSize;
 
     // Limits the number of results returned by the ClusterClientCursor to this many. Optional.
     // Should be forwarded to the remote hosts in 'cmdObj'.
-    boost::optional<int> limit;
+    boost::optional<long long> limit;
 };
 
 }  // mongo

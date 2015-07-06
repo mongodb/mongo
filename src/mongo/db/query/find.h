@@ -67,14 +67,14 @@ private:
  *
  * Should be called *after* adding to the result set rather than before.
  */
-bool enoughForFirstBatch(const LiteParsedQuery& pq, int numDocs, int bytesBuffered);
+bool enoughForFirstBatch(const LiteParsedQuery& pq, long long numDocs, int bytesBuffered);
 
 /**
  * Returns true if enough results have been prepared to stop adding more to a getMore batch.
  *
  * Should be called *after* adding to the result set rather than before.
  */
-bool enoughForGetMore(int ntoreturn, int numDocs, int bytesBuffered);
+bool enoughForGetMore(long long ntoreturn, long long numDocs, int bytesBuffered);
 
 /**
  * Whether or not the ClientCursor* is tailable.
@@ -115,8 +115,8 @@ bool shouldSaveCursorGetMore(PlanExecutor::ExecState finalState,
 void beginQueryOp(OperationContext* txn,
                   const NamespaceString& nss,
                   const BSONObj& queryObj,
-                  int ntoreturn,
-                  int ntoskip);
+                  long long ntoreturn,
+                  long long ntoskip);
 
 /**
  * Fills out CurOp for "txn" with information regarding this query's execution.
@@ -129,7 +129,7 @@ void beginQueryOp(OperationContext* txn,
 void endQueryOp(OperationContext* txn,
                 const PlanExecutor& exec,
                 int dbProfilingLevel,
-                int numResults,
+                long long numResults,
                 CursorId cursorId);
 
 /**

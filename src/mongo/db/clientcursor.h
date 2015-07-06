@@ -170,13 +170,13 @@ public:
     }
 
     // Used by ops/query.cpp to stash how many results have been returned by a query.
-    int pos() const {
+    long long pos() const {
         return _pos;
     }
-    void incPos(int n) {
+    void incPos(long long n) {
         _pos += n;
     }
-    void setPos(int n) {
+    void setPos(long long n) {
         _pos = n;
     }
 
@@ -256,7 +256,7 @@ private:
     bool _countedYet;
 
     // How many objects have been returned by the find() so far?
-    int _pos;
+    long long _pos;
 
     // If this cursor was created by a find operation, '_query' holds the query predicate for
     // the find. If this cursor was created by a command (e.g. the aggregate command), then
