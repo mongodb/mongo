@@ -63,8 +63,8 @@ Status CatalogManagerMock::shardCollection(OperationContext* txn,
                                            const string& ns,
                                            const ShardKeyPattern& fieldsAndOrder,
                                            bool unique,
-                                           vector<BSONObj>* initPoints,
-                                           std::set<ShardId>* initShardIds) {
+                                           const vector<BSONObj>& initPoints,
+                                           const std::set<ShardId>& initShardIds) {
     return Status::OK();
 }
 

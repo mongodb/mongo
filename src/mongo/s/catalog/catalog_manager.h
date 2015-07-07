@@ -118,7 +118,8 @@ public:
      * @param fieldsAndOrder: shardKey pattern
      * @param unique: if true, ensure underlying index enforces a unique constraint.
      * @param initPoints: create chunks based on a set of specified split points.
-     * @param initShardIds: if nullptr, use primary shard as lone shard for DB.
+     * @param initShardIds: If non-empty, specifies the set of shards to assign chunks between.
+     *     Otherwise all chunks will be assigned to the primary shard for the database.
      *
      * WARNING: It's not completely safe to place initial chunks onto non-primary
      *          shards using this method because a conflict may result if multiple map-reduce
@@ -129,8 +130,8 @@ public:
                                    const std::string& ns,
                                    const ShardKeyPattern& fieldsAndOrder,
                                    bool unique,
-                                   std::vector<BSONObj>* initPoints,
-                                   std::set<ShardId>* initShardIds = nullptr) = 0;
+                                   const std::vector<BSONObj>& initPoints,
+                                   const std::set<ShardId>& initShardIds) = 0;
 
     /**
      *

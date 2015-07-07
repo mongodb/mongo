@@ -110,16 +110,25 @@ protected:
     void expectInserts(const NamespaceString nss, const std::vector<BSONObj>& expected);
 
     /**
+     * Waits for a count command and returns a response reporting the given number of documents
+     * as the result of the count, or an error.
+     */
+    void expectCount(const HostAndPort& configHost,
+                     const NamespaceString& expectedNs,
+                     const BSONObj& expectedQuery,
+                     const StatusWith<long long>& response);
+    /**
      * Wait for an operation, which creates the sharding change log collection and return the
      * specified response.
      */
-    void expectChangeLogCreate(const BSONObj& response);
+    void expectChangeLogCreate(const HostAndPort& configHost, const BSONObj& response);
 
     /**
      * Wait for a single insert in the change log collection with the specified contents and return
      * a successful response.
      */
-    void expectChangeLogInsert(const std::string& clientAddress,
+    void expectChangeLogInsert(const HostAndPort& configHost,
+                               const std::string& clientAddress,
                                Date_t timestamp,
                                const std::string& what,
                                const std::string& ns,

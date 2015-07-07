@@ -129,29 +129,6 @@ protected:
 };
 
 //
-// Tests creating a new chunk manager and creating the default chunks
-//
-class ChunkManagerCreateBasicTest : public ChunkManagerTest {
-public:
-    void run() {
-        ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
-        ChunkManager manager(collName(), shardKeyPattern, false);
-        manager.createFirstChunks(_shardId, NULL, NULL);
-
-        BSONObj firstChunk = _client.findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
-
-        ASSERT(firstChunk[ChunkType::min()].Obj()["_id"].type() == MinKey);
-        ASSERT(firstChunk[ChunkType::max()].Obj()["_id"].type() == MaxKey);
-
-        ChunkVersion version = ChunkVersion::fromBSON(firstChunk, ChunkType::DEPRECATED_lastmod());
-
-        ASSERT(version.majorVersion() == 1);
-        ASSERT(version.minorVersion() == 0);
-        ASSERT(version.isEpochSet());
-    }
-};
-
-//
 // Tests creating a new chunk manager with random split points.  Creating chunks on multiple shards
 // is not tested here since there are unresolved race conditions there and probably should be
 // avoided if at all possible.
@@ -272,7 +249,6 @@ public:
     All() : Suite("sharding") {}
 
     void setupTests() {
-        add<ChunkManagerCreateBasicTest>();
         add<ChunkManagerCreateFullTest>();
         add<ChunkManagerLoadBasicTest>();
     }

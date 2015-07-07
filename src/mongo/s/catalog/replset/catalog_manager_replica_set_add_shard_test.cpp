@@ -63,7 +63,7 @@ protected:
         CatalogManagerReplSetTestFixture::setUp();
 
         getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
-        configTargeter()->setFindHostReturnValue(HostAndPort("ConfigHost:23456"));
+        configTargeter()->setFindHostReturnValue(configHost);
     }
 
     /**
@@ -141,15 +141,18 @@ protected:
      */
     void expectAddShardChangeLog(const std::string& shardName, const std::string& shardHost) {
         // Expect the change log collection to be created
-        expectChangeLogCreate(BSON("ok" << 1));
+        expectChangeLogCreate(configHost, BSON("ok" << 1));
 
         // Expect the change log operation
-        expectChangeLogInsert("FakeRemoteClient:34567",
+        expectChangeLogInsert(configHost,
+                              "FakeRemoteClient:34567",
                               shardRegistry()->getNetwork()->now(),
                               "addShard",
                               "",
                               BSON("name" << shardName << "host" << shardHost));
     }
+
+    const HostAndPort configHost{HostAndPort("ConfigHost:23456")};
 };
 
 TEST_F(AddShardTest, AddShardStandalone) {
@@ -197,8 +200,8 @@ TEST_F(AddShardTest, AddShardStandalone) {
 
     // Make sure the shard add code checks for the presence of each of the two databases we returned
     // in the previous call, in the config server metadata
-    onFindCommand([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort("ConfigHost:23456"));
+    onFindCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, configHost);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
@@ -302,8 +305,8 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
 
     // Make sure the shard add code checks for the presence of each of the two databases we returned
     // in the previous call, in the config server metadata
-    onFindCommand([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort("ConfigHost:23456"));
+    onFindCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, configHost);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);

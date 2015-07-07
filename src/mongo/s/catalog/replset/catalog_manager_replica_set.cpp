@@ -60,7 +60,10 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
@@ -87,6 +90,7 @@ const ReadPreferenceSetting kConfigWriteSelector(ReadPreference::PrimaryOnly, Ta
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::SecondaryOnly, TagSet{});
 
 const int kNotMasterNumRetries = 3;
+const int kInitialSSVRetries = 3;
 const Milliseconds kNotMasterRetryInterval{500};
 const int kActionLogCollectionSize = 1024 * 1024 * 2;
 const int kChangeLogCollectionSize = 1024 * 1024 * 10;
@@ -137,9 +141,89 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
                                                  const string& ns,
                                                  const ShardKeyPattern& fieldsAndOrder,
                                                  bool unique,
-                                                 vector<BSONObj>* initPoints,
-                                                 set<ShardId>* initShardsIds) {
-    return notYetImplemented;
+                                                 const vector<BSONObj>& initPoints,
+                                                 const set<ShardId>& initShardIds) {
+    // Lock the collection globally so that no other mongos can try to shard or drop the collection
+    // at the same time.
+    auto scopedDistLock = getDistLockManager()->lock(ns, "shardCollection");
+    if (!scopedDistLock.isOK()) {
+        return scopedDistLock.getStatus();
+    }
+
+    StatusWith<DatabaseType> status = getDatabase(nsToDatabase(ns));
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
+
+    DatabaseType dbt = status.getValue();
+    ShardId dbPrimaryShardId = dbt.getPrimary();
+    const auto primaryShard = grid.shardRegistry()->getShard(dbPrimaryShardId);
+
+    {
+        // In 3.0 and prior we include this extra safety check that the collection is not getting
+        // sharded concurrently by two different mongos instances. It is not 100%-proof, but it
+        // reduces the chance that two invocations of shard collection will step on each other's
+        // toes.  Now we take the distributed lock so going forward this check won't be necessary
+        // but we leave it around for compatibility with other mongoses from 3.0.
+        // TODO(spencer): Remove this after 3.2 ships.
+        const auto configShard = grid.shardRegistry()->getShard("config");
+        const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
+        if (!readHost.isOK()) {
+            return readHost.getStatus();
+        }
+
+        auto countStatus = _runCountCommand(
+            readHost.getValue(), NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::ns(ns)));
+        if (!countStatus.isOK()) {
+            return countStatus.getStatus();
+        }
+        if (countStatus.getValue() > 0) {
+            return Status(ErrorCodes::AlreadyInitialized,
+                          str::stream() << "collection " << ns << " already sharded with "
+                                        << countStatus.getValue() << " chunks.");
+        }
+    }
+
+    // Record start in changelog
+    {
+        BSONObjBuilder collectionDetail;
+        collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
+        collectionDetail.append("collection", ns);
+        collectionDetail.append("primary", primaryShard->toString());
+
+        {
+            BSONArrayBuilder initialShards(collectionDetail.subarrayStart("initShards"));
+            for (const ShardId& shardId : initShardIds) {
+                initialShards.append(shardId);
+            }
+        }
+
+        collectionDetail.append("numChunks", static_cast<int>(initPoints.size() + 1));
+
+        logChange(txn->getClient()->clientAddress(true),
+                  "shardCollection.start",
+                  ns,
+                  collectionDetail.obj());
+    }
+
+    ChunkManagerPtr manager(new ChunkManager(ns, fieldsAndOrder, unique));
+    manager->createFirstChunks(dbPrimaryShardId, &initPoints, &initShardIds);
+    manager->loadExistingRanges(nullptr);
+
+    CollectionInfo collInfo;
+    collInfo.useChunkManager(manager);
+    collInfo.save(ns);
+    manager->reload(true);
+
+    // TODO(spencer) SERVER-19319: Send setShardVersion to primary shard so it knows to start
+    // rejecting unversioned writes.
+
+    BSONObj finishDetail = BSON("version"
+                                << "");  // TODO(spencer) SERVER-19319 Report actual version used
+
+    logChange(txn->getClient()->clientAddress(true), "shardCollection", ns, finishDetail);
+
+    return Status::OK();
 }
 
 StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationContext* txn,

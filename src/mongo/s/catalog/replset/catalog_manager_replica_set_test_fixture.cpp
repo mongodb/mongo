@@ -37,6 +37,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -58,7 +59,9 @@ using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
 using unittest::assertGet;
 
+using std::string;
 using std::vector;
+using unittest::assertGet;
 
 CatalogManagerReplSetTestFixture::CatalogManagerReplSetTestFixture() = default;
 
@@ -170,8 +173,6 @@ void CatalogManagerReplSetTestFixture::onFindCommand(NetworkTestEnv::OnFindComma
 }
 
 void CatalogManagerReplSetTestFixture::setupShards(const std::vector<ShardType>& shards) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
-
     auto future = launchAsync([this] { shardRegistry()->reload(); });
 
     expectGetShards(shards);
@@ -233,8 +234,10 @@ void CatalogManagerReplSetTestFixture::expectInserts(const NamespaceString nss,
     });
 }
 
-void CatalogManagerReplSetTestFixture::expectChangeLogCreate(const BSONObj& response) {
-    onCommand([&response](const RemoteCommandRequest& request) {
+void CatalogManagerReplSetTestFixture::expectChangeLogCreate(const HostAndPort& configHost,
+                                                             const BSONObj& response) {
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
         BSONObj expectedCreateCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true
                                                   << "size" << 1024 * 1024 * 10);
@@ -244,13 +247,14 @@ void CatalogManagerReplSetTestFixture::expectChangeLogCreate(const BSONObj& resp
     });
 }
 
-void CatalogManagerReplSetTestFixture::expectChangeLogInsert(const std::string& clientAddress,
+void CatalogManagerReplSetTestFixture::expectChangeLogInsert(const HostAndPort& configHost,
+                                                             const std::string& clientAddress,
                                                              Date_t timestamp,
                                                              const std::string& what,
                                                              const std::string& ns,
                                                              const BSONObj& detail) {
-    onCommand([this, &clientAddress, timestamp, &what, &ns, &detail](
-        const RemoteCommandRequest& request) {
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
         BatchedInsertRequest actualBatchedInsert;
@@ -290,6 +294,33 @@ void CatalogManagerReplSetTestFixture::expectChangeLogInsert(const std::string& 
         response.setOk(true);
 
         return response.toBSON();
+    });
+}
+
+void CatalogManagerReplSetTestFixture::expectCount(const HostAndPort& configHost,
+                                                   const NamespaceString& expectedNs,
+                                                   const BSONObj& expectedQuery,
+                                                   const StatusWith<long long>& response) {
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(configHost, request.target);
+        string cmdName = request.cmdObj.firstElement().fieldName();
+        ASSERT_EQUALS("count", cmdName);
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQUALS(expectedNs.toString(), nss.toString());
+
+        if (expectedQuery.isEmpty()) {
+            ASSERT_TRUE(request.cmdObj["query"].eoo());
+        } else {
+            ASSERT_EQUALS(expectedQuery, request.cmdObj["query"].Obj());
+        }
+
+        if (response.isOK()) {
+            return BSON("ok" << 1 << "n" << response.getValue());
+        }
+
+        BSONObjBuilder responseBuilder;
+        Command::appendCommandStatus(responseBuilder, response.getStatus());
+        return responseBuilder.obj();
     });
 }
 

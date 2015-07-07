@@ -158,6 +158,7 @@ public:
     void pickMedianKey(BSONObj& medianKey) const;
 
     /**
+     * Ask the mongod holding this chunk to figure out the split points.
      * @param splitPoints vector to be filled in
      * @param chunkSize chunk size to target in bytes
      * @param maxPoints limits the number of split points that are needed, zero is max (optional)

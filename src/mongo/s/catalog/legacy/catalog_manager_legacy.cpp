@@ -280,8 +280,8 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
                                              const string& ns,
                                              const ShardKeyPattern& fieldsAndOrder,
                                              bool unique,
-                                             vector<BSONObj>* initPoints,
-                                             set<ShardId>* initShardIds) {
+                                             const vector<BSONObj>& initPoints,
+                                             const set<ShardId>& initShardIds) {
     // Lock the collection globally so that no other mongos can try to shard or drop the collection
     // at the same time.
     auto scopedDistLock = getDistLockManager()->lock(ns, "shardCollection");
@@ -327,25 +327,20 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
     }
     collectionDetail.append("primary", dbPrimaryShardStr);
 
-    BSONArray initialShards;
-    if (initShardIds == NULL)
-        initialShards = BSONArray();
-    else {
-        BSONArrayBuilder b;
-        for (const ShardId& shardId : *initShardIds) {
-            b.append(shardId);
+    {
+        BSONArrayBuilder initialShards(collectionDetail.subarrayStart("initShards"));
+        for (const ShardId& shardId : initShardIds) {
+            initialShards.append(shardId);
         }
-        initialShards = b.arr();
     }
 
-    collectionDetail.append("initShards", initialShards);
-    collectionDetail.append("numChunks", static_cast<int>(initPoints->size() + 1));
+    collectionDetail.append("numChunks", static_cast<int>(initPoints.size() + 1));
 
     logChange(
         txn->getClient()->clientAddress(true), "shardCollection.start", ns, collectionDetail.obj());
 
     ChunkManagerPtr manager(new ChunkManager(ns, fieldsAndOrder, unique));
-    manager->createFirstChunks(dbPrimaryShardId, initPoints, initShardIds);
+    manager->createFirstChunks(dbPrimaryShardId, &initPoints, &initShardIds);
     manager->loadExistingRanges(nullptr);
 
     CollectionInfo collInfo;

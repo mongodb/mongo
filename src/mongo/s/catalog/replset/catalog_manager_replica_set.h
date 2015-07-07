@@ -64,8 +64,8 @@ public:
                            const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,
                            bool unique,
-                           std::vector<BSONObj>* initPoints,
-                           std::set<ShardId>* initShardsIds = nullptr) override;
+                           const std::vector<BSONObj>& initPoints,
+                           const std::set<ShardId>& initShardsIds) override;
 
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;

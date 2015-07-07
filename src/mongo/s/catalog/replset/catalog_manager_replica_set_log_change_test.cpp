@@ -60,16 +60,21 @@ static const stdx::chrono::seconds kFutureTimeout{5};
 using LogChangeTest = CatalogManagerReplSetTestFixture;
 
 TEST_F(LogChangeTest, NoRetryAfterSuccessfulCreate) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+    const HostAndPort configHost{"TestHost1"};
+    configTargeter()->setFindHostReturnValue(configHost);
 
     auto future = launchAsync([this] {
         catalogManager()->logChange(
             "client", "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
     });
 
-    expectChangeLogCreate(BSON("ok" << 1));
-    expectChangeLogInsert(
-        "client", network()->now(), "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
+    expectChangeLogCreate(configHost, BSON("ok" << 1));
+    expectChangeLogInsert(configHost,
+                          "client",
+                          network()->now(),
+                          "moved a chunk",
+                          "foo.bar",
+                          BSON("min" << 3 << "max" << 4));
 
     // Now wait for the logChange call to return
     future.timed_get(kFutureTimeout);
@@ -80,7 +85,8 @@ TEST_F(LogChangeTest, NoRetryAfterSuccessfulCreate) {
             "client", "moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5));
     });
 
-    expectChangeLogInsert("client",
+    expectChangeLogInsert(configHost,
+                          "client",
                           network()->now(),
                           "moved a second chunk",
                           "foo.bar",
@@ -91,7 +97,8 @@ TEST_F(LogChangeTest, NoRetryAfterSuccessfulCreate) {
 }
 
 TEST_F(LogChangeTest, NoRetryCreateIfAlreadyExists) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+    const HostAndPort configHost{"TestHost1"};
+    configTargeter()->setFindHostReturnValue(configHost);
 
     auto future = launchAsync([this] {
         catalogManager()->logChange(
@@ -101,9 +108,13 @@ TEST_F(LogChangeTest, NoRetryCreateIfAlreadyExists) {
     BSONObjBuilder createResponseBuilder;
     Command::appendCommandStatus(createResponseBuilder,
                                  Status(ErrorCodes::NamespaceExists, "coll already exists"));
-    expectChangeLogCreate(createResponseBuilder.obj());
-    expectChangeLogInsert(
-        "client", network()->now(), "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
+    expectChangeLogCreate(configHost, createResponseBuilder.obj());
+    expectChangeLogInsert(configHost,
+                          "client",
+                          network()->now(),
+                          "moved a chunk",
+                          "foo.bar",
+                          BSON("min" << 3 << "max" << 4));
 
     // Now wait for the logAction call to return
     future.timed_get(kFutureTimeout);
@@ -114,7 +125,8 @@ TEST_F(LogChangeTest, NoRetryCreateIfAlreadyExists) {
             "client", "moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5));
     });
 
-    expectChangeLogInsert("client",
+    expectChangeLogInsert(configHost,
+                          "client",
                           network()->now(),
                           "moved a second chunk",
                           "foo.bar",
@@ -125,7 +137,8 @@ TEST_F(LogChangeTest, NoRetryCreateIfAlreadyExists) {
 }
 
 TEST_F(LogChangeTest, CreateFailure) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+    const HostAndPort configHost{"TestHost1"};
+    configTargeter()->setFindHostReturnValue(configHost);
 
     auto future = launchAsync([this] {
         catalogManager()->logChange(
@@ -135,7 +148,7 @@ TEST_F(LogChangeTest, CreateFailure) {
     BSONObjBuilder createResponseBuilder;
     Command::appendCommandStatus(createResponseBuilder,
                                  Status(ErrorCodes::HostUnreachable, "socket error"));
-    expectChangeLogCreate(createResponseBuilder.obj());
+    expectChangeLogCreate(configHost, createResponseBuilder.obj());
 
     // Now wait for the logAction call to return
     future.timed_get(kFutureTimeout);
@@ -146,8 +159,9 @@ TEST_F(LogChangeTest, CreateFailure) {
             "client", "moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5));
     });
 
-    expectChangeLogCreate(BSON("ok" << 1));
-    expectChangeLogInsert("client",
+    expectChangeLogCreate(configHost, BSON("ok" << 1));
+    expectChangeLogInsert(configHost,
+                          "client",
                           network()->now(),
                           "moved a second chunk",
                           "foo.bar",

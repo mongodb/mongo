@@ -397,7 +397,7 @@ public:
         audit::logShardCollection(ClientBasic::getCurrent(), ns, proposedKey, careAboutUnique);
 
         Status status = grid.catalogManager()->shardCollection(
-            txn, ns, proposedShardKey, careAboutUnique, &initSplits);
+            txn, ns, proposedShardKey, careAboutUnique, initSplits, std::set<ShardId>{});
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }

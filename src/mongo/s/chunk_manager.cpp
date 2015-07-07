@@ -36,6 +36,9 @@
 #include <map>
 #include <set>
 
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_planner.h"
@@ -335,7 +338,6 @@ void ChunkManager::calcInitSplitsAndShards(const ShardId& primaryShardId,
                                            vector<ShardId>* shardIds) const {
     verify(_chunkMap.size() == 0);
 
-    unsigned long long numObjects = 0;
     Chunk c(this,
             _keyPattern.getKeyPattern().globalMin(),
             _keyPattern.getKeyPattern().globalMax(),
@@ -343,19 +345,24 @@ void ChunkManager::calcInitSplitsAndShards(const ShardId& primaryShardId,
 
     if (!initPoints || !initPoints->size()) {
         // discover split points
-        {
-            const auto primaryShard = grid.shardRegistry()->getShard(primaryShardId);
-            // get stats to see if there is any data
-            ScopedDbConnection shardConn(primaryShard->getConnString());
+        const auto primaryShard = grid.shardRegistry()->getShard(primaryShardId);
+        auto targetStatus =
+            primaryShard->getTargeter()->findHost({ReadPreference::PrimaryPreferred, TagSet{}});
+        uassertStatusOK(targetStatus);
 
-            numObjects = shardConn->count(getns());
-            shardConn.done();
-        }
+        NamespaceString nss(getns());
+        auto result = grid.shardRegistry()->runCommand(
+            targetStatus.getValue(), nss.db().toString(), BSON("count" << nss.coll()));
+
+        long long numObjects = 0;
+        uassertStatusOK(result.getStatus());
+        uassertStatusOK(Command::getStatusFromCommandResult(result.getValue()));
+        uassertStatusOK(bsonExtractIntegerField(result.getValue(), "n", &numObjects));
 
         if (numObjects > 0)
             c.pickSplitVector(*splitPoints, Chunk::MaxChunkSize);
 
-        // since docs alread exists, must use primary shard
+        // since docs already exists, must use primary shard
         shardIds->push_back(primaryShardId);
     } else {
         // make sure points are unique and ordered

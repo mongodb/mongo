@@ -445,7 +445,7 @@ public:
                 BSONObj sortKey = BSON("_id" << 1);
                 ShardKeyPattern sortKeyPattern(sortKey);
                 Status status = grid.catalogManager()->shardCollection(
-                    txn, finalColLong, sortKeyPattern, true, &sortedSplitPts, &outShardIds);
+                    txn, finalColLong, sortKeyPattern, true, sortedSplitPts, outShardIds);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }

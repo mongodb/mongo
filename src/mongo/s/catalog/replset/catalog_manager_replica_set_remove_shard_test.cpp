@@ -62,29 +62,7 @@ static const stdx::chrono::seconds kFutureTimeout{5};
 
 class RemoveShardTest : public CatalogManagerReplSetTestFixture {
 public:
-    void expectCount(const NamespaceString& expectedNs,
-                     const BSONObj& expectedQuery,
-                     const StatusWith<long long>& response) {
-        onCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(configHost, request.target);
-            string cmdName = request.cmdObj.firstElement().fieldName();
-            ASSERT_EQUALS("count", cmdName);
-            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQUALS(expectedNs.toString(), nss.toString());
-
-            ASSERT_EQUALS(expectedQuery, request.cmdObj["query"].Obj());
-
-            if (response.isOK()) {
-                return BSON("ok" << 1 << "n" << response.getValue());
-            }
-
-            BSONObjBuilder responseBuilder;
-            Command::appendCommandStatus(responseBuilder, response.getStatus());
-            return responseBuilder.obj();
-        });
-    }
-
-    void setUp() {
+    void setUp() override {
         CatalogManagerReplSetTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(configHost);
     }
@@ -101,7 +79,8 @@ TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
                       catalogManager()->removeShard(operationContext(), shardName));
     });
 
-    expectCount(NamespaceString(ShardType::ConfigNS),
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
                 BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
                 1);
 
@@ -117,13 +96,16 @@ TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
     });
 
     // Report that there are no other draining operations ongoing
-    expectCount(NamespaceString(ShardType::ConfigNS),
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
                 BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
                 0);
 
     // Now report that there are no other shard left
-    expectCount(
-        NamespaceString(ShardType::ConfigNS), BSON(ShardType::name() << NE << shardName), 0);
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName),
+                0);
 
     future.timed_get(kFutureTimeout);
 }
@@ -140,16 +122,20 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     });
 
     // Report that there are no other draining operations ongoing
-    expectCount(NamespaceString(ShardType::ConfigNS),
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
                 BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
                 0);
 
     // Report that there *are* other shards left
-    expectCount(
-        NamespaceString(ShardType::ConfigNS), BSON(ShardType::name() << NE << shardName), 1);
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName),
+                1);
 
     // Report that the shard is not yet marked as draining
-    expectCount(NamespaceString(ShardType::ConfigNS),
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
                 BSON(ShardType::name() << shardName << ShardType::draining(true)),
                 0);
 
@@ -195,8 +181,9 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
         return vector<BSONObj>{remainingShard.toBSON()};
     });
 
-    expectChangeLogCreate(BSON("ok" << 1));
-    expectChangeLogInsert(clientHost.toString(),
+    expectChangeLogCreate(configHost, BSON("ok" << 1));
+    expectChangeLogInsert(configHost,
+                          clientHost.toString(),
                           network()->now(),
                           "removeShard.start",
                           "",
@@ -215,24 +202,32 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
     });
 
     // Report that there are no other draining operations ongoing
-    expectCount(NamespaceString(ShardType::ConfigNS),
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
                 BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
                 0);
 
     // Report that there *are* other shards left
-    expectCount(
-        NamespaceString(ShardType::ConfigNS), BSON(ShardType::name() << NE << shardName), 1);
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName),
+                1);
 
     // Report that the shard is already marked as draining
-    expectCount(NamespaceString(ShardType::ConfigNS),
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
                 BSON(ShardType::name() << shardName << ShardType::draining(true)),
                 1);
 
     // Report that there are still chunks to drain
-    expectCount(NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(shardName)), 10);
+    expectCount(
+        configHost, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(shardName)), 10);
 
     // Report that there are no more databases to drain
-    expectCount(NamespaceString(DatabaseType::ConfigNS), BSON(DatabaseType::primary(shardName)), 0);
+    expectCount(configHost,
+                NamespaceString(DatabaseType::ConfigNS),
+                BSON(DatabaseType::primary(shardName)),
+                0);
 
     future.timed_get(kFutureTimeout);
 }
@@ -247,24 +242,32 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
     });
 
     // Report that there are no other draining operations ongoing
-    expectCount(NamespaceString(ShardType::ConfigNS),
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
                 BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
                 0);
 
     // Report that there *are* other shards left
-    expectCount(
-        NamespaceString(ShardType::ConfigNS), BSON(ShardType::name() << NE << shardName), 1);
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName),
+                1);
 
     // Report that the shard is already marked as draining
-    expectCount(NamespaceString(ShardType::ConfigNS),
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
                 BSON(ShardType::name() << shardName << ShardType::draining(true)),
                 1);
 
     // Report that there are no more chunks to drain
-    expectCount(NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(shardName)), 0);
+    expectCount(
+        configHost, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(shardName)), 0);
 
     // Report that there are still more databases to drain
-    expectCount(NamespaceString(DatabaseType::ConfigNS), BSON(DatabaseType::primary(shardName)), 5);
+    expectCount(configHost,
+                NamespaceString(DatabaseType::ConfigNS),
+                BSON(DatabaseType::primary(shardName)),
+                5);
 
     future.timed_get(kFutureTimeout);
 }
@@ -281,24 +284,32 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     });
 
     // Report that there are no other draining operations ongoing
-    expectCount(NamespaceString(ShardType::ConfigNS),
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
                 BSON(ShardType::name() << NE << shardName << ShardType::draining(true)),
                 0);
 
     // Report that there *are* other shards left
-    expectCount(
-        NamespaceString(ShardType::ConfigNS), BSON(ShardType::name() << NE << shardName), 1);
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
+                BSON(ShardType::name() << NE << shardName),
+                1);
 
     // Report that the shard is already marked as draining
-    expectCount(NamespaceString(ShardType::ConfigNS),
+    expectCount(configHost,
+                NamespaceString(ShardType::ConfigNS),
                 BSON(ShardType::name() << shardName << ShardType::draining(true)),
                 1);
 
     // Report that there are no more chunks to drain
-    expectCount(NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(shardName)), 0);
+    expectCount(
+        configHost, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(shardName)), 0);
 
     // Report that there are no more databases to drain
-    expectCount(NamespaceString(DatabaseType::ConfigNS), BSON(DatabaseType::primary(shardName)), 0);
+    expectCount(configHost,
+                NamespaceString(DatabaseType::ConfigNS),
+                BSON(DatabaseType::primary(shardName)),
+                0);
 
     // Respond to request to remove shard entry.
     onCommand([&](const RemoteCommandRequest& request) {
@@ -340,9 +351,13 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
         return vector<BSONObj>{remainingShard.toBSON()};
     });
 
-    expectChangeLogCreate(BSON("ok" << 1));
-    expectChangeLogInsert(
-        clientHost.toString(), network()->now(), "removeShard", "", BSON("shard" << shardName));
+    expectChangeLogCreate(configHost, BSON("ok" << 1));
+    expectChangeLogInsert(configHost,
+                          clientHost.toString(),
+                          network()->now(),
+                          "removeShard",
+                          "",
+                          BSON("shard" << shardName));
 
     future.timed_get(kFutureTimeout);
 }

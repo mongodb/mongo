@@ -34,7 +34,9 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/config.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/write_concern.h"
@@ -293,9 +295,6 @@ void Chunk::pickSplitVector(vector<BSONObj>& splitPoints,
                             long long chunkSize /* bytes */,
                             int maxPoints,
                             int maxObjs) const {
-    // Ask the mongod holding this chunk to figure out the split points.
-    ScopedDbConnection conn(_getShardConnectionString());
-    BSONObj result;
     BSONObjBuilder cmd;
     cmd.append("splitVector", _manager->getns());
     cmd.append("keyPattern", _manager->getShardKeyPattern().toBSON());
@@ -306,18 +305,20 @@ void Chunk::pickSplitVector(vector<BSONObj>& splitPoints,
     cmd.append("maxChunkObjects", maxObjs);
     BSONObj cmdObj = cmd.obj();
 
-    if (!conn->runCommand("admin", cmdObj, result)) {
-        conn.done();
-        ostringstream os;
-        os << "splitVector command failed: " << result;
-        uassert(13345, os.str(), 0);
-    }
+    const auto primaryShard = grid.shardRegistry()->getShard(getShardId());
+    auto targetStatus =
+        primaryShard->getTargeter()->findHost({ReadPreference::PrimaryPreferred, TagSet{}});
+    uassertStatusOK(targetStatus);
 
-    BSONObjIterator it(result.getObjectField("splitKeys"));
+    auto result = grid.shardRegistry()->runCommand(targetStatus.getValue(), "admin", cmdObj);
+
+    uassertStatusOK(result.getStatus());
+    uassertStatusOK(Command::getStatusFromCommandResult(result.getValue()));
+
+    BSONObjIterator it(result.getValue().getObjectField("splitKeys"));
     while (it.more()) {
         splitPoints.push_back(it.next().Obj().getOwned());
     }
-    conn.done();
 }
 
 void Chunk::determineSplitPoints(bool atMedian, vector<BSONObj>* splitPoints) const {

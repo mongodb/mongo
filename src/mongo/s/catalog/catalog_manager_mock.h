@@ -51,8 +51,8 @@ public:
                            const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,
                            bool unique,
-                           std::vector<BSONObj>* initPoints,
-                           std::set<ShardId>* initShardIds = nullptr) override;
+                           const std::vector<BSONObj>& initPoints,
+                           const std::set<ShardId>& initShardIds) override;
 
     StatusWith<std::string> addShard(OperationContext* txn,
                                      const std::string* shardProposedName,
