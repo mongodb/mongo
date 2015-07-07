@@ -30,9 +30,11 @@
 
 #include <asio.hpp>
 #include <boost/optional.hpp>
+#include <string>
 #include <system_error>
 #include <unordered_map>
 
+#include "mongo/base/status.h"
 #include "mongo/client/connection_pool.h"
 #include "mongo/client/remote_command_runner.h"
 #include "mongo/executor/network_interface.h"
@@ -69,6 +71,10 @@ public:
     bool inShutdown() const;
 
 private:
+
+    using ResponseStatus = TaskExecutor::ResponseStatus;
+    using NetworkInterface::RemoteCommandCompletionFn;
+
     enum class State { kReady, kRunning, kShutdown };
 
     /**
@@ -183,7 +189,6 @@ private:
 
     void _completeOperation(AsyncOp* op, const TaskExecutor::ResponseStatus& resp);
 
-    void _keepAlive(AsyncOp* op);
     void _recvMessageHeader(AsyncOp* op);
     void _recvMessageBody(AsyncOp* op);
     void _receiveResponse(AsyncOp* op);
