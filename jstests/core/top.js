@@ -22,7 +22,7 @@ var lastTop = getTop();
 
 //  return the number of operations since the last call to diffTop for the specified key
 function diffTop(key) {
-    const thisTop = getTop();
+    var thisTop = getTop();
     difference = { time  : thisTop[key].time - lastTop[key].time,
                    count : thisTop[key].count - lastTop[key].count }
     lastTop[key] = thisTop[key];
@@ -35,7 +35,7 @@ function diffTop(key) {
     return difference;
 }
 
-const numRecords = 100
+var numRecords = 100;
 
 // check stats for specified key are as expected
 var checked = { }
