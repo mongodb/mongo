@@ -41,8 +41,13 @@
 namespace mongo {
 namespace repl {
 
-RollbackSourceImpl::RollbackSourceImpl(DBClientConnection* conn, const std::string& collectionName)
-    : _conn(conn), _collectionName(collectionName), _oplog(conn, collectionName) {}
+RollbackSourceImpl::RollbackSourceImpl(GetConnectionFn getConnection,
+                                       const HostAndPort& source,
+                                       const std::string& collectionName)
+    : _getConnection(getConnection),
+      _source(source),
+      _collectionName(collectionName),
+      _oplog(getConnection, collectionName) {}
 
 const OplogInterface& RollbackSourceImpl::getOplog() const {
     return _oplog;
@@ -50,27 +55,24 @@ const OplogInterface& RollbackSourceImpl::getOplog() const {
 
 int RollbackSourceImpl::getRollbackId() const {
     bo info;
-    _conn->simpleCommand("admin", &info, "replSetGetRBID");
+    _getConnection()->simpleCommand("admin", &info, "replSetGetRBID");
     return info["rbid"].numberInt();
 }
 
 BSONObj RollbackSourceImpl::getLastOperation() const {
     const Query query = Query().sort(BSON("$natural" << -1));
-    return _conn->findOne(_collectionName, query, 0, QueryOption_SlaveOk);
+    return _getConnection()->findOne(_collectionName, query, 0, QueryOption_SlaveOk);
 }
 
 BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& filter) const {
-    return _conn->findOne(nss.toString(), filter, NULL, QueryOption_SlaveOk).getOwned();
+    return _getConnection()->findOne(nss.toString(), filter, NULL, QueryOption_SlaveOk).getOwned();
 }
 
 void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* txn,
                                                   const NamespaceString& nss) const {
     std::string errmsg;
     std::unique_ptr<DBClientConnection> tmpConn(new DBClientConnection());
-    uassert(15908,
-            errmsg,
-            tmpConn->connect(_conn->getServerHostAndPort(), errmsg) &&
-                replAuthenticate(tmpConn.get()));
+    uassert(15908, errmsg, tmpConn->connect(_source, errmsg) && replAuthenticate(tmpConn.get()));
 
     // cloner owns _conn in unique_ptr
     Cloner cloner;
@@ -83,7 +85,7 @@ void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* txn,
 
 StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfo(const NamespaceString& nss) const {
     std::list<BSONObj> info =
-        _conn->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+        _getConnection()->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
     if (info.empty()) {
         return StatusWith<BSONObj>(ErrorCodes::NoSuchKey,
                                    str::stream() << "no collection info found: " << nss.ns());

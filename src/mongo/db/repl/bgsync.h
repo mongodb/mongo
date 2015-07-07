@@ -28,15 +28,18 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/queue.h"
 
 namespace mongo {
 
+class DBClientBase;
 class OperationContext;
 
 namespace executor {
@@ -48,7 +51,6 @@ class TaskExecutor;
 namespace repl {
 
 class Member;
-class OplogReader;
 class ReplicationCoordinator;
 
 // This interface exists to facilitate easier testing;
@@ -163,8 +165,23 @@ private:
     // Production thread
     void _producerThread(executor::TaskExecutor* taskExecutor);
     void _produce(OperationContext* txn, executor::TaskExecutor* taskExecutor);
-    // Checks the criteria for rolling back and executes a rollback if warranted.
-    bool _rollbackIfNeeded(OperationContext* txn, OplogReader& r);
+
+    /**
+     * Checks the criteria for rolling back.
+     * 'getNextOperation' returns the first result of the oplog tailing query.
+     * Returns RemoteOplogStale if the oplog query has no results.
+     * Returns OplogStartMissing if we cannot find the timestamp of the last fetched operation in
+     * the remote oplog.
+     */
+    Status _checkRemoteOplogStart(stdx::function<StatusWith<BSONObj>()> getNextOperation);
+
+    /**
+     * Executes a rollback.
+     * 'getConnection' returns a connection to the sync source.
+     */
+    void _rollback(OperationContext* txn,
+                   const HostAndPort& source,
+                   stdx::function<DBClientBase*()> getConnection);
 
     // Evaluate if the current sync target is still good
     bool _shouldChangeSyncSource(const HostAndPort& syncSource);

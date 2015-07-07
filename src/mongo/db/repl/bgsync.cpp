@@ -52,6 +52,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -252,9 +253,27 @@ void BackgroundSync::_produce(OperationContext* txn, executor::TaskExecutor* tas
         return;
     }
 
-    if (_rollbackIfNeeded(txn, syncSourceReader)) {
-        stop();
-        return;
+    {
+        // Prefer host in oplog reader to _syncSourceHost because _syncSourceHost may be cleared
+        // if sync source feedback fails.
+        const HostAndPort source = syncSourceReader.getHost();
+
+        auto getNextOperation = [&syncSourceReader]() -> StatusWith<BSONObj> {
+            if (!syncSourceReader.more()) {
+                return Status(ErrorCodes::OplogStartMissing, "remote oplog start missing");
+            }
+            return syncSourceReader.nextSafe();
+        };
+        auto getConnection =
+            [&syncSourceReader]() -> DBClientBase* { return syncSourceReader.conn(); };
+
+        auto remoteOplogStartStatus = _checkRemoteOplogStart(getNextOperation);
+        if (!remoteOplogStartStatus.isOK()) {
+            log() << "starting rollback: " << remoteOplogStartStatus;
+            _rollback(txn, source, getConnection);
+            stop();
+            return;
+        }
     }
 
     while (!inShutdown()) {
@@ -387,50 +406,42 @@ void BackgroundSync::consume() {
     bufferSizeGauge.decrement(getSize(op));
 }
 
-bool BackgroundSync::_rollbackIfNeeded(OperationContext* txn, OplogReader& r) {
-    string hn = r.conn()->getServerAddress();
-
-    // Abort only when syncRollback detects we are in a unrecoverable state.
-    // In other cases, we log the message contained in the error status and retry later.
-    auto fassertRollbackStatusNoTrace = [](int msgid, const Status& status) {
-        if (status.isOK()) {
-            return;
-        }
-        if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
-            fassertNoTrace(msgid, status);
-        }
-        warning() << "rollback cannot proceed at this time (retrying later): " << status;
-    };
-
-    if (!r.more()) {
+Status BackgroundSync::_checkRemoteOplogStart(
+    stdx::function<StatusWith<BSONObj>()> getNextOperation) {
+    auto result = getNextOperation();
+    if (!result.isOK()) {
         // The GTE query from upstream returns nothing, so we're ahead of the upstream.
-        log() << "we are ahead of the sync source, will try to roll back";
-        fassertRollbackStatusNoTrace(28656,
-                                     syncRollback(txn,
-                                                  _replCoord->getMyLastOptime(),
-                                                  OplogInterfaceLocal(txn, rsOplogName),
-                                                  RollbackSourceImpl(r.conn(), rsOplogName),
-                                                  _replCoord));
-
-        return true;
+        return Status(ErrorCodes::RemoteOplogStale,
+                      "we are ahead of the sync source, will try to roll back");
     }
-
-    BSONObj o = r.nextSafe();
+    BSONObj o = result.getValue();
     OpTime opTime = extractOpTime(o);
     long long hash = o["h"].numberLong();
     if (opTime != _lastOpTimeFetched || hash != _lastFetchedHash) {
-        log() << "our last op time fetched: " << _lastOpTimeFetched;
-        log() << "source's GTE: " << opTime;
-        fassertRollbackStatusNoTrace(28657,
-                                     syncRollback(txn,
-                                                  _replCoord->getMyLastOptime(),
-                                                  OplogInterfaceLocal(txn, rsOplogName),
-                                                  RollbackSourceImpl(r.conn(), rsOplogName),
-                                                  _replCoord));
-        return true;
+        return Status(ErrorCodes::OplogStartMissing,
+                      str::stream() << "our last op time fetched: " << _lastOpTimeFetched.toString()
+                                    << ". source's GTE: " << opTime.toString());
     }
+    return Status::OK();
+}
 
-    return false;
+void BackgroundSync::_rollback(OperationContext* txn,
+                               const HostAndPort& source,
+                               stdx::function<DBClientBase*()> getConnection) {
+    // Abort only when syncRollback detects we are in a unrecoverable state.
+    // In other cases, we log the message contained in the error status and retry later.
+    auto status = syncRollback(txn,
+                               _replCoord->getMyLastOptime(),
+                               OplogInterfaceLocal(txn, rsOplogName),
+                               RollbackSourceImpl(getConnection, source, rsOplogName),
+                               _replCoord);
+    if (status.isOK()) {
+        return;
+    }
+    if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
+        fassertNoTrace(28723, status);
+    }
+    warning() << "rollback cannot proceed at this time (retrying later): " << status;
 }
 
 HostAndPort BackgroundSync::getSyncTarget() {
@@ -457,13 +468,13 @@ void BackgroundSync::stop() {
 void BackgroundSync::start(OperationContext* txn) {
     massert(16235, "going to start syncing, but buffer is not empty", _buffer.empty());
 
-    long long updatedLastAppliedHash = _readLastAppliedHash(txn);
+    long long lastFetchedHash = _readLastAppliedHash(txn);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _pause = false;
 
     // reset _last fields with current oplog data
     _lastOpTimeFetched = _replCoord->getMyLastOptime();
-    _lastFetchedHash = updatedLastAppliedHash;
+    _lastFetchedHash = lastFetchedHash;
 
     LOG(1) << "bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastFetchedHash;
 }

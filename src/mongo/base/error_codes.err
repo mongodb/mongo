@@ -137,6 +137,7 @@ error_code("XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable", 134)
 error_code("StaleTerm", 135)
 error_code("CappedPositionLost", 136)
 error_code("IncompatibleShardingConfigVersion", 137)
+error_code("RemoteOplogStale", 138)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h
