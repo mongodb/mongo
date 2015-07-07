@@ -47,6 +47,8 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -195,6 +197,34 @@ void CatalogManagerReplSetTestFixture::setupShards(const std::vector<ShardType>&
     });
 
     future.timed_get(kFutureTimeout);
+}
+
+void CatalogManagerReplSetTestFixture::expectInserts(const NamespaceString nss,
+                                                     std::vector<BSONObj> expected) {
+    onCommand([&nss, &expected](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(nss.db(), request.dbname);
+
+        BatchedInsertRequest actualBatchedInsert;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+
+        ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().toString());
+
+        auto inserted = actualBatchedInsert.getDocuments();
+        ASSERT_EQUALS(expected.size(), inserted.size());
+
+        auto itInserted = inserted.begin();
+        auto itExpected = expected.begin();
+
+        for (; itInserted != inserted.end(); itInserted++, itExpected++) {
+            ASSERT_EQ(*itExpected, *itInserted);
+        }
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+
+        return response.toBSON();
+    });
 }
 
 }  // namespace mongo

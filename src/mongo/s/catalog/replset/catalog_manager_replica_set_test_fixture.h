@@ -98,6 +98,12 @@ protected:
      */
     void setupShards(const std::vector<ShardType>& shards);
 
+    /**
+     * Wait for a single insert request and ensures that the items being inserted exactly match the
+     * expected items. Responds with a success status.
+     */
+    void expectInserts(const NamespaceString nss, std::vector<BSONObj> expected);
+
     void setUp() override;
 
     void tearDown() override;
