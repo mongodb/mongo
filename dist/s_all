@@ -67,27 +67,27 @@ run "sh ./s_prototypes"
 run "sh ./s_typedef -b"
 
 read -d '' COMMANDS <<EOM
-sh ./s_tags > ${t_pfx}tags
-sh ./s_copyright > ${t_pfx}s_copyright
-sh ./s_define > ${t_pfx}s_define
-sh ./s_typedef -c > ${t_pfx}s_typedef_c
-sh ./s_funcs > ${t_pfx}s_funcs
-sh ./s_export > ${t_pfx}s_export
-sh ./s_getopt > ${t_pfx}s_getopt
-sh ./s_label > ${t_pfx}s_label
-sh ./s_lang > ${t_pfx}s_lang
-sh ./s_longlines > ${t_pfx}s_longlines
-sh ./s_stat > ${t_pfx}_tat
-sh ./s_string > ${t_pfx}s_string
-python style.py > ${t_pfx}py_style
-sh ./s_style > ${t_pfx}s_style
-sh ./s_python > ${t_pfx}s_python
-sh ./s_whitespace > ${t_pfx}s_whitespace
-sh ./s_win > ${t_pfx}s_win
-sh ./s_docs > ${t_pfx}s_docs
+'sh ./s_tags > ${t_pfx}tags'
+'sh ./s_copyright > ${t_pfx}s_copyright'
+'sh ./s_define > ${t_pfx}s_define'
+'sh ./s_typedef -c > ${t_pfx}s_typedef_c'
+'sh ./s_funcs > ${t_pfx}s_funcs'
+'sh ./s_export > ${t_pfx}s_export'
+'sh ./s_getopt > ${t_pfx}s_getopt'
+'sh ./s_label > ${t_pfx}s_label'
+'sh ./s_lang > ${t_pfx}s_lang'
+'sh ./s_longlines > ${t_pfx}s_longlines'
+'sh ./s_stat > ${t_pfx}_tat'
+'sh ./s_string > ${t_pfx}s_string'
+'python style.py > ${t_pfx}py_style'
+'sh ./s_style > ${t_pfx}s_style'
+'sh ./s_python > ${t_pfx}s_python'
+'sh ./s_whitespace > ${t_pfx}s_whitespace'
+'sh ./s_win > ${t_pfx}s_win'
+'sh ./s_docs > ${t_pfx}s_docs'
 EOM
 
-echo "$COMMANDS" | xargs -P 0 -n 1 -I{} /bin/sh -c {}
+echo "$COMMANDS" | xargs -P 20 -n 1 -I{} /bin/sh -c {}
 
 for f in `find . -name ${t_pfx}\*`; do
 	if ! `test -s $f`; then
