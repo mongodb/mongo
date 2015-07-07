@@ -79,7 +79,7 @@ read -d '' COMMANDS <<EOM
 'sh ./s_label > ${t_pfx}s_label'
 'sh ./s_lang > ${t_pfx}s_lang'
 'sh ./s_longlines > ${t_pfx}s_longlines'
-'sh ./s_stat > ${t_pfx}_tat'
+'sh ./s_stat > ${t_pfx}_stat'
 'sh ./s_string > ${t_pfx}s_string'
 'python style.py > ${t_pfx}py_style'
 'sh ./s_python > ${t_pfx}s_python'
