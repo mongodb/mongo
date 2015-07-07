@@ -3,6 +3,28 @@
 Import("env")
 
 env.Library(
+    target='timer_stats',
+    source=[
+        'timer_stats.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+    ],
+)
+
+env.CppUnitTest(
+    target='timer_stats_test',
+    source=[
+        'timer_stats_test.cpp',
+    ],
+    LIBDEPS=[
+        'timer_stats',
+    ],
+)
+
+env.Library(
     target='top',
     source=[
         'top.cpp',

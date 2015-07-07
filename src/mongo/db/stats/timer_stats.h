@@ -57,8 +57,8 @@ public:
 
 private:
     mutable SpinLock _lock;
-    long long _num;
-    long long _totalMillis;
+    long long _num = 0;
+    long long _totalMillis = 0;
 };
 
 /**

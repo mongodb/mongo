@@ -426,7 +426,6 @@ env.Library(
         "commands/user_management_commands_common.cpp",
         "commands/write_commands/write_commands_common.cpp",
         "dbcommands_generic.cpp",
-        "stats/timer_stats.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
@@ -450,6 +449,7 @@ env.Library(
         'server_parameters',
         'startup_warnings_common',
         'stats/counters',
+        'stats/timer_stats',
     ],
 )
 
