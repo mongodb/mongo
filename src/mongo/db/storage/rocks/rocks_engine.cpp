@@ -163,14 +163,14 @@ RocksEngine::RocksEngine(const std::string& path, bool durable)
             ProcessInfo pi;
             unsigned long long memSizeMB = pi.getMemSizeMB();
             if (memSizeMB > 0) {
-                double cacheMB = memSizeMB / 2;
+                double cacheMB = memSizeMB / 3;
                 cacheSizeGB = static_cast<uint64_t>(cacheMB / 1024);
             }
             if (cacheSizeGB < 1) {
                 cacheSizeGB = 1;
             }
         }
-        _block_cache = rocksdb::NewLRUCache(cacheSizeGB * 1024 * 1024 * 1024LL, 7);
+        _block_cache = rocksdb::NewLRUCache(cacheSizeGB * 1024 * 1024 * 1024LL, 6);
     }
     _maxWriteMBPerSec = rocksGlobalOptions.maxWriteMBPerSec;
     _rateLimiter.reset(
@@ -513,6 +513,7 @@ rocksdb::Options RocksEngine::_options() const {
     // This means there is no limit on open files. Make sure to always set ulimit so that it can
     // keep all RocksDB files opened.
     options.max_open_files = -1;
+    options.optimize_filters_for_hits = true;
     options.compaction_filter_factory.reset(new PrefixDeletingCompactionFilterFactory(this));
     options.enable_thread_tracking = true;
 

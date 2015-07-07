@@ -234,11 +234,10 @@ RocksRecordStore::RocksRecordStore(const StringData& ns,
     // load metadata
     _numRecords.store(_counterManager->loadCounter(_numRecordsKey));
     _dataSize.store(_counterManager->loadCounter(_dataSizeKey));
-    invariant(_dataSize.load() >= 0);
-    invariant(_numRecords.load() >= 0);
 
-    if (!emptyCollection && !_counterManager->crashSafe() &&
-        _numRecords.load() < kCollectionScanOnCreationThreshold) {
+    if ((!emptyCollection && !_counterManager->crashSafe() &&
+         _numRecords.load() < kCollectionScanOnCreationThreshold) ||
+        _numRecords.load() < 0 || _dataSize.load() < 0) {
         LOG(1) << "doing scan of collection " << ns << " to get info";
 
         _numRecords.store(0);
@@ -309,14 +308,16 @@ void RocksRecordStore::deleteRecord(OperationContext* txn, const RecordId& dl) {
 
 long long RocksRecordStore::dataSize(OperationContext* txn) const {
     RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-    return _dataSize.load(std::memory_order::memory_order_relaxed) +
-        ru->getDeltaCounter(_dataSizeKey);
+    return std::max(_dataSize.load(std::memory_order::memory_order_relaxed) +
+                        ru->getDeltaCounter(_dataSizeKey),
+                    static_cast<long long>(0));
 }
 
 long long RocksRecordStore::numRecords(OperationContext* txn) const {
     RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-    return _numRecords.load(std::memory_order::memory_order_relaxed) +
-        ru->getDeltaCounter(_numRecordsKey);
+    return std::max(_numRecords.load(std::memory_order::memory_order_relaxed) +
+                        ru->getDeltaCounter(_numRecordsKey),
+                    static_cast<long long>(0));
 }
 
 bool RocksRecordStore::cappedAndNeedDelete(long long dataSizeDelta,

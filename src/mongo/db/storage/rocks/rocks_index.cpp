@@ -140,15 +140,6 @@ public:
         return _loc == other._loc;
     }
 
-    virtual void advance() {
-        // Advance on a cursor at the end is a no-op
-        if (isEOF()) {
-            return;
-        }
-        advanceCursor();
-        updatePosition();
-    }
-
     bool locate(const BSONObj& key, const RecordId& loc) {
         const BSONObj finalKey = stripFieldNames(key);
 
@@ -355,6 +346,15 @@ public:
         query->resetToKey(key, _order, loc);
     }
 
+    virtual void advance() {
+        // Advance on a cursor at the end is a no-op
+        if (isEOF()) {
+            return;
+        }
+        advanceCursor();
+        updatePosition();
+    }
+
     virtual bool _locate(const KeyString& query, RecordId loc) {
         // loc already encoded in _key
         return seekCursor(query);
@@ -372,49 +372,107 @@ class RocksUniqueCursor : public RocksCursorBase {
 public:
     RocksUniqueCursor(
         OperationContext* txn, rocksdb::DB* db, std::string prefix, bool forward, Ordering order)
-        : RocksCursorBase(txn, db, prefix, forward, order) {}
+        : RocksCursorBase(txn, db, prefix, forward, order), _recordsIndex(0) {}
 
     virtual void fillQuery(const BSONObj& key, RecordId loc, KeyString* query) const {
         query->resetToKey(key, _order);  // loc doesn't go in _query for unique indexes
     }
 
     virtual bool _locate(const KeyString& query, RecordId loc) {
+        resetValue();
         if (!seekCursor(query)) {
             // If didn't seek to exact key, start at beginning of wherever we ended up.
             return false;
         }
         dassert(!isEOF());
 
-        // If we get here we need to look at the actual RecordId for this key and make sure
-        // we are supposed to see it.
+        if (loc.isNull()) {
+            // Null loc means means start and beginning or end of array as needed.
+            // so nothing to do
+            return true;
+        }
 
-        auto value = _iterator->value();
-        BufReader br(value.data(), value.size());
-        RecordId locInIndex = KeyString::decodeRecordId(&br);
-
-        if ((_forward && (locInIndex < loc)) || (!_forward && (locInIndex > loc))) {
-            advanceCursor();
+        // If we get here we need to make sure we are positioned at the correct point of the
+        // _records vector.
+        if (_forward) {
+            while (getLoc() < loc) {
+                _recordsIndex++;
+                if (_recordsIndex == _records.size()) {
+                    // This means we exhausted the scan and didn't find a record in range.
+                    resetValue();
+                    advanceCursor();
+                    return false;
+                }
+            }
+        } else {
+            while (getLoc() > loc) {
+                _recordsIndex++;
+                if (_recordsIndex == _records.size()) {
+                    resetValue();
+                    advanceCursor();
+                    return false;
+                }
+            }
         }
 
         return true;
     }
 
-    void updateLocAndTypeBits() {
-        // We assume that cursors can only ever see unique indexes in their "pristine"
-        // state,
-        // where no duplicates are possible. The cases where dups are allowed should hold
-        // sufficient locks to ensure that no cursor ever sees them.
+    virtual void updateLocAndTypeBits() {
+        loadValueIfNeeded();
+        _loc = _records[_recordsIndex].first;
+        _typeBits = _records[_recordsIndex].second;
+    }
+
+    virtual void advance() {
+        // Advance on a cursor at the end is a no-op
+        if (isEOF()) {
+            return;
+        }
+
+        loadValueIfNeeded();
+        _recordsIndex++;
+        if (_recordsIndex == _records.size()) {
+            resetValue();
+            advanceCursor();
+            updatePosition();
+        } else {
+            updateLocAndTypeBits();
+        }
+    }
+
+private:
+    RecordId getLoc() {
+        updateLocAndTypeBits();
+        return _loc;
+    }
+
+    void resetValue() {
+        _records.clear();
+    }
+
+    void loadValueIfNeeded() {
+        if (!_records.empty()) {
+            return;
+        }
+
+        _recordsIndex = 0;
 
         auto value = _iterator->value();
         BufReader br(value.data(), value.size());
-        _loc = KeyString::decodeRecordId(&br);
-        _typeBits.resetFromBuffer(&br);
+        while (br.remaining()) {
+            RecordId loc = KeyString::decodeRecordId(&br);
+            _records.emplace_back(loc, KeyString::TypeBits::fromBuffer(&br));
+        }
+        invariant(!_records.empty());
 
-        if (!br.atEof()) {
-            severe() << "Unique index cursor seeing multiple records for key " << getKey();
-            fassertFailed(28609);
+        if (!_forward) {
+            std::reverse(_records.begin(), _records.end());
         }
     }
+
+    mutable size_t _recordsIndex;
+    mutable std::vector<std::pair<RecordId, KeyString::TypeBits>> _records;
 };
 
 }  // namespace
