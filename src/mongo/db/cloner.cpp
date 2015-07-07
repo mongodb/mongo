@@ -347,7 +347,8 @@ namespace mongo {
         if ( !collection ) {
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 WriteUnitOfWork wunit(txn);
-                Status s = userCreateNS(txn, db, to_collection.toString(), from_opts, logForRepl, false);
+                Status s = userCreateNS(txn, db, to_collection.toString(), 
+                                        from_opts, logForRepl, false);
                 invariant(s.isOK());
                 collection = db->getCollection(to_collection);
                 invariant(collection);
@@ -420,10 +421,10 @@ namespace mongo {
         if (!collList.empty()) {
             invariant(collList.size() <= 1);
             BSONObj col = collList.front();
+            options = col.getObjectField("options");
             if (col["options"].isABSONObj()) {
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                     WriteUnitOfWork wunit(txn);
-                    options = col["options"].Obj();
                     Status status = userCreateNS(txn, db, ns, options, logForRepl, 0);
                     if ( !status.isOK() ) {
                         errmsg = status.toString();
