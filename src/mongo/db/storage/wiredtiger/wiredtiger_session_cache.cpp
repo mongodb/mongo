@@ -108,7 +108,7 @@ namespace mongo {
     void WiredTigerSession::closeAllCursors() {
         invariant(_session);
         for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
-            WT_CURSOR *cursor = i->_cursor;
+            WT_CURSOR* cursor = i->_cursor;
             if (cursor) {
                 invariantWTOK(cursor->close(cursor));
             }
@@ -118,7 +118,6 @@ namespace mongo {
 
     namespace {
         AtomicUInt64 nextCursorId(1);
-        AtomicUInt64 sessionsInCache(0);
     }
     // static
     uint64_t WiredTigerSession::genCursorId() {
@@ -128,14 +127,10 @@ namespace mongo {
     // -----------------------
 
     WiredTigerSessionCache::WiredTigerSessionCache(WiredTigerKVEngine* engine)
-        : _engine(engine), _conn(engine->getConnection()),
-          _shuttingDown(0), _sessionsOut(0), _highWaterMark(1) {
-    }
+        : _engine(engine), _conn(engine->getConnection()), _shuttingDown(0) {}
 
     WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn)
-        : _engine(NULL), _conn(conn),
-          _shuttingDown(0), _sessionsOut(0), _highWaterMark(1) {
-    }
+        : _engine(NULL), _conn(conn), _shuttingDown(0) {}
 
     WiredTigerSessionCache::~WiredTigerSessionCache() {
         shuttingDown();
@@ -161,7 +156,7 @@ namespace mongo {
 
         {
             boost::lock_guard<SpinLock> lock(_cacheLock);
-            _epoch++;
+            _epoch.fetchAndAdd(1);
             _sessions.swap(swap);
         }
 
@@ -177,11 +172,6 @@ namespace mongo {
         // operations should be allowed to start.
         invariant(!_shuttingDown.loadRelaxed());
 
-        // Set the high water mark if we need to
-        if (_sessionsOut.fetchAndAdd(1) > _highWaterMark.load()) {
-            _highWaterMark.store(_sessionsOut.load());
-        }
-
         {
             boost::lock_guard<SpinLock> lock(_cacheLock);
             if (!_sessions.empty()) {
@@ -189,13 +179,12 @@ namespace mongo {
                 // discarding older ones
                 WiredTigerSession* cachedSession = _sessions.back();
                 _sessions.pop_back();
-                sessionsInCache.fetchAndSubtract(1);
                 return cachedSession;
             }
        }
 
         // Outside of the cache partition lock, but on release will be put back on the cache
-        return new WiredTigerSession(_conn, _epoch);
+        return new WiredTigerSession(_conn, _epoch.load());
     }
 
     void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
@@ -220,30 +209,22 @@ namespace mongo {
             invariant(range == 0);
         }
 
-        _sessionsOut.fetchAndSubtract(1);
- 
         bool returnedToCache = false;
-        invariant(session->_getEpoch() <= _epoch);
+        uint64_t currentEpoch = _epoch.load();
 
-        // Only return sessions until we hit the maximum number of sessions we have ever seen demand
-        // for concurrently. We also want to immediately delete any session that is from a
-        // non-current epoch.
-        if (sessionsInCache.load() < _highWaterMark.load()) {
+        if (session->_getEpoch() == currentEpoch) {  // check outside of lock to reduce contention
             boost::lock_guard<SpinLock> lock(_cacheLock);
-            if (session->_getEpoch() == _epoch) {
+            if (session->_getEpoch() == _epoch.load()) {  // recheck inside the lock for correctness
                 returnedToCache = true;
                 _sessions.push_back(session);
             }
-        }
+        } else
+            invariant(session->_getEpoch() < currentEpoch);
 
-        if (returnedToCache) {
-            sessionsInCache.fetchAndAdd(1);
-        } else {
+        if (!returnedToCache)
             delete session;
-        }
 
-        if (_engine && _engine->haveDropsQueued()) {
+        if (_engine && _engine->haveDropsQueued())
             _engine->dropAllQueued();
-        }
     }
 }
