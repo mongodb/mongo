@@ -55,7 +55,8 @@ test "$reconf" -eq 0 || {
 	run "sh ./reconf" "Rebuilding GNU tools library support")
 }
 
-# Non parallelizable commands
+# Non parallelizable scripts The following scripts either modify files or
+# already parallelize internally.
 run "sh ./s_readme $force"
 run "python api_config.py"
 run "python api_err.py"
@@ -65,10 +66,11 @@ run "python stat.py"
 run "python java_doc.py"
 run "sh ./s_prototypes"
 run "sh ./s_typedef -b"
+run "sh ./s_copyright"
+run "sh ./s_style"
 
 read -d '' COMMANDS <<EOM
 'sh ./s_tags > ${t_pfx}tags'
-'sh ./s_copyright > ${t_pfx}s_copyright'
 'sh ./s_define > ${t_pfx}s_define'
 'sh ./s_typedef -c > ${t_pfx}s_typedef_c'
 'sh ./s_funcs > ${t_pfx}s_funcs'
@@ -80,7 +82,6 @@ read -d '' COMMANDS <<EOM
 'sh ./s_stat > ${t_pfx}_tat'
 'sh ./s_string > ${t_pfx}s_string'
 'python style.py > ${t_pfx}py_style'
-'sh ./s_style > ${t_pfx}s_style'
 'sh ./s_python > ${t_pfx}s_python'
 'sh ./s_whitespace > ${t_pfx}s_whitespace'
 'sh ./s_win > ${t_pfx}s_win'
