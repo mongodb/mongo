@@ -9,4 +9,4 @@ cd ..
 find bench examples ext src test \
     -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
 sed -e '/Makefile.in/d' -e '/build_win\/wiredtiger_config.h/d' |
-xargs -P 0 -n 1 -I{} sh ./dist/s_style.one {}
+xargs -P 20 -n 1 -I{} sh ./dist/s_style.one {}
