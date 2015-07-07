@@ -234,18 +234,8 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
     log() << "election succeeded, assuming primary role";
     _performPostMemberStateUpdateAction(kActionWinElection);
 
-    _electionWinnerDeclarer.reset(new ElectionWinnerDeclarer);
-    StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _electionWinnerDeclarer->start(
-        &_replExecutor,
-        _rsConfig.getReplSetName(),
-        _rsConfig.getMemberAt(_selfIndex).getId(),
-        _topCoord->getTerm(),
-        _topCoord->getMaybeUpHostAndPorts(),
-        stdx::bind(&ReplicationCoordinatorImpl::_onElectionWinnerDeclarerComplete, this));
-    if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return;
-    }
-    fassert(28644, nextPhaseEvh.getStatus());
+    _voteRequester.reset(nullptr);
+    _replExecutor.signalEvent(_electionFinishedEvent);
     lossGuard.dismiss();
 }
 

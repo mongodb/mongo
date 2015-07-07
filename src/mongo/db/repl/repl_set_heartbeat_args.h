@@ -101,22 +101,22 @@ public:
     /**
      * The below methods check whether or not value in the method name has been set.
      */
-    bool hasCheckEmpty() {
+    bool hasCheckEmpty() const {
         return _hasCheckEmpty;
     }
-    bool hasProtocolVersion() {
+    bool hasProtocolVersion() const {
         return _hasProtocolVersion;
     }
-    bool hasConfigVersion() {
+    bool hasConfigVersion() const {
         return _hasConfigVersion;
     }
-    bool hasSenderId() {
+    bool hasSenderId() const {
         return _hasSenderId;
     }
-    bool hasSetName() {
+    bool hasSetName() const {
         return _hasSetName;
     }
-    bool hasSenderHost() {
+    bool hasSenderHost() const {
         return _hasSenderHost;
     }
 

@@ -106,6 +106,7 @@ void ReplSetHeartbeatArgsV1::setConfigVersion(long long newVal) {
 
 void ReplSetHeartbeatArgsV1::setSenderHost(const HostAndPort& newVal) {
     _senderHost = newVal;
+    _hasSender = true;
 }
 
 void ReplSetHeartbeatArgsV1::setSenderId(long long newVal) {

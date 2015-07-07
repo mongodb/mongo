@@ -660,6 +660,12 @@ bool replHasDatabases(OperationContext* txn) {
     return false;
 }
 
+const std::string kHeartbeatConfigVersion = "configVersion";
+
+bool isHeartbeatRequestV1(const BSONObj& cmdObj) {
+    return cmdObj.hasField(kHeartbeatConfigVersion);
+}
+
 }  // namespace
 
 MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
@@ -695,7 +701,9 @@ public:
                 mp->tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
         }
 
-        if (getGlobalReplicationCoordinator()->isV1ElectionProtocol()) {
+        // Process heartbeat based on the version of request. The missing fields in mismatched
+        // version will be empty.
+        if (isHeartbeatRequestV1(cmdObj)) {
             ReplSetHeartbeatArgsV1 args;
             status = args.initialize(cmdObj);
             if (status.isOK()) {
