@@ -130,7 +130,7 @@ bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, str
 
     // can get rid of this if we make response handling smarter
     dbResponse.response->concat();
-    response = *dbResponse.response;
+    response = std::move(*dbResponse.response);
 
     return true;
 }

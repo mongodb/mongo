@@ -32,10 +32,11 @@
 #include <cstdint>
 #include <vector>
 
-#include "mongo/platform/atomic_word.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/encoded_value_storage.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
@@ -336,6 +337,7 @@ inline int ConstView::dataLen() const {
 }  // namespace MsgData
 
 class Message {
+    MONGO_DISALLOW_COPYING(Message);
 public:
     // we assume here that a vector with initial size 0 does no allocation (0 is the default, but
     // wanted to make it explicit).
@@ -343,8 +345,8 @@ public:
     Message(void* data, bool freeIt) : _buf(0), _data(0), _freeIt(false) {
         _setData(reinterpret_cast<char*>(data), freeIt);
     };
-    Message(Message& r) : _buf(0), _data(0), _freeIt(false) {
-        *this = r;
+    Message(Message&& r) : _buf(0), _data(0), _freeIt(false) {
+        *this = std::move(r);
     }
     ~Message() {
         reset();
@@ -410,8 +412,10 @@ public:
         _setData(buf, true);
     }
 
+    friend void swap(Message& other);
+
     // vector swap() so this is fast
-    Message& operator=(Message& r) {
+    Message& operator=(Message&& r) {
         verify(empty());
         verify(r._freeIt);
         _buf = r._buf;

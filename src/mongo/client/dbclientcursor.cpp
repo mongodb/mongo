@@ -116,7 +116,8 @@ void DBClientCursor::_assembleInit(Message& toSend) {
         bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
 
         if (_isCommand && hasValidNToReturnForCommand && hasValidFlagsForCommand) {
-            toSend = *assembleCommandRequest(_client, nsToDatabaseSubstring(ns), opts, query);
+            toSend =
+                std::move(*assembleCommandRequest(_client, nsToDatabaseSubstring(ns), opts, query));
             return;
         }
         assembleQueryRequest(ns, query, nextBatchSize(), nToSkip, fieldsToReturn, opts, toSend);
