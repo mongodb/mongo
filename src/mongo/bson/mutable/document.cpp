@@ -29,7 +29,6 @@
 
 #include "mongo/bson/mutable/document.h"
 
-#include <boost/static_assert.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -467,7 +466,7 @@ struct ElementRep {
 };
 #pragma pack(pop)
 
-BOOST_STATIC_ASSERT(sizeof(ElementRep) == 32);
+static_assert(sizeof(ElementRep) == 32, "sizeof(ElementRep) == 32");
 
 // We want ElementRep to be a POD so Document::Impl can grow the std::vector with
 // memmove.

@@ -40,7 +40,7 @@ using std::iostream;
 using std::string;
 using std::vector;
 
-BOOST_STATIC_ASSERT(sizeof(Extent) - 4 == 48 + 128);
+static_assert(sizeof(Extent) - 4 == 48 + 128, "sizeof(Extent) - 4 == 48 + 128");
 
 BSONObj Extent::dump() const {
     return BSON("loc" << myLoc.toString() << "xnext" << xnext.toString() << "xprev"

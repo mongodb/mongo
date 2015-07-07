@@ -322,8 +322,8 @@ public:
                                             (unsigned)i,
                                             seed + i,
                                             &pinger,
-                                            boost::ref(cmdObj),
-                                            boost::ref(*(results[i].get()))))));
+                                            stdx::ref(cmdObj),
+                                            stdx::ref(*(results[i].get()))))));
         }
 
         sleepsecs(wait / 1000);

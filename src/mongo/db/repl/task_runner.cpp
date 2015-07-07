@@ -32,7 +32,6 @@
 
 #include "mongo/db/repl/task_runner.h"
 
-#include <boost/thread/locks.hpp>
 #include <memory>
 
 #include "mongo/db/operation_context.h"

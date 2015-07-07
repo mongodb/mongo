@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/static_assert.hpp>
 #include <cstdint>
 #include <string>
 #include <limits>
@@ -173,7 +172,8 @@ const char* resourceTypeName(ResourceType resourceType);
 class ResourceId {
     // We only use 3 bits for the resource type in the ResourceId hash
     enum { resourceTypeBits = 3 };
-    BOOST_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
+    static_assert(ResourceTypesCount <= (1 << resourceTypeBits),
+                  "ResourceTypesCount <= (1 << resourceTypeBits)");
 
 public:
     /**
@@ -236,7 +236,7 @@ private:
 #ifndef MONGO_CONFIG_DEBUG_BUILD
 // Treat the resource ids as 64-bit integers in release mode in order to ensure we do
 // not spend too much time doing comparisons for hashing.
-BOOST_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
+static_assert(sizeof(ResourceId) == sizeof(uint64_t), "sizeof(ResourceId) == sizeof(uint64_t)");
 #endif
 
 

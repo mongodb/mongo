@@ -1452,7 +1452,7 @@ public:
 template <bool fpInjected, bool fpEnabled>
 class FailPointTest : public B {
 public:
-    BOOST_STATIC_ASSERT(fpInjected || !fpEnabled);
+    static_assert(fpInjected || !fpEnabled, "fpInjected || !fpEnabled");
 
     FailPointTest() : B(), _value(0) {
         if (fpEnabled) {

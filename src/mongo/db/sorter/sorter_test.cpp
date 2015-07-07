@@ -477,8 +477,10 @@ public:
 
     SortOptions adjustSortOptions(SortOptions opts) {
         // Make sure we use a reasonable number of files when we spill
-        BOOST_STATIC_ASSERT((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 50);
-        BOOST_STATIC_ASSERT((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500);
+        static_assert((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 50,
+                      "(NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 50");
+        static_assert((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500,
+                      "(NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500");
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed();
     }
@@ -514,13 +516,17 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
     typedef LotsOfDataLittleMemory<Random> Parent;
     SortOptions adjustSortOptions(SortOptions opts) {
         // Make sure our tests will spill or not as desired
-        BOOST_STATIC_ASSERT(MEM_LIMIT / 2 > (100 * sizeof(IWPair)));
-        BOOST_STATIC_ASSERT(MEM_LIMIT < (5000 * sizeof(IWPair)));
-        BOOST_STATIC_ASSERT(MEM_LIMIT * 2 > (5000 * sizeof(IWPair)));
+        static_assert(MEM_LIMIT / 2 > (100 * sizeof(IWPair)),
+                      "MEM_LIMIT / 2 > (100 * sizeof(IWPair))");
+        static_assert(MEM_LIMIT < (5000 * sizeof(IWPair)), "MEM_LIMIT < (5000 * sizeof(IWPair))");
+        static_assert(MEM_LIMIT * 2 > (5000 * sizeof(IWPair)),
+                      "MEM_LIMIT * 2 > (5000 * sizeof(IWPair))");
 
         // Make sure we use a reasonable number of files when we spill
-        BOOST_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 100);
-        BOOST_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500);
+        static_assert((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 100,
+                      "(Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 100");
+        static_assert((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500,
+                      "(Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500");
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed().Limit(Limit);
     }

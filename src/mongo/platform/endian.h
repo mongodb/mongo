@@ -27,12 +27,10 @@
 
 #pragma once
 
-#include <boost/static_assert.hpp>
-#include <boost/mpl/if.hpp>
-#include <boost/type_traits/is_signed.hpp>
 #include <climits>
 #include <cstdint>
 #include <cstring>
+#include <type_traits>
 
 #include "mongo/config.h"
 
@@ -345,7 +343,7 @@ struct ByteOrderConverter<float> {
     typedef float T;
 
     inline static T nativeToBig(T t) {
-        BOOST_STATIC_ASSERT(sizeof(T) == sizeof(uint32_t));
+        static_assert(sizeof(T) == sizeof(uint32_t), "sizeof(T) == sizeof(uint32_t)");
 
         uint32_t temp;
         std::memcpy(&temp, &t, sizeof(t));
@@ -384,7 +382,7 @@ struct ByteOrderConverter<double> {
     typedef double T;
 
     inline static T nativeToBig(T t) {
-        BOOST_STATIC_ASSERT(sizeof(T) == sizeof(uint64_t));
+        static_assert(sizeof(T) == sizeof(uint64_t), "sizeof(T) == sizeof(uint64_t)");
 
         uint64_t temp;
         std::memcpy(&temp, &t, sizeof(t));
@@ -428,31 +426,32 @@ struct IntegralTypeMap {
 
 template <>
 struct IntegralTypeMap<signed char> {
-    BOOST_STATIC_ASSERT(CHAR_BIT == 8);
+    static_assert(CHAR_BIT == 8, "CHAR_BIT == 8");
     typedef int8_t type;
 };
 
 template <>
 struct IntegralTypeMap<unsigned char> {
-    BOOST_STATIC_ASSERT(CHAR_BIT == 8);
+    static_assert(CHAR_BIT == 8, "CHAR_BIT == 8");
     typedef uint8_t type;
 };
 
 template <>
 struct IntegralTypeMap<char> {
-    BOOST_STATIC_ASSERT(CHAR_BIT == 8);
-    typedef boost::mpl::if_c<boost::is_signed<char>::value, int8_t, uint8_t>::type type;
+    static_assert(CHAR_BIT == 8, "CHAR_BIT == 8");
+    typedef std::conditional<std::is_signed<char>::value, int8_t, uint8_t>::type type;
 };
 
 template <>
 struct IntegralTypeMap<long long> {
-    BOOST_STATIC_ASSERT(sizeof(long long) == sizeof(int64_t));
+    static_assert(sizeof(long long) == sizeof(int64_t), "sizeof(long long) == sizeof(int64_t)");
     typedef int64_t type;
 };
 
 template <>
 struct IntegralTypeMap<unsigned long long> {
-    BOOST_STATIC_ASSERT(sizeof(unsigned long long) == sizeof(uint64_t));
+    static_assert(sizeof(unsigned long long) == sizeof(uint64_t),
+                  "sizeof(unsigned long long) == sizeof(uint64_t)");
     typedef uint64_t type;
 };
 

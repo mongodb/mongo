@@ -29,7 +29,6 @@
 
 #include <iostream>
 
-#include <boost/static_assert.hpp>
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"

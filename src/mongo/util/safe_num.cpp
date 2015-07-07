@@ -26,7 +26,6 @@
  */
 
 #include <sstream>
-#include <boost/static_assert.hpp>
 
 #include "mongo/platform/basic.h"
 #undef MONGO_PCH_WHITELISTED  // for malloc/realloc/INFINITY pulled from bson
@@ -182,7 +181,7 @@ SafeNum addInt32Int32(int lInt32, int rInt32) {
     // otherwise, we retain the 64-bit result.
 
     // This algorithm is only correct if sizeof(long long) > sizeof(int)
-    BOOST_STATIC_ASSERT(sizeof(long long) > sizeof(int));
+    static_assert(sizeof(long long) > sizeof(int), "sizeof(long long) > sizeof(int)");
 
     const long long int result =
         static_cast<long long int>(lInt32) + static_cast<long long int>(rInt32);
@@ -226,7 +225,7 @@ SafeNum mulInt32Int32(int lInt32, int rInt32) {
     // otherwise, we retain the 64-bit result.
 
     // This algorithm is only correct if sizeof(long long) >= (2 * sizeof(int))
-    BOOST_STATIC_ASSERT(sizeof(long long) >= (2 * sizeof(int)));
+    static_assert(sizeof(long long) >= (2 * sizeof(int)), "sizeof(long long) >= (2 * sizeof(int))");
 
     const long long int result =
         static_cast<long long int>(lInt32) * static_cast<long long int>(rInt32);

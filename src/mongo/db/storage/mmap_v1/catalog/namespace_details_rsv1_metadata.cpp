@@ -38,8 +38,10 @@ namespace mongo {
 using std::unique_ptr;
 using std::numeric_limits;
 
-BOOST_STATIC_ASSERT(RecordStoreV1Base::Buckets ==
-                    NamespaceDetails::SmallBuckets + NamespaceDetails::LargeBuckets);
+static_assert(RecordStoreV1Base::Buckets ==
+                  NamespaceDetails::SmallBuckets + NamespaceDetails::LargeBuckets,
+              "RecordStoreV1Base::Buckets == NamespaceDetails::SmallBuckets + "
+              "NamespaceDetails::LargeBuckets");
 
 NamespaceDetailsRSV1MetaData::NamespaceDetailsRSV1MetaData(StringData ns, NamespaceDetails* details)
     : _ns(ns.toString()), _details(details) {}

@@ -148,8 +148,10 @@ unsigned remapFileToStartAt;
 enum { DurStatsResetIntervalMillis = 3 * 1000 };
 
 // Size sanity checks
-BOOST_STATIC_ASSERT(UncommittedBytesLimit > BSONObjMaxInternalSize * 3);
-BOOST_STATIC_ASSERT(sizeof(void*) == 4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6);
+static_assert(UncommittedBytesLimit > BSONObjMaxInternalSize * 3,
+              "UncommittedBytesLimit > BSONObjMaxInternalSize * 3");
+static_assert(sizeof(void*) == 4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6,
+              "sizeof(void*) == 4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6");
 
 
 /**

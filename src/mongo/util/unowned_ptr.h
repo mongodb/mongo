@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/static_assert.hpp>
 #include <memory>
 #include <type_traits>
 

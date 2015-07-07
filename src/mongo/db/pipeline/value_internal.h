@@ -310,6 +310,6 @@ public:
         long long i64[2];
     };
 };
-BOOST_STATIC_ASSERT(sizeof(ValueStorage) == 16);
+static_assert(sizeof(ValueStorage) == 16, "sizeof(ValueStorage) == 16");
 #pragma pack()
 }

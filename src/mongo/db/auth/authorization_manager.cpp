@@ -32,7 +32,6 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 
-#include <boost/bind.hpp>
 #include <memory>
 #include <string>
 #include <vector>

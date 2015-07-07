@@ -86,9 +86,10 @@ const int RecordStoreV1Base::bucketSizes[] = {
 };
 
 // If this fails, it means that bucketSizes doesn't have the correct number of entries.
-BOOST_STATIC_ASSERT(sizeof(RecordStoreV1Base::bucketSizes) /
-                        sizeof(RecordStoreV1Base::bucketSizes[0]) ==
-                    RecordStoreV1Base::Buckets);
+static_assert(sizeof(RecordStoreV1Base::bucketSizes) / sizeof(RecordStoreV1Base::bucketSizes[0]) ==
+                  RecordStoreV1Base::Buckets,
+              "sizeof(RecordStoreV1Base::bucketSizes) / sizeof(RecordStoreV1Base::bucketSizes[0]) "
+              "== RecordStoreV1Base::Buckets");
 
 SavedCursorRegistry::~SavedCursorRegistry() {
     for (SavedCursorSet::iterator it = _cursors.begin(); it != _cursors.end(); it++) {

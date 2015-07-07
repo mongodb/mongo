@@ -35,7 +35,6 @@
 #include <algorithm>
 #include <math.h>
 #include <memory>
-#include "boost/thread/locks.hpp"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/dbclientinterface.h"  // For QueryOption_foobar
 #include "mongo/db/matcher/expression_array.h"

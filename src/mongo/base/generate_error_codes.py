@@ -254,7 +254,6 @@ source_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 
 #include "mongo/base/error_codes.h"
 
-#include <boost/static_assert.hpp>
 
 #include "mongo/util/mongoutils/str.h"
 
@@ -279,7 +278,7 @@ namespace mongo {
     %(error_code_class_predicate_definitions)s
 
 namespace {
-    BOOST_STATIC_ASSERT(sizeof(ErrorCodes::Error) == sizeof(int));
+    static_assert(sizeof(ErrorCodes::Error) == sizeof(int), "sizeof(ErrorCodes::Error) == sizeof(int)");
 }  // namespace
 }  // namespace mongo
 '''

@@ -30,7 +30,6 @@
 #include <atomic>
 #include <type_traits>
 
-#include <boost/static_assert.hpp>
 
 namespace mongo {
 
@@ -150,11 +149,11 @@ private:
     std::atomic<WordType> _value;
 };
 
-#define _ATOMIC_WORD_DECLARE(NAME, WTYPE)                       \
-    typedef class AtomicWord<WTYPE> NAME;                       \
-    namespace {                                                 \
-    BOOST_STATIC_ASSERT(sizeof(NAME) == sizeof(WTYPE));         \
-    BOOST_STATIC_ASSERT(std::is_standard_layout<WTYPE>::value); \
+#define _ATOMIC_WORD_DECLARE(NAME, WTYPE)                                                          \
+    typedef class AtomicWord<WTYPE> NAME;                                                          \
+    namespace {                                                                                    \
+    static_assert(sizeof(NAME) == sizeof(WTYPE), "sizeof(NAME) == sizeof(WTYPE)");                 \
+    static_assert(std::is_standard_layout<WTYPE>::value, "std::is_standard_layout<WTYPE>::value"); \
     }  // namespace
 
 _ATOMIC_WORD_DECLARE(AtomicUInt32, unsigned);

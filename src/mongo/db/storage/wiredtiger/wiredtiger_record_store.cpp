@@ -71,8 +71,10 @@ namespace {
 static const int kMinimumRecordStoreVersion = 1;
 static const int kCurrentRecordStoreVersion = 1;  // New record stores use this by default.
 static const int kMaximumRecordStoreVersion = 1;
-BOOST_STATIC_ASSERT(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion);
-BOOST_STATIC_ASSERT(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion);
+static_assert(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion,
+              "kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion");
+static_assert(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion,
+              "kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion");
 
 bool shouldUseOplogHack(OperationContext* opCtx, const std::string& uri) {
     StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(opCtx, uri);

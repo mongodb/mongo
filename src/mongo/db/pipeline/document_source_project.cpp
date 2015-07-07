@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"

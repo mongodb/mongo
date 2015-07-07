@@ -93,7 +93,7 @@ StatusWith<SnapshotDiff> Snapshots::computeDelta() {
     }
 
     // The following logic depends on there being exactly 2 stored snapshots
-    BOOST_STATIC_ASSERT(kNumSnapshots == 2);
+    static_assert(kNumSnapshots == 2, "kNumSnapshots == 2");
 
     // Current and previous napshot alternates between indexes 0 and 1
     int currIdx = _loc;

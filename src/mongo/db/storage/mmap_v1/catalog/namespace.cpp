@@ -32,17 +32,20 @@
 
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
 
-#include <boost/static_assert.hpp>
 
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
 namespace {
-BOOST_STATIC_ASSERT(sizeof(Namespace) == 128);
-BOOST_STATIC_ASSERT(Namespace::MaxNsLenWithNUL == MaxDatabaseNameLen);
-BOOST_STATIC_ASSERT((int)Namespace::MaxNsLenWithNUL == (int)NamespaceString::MaxNsLenWithNUL);
-BOOST_STATIC_ASSERT((int)Namespace::MaxNsLen == (int)NamespaceString::MaxNsLen);
+static_assert(sizeof(Namespace) == 128, "sizeof(Namespace) == 128");
+static_assert(Namespace::MaxNsLenWithNUL == MaxDatabaseNameLen,
+              "Namespace::MaxNsLenWithNUL == MaxDatabaseNameLen");
+static_assert((int)Namespace::MaxNsLenWithNUL == (int)NamespaceString::MaxNsLenWithNUL,
+              "(int)Namespace::MaxNsLenWithNUL == (int)NamespaceString::MaxNsLenWithNUL");
+static_assert((int)Namespace::MaxNsLen == (int)NamespaceString::MaxNsLen,
+              "(int)Namespace::MaxNsLen == (int)NamespaceString::MaxNsLen");
 // Note the typo.
-BOOST_STATIC_ASSERT((int)Namespace::MaxNsColletionLen == (int)NamespaceString::MaxNsCollectionLen);
+static_assert((int)Namespace::MaxNsColletionLen == (int)NamespaceString::MaxNsCollectionLen,
+              "(int)Namespace::MaxNsColletionLen == (int)NamespaceString::MaxNsCollectionLen");
 }
 }

@@ -97,11 +97,12 @@ const uint8_t kNumericPositive6ByteInt = kNumeric + 18;
 const uint8_t kNumericPositive7ByteInt = kNumeric + 19;
 const uint8_t kNumericPositive8ByteInt = kNumeric + 20;
 const uint8_t kNumericPositiveLargeDouble = kNumeric + 21;  // >= 2**63 including +Inf
-BOOST_STATIC_ASSERT(kNumericPositiveLargeDouble < kStringLike);
+static_assert(kNumericPositiveLargeDouble < kStringLike,
+              "kNumericPositiveLargeDouble < kStringLike");
 
 const uint8_t kBoolFalse = kBool + 0;
 const uint8_t kBoolTrue = kBool + 1;
-BOOST_STATIC_ASSERT(kBoolTrue < kDate);
+static_assert(kBoolTrue < kDate, "kBoolTrue < kDate");
 
 size_t numBytesForInt(uint8_t ctype) {
     if (ctype >= kNumericPositive1ByteInt) {

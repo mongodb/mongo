@@ -116,7 +116,7 @@ private:
     };
 #pragma pack()
 
-    BOOST_STATIC_ASSERT(sizeof(Node) == 628);
+    static_assert(sizeof(Node) == 628, "sizeof(Node) == 628");
 
 
     int _find(const Namespace& k, bool& found) const;

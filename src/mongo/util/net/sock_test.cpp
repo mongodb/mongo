@@ -146,12 +146,12 @@ SocketPair socketPair(const int type, const int protocol) {
     Notification accepted;
     SOCKET acceptSock = INVALID_SOCKET;
     stdx::thread acceptor(
-        stdx::bind(&detail::awaitAccept, &acceptSock, listenSock, boost::ref(accepted)));
+        stdx::bind(&detail::awaitAccept, &acceptSock, listenSock, stdx::ref(accepted)));
 
     Notification connected;
     SOCKET connectSock = INVALID_SOCKET;
     stdx::thread connector(
-        stdx::bind(&detail::awaitConnect, &connectSock, *connectRes, boost::ref(connected)));
+        stdx::bind(&detail::awaitConnect, &connectSock, *connectRes, stdx::ref(connected)));
 
     connected.waitToBeNotified();
     connector.join();

@@ -26,8 +26,6 @@
 *    it in the license file.
 */
 
-#include <boost/thread/tss.hpp>
-
 #include "mongo/client/dbclientinterface.h"
 
 namespace mongo {

@@ -32,8 +32,6 @@
 
 #include "mongo/db/storage/mmap_v1/dur_journal_writer.h"
 
-#include <boost/bind.hpp>
-
 #include "mongo/db/client.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"

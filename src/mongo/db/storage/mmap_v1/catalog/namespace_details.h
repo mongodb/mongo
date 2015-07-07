@@ -240,11 +240,12 @@ private:
 
     /** Update cappedLastDelRecLastExtent() after capExtent changed in cappedTruncateAfter() */
     void cappedTruncateLastDelUpdate();
-    BOOST_STATIC_ASSERT(NIndexesMax <= NIndexesBase + NIndexesExtra * 2);
-    BOOST_STATIC_ASSERT(NIndexesMax <= 64);  // multiKey bits
-    BOOST_STATIC_ASSERT(sizeof(NamespaceDetails::Extra) == 496);
+    static_assert(NIndexesMax <= NIndexesBase + NIndexesExtra * 2,
+                  "NIndexesMax <= NIndexesBase + NIndexesExtra * 2");
+    static_assert(NIndexesMax <= 64, "NIndexesMax <= 64");  // multiKey bits
+    static_assert(sizeof(NamespaceDetails::Extra) == 496, "sizeof(NamespaceDetails::Extra) == 496");
 };  // NamespaceDetails
-BOOST_STATIC_ASSERT(sizeof(NamespaceDetails) == 496);
+static_assert(sizeof(NamespaceDetails) == 496, "sizeof(NamespaceDetails) == 496");
 #pragma pack()
 
 }  // namespace mongo

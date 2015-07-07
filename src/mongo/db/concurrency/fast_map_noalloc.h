@@ -233,8 +233,8 @@ public:
 private:
     // Empty and very large maps do not make sense since there will be no performance gain, so
     // disallow them.
-    BOOST_STATIC_ASSERT(PreallocCount > 0);
-    BOOST_STATIC_ASSERT(PreallocCount < 32);
+    static_assert(PreallocCount > 0, "PreallocCount > 0");
+    static_assert(PreallocCount < 32, "PreallocCount < 32");
 
     // Iterator accesses the map directly
     friend class IteratorImpl<FastMapNoAlloc<KeyType, ValueType, PreallocCount>, ValueType>;

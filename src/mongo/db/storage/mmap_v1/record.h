@@ -175,6 +175,6 @@ private:
     DiskLoc _nextDeleted;
 };
 
-BOOST_STATIC_ASSERT(16 == sizeof(DeletedRecord));
+static_assert(16 == sizeof(DeletedRecord), "16 == sizeof(DeletedRecord)");
 
 }  // namespace mongo

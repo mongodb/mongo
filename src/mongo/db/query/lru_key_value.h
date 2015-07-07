@@ -28,9 +28,9 @@
 
 #pragma once
 
-#include <boost/unordered_map.hpp>
 #include <list>
 #include <memory>
+#include <unordered_map>
 
 #include "mongo/base/status.h"
 #include "mongo/util/assert_util.h"
@@ -72,7 +72,7 @@ public:
     typedef typename KVList::iterator KVListIt;
     typedef typename KVList::const_iterator KVListConstIt;
 
-    typedef boost::unordered_map<K, KVListIt> KVMap;
+    typedef std::unordered_map<K, KVListIt> KVMap;
     typedef typename KVMap::const_iterator KVMapConstIt;
 
     /**

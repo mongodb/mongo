@@ -82,8 +82,10 @@ static const WiredTigerItem emptyItem(NULL, 0);
 static const int kMinimumIndexVersion = 6;
 static const int kCurrentIndexVersion = 6;  // New indexes use this by default.
 static const int kMaximumIndexVersion = 6;
-BOOST_STATIC_ASSERT(kCurrentIndexVersion >= kMinimumIndexVersion);
-BOOST_STATIC_ASSERT(kCurrentIndexVersion <= kMaximumIndexVersion);
+static_assert(kCurrentIndexVersion >= kMinimumIndexVersion,
+              "kCurrentIndexVersion >= kMinimumIndexVersion");
+static_assert(kCurrentIndexVersion <= kMaximumIndexVersion,
+              "kCurrentIndexVersion <= kMaximumIndexVersion");
 
 bool hasFieldNames(const BSONObj& obj) {
     BSONForEach(e, obj) {

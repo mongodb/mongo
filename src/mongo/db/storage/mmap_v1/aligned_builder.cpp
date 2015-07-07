@@ -45,7 +45,7 @@ AlignedBuilder::AlignedBuilder(unsigned initSize) {
     uassert(13584, "out of memory AlignedBuilder", _p._allocationAddress);
 }
 
-BOOST_STATIC_ASSERT(sizeof(void*) == sizeof(size_t));
+static_assert(sizeof(void*) == sizeof(size_t), "sizeof(void*) == sizeof(size_t)");
 
 /** reset for a re-use. shrinks if > 128MB */
 void AlignedBuilder::reset() {

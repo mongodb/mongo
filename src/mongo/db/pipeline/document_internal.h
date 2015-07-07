@@ -123,7 +123,8 @@ private:
 };
 // Real size is sizeof(ValueElement) + nameLen
 #pragma pack()
-BOOST_STATIC_ASSERT(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1));
+static_assert(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1),
+              "sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1)");
 
 // This is an internal class for Document. See FieldIterator for the public version.
 class DocumentStorageIterator {

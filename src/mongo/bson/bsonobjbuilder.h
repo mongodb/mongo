@@ -34,7 +34,6 @@
 
 #pragma once
 
-#include <boost/static_assert.hpp>
 #include <map>
 #include <cmath>
 #include <limits>

@@ -276,7 +276,7 @@ private:
     ValueStorage _storage;
     friend class MutableValue;  // gets and sets _storage.genericRCPtr
 };
-BOOST_STATIC_ASSERT(sizeof(Value) == 16);
+static_assert(sizeof(Value) == 16, "sizeof(Value) == 16");
 
 typedef unordered_set<Value, Value::Hash> ValueSet;
 }

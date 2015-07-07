@@ -31,7 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
-#include <boost/unordered_set.hpp>
+#include <unordered_set>
 #include <vector>
 
 #include "mongo/bson/bsontypes.h"
@@ -86,7 +86,7 @@ public:
     static boost::intrusive_ptr<Accumulator> create();
 
 private:
-    typedef boost::unordered_set<Value, Value::Hash> SetType;
+    typedef std::unordered_set<Value, Value::Hash> SetType;
     SetType set;
 };
 
