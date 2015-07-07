@@ -138,6 +138,7 @@ elif usemozjs:
             'mozjs/nativefunction.cpp',
             'mozjs/numberint.cpp',
             'mozjs/numberlong.cpp',
+            'mozjs/numberdecimal.cpp',
             'mozjs/object.cpp',
             'mozjs/objectwrapper.cpp',
             'mozjs/oid.cpp',

@@ -41,6 +41,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
@@ -811,6 +812,71 @@ public:
         ASSERT(s->exec("f = {f:a.a.top}", "foo", false, true, false));
         out = s->getObject("f");
         ASSERT(Undefined == out.firstElement().type());
+    }
+};
+
+class NumberDecimal {
+public:
+    void run() {
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
+        BSONObjBuilder b;
+        Decimal128 val = Decimal128("2.010");
+        b.append("a", val);
+        BSONObj in = b.obj();
+        s->setObject("a", in);
+
+        // Test the scope object
+        BSONObj out = s->getObject("a");
+        ASSERT_EQUALS(mongo::NumberDecimal, out.firstElement().type());
+        ASSERT_TRUE(val.isEqual(out.firstElement().numberDecimal()));
+
+        ASSERT(s->exec("b = {b:a.a}", "foo", false, true, false));
+        out = s->getObject("b");
+        ASSERT_EQUALS(mongo::NumberDecimal, out.firstElement().type());
+        ASSERT_TRUE(val.isEqual(out.firstElement().numberDecimal()));
+
+        // Test that the appropriate string output is generated
+        ASSERT(s->exec("c = {c:a.a.toString()}", "foo", false, true, false));
+        out = s->getObject("c");
+        stringstream ss;
+        ss << "NumberDecimal(\"" << val.toString() << "\")";
+        ASSERT_EQUALS(ss.str(), out.firstElement().valuestr());
+    }
+};
+
+class NumberDecimalGetFromScope {
+public:
+    void run() {
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
+        ASSERT(s->exec("a = 5;", "a", false, true, false));
+        ASSERT_TRUE(Decimal128(5).isEqual(s->getNumberDecimal("a")));
+    }
+};
+
+class NumberDecimalBigObject {
+public:
+    void run() {
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
+
+        BSONObj in;
+        {
+            BSONObjBuilder b;
+            b.append("a", 5);
+            b.append("b", Decimal128("1.5E-3000"));
+            b.append("c", Decimal128("1.5E-1"));
+            b.append("d", Decimal128("1.5E3000"));
+            b.append("e", Decimal128("Infinity"));
+            b.append("f", Decimal128("NaN"));
+            in = b.obj();
+        }
+        s->setObject("a", in);
+
+        ASSERT(s->exec("x = tojson( a ); ", "foo", false, true, false));
+        string outString = s->getString("x");
+
+        ASSERT(s->exec((string) "y = " + outString, "foo2", false, true, false));
+        BSONObj out = s->getObject("y");
+        ASSERT_EQUALS(in, out);
     }
 };
 
@@ -1812,6 +1878,116 @@ public:
     }
 };
 
+class NumberDecimal : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("2.010"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"+2.010\") }";
+    }
+};
+
+class NumberDecimalNegative : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("-4.018"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"-4018E-3\") }";
+    }
+};
+
+class NumberDecimalMax : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("+9.999999999999999999999999999999999E6144"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"+9999999999999999999999999999999999E6111\") }";
+    }
+};
+
+class NumberDecimalMin : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("0.000000000000000000000000000000001E-6143"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"+1E-6176\") }";
+    }
+};
+
+class NumberDecimalPositiveZero : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("0"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"0\") }";
+    }
+};
+
+class NumberDecimalNegativeZero : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("-0"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"-0\") }";
+    }
+};
+
+class NumberDecimalPositiveNaN : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("NaN"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"NaN\") }";
+    }
+};
+
+class NumberDecimalNegativeNaN : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("-NaN"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"-NaN\") }";
+    }
+};
+
+class NumberDecimalPositiveInfinity : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("1E999999"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"+Inf\") }";
+    }
+};
+
+class NumberDecimalNegativeInfinity : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("-1E999999"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"-Inf\") }";
+    }
+};
+
+class NumberDecimalPrecision : public TestRoundTrip {
+public:
+    virtual BSONObj bson() const {
+        return BSON("decimal" << Decimal128("5.00"));
+    }
+    virtual string json() const {
+        return "{ \"decimal\": NumberDecimal(\"+500E-2\") }";
+    }
+};
+
 class UUID : public TestRoundTrip {
     virtual BSONObj bson() const {
         BSONObjBuilder b;
@@ -2233,6 +2409,13 @@ public:
         add<TypeConservation>();
         add<NumberLong>();
         add<NumberLong2>();
+
+        if (Decimal128::enabled) {
+            add<NumberDecimal>();
+            add<NumberDecimalGetFromScope>();
+            add<NumberDecimalBigObject>();
+        }
+
         add<InvalidTimestamp>();
         add<RenameTest>();
 
@@ -2302,6 +2485,21 @@ public:
         add<RoundTripTests::NumberLong>();
         add<RoundTripTests::NumberInt>();
         add<RoundTripTests::Number>();
+
+        if (Decimal128::enabled) {
+            add<RoundTripTests::NumberDecimal>();
+            add<RoundTripTests::NumberDecimalNegative>();
+            add<RoundTripTests::NumberDecimalMax>();
+            add<RoundTripTests::NumberDecimalMin>();
+            add<RoundTripTests::NumberDecimalPositiveZero>();
+            add<RoundTripTests::NumberDecimalNegativeZero>();
+            add<RoundTripTests::NumberDecimalPositiveNaN>();
+            add<RoundTripTests::NumberDecimalNegativeNaN>();
+            add<RoundTripTests::NumberDecimalPositiveInfinity>();
+            add<RoundTripTests::NumberDecimalNegativeInfinity>();
+            add<RoundTripTests::NumberDecimalPrecision>();
+        }
+
         add<RoundTripTests::UUID>();
         add<RoundTripTests::HexData>();
         add<RoundTripTests::MD5>();

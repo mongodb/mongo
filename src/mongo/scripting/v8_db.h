@@ -86,6 +86,11 @@ v8::Handle<v8::Value> numberIntToNumber(V8Scope* scope, const v8::Arguments& arg
 v8::Handle<v8::Value> numberIntValueOf(V8Scope* scope, const v8::Arguments& args);
 v8::Handle<v8::Value> numberIntToString(V8Scope* scope, const v8::Arguments& args);
 
+// NumberDecimal object
+Decimal128 numberDecimalVal(V8Scope* scope, const v8::Handle<v8::Object>& it);
+v8::Handle<v8::Value> numberDecimalInit(V8Scope* scope, const v8::Arguments& args);
+v8::Handle<v8::Value> numberDecimalToString(V8Scope* scope, const v8::Arguments& args);
+
 // DBQuery object
 v8::Handle<v8::Value> dbQueryInit(V8Scope* scope, const v8::Arguments& args);
 v8::Handle<v8::Value> dbQueryIndexAccess(::uint32_t index, const v8::AccessorInfo& info);

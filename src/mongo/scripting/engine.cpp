@@ -87,6 +87,9 @@ void Scope::append(BSONObjBuilder& builder, const char* fieldName, const char* s
         case NumberLong:
             builder.append(fieldName, getNumberLongLong(scopeName));
             break;
+        case NumberDecimal:
+            builder.append(fieldName, getNumberDecimal(scopeName));
+            break;
         case String:
             builder.append(fieldName, getString(scopeName));
             break;
@@ -429,6 +432,9 @@ public:
     }
     double getNumber(const char* field) {
         return _real->getNumber(field);
+    }
+    Decimal128 getNumberDecimal(const char* field) {
+        return _real->getNumberDecimal(field);
     }
     string getString(const char* field) {
         return _real->getString(field);

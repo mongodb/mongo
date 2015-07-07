@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/util/log.h"
 
 
@@ -198,6 +199,26 @@ public:
         BSONObjBuilder b;
         b.append("a", -20000LL);
         ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"-20000\" } }", b.done().jsonString(Strict));
+    }
+};
+
+class NumberDecimal {
+public:
+    void run() {
+        BSONObjBuilder b;
+        b.append("a", mongo::Decimal128("123456789.12345"));
+        ASSERT_EQUALS("{ \"a\" : NumberDecimal(\"123456789.12345\") }",
+                      b.done().jsonString(TenGen));
+    }
+};
+
+class NumberDecimalStrict {
+public:
+    void run() {
+        BSONObjBuilder b;
+        b.append("a", mongo::Decimal128("123456789.12345"));
+        ASSERT_EQUALS("{ \"a\" : { \"$numberDecimal\" : \"123456789.12345\" } }",
+                      b.done().jsonString(Strict));
     }
 };
 
@@ -586,7 +607,8 @@ public:
         b.append("r", (int)5);
         b.appendTimestamp("s", 123123123123123LL);
         b.append("t", 12321312312LL);
-        b.appendMaxKey("u");
+        b.append("u", "123456789.12345");
+        b.appendMaxKey("v");
 
         BSONObj o = b.obj();
         o.jsonString();
@@ -2695,6 +2717,12 @@ public:
         add<JsonStringTests::NumberLongStrict>();
         add<JsonStringTests::NumberLongStrictLarge>();
         add<JsonStringTests::NumberLongStrictNegative>();
+
+        if (Decimal128::enabled) {
+            add<JsonStringTests::NumberDecimal>();
+            add<JsonStringTests::NumberDecimalStrict>();
+        }
+
         add<JsonStringTests::NumberDoubleNaN>();
         add<JsonStringTests::NumberDoubleInfinity>();
         add<JsonStringTests::NumberDoubleNegativeInfinity>();

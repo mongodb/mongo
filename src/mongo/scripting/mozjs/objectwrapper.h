@@ -31,6 +31,7 @@
 #include <jsapi.h>
 #include <string>
 
+#include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/exception.h"
 
 namespace mongo {
@@ -95,6 +96,7 @@ public:
     double getNumber(Key key);
     int getNumberInt(Key key);
     long long getNumberLongLong(Key key);
+    Decimal128 getNumberDecimal(Key key);
     std::string getString(Key key);
     bool getBoolean(Key key);
     BSONObj getObject(Key key);

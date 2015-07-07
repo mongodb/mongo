@@ -51,6 +51,7 @@
 #include "mongo/scripting/mozjs/nativefunction.h"
 #include "mongo/scripting/mozjs/numberint.h"
 #include "mongo/scripting/mozjs/numberlong.h"
+#include "mongo/scripting/mozjs/numberdecimal.h"
 #include "mongo/scripting/mozjs/object.h"
 #include "mongo/scripting/mozjs/oid.h"
 #include "mongo/scripting/mozjs/regexp.h"
@@ -105,6 +106,7 @@ public:
     double getNumber(const char* field) override;
     int getNumberInt(const char* field) override;
     long long getNumberLongLong(const char* field) override;
+    Decimal128 getNumberDecimal(const char* field) override;
     std::string getString(const char* field) override;
     bool getBoolean(const char* field) override;
     BSONObj getObject(const char* field) override;
@@ -220,6 +222,10 @@ public:
         return _numberLongProto;
     }
 
+    WrapType<NumberDecimalInfo>& getNumberDecimalProto() {
+        return _numberDecimalProto;
+    }
+
     WrapType<ObjectInfo>& getObjectProto() {
         return _objectProto;
     }
@@ -326,6 +332,7 @@ private:
     WrapType<NativeFunctionInfo> _nativeFunctionProto;
     WrapType<NumberIntInfo> _numberIntProto;
     WrapType<NumberLongInfo> _numberLongProto;
+    WrapType<NumberDecimalInfo> _numberDecimalProto;
     WrapType<ObjectInfo> _objectProto;
     WrapType<OIDInfo> _oidProto;
     WrapType<RegExpInfo> _regExpProto;

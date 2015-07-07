@@ -37,6 +37,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
@@ -246,6 +247,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _nativeFunctionProto(_context),
       _numberIntProto(_context),
       _numberLongProto(_context),
+      _numberDecimalProto(_context),
       _objectProto(_context),
       _oidProto(_context),
       _regExpProto(_context),
@@ -356,6 +358,12 @@ long long MozJSImplScope::getNumberLongLong(const char* field) {
     MozJSEntry entry(this);
 
     return ObjectWrapper(_context, _global).getNumberLongLong(field);
+}
+
+Decimal128 MozJSImplScope::getNumberDecimal(const char* field) {
+    MozJSEntry entry(this);
+
+    return ObjectWrapper(_context, _global).getNumberDecimal(field);
 }
 
 std::string MozJSImplScope::getString(const char* field) {
@@ -661,6 +669,9 @@ void MozJSImplScope::installBSONTypes() {
     _nativeFunctionProto.install(_global);
     _numberIntProto.install(_global);
     _numberLongProto.install(_global);
+    if (experimentalDecimalSupport) {
+        _numberDecimalProto.install(_global);
+    }
     _objectProto.install(_global);
     _oidProto.install(_global);
     _regExpProto.install(_global);

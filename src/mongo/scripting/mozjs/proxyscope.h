@@ -128,6 +128,7 @@ public:
     double getNumber(const char* field) override;
     int getNumberInt(const char* field) override;
     long long getNumberLongLong(const char* field) override;
+    Decimal128 getNumberDecimal(const char* field) override;
     std::string getString(const char* field) override;
     bool getBoolean(const char* field) override;
     BSONObj getObject(const char* field) override;

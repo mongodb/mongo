@@ -28,57 +28,35 @@
 
 #pragma once
 
-#include <jsapi.h>
-#include <string>
-
-#include "mongo/bson/bsonobj.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {
 namespace mozjs {
 
 /**
- * Writes C++ values out of JS Values
+ * The "NumberDecimal" Javascript object.
  *
- * depth is used to trap circular objects in js and prevent stack smashing
- *
- * originalBSON is a hack to keep integer types in their original type when
- * they're read out, manipulated in js and saved back.
+ * Wraps a 'Decimal128' as its private member
  */
-class ValueWriter {
-public:
-    ValueWriter(JSContext* cx, JS::HandleValue value, int depth = 0);
 
-    BSONObj toBSON();
+struct NumberDecimalInfo : public BaseInfo {
+    static void construct(JSContext* cx, JS::CallArgs args);
+    static void finalize(JSFreeOp* fop, JSObject* obj);
 
-    /**
-     * These coercions flow through JS::To_X. I.e. they can call toString() or
-     * toNumber()
-     */
-    std::string toString();
-    int type();
-    double toNumber();
-    int32_t toInt32();
-    int64_t toInt64();
-    Decimal128 toDecimal128();
-    bool toBoolean();
+    struct Functions {
+        MONGO_DEFINE_JS_FUNCTION(toString);
+    };
 
-    /**
-     * Writes the value into a bsonobjbuilder under the name in sd.
-     */
-    void writeThis(BSONObjBuilder* b, StringData sd);
+    static const JSFunctionSpec methods[2];
 
-    void setOriginalBSON(BSONObj* obj);
+    static const char* const className;
+    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
 
-private:
-    /**
-     * Writes the object into a bsonobjbuilder under the name in sd.
-     */
-    void _writeObject(BSONObjBuilder* b, StringData sd, JS::HandleObject obj);
+    static Decimal128 ToNumberDecimal(JSContext* cx, JS::HandleObject object);
+    static Decimal128 ToNumberDecimal(JSContext* cx, JS::HandleValue value);
 
-    JSContext* _context;
-    JS::HandleValue _value;
-    int _depth;
-    BSONObj* _originalParent;
+    static void make(JSContext* cx, JS::MutableHandleValue value, Decimal128 d);
 };
 
 }  // namespace mozjs

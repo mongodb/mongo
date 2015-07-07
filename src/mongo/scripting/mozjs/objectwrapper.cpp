@@ -32,6 +32,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/valuereader.h"
@@ -197,6 +198,13 @@ long long ObjectWrapper::getNumberLongLong(Key key) {
     getValue(key, &x);
 
     return ValueWriter(_context, x).toInt64();
+}
+
+Decimal128 ObjectWrapper::getNumberDecimal(Key key) {
+    JS::RootedValue x(_context);
+    getValue(key, &x);
+
+    return ValueWriter(_context, x).toDecimal128();
 }
 
 std::string ObjectWrapper::getString(Key key) {

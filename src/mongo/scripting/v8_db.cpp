@@ -1131,6 +1131,33 @@ v8::Handle<v8::Value> numberIntToString(V8Scope* scope, const v8::Arguments& arg
     return v8::String::New(ret.c_str());
 }
 
+Decimal128 numberDecimalVal(V8Scope* scope, const v8::Handle<v8::Object>& it) {
+    verify(scope->NumberDecimalFT()->HasInstance(it));
+    return Decimal128(toSTLString(it->Get(v8::String::New("val"))));
+}
+
+v8::Handle<v8::Value> numberDecimalInit(V8Scope* scope, const v8::Arguments& args) {
+    if (!args.IsConstructCall()) {
+        v8::Handle<v8::Function> f = scope->NumberDecimalFT()->GetFunction();
+        return newInstance(f, args);
+    }
+
+    v8::Handle<v8::Object> it = args.This();
+    verify(scope->NumberDecimalFT()->HasInstance(it));
+    argumentCheck(args.Length() == 1, "NumberDecimal needs 1 argument");
+    argumentCheck(args[0]->IsString(), "NumberDecimal 1st parameter must be a string");
+
+    it->ForceSet(scope->v8StringData("val"), args[0]);
+    return it;
+}
+
+v8::Handle<v8::Value> numberDecimalToString(V8Scope* scope, const v8::Arguments& args) {
+    v8::Handle<v8::Object> it = args.This();
+    Decimal128 val = numberDecimalVal(scope, it);
+    string ret = str::stream() << "NumberDecimal(\"" << val.toString() << "\")";
+    return v8::String::New(ret.c_str());
+}
+
 v8::Handle<v8::Value> v8ObjectInvalidForStorage(V8Scope* scope, const v8::Arguments& args) {
     argumentCheck(args.Length() == 1, "invalidForStorage needs 1 argument") if (args[0]->IsNull()) {
         return v8::Null();

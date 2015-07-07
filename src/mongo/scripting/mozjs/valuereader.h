@@ -50,6 +50,7 @@ public:
     void fromBSONElement(const BSONElement& elem, bool readOnly);
     void fromBSON(const BSONObj& obj, bool readOnly);
     void fromStringData(StringData sd);
+    void fromDecimal128(Decimal128 decimal);
 
 private:
     JSContext* _context;
