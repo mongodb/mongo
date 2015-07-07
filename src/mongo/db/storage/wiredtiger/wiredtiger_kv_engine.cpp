@@ -85,9 +85,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,
         }
     }
 
+    boost::filesystem::path journalPath = path;
+    journalPath /= "journal";
     if (_durable) {
-        boost::filesystem::path journalPath = path;
-        journalPath /= "journal";
         if (!boost::filesystem::exists(journalPath)) {
             try {
                 boost::filesystem::create_directory(journalPath);
@@ -106,16 +106,37 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,
     ss << "session_max=20000,";
     ss << "eviction=(threads_max=4),";
     ss << "statistics=(fast),";
-    if (_durable) {
-        ss << "log=(enabled=true,archive=true,path=journal,compressor=";
-        ss << wiredTigerGlobalOptions.journalCompressor << "),";
-    }
+    // The setting may have a later setting override it if not using the journal.  We make it
+    // unconditional here because even nojournal may need this setting if it is a transition
+    // from using the journal.
+    ss << "log=(enabled=true,archive=true,path=journal,compressor=";
+    ss << wiredTigerGlobalOptions.journalCompressor << "),";
     ss << "file_manager=(close_idle_time=100000),";  //~28 hours, will put better fix in 3.1.x
     ss << "checkpoint=(wait=" << wiredTigerGlobalOptions.checkpointDelaySecs;
     ss << ",log_size=2GB),";
     ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getOpenConfig("metadata");
     ss << extraOpenOptions;
+    if (!_durable) {
+        // If we started without the journal, but previously used the journal then open with the
+        // WT log enabled to perform any unclean shutdown recovery and then close and reopen in
+        // the normal path without the journal.
+        if (boost::filesystem::exists(journalPath)) {
+            string config = ss.str();
+            log() << "Detected WT journal files.  Running recovery from last checkpoint.";
+            log() << "journal to nojournal transition config: " << config;
+            int ret = wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn);
+            if (ret == EINVAL) {
+                fassertFailedNoTrace(28717);
+            } else if (ret != 0) {
+                Status s(wtRCToStatus(ret));
+                msgassertedNoTrace(28718, s.reason());
+            }
+            invariantWTOK(_conn->close(_conn, NULL));
+        }
+        // This setting overrides the earlier setting because it is later in the config string.
+        ss << ",log=(enabled=false),";
+    }
     string config = ss.str();
     log() << "wiredtiger_open config: " << config;
     int ret = wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn);
