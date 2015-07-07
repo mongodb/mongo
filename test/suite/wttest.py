@@ -440,7 +440,7 @@ class WiredTigerTestCase(unittest.TestCase):
     @staticmethod
     def tty(message):
         if WiredTigerTestCase._ttyDescriptor == None:
-	    WiredTigerTestCase._ttyDescriptor = open('/dev/tty', 'w')
+            WiredTigerTestCase._ttyDescriptor = open('/dev/tty', 'w')
         WiredTigerTestCase._ttyDescriptor.write(message + '\n')
 
     def ttyVerbose(self, level, message):
