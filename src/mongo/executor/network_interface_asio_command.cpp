@@ -36,7 +36,11 @@
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/factory.h"
+#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/util/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace executor {
@@ -56,28 +60,23 @@ void NetworkInterfaceASIO::_asyncRunCommand(AsyncOp* op) {
     _connectWithDBClientConnection(op);
 }
 
-void NetworkInterfaceASIO::_messageFromRequest(const RemoteCommandRequest& request,
-                                               Message* toSend,
-                                               bool useOpCommand) {
+std::unique_ptr<Message> NetworkInterfaceASIO::_messageFromRequest(
+    const RemoteCommandRequest& request, rpc::Protocol protocol) {
     BSONObj query = request.cmdObj;
-    invariant(query.isValid());
+    auto requestBuilder = rpc::makeRequestBuilder(protocol);
 
-    // TODO: Once OP_COMMAND work is complete,
-    // look at client to see if it supports OP_COMMAND.
+    // TODO: handle metadata writers
+    auto toSend = rpc::makeRequestBuilder(protocol)
+                      ->setDatabase(request.dbname)
+                      .setCommandName(request.cmdObj.firstElementFieldName())
+                      .setMetadata(request.metadata)
+                      .setCommandArgs(request.cmdObj)
+                      .done();
 
-    // TODO: Investigate whether we can use CommandRequestBuilder here.
-
-    BufBuilder b;
-    b.appendNum(0);  // opts
-    b.appendStr(request.dbname + ".$cmd");
-    b.appendNum(0);  // toSkip
-    b.appendNum(1);  // toReturn, don't care about responses
-    query.appendSelfToBufBuilder(b);
-
-    // TODO: If AsyncOp can own this buffer, we can avoid copying it in setData().
-    toSend->setData(dbQuery, b.buf(), b.len());
     toSend->header().setId(nextMessageId());
     toSend->header().setResponseTo(0);
+
+    return toSend;
 }
 
 void NetworkInterfaceASIO::_asyncSendSimpleMessage(AsyncOp* op, const asio::const_buffer& buf) {
@@ -102,32 +101,60 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
         return _completeOperation(op, kCanceledStatus);
     }
 
-    Message* toSend = op->toSend();
-    _messageFromRequest(op->request(), toSend);
+    auto negotiatedProtocol =
+        rpc::negotiate(op->connection()->serverProtocols(), op->connection()->clientProtocols());
 
-    if (toSend->empty())
+    if (!negotiatedProtocol.isOK()) {
+        return _completeOperation(op, negotiatedProtocol.getStatus());
+    }
+
+    op->setOperationProtocol(negotiatedProtocol.getValue());
+
+    op->setToSend(std::move(*_messageFromRequest(op->request(), negotiatedProtocol.getValue())));
+
+    // TODO: Is this logic actually necessary (SERVER-19320)?
+    if (op->toSend()->empty())
         return _completedWriteCallback(op);
 
     // TODO: Some day we may need to support vector messages.
-    fassert(28708, toSend->buf() != 0);
-    asio::const_buffer buf(toSend->buf(), toSend->size());
+    fassert(28708, op->toSend()->buf() != 0);
+    asio::const_buffer buf(op->toSend()->buf(), op->toSend()->size());
     return _asyncSendSimpleMessage(op, buf);
 }
 
 void NetworkInterfaceASIO::_completedWriteCallback(AsyncOp* op) {
     // If we were told to send an empty message, toRecv will be empty here.
 
-    // TODO: handle metadata SERVER-19156
-    BSONObj commandReply;
+    // TODO: handle metadata readers
+    const auto elapsed = [this, op]() { return now() - op->start(); };
+
     if (op->toRecv()->empty()) {
         LOG(3) << "received an empty message";
-    } else {
-        QueryResult::View qr = op->toRecv()->singleData().view2ptr();
-        // unavoidable copy
-        commandReply = BSONObj(qr.data()).getOwned();
+        return _completeOperation(op, RemoteCommandResponse(BSONObj(), BSONObj(), elapsed()));
     }
-    _completeOperation(
-        op, RemoteCommandResponse(std::move(commandReply), BSONObj(), now() - op->start()));
+
+    try {
+        auto reply = rpc::makeReply(op->toRecv());
+
+        if (reply->getProtocol() != op->operationProtocol()) {
+            return _completeOperation(op,
+                                      Status(ErrorCodes::RPCProtocolNegotiationFailed,
+                                             str::stream()
+                                                 << "Mismatched RPC protocols - request was '"
+                                                 << opToString(op->toSend()->operation()) << "' '"
+                                                 << " but reply was '"
+                                                 << opToString(op->toRecv()->operation()) << "'"));
+        }
+
+        _completeOperation(op,
+                           // unavoidable copy
+                           RemoteCommandResponse(reply->getCommandReply().getOwned(),
+                                                 reply->getMetadata().getOwned(),
+                                                 elapsed()));
+    } catch (...) {
+        // makeReply can throw if the reply was invalid.
+        _completeOperation(op, exceptionToStatus());
+    }
 }
 
 void NetworkInterfaceASIO::_networkErrorCallback(AsyncOp* op, const std::error_code& ec) {

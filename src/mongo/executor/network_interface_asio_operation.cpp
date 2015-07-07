@@ -106,7 +106,7 @@ void NetworkInterfaceASIO::AsyncOp::connect(ConnectionPool* const pool,
     tcp::socket sock{
         *service, protocol == AF_INET ? tcp::v4() : tcp::v6(), conn.get()->port().psock->rawFD()};
 
-    _connection.emplace(std::move(sock), conn.get()->getServerRPCProtocols());
+    _connection.emplace(std::move(sock), conn.get()->getServerRPCProtocols(), std::move(conn));
 
     _state = OpState::kConnected;
 }
@@ -147,11 +147,27 @@ Date_t NetworkInterfaceASIO::AsyncOp::start() const {
 }
 
 Message* NetworkInterfaceASIO::AsyncOp::toSend() {
-    return &_toSend;
+    invariant(_toSend.is_initialized());
+    return _toSend.get_ptr();
+}
+
+void NetworkInterfaceASIO::AsyncOp::setToSend(Message&& message) {
+    invariant(!_toSend.is_initialized());
+    _toSend = std::move(message);
 }
 
 Message* NetworkInterfaceASIO::AsyncOp::toRecv() {
     return &_toRecv;
+}
+
+rpc::Protocol NetworkInterfaceASIO::AsyncOp::operationProtocol() const {
+    invariant(_operationProtocol.is_initialized());
+    return *_operationProtocol;
+}
+
+void NetworkInterfaceASIO::AsyncOp::setOperationProtocol(rpc::Protocol proto) {
+    invariant(!_operationProtocol.is_initialized());
+    _operationProtocol = proto;
 }
 
 }  // namespace executor

@@ -30,6 +30,7 @@
 
 #include <asio.hpp>
 #include <boost/optional.hpp>
+#include <memory>
 #include <string>
 #include <system_error>
 #include <unordered_map>
@@ -81,9 +82,16 @@ private:
      */
     class AsyncConnection {
     public:
-        AsyncConnection(asio::ip::tcp::socket&& sock, rpc::ProtocolSet protocols);
+        AsyncConnection(asio::ip::tcp::socket&& sock, rpc::ProtocolSet serverProtocols);
+
+        AsyncConnection(asio::ip::tcp::socket&& sock,
+                        rpc::ProtocolSet serverProtocols,
+                        boost::optional<ConnectionPool::ConnectionPtr>&& bootstrapConn);
 
         asio::ip::tcp::socket& sock();
+
+        rpc::ProtocolSet serverProtocols() const;
+        rpc::ProtocolSet clientProtocols() const;
 
 // Explicit move construction and assignment to support MSVC
 #if defined(_MSC_VER) && _MSC_VER < 1900
@@ -96,7 +104,16 @@ private:
 
     private:
         asio::ip::tcp::socket _sock;
-        rpc::ProtocolSet _protocols;
+
+        rpc::ProtocolSet _serverProtocols;
+        rpc::ProtocolSet _clientProtocols{rpc::supports::kAll};
+
+        /**
+         * The bootstrap connection we use to run auth. This will eventually go away when we finish
+         * implementing async auth, but for now we need to keep it alive so that the socket it
+         * creates stays open.
+         */
+        boost::optional<ConnectionPool::ConnectionPtr> _bootstrapConn;
     };
 
     /**
@@ -132,7 +149,14 @@ private:
         Date_t start() const;
 
         Message* toSend();
+
+        void setToSend(Message&& message);
+
         Message* toRecv();
+
+        rpc::Protocol operationProtocol() const;
+
+        void setOperationProtocol(rpc::Protocol proto);
 
     private:
         enum class OpState {
@@ -154,12 +178,22 @@ private:
          */
         boost::optional<AsyncConnection> _connection;
 
+        /**
+         * The RPC protocol used for this operation. We wrap it in an optional as it
+         * is not known until we obtain a connection.
+         */
+        boost::optional<rpc::Protocol> _operationProtocol;
+
         const Date_t _start;
 
         OpState _state;
         AtomicUInt64 _canceled;
 
-        Message _toSend;
+        /**
+         * The outgoing command associated with this operation.
+         */
+        boost::optional<Message> _toSend;
+
         Message _toRecv;
         MSGHEADER::Value _header;
 
@@ -168,9 +202,8 @@ private:
 
     void _asyncRunCommand(AsyncOp* op);
 
-    void _messageFromRequest(const RemoteCommandRequest& request,
-                             Message* toSend,
-                             bool useOpCommand = false);
+    std::unique_ptr<Message> _messageFromRequest(const RemoteCommandRequest& request,
+                                                 rpc::Protocol protocol);
 
     void _asyncSendSimpleMessage(AsyncOp* op, const asio::const_buffer& buf);
 

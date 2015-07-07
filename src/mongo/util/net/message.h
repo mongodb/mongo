@@ -412,8 +412,6 @@ public:
         _setData(buf, true);
     }
 
-    friend void swap(Message& other);
-
     // vector swap() so this is fast
     Message& operator=(Message&& r) {
         verify(empty());

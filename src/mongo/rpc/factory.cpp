@@ -49,7 +49,11 @@ namespace rpc {
 
 std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(ProtocolSet clientProtos,
                                                             ProtocolSet serverProtos) {
-    switch (uassertStatusOK(negotiate(clientProtos, serverProtos))) {
+    return makeRequestBuilder(uassertStatusOK(negotiate(clientProtos, serverProtos)));
+}
+
+std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(Protocol proto) {
+    switch (proto) {
         case Protocol::kOpQuery:
             return stdx::make_unique<LegacyRequestBuilder>();
         case Protocol::kOpCommandV1:

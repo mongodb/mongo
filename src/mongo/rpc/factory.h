@@ -52,6 +52,8 @@ class RequestInterface;
 std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(ProtocolSet clientProtos,
                                                             ProtocolSet serverProtos);
 
+std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(Protocol proto);
+
 /**
  * Returns the appropriate concrete Reply according to the contents of the message.
  * Throws if one cannot be chosen.

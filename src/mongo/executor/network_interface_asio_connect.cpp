@@ -48,22 +48,41 @@ const auto kCanceledStatus = Status(ErrorCodes::CallbackCanceled, "Callback canc
 
 NetworkInterfaceASIO::AsyncConnection::AsyncConnection(asio::ip::tcp::socket&& sock,
                                                        rpc::ProtocolSet protocols)
-    : _sock(std::move(sock)), _protocols(protocols) {}
+    : AsyncConnection(std::move(sock), protocols, boost::none) {}
+
+NetworkInterfaceASIO::AsyncConnection::AsyncConnection(
+    asio::ip::tcp::socket&& sock,
+    rpc::ProtocolSet protocols,
+    boost::optional<ConnectionPool::ConnectionPtr>&& bootstrapConn)
+    : _sock(std::move(sock)),
+      _serverProtocols(protocols),
+      _bootstrapConn(std::move(bootstrapConn)) {}
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
 NetworkInterfaceASIO::AsyncConnection::AsyncConnection(AsyncConnection&& other)
-    : _sock(std::move(other._sock)), _protocols(other._protocols) {}
+    : _sock(std::move(other._sock)),
+      _serverProtocols(other._serverProtocols),
+      _clientProtocols(other._clientProtocols) {}
 
 NetworkInterfaceASIO::AsyncConnection& NetworkInterfaceASIO::AsyncConnection::operator=(
     AsyncConnection&& other) {
     _sock = std::move(other._sock);
-    _protocols = other._protocols;
+    _serverProtocols = other._serverProtocols;
+    _clientProtocols = other._clientProtocols;
     return *this;
 }
 #endif
 
 asio::ip::tcp::socket& NetworkInterfaceASIO::AsyncConnection::sock() {
     return _sock;
+}
+
+rpc::ProtocolSet NetworkInterfaceASIO::AsyncConnection::serverProtocols() const {
+    return _serverProtocols;
+}
+
+rpc::ProtocolSet NetworkInterfaceASIO::AsyncConnection::clientProtocols() const {
+    return _clientProtocols;
 }
 
 void NetworkInterfaceASIO::_connectASIO(AsyncOp* op) {
