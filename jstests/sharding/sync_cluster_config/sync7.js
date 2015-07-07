@@ -2,6 +2,12 @@
 
 s = new ShardingTest( "moveDistLock", 3, 0, undefined, { sync : true } );
 
+// Enable sharding on DB and collection before skewing the clocks
+result = s.getDB("admin").runCommand( { enablesharding : "test1" } );
+result = s.getDB("test1").foo.ensureIndex( { a : 1 } );
+result = s.getDB("admin").runCommand( { shardcollection : "test1.foo", key : { a : 1 } } );
+print("  Collection Sharded! ")
+
 s._configServers[0].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : 15000 } )
 s._configServers[1].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : -32000 } )
 
@@ -31,12 +37,6 @@ result = otherMongos.getDB( "admin" ).runCommand( { moveprimary : "test1", to : 
 printjson(result);
 s.printShardingStatus();
 assert.eq( result.ok, 0, "Move command should not have succeeded!" )
-
-// Enable sharding on DB and collection
-result = otherMongos.getDB("admin").runCommand( { enablesharding : "test1" } );
-result = otherMongos.getDB("test1").foo.ensureIndex( { a : 1 } );
-result = otherMongos.getDB("admin").runCommand( { shardcollection : "test1.foo", key : { a : 1 } } );
-print("  Collection Sharded! ")
 
 // Make sure we can't split when our clock skew is so high
 result = otherMongos.getDB( "admin" ).runCommand( { split : "test1.foo", find : { a : 2 } } );

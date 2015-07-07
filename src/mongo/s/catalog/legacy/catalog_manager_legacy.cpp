@@ -322,6 +322,13 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
                                              bool unique,
                                              vector<BSONObj>* initPoints,
                                              set<ShardId>* initShardIds) {
+    // Lock the collection globally so that no other mongos can try to shard or drop the collection
+    // at the same time.
+    auto scopedDistLock = getDistLockManager()->lock(ns, "shardCollection");
+    if (!scopedDistLock.isOK()) {
+        return scopedDistLock.getStatus();
+    }
+
     StatusWith<DatabaseType> status = getDatabase(nsToDatabase(ns));
     if (!status.isOK()) {
         return status.getStatus();
