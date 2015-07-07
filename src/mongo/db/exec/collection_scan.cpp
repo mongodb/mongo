@@ -76,7 +76,11 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
     ScopedTimer timer(&_commonStats.executionTimeMillis);
 
     if (_isDead) {
-        Status status(ErrorCodes::InternalError, "CollectionScan died");
+        Status status(
+            ErrorCodes::CappedPositionLost,
+            str::stream()
+                << "CollectionScan died due to position in capped collection being deleted. "
+                << "Last seen record id: " << _lastSeenId);
         *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
         return PlanStage::DEAD;
     }
@@ -106,8 +110,10 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
                 // time we'd need to create a cursor after already getting a record out of it.
                 if (!_cursor->seekExact(_lastSeenId)) {
                     _isDead = true;
-                    Status status(ErrorCodes::InternalError,
-                                  "CollectionScan died: Unexpected RecordId");
+                    Status status(ErrorCodes::CappedPositionLost,
+                                  str::stream() << "CollectionScan died due to failure to restore "
+                                                << "tailable cursor position. "
+                                                << "Last seen record id: " << _lastSeenId);
                     *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
                     return PlanStage::DEAD;
                 }
@@ -222,8 +228,7 @@ void CollectionScan::restoreState(OperationContext* opCtx) {
     ++_commonStats.unyields;
     if (_cursor) {
         if (!_cursor->restore(opCtx)) {
-            warning() << "Collection dropped or state deleted during yield of CollectionScan: "
-                      << opCtx->getNS();
+            warning() << "Could not restore RecordCursor for CollectionScan: " << opCtx->getNS();
             _isDead = true;
         }
     }
