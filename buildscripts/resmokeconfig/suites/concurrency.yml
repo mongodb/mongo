@@ -2,10 +2,6 @@ selector:
   js_test:
     roots:
     - jstests/concurrency/*.js
-    exclude_files:
-    # Skip replication and sharding tests because they're run in different suites
-    - jstests/concurrency/fsm_all_replication*.js
-    - jstests/concurrency/fsm_all_sharded*.js
 
 executor:
   js_test:

@@ -27,12 +27,10 @@ var workerThread = (function() {
             if (Cluster.isStandalone(args.clusterOptions)) {
                 myDB = db.getSiblingDB(args.dbName);
             } else {
-                if (typeof db !== 'undefined') {
-                    // The implicit database connection created within the thread's scope
-                    // is unneeded, so forcibly clean it up.
-                    db = null;
-                    gc();
-                }
+                // The implicit database connection created within the thread's scope
+                // is unneeded, so forcibly clean it up
+                db = null;
+                gc();
 
                 myDB = new Mongo(args.host).getDB(args.dbName);
             }
