@@ -149,8 +149,9 @@ namespace mongo {
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
 
                     WriteUnitOfWork wunit(txn);
-                    collection = db->createCollection(txn, to_collection.ns());
-                    verify(collection);
+                    Status s = userCreateNS(txn, db, to_collection.toString(),
+                                            from_options, logForRepl, false);
+                    verify(s.isOK());
 
                     if (logForRepl) {
                         repl::logOp(txn,
@@ -254,6 +255,7 @@ namespace mongo {
 
         int64_t numSeen;
         NamespaceString from_collection;
+        BSONObj from_options;
         NamespaceString to_collection;
         time_t saveLast;
         bool logForRepl;
@@ -266,6 +268,7 @@ namespace mongo {
     void Cloner::copy(OperationContext* txn,
                       const string& toDBName,
                       const NamespaceString& from_collection,
+                      const BSONObj& from_opts,
                       const NamespaceString& to_collection,
                       bool logForRepl,
                       bool masterSameProcess,
@@ -278,6 +281,7 @@ namespace mongo {
         Fun f(txn, toDBName);
         f.numSeen = 0;
         f.from_collection = from_collection;
+        f.from_options = from_opts;
         f.to_collection = to_collection;
         f.saveLast = time( 0 );
         f.logForRepl = logForRepl;
@@ -302,6 +306,7 @@ namespace mongo {
     void Cloner::copyIndexes(OperationContext* txn,
                              const string& toDBName,
                              const NamespaceString& from_collection,
+                             const BSONObj& from_opts,
                              const NamespaceString& to_collection,
                              bool logForRepl,
                              bool masterSameProcess,
@@ -342,7 +347,9 @@ namespace mongo {
         if ( !collection ) {
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 WriteUnitOfWork wunit(txn);
-                collection = db->createCollection( txn, to_collection.ns() );
+                Status s = userCreateNS(txn, db, to_collection.toString(), from_opts, logForRepl, false);
+                invariant(s.isOK());
+                collection = db->getCollection(to_collection);
                 invariant(collection);
                 if (logForRepl) {
                     repl::logOp(txn,
@@ -409,15 +416,18 @@ namespace mongo {
         // config
         BSONObj filter = BSON("name" << nss.coll().toString());
         list<BSONObj> collList = _conn->getCollectionInfos( dbname, filter);
+        BSONObj options;
         if (!collList.empty()) {
             invariant(collList.size() <= 1);
             BSONObj col = collList.front();
             if (col["options"].isABSONObj()) {
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                     WriteUnitOfWork wunit(txn);
-                    Status status = userCreateNS(txn, db, ns, col["options"].Obj(), logForRepl, 0);
+                    options = col["options"].Obj();
+                    Status status = userCreateNS(txn, db, ns, options, logForRepl, 0);
                     if ( !status.isOK() ) {
                         errmsg = status.toString();
+                        // aborts write unit of work
                         return false;
                     }
                     wunit.commit();
@@ -427,7 +437,7 @@ namespace mongo {
 
         // main data
         copy(txn, dbname,
-             nss, nss,
+             nss, options, nss,
              logForRepl, false, true, mayYield, mayBeInterrupted,
              Query(query).snapshot());
 
@@ -438,7 +448,7 @@ namespace mongo {
 
         // indexes
         copyIndexes(txn, dbname,
-                    NamespaceString(ns), NamespaceString(ns),
+                    NamespaceString(ns), options, NamespaceString(ns),
                     logForRepl, false, true, mayYield,
                     mayBeInterrupted);
 
@@ -620,6 +630,7 @@ namespace mongo {
                 copy(txn,
                      toDBName,
                      from_name,
+                     options,
                      to_name,
                      opts.logForRepl,
                      masterSameProcess,
@@ -693,6 +704,7 @@ namespace mongo {
                 copyIndexes(txn,
                             toDBName,
                             from_name,
+                            collection.getObjectField("options"),
                             to_name,
                             opts.logForRepl,
                             masterSameProcess,
