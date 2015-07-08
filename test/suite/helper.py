@@ -97,11 +97,11 @@ def confirm_empty(self, uri):
     cursor.close()
 
 # copy a WT home directory
-def copy_live_wiredtiger_home(olddir, newdir, aligned=True):
+def copy_wiredtiger_home(olddir, newdir, aligned=True):
     # unaligned copy requires 'dd', which may not be available on Windows
     if not aligned and os.name == "nt":
         raise AssertionError(
-            'copy_live_wiredtiger_home: unaligned copy impossible on Windows')
+            'copy_wiredtiger_home: unaligned copy impossible on Windows')
     shutil.rmtree(newdir, ignore_errors=True)
     os.mkdir(newdir)
     for fname in os.listdir(olddir):

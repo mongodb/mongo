@@ -37,7 +37,7 @@ import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
-from helper import copy_live_wiredtiger_home
+from helper import copy_wiredtiger_home
 import wttest
 
 class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
@@ -61,7 +61,7 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
         # With the connection still open, copy files to new directory.
         # Half the time use an unaligned copy.
         aligned = (i % (self.freq * 2) != 0) or os.name == "nt"
-        copy_live_wiredtiger_home(olddir, newdir, aligned)
+        copy_wiredtiger_home(olddir, newdir, aligned)
 
         # Now simulate fsyncUnlock by closing the backup cursor.
         cbkup.close()
