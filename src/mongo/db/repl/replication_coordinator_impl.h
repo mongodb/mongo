@@ -283,6 +283,11 @@ public:
     ReplicaSetConfig getReplicaSetConfig_forTest();
 
     /**
+     * Gets the latest OpTime of the currentCommittedSnapshot.
+     */
+    OpTime getCurrentCommittedSnapshot_forTest();
+
+    /**
      * Simple wrapper around _setLastOptime_inlock to make it easier to test.
      */
     Status setLastOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);

@@ -2258,9 +2258,13 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
                                                                          << "_id" << 2))
                             << "settings" << BSON("protocolVersion" << 1)),
                        HostAndPort("node1", 12345));
+    getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
     getReplCoord()->updateTerm(1);
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
+
+    OpTime time(Timestamp(10, 0), 1);
+    getReplCoord()->onSnapshotCreate(time);
 
     // higher OpTime, should change
     ReplicationMetadata metadata;
@@ -2269,6 +2273,7 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
                                                         << 2 << "term" << 1));
     getReplCoord()->processReplicationMetadata(metadata);
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(time, getReplCoord()->getCurrentCommittedSnapshot_forTest());
 
     // lower OpTime, should not change
     ReplicationMetadata metadata2;
@@ -2328,6 +2333,44 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
     ASSERT_EQUALS(OpTime(Timestamp(11, 0), 3), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
     ASSERT_EQUALS(2, getTopoCoord().getCurrentPrimaryIndex());
+}
+
+TEST_F(ReplCoordTest, SnapshotCommitting) {
+    init("mySet");
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234"))),
+                       HostAndPort("test1", 1234));
+    OperationContextReplMock txn;
+    getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+    OpTime time1(Timestamp(100, 1), 1);
+    OpTime time2(Timestamp(100, 2), 1);
+    OpTime time3(Timestamp(100, 3), 1);
+    OpTime time4(Timestamp(100, 4), 1);
+    OpTime time5(Timestamp(100, 5), 1);
+    OpTime time6(Timestamp(100, 6), 1);
+
+    getReplCoord()->onSnapshotCreate(time1);
+    getReplCoord()->onSnapshotCreate(time2);
+    getReplCoord()->onSnapshotCreate(time5);
+
+    // ensure current snapshot follows price is right rules (closest but not greater than)
+    getReplCoord()->setMyLastOptime(time3);
+    ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshot_forTest());
+    getReplCoord()->setMyLastOptime(time4);
+    ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshot_forTest());
+
+    // ensure current snapshot will not advance beyond existing snapshots
+    getReplCoord()->setMyLastOptime(time6);
+    ASSERT_EQUALS(time5, getReplCoord()->getCurrentCommittedSnapshot_forTest());
+
+    // ensure current snapshot updates on new snapshot if we are that far
+    getReplCoord()->onSnapshotCreate(time6);
+    ASSERT_EQUALS(time6, getReplCoord()->getCurrentCommittedSnapshot_forTest());
 }
 
 // TODO(schwerin): Unit test election id updating

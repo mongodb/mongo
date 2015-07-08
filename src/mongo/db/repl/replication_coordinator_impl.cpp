@@ -247,6 +247,11 @@ ReplicaSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
     return _rsConfig;
 }
 
+OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshot_forTest() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return *_currentCommittedSnapshot;
+}
+
 void ReplicationCoordinatorImpl::_updateLastVote(const LastVote& lastVote) {
     _topCoord->loadLastVote(lastVote);
 }
