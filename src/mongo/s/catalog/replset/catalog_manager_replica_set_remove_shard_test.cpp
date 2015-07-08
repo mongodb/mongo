@@ -39,7 +39,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
-#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -82,45 +81,6 @@ public:
             BSONObjBuilder responseBuilder;
             Command::appendCommandStatus(responseBuilder, response.getStatus());
             return responseBuilder.obj();
-        });
-    }
-
-    void expectLogChange(const string& clientAddress,
-                         const string& what,
-                         const string& ns,
-                         const BSONObj& detail) {
-        onCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS("config", request.dbname);
-            BSONObj expectedCreateCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true
-                                                      << "size" << 1024 * 1024 * 10);
-            ASSERT_EQUALS(expectedCreateCmd, request.cmdObj);
-
-            return BSON("ok" << 1);
-        });
-
-        onCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS("config", request.dbname);
-
-            BatchedInsertRequest actualBatchedInsert;
-            std::string errmsg;
-            ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
-            ASSERT_EQUALS(ChangeLogType::ConfigNS, actualBatchedInsert.getNS().ns());
-            auto inserts = actualBatchedInsert.getDocuments();
-            ASSERT_EQUALS(1U, inserts.size());
-            BSONObj insert = inserts.front();
-
-            auto actualChangeLog = assertGet(ChangeLogType::fromBSON(insert));
-            ASSERT_EQUALS(clientAddress, actualChangeLog.getClientAddr());
-            ASSERT_EQUALS(what, actualChangeLog.getWhat());
-            ASSERT_EQUALS(ns, actualChangeLog.getNS());
-            ASSERT_EQUALS(detail, actualChangeLog.getDetails());
-
-            BatchedCommandResponse response;
-            response.setOk(true);
-
-            return response.toBSON();
         });
     }
 
@@ -235,7 +195,12 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
         return vector<BSONObj>{remainingShard.toBSON()};
     });
 
-    expectLogChange(clientHost.toString(), "removeShard.start", "", BSON("shard" << shardName));
+    expectChangeLogCreate(BSON("ok" << 1));
+    expectChangeLogInsert(clientHost.toString(),
+                          network()->now(),
+                          "removeShard.start",
+                          "",
+                          BSON("shard" << shardName));
 
     future.timed_get(kFutureTimeout);
 }
@@ -375,7 +340,9 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
         return vector<BSONObj>{remainingShard.toBSON()};
     });
 
-    expectLogChange(clientHost.toString(), "removeShard", "", BSON("shard" << shardName));
+    expectChangeLogCreate(BSON("ok" << 1));
+    expectChangeLogInsert(
+        clientHost.toString(), network()->now(), "removeShard", "", BSON("shard" << shardName));
 
     future.timed_get(kFutureTimeout);
 }

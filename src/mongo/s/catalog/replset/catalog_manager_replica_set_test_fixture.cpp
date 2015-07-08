@@ -44,6 +44,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
+#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -55,6 +56,7 @@ namespace mongo {
 
 using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
+using unittest::assertGet;
 
 using std::vector;
 
@@ -200,7 +202,7 @@ void CatalogManagerReplSetTestFixture::setupShards(const std::vector<ShardType>&
 }
 
 void CatalogManagerReplSetTestFixture::expectInserts(const NamespaceString nss,
-                                                     std::vector<BSONObj> expected) {
+                                                     const std::vector<BSONObj>& expected) {
     onCommand([&nss, &expected](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(nss.db(), request.dbname);
 
@@ -219,6 +221,66 @@ void CatalogManagerReplSetTestFixture::expectInserts(const NamespaceString nss,
         for (; itInserted != inserted.end(); itInserted++, itExpected++) {
             ASSERT_EQ(*itExpected, *itInserted);
         }
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+
+        return response.toBSON();
+    });
+}
+
+void CatalogManagerReplSetTestFixture::expectChangeLogCreate(const BSONObj& response) {
+    onCommand([&response](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS("config", request.dbname);
+        BSONObj expectedCreateCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true
+                                                  << "size" << 1024 * 1024 * 10);
+        ASSERT_EQUALS(expectedCreateCmd, request.cmdObj);
+
+        return response;
+    });
+}
+
+void CatalogManagerReplSetTestFixture::expectChangeLogInsert(const std::string& clientAddress,
+                                                             Date_t timestamp,
+                                                             const std::string& what,
+                                                             const std::string& ns,
+                                                             const BSONObj& detail) {
+    onCommand([this, &clientAddress, timestamp, &what, &ns, &detail](
+        const RemoteCommandRequest& request) {
+        ASSERT_EQUALS("config", request.dbname);
+
+        BatchedInsertRequest actualBatchedInsert;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(ChangeLogType::ConfigNS, actualBatchedInsert.getNS().ns());
+
+        auto inserts = actualBatchedInsert.getDocuments();
+        ASSERT_EQUALS(1U, inserts.size());
+
+        const ChangeLogType& actualChangeLog = assertGet(ChangeLogType::fromBSON(inserts.front()));
+
+        ASSERT_EQUALS(clientAddress, actualChangeLog.getClientAddr());
+        ASSERT_EQUALS(detail, actualChangeLog.getDetails());
+        ASSERT_EQUALS(ns, actualChangeLog.getNS());
+        ASSERT_EQUALS(shardRegistry()->getNetwork()->getHostName(), actualChangeLog.getServer());
+        ASSERT_EQUALS(timestamp, actualChangeLog.getTime());
+        ASSERT_EQUALS(what, actualChangeLog.getWhat());
+
+        // Handle changeId specially because there's no way to know what OID was generated
+        std::string changeId = actualChangeLog.getChangeId();
+        size_t firstDash = changeId.find("-");
+        size_t lastDash = changeId.rfind("-");
+
+        const std::string serverPiece = changeId.substr(0, firstDash);
+        const std::string timePiece = changeId.substr(firstDash + 1, lastDash - firstDash - 1);
+        const std::string oidPiece = changeId.substr(lastDash + 1);
+
+        ASSERT_EQUALS(shardRegistry()->getNetwork()->getHostName(), serverPiece);
+        ASSERT_EQUALS(timestamp.toString(), timePiece);
+
+        OID generatedOID;
+        // Just make sure this doesn't throws and assume the OID is valid
+        generatedOID.init(oidPiece);
 
         BatchedCommandResponse response;
         response.setOk(true);

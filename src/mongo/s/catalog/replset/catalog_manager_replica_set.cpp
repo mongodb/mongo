@@ -279,7 +279,7 @@ StatusWith<DatabaseType> CatalogManagerReplicaSet::getDatabase(const std::string
 
     const auto& docs = findStatus.getValue();
     if (docs.empty()) {
-        return {ErrorCodes::NamespaceNotFound, stream() << "database " << dbName << " not found"};
+        return {ErrorCodes::DatabaseNotFound, stream() << "database " << dbName << " not found"};
     }
 
     invariant(docs.size() == 1);

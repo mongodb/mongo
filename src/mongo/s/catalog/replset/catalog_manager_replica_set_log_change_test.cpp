@@ -38,7 +38,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
-#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -58,160 +57,79 @@ using unittest::assertGet;
 
 static const stdx::chrono::seconds kFutureTimeout{5};
 
-class LogChangeTest : public CatalogManagerReplSetTestFixture {
-public:
-    void expectChangeLogCreate(const BSONObj& response) {
-        onCommand([&response](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS("config", request.dbname);
-            BSONObj expectedCreateCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true
-                                                      << "size" << 1024 * 1024 * 10);
-            ASSERT_EQUALS(expectedCreateCmd, request.cmdObj);
+using LogChangeTest = CatalogManagerReplSetTestFixture;
 
-            return response;
-        });
-    }
-
-    void expectChangeLogInsert(const ChangeLogType& expectedChangeLog) {
-        onCommand([&expectedChangeLog](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS("config", request.dbname);
-
-            BatchedInsertRequest actualBatchedInsert;
-            std::string errmsg;
-            ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
-            ASSERT_EQUALS(ChangeLogType::ConfigNS, actualBatchedInsert.getNS().ns());
-            auto inserts = actualBatchedInsert.getDocuments();
-            ASSERT_EQUALS(1U, inserts.size());
-            BSONObj insert = inserts.front();
-
-            auto changeLogResult = ChangeLogType::fromBSON(insert);
-            ASSERT_OK(changeLogResult.getStatus());
-            ChangeLogType& actualChangeLog = changeLogResult.getValue();
-
-            ASSERT_EQUALS(expectedChangeLog.getClientAddr(), actualChangeLog.getClientAddr());
-            ASSERT_EQUALS(expectedChangeLog.getDetails(), actualChangeLog.getDetails());
-            ASSERT_EQUALS(expectedChangeLog.getNS(), actualChangeLog.getNS());
-            ASSERT_EQUALS(expectedChangeLog.getServer(), actualChangeLog.getServer());
-            ASSERT_EQUALS(expectedChangeLog.getTime(), actualChangeLog.getTime());
-            ASSERT_EQUALS(expectedChangeLog.getWhat(), actualChangeLog.getWhat());
-
-            // Handle changeId specially because there's no way to know what OID was generated
-            std::string changeId = actualChangeLog.getChangeId();
-            size_t firstDash = changeId.find("-");
-            size_t lastDash = changeId.rfind("-");
-            std::string serverPiece = changeId.substr(0, firstDash);
-            std::string timePiece = changeId.substr(firstDash + 1, lastDash - firstDash - 1);
-            std::string oidPiece = changeId.substr(lastDash + 1);
-
-            ASSERT_EQUALS(serverPiece, expectedChangeLog.getServer());
-            ASSERT_EQUALS(timePiece, expectedChangeLog.getTime().toString());
-
-            OID generatedOID;
-            // Just make sure this doesn't throws and assume the OID is valid
-            generatedOID.init(oidPiece);
-
-            BatchedCommandResponse response;
-            response.setOk(true);
-
-            return response.toBSON();
-        });
-    }
-};
-
-TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
+TEST_F(LogChangeTest, NoRetryAfterSuccessfulCreate) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    ChangeLogType expectedChangeLog;
-    expectedChangeLog.setServer(network()->getHostName());
-    expectedChangeLog.setClientAddr("client");
-    expectedChangeLog.setTime(network()->now());
-    expectedChangeLog.setNS("foo.bar");
-    expectedChangeLog.setWhat("moved a chunk");
-    expectedChangeLog.setDetails(BSON("min" << 3 << "max" << 4));
-
-    auto future = launchAsync([this, &expectedChangeLog] {
-        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                    expectedChangeLog.getWhat(),
-                                    expectedChangeLog.getNS(),
-                                    expectedChangeLog.getDetails());
+    auto future = launchAsync([this] {
+        catalogManager()->logChange(
+            "client", "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
     });
 
     expectChangeLogCreate(BSON("ok" << 1));
-    expectChangeLogInsert(expectedChangeLog);
+    expectChangeLogInsert(
+        "client", network()->now(), "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
 
     // Now wait for the logChange call to return
     future.timed_get(kFutureTimeout);
 
     // Now log another change and confirm that we don't re-attempt to create the collection
-    future = launchAsync([this, &expectedChangeLog] {
-        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                    expectedChangeLog.getWhat(),
-                                    expectedChangeLog.getNS(),
-                                    expectedChangeLog.getDetails());
+    future = launchAsync([this] {
+        catalogManager()->logChange(
+            "client", "moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5));
     });
 
-    expectChangeLogInsert(expectedChangeLog);
+    expectChangeLogInsert("client",
+                          network()->now(),
+                          "moved a second chunk",
+                          "foo.bar",
+                          BSON("min" << 4 << "max" << 5));
 
     // Now wait for the logChange call to return
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
+TEST_F(LogChangeTest, NoRetryCreateIfAlreadyExists) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    ChangeLogType expectedChangeLog;
-    expectedChangeLog.setServer(network()->getHostName());
-    expectedChangeLog.setClientAddr("client");
-    expectedChangeLog.setTime(network()->now());
-    expectedChangeLog.setNS("foo.bar");
-    expectedChangeLog.setWhat("moved a chunk");
-    expectedChangeLog.setDetails(BSON("min" << 3 << "max" << 4));
-
-    auto future = launchAsync([this, &expectedChangeLog] {
-        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                    expectedChangeLog.getWhat(),
-                                    expectedChangeLog.getNS(),
-                                    expectedChangeLog.getDetails());
+    auto future = launchAsync([this] {
+        catalogManager()->logChange(
+            "client", "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
     });
 
     BSONObjBuilder createResponseBuilder;
     Command::appendCommandStatus(createResponseBuilder,
                                  Status(ErrorCodes::NamespaceExists, "coll already exists"));
     expectChangeLogCreate(createResponseBuilder.obj());
-    expectChangeLogInsert(expectedChangeLog);
+    expectChangeLogInsert(
+        "client", network()->now(), "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
 
     // Now wait for the logAction call to return
     future.timed_get(kFutureTimeout);
 
     // Now log another change and confirm that we don't re-attempt to create the collection
-    future = launchAsync([this, &expectedChangeLog] {
-        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                    expectedChangeLog.getWhat(),
-                                    expectedChangeLog.getNS(),
-                                    expectedChangeLog.getDetails());
+    future = launchAsync([this] {
+        catalogManager()->logChange(
+            "client", "moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5));
     });
 
-    expectChangeLogInsert(expectedChangeLog);
+    expectChangeLogInsert("client",
+                          network()->now(),
+                          "moved a second chunk",
+                          "foo.bar",
+                          BSON("min" << 4 << "max" << 5));
 
     // Now wait for the logChange call to return
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(LogChangeTest, LogActionCreateFailure) {
+TEST_F(LogChangeTest, CreateFailure) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    ChangeLogType expectedChangeLog;
-    expectedChangeLog.setServer(network()->getHostName());
-    expectedChangeLog.setClientAddr("client");
-    expectedChangeLog.setTime(network()->now());
-    expectedChangeLog.setNS("foo.bar");
-    expectedChangeLog.setWhat("moved a chunk");
-    expectedChangeLog.setDetails(BSON("min" << 3 << "max" << 4));
-
-    auto future = launchAsync([this, &expectedChangeLog] {
-        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                    expectedChangeLog.getWhat(),
-                                    expectedChangeLog.getNS(),
-                                    expectedChangeLog.getDetails());
+    auto future = launchAsync([this] {
+        catalogManager()->logChange(
+            "client", "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
     });
 
     BSONObjBuilder createResponseBuilder;
@@ -223,15 +141,17 @@ TEST_F(LogChangeTest, LogActionCreateFailure) {
     future.timed_get(kFutureTimeout);
 
     // Now log another change and confirm that we *do* attempt to create the collection
-    future = launchAsync([this, &expectedChangeLog] {
-        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
-                                    expectedChangeLog.getWhat(),
-                                    expectedChangeLog.getNS(),
-                                    expectedChangeLog.getDetails());
+    future = launchAsync([this] {
+        catalogManager()->logChange(
+            "client", "moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5));
     });
 
     expectChangeLogCreate(BSON("ok" << 1));
-    expectChangeLogInsert(expectedChangeLog);
+    expectChangeLogInsert("client",
+                          network()->now(),
+                          "moved a second chunk",
+                          "foo.bar",
+                          BSON("min" << 4 << "max" << 5));
 
     // Now wait for the logChange call to return
     future.timed_get(kFutureTimeout);

@@ -102,7 +102,23 @@ protected:
      * Wait for a single insert request and ensures that the items being inserted exactly match the
      * expected items. Responds with a success status.
      */
-    void expectInserts(const NamespaceString nss, std::vector<BSONObj> expected);
+    void expectInserts(const NamespaceString nss, const std::vector<BSONObj>& expected);
+
+    /**
+     * Wait for an operation, which creates the sharding change log collection and return the
+     * specified response.
+     */
+    void expectChangeLogCreate(const BSONObj& response);
+
+    /**
+     * Wait for a single insert in the change log collection with the specified contents and return
+     * a successful response.
+     */
+    void expectChangeLogInsert(const std::string& clientAddress,
+                               Date_t timestamp,
+                               const std::string& what,
+                               const std::string& ns,
+                               const BSONObj& detail);
 
     void setUp() override;
 
