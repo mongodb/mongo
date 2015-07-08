@@ -525,8 +525,6 @@ public:
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
 
-    static const char groupName[];
-
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
@@ -626,8 +624,6 @@ public:
     /// Returns the query in Matcher syntax.
     BSONObj getQuery() const;
 
-    static const char matchName[];
-
     /** Returns the portion of the match that can safely be promoted to before a $redact.
      *  If this returns an empty BSONObj, no part of this match may safely be promoted.
      *
@@ -672,8 +668,6 @@ public:
 
     static boost::intrusive_ptr<DocumentSource> create(
         const CursorIds& cursorIds, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    static const char name[];
 
     /** Returns non-owning pointers to cursors managed by this stage.
      *  Call this instead of getNext() if you want access to the raw streams.
@@ -749,8 +743,6 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    static const char outName[];
-
 private:
     DocumentSourceOut(const NamespaceString& outputNs,
                       const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -790,8 +782,6 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    static const char projectName[];
-
     /** projection as specified by the user */
     BSONObj getRaw() const {
         return _raw;
@@ -812,8 +802,6 @@ public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
-
-    static const char redactName[];
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -888,8 +876,6 @@ public:
     boost::intrusive_ptr<DocumentSourceLimit> getLimitSrc() const {
         return limitSrc;
     }
-
-    static const char sortName[];
 
 private:
     explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -1000,8 +986,6 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    static const char limitName[];
-
 private:
     DocumentSourceLimit(const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
 
@@ -1061,8 +1045,6 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    static const char skipName[];
-
 private:
     explicit DocumentSourceSkip(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
@@ -1092,8 +1074,6 @@ public:
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    static const char unwindName[];
 
 private:
     explicit DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
