@@ -2,7 +2,9 @@
 
 # Run standard scripts.
 t=__wt.$$
-trap 'rm -f $t *.pyc __tmp __wt.*' 0 1 2 3 13 15
+t_pfx=__s_all_tmp
+trap 'rm -f $t *.pyc __tmp __wt.* __s_all_tmp*' 0 1 2 3 13 15
+FAIL_HEADER="####################### ERROR ############################"
 
 # We require python which may not be installed.
 type python > /dev/null 2>&1 || {
@@ -12,16 +14,18 @@ type python > /dev/null 2>&1 || {
 
 run()
 {
-	printf "WiredTiger: $2..."
+	error_prefix="s_all run of: $1 resulted in:"
 	$1 > $t
 
 	if `grep 'skipped' $t > /dev/null 2>&1`; then
-		printf " " && cat $t
+		echo "$FAIL_HEADER"
+		printf "$error_prefix"
+	        printf "	" && cat $t
 	elif `test -s $t`; then
+		echo "$FAIL_HEADER"
+		printf "$error_prefix"
 		echo
 		sed -e 's/^/	/' $t
-	else
-		echo ' OK'
 	fi
 	rm -f $t
 	return 0
@@ -51,34 +55,50 @@ test "$reconf" -eq 0 || {
 	run "sh ./reconf" "Rebuilding GNU tools library support")
 }
 
-run "sh ./s_readme $force" "building README file"
-run "python api_config.py" "building WiredTiger API"
-run "python api_err.py" "building WiredTiger error returns"
-run "python flags.py" "building flags"
-run "python log.py" "building logging layer"
-run "python stat.py" "building statistics support"
-run "python java_doc.py" "building Java documentation index"
-run "sh ./s_typedef -b" "building standard typedefs"
-run "sh ./s_prototypes" "building function prototypes"
-run "sh ./s_tags" "building tags files"
+# Non parallelizable scripts The following scripts either modify files or
+# already parallelize internally.
+run "sh ./s_readme $force"
+run "python api_config.py"
+run "python api_err.py"
+run "python flags.py"
+run "python log.py"
+run "python stat.py"
+run "python java_doc.py"
+run "sh ./s_prototypes"
+run "sh ./s_typedef -b"
+run "sh ./s_copyright"
+run "sh ./s_style"
 
-run "sh ./s_copyright" "checking copyright notices"
-run "sh ./s_define" "checking for unused #defines"
-run "sh ./s_typedef -c" "checking for unused typedefs"
-run "sh ./s_funcs" "checking for unused functions"
-run "sh ./s_export" "checking external symbol names"
-run "sh ./s_getopt" "checking for incorrect getopt usage"
-run "sh ./s_label" "checking error/return labels"
-run "sh ./s_lang" "checking for SWIG generated name conflicts"
-run "sh ./s_longlines" "checking for long lines"
-run "sh ./s_stat" "checking for unused statistics fields"
-run "sh ./s_string" "checking string spelling"
-run "python style.py" "checking style (pass 1)"
-run "sh ./s_style" "checking style (pass 2)"
-run "sh ./s_python" "checking Python style"
-run "sh ./s_whitespace" "checking whitespace"
-run "sh ./s_win" "checking windows config"
+read -d '' COMMANDS <<EOM
+'sh ./s_tags > ${t_pfx}tags'
+'sh ./s_define > ${t_pfx}s_define'
+'sh ./s_typedef -c > ${t_pfx}s_typedef_c'
+'sh ./s_funcs > ${t_pfx}s_funcs'
+'sh ./s_export > ${t_pfx}s_export'
+'sh ./s_getopt > ${t_pfx}s_getopt'
+'sh ./s_label > ${t_pfx}s_label'
+'sh ./s_lang > ${t_pfx}s_lang'
+'sh ./s_longlines > ${t_pfx}s_longlines'
+'sh ./s_stat > ${t_pfx}_stat'
+'sh ./s_string > ${t_pfx}s_string'
+'python style.py > ${t_pfx}py_style'
+'sh ./s_python > ${t_pfx}s_python'
+'sh ./s_whitespace > ${t_pfx}s_whitespace'
+'sh ./s_win > ${t_pfx}s_win'
+'sh ./s_docs > ${t_pfx}s_docs'
+EOM
 
-run "sh ./s_docs" "generating documentation"
+echo "$COMMANDS" | xargs -P 20 -n 1 -I{} /bin/sh -c {}
+
+for f in `find . -name ${t_pfx}\*`; do
+	if ! `test -s $f`; then
+		continue
+	fi
+	LOCAL_NAME=`basename $f`
+	FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | cut -d '>' -f 1`
+	echo "$FAIL_HEADER"
+	echo "s_all run failed: $FAILED_CMD produced"
+	cat $f
+done
 
 echo 'dist/s_all run finished'

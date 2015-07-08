@@ -43,7 +43,15 @@ ENDOFTEXT
 
 check()
 {
-	# Skip files in which WiredTiger holds no rights.
+	cd dist
+	# Skip files in which WiredTiger holds no rights. 3rdparty and
+	# node_modules are used by wtstats
+	if `egrep "3rdparty" <<< $1 > /dev/null`; then
+		return;
+	fi
+	if `egrep "node_modules" <<< $1 > /dev/null`; then
+		return;
+	fi
 	if `egrep "skip	$1" s_copyright.list > /dev/null`; then
 		return;
 	fi
@@ -72,38 +80,46 @@ check()
 	echo "$1: copyright information is incorrect"
 }
 
-# Search for files, skipping some well-known 3rd party directories.
-for i in `cd .. &&
-    find [a-z]* -name '*.[chi]' \
-        -o -name '*.cxx' -o -name '*.in' -o -name '*.java' -o -name '*.py' |
-    sed	-e '/Makefile.in/d' \
-	-e '/^build_posix\//d' \
-        -e '/api\/leveldb\/basho\//d' \
-        -e '/api\/leveldb\/hyperleveldb\//d' \
-        -e '/api\/leveldb\/leveldb\//d' \
-        -e '/api\/leveldb\/rocksdb\//d' \
-        -e '/test\/3rdparty\//d' \
-        -e '/tools\/wtperf_stats\/3rdparty\//d' \
-	-e 's/^\.\///'`
-do
-	check $i
-done
+if [ $# -ne 1 ]; then
+	# Search for files, skipping some well-known 3rd party directories.
+	(cd .. && find [a-z]* -name '*.[chi]' \
+		-o -name '*.cxx' \
+		-o -name '*.in' \
+		-o -name '*.java' \
+		-o -name '*.py' |
+	    sed	-e '/Makefile.in/d' \
+		-e '/^build_posix\//d' \
+		-e '/api\/leveldb\/basho\//d' \
+		-e '/api\/leveldb\/hyperleveldb\//d' \
+		-e '/api\/leveldb\/leveldb\//d' \
+		-e '/api\/leveldb\/rocksdb\//d' \
+		-e '/test\/3rdparty\//d' \
+		-e '/tools\/wtperf_stats\/3rdparty\//d' \
+		-e '/dist\/__/d' \
+		-e 's/^\.\///' |
+	    xargs -P 20 -n 1 -I{} sh ./dist/s_copyright {})
 
-# A few special cases: LICENSE, documentation, wt utility, some of which
-# have more than one copyright notice in the file. For files that have
-# only a single copyright notice, we give it to MongoDB, from 2008 to now.
-string1="Copyright \(c\) 2014-$year MongoDB, Inc."
-string2="Copyright \(c\) 2008-$year MongoDB, Inc."
-string3="printf.*Copyright \(c\) 2008-$year MongoDB, Inc."
-special_copyright()
-{
-	cnt=`egrep "$3" ../$1 | wc -l`
-	if test $cnt -ne $2; then
-		echo "$1: copyright information is incorrect"
-	fi
-}
+	# A few special cases: LICENSE, documentation, wt utility, some of
+	# which have more than one copyright notice in the file. For files that
+	# have only a single copyright notice, we give it to MongoDB, from 2008
+	# to now.
+	string1="Copyright \(c\) 2014-$year MongoDB, Inc."
+	string2="Copyright \(c\) 2008-$year MongoDB, Inc."
+	string3="printf.*Copyright \(c\) 2008-$year MongoDB, Inc."
+	special_copyright()
+	{
+		cnt=`egrep "$3" ../$1 | wc -l`
+		if test $cnt -ne $2; then
+			echo "$1: copyright information is incorrect"
+		fi
+	}
 
-special_copyright LICENSE 1 "$string1"
-special_copyright src/docs/build-javadoc.sh 1 "$string2"
-special_copyright src/docs/style/footer.html 2 "$string2"
-special_copyright src/utilities/util_cpyright.c 1 "$string3"
+	special_copyright LICENSE 1 "$string1"
+	special_copyright src/docs/build-javadoc.sh 1 "$string2"
+	special_copyright src/docs/style/footer.html 2 "$string2"
+	special_copyright src/utilities/util_cpyright.c 1 "$string3"
+else
+	# s_copyright is re-entrant. It calls itself with individual file
+	# names. Any single arg call is a file name - check it's copyright.
+	check $1
+fi
