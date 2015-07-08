@@ -43,9 +43,15 @@ class PackTester:
         self.forw_idx = None      #  code -> r
         self.back = None          #  code -> r
         self.back_idx = None      #  r -> code
+        self.session = None
         self.equals = equals
+        self.forw_uri = None
+        self.back_uri = None
+        self.forw_idx_uri = None
+        self.back_idx_uri = None
 
     def initialize(self, session):
+        self.session = session
         pfx = 'test_intpack_'
         x = self.formatcode
         if x.isupper():
@@ -60,14 +66,37 @@ class PackTester:
         session.create(forw_uri, "columns=(k,v)," +
                        "key_format=i,value_format=" + self.formatcode)
         session.create(forw_idx_uri, "columns=(v)")
-        self.forw = session.open_cursor(forw_uri, None, None)
-        self.forw_idx = session.open_cursor(forw_idx_uri + "(k)", None, None)
-
         session.create(back_uri, "columns=(k,v)," +
                        "key_format=" + self.formatcode + ",value_format=i")
         session.create(back_idx_uri, "columns=(v)")
-        self.back = session.open_cursor(back_uri, None, None)
-        self.back_idx = session.open_cursor(back_idx_uri + "(k)", None, None)
+        self.forw_uri = forw_uri
+        self.back_uri = back_uri
+        self.forw_idx_uri = forw_idx_uri
+        self.back_idx_uri = back_idx_uri
+        self.truncate()
+
+    def closeall(self):
+        if self.forw != None:
+            self.forw.close()
+            self.forw_idx.close()
+            self.back.close()
+            self.back_idx.close()
+            self.forw = None
+            self.forw_idx = None
+            self.back = None
+            self.back_idx = None
+
+    def truncate(self):
+        self.closeall()
+        self.session.truncate(self.forw_uri, None, None, None)
+        self.session.truncate(self.back_uri, None, None, None)
+        self.forw = self.session.open_cursor(self.forw_uri, None, None)
+        self.forw_idx = self.session.open_cursor(self.forw_idx_uri + "(k)",
+                                                 None, None)
+
+        self.back = self.session.open_cursor(self.back_uri, None, None)
+        self.back_idx = self.session.open_cursor(self.back_idx_uri + "(k)",
+                                                 None, None)
 
     def check_range(self, low, high):
         if low < self.validlow:
@@ -75,18 +104,25 @@ class PackTester:
         if high > self.validhigh:
             high = self.validhigh
         i = low
+        forw = self.forw
+        forw_idx = self.forw_idx
+        back = self.back
+        back_idx = self.back_idx
         while i <= high:
-            self.forw[self.recno] = i
-            self.back[i] = self.recno
-            self.equals(self.forw[self.recno], i)
-            self.equals(self.forw_idx[i], self.recno)
-            self.equals(self.back[i], self.recno)
-            self.equals(self.back_idx[self.recno], i)
+            forw[self.recno] = i
+            back[i] = self.recno
+            self.equals(forw[self.recno], i)
+            self.equals(forw_idx[i], self.recno)
+            self.equals(back[i], self.recno)
+            self.equals(back_idx[self.recno], i)
+            forw.reset()
+            forw_idx.reset()
+            back.reset()
+            back_idx.reset()
             self.recno += 1
             i += 1
 
-
-# Test configuration strings.
+# Test integer packing with various formats
 class test_intpack(wttest.WiredTigerTestCase):
     name = 'test_intpack'
 
@@ -111,7 +147,7 @@ class test_intpack(wttest.WiredTigerTestCase):
         pt = PackTester(self.formatcode, self.low, self.high, self.assertEquals)
         self.assertEquals(2 ** self.nbits, self.high - self.low + 1)
         pt.initialize(self.session)
-        pt.check_range(-10000, 10000)
+        pt.check_range(-66000, 66000)
         if self.nbits >= 32:
             e32 = 2 ** 32
             pt.check_range(e32 - 1000, e32 + 1000)
@@ -120,7 +156,12 @@ class test_intpack(wttest.WiredTigerTestCase):
             e64 = 2 ** 64
             pt.check_range(e64 - 1000, e64 + 1000)
             pt.check_range(-e64 - 1000, -e64 + 1000)
-
+            pt.truncate()
+            i = 8
+            while i < 1 << 60:
+                pt.check_range(-i - 1, -i + 1)
+                pt.check_range(i - 1, i + 1)
+                i <<= 1
 
 if __name__ == '__main__':
     wttest.run()
