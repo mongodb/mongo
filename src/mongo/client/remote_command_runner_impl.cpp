@@ -255,7 +255,7 @@ StatusWith<RemoteCommandResponse> RemoteCommandRunnerImpl::runCommand(
 
         return StatusWith<RemoteCommandResponse>(
             RemoteCommandResponse(std::move(output),
-                                  commandResponse->getCommandReply().getOwned(),
+                                  commandResponse->getMetadata().getOwned(),
                                   Milliseconds(requestFinishDate - requestStartDate)));
     } catch (const DBException& ex) {
         return StatusWith<RemoteCommandResponse>(ex.toStatus());
