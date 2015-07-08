@@ -145,6 +145,10 @@ src/third_party/v8/src/libraries.cc
 .project
 .pydevproject
 
+# Idea CLion project artifacts
+.idea
+CMakeLists.txt
+
 # old things that should be removed
 # maybe remove this mid 2012
 src/mongo/buildinfo.cpp
