@@ -52,12 +52,12 @@ using stdx::make_unique;
 class MockStage : public PlanStage {
 public:
     MockStage(const vector<BSONObj>& data, WorkingSet* workingSet)
-        : _data(data), _pos(0), _workingSet(workingSet), _stats("MOCK_STAGE") {}
+        : PlanStage("MOCK_STAGE"), _data(data), _pos(0), _workingSet(workingSet) {}
 
     virtual ~MockStage() {}
 
     virtual StageState work(WorkingSetID* out) {
-        ++_stats.works;
+        ++_commonStats.works;
 
         if (isEOF())
             return PlanStage::IS_EOF;
@@ -82,25 +82,12 @@ public:
         return _pos == static_cast<int>(_data.size());
     }
 
-    virtual void saveState() {}
-
-    virtual void restoreState(OperationContext* opCtx) {}
-
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {}
-    virtual vector<PlanStage*> getChildren() const {
-        return vector<PlanStage*>();
-    }
-
     virtual StageType stageType() const {
         return STAGE_UNKNOWN;
     }
 
     virtual unique_ptr<PlanStageStats> getStats() {
-        return make_unique<PlanStageStats>(_stats, STAGE_UNKNOWN);
-    }
-
-    virtual const CommonStats* getCommonStats() const {
-        return &_stats;
+        return make_unique<PlanStageStats>(_commonStats, STAGE_UNKNOWN);
     }
 
     virtual const SpecificStats* getSpecificStats() const {
@@ -113,8 +100,6 @@ private:
 
     // Not owned here
     WorkingSet* const _workingSet;
-
-    CommonStats _stats;
 };
 
 /**
@@ -133,11 +118,7 @@ public:
     };
 
     MockNearStage(WorkingSet* workingSet)
-        : NearStage(NULL,
-                    workingSet,
-                    NULL,
-                    new PlanStageStats(CommonStats("MOCK_DISTANCE_SEARCH_STAGE"), STAGE_UNKNOWN)),
-          _pos(0) {}
+        : NearStage(NULL, "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, NULL), _pos(0) {}
 
     virtual ~MockNearStage() {}
 
@@ -154,12 +135,9 @@ public:
         const MockInterval& interval = *_intervals.vector()[_pos++];
 
         bool lastInterval = _pos == static_cast<int>(_intervals.vector().size());
-        return StatusWith<CoveredInterval*>(
-            new CoveredInterval(new MockStage(interval.data, workingSet),
-                                true,
-                                interval.min,
-                                interval.max,
-                                lastInterval));
+        _children.emplace_back(new MockStage(interval.data, workingSet));
+        return StatusWith<CoveredInterval*>(new CoveredInterval(
+            _children.back().get(), true, interval.min, interval.max, lastInterval));
     }
 
     virtual StatusWith<double> computeDistance(WorkingSetMember* member) {
@@ -173,14 +151,6 @@ public:
                                   WorkingSetID* out) {
         return IS_EOF;
     }
-
-    virtual void finishSaveState() {}
-
-    virtual void finishRestoreState(OperationContext* txn) {}
-
-    virtual void finishInvalidate(OperationContext* txn,
-                                  const RecordId& dl,
-                                  InvalidationType type) {}
 
 private:
     OwnedPointerVector<MockInterval> _intervals;

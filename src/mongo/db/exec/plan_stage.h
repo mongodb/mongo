@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/invalidation_type.h"
@@ -101,7 +104,11 @@ class OperationContext;
  */
 class PlanStage {
 public:
+    PlanStage(const char* typeName) : _commonStats(typeName) {}
+
     virtual ~PlanStage() {}
+
+    using Children = std::vector<std::unique_ptr<PlanStage>>;
 
     /**
      * All possible return values of work(...)
@@ -199,24 +206,22 @@ public:
     //
 
     /**
-     * Notifies the stage that all locks are about to be released.  The stage must save any
-     * state required to resume where it was before saveState was called.
+     * Notifies the stage that the underlying data source may change.
      *
-     * Stages must be able to handle multiple calls to saveState() in a row without a call to
-     * restoreState() in between.
+     * It is illegal to call work() or isEOF() when a stage is in the "saved" state.
+     *
+     * Propagates to all children, then calls doSaveState().
      */
-    virtual void saveState() = 0;
+    void saveState();
 
     /**
-     * Notifies the stage that any required locks have been reacquired.  The stage must restore
-     * any saved state and be ready to handle calls to work().
+     * Notifies the stage that underlying data is stable again and prepares for calls to work().
      *
-     * Can only be called after saveState.
+     * Can only be called while the stage in is the "saved" state.
      *
-     * If the stage needs an OperationContext during its execution, it may keep a handle to the
-     * provided OperationContext (which is valid until the next call to saveState()).
+     * Propagates to all children, then calls doRestoreState().
      */
-    virtual void restoreState(OperationContext* opCtx) = 0;
+    void restoreState(OperationContext* opCtx);
 
     /**
      * Notifies a stage that a RecordId is going to be deleted (or in-place updated) so that the
@@ -228,14 +233,18 @@ public:
      * The provided OperationContext should be used if any work needs to be performed during the
      * invalidate (as the state of the stage must be saved before any calls to invalidate, the
      * stage's own OperationContext is inactive during the invalidate and should not be used).
+     *
+     * Propagates to all children, then calls doInvalidate().
      */
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) = 0;
+    void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     /**
      * Retrieve a list of this stage's children. This stage keeps ownership of
      * its children.
      */
-    virtual std::vector<PlanStage*> getChildren() const = 0;
+    const Children& getChildren() const {
+        return _children;
+    }
 
     /**
      * What type of stage is this?
@@ -262,7 +271,9 @@ public:
      * It must not exist past the stage. If you need the stats to outlive the stage,
      * use the getStats(...) method above.
      */
-    virtual const CommonStats* getCommonStats() const = 0;
+    const CommonStats* getCommonStats() const {
+        return &_commonStats;
+    }
 
     /**
      * Get stats specific to this stage. Some stages may not have specific stats, in which
@@ -273,6 +284,42 @@ public:
      * use the getStats(...) method above.
      */
     virtual const SpecificStats* getSpecificStats() const = 0;
+
+protected:
+    /**
+     * Saves any stage-specific state required to resume where it was if the underlying data
+     * changes.
+     *
+     * Stages must be able to handle multiple calls to doSaveState() in a row without a call to
+     * doRestoreState() in between.
+     */
+    virtual void doSaveState() {}
+
+    /**
+     * Restores any stage-specific saved state and prepares to handle calls to work().
+     *
+     * If the stage needs an OperationContext during its execution, it may keep a handle to the
+     * provided OperationContext (which is valid until the next call to saveState()).
+     */
+    virtual void doRestoreState(OperationContext* txn) {}
+
+    /**
+     * Does the stage-specific invalidation work.
+     */
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {}
+
+    /**
+     * Returns the only child.
+     *
+     * Convenience method for PlanStages that have exactly one child.
+     */
+    const std::unique_ptr<PlanStage>& child() const {
+        dassert(_children.size() == 1);
+        return _children.front();
+    }
+
+    Children _children;
+    CommonStats _commonStats;
 };
 
 }  // namespace mongo

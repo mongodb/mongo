@@ -50,19 +50,11 @@ public:
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
-
     virtual StageType stageType() const {
         return STAGE_LIMIT;
     }
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -70,13 +62,11 @@ public:
 
 private:
     WorkingSet* _ws;
-    std::unique_ptr<PlanStage> _child;
 
     // We only return this many results.
     long long _numToReturn;
 
     // Stats
-    CommonStats _commonStats;
     LimitStats _specificStats;
 };
 

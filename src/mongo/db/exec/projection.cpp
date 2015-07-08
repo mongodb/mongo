@@ -55,7 +55,8 @@ const char* ProjectionStage::kStageType = "PROJECTION";
 ProjectionStage::ProjectionStage(const ProjectionStageParams& params,
                                  WorkingSet* ws,
                                  PlanStage* child)
-    : _ws(ws), _child(child), _commonStats(kStageType), _projImpl(params.projImpl) {
+    : PlanStage(kStageType), _ws(ws), _projImpl(params.projImpl) {
+    _children.emplace_back(child);
     _projObj = params.projObj;
 
     if (ProjectionStageParams::NO_FAST_PATH == _projImpl) {
@@ -189,10 +190,8 @@ Status ProjectionStage::transform(WorkingSetMember* member) {
     return Status::OK();
 }
 
-ProjectionStage::~ProjectionStage() {}
-
 bool ProjectionStage::isEOF() {
-    return _child->isEOF();
+    return child()->isEOF();
 }
 
 PlanStage::StageState ProjectionStage::work(WorkingSetID* out) {
@@ -202,7 +201,7 @@ PlanStage::StageState ProjectionStage::work(WorkingSetID* out) {
     ScopedTimer timer(&_commonStats.executionTimeMillis);
 
     WorkingSetID id = WorkingSet::INVALID_ID;
-    StageState status = _child->work(&id);
+    StageState status = child()->work(&id);
 
     // Note that we don't do the normal if isEOF() return EOF thing here.  Our child might be a
     // tailable cursor and isEOF() would be true even if it had more data...
@@ -239,27 +238,6 @@ PlanStage::StageState ProjectionStage::work(WorkingSetID* out) {
     return status;
 }
 
-void ProjectionStage::saveState() {
-    ++_commonStats.yields;
-    _child->saveState();
-}
-
-void ProjectionStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-    _child->restoreState(opCtx);
-}
-
-void ProjectionStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-    _child->invalidate(txn, dl, type);
-}
-
-vector<PlanStage*> ProjectionStage::getChildren() const {
-    vector<PlanStage*> children;
-    children.push_back(_child.get());
-    return children;
-}
-
 unique_ptr<PlanStageStats> ProjectionStage::getStats() {
     _commonStats.isEOF = isEOF();
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_PROJECTION);
@@ -268,12 +246,8 @@ unique_ptr<PlanStageStats> ProjectionStage::getStats() {
     projStats->projObj = _projObj;
     ret->specific = std::move(projStats);
 
-    ret->children.push_back(_child->getStats().release());
+    ret->children.push_back(child()->getStats().release());
     return ret;
-}
-
-const CommonStats* ProjectionStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* ProjectionStage::getSpecificStats() const {

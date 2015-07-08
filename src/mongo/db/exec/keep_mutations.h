@@ -52,19 +52,11 @@ public:
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
-
     virtual StageType stageType() const {
         return STAGE_KEEP_MUTATIONS;
     }
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -73,8 +65,6 @@ public:
 private:
     // Not owned here.
     WorkingSet* _workingSet;
-
-    std::unique_ptr<PlanStage> _child;
 
     // Not owned here.  Should be the full query expression tree.
     const MatchExpression* _filter;
@@ -85,9 +75,6 @@ private:
     // ...until it's out of results, at which point we put any flagged results back in the query
     // stream.
     bool _doneReturningFlagged;
-
-    // Stats.
-    CommonStats _commonStats;
 
     // Our copy of the working set's flagged results.
     std::vector<WorkingSetID> _flagged;

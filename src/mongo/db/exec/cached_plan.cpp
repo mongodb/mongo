@@ -60,15 +60,15 @@ CachedPlanStage::CachedPlanStage(OperationContext* txn,
                                  const QueryPlannerParams& params,
                                  size_t decisionWorks,
                                  PlanStage* root)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _collection(collection),
       _ws(ws),
       _canonicalQuery(cq),
       _plannerParams(params),
-      _decisionWorks(decisionWorks),
-      _root(root),
-      _commonStats(kStageType) {
+      _decisionWorks(decisionWorks) {
     invariant(_collection);
+    _children.emplace_back(root);
 }
 
 Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
@@ -93,7 +93,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
 
         WorkingSetID id = WorkingSet::INVALID_ID;
-        PlanStage::StageState state = _root->work(&id);
+        PlanStage::StageState state = child()->work(&id);
 
         if (PlanStage::ADVANCED == state) {
             // Save result for later.
@@ -138,7 +138,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
             LOG(1) << "Execution of cached plan failed, falling back to replan."
                    << " query: " << _canonicalQuery->toStringShort()
-                   << " planSummary: " << Explain::getPlanSummary(_root.get())
+                   << " planSummary: " << Explain::getPlanSummary(child().get())
                    << " status: " << statusObj;
 
             const bool shouldCache = false;
@@ -149,7 +149,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
             LOG(1) << "Execution of cached plan failed: PlanStage died"
                    << ", query: " << _canonicalQuery->toStringShort()
-                   << " planSummary: " << Explain::getPlanSummary(_root.get())
+                   << " planSummary: " << Explain::getPlanSummary(child().get())
                    << " status: " << statusObj;
 
             return WorkingSetCommon::getMemberObjectStatus(statusObj);
@@ -164,7 +164,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
            << " works, but was originally cached with only " << _decisionWorks
            << " works. Evicting cache entry and replanning query: "
            << _canonicalQuery->toStringShort()
-           << " plan summary before replan: " << Explain::getPlanSummary(_root.get());
+           << " plan summary before replan: " << Explain::getPlanSummary(child().get());
 
     const bool shouldCache = true;
     return replan(yieldPolicy, shouldCache);
@@ -194,11 +194,10 @@ Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
 }
 
 Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
-    // We're going to start over with a new plan. No need for only old buffered results.
+    // We're going to start over with a new plan. Clear out info from our old plan.
     _results.clear();
-
-    // Clear out the working set. We'll start with a fresh working set.
     _ws->clear();
+    _children.clear();
 
     // Use the query planning module to plan the whole query.
     std::vector<QuerySolution*> rawSolutions;
@@ -230,15 +229,15 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
         PlanStage* newRoot;
         // Only one possible plan. Build the stages from the solution.
         verify(StageBuilder::build(_txn, _collection, *solutions[0], _ws, &newRoot));
-        _root.reset(newRoot);
+        _children.emplace_back(newRoot);
         _replannedQs.reset(solutions.popAndReleaseBack());
         return Status::OK();
     }
 
     // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
     // and so on. The working set will be shared by all candidate plans.
-    _root.reset(new MultiPlanStage(_txn, _collection, _canonicalQuery, shouldCache));
-    MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(_root.get());
+    _children.emplace_back(new MultiPlanStage(_txn, _collection, _canonicalQuery, shouldCache));
+    MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
     for (size_t ix = 0; ix < solutions.size(); ++ix) {
         if (solutions[ix]->cacheData.get()) {
@@ -257,7 +256,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
 }
 
 bool CachedPlanStage::isEOF() {
-    return _results.empty() && _root->isEOF();
+    return _results.empty() && child()->isEOF();
 }
 
 PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
@@ -279,7 +278,7 @@ PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
     }
 
     // Nothing left in trial period buffer.
-    StageState childStatus = _root->work(out);
+    StageState childStatus = child()->work(out);
 
     if (PlanStage::ADVANCED == childStatus) {
         _commonStats.advanced++;
@@ -292,24 +291,14 @@ PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
     return childStatus;
 }
 
-void CachedPlanStage::saveState() {
-    _txn = NULL;
-    ++_commonStats.yields;
-    _root->saveState();
-}
 
-void CachedPlanStage::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
+void CachedPlanStage::doRestoreState(OperationContext* opCtx) {
     _txn = opCtx;
-
-    ++_commonStats.unyields;
-    _root->restoreState(opCtx);
 }
 
-void CachedPlanStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    _root->invalidate(txn, dl, type);
-    ++_commonStats.invalidates;
-
+void CachedPlanStage::doInvalidate(OperationContext* txn,
+                                   const RecordId& dl,
+                                   InvalidationType type) {
     for (std::list<WorkingSetID>::iterator it = _results.begin(); it != _results.end();) {
         WorkingSetMember* member = _ws->get(*it);
         if (member->hasLoc() && member->loc == dl) {
@@ -324,23 +313,15 @@ void CachedPlanStage::invalidate(OperationContext* txn, const RecordId& dl, Inva
     }
 }
 
-std::vector<PlanStage*> CachedPlanStage::getChildren() const {
-    return {_root.get()};
-}
-
 std::unique_ptr<PlanStageStats> CachedPlanStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     std::unique_ptr<PlanStageStats> ret =
         stdx::make_unique<PlanStageStats>(_commonStats, STAGE_CACHED_PLAN);
     ret->specific = stdx::make_unique<CachedPlanStats>(_specificStats);
-    ret->children.push_back(_root->getStats().release());
+    ret->children.push_back(child()->getStats().release());
 
     return ret;
-}
-
-const CommonStats* CachedPlanStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* CachedPlanStage::getSpecificStats() const {

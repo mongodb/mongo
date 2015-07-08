@@ -48,20 +48,10 @@ class RecordId;
 class QueuedDataStage : public PlanStage {
 public:
     QueuedDataStage(WorkingSet* ws);
-    virtual ~QueuedDataStage() {}
 
     virtual StageState work(WorkingSetID* out);
 
     virtual bool isEOF();
-
-    // These don't really mean anything here.
-    // Some day we could count the # of calls to the yield functions to check that other stages
-    // have correct yielding behavior.
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
 
     virtual StageType stageType() const {
         return STAGE_QUEUED_DATA;
@@ -72,8 +62,6 @@ public:
     //
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -110,7 +98,6 @@ private:
     std::queue<WorkingSetID> _members;
 
     // Stats
-    CommonStats _commonStats;
     MockStats _specificStats;
 };
 

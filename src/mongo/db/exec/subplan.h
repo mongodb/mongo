@@ -77,19 +77,13 @@ public:
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doRestoreState(OperationContext* opCtx);
 
     virtual StageType stageType() const {
         return STAGE_SUBPLAN;
     }
 
     std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -203,15 +197,11 @@ private:
     // independently, that solution is owned here.
     std::unique_ptr<QuerySolution> _compositeSolution;
 
-    std::unique_ptr<PlanStage> _child;
-
     // Holds a list of the results from planning each branch.
     OwnedPointerVector<BranchPlanningResult> _branchResults;
 
     // We need this to extract cache-friendly index data from the index assignments.
     std::map<BSONObj, size_t> _indexMap;
-
-    CommonStats _commonStats;
 };
 
 }  // namespace mongo

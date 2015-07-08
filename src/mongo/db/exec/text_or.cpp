@@ -59,10 +59,10 @@ TextOrStage::TextOrStage(OperationContext* txn,
                          WorkingSet* ws,
                          const MatchExpression* filter,
                          IndexDescriptor* index)
-    : _ftsSpec(ftsSpec),
+    : PlanStage(kStageType),
+      _ftsSpec(ftsSpec),
       _ws(ws),
       _scoreIterator(_scores.end()),
-      _commonStats(kStageType),
       _filter(filter),
       _txn(txn),
       _idRetrying(WorkingSet::INVALID_ID),
@@ -78,41 +78,22 @@ bool TextOrStage::isEOF() {
     return _internalState == State::kDone;
 }
 
-void TextOrStage::saveState() {
+void TextOrStage::doSaveState() {
     _txn = NULL;
-    ++_commonStats.yields;
-
-    for (auto& child : _children) {
-        child->saveState();
-    }
-
     if (_recordCursor) {
         _recordCursor->saveUnpositioned();
     }
 }
 
-void TextOrStage::restoreState(OperationContext* opCtx) {
+void TextOrStage::doRestoreState(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
-    ++_commonStats.unyields;
-
-    for (auto& child : _children) {
-        child->restoreState(opCtx);
-    }
-
     if (_recordCursor) {
         invariant(_recordCursor->restore(opCtx));
     }
 }
 
-void TextOrStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
-    // Propagate invalidate to children.
-    for (auto& child : _children) {
-        child->invalidate(txn, dl, type);
-    }
-
+void TextOrStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
     // Remove the RecordID from the ScoreMap.
     ScoreMap::iterator scoreIt = _scores.find(dl);
     if (scoreIt != _scores.end()) {
@@ -121,14 +102,6 @@ void TextOrStage::invalidate(OperationContext* txn, const RecordId& dl, Invalida
         }
         _scores.erase(scoreIt);
     }
-}
-
-vector<PlanStage*> TextOrStage::getChildren() const {
-    std::vector<PlanStage*> vec;
-    for (auto& child : _children) {
-        vec.push_back(child.get());
-    }
-    return vec;
 }
 
 std::unique_ptr<PlanStageStats> TextOrStage::getStats() {
@@ -148,10 +121,6 @@ std::unique_ptr<PlanStageStats> TextOrStage::getStats() {
     }
 
     return ret;
-}
-
-const CommonStats* TextOrStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* TextOrStage::getSpecificStats() const {

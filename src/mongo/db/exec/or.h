@@ -46,7 +46,6 @@ namespace mongo {
 class OrStage : public PlanStage {
 public:
     OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter);
-    virtual ~OrStage();
 
     void addChild(PlanStage* child);
 
@@ -54,19 +53,13 @@ public:
 
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     virtual StageType stageType() const {
         return STAGE_OR;
     }
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -79,9 +72,6 @@ private:
     // The filter is not owned by us.
     const MatchExpression* _filter;
 
-    // Owned by us.
-    std::vector<PlanStage*> _children;
-
     // Which of _children are we calling work(...) on now?
     size_t _currentChild;
 
@@ -92,7 +82,6 @@ private:
     unordered_set<RecordId, RecordId::Hasher> _seen;
 
     // Stats
-    CommonStats _commonStats;
     OrStats _specificStats;
 };
 

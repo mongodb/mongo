@@ -79,19 +79,11 @@ public:
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
-
     virtual StageType stageType() const {
         return STAGE_SHARDING_FILTER;
     }
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -99,10 +91,8 @@ public:
 
 private:
     WorkingSet* _ws;
-    std::unique_ptr<PlanStage> _child;
 
     // Stats
-    CommonStats _commonStats;
     ShardingFilterStats _specificStats;
 
     // Note: it is important that this is the metadata from the time this stage is constructed.

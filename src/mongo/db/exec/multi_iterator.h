@@ -59,26 +59,17 @@ public:
 
     void kill();
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void doSaveState();
+    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     // Returns empty PlanStageStats object
     virtual std::unique_ptr<PlanStageStats> getStats();
 
     // Not used.
-    virtual CommonStats* getCommonStats() const {
-        return NULL;
-    }
-
-    // Not used.
     virtual SpecificStats* getSpecificStats() const {
         return NULL;
     }
-
-    // Not used.
-    virtual std::vector<PlanStage*> getChildren() const;
 
     // Not used.
     virtual StageType stageType() const {

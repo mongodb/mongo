@@ -58,24 +58,20 @@ public:
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void doSaveState();
+    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     /**
      * ID Hack has a very strict criteria for the queries it supports.
      */
     static bool supportsQuery(const CanonicalQuery& query);
 
-    virtual std::vector<PlanStage*> getChildren() const;
-
     virtual StageType stageType() const {
         return STAGE_IDHACK;
     }
 
     std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -115,7 +111,6 @@ private:
     // the fetch request.
     WorkingSetID _idBeingPagedIn;
 
-    CommonStats _commonStats;
     IDHackStats _specificStats;
 };
 

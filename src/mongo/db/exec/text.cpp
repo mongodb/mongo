@@ -60,16 +60,15 @@ TextStage::TextStage(OperationContext* txn,
                      const TextStageParams& params,
                      WorkingSet* ws,
                      const MatchExpression* filter)
-    : _params(params), _textTreeRoot(buildTextTree(txn, ws, filter)), _commonStats(kStageType) {
+    : PlanStage(kStageType), _params(params) {
+    _children.emplace_back(buildTextTree(txn, ws, filter));
     _specificStats.indexPrefix = _params.indexPrefix;
     _specificStats.indexName = _params.index->indexName();
     _specificStats.parsedTextQuery = _params.query.toBSON();
 }
 
-TextStage::~TextStage() {}
-
 bool TextStage::isEOF() {
-    return _textTreeRoot->isEOF();
+    return child()->isEOF();
 }
 
 PlanStage::StageState TextStage::work(WorkingSetID* out) {
@@ -82,7 +81,7 @@ PlanStage::StageState TextStage::work(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    PlanStage::StageState stageState = _textTreeRoot->work(out);
+    PlanStage::StageState stageState = child()->work(out);
 
     // Increment common stats counters that are specific to the return value of work().
     switch (stageState) {
@@ -102,39 +101,13 @@ PlanStage::StageState TextStage::work(WorkingSetID* out) {
     return stageState;
 }
 
-void TextStage::saveState() {
-    ++_commonStats.yields;
-
-    _textTreeRoot->saveState();
-}
-
-void TextStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-
-    _textTreeRoot->restoreState(opCtx);
-}
-
-void TextStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
-    _textTreeRoot->invalidate(txn, dl, type);
-}
-
-vector<PlanStage*> TextStage::getChildren() const {
-    return {_textTreeRoot.get()};
-}
-
 unique_ptr<PlanStageStats> TextStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_TEXT);
     ret->specific = make_unique<TextStats>(_specificStats);
-    ret->children.push_back(_textTreeRoot->getStats().release());
+    ret->children.push_back(child()->getStats().release());
     return ret;
-}
-
-const CommonStats* TextStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* TextStage::getSpecificStats() const {

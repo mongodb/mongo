@@ -48,21 +48,15 @@ const char* MergeSortStage::kStageType = "SORT_MERGE";
 MergeSortStage::MergeSortStage(const MergeSortStageParams& params,
                                WorkingSet* ws,
                                const Collection* collection)
-    : _collection(collection),
+    : PlanStage(kStageType),
+      _collection(collection),
       _ws(ws),
       _pattern(params.pattern),
       _dedup(params.dedup),
-      _merging(StageWithValueComparison(ws, params.pattern)),
-      _commonStats(kStageType) {}
-
-MergeSortStage::~MergeSortStage() {
-    for (size_t i = 0; i < _children.size(); ++i) {
-        delete _children[i];
-    }
-}
+      _merging(StageWithValueComparison(ws, params.pattern)) {}
 
 void MergeSortStage::addChild(PlanStage* child) {
-    _children.push_back(child);
+    _children.emplace_back(child);
 
     // We have to call work(...) on every child before we can pick a min.
     _noResultToMerge.push(child);
@@ -191,26 +185,10 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
-void MergeSortStage::saveState() {
-    ++_commonStats.yields;
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->saveState();
-    }
-}
 
-void MergeSortStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->restoreState(opCtx);
-    }
-}
-
-void MergeSortStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->invalidate(txn, dl, type);
-    }
-
+void MergeSortStage::doInvalidate(OperationContext* txn,
+                                  const RecordId& dl,
+                                  InvalidationType type) {
     // Go through our data and see if we're holding on to the invalidated loc.
     for (list<StageWithValue>::iterator valueIt = _mergingData.begin();
          valueIt != _mergingData.end();
@@ -265,10 +243,6 @@ bool MergeSortStage::StageWithValueComparison::operator()(const MergingRef& lhs,
     return false;
 }
 
-vector<PlanStage*> MergeSortStage::getChildren() const {
-    return _children;
-}
-
 unique_ptr<PlanStageStats> MergeSortStage::getStats() {
     _commonStats.isEOF = isEOF();
 
@@ -280,10 +254,6 @@ unique_ptr<PlanStageStats> MergeSortStage::getStats() {
         ret->children.push_back(_children[i]->getStats().release());
     }
     return ret;
-}
-
-const CommonStats* MergeSortStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* MergeSortStage::getSpecificStats() const {

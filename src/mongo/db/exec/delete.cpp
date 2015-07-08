@@ -58,16 +58,15 @@ DeleteStage::DeleteStage(OperationContext* txn,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _params(params),
       _ws(ws),
       _collection(collection),
-      _child(child),
       _idRetrying(WorkingSet::INVALID_ID),
-      _idReturning(WorkingSet::INVALID_ID),
-      _commonStats(kStageType) {}
-
-DeleteStage::~DeleteStage() {}
+      _idReturning(WorkingSet::INVALID_ID) {
+    _children.emplace_back(child);
+}
 
 bool DeleteStage::isEOF() {
     if (!_collection) {
@@ -77,7 +76,7 @@ bool DeleteStage::isEOF() {
         return true;
     }
     return _idRetrying == WorkingSet::INVALID_ID && _idReturning == WorkingSet::INVALID_ID &&
-        _child->isEOF();
+        child()->isEOF();
 }
 
 PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
@@ -110,7 +109,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
     WorkingSetID id;
     StageState status;
     if (_idRetrying == WorkingSet::INVALID_ID) {
-        status = _child->work(&id);
+        status = child()->work(&id);
     } else {
         status = ADVANCED;
         id = _idRetrying;
@@ -160,7 +159,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
             // saving/restoring state repeatedly?
 
             try {
-                _child->saveState();
+                child()->saveState();
                 if (supportsDocLocking()) {
                     // Doc-locking engines require this after saveState() since they don't use
                     // invalidations.
@@ -208,7 +207,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
         //  transaction in which they are created, and a WriteUnitOfWork is a
         //  transaction, make sure to restore the state outside of the WritUnitOfWork.
         try {
-            _child->restoreState(_txn);
+            child()->restoreState(_txn);
         } catch (const WriteConflictException& wce) {
             // Note we don't need to retry anything in this case since the delete already
             // was committed. However, we still need to return the deleted document
@@ -258,18 +257,8 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
     return status;
 }
 
-void DeleteStage::saveState() {
-    _txn = NULL;
-    ++_commonStats.yields;
-    _child->saveState();
-}
-
-void DeleteStage::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
+void DeleteStage::doRestoreState(OperationContext* opCtx) {
     _txn = opCtx;
-    ++_commonStats.unyields;
-    _child->restoreState(opCtx);
-
     const NamespaceString& ns(_collection->ns());
     massert(28537,
             str::stream() << "Demoted from primary while removing from " << ns.ns(),
@@ -277,27 +266,12 @@ void DeleteStage::restoreState(OperationContext* opCtx) {
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns));
 }
 
-void DeleteStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-    _child->invalidate(txn, dl, type);
-}
-
-vector<PlanStage*> DeleteStage::getChildren() const {
-    vector<PlanStage*> children;
-    children.push_back(_child.get());
-    return children;
-}
-
 unique_ptr<PlanStageStats> DeleteStage::getStats() {
     _commonStats.isEOF = isEOF();
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_DELETE);
     ret->specific = make_unique<DeleteStats>(_specificStats);
-    ret->children.push_back(_child->getStats().release());
+    ret->children.push_back(child()->getStats().release());
     return ret;
-}
-
-const CommonStats* DeleteStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* DeleteStage::getSpecificStats() const {

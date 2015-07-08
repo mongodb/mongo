@@ -62,19 +62,13 @@ public:
                    CanonicalQuery* cq,
                    bool shouldCache = true);
 
-    virtual ~MultiPlanStage();
-
     virtual bool isEOF();
 
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
+    virtual void doRestoreState(OperationContext* opCtx);
 
-    virtual void restoreState(OperationContext* opCtx);
-
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     virtual StageType stageType() const {
         return STAGE_MULTI_PLAN;
@@ -82,7 +76,6 @@ public:
 
     virtual std::unique_ptr<PlanStageStats> getStats();
 
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -187,9 +180,10 @@ private:
     // not owned here
     CanonicalQuery* _query;
 
-    // Candidate plans. Each candidate includes a child PlanStage tree and QuerySolution which
-    // are owned here. Ownership of all QuerySolutions is retained here, and will *not* be
-    // tranferred to the PlanExecutor that wraps this stage.
+    // Candidate plans. Each candidate includes a child PlanStage tree and QuerySolution. Ownership
+    // of all QuerySolutions is retained here, and will *not* be tranferred to the PlanExecutor that
+    // wraps this stage. Ownership of the PlanStages will be in PlanStage::_children which maps
+    // one-to-one with _candidates.
     std::vector<CandidatePlan> _candidates;
 
     // index into _candidates, of the winner of the plan competition
@@ -227,7 +221,6 @@ private:
     std::unique_ptr<RecordFetcher> _fetcher;
 
     // Stats
-    CommonStats _commonStats;
     MultiPlanStats _specificStats;
 };
 

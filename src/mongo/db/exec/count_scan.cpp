@@ -43,13 +43,13 @@ using stdx::make_unique;
 const char* CountScan::kStageType = "COUNT_SCAN";
 
 CountScan::CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _workingSet(workingSet),
       _descriptor(params.descriptor),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
       _shouldDedup(params.descriptor->isMultikey(txn)),
-      _params(params),
-      _commonStats(kStageType) {
+      _params(params) {
     _specificStats.keyPattern = _params.descriptor->keyPattern();
     _specificStats.indexName = _params.descriptor->indexName();
     _specificStats.isMultiKey = _params.descriptor->isMultikey(txn);
@@ -120,17 +120,15 @@ bool CountScan::isEOF() {
     return _commonStats.isEOF;
 }
 
-void CountScan::saveState() {
+void CountScan::doSaveState() {
     _txn = NULL;
-    ++_commonStats.yields;
     if (_cursor)
         _cursor->savePositioned();
 }
 
-void CountScan::restoreState(OperationContext* opCtx) {
+void CountScan::doRestoreState(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
-    ++_commonStats.unyields;
 
     if (_cursor)
         _cursor->restore(opCtx);
@@ -140,9 +138,7 @@ void CountScan::restoreState(OperationContext* opCtx) {
     _shouldDedup = _descriptor->isMultikey(_txn);
 }
 
-void CountScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
+void CountScan::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
     // The only state we're responsible for holding is what RecordIds to drop.  If a document
     // mutates the underlying index cursor will deal with it.
     if (INVALIDATION_MUTATION == type) {
@@ -157,11 +153,6 @@ void CountScan::invalidate(OperationContext* txn, const RecordId& dl, Invalidati
     }
 }
 
-vector<PlanStage*> CountScan::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
-}
-
 unique_ptr<PlanStageStats> CountScan::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_COUNT_SCAN);
 
@@ -170,10 +161,6 @@ unique_ptr<PlanStageStats> CountScan::getStats() {
     ret->specific = std::move(countStats);
 
     return ret;
-}
-
-const CommonStats* CountScan::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* CountScan::getSpecificStats() const {

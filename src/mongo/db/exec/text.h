@@ -76,24 +76,15 @@ public:
               WorkingSet* ws,
               const MatchExpression* filter);
 
-    ~TextStage() final;
 
     StageState work(WorkingSetID* out) final;
     bool isEOF() final;
-
-    void saveState() final;
-    void restoreState(OperationContext* opCtx) final;
-    void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
-
-    vector<PlanStage*> getChildren() const;
 
     StageType stageType() const final {
         return STAGE_TEXT;
     }
 
     std::unique_ptr<PlanStageStats> getStats();
-
-    const CommonStats* getCommonStats() const final;
 
     const SpecificStats* getSpecificStats() const final;
 
@@ -110,11 +101,7 @@ private:
     // Parameters of this text stage.
     TextStageParams _params;
 
-    // The root of the text query tree.
-    unique_ptr<PlanStage> _textTreeRoot;
-
     // Stats.
-    CommonStats _commonStats;
     TextStats _specificStats;
 };
 

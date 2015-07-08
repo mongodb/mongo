@@ -66,9 +66,9 @@ PlanStage* getStageByType(PlanStage* root, StageType type) {
         return root;
     }
 
-    vector<PlanStage*> children = root->getChildren();
+    const auto& children = root->getChildren();
     for (size_t i = 0; i < children.size(); i++) {
-        PlanStage* result = getStageByType(children[i], type);
+        PlanStage* result = getStageByType(children[i].get(), type);
         if (result) {
             return result;
         }

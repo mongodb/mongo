@@ -58,26 +58,19 @@ public:
     MergeSortStage(const MergeSortStageParams& params,
                    WorkingSet* ws,
                    const Collection* collection);
-    virtual ~MergeSortStage();
 
     void addChild(PlanStage* child);
 
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     virtual StageType stageType() const {
         return STAGE_SORT_MERGE;
     }
 
     std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -98,9 +91,6 @@ private:
 
     // Which RecordIds have we seen?
     unordered_set<RecordId, RecordId::Hasher> _seen;
-
-    // Owned by us.  All the children we're reading from.
-    std::vector<PlanStage*> _children;
 
     // In order to pick the next smallest value, we need each child work(...) until it produces
     // a result.  This is the queue of children that haven't given us a result yet.
@@ -149,7 +139,6 @@ private:
     std::list<StageWithValue> _mergingData;
 
     // Stats
-    CommonStats _commonStats;
     MergeSortStats _specificStats;
 };
 

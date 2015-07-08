@@ -86,19 +86,15 @@ public:
 
     StageState work(WorkingSetID* out) final;
 
-    void saveState() final;
-    void restoreState(OperationContext* opCtx) final;
-    void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
-
-    std::vector<PlanStage*> getChildren() const final;
+    void doSaveState() final;
+    void doRestoreState(OperationContext* opCtx) final;
+    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_TEXT_OR;
     }
 
     std::unique_ptr<PlanStageStats> getStats() final;
-
-    const CommonStats* getCommonStats() const final;
 
     const SpecificStats* getSpecificStats() const final;
 
@@ -137,9 +133,6 @@ private:
     // What state are we in?  See the State enum above.
     State _internalState = State::kInit;
 
-    // Children owned by us.
-    vector<unique_ptr<PlanStage>> _children;
-
     // Which of _children are we calling work(...) on now?
     size_t _currentChild = 0;
 
@@ -158,8 +151,6 @@ private:
     ScoreMap _scores;
     ScoreMap::const_iterator _scoreIterator;
 
-    // Stats
-    CommonStats _commonStats;
     TextOrStats _specificStats;
 
     // Members needed only for using the TextMatchableDocument.

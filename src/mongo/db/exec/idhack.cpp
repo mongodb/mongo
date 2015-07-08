@@ -54,13 +54,13 @@ IDHackStage::IDHackStage(OperationContext* txn,
                          const Collection* collection,
                          CanonicalQuery* query,
                          WorkingSet* ws)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _collection(collection),
       _workingSet(ws),
       _key(query->getQueryObj()["_id"].wrap()),
       _done(false),
-      _idBeingPagedIn(WorkingSet::INVALID_ID),
-      _commonStats(kStageType) {
+      _idBeingPagedIn(WorkingSet::INVALID_ID) {
     if (NULL != query->getProj()) {
         _addKeyMetadata = query->getProj()->wantIndexKey();
     } else {
@@ -72,14 +72,14 @@ IDHackStage::IDHackStage(OperationContext* txn,
                          Collection* collection,
                          const BSONObj& key,
                          WorkingSet* ws)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _collection(collection),
       _workingSet(ws),
       _key(key),
       _done(false),
       _addKeyMetadata(false),
-      _idBeingPagedIn(WorkingSet::INVALID_ID),
-      _commonStats(kStageType) {}
+      _idBeingPagedIn(WorkingSet::INVALID_ID) {}
 
 IDHackStage::~IDHackStage() {}
 
@@ -199,24 +199,20 @@ PlanStage::StageState IDHackStage::advance(WorkingSetID id,
     return PlanStage::ADVANCED;
 }
 
-void IDHackStage::saveState() {
+void IDHackStage::doSaveState() {
     _txn = NULL;
-    ++_commonStats.yields;
     if (_recordCursor)
         _recordCursor->saveUnpositioned();
 }
 
-void IDHackStage::restoreState(OperationContext* opCtx) {
+void IDHackStage::doRestoreState(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
-    ++_commonStats.unyields;
     if (_recordCursor)
         _recordCursor->restore(opCtx);
 }
 
-void IDHackStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
+void IDHackStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
     // Since updates can't mutate the '_id' field, we can ignore mutation invalidations.
     if (INVALIDATION_MUTATION == type) {
         return;
@@ -241,20 +237,11 @@ bool IDHackStage::supportsQuery(const CanonicalQuery& query) {
         !query.getParsed().isTailable();
 }
 
-vector<PlanStage*> IDHackStage::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
-}
-
 unique_ptr<PlanStageStats> IDHackStage::getStats() {
     _commonStats.isEOF = isEOF();
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_IDHACK);
     ret->specific = make_unique<IDHackStats>(_specificStats);
     return ret;
-}
-
-const CommonStats* IDHackStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* IDHackStage::getSpecificStats() const {

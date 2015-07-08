@@ -47,7 +47,8 @@ OplogStart::OplogStart(OperationContext* txn,
                        const Collection* collection,
                        MatchExpression* filter,
                        WorkingSet* ws)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _needInit(true),
       _backwardsScanning(false),
       _extentHopping(false),
@@ -56,15 +57,13 @@ OplogStart::OplogStart(OperationContext* txn,
       _workingSet(ws),
       _filter(filter) {}
 
-OplogStart::~OplogStart() {}
-
 PlanStage::StageState OplogStart::work(WorkingSetID* out) {
     // We do our (heavy) init in a work(), where work is expected.
     if (_needInit) {
         CollectionScanParams params;
         params.collection = _collection;
         params.direction = CollectionScanParams::BACKWARD;
-        _cs.reset(new CollectionScan(_txn, params, _workingSet, NULL));
+        _children.emplace_back(new CollectionScan(_txn, params, _workingSet, NULL));
 
         _needInit = false;
         _backwardsScanning = true;
@@ -133,11 +132,11 @@ void OplogStart::switchToExtentHopping() {
     _extentHopping = true;
 
     // Toss the collection scan we were using.
-    _cs.reset();
+    _children.clear();
 }
 
 PlanStage::StageState OplogStart::workBackwardsScan(WorkingSetID* out) {
-    PlanStage::StageState state = _cs->work(out);
+    PlanStage::StageState state = child()->work(out);
 
     // EOF.  Just start from the beginning, which is where we've hit.
     if (PlanStage::IS_EOF == state) {
@@ -167,7 +166,7 @@ bool OplogStart::isEOF() {
     return _done;
 }
 
-void OplogStart::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void OplogStart::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
     if (_needInit) {
         return;
     }
@@ -176,32 +175,21 @@ void OplogStart::invalidate(OperationContext* txn, const RecordId& dl, Invalidat
         return;
     }
 
-    if (_cs) {
-        _cs->invalidate(txn, dl, type);
-    }
-
     for (size_t i = 0; i < _subIterators.size(); i++) {
         _subIterators[i]->invalidate(dl);
     }
 }
 
-void OplogStart::saveState() {
+void OplogStart::doSaveState() {
     _txn = NULL;
-    if (_cs) {
-        _cs->saveState();
-    }
-
     for (size_t i = 0; i < _subIterators.size(); i++) {
         _subIterators[i]->savePositioned();
     }
 }
 
-void OplogStart::restoreState(OperationContext* opCtx) {
+void OplogStart::doRestoreState(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
-    if (_cs) {
-        _cs->restoreState(opCtx);
-    }
 
     for (size_t i = 0; i < _subIterators.size(); i++) {
         if (!_subIterators[i]->restore(opCtx)) {
@@ -217,11 +205,6 @@ unique_ptr<PlanStageStats> OplogStart::getStats() {
         make_unique<PlanStageStats>(CommonStats(kStageType), STAGE_OPLOG_START);
     ret->specific = make_unique<CollectionScanStats>();
     return ret;
-}
-
-vector<PlanStage*> OplogStart::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
 }
 
 int OplogStart::_backwardsScanTime = 5;

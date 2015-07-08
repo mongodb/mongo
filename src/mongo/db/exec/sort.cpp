@@ -279,23 +279,24 @@ bool SortStage::WorkingSetComparator::operator()(const SortableDataItem& lhs,
 }
 
 SortStage::SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child)
-    : _collection(params.collection),
+    : PlanStage(kStageType),
+      _collection(params.collection),
       _ws(ws),
-      _child(child),
       _pattern(params.pattern),
       _query(params.query),
       _limit(params.limit),
       _sorted(false),
       _resultIterator(_data.end()),
-      _commonStats(kStageType),
-      _memUsage(0) {}
+      _memUsage(0) {
+    _children.emplace_back(child);
+}
 
 SortStage::~SortStage() {}
 
 bool SortStage::isEOF() {
     // We're done when our child has no more results, we've sorted the child's results, and
     // we've returned all sorted results.
-    return _child->isEOF() && _sorted && (_data.end() == _resultIterator);
+    return child()->isEOF() && _sorted && (_data.end() == _resultIterator);
 }
 
 PlanStage::StageState SortStage::work(WorkingSetID* out) {
@@ -334,7 +335,7 @@ PlanStage::StageState SortStage::work(WorkingSetID* out) {
     // Still reading in results to sort.
     if (!_sorted) {
         WorkingSetID id = WorkingSet::INVALID_ID;
-        StageState code = _child->work(&id);
+        StageState code = child()->work(&id);
 
         if (PlanStage::ADVANCED == code) {
             // Add it into the map for quick invalidation if it has a valid RecordId.
@@ -414,20 +415,7 @@ PlanStage::StageState SortStage::work(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
-void SortStage::saveState() {
-    ++_commonStats.yields;
-    _child->saveState();
-}
-
-void SortStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-    _child->restoreState(opCtx);
-}
-
-void SortStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-    _child->invalidate(txn, dl, type);
-
+void SortStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
     // If we have a deletion, we can fetch and carry on.
     // If we have a mutation, it's easier to fetch and use the previous document.
     // So, no matter what, fetch and keep the doc in play.
@@ -451,12 +439,6 @@ void SortStage::invalidate(OperationContext* txn, const RecordId& dl, Invalidati
     }
 }
 
-vector<PlanStage*> SortStage::getChildren() const {
-    vector<PlanStage*> children;
-    children.push_back(_child.get());
-    return children;
-}
-
 unique_ptr<PlanStageStats> SortStage::getStats() {
     _commonStats.isEOF = isEOF();
     const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes);
@@ -467,12 +449,8 @@ unique_ptr<PlanStageStats> SortStage::getStats() {
 
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_SORT);
     ret->specific = make_unique<SortStats>(_specificStats);
-    ret->children.push_back(_child->getStats().release());
+    ret->children.push_back(child()->getStats().release());
     return ret;
-}
-
-const CommonStats* SortStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* SortStage::getSpecificStats() const {

@@ -48,13 +48,13 @@ const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 DistinctScan::DistinctScan(OperationContext* txn,
                            const DistinctParams& params,
                            WorkingSet* workingSet)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _workingSet(workingSet),
       _descriptor(params.descriptor),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
       _params(params),
-      _checker(&_params.bounds, _descriptor->keyPattern(), _params.direction),
-      _commonStats(kStageType) {
+      _checker(&_params.bounds, _descriptor->keyPattern(), _params.direction) {
     _specificStats.keyPattern = _params.descriptor->keyPattern();
     _specificStats.indexName = _params.descriptor->indexName();
     _specificStats.indexVersion = _params.descriptor->version();
@@ -128,41 +128,26 @@ bool DistinctScan::isEOF() {
     return _commonStats.isEOF;
 }
 
-void DistinctScan::saveState() {
+void DistinctScan::doSaveState() {
     _txn = NULL;
-    ++_commonStats.yields;
 
     // We always seek, so we don't care where the cursor is.
     if (_cursor)
         _cursor->saveUnpositioned();
 }
 
-void DistinctScan::restoreState(OperationContext* opCtx) {
+void DistinctScan::doRestoreState(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
-    ++_commonStats.unyields;
 
     if (_cursor)
         _cursor->restore(opCtx);
-}
-
-void DistinctScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-}
-
-vector<PlanStage*> DistinctScan::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
 }
 
 unique_ptr<PlanStageStats> DistinctScan::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_DISTINCT_SCAN);
     ret->specific = make_unique<DistinctScanStats>(_specificStats);
     return ret;
-}
-
-const CommonStats* DistinctScan::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* DistinctScan::getSpecificStats() const {

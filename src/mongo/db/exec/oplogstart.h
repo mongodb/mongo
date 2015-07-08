@@ -65,26 +65,20 @@ public:
                const Collection* collection,
                MatchExpression* filter,
                WorkingSet* ws);
-    virtual ~OplogStart();
 
     virtual StageState work(WorkingSetID* out);
     virtual bool isEOF();
 
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void doSaveState();
+    virtual void doRestoreState(OperationContext* opCtx);
 
     // Returns empty PlanStageStats object
     virtual std::unique_ptr<PlanStageStats> getStats();
 
     //
-    // Exec stats -- do not call these for the oplog start stage.
+    // Exec stats -- do not call for the oplog start stage.
     //
-    virtual const CommonStats* getCommonStats() const {
-        return NULL;
-    }
 
     virtual const SpecificStats* getSpecificStats() const {
         return NULL;
@@ -116,9 +110,6 @@ private:
 
     // transactional context for read locks. Not owned by us
     OperationContext* _txn;
-
-    // If we're backwards scanning we just punt to a collscan.
-    std::unique_ptr<CollectionScan> _cs;
 
     // This is only used for the extent hopping scan.
     std::vector<std::unique_ptr<RecordCursor>> _subIterators;

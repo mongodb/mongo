@@ -82,32 +82,22 @@ public:
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     virtual StageType stageType() const;
     virtual std::unique_ptr<PlanStageStats> getStats();
-    virtual const CommonStats* getCommonStats() const;
     virtual const SpecificStats* getSpecificStats() const;
 
 protected:
     /**
      * Subclasses of NearStage must provide basics + a stats object which gets owned here.
-     * The stats object must have specific stats which are a subclass of NearStats, otherwise
-     * it's generated automatically.
      */
     NearStage(OperationContext* txn,
+              const char* typeName,
+              StageType type,
               WorkingSet* workingSet,
-              Collection* collection,
-              PlanStageStats* stats);
-
-    /**
-     * Exposes NearStats for adaptive search, allows additional specific stats in subclasses.
-     */
-    NearStats* getNearStats();
+              Collection* collection);
 
     //
     // Methods implemented for specific search functionality
@@ -144,19 +134,10 @@ protected:
                                   Collection* collection,
                                   WorkingSetID* out) = 0;
 
+    // Filled in by subclasses.
+    NearStats _specificStats;
+
 private:
-    //
-    // Save/restore/invalidate work specific to the search type.
-    //
-
-    virtual void finishSaveState() = 0;
-
-    virtual void finishRestoreState(OperationContext* txn) = 0;
-
-    virtual void finishInvalidate(OperationContext* txn,
-                                  const RecordId& dl,
-                                  InvalidationType type) = 0;
-
     //
     // Generic methods for progressive search functionality
     //
@@ -196,7 +177,7 @@ private:
     std::priority_queue<SearchResult> _resultBuffer;
 
     // Stats
-    std::unique_ptr<PlanStageStats> _stats;
+    const StageType _stageType;
 
     // The current stage from which this stage should buffer results
     // Pointer to the last interval in _childrenIntervals. Owned by _childrenIntervals.
@@ -219,8 +200,7 @@ struct NearStage::CoveredInterval {
                     double maxDistance,
                     bool inclusiveMax);
 
-    // Owned by NearStage
-    std::unique_ptr<PlanStage> const covering;
+    PlanStage* const covering;  // Owned in PlanStage::_children.
     const bool dedupCovering;
 
     const double minDistance;

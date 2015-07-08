@@ -40,7 +40,7 @@ using stdx::make_unique;
 
 const char* QueuedDataStage::kStageType = "QUEUED_DATA";
 
-QueuedDataStage::QueuedDataStage(WorkingSet* ws) : _ws(ws), _commonStats(kStageType) {}
+QueuedDataStage::QueuedDataStage(WorkingSet* ws) : PlanStage(kStageType), _ws(ws) {}
 
 PlanStage::StageState QueuedDataStage::work(WorkingSetID* out) {
     ++_commonStats.works;
@@ -70,18 +70,6 @@ bool QueuedDataStage::isEOF() {
     return _results.empty();
 }
 
-void QueuedDataStage::saveState() {
-    ++_commonStats.yields;
-}
-
-void QueuedDataStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-}
-
-void QueuedDataStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-}
-
 unique_ptr<PlanStageStats> QueuedDataStage::getStats() {
     _commonStats.isEOF = isEOF();
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_QUEUED_DATA);
@@ -89,9 +77,6 @@ unique_ptr<PlanStageStats> QueuedDataStage::getStats() {
     return ret;
 }
 
-const CommonStats* QueuedDataStage::getCommonStats() const {
-    return &_commonStats;
-}
 
 const SpecificStats* QueuedDataStage::getSpecificStats() const {
     return &_specificStats;
@@ -107,11 +92,6 @@ void QueuedDataStage::pushBack(const WorkingSetID& id) {
 
     // member lives in _ws.  We'll return it when _results hits ADVANCED.
     _members.push(id);
-}
-
-vector<PlanStage*> QueuedDataStage::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
 }
 
 }  // namespace mongo

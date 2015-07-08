@@ -58,13 +58,13 @@ CollectionScan::CollectionScan(OperationContext* txn,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _workingSet(workingSet),
       _filter(filter),
       _params(params),
       _isDead(false),
-      _wsidForFetch(_workingSet->allocate()),
-      _commonStats(kStageType) {
+      _wsidForFetch(_workingSet->allocate()) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
 }
@@ -191,9 +191,9 @@ bool CollectionScan::isEOF() {
     return _commonStats.isEOF || _isDead;
 }
 
-void CollectionScan::invalidate(OperationContext* txn, const RecordId& id, InvalidationType type) {
-    ++_commonStats.invalidates;
-
+void CollectionScan::doInvalidate(OperationContext* txn,
+                                  const RecordId& id,
+                                  InvalidationType type) {
     // We don't care about mutations since we apply any filters to the result when we (possibly)
     // return it.
     if (INVALIDATION_DELETION != type) {
@@ -214,29 +214,22 @@ void CollectionScan::invalidate(OperationContext* txn, const RecordId& id, Inval
     }
 }
 
-void CollectionScan::saveState() {
+void CollectionScan::doSaveState() {
     _txn = NULL;
-    ++_commonStats.yields;
     if (_cursor) {
         _cursor->savePositioned();
     }
 }
 
-void CollectionScan::restoreState(OperationContext* opCtx) {
+void CollectionScan::doRestoreState(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
-    ++_commonStats.unyields;
     if (_cursor) {
         if (!_cursor->restore(opCtx)) {
             warning() << "Could not restore RecordCursor for CollectionScan: " << opCtx->getNS();
             _isDead = true;
         }
     }
-}
-
-vector<PlanStage*> CollectionScan::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
 }
 
 unique_ptr<PlanStageStats> CollectionScan::getStats() {
@@ -250,10 +243,6 @@ unique_ptr<PlanStageStats> CollectionScan::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_COLLSCAN);
     ret->specific = make_unique<CollectionScanStats>(_specificStats);
     return ret;
-}
-
-const CommonStats* CollectionScan::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* CollectionScan::getSpecificStats() const {

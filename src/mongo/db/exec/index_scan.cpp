@@ -62,7 +62,8 @@ IndexScan::IndexScan(OperationContext* txn,
                      const IndexScanParams& params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _workingSet(workingSet),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
       _keyPattern(params.descriptor->keyPattern().getOwned()),
@@ -71,7 +72,6 @@ IndexScan::IndexScan(OperationContext* txn,
       _shouldDedup(true),
       _forward(params.direction == 1),
       _params(params),
-      _commonStats(kStageType),
       _endKeyInclusive(false) {
     // We can't always access the descriptor in the call to getStats() so we pull
     // any info we need for stats reporting out here.
@@ -233,14 +233,13 @@ bool IndexScan::isEOF() {
     return _commonStats.isEOF;
 }
 
-void IndexScan::saveState() {
+void IndexScan::doSaveState() {
     if (!_txn) {
         // We were already saved. Nothing to do.
         return;
     }
-
     _txn = NULL;
-    ++_commonStats.yields;
+
     if (!_indexCursor)
         return;
 
@@ -252,18 +251,14 @@ void IndexScan::saveState() {
     _indexCursor->savePositioned();
 }
 
-void IndexScan::restoreState(OperationContext* opCtx) {
+void IndexScan::doRestoreState(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
-    ++_commonStats.unyields;
-
     if (_indexCursor)
         _indexCursor->restore(opCtx);
 }
 
-void IndexScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
+void IndexScan::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
     // The only state we're responsible for holding is what RecordIds to drop.  If a document
     // mutates the underlying index cursor will deal with it.
     if (INVALIDATION_MUTATION == type) {
@@ -277,10 +272,6 @@ void IndexScan::invalidate(OperationContext* txn, const RecordId& dl, Invalidati
         ++_specificStats.seenInvalidated;
         _returned.erase(it);
     }
-}
-
-std::vector<PlanStage*> IndexScan::getChildren() const {
-    return {};
 }
 
 std::unique_ptr<PlanStageStats> IndexScan::getStats() {
@@ -307,10 +298,6 @@ std::unique_ptr<PlanStageStats> IndexScan::getStats() {
         stdx::make_unique<PlanStageStats>(_commonStats, STAGE_IXSCAN);
     ret->specific = stdx::make_unique<IndexScanStats>(_specificStats);
     return ret;
-}
-
-const CommonStats* IndexScan::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* IndexScan::getSpecificStats() const {

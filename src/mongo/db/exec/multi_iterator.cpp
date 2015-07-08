@@ -46,7 +46,11 @@ const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 MultiIteratorStage::MultiIteratorStage(OperationContext* txn,
                                        WorkingSet* ws,
                                        Collection* collection)
-    : _txn(txn), _collection(collection), _ws(ws), _wsidForFetch(_ws->allocate()) {}
+    : PlanStage(kStageType),
+      _txn(txn),
+      _collection(collection),
+      _ws(ws),
+      _wsidForFetch(_ws->allocate()) {}
 
 void MultiIteratorStage::addIterator(unique_ptr<RecordCursor> it) {
     _iterators.push_back(std::move(it));
@@ -102,14 +106,14 @@ void MultiIteratorStage::kill() {
     _iterators.clear();
 }
 
-void MultiIteratorStage::saveState() {
+void MultiIteratorStage::doSaveState() {
     _txn = NULL;
     for (size_t i = 0; i < _iterators.size(); i++) {
         _iterators[i]->savePositioned();
     }
 }
 
-void MultiIteratorStage::restoreState(OperationContext* opCtx) {
+void MultiIteratorStage::doRestoreState(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
     for (size_t i = 0; i < _iterators.size(); i++) {
@@ -119,9 +123,9 @@ void MultiIteratorStage::restoreState(OperationContext* opCtx) {
     }
 }
 
-void MultiIteratorStage::invalidate(OperationContext* txn,
-                                    const RecordId& dl,
-                                    InvalidationType type) {
+void MultiIteratorStage::doInvalidate(OperationContext* txn,
+                                      const RecordId& dl,
+                                      InvalidationType type) {
     switch (type) {
         case INVALIDATION_DELETION:
             for (size_t i = 0; i < _iterators.size(); i++) {
@@ -132,11 +136,6 @@ void MultiIteratorStage::invalidate(OperationContext* txn,
             // no-op
             break;
     }
-}
-
-vector<PlanStage*> MultiIteratorStage::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
 }
 
 unique_ptr<PlanStageStats> MultiIteratorStage::getStats() {

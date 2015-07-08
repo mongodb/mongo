@@ -67,23 +67,18 @@ struct CountScanParams {
 class CountScan : public PlanStage {
 public:
     CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet);
-    virtual ~CountScan() {}
 
     virtual StageState work(WorkingSetID* out);
     virtual bool isEOF();
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doSaveState();
+    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     virtual StageType stageType() const {
         return STAGE_COUNT_SCAN;
     }
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -108,7 +103,6 @@ private:
 
     CountScanParams _params;
 
-    CommonStats _commonStats;
     CountScanStats _specificStats;
 };
 

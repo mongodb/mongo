@@ -85,24 +85,17 @@ public:
                 WorkingSet* ws,
                 Collection* collection,
                 PlanStage* child);
-    virtual ~DeleteStage();
 
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doRestoreState(OperationContext* opCtx);
 
     virtual StageType stageType() const {
         return STAGE_DELETE;
     }
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -129,8 +122,6 @@ private:
     // stage.
     Collection* _collection;
 
-    std::unique_ptr<PlanStage> _child;
-
     // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
     WorkingSetID _idRetrying;
 
@@ -138,7 +129,6 @@ private:
     WorkingSetID _idReturning;
 
     // Stats
-    CommonStats _commonStats;
     DeleteStats _specificStats;
 };
 

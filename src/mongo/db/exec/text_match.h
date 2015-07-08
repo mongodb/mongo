@@ -69,19 +69,11 @@ public:
 
     StageState work(WorkingSetID* out) final;
 
-    void saveState() final;
-    void restoreState(OperationContext* opCtx) final;
-    void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
-
-    std::vector<PlanStage*> getChildren() const final;
-
     StageType stageType() const final {
         return STAGE_TEXT_MATCH;
     }
 
     std::unique_ptr<PlanStageStats> getStats() final;
-
-    const CommonStats* getCommonStats() const final;
 
     const SpecificStats* getSpecificStats() const final;
 
@@ -94,11 +86,6 @@ private:
     // Not owned by us.
     WorkingSet* _ws;
 
-    // The child PlanStage that provides the RecordIDs and scores for text matching.
-    unique_ptr<PlanStage> _child;
-
-    // Stats
-    CommonStats _commonStats;
     TextMatchStats _specificStats;
 };
 }  // namespace mongo

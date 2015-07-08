@@ -54,26 +54,19 @@ namespace mongo {
 class AndSortedStage : public PlanStage {
 public:
     AndSortedStage(WorkingSet* ws, const Collection* collection);
-    virtual ~AndSortedStage();
 
     void addChild(PlanStage* child);
 
     virtual StageState work(WorkingSetID* out);
     virtual bool isEOF();
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     virtual StageType stageType() const {
         return STAGE_AND_SORTED;
     }
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -93,9 +86,6 @@ private:
     // Not owned by us.
     WorkingSet* _ws;
 
-    // Owned by us.
-    std::vector<PlanStage*> _children;
-
     // The current node we're AND-ing against.
     size_t _targetNode;
     RecordId _targetLoc;
@@ -110,7 +100,6 @@ private:
     bool _isEOF;
 
     // Stats
-    CommonStats _commonStats;
     AndSortedStats _specificStats;
 };
 

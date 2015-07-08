@@ -42,21 +42,17 @@ using std::vector;
 using stdx::make_unique;
 
 NearStage::NearStage(OperationContext* txn,
+                     const char* typeName,
+                     StageType type,
                      WorkingSet* workingSet,
-                     Collection* collection,
-                     PlanStageStats* stats)
-    : _txn(txn),
+                     Collection* collection)
+    : PlanStage(typeName),
+      _txn(txn),
       _workingSet(workingSet),
       _collection(collection),
       _searchState(SearchState_Initializing),
-      _stats(stats),
-      _nextInterval(NULL) {
-    // Ensure we have specific distance search stats unless a child class specified their
-    // own distance stats subclass
-    if (!_stats->specific) {
-        _stats->specific.reset(new NearStats);
-    }
-}
+      _stageType(type),
+      _nextInterval(NULL) {}
 
 NearStage::~NearStage() {}
 
@@ -86,10 +82,10 @@ PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
 }
 
 PlanStage::StageState NearStage::work(WorkingSetID* out) {
-    ++_stats->common.works;
+    ++_commonStats.works;
 
     // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_stats->common.executionTimeMillis);
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
 
     WorkingSetID toReturn = WorkingSet::INVALID_ID;
     Status error = Status::OK();
@@ -118,14 +114,14 @@ PlanStage::StageState NearStage::work(WorkingSetID* out) {
         *out = WorkingSetCommon::allocateStatusMember(_workingSet, error);
     } else if (PlanStage::ADVANCED == nextState) {
         *out = toReturn;
-        ++_stats->common.advanced;
+        ++_commonStats.advanced;
     } else if (PlanStage::NEED_YIELD == nextState) {
         *out = toReturn;
-        ++_stats->common.needYield;
+        ++_commonStats.needYield;
     } else if (PlanStage::NEED_TIME == nextState) {
-        ++_stats->common.needTime;
+        ++_commonStats.needTime;
     } else if (PlanStage::IS_EOF == nextState) {
-        _stats->common.isEOF = true;
+        _commonStats.isEOF = true;
     }
 
     return nextState;
@@ -178,7 +174,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     PlanStage::StageState intervalState = _nextInterval->covering->work(&nextMemberID);
 
     if (PlanStage::IS_EOF == intervalState) {
-        getNearStats()->intervalStats.push_back(*_nextIntervalStats);
+        _specificStats.intervalStats.push_back(*_nextIntervalStats);
         _nextIntervalStats.reset();
         _nextInterval = NULL;
         _searchState = SearchState_Advancing;
@@ -288,35 +284,11 @@ bool NearStage::isEOF() {
     return SearchState_Finished == _searchState;
 }
 
-void NearStage::saveState() {
-    _txn = NULL;
-    ++_stats->common.yields;
-    for (size_t i = 0; i < _childrenIntervals.size(); i++) {
-        _childrenIntervals[i]->covering->saveState();
-    }
-
-    // Subclass specific saving, e.g. saving the 2d or 2dsphere density estimator.
-    finishSaveState();
-}
-
-void NearStage::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
+void NearStage::doRestoreState(OperationContext* opCtx) {
     _txn = opCtx;
-    ++_stats->common.unyields;
-    for (size_t i = 0; i < _childrenIntervals.size(); i++) {
-        _childrenIntervals[i]->covering->restoreState(opCtx);
-    }
-
-    // Subclass specific restoring, e.g. restoring the 2d or 2dsphere density estimator.
-    finishRestoreState(opCtx);
 }
 
-void NearStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_stats->common.invalidates;
-    for (size_t i = 0; i < _childrenIntervals.size(); i++) {
-        _childrenIntervals[i]->covering->invalidate(txn, dl, type);
-    }
-
+void NearStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
     // If a result is in _resultBuffer and has a RecordId it will be in _nextIntervalSeen as
     // well. It's safe to return the result w/o the RecordId, so just fetch the result.
     unordered_map<RecordId, WorkingSetID, RecordId::Hasher>::iterator seenIt =
@@ -331,42 +303,23 @@ void NearStage::invalidate(OperationContext* txn, const RecordId& dl, Invalidati
         // Don't keep it around in the seen map since there's no valid RecordId anymore
         _nextIntervalSeen.erase(seenIt);
     }
-
-    // Subclass specific invalidation, e.g. passing the invalidation to the 2d or 2dsphere
-    // density estimator.
-    finishInvalidate(txn, dl, type);
-}
-
-vector<PlanStage*> NearStage::getChildren() const {
-    vector<PlanStage*> children;
-    for (size_t i = 0; i < _childrenIntervals.size(); i++) {
-        children.push_back(_childrenIntervals[i]->covering.get());
-    }
-    return children;
 }
 
 unique_ptr<PlanStageStats> NearStage::getStats() {
-    unique_ptr<PlanStageStats> statsClone(_stats->clone());
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, _stageType);
+    ret->specific.reset(_specificStats.clone());
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
-        statsClone->children.push_back(_childrenIntervals[i]->covering->getStats().release());
+        ret->children.push_back(_childrenIntervals[i]->covering->getStats().release());
     }
-    return statsClone;
+    return ret;
 }
 
 StageType NearStage::stageType() const {
-    return _stats->stageType;
-}
-
-const CommonStats* NearStage::getCommonStats() const {
-    return &_stats->common;
+    return _stageType;
 }
 
 const SpecificStats* NearStage::getSpecificStats() const {
-    return _stats->specific.get();
-}
-
-NearStats* NearStage::getNearStats() {
-    return static_cast<NearStats*>(_stats->specific.get());
+    return &_specificStats;
 }
 
 }  // namespace mongo

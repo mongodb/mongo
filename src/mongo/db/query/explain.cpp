@@ -66,9 +66,9 @@ void flattenStatsTree(const PlanStageStats* root, vector<const PlanStageStats*>*
  */
 void flattenExecTree(const PlanStage* root, vector<const PlanStage*>* flattened) {
     flattened->push_back(root);
-    vector<PlanStage*> children = root->getChildren();
+    const auto& children = root->getChildren();
     for (size_t i = 0; i < children.size(); ++i) {
-        flattenExecTree(children[i], flattened);
+        flattenExecTree(children[i].get(), flattened);
     }
 }
 
@@ -82,9 +82,9 @@ MultiPlanStage* getMultiPlanStage(PlanStage* root) {
         return mps;
     }
 
-    vector<PlanStage*> children = root->getChildren();
+    const auto& children = root->getChildren();
     for (size_t i = 0; i < children.size(); i++) {
-        MultiPlanStage* mps = getMultiPlanStage(children[i]);
+        MultiPlanStage* mps = getMultiPlanStage(children[i].get());
         if (mps != NULL) {
             return mps;
         }

@@ -65,7 +65,8 @@ MultiPlanStage::MultiPlanStage(OperationContext* txn,
                                const Collection* collection,
                                CanonicalQuery* cq,
                                bool shouldCache)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _collection(collection),
       _shouldCache(shouldCache),
       _query(cq),
@@ -73,20 +74,13 @@ MultiPlanStage::MultiPlanStage(OperationContext* txn,
       _backupPlanIdx(kNoSuchPlan),
       _failure(false),
       _failureCount(0),
-      _statusMemberId(WorkingSet::INVALID_ID),
-      _commonStats(kStageType) {
+      _statusMemberId(WorkingSet::INVALID_ID) {
     invariant(_collection);
-}
-
-MultiPlanStage::~MultiPlanStage() {
-    for (size_t ix = 0; ix < _candidates.size(); ++ix) {
-        delete _candidates[ix].solution;
-        delete _candidates[ix].root;
-    }
 }
 
 void MultiPlanStage::addPlan(QuerySolution* solution, PlanStage* root, WorkingSet* ws) {
     _candidates.push_back(CandidatePlan(solution, root, ws));
+    _children.emplace_back(root);
 }
 
 bool MultiPlanStage::isEOF() {
@@ -255,7 +249,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     CandidatePlan& bestCandidate = _candidates[_bestPlanIdx];
     std::list<WorkingSetID>& alreadyProduced = bestCandidate.results;
-    QuerySolution* bestSolution = bestCandidate.solution;
+    const auto& bestSolution = bestCandidate.solution;
 
     LOG(5) << "Winning solution:\n" << bestSolution->toString() << endl;
     LOG(2) << "Winning plan: " << Explain::getPlanSummary(bestCandidate.root);
@@ -283,7 +277,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         for (size_t orderingIndex = 0; orderingIndex < candidateOrder.size(); ++orderingIndex) {
             // index into candidates/ranking
             size_t ix = candidateOrder[orderingIndex];
-            solutions.push_back(_candidates[ix].solution);
+            solutions.push_back(_candidates[ix].solution.get());
         }
 
         // Check solution cache data. Do not add to cache if
@@ -394,20 +388,8 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
     return !doneWorking;
 }
 
-void MultiPlanStage::saveState() {
-    _txn = NULL;
-    for (size_t i = 0; i < _candidates.size(); ++i) {
-        _candidates[i].root->saveState();
-    }
-}
-
-void MultiPlanStage::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
+void MultiPlanStage::doRestoreState(OperationContext* opCtx) {
     _txn = opCtx;
-
-    for (size_t i = 0; i < _candidates.size(); ++i) {
-        _candidates[i].root->restoreState(opCtx);
-    }
 }
 
 namespace {
@@ -434,23 +416,22 @@ void invalidateHelper(OperationContext* txn,
 }
 }
 
-void MultiPlanStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void MultiPlanStage::doInvalidate(OperationContext* txn,
+                                  const RecordId& dl,
+                                  InvalidationType type) {
     if (_failure) {
         return;
     }
 
     if (bestPlanChosen()) {
         CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
-        bestPlan.root->invalidate(txn, dl, type);
         invalidateHelper(txn, bestPlan.ws, dl, &bestPlan.results, _collection);
         if (hasBackupPlan()) {
             CandidatePlan& backupPlan = _candidates[_backupPlanIdx];
-            backupPlan.root->invalidate(txn, dl, type);
             invalidateHelper(txn, backupPlan.ws, dl, &backupPlan.results, _collection);
         }
     } else {
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
-            _candidates[ix].root->invalidate(txn, dl, type);
             invalidateHelper(txn, _candidates[ix].ws, dl, &_candidates[ix].results, _collection);
         }
     }
@@ -472,21 +453,7 @@ QuerySolution* MultiPlanStage::bestSolution() {
     if (_bestPlanIdx == kNoSuchPlan)
         return NULL;
 
-    return _candidates[_bestPlanIdx].solution;
-}
-
-vector<PlanStage*> MultiPlanStage::getChildren() const {
-    vector<PlanStage*> children;
-
-    if (bestPlanChosen()) {
-        children.push_back(_candidates[_bestPlanIdx].root);
-    } else {
-        for (size_t i = 0; i < _candidates.size(); i++) {
-            children.push_back(_candidates[i].root);
-        }
-    }
-
-    return children;
+    return _candidates[_bestPlanIdx].solution.get();
 }
 
 unique_ptr<PlanStageStats> MultiPlanStage::getStats() {
@@ -499,10 +466,6 @@ unique_ptr<PlanStageStats> MultiPlanStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     return make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_PLAN);
-}
-
-const CommonStats* MultiPlanStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* MultiPlanStage::getSpecificStats() const {

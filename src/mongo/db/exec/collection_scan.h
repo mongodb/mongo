@@ -57,19 +57,15 @@ public:
     virtual StageState work(WorkingSetID* out);
     virtual bool isEOF();
 
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void doSaveState();
+    virtual void doRestoreState(OperationContext* opCtx);
 
     virtual StageType stageType() const {
         return STAGE_COLLSCAN;
     }
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -105,7 +101,6 @@ private:
     const WorkingSetID _wsidForFetch;
 
     // Stats
-    CommonStats _commonStats;
     CollectionScanStats _specificStats;
 };
 

@@ -415,16 +415,16 @@ UpdateStage::UpdateStage(OperationContext* txn,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _params(params),
       _ws(ws),
       _collection(collection),
-      _child(child),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID),
-      _commonStats(kStageType),
       _updatedLocs(params.request->isMulti() ? new DiskLocSet() : NULL),
       _doc(params.driver->getDocument()) {
+    _children.emplace_back(child);
     // We are an update until we fall into the insert case.
     params.driver->setContext(ModifierInterface::ExecInfo::UPDATE_CONTEXT);
 
@@ -715,7 +715,7 @@ bool UpdateStage::doneUpdating() {
     // We're done updating if either the child has no more results to give us, or we've
     // already gotten a result back and we're not a multi-update.
     return _idRetrying == WorkingSet::INVALID_ID && _idReturning == WorkingSet::INVALID_ID &&
-        (_child->isEOF() || (_specificStats.nMatched > 0 && !_params.request->isMulti()));
+        (child()->isEOF() || (_specificStats.nMatched > 0 && !_params.request->isMulti()));
 }
 
 bool UpdateStage::needInsert() {
@@ -795,7 +795,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
     WorkingSetID id;
     StageState status;
     if (_idRetrying == WorkingSet::INVALID_ID) {
-        status = _child->work(&id);
+        status = child()->work(&id);
     } else {
         status = ADVANCED;
         id = _idRetrying;
@@ -855,7 +855,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
 
             // Save state before making changes
             try {
-                _child->saveState();
+                child()->saveState();
                 if (supportsDocLocking()) {
                     // Doc-locking engines require this after saveState() since they don't use
                     // invalidations.
@@ -902,7 +902,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
         // As restoreState may restore (recreate) cursors, make sure to restore the
         // state outside of the WritUnitOfWork.
         try {
-            _child->restoreState(_txn);
+            child()->restoreState(_txn);
         } catch (const WriteConflictException& wce) {
             // Note we don't need to retry updating anything in this case since the update
             // already was committed. However, we still need to return the updated document
@@ -958,12 +958,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
     return status;
 }
 
-void UpdateStage::saveState() {
-    _txn = NULL;
-    ++_commonStats.yields;
-    _child->saveState();
-}
-
 Status UpdateStage::restoreUpdateState(OperationContext* opCtx) {
     const UpdateRequest& request = *_params.request;
     const NamespaceString& nsString(request.getNamespaceString());
@@ -994,37 +988,18 @@ Status UpdateStage::restoreUpdateState(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void UpdateStage::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
+void UpdateStage::doRestoreState(OperationContext* opCtx) {
     _txn = opCtx;
-    ++_commonStats.unyields;
-    // Restore our child.
-    _child->restoreState(opCtx);
-    // Restore self.
     uassertStatusOK(restoreUpdateState(opCtx));
 }
 
-void UpdateStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-    _child->invalidate(txn, dl, type);
-}
-
-vector<PlanStage*> UpdateStage::getChildren() const {
-    vector<PlanStage*> children;
-    children.push_back(_child.get());
-    return children;
-}
 
 unique_ptr<PlanStageStats> UpdateStage::getStats() {
     _commonStats.isEOF = isEOF();
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_UPDATE);
     ret->specific = make_unique<UpdateStats>(_specificStats);
-    ret->children.push_back(_child->getStats().release());
+    ret->children.push_back(child()->getStats().release());
     return ret;
-}
-
-const CommonStats* UpdateStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* UpdateStage::getSpecificStats() const {

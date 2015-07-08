@@ -77,24 +77,14 @@ class ProjectionStage : public PlanStage {
 public:
     ProjectionStage(const ProjectionStageParams& params, WorkingSet* ws, PlanStage* child);
 
-    virtual ~ProjectionStage();
-
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
-
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
 
     virtual StageType stageType() const {
         return STAGE_PROJECTION;
     }
 
     std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -126,10 +116,8 @@ private:
 
     // _ws is not owned by us.
     WorkingSet* _ws;
-    std::unique_ptr<PlanStage> _child;
 
     // Stats
-    CommonStats _commonStats;
     ProjectionStats _specificStats;
 
     // Fast paths:

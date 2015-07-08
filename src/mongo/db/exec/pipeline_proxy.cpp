@@ -48,9 +48,9 @@ const char* PipelineProxyStage::kStageType = "PIPELINE_PROXY";
 PipelineProxyStage::PipelineProxyStage(intrusive_ptr<Pipeline> pipeline,
                                        const std::shared_ptr<PlanExecutor>& child,
                                        WorkingSet* ws)
-    : _pipeline(pipeline),
-      _includeMetaData(_pipeline->getContext()->inShard)  // send metadata to merger
-      ,
+    : PlanStage(kStageType),
+      _pipeline(pipeline),
+      _includeMetaData(_pipeline->getContext()->inShard),  // send metadata to merger
       _childExec(child),
       _ws(ws) {}
 
@@ -91,31 +91,26 @@ bool PipelineProxyStage::isEOF() {
     return true;
 }
 
-void PipelineProxyStage::invalidate(OperationContext* txn,
-                                    const RecordId& dl,
-                                    InvalidationType type) {
+void PipelineProxyStage::doInvalidate(OperationContext* txn,
+                                      const RecordId& dl,
+                                      InvalidationType type) {
     // propagate to child executor if still in use
     if (std::shared_ptr<PlanExecutor> exec = _childExec.lock()) {
         exec->invalidate(txn, dl, type);
     }
 }
 
-void PipelineProxyStage::saveState() {
+void PipelineProxyStage::doSaveState() {
     _pipeline->getContext()->opCtx = NULL;
 }
 
-void PipelineProxyStage::restoreState(OperationContext* opCtx) {
+void PipelineProxyStage::doRestoreState(OperationContext* opCtx) {
     invariant(_pipeline->getContext()->opCtx == NULL);
     _pipeline->getContext()->opCtx = opCtx;
 }
 
 void PipelineProxyStage::pushBack(const BSONObj& obj) {
     _stash.push_back(obj);
-}
-
-vector<PlanStage*> PipelineProxyStage::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
 }
 
 unique_ptr<PlanStageStats> PipelineProxyStage::getStats() {

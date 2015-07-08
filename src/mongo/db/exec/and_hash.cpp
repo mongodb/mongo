@@ -55,31 +55,25 @@ const size_t AndHashStage::kLookAheadWorks = 10;
 const char* AndHashStage::kStageType = "AND_HASH";
 
 AndHashStage::AndHashStage(WorkingSet* ws, const Collection* collection)
-    : _collection(collection),
+    : PlanStage(kStageType),
+      _collection(collection),
       _ws(ws),
       _hashingChildren(true),
       _currentChild(0),
-      _commonStats(kStageType),
       _memUsage(0),
       _maxMemUsage(kDefaultMaxMemUsageBytes) {}
 
 AndHashStage::AndHashStage(WorkingSet* ws, const Collection* collection, size_t maxMemUsage)
-    : _collection(collection),
+    : PlanStage(kStageType),
+      _collection(collection),
       _ws(ws),
       _hashingChildren(true),
       _currentChild(0),
-      _commonStats(kStageType),
       _memUsage(0),
       _maxMemUsage(maxMemUsage) {}
 
-AndHashStage::~AndHashStage() {
-    for (size_t i = 0; i < _children.size(); ++i) {
-        delete _children[i];
-    }
-}
-
 void AndHashStage::addChild(PlanStage* child) {
-    _children.push_back(child);
+    _children.emplace_back(child);
 }
 
 size_t AndHashStage::getMemUsage() const {
@@ -137,7 +131,7 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
         // a result.  If it's EOF this whole stage will be EOF.  If it produces a
         // result we cache it for later.
         for (size_t i = 0; i < _children.size(); ++i) {
-            PlanStage* child = _children[i];
+            auto& child = _children[i];
             for (size_t j = 0; j < kLookAheadWorks; ++j) {
                 StageState childStatus = child->work(&_lookAheadResults[i]);
 
@@ -428,31 +422,10 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
     }
 }
 
-void AndHashStage::saveState() {
-    ++_commonStats.yields;
-
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->saveState();
-    }
-}
-
-void AndHashStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->restoreState(opCtx);
-    }
-}
-
-void AndHashStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
+void AndHashStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    // TODO remove this since calling isEOF is illegal inside of doInvalidate().
     if (isEOF()) {
         return;
-    }
-
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->invalidate(txn, dl, type);
     }
 
     // Invalidation can happen to our warmup results.  If that occurs just
@@ -500,10 +473,6 @@ void AndHashStage::invalidate(OperationContext* txn, const RecordId& dl, Invalid
     }
 }
 
-vector<PlanStage*> AndHashStage::getChildren() const {
-    return _children;
-}
-
 unique_ptr<PlanStageStats> AndHashStage::getStats() {
     _commonStats.isEOF = isEOF();
 
@@ -517,10 +486,6 @@ unique_ptr<PlanStageStats> AndHashStage::getStats() {
     }
 
     return ret;
-}
-
-const CommonStats* AndHashStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* AndHashStage::getSpecificStats() const {

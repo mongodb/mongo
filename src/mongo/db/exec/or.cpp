@@ -44,16 +44,10 @@ using stdx::make_unique;
 const char* OrStage::kStageType = "OR";
 
 OrStage::OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter)
-    : _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup), _commonStats(kStageType) {}
-
-OrStage::~OrStage() {
-    for (size_t i = 0; i < _children.size(); ++i) {
-        delete _children[i];
-    }
-}
+    : PlanStage(kStageType), _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup) {}
 
 void OrStage::addChild(PlanStage* child) {
-    _children.push_back(child);
+    _children.emplace_back(child);
 }
 
 bool OrStage::isEOF() {
@@ -138,29 +132,10 @@ PlanStage::StageState OrStage::work(WorkingSetID* out) {
     return childStatus;
 }
 
-void OrStage::saveState() {
-    ++_commonStats.yields;
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->saveState();
-    }
-}
-
-void OrStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->restoreState(opCtx);
-    }
-}
-
-void OrStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
+void OrStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    // TODO remove this since calling isEOF is illegal inside of doInvalidate().
     if (isEOF()) {
         return;
-    }
-
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->invalidate(txn, dl, type);
     }
 
     // If we see DL again it is not the same record as it once was so we still want to
@@ -172,10 +147,6 @@ void OrStage::invalidate(OperationContext* txn, const RecordId& dl, Invalidation
             _seen.erase(dl);
         }
     }
-}
-
-vector<PlanStage*> OrStage::getChildren() const {
-    return _children;
 }
 
 unique_ptr<PlanStageStats> OrStage::getStats() {
@@ -195,10 +166,6 @@ unique_ptr<PlanStageStats> OrStage::getStats() {
     }
 
     return ret;
-}
-
-const CommonStats* OrStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* OrStage::getSpecificStats() const {

@@ -58,6 +58,7 @@ env.Library(
         "oplogstart.cpp",
         "or.cpp",
         "pipeline_proxy.cpp",
+        "plan_stage.cpp",
         "projection.cpp",
         "projection_exec.cpp",
         "queued_data_stage.cpp",

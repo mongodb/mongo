@@ -44,12 +44,13 @@ const char* KeepMutationsStage::kStageType = "KEEP_MUTATIONS";
 KeepMutationsStage::KeepMutationsStage(const MatchExpression* filter,
                                        WorkingSet* ws,
                                        PlanStage* child)
-    : _workingSet(ws),
-      _child(child),
+    : PlanStage(kStageType),
+      _workingSet(ws),
       _filter(filter),
       _doneReadingChild(false),
-      _doneReturningFlagged(false),
-      _commonStats(kStageType) {}
+      _doneReturningFlagged(false) {
+    _children.emplace_back(child);
+}
 
 KeepMutationsStage::~KeepMutationsStage() {}
 
@@ -70,7 +71,7 @@ PlanStage::StageState KeepMutationsStage::work(WorkingSetID* out) {
 
     // Stream child results until the child is all done.
     if (!_doneReadingChild) {
-        StageState status = _child->work(out);
+        StageState status = child()->work(out);
 
         // Child is still returning results.  Pass them through.
         if (PlanStage::IS_EOF != status) {
@@ -119,39 +120,12 @@ PlanStage::StageState KeepMutationsStage::work(WorkingSetID* out) {
     }
 }
 
-void KeepMutationsStage::saveState() {
-    ++_commonStats.yields;
-    _child->saveState();
-}
-
-void KeepMutationsStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-    _child->restoreState(opCtx);
-}
-
-void KeepMutationsStage::invalidate(OperationContext* txn,
-                                    const RecordId& dl,
-                                    InvalidationType type) {
-    ++_commonStats.invalidates;
-    _child->invalidate(txn, dl, type);
-}
-
-vector<PlanStage*> KeepMutationsStage::getChildren() const {
-    vector<PlanStage*> children;
-    children.push_back(_child.get());
-    return children;
-}
-
 unique_ptr<PlanStageStats> KeepMutationsStage::getStats() {
     _commonStats.isEOF = isEOF();
     unique_ptr<PlanStageStats> ret =
         make_unique<PlanStageStats>(_commonStats, STAGE_KEEP_MUTATIONS);
-    ret->children.push_back(_child->getStats().release());
+    ret->children.push_back(child()->getStats().release());
     return ret;
-}
-
-const CommonStats* KeepMutationsStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* KeepMutationsStage::getSpecificStats() const {

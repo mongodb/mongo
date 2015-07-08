@@ -317,7 +317,7 @@ public:
 
         unique_ptr<PlanExecutor> exec(makePlanExecutorWithSortStage(coll));
         SortStage* ss = static_cast<SortStage*>(exec->getRootStage());
-        QueuedDataStage* ms = static_cast<QueuedDataStage*>(ss->getChildren()[0]);
+        QueuedDataStage* ms = static_cast<QueuedDataStage*>(ss->getChildren()[0].get());
 
         // Have sort read in data from the queued data stage.
         const int firstRead = 5;
@@ -426,7 +426,7 @@ public:
 
         unique_ptr<PlanExecutor> exec(makePlanExecutorWithSortStage(coll));
         SortStage* ss = static_cast<SortStage*>(exec->getRootStage());
-        QueuedDataStage* ms = static_cast<QueuedDataStage*>(ss->getChildren()[0]);
+        QueuedDataStage* ms = static_cast<QueuedDataStage*>(ss->getChildren()[0].get());
 
         const int firstRead = 10;
         // Have sort read in data from the queued data stage.

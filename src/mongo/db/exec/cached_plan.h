@@ -65,19 +65,14 @@ public:
 
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     virtual StageType stageType() const {
         return STAGE_CACHED_PLAN;
     }
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -142,8 +137,6 @@ private:
     // that solution is owned here.
     std::unique_ptr<QuerySolution> _replannedQs;
 
-    std::unique_ptr<PlanStage> _root;
-
     // Any results produced during trial period execution are kept here.
     std::list<WorkingSetID> _results;
 
@@ -154,7 +147,6 @@ private:
     std::unique_ptr<RecordFetcher> _fetcher;
 
     // Stats
-    CommonStats _commonStats;
     CachedPlanStats _specificStats;
 };
 

@@ -60,19 +60,15 @@ public:
     virtual bool isEOF();
     virtual StageState work(WorkingSetID* out);
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doSaveState();
+    virtual void doRestoreState(OperationContext* opCtx);
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     virtual StageType stageType() const {
         return STAGE_FETCH;
     }
 
     std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -95,7 +91,6 @@ private:
 
     // _ws is not owned by us.
     WorkingSet* _ws;
-    std::unique_ptr<PlanStage> _child;
 
     // The filter is not owned by us.
     const MatchExpression* _filter;
@@ -104,7 +99,6 @@ private:
     WorkingSetID _idRetrying;
 
     // Stats
-    CommonStats _commonStats;
     FetchStats _specificStats;
 };
 

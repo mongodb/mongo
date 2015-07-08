@@ -58,8 +58,6 @@ public:
      */
     AndHashStage(WorkingSet* ws, const Collection* collection, size_t maxMemUsage);
 
-    virtual ~AndHashStage();
-
     void addChild(PlanStage* child);
 
     /**
@@ -71,19 +69,13 @@ public:
     virtual StageState work(WorkingSetID* out);
     virtual bool isEOF();
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
     virtual StageType stageType() const {
         return STAGE_AND_HASH;
     }
 
     virtual std::unique_ptr<PlanStageStats> getStats();
-
-    virtual const CommonStats* getCommonStats() const;
 
     virtual const SpecificStats* getSpecificStats() const;
 
@@ -101,9 +93,6 @@ private:
 
     // Not owned by us.
     WorkingSet* _ws;
-
-    // The stages we read from.  Owned by us.
-    std::vector<PlanStage*> _children;
 
     // We want to see if any of our children are EOF immediately.  This requires working them a
     // few times to see if they hit EOF or if they produce a result.  If they produce a result,
@@ -127,7 +116,6 @@ private:
     size_t _currentChild;
 
     // Stats
-    CommonStats _commonStats;
     AndHashStats _specificStats;
 
     // The usage in bytes of all buffered data that we're holding.

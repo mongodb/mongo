@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,35 +26,39 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/record_id.h"
 
 namespace mongo {
 
-/**
- * This stage just returns EOF immediately.
- */
-class EOFStage : public PlanStage {
-public:
-    EOFStage();
-
-    virtual ~EOFStage();
-
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
-
-
-    virtual StageType stageType() const {
-        return STAGE_EOF;
+void PlanStage::saveState() {
+    ++_commonStats.yields;
+    for (auto&& child : _children) {
+        child->saveState();
     }
 
-    std::unique_ptr<PlanStageStats> getStats();
+    doSaveState();
+}
 
-    virtual const SpecificStats* getSpecificStats() const;
+void PlanStage::restoreState(OperationContext* opCtx) {
+    ++_commonStats.unyields;
+    for (auto&& child : _children) {
+        child->restoreState(opCtx);
+    }
 
-    static const char* kStageType;
-};
+    doRestoreState(opCtx);
+}
+
+void PlanStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    ++_commonStats.invalidates;
+    for (auto&& child : _children) {
+        child->invalidate(txn, dl, type);
+    }
+
+    doInvalidate(txn, dl, type);
+}
 
 }  // namespace mongo

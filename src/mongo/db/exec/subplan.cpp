@@ -59,12 +59,12 @@ SubplanStage::SubplanStage(OperationContext* txn,
                            WorkingSet* ws,
                            const QueryPlannerParams& params,
                            CanonicalQuery* cq)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _collection(collection),
       _ws(ws),
       _plannerParams(params),
-      _query(cq),
-      _commonStats(kStageType) {
+      _query(cq) {
     invariant(_collection);
 }
 
@@ -323,8 +323,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
             _ws->clear();
 
-            _child.reset(new MultiPlanStage(_txn, _collection, branchResult->canonicalQuery.get()));
-            MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(_child.get());
+            MultiPlanStage multiPlanStage(_txn, _collection, branchResult->canonicalQuery.get());
 
             // Dump all the solutions into the MPS.
             for (size_t ix = 0; ix < branchResult->solutions.size(); ++ix) {
@@ -333,22 +332,22 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
                     _txn, _collection, *branchResult->solutions[ix], _ws, &nextPlanRoot));
 
                 // Takes ownership of solution with index 'ix' and 'nextPlanRoot'.
-                multiPlanStage->addPlan(branchResult->solutions.releaseAt(ix), nextPlanRoot, _ws);
+                multiPlanStage.addPlan(branchResult->solutions.releaseAt(ix), nextPlanRoot, _ws);
             }
 
-            Status planSelectStat = multiPlanStage->pickBestPlan(yieldPolicy);
+            Status planSelectStat = multiPlanStage.pickBestPlan(yieldPolicy);
             if (!planSelectStat.isOK()) {
                 return planSelectStat;
             }
 
-            if (!multiPlanStage->bestPlanChosen()) {
+            if (!multiPlanStage.bestPlanChosen()) {
                 mongoutils::str::stream ss;
                 ss << "Failed to pick best plan for subchild "
                    << branchResult->canonicalQuery->toString();
                 return Status(ErrorCodes::BadValue, ss);
             }
 
-            QuerySolution* bestSoln = multiPlanStage->bestSolution();
+            QuerySolution* bestSoln = multiPlanStage.bestSolution();
 
             // Check that we have good cache data. For example, we don't cache things
             // for 2d indices.
@@ -410,7 +409,8 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     _ws->clear();
     PlanStage* root;
     invariant(StageBuilder::build(_txn, _collection, *_compositeSolution.get(), _ws, &root));
-    _child.reset(root);
+    invariant(_children.empty());
+    _children.emplace_back(root);
 
     return Status::OK();
 }
@@ -442,7 +442,8 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
         PlanStage* root;
         // Only one possible plan.  Run it.  Build the stages from the solution.
         verify(StageBuilder::build(_txn, _collection, *solutions[0], _ws, &root));
-        _child.reset(root);
+        invariant(_children.empty());
+        _children.emplace_back(root);
 
         // This SubplanStage takes ownership of the query solution.
         _compositeSolution.reset(solutions.popAndReleaseBack());
@@ -451,8 +452,9 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     } else {
         // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
         // and so on. The working set will be shared by all candidate plans.
-        _child.reset(new MultiPlanStage(_txn, _collection, _query));
-        MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(_child.get());
+        invariant(_children.empty());
+        _children.emplace_back(new MultiPlanStage(_txn, _collection, _query));
+        MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
             if (solutions[ix]->cacheData.get()) {
@@ -500,8 +502,8 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
 bool SubplanStage::isEOF() {
     // If we're running we best have a runner.
-    invariant(_child.get());
-    return _child->isEOF();
+    invariant(child());
+    return child()->isEOF();
 }
 
 PlanStage::StageState SubplanStage::work(WorkingSetID* out) {
@@ -514,8 +516,8 @@ PlanStage::StageState SubplanStage::work(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    invariant(_child.get());
-    StageState state = _child->work(out);
+    invariant(child());
+    StageState state = child()->work(out);
 
     if (PlanStage::NEED_TIME == state) {
         ++_commonStats.needTime;
@@ -528,58 +530,19 @@ PlanStage::StageState SubplanStage::work(WorkingSetID* out) {
     return state;
 }
 
-void SubplanStage::saveState() {
-    _txn = NULL;
-    ++_commonStats.yields;
-
-    // We're ranking a sub-plan via an MPS or we're streaming results from this stage.  Either
-    // way, pass on the request.
-    if (NULL != _child.get()) {
-        _child->saveState();
-    }
-}
-
-void SubplanStage::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
+void SubplanStage::doRestoreState(OperationContext* opCtx) {
     _txn = opCtx;
-    ++_commonStats.unyields;
-
-    // We're ranking a sub-plan via an MPS or we're streaming results from this stage.  Either
-    // way, pass on the request.
-    if (NULL != _child.get()) {
-        _child->restoreState(opCtx);
-    }
-}
-
-void SubplanStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
-    if (NULL != _child.get()) {
-        _child->invalidate(txn, dl, type);
-    }
-}
-
-std::vector<PlanStage*> SubplanStage::getChildren() const {
-    std::vector<PlanStage*> children;
-    if (NULL != _child.get()) {
-        children.push_back(_child.get());
-    }
-    return children;
 }
 
 unique_ptr<PlanStageStats> SubplanStage::getStats() {
     _commonStats.isEOF = isEOF();
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_SUBPLAN);
-    ret->children.push_back(_child->getStats().release());
+    ret->children.push_back(child()->getStats().release());
     return ret;
 }
 
 bool SubplanStage::branchPlannedFromCache(size_t i) const {
     return NULL != _branchResults[i]->cachedSolution.get();
-}
-
-const CommonStats* SubplanStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* SubplanStage::getSpecificStats() const {

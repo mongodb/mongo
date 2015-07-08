@@ -45,21 +45,16 @@ using stdx::make_unique;
 const char* AndSortedStage::kStageType = "AND_SORTED";
 
 AndSortedStage::AndSortedStage(WorkingSet* ws, const Collection* collection)
-    : _collection(collection),
+    : PlanStage(kStageType),
+      _collection(collection),
       _ws(ws),
       _targetNode(numeric_limits<size_t>::max()),
       _targetId(WorkingSet::INVALID_ID),
-      _isEOF(false),
-      _commonStats(kStageType) {}
+      _isEOF(false) {}
 
-AndSortedStage::~AndSortedStage() {
-    for (size_t i = 0; i < _children.size(); ++i) {
-        delete _children[i];
-    }
-}
 
 void AndSortedStage::addChild(PlanStage* child) {
-    _children.push_back(child);
+    _children.emplace_back(child);
 }
 
 bool AndSortedStage::isEOF() {
@@ -160,7 +155,7 @@ PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
 
     // We have nodes that haven't hit _targetLoc yet.
     size_t workingChildNumber = _workingTowardRep.front();
-    PlanStage* next = _children[workingChildNumber];
+    auto& next = _children[workingChildNumber];
     WorkingSetID id = WorkingSet::INVALID_ID;
     StageState state = next->work(&id);
 
@@ -253,31 +248,13 @@ PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
     }
 }
 
-void AndSortedStage::saveState() {
-    ++_commonStats.yields;
 
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->saveState();
-    }
-}
-
-void AndSortedStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->restoreState(opCtx);
-    }
-}
-
-void AndSortedStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
+void AndSortedStage::doInvalidate(OperationContext* txn,
+                                  const RecordId& dl,
+                                  InvalidationType type) {
+    // TODO remove this since calling isEOF is illegal inside of doInvalidate().
     if (isEOF()) {
         return;
-    }
-
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->invalidate(txn, dl, type);
     }
 
     if (dl == _targetLoc) {
@@ -298,10 +275,6 @@ void AndSortedStage::invalidate(OperationContext* txn, const RecordId& dl, Inval
     }
 }
 
-vector<PlanStage*> AndSortedStage::getChildren() const {
-    return _children;
-}
-
 unique_ptr<PlanStageStats> AndSortedStage::getStats() {
     _commonStats.isEOF = isEOF();
 
@@ -312,10 +285,6 @@ unique_ptr<PlanStageStats> AndSortedStage::getStats() {
     }
 
     return ret;
-}
-
-const CommonStats* AndSortedStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* AndSortedStage::getSpecificStats() const {

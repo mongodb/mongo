@@ -69,8 +69,6 @@ public:
                    Collection* collection,
                    IndexDescriptor* twoDIndex);
 
-    virtual ~GeoNear2DStage();
-
 protected:
     virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
                                                       WorkingSet* workingSet,
@@ -84,12 +82,6 @@ protected:
                                              WorkingSetID* out);
 
 private:
-    virtual void finishSaveState();
-
-    virtual void finishRestoreState(OperationContext* txn);
-
-    virtual void finishInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
     const GeoNearParams _nearParams;
 
     // The 2D index we're searching over
@@ -135,12 +127,6 @@ protected:
                                              WorkingSetID* out);
 
 private:
-    virtual void finishSaveState();
-
-    virtual void finishRestoreState(OperationContext* txn);
-
-    virtual void finishInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
     const GeoNearParams _nearParams;
 
     // The 2D index we're searching over

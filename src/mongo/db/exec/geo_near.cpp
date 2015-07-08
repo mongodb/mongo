@@ -259,8 +259,10 @@ static R2Annulus twoDDistanceBounds(const GeoNearParams& nearParams,
 
 class GeoNear2DStage::DensityEstimator {
 public:
-    DensityEstimator(const IndexDescriptor* twoDindex, const GeoNearParams* nearParams)
-        : _twoDIndex(twoDindex), _nearParams(nearParams), _currentLevel(0) {
+    DensityEstimator(PlanStage::Children* children,
+                     const IndexDescriptor* twoDindex,
+                     const GeoNearParams* nearParams)
+        : _children(children), _twoDIndex(twoDindex), _nearParams(nearParams), _currentLevel(0) {
         GeoHashConverter::Parameters hashParams;
         Status status = GeoHashConverter::parseParameters(_twoDIndex->infoObj(), &hashParams);
         // The index status should always be valid.
@@ -281,16 +283,13 @@ public:
                                WorkingSetID* out,
                                double* estimatedDistance);
 
-    void saveState();
-    void restoreState(OperationContext* txn);
-    void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
 private:
     void buildIndexScan(OperationContext* txn, WorkingSet* workingSet, Collection* collection);
 
+    PlanStage::Children* _children;     // Points to PlanStage::_children in the NearStage.
     const IndexDescriptor* _twoDIndex;  // Not owned here.
     const GeoNearParams* _nearParams;   // Not owned here.
-    unique_ptr<IndexScan> _indexScan;
+    IndexScan* _indexScan = nullptr;    // Owned in PlanStage::_children.
     unique_ptr<GeoHashConverter> _converter;
     GeoHash _centroidCell;
     unsigned _currentLevel;
@@ -335,7 +334,9 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* txn,
     // in the scan (i.e. $within)
     IndexBoundsBuilder::intersectize(oil, &scanParams.bounds.fields[twoDFieldPosition]);
 
-    _indexScan.reset(new IndexScan(txn, scanParams, workingSet, NULL));
+    invariant(!_indexScan);
+    _indexScan = new IndexScan(txn, scanParams, workingSet, NULL);
+    _children->emplace_back(_indexScan);
 }
 
 // Return IS_EOF is we find a document in it's ancestor cells and set estimated distance
@@ -359,7 +360,9 @@ PlanStage::StageState GeoNear2DStage::DensityEstimator::work(OperationContext* t
             // Advance to the next level and search again.
             _currentLevel--;
             // Reset index scan for the next level.
-            _indexScan.reset(NULL);
+            invariant(_children->back().get() == _indexScan);
+            _indexScan = nullptr;
+            _children->pop_back();
             return PlanStage::NEED_TIME;
         }
 
@@ -380,33 +383,12 @@ PlanStage::StageState GeoNear2DStage::DensityEstimator::work(OperationContext* t
     return state;
 }
 
-void GeoNear2DStage::DensityEstimator::saveState() {
-    if (_indexScan) {
-        _indexScan->saveState();
-    }
-}
-
-void GeoNear2DStage::DensityEstimator::restoreState(OperationContext* txn) {
-    if (_indexScan) {
-        _indexScan->restoreState(txn);
-    }
-}
-
-void GeoNear2DStage::DensityEstimator::invalidate(OperationContext* txn,
-                                                  const RecordId& dl,
-                                                  InvalidationType type) {
-    if (_indexScan) {
-        _indexScan->invalidate(txn, dl, type);
-    }
-}
-
-
 PlanStage::StageState GeoNear2DStage::initialize(OperationContext* txn,
                                                  WorkingSet* workingSet,
                                                  Collection* collection,
                                                  WorkingSetID* out) {
     if (!_densityEstimator) {
-        _densityEstimator.reset(new DensityEstimator(_twoDIndex, &_nearParams));
+        _densityEstimator.reset(new DensityEstimator(&_children, _twoDIndex, &_nearParams));
     }
 
     double estimatedDistance;
@@ -451,40 +433,16 @@ GeoNear2DStage::GeoNear2DStage(const GeoNearParams& nearParams,
                                WorkingSet* workingSet,
                                Collection* collection,
                                IndexDescriptor* twoDIndex)
-    : NearStage(txn,
-                workingSet,
-                collection,
-                new PlanStageStats(CommonStats(kTwoDIndexNearStage.c_str()), STAGE_GEO_NEAR_2D)),
+    : NearStage(txn, kTwoDIndexNearStage.c_str(), STAGE_GEO_NEAR_2D, workingSet, collection),
       _nearParams(nearParams),
       _twoDIndex(twoDIndex),
       _fullBounds(twoDDistanceBounds(nearParams, twoDIndex)),
       _currBounds(_fullBounds.center(), -1, _fullBounds.getInner()),
       _boundsIncrement(0.0) {
-    getNearStats()->keyPattern = twoDIndex->keyPattern();
-    getNearStats()->indexName = twoDIndex->indexName();
+    _specificStats.keyPattern = twoDIndex->keyPattern();
+    _specificStats.indexName = twoDIndex->indexName();
 }
 
-GeoNear2DStage::~GeoNear2DStage() {}
-
-void GeoNear2DStage::finishSaveState() {
-    if (_densityEstimator) {
-        _densityEstimator->saveState();
-    }
-}
-
-void GeoNear2DStage::finishRestoreState(OperationContext* txn) {
-    if (_densityEstimator) {
-        _densityEstimator->restoreState(txn);
-    }
-}
-
-void GeoNear2DStage::finishInvalidate(OperationContext* txn,
-                                      const RecordId& dl,
-                                      InvalidationType type) {
-    if (_densityEstimator) {
-        _densityEstimator->invalidate(txn, dl, type);
-    }
-}
 
 namespace {
 
@@ -665,10 +623,8 @@ StatusWith<NearStage::CoveredInterval*>  //
     // Setup the next interval
     //
 
-    const NearStats* stats = getNearStats();
-
-    if (!stats->intervalStats.empty()) {
-        const IntervalStats& lastIntervalStats = stats->intervalStats.back();
+    if (!_specificStats.intervalStats.empty()) {
+        const IntervalStats& lastIntervalStats = _specificStats.intervalStats.back();
 
         // TODO: Generally we want small numbers of results fast, then larger numbers later
         if (lastIntervalStats.numResultsBuffered < 300)
@@ -805,10 +761,13 @@ StatusWith<NearStage::CoveredInterval*>  //
     }
 
     // FetchStage owns index scan
-    FetchStage* fetcher(new FetchStageWithMatch(txn, workingSet, scan, docMatcher, collection));
+    _children.emplace_back(new FetchStageWithMatch(txn, workingSet, scan, docMatcher, collection));
 
-    return StatusWith<CoveredInterval*>(new CoveredInterval(
-        fetcher, true, nextBounds.getInner(), nextBounds.getOuter(), isLastInterval));
+    return StatusWith<CoveredInterval*>(new CoveredInterval(_children.back().get(),
+                                                            true,
+                                                            nextBounds.getInner(),
+                                                            nextBounds.getOuter(),
+                                                            isLastInterval));
 }
 
 StatusWith<double> GeoNear2DStage::computeDistance(WorkingSetMember* member) {
@@ -843,18 +802,14 @@ GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
                                            WorkingSet* workingSet,
                                            Collection* collection,
                                            IndexDescriptor* s2Index)
-    : NearStage(
-          txn,
-          workingSet,
-          collection,
-          new PlanStageStats(CommonStats(kS2IndexNearStage.c_str()), STAGE_GEO_NEAR_2DSPHERE)),
+    : NearStage(txn, kS2IndexNearStage.c_str(), STAGE_GEO_NEAR_2DSPHERE, workingSet, collection),
       _nearParams(nearParams),
       _s2Index(s2Index),
       _fullBounds(geoNearDistanceBounds(*nearParams.nearQuery)),
       _currBounds(_fullBounds.center(), -1, _fullBounds.getInner()),
       _boundsIncrement(0.0) {
-    getNearStats()->keyPattern = s2Index->keyPattern();
-    getNearStats()->indexName = s2Index->indexName();
+    _specificStats.keyPattern = s2Index->keyPattern();
+    _specificStats.indexName = s2Index->indexName();
 }
 
 GeoNear2DSphereStage::~GeoNear2DSphereStage() {}
@@ -940,8 +895,10 @@ private:
 // Estimate the density of data by search the nearest cells level by level around center.
 class GeoNear2DSphereStage::DensityEstimator {
 public:
-    DensityEstimator(const IndexDescriptor* s2Index, const GeoNearParams* nearParams)
-        : _s2Index(s2Index), _nearParams(nearParams), _currentLevel(0) {
+    DensityEstimator(PlanStage::Children* children,
+                     const IndexDescriptor* s2Index,
+                     const GeoNearParams* nearParams)
+        : _children(children), _s2Index(s2Index), _nearParams(nearParams), _currentLevel(0) {
         S2IndexingParams params;
         ExpressionParams::parse2dsphereParams(_s2Index->infoObj(), &params);
         // Since cellId.AppendVertexNeighbors(level, output) requires level < cellId.level(),
@@ -959,17 +916,14 @@ public:
                                WorkingSetID* out,
                                double* estimatedDistance);
 
-    void saveState();
-    void restoreState(OperationContext* txn);
-    void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
 private:
     void buildIndexScan(OperationContext* txn, WorkingSet* workingSet, Collection* collection);
 
+    PlanStage::Children* _children;    // Points to PlanStage::_children in the NearStage.
     const IndexDescriptor* _s2Index;   // Not owned here.
     const GeoNearParams* _nearParams;  // Not owned here.
     int _currentLevel;
-    unique_ptr<IndexScan> _indexScan;
+    IndexScan* _indexScan = nullptr;  // Owned in PlanStage::_children.
 };
 
 // Setup the index scan stage for neighbors at this level.
@@ -1016,7 +970,9 @@ void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(OperationContext* tx
     invariant(coveredIntervals->isValidFor(1));
 
     // Index scan
-    _indexScan.reset(new IndexScan(txn, scanParams, workingSet, NULL));
+    invariant(!_indexScan);
+    _indexScan = new IndexScan(txn, scanParams, workingSet, NULL);
+    _children->emplace_back(_indexScan);
 }
 
 PlanStage::StageState GeoNear2DSphereStage::DensityEstimator::work(OperationContext* txn,
@@ -1038,7 +994,9 @@ PlanStage::StageState GeoNear2DSphereStage::DensityEstimator::work(OperationCont
             // Advance to the next level and search again.
             _currentLevel--;
             // Reset index scan for the next level.
-            _indexScan.reset(NULL);
+            invariant(_children->back().get() == _indexScan);
+            _indexScan = nullptr;
+            _children->pop_back();
             return PlanStage::NEED_TIME;
         }
 
@@ -1059,33 +1017,13 @@ PlanStage::StageState GeoNear2DSphereStage::DensityEstimator::work(OperationCont
     return state;
 }
 
-void GeoNear2DSphereStage::DensityEstimator::saveState() {
-    if (_indexScan) {
-        _indexScan->saveState();
-    }
-}
-
-void GeoNear2DSphereStage::DensityEstimator::restoreState(OperationContext* txn) {
-    if (_indexScan) {
-        _indexScan->restoreState(txn);
-    }
-}
-
-void GeoNear2DSphereStage::DensityEstimator::invalidate(OperationContext* txn,
-                                                        const RecordId& dl,
-                                                        InvalidationType type) {
-    if (_indexScan) {
-        _indexScan->invalidate(txn, dl, type);
-    }
-}
-
 
 PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* txn,
                                                        WorkingSet* workingSet,
                                                        Collection* collection,
                                                        WorkingSetID* out) {
     if (!_densityEstimator) {
-        _densityEstimator.reset(new DensityEstimator(_s2Index, &_nearParams));
+        _densityEstimator.reset(new DensityEstimator(&_children, _s2Index, &_nearParams));
     }
 
     double estimatedDistance;
@@ -1110,26 +1048,6 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* txn,
     return state;
 }
 
-void GeoNear2DSphereStage::finishSaveState() {
-    if (_densityEstimator) {
-        _densityEstimator->saveState();
-    }
-}
-
-void GeoNear2DSphereStage::finishRestoreState(OperationContext* txn) {
-    if (_densityEstimator) {
-        _densityEstimator->restoreState(txn);
-    }
-}
-
-void GeoNear2DSphereStage::finishInvalidate(OperationContext* txn,
-                                            const RecordId& dl,
-                                            InvalidationType type) {
-    if (_densityEstimator) {
-        _densityEstimator->invalidate(txn, dl, type);
-    }
-}
-
 StatusWith<NearStage::CoveredInterval*>  //
     GeoNear2DSphereStage::nextInterval(OperationContext* txn,
                                        WorkingSet* workingSet,
@@ -1143,10 +1061,8 @@ StatusWith<NearStage::CoveredInterval*>  //
     // Setup the next interval
     //
 
-    const NearStats* stats = getNearStats();
-
-    if (!stats->intervalStats.empty()) {
-        const IntervalStats& lastIntervalStats = stats->intervalStats.back();
+    if (!_specificStats.intervalStats.empty()) {
+        const IntervalStats& lastIntervalStats = _specificStats.intervalStats.back();
 
         // TODO: Generally we want small numbers of results fast, then larger numbers later
         if (lastIntervalStats.numResultsBuffered < 300)
@@ -1196,10 +1112,13 @@ StatusWith<NearStage::CoveredInterval*>  //
     IndexScan* scan = new IndexScanWithMatch(txn, scanParams, workingSet, keyMatcher);
 
     // FetchStage owns index scan
-    FetchStage* fetcher(new FetchStage(txn, workingSet, scan, _nearParams.filter, collection));
+    _children.emplace_back(new FetchStage(txn, workingSet, scan, _nearParams.filter, collection));
 
-    return StatusWith<CoveredInterval*>(new CoveredInterval(
-        fetcher, true, nextBounds.getInner(), nextBounds.getOuter(), isLastInterval));
+    return StatusWith<CoveredInterval*>(new CoveredInterval(_children.back().get(),
+                                                            true,
+                                                            nextBounds.getInner(),
+                                                            nextBounds.getOuter(),
+                                                            isLastInterval));
 }
 
 StatusWith<double> GeoNear2DSphereStage::computeDistance(WorkingSetMember* member) {

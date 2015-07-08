@@ -54,13 +54,14 @@ FetchStage::FetchStage(OperationContext* txn,
                        PlanStage* child,
                        const MatchExpression* filter,
                        const Collection* collection)
-    : _txn(txn),
+    : PlanStage(kStageType),
+      _txn(txn),
       _collection(collection),
       _ws(ws),
-      _child(child),
       _filter(filter),
-      _idRetrying(WorkingSet::INVALID_ID),
-      _commonStats(kStageType) {}
+      _idRetrying(WorkingSet::INVALID_ID) {
+    _children.emplace_back(child);
+}
 
 FetchStage::~FetchStage() {}
 
@@ -71,7 +72,7 @@ bool FetchStage::isEOF() {
         return false;
     }
 
-    return _child->isEOF();
+    return child()->isEOF();
 }
 
 PlanStage::StageState FetchStage::work(WorkingSetID* out) {
@@ -88,7 +89,7 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
     WorkingSetID id;
     StageState status;
     if (_idRetrying == WorkingSet::INVALID_ID) {
-        status = _child->work(&id);
+        status = child()->work(&id);
     } else {
         status = ADVANCED;
         id = _idRetrying;
@@ -158,28 +159,20 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
     return status;
 }
 
-void FetchStage::saveState() {
+void FetchStage::doSaveState() {
     _txn = NULL;
-    ++_commonStats.yields;
     if (_cursor)
         _cursor->saveUnpositioned();
-    _child->saveState();
 }
 
-void FetchStage::restoreState(OperationContext* opCtx) {
+void FetchStage::doRestoreState(OperationContext* opCtx) {
     invariant(_txn == NULL);
     _txn = opCtx;
-    ++_commonStats.unyields;
     if (_cursor)
         _cursor->restore(opCtx);
-    _child->restoreState(opCtx);
 }
 
-void FetchStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
-    _child->invalidate(txn, dl, type);
-
+void FetchStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
     // It's possible that the loc getting invalidated is the one we're about to
     // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
     if (WorkingSet::INVALID_ID != _idRetrying) {
@@ -223,12 +216,6 @@ PlanStage::StageState FetchStage::returnIfMatches(WorkingSetMember* member,
     }
 }
 
-vector<PlanStage*> FetchStage::getChildren() const {
-    vector<PlanStage*> children;
-    children.push_back(_child.get());
-    return children;
-}
-
 unique_ptr<PlanStageStats> FetchStage::getStats() {
     _commonStats.isEOF = isEOF();
 
@@ -241,12 +228,8 @@ unique_ptr<PlanStageStats> FetchStage::getStats() {
 
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_FETCH);
     ret->specific = make_unique<FetchStats>(_specificStats);
-    ret->children.push_back(_child->getStats().release());
+    ret->children.push_back(child()->getStats().release());
     return ret;
-}
-
-const CommonStats* FetchStage::getCommonStats() const {
-    return &_commonStats;
 }
 
 const SpecificStats* FetchStage::getSpecificStats() const {
