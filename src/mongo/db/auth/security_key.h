@@ -31,6 +31,9 @@
 #include <string>
 
 namespace mongo {
+template <class T>
+class StatusWith;
+
 /**
  * This method checks the validity of filename as a security key, hashes its
  * contents, and stores it in the internalSecurity variable.  Prints an
@@ -39,5 +42,11 @@ namespace mongo {
  * @return if the key was successfully stored
  */
 bool setUpSecurityKey(const std::string& filename);
+
+/**
+ * This method takes in a filename and returns the contents as a string.
+ * It checks that the contents are valid base 64 characters.
+ */
+StatusWith<std::string> readSecurityFile(const std::string& filename);
 
 }  // namespace mongo
