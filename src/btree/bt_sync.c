@@ -109,17 +109,6 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		/* Write all dirty in-cache pages. */
 		flags |= WT_READ_NO_EVICT;
 		for (walk = NULL;;) {
-			/*
-			 * If we have a page, and it was ever modified, track
-			 * the highest transaction ID in the tree.  We do this
-			 * here because we want the value after reconciling
-			 * dirty pages.
-			 */
-			if (walk != NULL && walk->page != NULL &&
-			    (mod = walk->page->modify) != NULL &&
-			    WT_TXNID_LT(btree->rec_max_txn, mod->rec_max_txn))
-				btree->rec_max_txn = mod->rec_max_txn;
-
 			WT_ERR(__wt_tree_walk(session, &walk, NULL, flags));
 			if (walk == NULL)
 				break;
