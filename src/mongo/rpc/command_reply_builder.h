@@ -30,7 +30,7 @@
 
 #include <memory>
 
-#include "mongo/base/status_with.h"
+#include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/document_range.h"
 #include "mongo/rpc/protocol.h"
@@ -56,11 +56,11 @@ public:
      */
     CommandReplyBuilder(std::unique_ptr<Message> message);
 
-    CommandReplyBuilder& setMetadata(BSONObj metadata) final;
-    CommandReplyBuilder& setRawCommandReply(BSONObj commandReply) final;
+    CommandReplyBuilder& setMetadata(const BSONObj& metadata) final;
+    CommandReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
 
-    CommandReplyBuilder& addOutputDocs(DocumentRange outputDocs) final;
-    CommandReplyBuilder& addOutputDoc(BSONObj outputDoc) final;
+    Status addOutputDocs(DocumentRange outputDocs) final;
+    Status addOutputDoc(const BSONObj& outputDoc) final;
 
     State getState() const final;
 
@@ -75,13 +75,18 @@ public:
      */
     std::unique_ptr<Message> done() final;
 
-    std::size_t availableSpaceForOutputDocs() const final;
+    std::size_t availableBytes() const final;
 
 private:
+    /**
+     *  Checks if there is enough space in the buffer to store dataSize bytes
+     *  and computes error message if not.
+     */
+    Status _hasSpaceFor(std::size_t dataSize) const;
+
     // Default values are all empty.
     BufBuilder _builder{};
     std::unique_ptr<Message> _message;
-
     State _state{State::kMetadata};
 };
 

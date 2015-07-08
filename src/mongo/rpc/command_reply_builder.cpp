@@ -28,11 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/rpc/command_reply_builder.h"
+
 #include <utility>
 
-#include "mongo/rpc/command_reply_builder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace rpc {
@@ -42,32 +44,46 @@ CommandReplyBuilder::CommandReplyBuilder() : _message{stdx::make_unique<Message>
 CommandReplyBuilder::CommandReplyBuilder(std::unique_ptr<Message> message)
     : _message{std::move(message)} {}
 
-CommandReplyBuilder& CommandReplyBuilder::setMetadata(BSONObj metadata) {
+CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
     invariant(_state == State::kMetadata);
+
     metadata.appendSelfToBufBuilder(_builder);
     _state = State::kCommandReply;
     return *this;
 }
 
-CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(BSONObj commandReply) {
+CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(const BSONObj& commandReply) {
     invariant(_state == State::kCommandReply);
+
     commandReply.appendSelfToBufBuilder(_builder);
     _state = State::kOutputDocs;
     return *this;
 }
 
-CommandReplyBuilder& CommandReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
+Status CommandReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
     invariant(_state == State::kOutputDocs);
     auto rangeData = outputDocs.data();
-    _builder.appendBuf(rangeData.data(), rangeData.length());
-    // leave state as is as we can add as many outputDocs as we want.
-    return *this;
+    auto dataSize = rangeData.length();
+    auto hasSpace = _hasSpaceFor(dataSize);
+    if (!hasSpace.isOK()) {
+        return hasSpace;
+    }
+
+    _builder.appendBuf(rangeData.data(), dataSize);
+    return Status::OK();
 }
 
-CommandReplyBuilder& CommandReplyBuilder::addOutputDoc(BSONObj outputDoc) {
+Status CommandReplyBuilder::addOutputDoc(const BSONObj& outputDoc) {
     invariant(_state == State::kOutputDocs);
+
+    auto dataSize = static_cast<std::size_t>(outputDoc.objsize());
+    auto hasSpace = _hasSpaceFor(dataSize);
+    if (!hasSpace.isOK()) {
+        return hasSpace;
+    }
+
     outputDoc.appendSelfToBufBuilder(_builder);
-    return *this;
+    return Status::OK();
 }
 
 ReplyBuilderInterface::State CommandReplyBuilder::getState() const {
@@ -98,14 +114,23 @@ std::unique_ptr<Message> CommandReplyBuilder::done() {
     return std::move(_message);
 }
 
-std::size_t CommandReplyBuilder::availableSpaceForOutputDocs() const {
-    invariant(State::kDone != _state);
+std::size_t CommandReplyBuilder::availableBytes() const {
     int intLen = _builder.len();
     invariant(0 <= intLen);
     std::size_t len = static_cast<std::size_t>(intLen);
     std::size_t msgHeaderSz = static_cast<std::size_t>(MsgData::MsgDataHeaderSize);
     invariant(len + msgHeaderSz <= mongo::MaxMessageSizeBytes);
     return mongo::MaxMessageSizeBytes - len - msgHeaderSz;
+}
+
+Status CommandReplyBuilder::_hasSpaceFor(std::size_t dataSize) const {
+    size_t availBytes = availableBytes();
+    if (availBytes < dataSize) {
+        return Status(ErrorCodes::Overflow,
+                      str::stream() << "Not enough space to store " << dataSize << " bytes. Only "
+                                    << availBytes << " bytes are available.");
+    }
+    return Status::OK();
 }
 
 }  // rpc

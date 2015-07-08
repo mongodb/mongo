@@ -106,13 +106,14 @@ using CommandReplyWithMetadata = std::tuple<BSONObj, BSONObj>;
  * Given a legacy command reply, attempts to strip the metadata from the reply and construct
  * a metadata object.
  */
-StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(BSONObj legacyReply);
+StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(const BSONObj& legacyReply);
 
 /**
  * Given a command reply object and an associated metadata object,
  * attempts to construct a legacy command object.
  */
-StatusWith<BSONObj> downconvertReplyMetadata(BSONObj commandReply, BSONObj replyMetadata);
+StatusWith<BSONObj> downconvertReplyMetadata(const BSONObj& commandReply,
+                                             const BSONObj& replyMetadata);
 
 /**
  * A function type for writing request metadata. The function takes a pointer to a

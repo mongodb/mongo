@@ -80,9 +80,10 @@ public:
 private:
     const Message* _message;
 
-    // TODO: SERVER-18236
-    BSONObj _metadata{};
     BSONObj _commandReply{};  // will hold unowned
+    BSONObj _metadata{};
+    BufBuilder _docBuffer{};
+    DocumentRange _outputDocs{};
 };
 
 }  // namespace rpc

@@ -31,7 +31,7 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/status_with.h"
+#include "mongo/base/status.h"
 #include "mongo/rpc/protocol.h"
 
 namespace mongo {
@@ -59,13 +59,13 @@ public:
 
     virtual ~ReplyBuilderInterface() = default;
 
-    virtual ReplyBuilderInterface& setMetadata(BSONObj metadata) = 0;
+    virtual ReplyBuilderInterface& setMetadata(const BSONObj& metadata) = 0;
 
     /**
      * Sets the raw command reply. This should probably not be used in favor of the
      * variants that accept a Status or StatusWith.
      */
-    virtual ReplyBuilderInterface& setRawCommandReply(BSONObj reply) = 0;
+    virtual ReplyBuilderInterface& setRawCommandReply(const BSONObj& reply) = 0;
 
     /**
      * Sets the reply for this command. If an engaged StatusWith<BSONObj> is passed, the command
@@ -85,19 +85,21 @@ public:
      * interfacing with legacy code that adds additional data to a failed command reply and
      * its use is discouraged in new code.
      */
-    ReplyBuilderInterface& setCommandReply(Status nonOKStatus, BSONObj extraErrorInfo);
+    ReplyBuilderInterface& setCommandReply(Status nonOKStatus, const BSONObj& extraErrorInfo);
 
     /**
      * Add a range of output documents to the reply. This method can be called multiple times
-     * before calling done().
+     * before calling done(). A non OK status indicates that the message does not have
+     * enough space to store ouput documents.
      */
-    virtual ReplyBuilderInterface& addOutputDocs(DocumentRange outputDocs) = 0;
+    virtual Status addOutputDocs(DocumentRange outputDocs) = 0;
 
     /**
      * Add a single output document to the reply. This method can be called multiple times
-     * before calling done().
+     * before calling done(). A non OK status indicates that the message does not have
+     * enough space to store ouput documents.
      */
-    virtual ReplyBuilderInterface& addOutputDoc(BSONObj outputDoc) = 0;
+    virtual Status addOutputDoc(const BSONObj& outputDoc) = 0;
 
     /**
      * Gets the state of the builder. As the builder will simply crash the process if it is ever
@@ -123,7 +125,7 @@ public:
      * Returns available space in bytes, should be used to verify that the message have enough
      * space for ouput documents.
      */
-    virtual std::size_t availableSpaceForOutputDocs() const = 0;
+    virtual std::size_t availableBytes() const = 0;
 
     /**
      * Writes data then transfers ownership of the message to the caller. The behavior of

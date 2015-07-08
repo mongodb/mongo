@@ -30,7 +30,7 @@
 
 #include <memory>
 
-#include "mongo/base/status_with.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/rpc/document_range.h"
 #include "mongo/rpc/protocol.h"
@@ -41,15 +41,18 @@ namespace rpc {
 
 class LegacyReplyBuilder : public ReplyBuilderInterface {
 public:
+    static const char kCursorTag[];
+    static const char kFirstBatchTag[];
+
     LegacyReplyBuilder();
     LegacyReplyBuilder(std::unique_ptr<Message>);
     ~LegacyReplyBuilder() final;
 
-    LegacyReplyBuilder& setMetadata(BSONObj metadata) final;
-    LegacyReplyBuilder& setRawCommandReply(BSONObj commandReply) final;
+    LegacyReplyBuilder& setMetadata(const BSONObj& metadata) final;
+    LegacyReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
 
-    LegacyReplyBuilder& addOutputDocs(DocumentRange outputDocs) final;
-    LegacyReplyBuilder& addOutputDoc(BSONObj outputDoc) final;
+    Status addOutputDocs(DocumentRange outputDocs) final;
+    Status addOutputDoc(const BSONObj& outputDoc) final;
 
     State getState() const final;
 
@@ -59,12 +62,25 @@ public:
 
     Protocol getProtocol() const final;
 
-    std::size_t availableSpaceForOutputDocs() const final;
+    std::size_t availableBytes() const final;
 
 private:
-    BufBuilder _builder{};
-    BSONObj _metadata{};
+    /**
+     *  Checks if there is enough space in the buffer to store dataSize bytes
+     *  and computes error message if not.
+     */
+    Status _hasSpaceFor(std::size_t dataSize) const;
+
+    // If _allowAddingOutputDocs is false it enforces the "legacy" semantic
+    // where command results are returned inside commandReply.
+    // In this case calling addOutputDoc(s) will break the invariant.
+    bool _allowAddingOutputDocs{true};
+    BSONObj _commandReply{};
+    std::size_t _currentLength;
+    std::size_t _currentIndex = 0U;
     std::unique_ptr<Message> _message;
+    BSONObj _metadata{};
+    std::vector<BSONObj> _outputDocs{};
     State _state{State::kMetadata};
 };
 

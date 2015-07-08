@@ -77,7 +77,7 @@ ReplyBuilderInterface& ReplyBuilderInterface::setCommandReply(StatusWith<BSONObj
 }
 
 ReplyBuilderInterface& ReplyBuilderInterface::setCommandReply(Status nonOKStatus,
-                                                              BSONObj extraErrorInfo) {
+                                                              const BSONObj& extraErrorInfo) {
     invariant(!nonOKStatus.isOK());
     return setRawCommandReply(augmentReplyWithStatus(nonOKStatus, extraErrorInfo));
 }

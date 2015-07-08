@@ -123,7 +123,7 @@ StatusWith<LegacyCommandAndFlags> downconvertRequestMetadata(BSONObj cmdObj, BSO
     return std::make_tuple(ssmCommandBob.obj(), std::move(legacyQueryFlags));
 }
 
-StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(BSONObj legacyReply) {
+StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(const BSONObj& legacyReply) {
     BSONObjBuilder commandReplyBob;
     BSONObjBuilder metadataBob;
 
@@ -135,7 +135,8 @@ StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(BSONObj legacyReply)
     return std::make_tuple(commandReplyBob.obj(), metadataBob.obj());
 }
 
-StatusWith<BSONObj> downconvertReplyMetadata(BSONObj commandReply, BSONObj replyMetadata) {
+StatusWith<BSONObj> downconvertReplyMetadata(const BSONObj& commandReply,
+                                             const BSONObj& replyMetadata) {
     BSONObjBuilder legacyCommandReplyBob;
 
     auto downconvertStatus =
