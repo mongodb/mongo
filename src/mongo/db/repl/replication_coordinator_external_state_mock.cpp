@@ -190,5 +190,8 @@ void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(OpTime new
 
 void ReplicationCoordinatorExternalStateMock::forceSnapshotCreation() {}
 
+bool ReplicationCoordinatorExternalStateMock::snapshotsEnabled() const {
+    return true;
+}
 }  // namespace repl
 }  // namespace mongo

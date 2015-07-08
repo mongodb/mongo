@@ -206,6 +206,11 @@ public:
      * Does not wait for the timestamp to be taken.
      */
     virtual void forceSnapshotCreation() = 0;
+
+    /**
+     * Returns whether or not the SnapshotThread is active.
+     */
+    virtual bool snapshotsEnabled() const = 0;
 };
 
 }  // namespace repl

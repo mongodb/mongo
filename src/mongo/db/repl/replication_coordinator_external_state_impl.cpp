@@ -350,5 +350,9 @@ void ReplicationCoordinatorExternalStateImpl::forceSnapshotCreation() {
     if (_snapshotThread)
         _snapshotThread->forceSnapshot();
 }
+
+bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {
+    return _snapshotThread != nullptr;
+}
 }  // namespace repl
 }  // namespace mongo

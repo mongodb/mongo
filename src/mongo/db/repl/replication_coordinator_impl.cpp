@@ -611,6 +611,7 @@ void ReplicationCoordinatorImpl::_addSlaveInfo_inlock(const SlaveInfo& slaveInfo
     invariant(getReplicationMode() == modeMasterSlave);
     _slaveInfo.push_back(slaveInfo);
 
+    _updateLastCommittedOpTime_inlock();
     // Wake up any threads waiting for replication that now have their replication
     // check satisfied
     _wakeReadyWaiters_inlock();
@@ -620,6 +621,7 @@ void ReplicationCoordinatorImpl::_updateSlaveInfoOptime_inlock(SlaveInfo* slaveI
                                                                const OpTime& opTime) {
     slaveInfo->opTime = opTime;
 
+    _updateLastCommittedOpTime_inlock();
     // Wake up any threads waiting for replication that now have their replication
     // check satisfied
     _wakeReadyWaiters_inlock();
@@ -847,8 +849,7 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
         return Status(ErrorCodes::NodeNotFound, errmsg);
     }
 
-    if (args.rid == _getMyRID_inlock() ||
-        args.memberId == _rsConfig.getMemberAt(_selfIndex).getId()) {
+    if (args.memberId == _rsConfig.getMemberAt(_selfIndex).getId()) {
         // Do not let remote nodes tell us what our optime is.
         return Status::OK();
     }
@@ -945,7 +946,14 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
     if (!writeConcern.wMode.empty()) {
         StringData patternName;
         if (writeConcern.wMode == WriteConcernOptions::kMajority) {
-            patternName = ReplicaSetConfig::kMajorityWriteConcernModeName;
+            if (_externalState->snapshotsEnabled()) {
+                if (!_currentCommittedSnapshot) {
+                    return false;
+                }
+                return opTime <= *_currentCommittedSnapshot;
+            } else {
+                patternName = ReplicaSetConfig::kMajorityWriteConcernModeName;
+            }
         } else {
             patternName = writeConcern.wMode;
         }
@@ -2223,6 +2231,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
         // nodes in the set will contact us.
         _startHeartbeats();
     }
+    _updateLastCommittedOpTime_inlock();
     _wakeReadyWaiters_inlock();
     return action;
 }
@@ -2496,28 +2505,27 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     if (!_getMemberState_inlock().primary()) {
         return;
     }
-    StatusWith<ReplicaSetTagPattern> tagPattern =
-        _rsConfig.findCustomWriteMode(ReplicaSetConfig::kMajorityWriteConcernModeName);
-    invariant(tagPattern.isOK());
-    ReplicaSetTagMatch matcher{tagPattern.getValue()};
 
     std::vector<OpTime> votingNodesOpTimes;
 
     for (const auto& sI : _slaveInfo) {
         auto memberConfig = _rsConfig.findMemberByID(sI.memberId);
         invariant(memberConfig);
-        for (auto tagIt = memberConfig->tagsBegin(); tagIt != memberConfig->tagsEnd(); ++tagIt) {
-            if (matcher.update(*tagIt)) {
-                votingNodesOpTimes.push_back(sI.opTime);
-                break;
-            }
+        if (memberConfig->isVoter()) {
+            votingNodesOpTimes.push_back(sI.opTime);
         }
     }
+
     invariant(votingNodesOpTimes.size() > 0);
+    if (votingNodesOpTimes.size() < static_cast<unsigned long>(_rsConfig.getMajorityVoteCount())) {
+        return;
+    }
+
     std::sort(votingNodesOpTimes.begin(), votingNodesOpTimes.end());
 
-    // Use the index of the minimum quorum in the vector of nodes.
-    _setLastCommittedOpTime_inlock(votingNodesOpTimes[(votingNodesOpTimes.size() - 1) / 2]);
+    // need the majority to have this OpTime
+    _setLastCommittedOpTime_inlock(
+        votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getMajorityVoteCount()]);
 }
 
 void ReplicationCoordinatorImpl::_setLastCommittedOpTime(const OpTime& committedOpTime) {

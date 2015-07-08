@@ -75,6 +75,7 @@ public:
     virtual void dropAllSnapshots();
     virtual void updateCommittedSnapshot(OpTime newCommitPoint);
     virtual void forceSnapshotCreation();
+    virtual bool snapshotsEnabled() const;
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

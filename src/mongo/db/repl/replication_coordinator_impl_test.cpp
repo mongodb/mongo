@@ -649,6 +649,7 @@ TEST_F(ReplCoordTest, AwaitReplicationNamedModesNonBlocking) {
     // Majority satisfied but not either custom mode
     getReplCoord()->setLastOptime_forTest(2, 1, time1);
     getReplCoord()->setLastOptime_forTest(2, 2, time1);
+    getReplCoord()->onSnapshotCreate(time1);
 
     statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
     ASSERT_OK(statusAndDur.status);
@@ -1904,8 +1905,9 @@ TEST_F(ReplCoordTest, AwaitReplicationReconfigToSmallerMajority) {
 
     OpTimeWithTermZero time(100, 2);
 
+    getReplCoord()->setMyLastOptime(time);
+    getReplCoord()->onSnapshotCreate(time);
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, time));
-    ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 2, time));
 
 
     // majority nodes waiting for time
@@ -1998,6 +2000,10 @@ TEST_F(ReplCoordTest, AwaitReplicationMajority) {
                   getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
 
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 2, time));
+    ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
+                  getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
+
+    getReplCoord()->onSnapshotCreate(time);
     ASSERT_OK(getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
 }
 
@@ -2023,31 +2029,33 @@ TEST_F(ReplCoordTest, LastCommittedOpTime) {
                                                   << "_id" << 4 << "arbiterOnly" << true))),
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    OpTimeWithTermZero zero(0, 0);
-    OpTimeWithTermZero time(100, 0);
+    OpTime zero(Timestamp(0, 0), 0);
+    OpTime time(Timestamp(100, 0), 1);
     getReplCoord()->setMyLastOptime(time);
     simulateSuccessfulElection();
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
 
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, time));
-    ASSERT_EQUALS((OpTime)zero, getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
 
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 3, time));
-    ASSERT_EQUALS((OpTime)zero, getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
 
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 2, time));
-    ASSERT_EQUALS((OpTime)time, getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
 
 
     // Set a new, later OpTime.
-    OpTimeWithTermZero newTime = OpTimeWithTermZero(100, 1);
+    OpTime newTime(Timestamp(100, 1), 1);
     getReplCoord()->setMyLastOptime(newTime);
+    ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 3, newTime));
-    ASSERT_EQUALS((OpTime)time, getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 2, newTime));
     // Reached majority of voting nodes with newTime.
-    ASSERT_EQUALS((OpTime)newTime, getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, newTime));
-    ASSERT_EQUALS((OpTime)newTime, getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(newTime, getReplCoord()->getLastCommittedOpTime());
 }
 
 TEST_F(ReplCoordTest, CantUseReadAfterIfNotReplSet) {

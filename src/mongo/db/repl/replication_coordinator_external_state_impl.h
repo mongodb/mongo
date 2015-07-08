@@ -72,6 +72,7 @@ public:
     void dropAllSnapshots() final;
     void updateCommittedSnapshot(OpTime newCommitPoint) final;
     void forceSnapshotCreation() final;
+    virtual bool snapshotsEnabled() const;
 
     std::string getNextOpContextThreadName();
 
