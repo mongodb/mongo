@@ -104,7 +104,8 @@ typedef struct {
 
 /* Queue entry for use with the Truncate Logic */
 struct __truncate_queue_entry {
-	char *key;
+	char *key;			/* Truncation point */
+	uint diff;			/* Num Docs to be truncated*/
 	STAILQ_ENTRY(__truncate_queue_entry) q;
 };
 typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
