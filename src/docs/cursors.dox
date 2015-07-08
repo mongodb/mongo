@@ -72,6 +72,16 @@ well as any key and value.
 
 See @ref transactions for more information.
 
+@section cursors_eviction Cursors and Eviction
+
+Cursor positions hold resources that can inhibit the eviction of memory
+pages. If a cursor is active on a page being considered for eviction,
+the eviction will defer until the cursor is moved or reset. To avoid
+this and to keep resources freed in general, an application should call
+WT_CURSOR::reset during times it does not need to keep the cursor
+positioned.  A cursor that has been reset is not active and will not
+inhibit eviction.
+
 @section cursor_raw Raw mode
 
 Cursors can be configured for raw mode by specifying the \c "raw" config
