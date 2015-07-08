@@ -67,6 +67,8 @@ env.Library(
         "stagedebug_cmd.cpp",
         "subplan.cpp",
         "text.cpp",
+        "text_match.cpp",
+        "text_or.cpp",
         "update.cpp",
         "working_set_common.cpp",
     ],

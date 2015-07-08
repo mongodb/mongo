@@ -627,7 +627,7 @@ struct UpdateStats : public SpecificStats {
 };
 
 struct TextStats : public SpecificStats {
-    TextStats() : keysExamined(0), fetches(0), parsedTextQuery() {}
+    TextStats() : parsedTextQuery() {}
 
     virtual SpecificStats* clone() const {
         TextStats* specific = new TextStats(*this);
@@ -636,15 +636,33 @@ struct TextStats : public SpecificStats {
 
     std::string indexName;
 
-    size_t keysExamined;
-
-    size_t fetches;
-
     // Human-readable form of the FTSQuery associated with the text stage.
     BSONObj parsedTextQuery;
 
     // Index keys that precede the "text" index key.
     BSONObj indexPrefix;
+};
+
+struct TextMatchStats : public SpecificStats {
+    TextMatchStats() : docsRejected(0) {}
+
+    virtual SpecificStats* clone() const {
+        TextMatchStats* specific = new TextMatchStats(*this);
+        return specific;
+    }
+
+    size_t docsRejected;
+};
+
+struct TextOrStats : public SpecificStats {
+    TextOrStats() : fetches(0) {}
+
+    virtual SpecificStats* clone() const {
+        TextOrStats* specific = new TextOrStats(*this);
+        return specific;
+    }
+
+    size_t fetches;
 };
 
 }  // namespace mongo

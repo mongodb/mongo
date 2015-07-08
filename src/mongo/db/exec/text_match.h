@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013-2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,69 +29,57 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/fts/fts_util.h"
-#include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
 
 using std::unique_ptr;
-using std::vector;
 
+using fts::FTSMatcher;
 using fts::FTSQuery;
 using fts::FTSSpec;
 
+
 class OperationContext;
-
-struct TextStageParams {
-    TextStageParams(const FTSSpec& s) : spec(s) {}
-
-    // Text index descriptor.  IndexCatalog owns this.
-    IndexDescriptor* index;
-
-    // Index spec.
-    FTSSpec spec;
-
-    // Index keys that precede the "text" index key.
-    BSONObj indexPrefix;
-
-    // The text query.
-    FTSQuery query;
-};
+class RecordID;
 
 /**
- * Implements a blocking stage that returns text search results.
+ * A stage that returns every document in the child that satisfies the FTS text matcher built with
+ * the query parameter.
  *
- * Output type: LOC_AND_OBJ.
+ * Prerequisites: A single child stage that passes up WorkingSetMembers in the LOC_AND_OBJ state,
+ * with associated text scores.
  */
-class TextStage : public PlanStage {
+class TextMatchStage final : public PlanStage {
 public:
-    TextStage(OperationContext* txn,
-              const TextStageParams& params,
-              WorkingSet* ws,
-              const MatchExpression* filter);
+    TextMatchStage(unique_ptr<PlanStage> child,
+                   const FTSQuery& query,
+                   const FTSSpec& spec,
+                   WorkingSet* ws);
+    ~TextMatchStage() final;
 
-    ~TextStage() final;
+    void addChild(PlanStage* child);
+
+    bool isEOF() final;
 
     StageState work(WorkingSetID* out) final;
-    bool isEOF() final;
 
     void saveState() final;
     void restoreState(OperationContext* opCtx) final;
     void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
-    vector<PlanStage*> getChildren() const;
+    std::vector<PlanStage*> getChildren() const final;
 
     StageType stageType() const final {
-        return STAGE_TEXT;
+        return STAGE_TEXT_MATCH;
     }
 
-    std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
     const CommonStats* getCommonStats() const final;
 
@@ -100,22 +88,17 @@ public:
     static const char* kStageType;
 
 private:
-    /**
-     * Helper method to built the query execution plan for the text stage.
-     */
-    unique_ptr<PlanStage> buildTextTree(OperationContext* txn,
-                                        WorkingSet* ws,
-                                        const MatchExpression* filter) const;
+    // Text-specific phrase and negated term matcher.
+    FTSMatcher _ftsMatcher;
 
-    // Parameters of this text stage.
-    TextStageParams _params;
+    // Not owned by us.
+    WorkingSet* _ws;
 
-    // The root of the text query tree.
-    unique_ptr<PlanStage> _textTreeRoot;
+    // The child PlanStage that provides the RecordIDs and scores for text matching.
+    unique_ptr<PlanStage> _child;
 
-    // Stats.
+    // Stats
     CommonStats _commonStats;
-    TextStats _specificStats;
+    TextMatchStats _specificStats;
 };
-
 }  // namespace mongo
