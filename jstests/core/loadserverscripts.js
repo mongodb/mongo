@@ -10,8 +10,6 @@ var x;
 
 // clear out any data from old tests
 testdb.system.js.remove({});
-delete myfunc;
-delete myfunc2;
 
 x = testdb.system.js.findOne();
 assert.isnull(x, "Test for empty collection");
