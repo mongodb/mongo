@@ -2980,6 +2980,41 @@ buildvariants:
   - name: tool
   - name: tool_WT
 
+- name: enterprise-osx-108
+  display_name: Enterprise OS X 10.8
+  modules:
+  - enterprise
+  run_on:
+  - osx-108
+  expansions:
+    push_path: osx
+    push_bucket: downloads.10gen.com
+    push_name: osx
+    push_arch: x86_64-enterprise
+    tooltags: "-tags 'ssl sasl'"
+    compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
+    num_cores: $(sysctl -n hw.logicalcpu)
+    num_jobs_unittests: $(sysctl -n hw.logicalcpu)
+    test_flags: --continueOnFailure
+  tasks:
+  - name: compile
+  - name: audit
+  - name: audit_WT
+  - name: dbtest
+  - name: dbtest_WT
+  - name: jsCore_auth
+  - name: mmap
+  - name: replicasets_auth
+  - name: sasl
+  - name: sharding_auth
+  - name: snmp
+  - name: snmp_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: push
+    distros:
+    - rhel55-test
+
 ###########################################
 #          Redhat buildvariants           #
 ###########################################
