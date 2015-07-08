@@ -183,7 +183,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_RET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
 
 	conn = S2C(session);
-	*blockp = NULL;
+	*blockp = block = NULL;
 	hash = __wt_hash_city64(filename, strlen(filename));
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 	__wt_spin_lock(session, &conn->block_lock);
@@ -197,7 +197,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	}
 
 	/* Basic structure allocation, initialization. */
-	WT_RET(__wt_calloc_one(session, &block));
+	WT_ERR(__wt_calloc_one(session, &block));
 	block->ref = 1;
 	WT_CONN_BLOCK_INSERT(conn, block, bucket);
 
@@ -264,7 +264,8 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	__wt_spin_unlock(session, &conn->block_lock);
 	return (0);
 
-err:	WT_TRET(__block_destroy(session, block));
+err:	if (block != NULL)
+		WT_TRET(__block_destroy(session, block));
 	__wt_spin_unlock(session, &conn->block_lock);
 	return (ret);
 }
