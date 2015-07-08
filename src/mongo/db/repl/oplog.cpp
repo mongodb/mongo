@@ -79,6 +79,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/platform/random.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
@@ -104,6 +105,8 @@ namespace {
 // cached copies of these...so don't rename them, drop them, etc.!!!
 Database* _localDB = nullptr;
 Collection* _localOplogCollection = nullptr;
+
+PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
 
 // Synchronizes the section where a new Timestamp is generated and when it actually
 // appears in the oplog.
@@ -155,19 +158,7 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
             term = ReplClientInfo::forClient(txn->getClient()).getTerm();
         }
 
-        hashNew = BackgroundSync::get()->getLastAppliedHash();
-
-        // Check to make sure logOp() is legal at this point.
-        if (*opstr == 'n') {
-            // 'n' operations are always logged
-            invariant(*ns == '\0');
-            // 'n' operations do not advance the hash, since they are not rolled back
-        } else {
-            // Advance the hash
-            hashNew = (hashNew * 131 + ts.asLL()) * 17 + replCoord->getMyId();
-
-            BackgroundSync::get()->setLastAppliedHash(hashNew);
-        }
+        hashNew = hashGenerator.nextInt64();
     }
 
     OpTime opTime(ts, term);
@@ -366,11 +357,6 @@ OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
         wunit.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeOps", _localOplogCollection->ns().ns());
-
-    BackgroundSync* bgsync = BackgroundSync::get();
-    // Keep this up-to-date, in case we step up to primary.
-    long long hash = ops.back()["h"].numberLong();
-    bgsync->setLastAppliedHash(hash);
 
     return lastOptime;
 }

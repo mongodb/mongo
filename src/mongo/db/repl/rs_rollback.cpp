@@ -654,7 +654,6 @@ void syncFixUp(OperationContext* txn,
     // Reload the lastOpTimeApplied value in the replcoord and the lastAppliedHash value in
     // bgsync to reflect our new last op.
     replCoord->resetLastOpTimeFromOplog(txn);
-    BackgroundSync::get()->loadLastAppliedHash(txn);
 
     // done
     if (warn)

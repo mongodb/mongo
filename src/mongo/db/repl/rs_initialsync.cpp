@@ -94,7 +94,6 @@ void truncateAndResetOplog(OperationContext* txn,
     // because the bgsync thread, while running, may update the blacklist.
     replCoord->resetMyLastOptime();
     bgsync->stop();
-    bgsync->setLastAppliedHash(0);
     bgsync->clearBuffer();
 
     replCoord->clearSyncSourceBlacklist();

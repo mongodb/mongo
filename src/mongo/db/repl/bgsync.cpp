@@ -107,7 +107,6 @@ BackgroundSync::BackgroundSync()
     : _buffer(bufferMaxSizeGauge, &getSize),
       _lastOpTimeFetched(Timestamp(std::numeric_limits<int>::max(), 0),
                          std::numeric_limits<long long>::max()),
-      _lastAppliedHash(0),
       _lastFetchedHash(0),
       _pause(true),
       _appliedBuffer(true),
@@ -463,9 +462,8 @@ void BackgroundSync::start(OperationContext* txn) {
     _pause = false;
 
     // reset _last fields with current oplog data
-    _lastAppliedHash = updatedLastAppliedHash;
     _lastOpTimeFetched = _replCoord->getMyLastOptime();
-    _lastFetchedHash = _lastAppliedHash;
+    _lastFetchedHash = updatedLastAppliedHash;
 
     LOG(1) << "bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastFetchedHash;
 }
@@ -477,24 +475,8 @@ void BackgroundSync::waitUntilPaused() {
     }
 }
 
-long long BackgroundSync::getLastAppliedHash() const {
-    stdx::lock_guard<stdx::mutex> lck(_mutex);
-    return _lastAppliedHash;
-}
-
 void BackgroundSync::clearBuffer() {
     _buffer.clear();
-}
-
-void BackgroundSync::setLastAppliedHash(long long newHash) {
-    stdx::lock_guard<stdx::mutex> lck(_mutex);
-    _lastAppliedHash = newHash;
-}
-
-void BackgroundSync::loadLastAppliedHash(OperationContext* txn) {
-    long long result = _readLastAppliedHash(txn);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _lastAppliedHash = result;
 }
 
 long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {

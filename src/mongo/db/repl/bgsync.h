@@ -113,10 +113,6 @@ public:
     // For monitoring
     BSONObj getCounters();
 
-    long long getLastAppliedHash() const;
-    void setLastAppliedHash(long long oldH);
-    void loadLastAppliedHash(OperationContext* txn);
-
     // Clears any fetched and buffered oplog entries.
     void clearBuffer();
 
@@ -148,8 +144,6 @@ private:
 
     OpTime _lastOpTimeFetched;
 
-    // lastAppliedHash is used to generate a new hash for the following op, when primary.
-    long long _lastAppliedHash;
     // lastFetchedHash is used to match ops to determine if we need to rollback, when
     // a secondary.
     long long _lastFetchedHash;
