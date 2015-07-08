@@ -256,9 +256,9 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 			    session, uri, 0, NULL, &colgroup));
 			WT_RET(__wt_open_cursor(
 			    session, colgroup->source, owner, cfg, cursorp));
-		} else if (WT_PREFIX_MATCH(uri, "config:"))
-			WT_RET(__wt_curconfig_open(
-			    session, uri, cfg, cursorp));
+		} else if (WT_STREQ(uri, "config:"))
+			WT_RET(__wt_curmetadata_open(
+			    session, uri, owner, cfg, cursorp));
 		break;
 	case 'i':
 		if (WT_PREFIX_MATCH(uri, "index:"))
@@ -282,7 +282,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 			    session, uri, owner, cfg, cursorp));
 		break;
 	case 'm':
-		if (WT_PREFIX_MATCH(uri, WT_METADATA_URI))
+		if (WT_STREQ(uri, WT_METADATA_URI))
 			WT_RET(__wt_curmetadata_open(
 			    session, uri, owner, cfg, cursorp));
 		break;
@@ -347,6 +347,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 	if (to_dup != NULL) {
 		uri = to_dup->uri;
 		if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+		    !WT_STREQ(uri, "config:") &&
 		    !WT_PREFIX_MATCH(uri, "index:") &&
 		    !WT_PREFIX_MATCH(uri, "file:") &&
 		    !WT_PREFIX_MATCH(uri, "lsm:") &&
@@ -380,23 +381,6 @@ err:		if (cursor != NULL)
 		ret = WT_NOTFOUND;
 
 	API_END_RET_NOTFOUND_MAP(session, ret);
-}
-
-/*
- * __wt_session_create_strip --
- *	Discard any configuration information from a schema entry that is not
- * applicable to an session.create call, here for the wt dump command utility,
- * which only wants to dump the schema information needed for load.
- */
-int
-__wt_session_create_strip(WT_SESSION *wt_session,
-    const char *v1, const char *v2, char **value_ret)
-{
-	WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)wt_session;
-	const char *cfg[] =
-	    { WT_CONFIG_BASE(session, WT_SESSION_create), v1, v2, NULL };
-
-	return (__wt_config_collapse(session, cfg, value_ret));
 }
 
 /*
