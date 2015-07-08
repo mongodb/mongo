@@ -72,7 +72,7 @@ functions:
           cd perf
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
-          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 7 -f testcases/*.js --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
+          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
     - command: "json.send"
       params:
         name: "perf"
@@ -186,6 +186,7 @@ tasks:
 buildvariants:
 - name: linux-wt-standalone
   display_name: Linux WT Standalone
+  batchtime: 180 # 3 hours
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     mongod_exec_wrapper: "numactl --physcpubind=4,5,6,7 -i 1"
@@ -207,6 +208,7 @@ buildvariants:
 
 - name: linux-wt-repl
   display_name: Linux WT 1-Node ReplSet
+  batchtime: 4320 # 3 day
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     mongod_exec_wrapper: "numactl --physcpubind=4,5,6,7 -i 1"
