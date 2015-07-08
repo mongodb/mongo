@@ -31,7 +31,7 @@
 #
 
 import wiredtiger, wttest
-import sys
+import re, sys
 
 class test_pack(wttest.WiredTigerTestCase):
     name = 'test_pack'
@@ -46,8 +46,9 @@ class test_pack(wttest.WiredTigerTestCase):
         
     def check(self, fmt, *v):
         v = list(v)
-        uri = 'table:' + test_pack.name + '-' + fmt
-        idx_uri = 'index:' + test_pack.name + '-' + fmt + ':inverse'
+        fmtname = re.sub('([A-Z])', r'_\1', fmt)
+        uri = 'table:' + test_pack.name + '-' + fmtname
+        idx_uri = 'index:' + test_pack.name + '-' + fmtname + ':inverse'
         nargs = len(v)
         colnames = ",".join("v" + str(x) for x in xrange(nargs))
         self.session.create(uri, "columns=(k," + colnames + ")," +
@@ -76,7 +77,7 @@ class test_pack(wttest.WiredTigerTestCase):
 
     def test_packing(self):
         self.check('iii', 0, 101, -99)
-        #### self.check('3i', 0, 101, -99)    # WT-1998
+        self.check('3i', 0, 101, -99)
         self.check('iS', 42, "forty two")
 
         self.check('S', 'abc')
@@ -91,11 +92,11 @@ class test_pack(wttest.WiredTigerTestCase):
 
         self.check('u', r"\x42" * 20)
         self.check('uu', r"\x42" * 10, r"\x42" * 10)
-        #### self.check('3u', r"\x4")      # WT-1998
-        #### self.check('3uu', r"\x4", r"\x42" * 10)      # WT-1998
-        #### self.check('u3u', r"\x42" * 10, r"\x4")      # WT-1998
+        self.check('3u', r"\x4")
+        self.check('3uu', r"\x4", r"\x42" * 10)
+        self.check('u3u', r"\x42" * 10, r"\x4")
 
-        #### self.check('s', "4")                        # WT-2000
+        self.check('s', "4")
         self.check("1s", "4")
         self.check("2s", "42")
 
