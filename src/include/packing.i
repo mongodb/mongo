@@ -181,6 +181,7 @@ next:	if (pack->cur == pack->end)
 		/* Integral types repeat <size> times. */
 		if (pv->size == 0)
 			goto next;
+		pv->havesize = 0;
 		pack->repeats = pv->size - 1;
 		pack->lastv = *pv;
 		return (0);
@@ -322,18 +323,19 @@ __pack_write(
 		*pp += pv->size;
 		break;
 	case 's':
+		WT_SIZE_CHECK(pv->size, maxlen);
+		memcpy(*pp, pv->u.s, pv->size);
+		*pp += pv->size;
+		break;
 	case 'S':
-		/*
-		 * XXX if pv->havesize, only want to know if there is a
-		 * '\0' in the first pv->size characters.
-		 */
 		s = strlen(pv->u.s);
-		if ((pv->type == 's' || pv->havesize) && pv->size < s) {
-			s = pv->size;
-			pad = 0;
-		} else if (pv->havesize)
-			pad = pv->size - s;
-		else
+		if (pv->havesize) {
+			if (pv->size < s) {
+				s = pv->size;
+				pad = 0;
+			} else
+				pad = pv->size - s;
+		} else
 			pad = 1;
 		WT_SIZE_CHECK(s + pad, maxlen);
 		if (s > 0)
@@ -665,6 +667,7 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 
 	if (fmt[0] != '\0' && fmt[1] == '\0') {
 		pv.type = fmt[0];
+		pv.size = 1;
 		if ((ret = __unpack_read(session, &pv, &p, size)) == 0)
 			WT_UNPACK_PUT(session, pv, ap);
 		return (0);
