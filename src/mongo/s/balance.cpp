@@ -196,16 +196,19 @@ int Balancer::_moveChunks(const vector<shared_ptr<MigrateInfo>>& candidateChunks
 }
 
 void Balancer::_ping(bool waiting) {
-    grid.catalogManager()->update(
-        MongosType::ConfigNS,
-        BSON(MongosType::name(_myid)),
-        BSON("$set" << BSON(MongosType::ping(jsTime())
-                            << MongosType::up(static_cast<int>(time(0) - _started))
-                            << MongosType::waiting(waiting)
-                            << MongosType::mongoVersion(versionString))),
-        true,
-        false,
-        NULL);
+    MongosType mType;
+    mType.setName(_myid);
+    mType.setPing(jsTime());
+    mType.setUptime(static_cast<int>(time(0) - _started));
+    mType.setWaiting(waiting);
+    mType.setMongoVersion(versionString);
+
+    grid.catalogManager()->update(MongosType::ConfigNS,
+                                  BSON(MongosType::name(_myid)),
+                                  BSON("$set" << mType.toBSON()),
+                                  true,
+                                  false,
+                                  NULL);
 }
 
 bool Balancer::_checkOIDs() {
