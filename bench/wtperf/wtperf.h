@@ -90,7 +90,7 @@ typedef struct {
 	int64_t throttle;		/* Maximum operations/second */
 		/* Number of operations per transaction. Zero for autocommit */
 	int64_t ops_per_txn;
-	uint64_t truncate;		/* Truncate ratio */
+	int64_t truncate;		/* Truncate ratio */
 	uint64_t truncate_pct;		/* Truncate Percent */
 	uint64_t truncate_count;		/* Truncate Percent */
 
@@ -101,6 +101,13 @@ typedef struct {
 #define	WORKER_UPDATE		5	/* Update */
 	uint8_t ops[100];		/* Operation schedule */
 } WORKLOAD;
+
+/* Queue entry for use with the Truncate Logic */
+struct __truncate_queue_entry {
+	char *key;
+	STAILQ_ENTRY(__truncate_queue_entry) q;
+};
+typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 
 #define	LOG_PARTIAL_CONFIG	",log=(enabled=false)"
 /*
@@ -149,6 +156,11 @@ struct __config {			/* Configuration structure */
 	volatile int in_warmup;		/* Running warmup phase */
 
 	volatile uint32_t totalsec;	/* total seconds running */
+
+	u_int		 has_truncate;  /* if there is a truncate workload */
+
+	/* Queue head for use with the Truncate Logic */
+	STAILQ_HEAD(__truncate_qh, __truncate_queue_entry) truncate_stone_head;
 
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT
@@ -230,6 +242,7 @@ struct __config_thread {		/* Per-thread structure */
 	TRACK truncate;			/* Truncate operations */
 	TRACK truncate_sleep;		/* Truncate sleep operations */
 
+	uint64_t total_inserts;		/* Inserts done by this thread */
 };
 
 int	 config_assign(CONFIG *, const CONFIG *);

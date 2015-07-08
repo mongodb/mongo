@@ -27,7 +27,6 @@
  */
 
 #include "wtperf.h"
-#include "../src/include/queue.h"
 
 /* Default values. */
 static const CONFIG default_cfg = {
@@ -58,21 +57,13 @@ static const CONFIG default_cfg = {
 	0,				/* notify threads to stop */
 	0,				/* in warmup phase */
 	0,				/* total seconds running */
+	0,				/* has truncate */
+	{NULL, NULL},			/* the truncate queue */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
 #undef OPT_DEFINE_DEFAULT
 };
-
-/* Queue entry for use with the Truncate Logic */
-struct __truncate_queue_entry {
-	char *key;
-	STAILQ_ENTRY(__truncate_queue_entry) q;
-};
-typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
-
-/* Queue head for use with the Truncate Logic */
-STAILQ_HEAD(__truncate_qh, __truncate_queue_entry) truncate_stone_head;
 
 static const char * const debug_cconfig = "";
 static const char * const debug_tconfig = "";
@@ -123,11 +114,13 @@ generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 static inline uint64_t
 decode_key(CONFIG *cfg, char *key_buf)
 {
-	uint32_t i = 0;
+	char *endPtr;
+	uint32_t i;
+	i= 0;
 	for (;i < cfg->key_sz; i++)
 		if (key_buf[i] != 0)
 			break;
-	return (atoi (key_buf + i));
+	return (strtoull (key_buf + i, &endPtr, 10));
 }
 
 static void
@@ -411,11 +404,12 @@ worker(void *arg)
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
 	size_t i;
-	uint64_t needed_milestones, next_val, num_milestones, last_key;
-	uint64_t start_point_val, end_point_val, truncate_milestone_gap, usecs;
+	uint64_t final_milestone_gap, needed_milestones, next_val;
+	uint64_t num_milestones, last_key, start_point_val, end_point_val;
+	uint64_t total_inserts, truncate_milestone_gap, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
-	char *value_buf, *key_buf, *truncate_buf, *truncate_key, *value;
+	char *value_buf, *key_buf, *truncate_key, *value;
 	char buf[512];
 	double truncation_percentage;
 
@@ -431,6 +425,7 @@ worker(void *arg)
 	trk = NULL;
 	throttle_ops = 0;
 	truncate_milestone_gap = 0;
+	total_inserts = 0;
 
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
@@ -474,7 +469,6 @@ worker(void *arg)
 	}
 
 	key_buf = thread->key_buf;
-	truncate_buf = malloc(cfg->key_sz);
 	value_buf = thread->value_buf;
 
 	op = thread->workload->ops;
@@ -489,8 +483,6 @@ worker(void *arg)
 	/* Setup for truncate */
 	if (thread->workload->truncate != 0) {
 
-		STAILQ_INIT(&truncate_stone_head);
-
 		cursor = cursors[cfg->icount % cfg->table_count];
 
 		/* Truncation percentage value. eg 10% is 0.1 */
@@ -503,15 +495,17 @@ worker(void *arg)
 		needed_milestones = thread->workload->truncate_count /
 		    truncate_milestone_gap;
 
+		final_milestone_gap = truncate_milestone_gap;
+
 		/* Reset this value for use again */
 		truncate_milestone_gap = 0;
 
 		cursor->next(cursor);
-		ret = cursor->get_key(cursor, &truncate_buf);
+		ret = cursor->get_key(cursor, &key_buf);
 
 		/* We have data */
 		if (ret == 0) {
-			start_point_val = decode_key(cfg, truncate_buf);
+			start_point_val = decode_key(cfg, key_buf);
 			cursor->reset(cursor);
 			if ((ret = cursor->prev(cursor)) != 0) {
 				lprintf(cfg, ret, 0,
@@ -519,13 +513,13 @@ worker(void *arg)
 				goto err;
 			}
 			if ((ret = cursor->get_key(cursor,
-				    &truncate_buf)) != 0) {
+				    &key_buf)) != 0) {
 				lprintf(cfg, ret, 0,
 				    "truncate setup end: get_key failed");
 				goto err;
 			}
-			end_point_val = decode_key(cfg, truncate_buf);
-				/* Not enough documents? */
+			end_point_val = decode_key(cfg, key_buf);
+			/* Not enough documents? */
 				if (start_point_val + needed_milestones
 				    > end_point_val)
 					truncate_milestone_gap = 0;
@@ -552,8 +546,9 @@ worker(void *arg)
 				    truncate_milestone_gap * (i+1));
 				truncate_item->key = truncate_key;
 				STAILQ_INSERT_TAIL(
-				    &truncate_stone_head, truncate_item, q);
+				    &cfg->truncate_stone_head, truncate_item, q);
 				last_key = truncate_milestone_gap * (i+1);
+				printf("adding truncate point of %s\n", truncate_item->key);
 				num_milestones++;
 			}
 		}
@@ -591,6 +586,9 @@ worker(void *arg)
 			break;
 		case WORKER_TRUNCATE:
 			next_val = wtperf_rand(thread);
+			for (i=0; i < thread->cfg->workers_cnt; i++){
+				total_inserts += thread->cfg->workers[i].total_inserts;
+			}
 			break;
 		default:
 			goto err;		/* can't happen */
@@ -651,33 +649,37 @@ worker(void *arg)
 			if (cfg->random_value)
 				randomize_value(thread, value_buf);
 			cursor->set_value(cursor, value_buf);
-			if ((ret = cursor->insert(cursor)) == 0)
+			if ((ret = cursor->insert(cursor)) == 0){
+				thread->total_inserts++;
 				break;
+			}
 			goto op_err;
 		case WORKER_TRUNCATE:
-			if ((ret = cursor->reset(cursor)) != 0) {
-				lprintf(cfg, ret, 0, "Cursor reset failed");
-				goto op_err;
-			}
 			trk = &thread->truncate;
 			truncate_milestone_gap = 0;
 
-			cursor->reset(cursor);
-			cursor->next(cursor);
-			ret = cursor->get_key(cursor, &truncate_buf);
+			if ((ret = cursor->reset(cursor)) != 0) {
+				printf("cursor.reset failed with %d\n", ret);
+				goto op_err;
+			}
+			if ((ret = cursor->next(cursor)) != 0) {
+				printf("cursor.next failed with %d\n", ret);
+				goto op_err;
+			}
+			ret = cursor->get_key(cursor, &key_buf);
 
 			/* We have data */
 			if (ret == 0) {
-				start_point_val = decode_key(cfg, truncate_buf);
+				start_point_val = decode_key(cfg, key_buf);
 				cursor->reset(cursor);
 				cursor->prev(cursor);
 				if ((ret = cursor->get_key(cursor,
-				    &truncate_buf)) != 0) {
+				    &key_buf)) != 0) {
 					lprintf(cfg, ret, 0,
-					    "worker truncate: get_key failed");
-					goto err;
+					    "truncate end: get_key failed");
+					goto op_err;
 				}
-				end_point_val = decode_key(cfg, truncate_buf);
+				end_point_val = decode_key(cfg, key_buf);
 
 				/* Not enough documents? */
 				if (start_point_val + needed_milestones
@@ -685,12 +687,11 @@ worker(void *arg)
 					truncate_milestone_gap = 0;
 				else
 					truncate_milestone_gap =
-					    (end_point_val - start_point_val)
-					    / needed_milestones;
+					    final_milestone_gap;
 			} else if ( ret != WT_NOTFOUND ) {
 				lprintf(cfg, ret, 0,
-					    "worker truncate: get_key failed");
-				goto err;
+					    "truncate start: get_key failed");
+				goto op_err;
 			}
 
 			if (truncate_milestone_gap != 0) {
@@ -703,27 +704,32 @@ worker(void *arg)
 					    malloc(sizeof(truncate_item));
 					if (truncate_item == NULL) {
 						(void)enomem(cfg);
-						goto err;
+						goto op_err;
 					}
 					generate_key(cfg,
 					    truncate_key, last_key);
 					truncate_item->key = truncate_key;
 					STAILQ_INSERT_TAIL(
-					    &truncate_stone_head,
+					    &cfg->truncate_stone_head,
 					    truncate_item, q);
+					printf("adding truncate point of %s\n", truncate_key);
 					num_milestones++;
 				}
 
 				/* We have too much data, we need to truncate */
-				if (end_point_val - start_point_val
-				    > thread->workload->truncate_count) {
+				if ((end_point_val - start_point_val) >
+				    thread->workload->truncate_count &&
+				    num_milestones > 0) {
+				    	printf("pretrunc currently there are %llu items in table and the start is %llu and end is %llu\n", end_point_val - start_point_val, start_point_val, end_point_val);
 					truncate_item =
-					    STAILQ_FIRST(&truncate_stone_head);
+					    STAILQ_FIRST(&cfg->truncate_stone_head);
 					num_milestones--;
 					STAILQ_REMOVE_HEAD(
-					    &truncate_stone_head, q);
+					    &cfg->truncate_stone_head, q);
 					cursor->set_key(cursor,
 					    truncate_item->key);
+					cursor->search(cursor);
+					printf("about to truncate to %s\n", truncate_item->key);
 					ret = session->truncate(session,
 					    NULL, NULL, cursor, NULL);
 					if ( ret != 0) {
@@ -731,10 +737,27 @@ worker(void *arg)
 						    "Truncate failed");
 						goto op_err;
 					}
+					free(truncate_item->key);
 					free(truncate_item);
 					truncate_item = NULL;
+					/*
+					if ((ret = cursor->reset(cursor)) != 0)
+						goto op_err;
+					if ((ret = cursor->next(cursor)) != 0)
+						goto op_err;
+					if ((ret = cursor->get_key(cursor, &key_buf)) != 0)
+						goto op_err;
+					start_point_val = decode_key(cfg, key_buf);
+					if ((ret = cursor->reset(cursor)) != 0)
+						goto op_err;
+					if ((ret = cursor->prev(cursor)) != 0)
+						goto op_err;
+					if ((ret = cursor->get_key(cursor, &key_buf)) != 0)
+						goto op_err;
+					end_point_val = decode_key(cfg, key_buf);
+					printf("posttrunc currently there are %llu items in table and the start is %llu\n", end_point_val - start_point_val, start_point_val);
+					*/
 				}
-
 			} else {
 				trk = &thread->truncate_sleep;
 				(void)usleep(1000);
@@ -1658,9 +1681,9 @@ execute_workload(CONFIG *cfg)
 	    workp = cfg->workload; i < cfg->workload_cnt; ++i, ++workp) {
 		lprintf(cfg, 0, 1,
 		    "Starting workload #%d: %" PRId64 " threads, inserts=%"
-		    PRId64 ", reads=%" PRId64 ", updates=%" PRId64,
-		    i + 1,
-		    workp->threads, workp->insert, workp->read, workp->update);
+		    PRId64 ", reads=%" PRId64 ", updates=%" PRId64
+		    ", truncate=%" PRId64, i + 1, workp->threads, workp->insert,
+		    workp->read, workp->update, workp->truncate);
 
 		/* Figure out the workload's schedule. */
 		if ((ret = run_mix_schedule(cfg, workp)) != 0)
@@ -2025,6 +2048,9 @@ start_run(CONFIG *cfg)
 	int monitor_created, ret, t_ret;
 	char helium_buf[256];
 
+	if (cfg->has_truncate > 0)
+		STAILQ_INIT(&cfg->truncate_stone_head);
+
 	monitor_created = ret = 0;
 					/* [-Wconditional-uninitialized] */
 	memset(&monitor_thread, 0, sizeof(monitor_thread));
@@ -2273,7 +2299,7 @@ main(int argc, char *argv[])
 	 * the compact operation, but not for the workloads.
 	 */
 	if (cfg->async_threads > 0) {
-		if (cfg->workload->truncate > 0)
+		if (cfg->has_truncate > 0)
 			goto err;
 		cfg->use_asyncops = 1;
 	}
@@ -2299,7 +2325,7 @@ main(int argc, char *argv[])
 		goto err;
 
 	/* You can't have truncate on a random collection */
-	if (cfg->workload->truncate && cfg->random_range)
+	if (cfg->has_truncate && cfg->random_range)
 		goto err;
 
 	/* Build the URI from the table name. */
@@ -2459,6 +2485,7 @@ start_threads(CONFIG *cfg,
 		thread->update.min_latency = UINT32_MAX;
 		thread->ckpt.max_latency = thread->insert.max_latency =
 		thread->read.max_latency = thread->update.max_latency = 0;
+		thread->total_inserts = 0;
 	}
 
 	/* Start the threads. */
