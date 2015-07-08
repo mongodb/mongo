@@ -109,9 +109,6 @@ size_t getKeysExamined(StageType type, const SpecificStats* specific) {
     } else if (STAGE_IDHACK == type) {
         const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
         return spec->keysExamined;
-    } else if (STAGE_TEXT == type) {
-        const TextStats* spec = static_cast<const TextStats*>(specific);
-        return spec->keysExamined;
     } else if (STAGE_COUNT_SCAN == type) {
         const CountScanStats* spec = static_cast<const CountScanStats*>(specific);
         return spec->keysExamined;
@@ -133,18 +130,18 @@ size_t getKeysExamined(StageType type, const SpecificStats* specific) {
  * (in which case this gets called from Explain::getSummaryStats()).
  */
 size_t getDocsExamined(StageType type, const SpecificStats* specific) {
-    if (STAGE_IDHACK == type) {
-        const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
-        return spec->docsExamined;
-    } else if (STAGE_TEXT == type) {
-        const TextStats* spec = static_cast<const TextStats*>(specific);
-        return spec->fetches;
+    if (STAGE_COLLSCAN == type) {
+        const CollectionScanStats* spec = static_cast<const CollectionScanStats*>(specific);
+        return spec->docsTested;
     } else if (STAGE_FETCH == type) {
         const FetchStats* spec = static_cast<const FetchStats*>(specific);
         return spec->docsExamined;
-    } else if (STAGE_COLLSCAN == type) {
-        const CollectionScanStats* spec = static_cast<const CollectionScanStats*>(specific);
-        return spec->docsTested;
+    } else if (STAGE_IDHACK == type) {
+        const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
+        return spec->docsExamined;
+    } else if (STAGE_TEXT_OR == type) {
+        const TextOrStats* spec = static_cast<const TextOrStats*>(specific);
+        return spec->fetches;
     }
 
     return 0;
@@ -387,14 +384,21 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_TEXT == stats.stageType) {
         TextStats* spec = static_cast<TextStats*>(stats.specific.get());
 
-        if (verbosity >= ExplainCommon::EXEC_STATS) {
-            bob->appendNumber("keysExamined", spec->keysExamined);
-            bob->appendNumber("docsExamined", spec->fetches);
-        }
-
         bob->append("indexPrefix", spec->indexPrefix);
         bob->append("indexName", spec->indexName);
         bob->append("parsedTextQuery", spec->parsedTextQuery);
+    } else if (STAGE_TEXT_MATCH == stats.stageType) {
+        TextMatchStats* spec = static_cast<TextMatchStats*>(stats.specific.get());
+
+        if (verbosity >= ExplainCommon::EXEC_STATS) {
+            bob->appendNumber("docsRejected", spec->docsRejected);
+        }
+    } else if (STAGE_TEXT_OR == stats.stageType) {
+        TextOrStats* spec = static_cast<TextOrStats*>(stats.specific.get());
+
+        if (verbosity >= ExplainCommon::EXEC_STATS) {
+            bob->appendNumber("docsExamined", spec->fetches);
+        }
     } else if (STAGE_UPDATE == stats.stageType) {
         UpdateStats* spec = static_cast<UpdateStats*>(stats.specific.get());
 
