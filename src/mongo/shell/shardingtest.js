@@ -319,9 +319,12 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                            keyFile : keyFile,
                            name: testName + "-configRS"
                       };
+
+        // when using CSRS, always use wiredTiger as the storage engine
         var startOptions = { pathOpts: pathOpts,
                              configsvr : "",
                              noJournalPrealloc : otherParams.nopreallocj,
+                             storageEngine : "wiredTiger"
                            };
 
         startOptions = Object.merge( startOptions, ShardingTest.configOptions || {} )
