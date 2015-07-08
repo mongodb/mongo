@@ -111,10 +111,10 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	btree = S2BT_SAFE(session);
 
 	/*
-         * Take a local copy of these IDs in case they are updated while we are
-         * checking visibility.  Only the generation needs to be carefully
-         * ordered: if a checkpoint is starting and the generation is bumped,
-         * we take the minimum of the other two IDs, which is what we want.
+	 * Take a local copy of these IDs in case they are updated while we are
+	 * checking visibility.  Only the generation needs to be carefully
+	 * ordered: if a checkpoint is starting and the generation is bumped,
+	 * we take the minimum of the other two IDs, which is what we want.
 	 */
 	oldest_id = txn_global->oldest_id;
 	WT_ORDERED_READ(checkpoint_gen, txn_global->checkpoint_gen);
