@@ -402,7 +402,7 @@ connection_runtime_config = [
             to close''', min=0),
         Config('close_idle_time', '30', r'''
             amount of time in seconds a file handle needs to be idle
-            before attempting to close it. A setting of 0 will mean that older
+            before attempting to close it. A setting of 0 means that idle
             handles are not closed''', min=0, max=100000),
         Config('close_scan_interval', '10', r'''
             interval in seconds at which to check for files that are
