@@ -37,6 +37,7 @@
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -48,12 +49,10 @@ class Status;
  *
  * See the Options struct for information about how to configure an instance.
  */
-class ThreadPool {
+class ThreadPool final : public ThreadPoolInterface {
     MONGO_DISALLOW_COPYING(ThreadPool);
 
 public:
-    using Task = stdx::function<void()>;
-
     /**
      * Structure used to configure an instance of ThreadPool.
      */
@@ -109,44 +108,12 @@ public:
      */
     explicit ThreadPool(Options options);
 
-    /**
-     * Destroys a thread pool.
-     *
-     * The destructor may block if join() has not previously been called and returned.
-     * It is fatal to destroy the pool while another thread is blocked on join().
-     */
-    ~ThreadPool();
+    ~ThreadPool() override;
 
-    /**
-     * Starts the thread pool. May be called at most once.
-     */
-    void startup();
-
-    /**
-     * Signals the thread pool to shut down.  Returns promptly.
-     *
-     * After this call, the thread will return an error for subsequent calls to schedule().
-     *
-     * May be called by a task executing in the thread pool.  Call join() after calling shutdown()
-     * to block until all tasks scheduled on the pool complete.
-     */
-    void shutdown();
-
-    /**
-     * Blocks until the thread pool has fully shut down. Call at most once, and never from a task
-     * inside the pool.
-     */
-    void join();
-
-    /**
-     * Schedules "task" to run in the thread pool.
-     *
-     * Returns OK on success, ShutdownInProgress if shutdown() has already executed.
-     *
-     * It is safe to call this before startup(), but the scheduled task will not execute
-     * until after startup() is called.
-     */
-    Status schedule(Task task);
+    void startup() override;
+    void shutdown() override;
+    void join() override;
+    Status schedule(Task task) override;
 
     /**
      * Blocks the caller until there are no pending tasks on this pool.
