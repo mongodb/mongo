@@ -38,6 +38,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -130,14 +131,20 @@ WiredTigerSessionCache::~WiredTigerSessionCache() {
 }
 
 void WiredTigerSessionCache::shuttingDown() {
-    if (_shuttingDown.compareAndSwap(0, 1))
-        return;
+    uint32_t actual = _shuttingDown.load();
+    uint32_t expected;
 
-    {
-        // This ensures that any calls, which are currently inside of getSession/releaseSession
-        // will be able to complete before we start cleaning up the pool. Any others, which are
-        // about to enter will return immediately because of _shuttingDown == true.
-        stdx::lock_guard<boost::shared_mutex> lk(_shutdownLock);  // NOLINT
+    // Try to atomically set _shuttingDown flag, but just return if another thread was first.
+    do {
+        expected = actual;
+        actual = _shuttingDown.compareAndSwap(expected, expected | kShuttingDownMask);
+        if (actual & kShuttingDownMask)
+            return;
+    } while (actual != expected);
+
+    // Spin as long as there are threads in releaseSession
+    while (_shuttingDown.load() != kShuttingDownMask) {
+        sleepmillis(1);
     }
 
     closeAll();
@@ -160,11 +167,9 @@ void WiredTigerSessionCache::closeAll() {
 }
 
 WiredTigerSession* WiredTigerSessionCache::getSession() {
-    boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);  // NOLINT
-
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.
-    invariant(!_shuttingDown.loadRelaxed());
+    invariant(!(_shuttingDown.loadRelaxed() & kShuttingDownMask));
 
     {
         stdx::lock_guard<SpinLock> lock(_cacheLock);
@@ -185,8 +190,10 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     invariant(session);
     invariant(session->cursorsOut() == 0);
 
-    boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);  // NOLINT
-    if (_shuttingDown.loadRelaxed()) {
+    const int shuttingDown = _shuttingDown.fetchAndAdd(1);
+    ON_BLOCK_EXIT([this] { _shuttingDown.fetchAndSubtract(1); });
+
+    if (shuttingDown & kShuttingDownMask) {
         // Leak the session in order to avoid race condition with clean shutdown, where the
         // storage engine is ripped from underneath transactions, which are not "active"
         // (i.e., do not have any locks), but are just about to delete the recovery unit.

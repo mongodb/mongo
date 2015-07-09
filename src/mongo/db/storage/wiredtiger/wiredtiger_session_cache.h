@@ -116,17 +116,40 @@ private:
     int _cursorsCached, _cursorsOut;
 };
 
+/**
+ *  This cache implements a shared pool of WiredTiger sessions with the goal to amortize the
+ *  cost of session creation and destruction over multiple uses.
+ */
 class WiredTigerSessionCache {
 public:
     WiredTigerSessionCache(WiredTigerKVEngine* engine);
     WiredTigerSessionCache(WT_CONNECTION* conn);
     ~WiredTigerSessionCache();
 
+    /**
+     * Returns a previously released session for reuse, or creates a new session.
+     * This method must only be called while holding the global lock to avoid races with
+     * shuttingDown, but otherwise is thread safe.
+     */
     WiredTigerSession* getSession();
+
+    /**
+     * Returns a session to the cache for later reuse. If closeAll was called between getting this
+     * session and releasing it, the session is directly released. This method is thread safe.
+     */
     void releaseSession(WiredTigerSession* session);
 
+    /**
+     * Free all cached sessions and ensures that previously acquired sessions will be freed on
+     * release.
+     */
     void closeAll();
 
+    /**
+     * Transitions the cache to shutting down mode. Any already released sessions are freed and
+     * any sessions released subsequently are leaked. Must be called while holding the global
+     * lock in exclusive mode to avoid races with getSession.
+     */
     void shuttingDown();
 
     WT_CONNECTION* conn() const {
@@ -145,11 +168,11 @@ private:
     WT_CONNECTION* _conn;         // not owned
     WiredTigerSnapshotManager _snapshotManager;
 
-    // Regular operations take it in shared mode. Shutdown sets the _shuttingDown flag and
-    // then takes it in exclusive mode. This ensures that all threads, which would return
-    // sessions to the cache would leak them.
-    boost::shared_mutex _shutdownLock;  // NOLINT
-    AtomicUInt32 _shuttingDown;         // Used as boolean - 0 = false, 1 = true
+    // Used as follows:
+    //   The low 31 bits are a count of active calls to releaseSession.
+    //   The high bit is a flag that is set if and only if we're shutting down.
+    AtomicUInt32 _shuttingDown;
+    static const uint32_t kShuttingDownMask = 1 << 31;
 
     SpinLock _cacheLock;
     typedef std::vector<WiredTigerSession*> SessionCache;
