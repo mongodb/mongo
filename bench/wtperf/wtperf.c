@@ -406,10 +406,10 @@ worker(void *arg)
 	size_t i;
 	uint64_t final_milestone_gap, needed_milestones, next_val;
 	uint64_t num_milestones, last_key, start_point_val, end_point_val;
-	uint64_t expected_total, last_total_inserts, total_inserts, total_truncations, truncate_milestone_gap, usecs;
+	uint64_t expected_total, last_total_inserts, total_gross_inserts, total_truncations, truncate_milestone_gap, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
-	char *value_buf, *key_buf, *truncate_key, *value;
+	char *value_buf, *key, *key_buf, *truncate_key, *value;
 	char buf[512];
 	double truncation_percentage;
 
@@ -425,7 +425,7 @@ worker(void *arg)
 	trk = NULL;
 	throttle_ops = 0;
 	truncate_milestone_gap = 0;
-	total_truncations = total_inserts = last_total_inserts = expected_total = 0;
+	total_truncations = total_gross_inserts = last_total_inserts = expected_total = 0;
 
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
@@ -501,11 +501,11 @@ worker(void *arg)
 		truncate_milestone_gap = 0;
 
 		cursor->next(cursor);
-		ret = cursor->get_key(cursor, &key_buf);
+		ret = cursor->get_key(cursor, &key);
 
 		/* We have data */
 		if (ret == 0) {
-			start_point_val = decode_key(cfg, key_buf);
+			start_point_val = decode_key(cfg, key);
 			cursor->reset(cursor);
 			if ((ret = cursor->prev(cursor)) != 0) {
 				lprintf(cfg, ret, 0,
@@ -513,12 +513,12 @@ worker(void *arg)
 				goto err;
 			}
 			if ((ret = cursor->get_key(cursor,
-				    &key_buf)) != 0) {
+				    &key)) != 0) {
 				lprintf(cfg, ret, 0,
 				    "truncate setup end: get_key failed");
 				goto err;
 			}
-			end_point_val = decode_key(cfg, key_buf);
+			end_point_val = decode_key(cfg, key);
 			/* Not enough documents? */
 				if (start_point_val + needed_milestones
 				    > end_point_val)
@@ -537,7 +537,7 @@ worker(void *arg)
 		if (truncate_milestone_gap != 0) {
 			expected_total = (end_point_val - start_point_val);
 			for (i = 0; i < needed_milestones; i++) {
-				truncate_key = malloc(cfg->key_sz);
+				truncate_key = calloc(cfg->key_sz, 1);
 				truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 				if (truncate_item == NULL) {
 					(void)enomem(cfg);
@@ -548,10 +548,10 @@ worker(void *arg)
 				printf("just generated key %s\n", truncate_key);
 				truncate_item->key = truncate_key;
 				truncate_item->diff = (truncate_milestone_gap * (i+1)) - last_key;
+				printf("adding truncate point of %s which covers %u docs\n", truncate_item->key, truncate_item->diff);
 				STAILQ_INSERT_TAIL(
 				    &cfg->truncate_stone_head, truncate_item, q);
 				last_key = truncate_milestone_gap * (i+1);
-				printf("adding truncate point of %s which covers %u docs\n", truncate_item->key, truncate_item->diff);
 				num_milestones++;
 			}
 		}
@@ -589,10 +589,10 @@ worker(void *arg)
 				continue;
 			break;
 		case WORKER_TRUNCATE:
-			total_inserts = 0;
+			total_gross_inserts = 0;
 			next_val = wtperf_rand(thread);
 			for (i=0; i < thread->cfg->workers_cnt; i++){
-				total_inserts += thread->cfg->workers[i].total_inserts;
+				total_gross_inserts += thread->cfg->workers[i].total_inserts;
 			}
 			break;
 		default:
@@ -662,16 +662,16 @@ worker(void *arg)
 		case WORKER_TRUNCATE:
 			trk = &thread->truncate;
 
-			expected_total += (total_inserts - last_total_inserts);
-			last_total_inserts = total_inserts;
+			expected_total += (total_gross_inserts - last_total_inserts);
+			last_total_inserts = total_gross_inserts;
 
 			/* We have enough data */
 			if (expected_total > needed_milestones)  {
 
 				while (num_milestones < needed_milestones) {
-					truncate_key = malloc(cfg->key_sz);
+					truncate_key = calloc(cfg->key_sz, 1);
 					truncate_item =
-					    malloc(sizeof(TRUNCATE_QUEUE_ENTRY));
+					    calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 					if (truncate_item == NULL) {
 						(void)enomem(cfg);
 						goto op_err;
@@ -680,10 +680,10 @@ worker(void *arg)
 					    truncate_key, last_key);
 					truncate_item->key = truncate_key;
 					truncate_item->diff = truncate_milestone_gap;
+					printf("adding truncate point of %s which covers %u docs\n", truncate_item->key, truncate_item->diff);
 					STAILQ_INSERT_TAIL(
 					    &cfg->truncate_stone_head,
 					    truncate_item, q);
-					printf("adding truncate point of %s which covers %u docs\n", truncate_item->key, truncate_item->diff);
 					num_milestones++;
 					last_key += truncate_milestone_gap;
 				}
@@ -698,10 +698,10 @@ worker(void *arg)
 					num_milestones--;
 					STAILQ_REMOVE_HEAD(
 					    &cfg->truncate_stone_head, q);
+					printf("about to truncate to %s\n", truncate_item->key);
 					cursor->set_key(cursor,
 					    truncate_item->key);
 					cursor->search(cursor);
-					printf("about to truncate to %s\n", truncate_item->key);
 					ret = session->truncate(session,
 					    NULL, NULL, cursor, NULL);
 					expected_total -= truncate_item->diff;
