@@ -187,6 +187,9 @@ Status IndexBuilder::_build(OperationContext* txn,
                     indexer.commit();
                     wunit.commit();
                 }
+                if (!status.isOK()) {
+                    error() << "bad status from index build: " << status;
+                }
             } catch (const DBException& e) {
                 status = e.toStatus();
             }
