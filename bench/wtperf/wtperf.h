@@ -105,7 +105,7 @@ typedef struct {
 /* Queue entry for use with the Truncate Logic */
 struct __truncate_queue_entry {
 	char *key;			/* Truncation point */
-	uint diff;			/* Num Docs to be truncated*/
+	u_int diff;			/* Number of items to be truncated*/
 	STAILQ_ENTRY(__truncate_queue_entry) q;
 };
 typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
@@ -147,6 +147,7 @@ struct __config {			/* Configuration structure */
 	uint64_t ckpt_ops;		/* checkpoint operations */
 	uint64_t insert_ops;		/* insert operations */
 	uint64_t read_ops;		/* read operations */
+	uint64_t truncate_ops;		/* truncate operations */
 	uint64_t update_ops;		/* update operations */
 
 	uint64_t insert_key;		/* insert key */
@@ -264,6 +265,7 @@ uint64_t sum_ckpt_ops(CONFIG *);
 uint64_t sum_insert_ops(CONFIG *);
 uint64_t sum_pop_ops(CONFIG *);
 uint64_t sum_read_ops(CONFIG *);
+uint64_t sum_truncate_ops(CONFIG *);
 uint64_t sum_update_ops(CONFIG *);
 void	 usage(void);
 

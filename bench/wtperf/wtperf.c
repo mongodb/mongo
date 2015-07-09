@@ -50,6 +50,7 @@ static const CONFIG default_cfg = {
 	0,				/* checkpoint operations */
 	0,				/* insert operations */
 	0,				/* read operations */
+	0,				/* truncate operations */
 	0,				/* update operations */
 	0,				/* insert key */
 	0,				/* checkpoint in progress */
@@ -406,7 +407,8 @@ worker(void *arg)
 	size_t i;
 	uint64_t final_milestone_gap, needed_milestones, next_val;
 	uint64_t num_milestones, last_key, start_point_val, end_point_val;
-	uint64_t expected_total, last_total_inserts, total_gross_inserts, total_truncations, truncate_milestone_gap, usecs;
+	uint64_t expected_total, last_total_inserts, total_gross_inserts;
+	uint64_t truncate_milestone_gap, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
 	char *value_buf, *key, *key_buf, *truncate_key, *value;
@@ -425,7 +427,7 @@ worker(void *arg)
 	trk = NULL;
 	throttle_ops = 0;
 	truncate_milestone_gap = 0;
-	total_truncations = total_gross_inserts = last_total_inserts = expected_total = 0;
+	total_gross_inserts = last_total_inserts = expected_total = 0;
 
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
@@ -538,19 +540,19 @@ worker(void *arg)
 			expected_total = (end_point_val - start_point_val);
 			for (i = 0; i < needed_milestones; i++) {
 				truncate_key = calloc(cfg->key_sz, 1);
-				truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
+				truncate_item =
+				    calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 				if (truncate_item == NULL) {
 					(void)enomem(cfg);
 					goto err;
 				}
 				generate_key(cfg, truncate_key,
 				    truncate_milestone_gap * (i+1));
-				printf("just generated key %s\n", truncate_key);
 				truncate_item->key = truncate_key;
-				truncate_item->diff = (truncate_milestone_gap * (i+1)) - last_key;
-				printf("adding truncate point of %s which covers %u docs\n", truncate_item->key, truncate_item->diff);
-				STAILQ_INSERT_TAIL(
-				    &cfg->truncate_stone_head, truncate_item, q);
+				truncate_item->diff =
+				    (truncate_milestone_gap * (i+1)) - last_key;
+				STAILQ_INSERT_TAIL( &cfg->truncate_stone_head,
+				    truncate_item, q);
 				last_key = truncate_milestone_gap * (i+1);
 				num_milestones++;
 			}
@@ -591,8 +593,9 @@ worker(void *arg)
 		case WORKER_TRUNCATE:
 			total_gross_inserts = 0;
 			next_val = wtperf_rand(thread);
-			for (i=0; i < thread->cfg->workers_cnt; i++){
-				total_gross_inserts += thread->cfg->workers[i].total_inserts;
+			for (i=0; i < thread->cfg->workers_cnt; i++) {
+				total_gross_inserts +=
+				    thread->cfg->workers[i].total_inserts;
 			}
 			break;
 		default:
@@ -654,7 +657,7 @@ worker(void *arg)
 			if (cfg->random_value)
 				randomize_value(thread, value_buf);
 			cursor->set_value(cursor, value_buf);
-			if ((ret = cursor->insert(cursor)) == 0){
+			if ((ret = cursor->insert(cursor)) == 0) {
 				thread->total_inserts++;
 				break;
 			}
@@ -662,7 +665,8 @@ worker(void *arg)
 		case WORKER_TRUNCATE:
 			trk = &thread->truncate;
 
-			expected_total += (total_gross_inserts - last_total_inserts);
+			expected_total +=
+			    (total_gross_inserts - last_total_inserts);
 			last_total_inserts = total_gross_inserts;
 
 			/* We have enough data */
@@ -671,7 +675,8 @@ worker(void *arg)
 				while (num_milestones < needed_milestones) {
 					truncate_key = calloc(cfg->key_sz, 1);
 					truncate_item =
-					    calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
+					    calloc(
+					    sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 					if (truncate_item == NULL) {
 						(void)enomem(cfg);
 						goto op_err;
@@ -679,8 +684,8 @@ worker(void *arg)
 					generate_key(cfg,
 					    truncate_key, last_key);
 					truncate_item->key = truncate_key;
-					truncate_item->diff = truncate_milestone_gap;
-					printf("adding truncate point of %s which covers %u docs\n", truncate_item->key, truncate_item->diff);
+					truncate_item->diff =
+					    truncate_milestone_gap;
 					STAILQ_INSERT_TAIL(
 					    &cfg->truncate_stone_head,
 					    truncate_item, q);
@@ -692,13 +697,12 @@ worker(void *arg)
 				if (expected_total >
 				    thread->workload->truncate_count &&
 				    num_milestones > 0) {
-				    	printf("currently there are %llu items in table\n", expected_total);
 					truncate_item =
-					    STAILQ_FIRST(&cfg->truncate_stone_head);
+					    STAILQ_FIRST(
+					    &cfg->truncate_stone_head);
 					num_milestones--;
 					STAILQ_REMOVE_HEAD(
 					    &cfg->truncate_stone_head, q);
-					printf("about to truncate to %s\n", truncate_item->key);
 					cursor->set_key(cursor,
 					    truncate_item->key);
 					cursor->search(cursor);
@@ -710,14 +714,16 @@ worker(void *arg)
 						    "Truncate failed");
 						goto op_err;
 					}
-					printf("expected coll size is %llu\n", expected_total);
 					free(truncate_item->key);
 					free(truncate_item);
 					truncate_item = NULL;
+				} else {
+					trk = &thread->truncate_sleep;
+					(void)usleep(1000);
 				}
 			} else {
-				trk = &thread->truncate_sleep;
-				(void)usleep(1000);
+					trk = &thread->truncate_sleep;
+					(void)usleep(1000);
 			}
 			break;
 		case WORKER_UPDATE:
@@ -827,6 +833,15 @@ op_err:			lprintf(cfg, ret, 0,
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
 err:		cfg->error = cfg->stop = 1;
+	}
+	/* Empty the truncate queue before close */
+	if (thread->workload->truncate != 0) {
+		while (!STAILQ_EMPTY(&cfg->truncate_stone_head)) {
+			truncate_item = STAILQ_FIRST(&cfg->truncate_stone_head);
+			STAILQ_REMOVE_HEAD(&cfg->truncate_stone_head, q);
+			free(truncate_item->key);
+			free(truncate_item);
+		}
 	}
 	free(cursors);
 
@@ -1604,16 +1619,19 @@ execute_workload(CONFIG *cfg)
 {
 	CONFIG_THREAD *threads;
 	WORKLOAD *workp;
-	uint64_t last_ckpts, last_inserts, last_reads, last_updates;
+	uint64_t last_ckpts, last_inserts, last_reads, last_truncates;
+	uint64_t last_updates;
 	uint32_t interval, run_ops, run_time;
 	u_int i;
 	int ret, t_ret;
 	void *(*pfunc)(void *);
 
 	cfg->insert_key = 0;
-	cfg->insert_ops = cfg->read_ops = cfg->update_ops = 0;
+	cfg->insert_ops = cfg->read_ops =
+	    cfg->truncate_ops = cfg->update_ops = 0;
 
-	last_ckpts = last_inserts = last_reads = last_updates = 0;
+	last_ckpts = last_inserts =
+	    last_reads =last_truncates = last_updates = 0;
 	ret = 0;
 
 	if (cfg->warmup != 0)
@@ -1645,6 +1663,10 @@ execute_workload(CONFIG *cfg)
 		/* Figure out the workload's schedule. */
 		if ((ret = run_mix_schedule(cfg, workp)) != 0)
 			goto err;
+
+		/* Allocate the truncate threads queue */
+		if (workp->truncate > 0)
+			STAILQ_INIT(&cfg->truncate_stone_head);
 
 		/* Start the workload's threads. */
 		if ((ret = start_threads(
@@ -1680,6 +1702,7 @@ execute_workload(CONFIG *cfg)
 		cfg->insert_ops = sum_insert_ops(cfg);
 		cfg->read_ops = sum_read_ops(cfg);
 		cfg->update_ops = sum_update_ops(cfg);
+		cfg->truncate_ops = sum_truncate_ops(cfg);
 
 		/* If we're checking total operations, see if we're done. */
 		if (run_ops != 0 && run_ops <=
@@ -1694,16 +1717,18 @@ execute_workload(CONFIG *cfg)
 
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
-		    " updates, %" PRIu64 " checkpoints in %" PRIu32
-		    " secs (%" PRIu32 " total secs)",
+		    " updates, %" PRIu64 " truncates, %" PRIu64
+		    " checkpoints in %" PRIu32 " secs (%" PRIu32 " total secs)",
 		    cfg->read_ops - last_reads,
 		    cfg->insert_ops - last_inserts,
 		    cfg->update_ops - last_updates,
+		    cfg->truncate_ops - last_truncates,
 		    cfg->ckpt_ops - last_ckpts,
 		    cfg->report_interval, cfg->totalsec);
 		last_reads = cfg->read_ops;
 		last_inserts = cfg->insert_ops;
 		last_updates = cfg->update_ops;
+		last_truncates = cfg->truncate_ops;
 		last_ckpts = cfg->ckpt_ops;
 	}
 
@@ -2004,9 +2029,6 @@ start_run(CONFIG *cfg)
 	uint64_t total_ops;
 	int monitor_created, ret, t_ret;
 	char helium_buf[256];
-
-	if (cfg->has_truncate > 0)
-		STAILQ_INIT(&cfg->truncate_stone_head);
 
 	monitor_created = ret = 0;
 					/* [-Wconditional-uninitialized] */
