@@ -6,7 +6,6 @@ var mongo = new Mongo(db.getMongo().host);
 var newdb = mongo.getDB(db.toString());
 
 var t = newdb.opcounters;
-var isMongos = ("isdbgrid" == newdb.runCommand("ismaster").msg);
 var opCounters;
 var res;
 
@@ -101,8 +100,7 @@ assert.eq(opCounters.delete + 1, newdb.serverStatus().opcounters.delete);
 //
 // 4. Query.
 //
-// - mongod: counted as 1 op, regardless of errors
-// - mongos: counted as 1 op if successful, else 0
+// - counted as 1 op, regardless of errors
 //
 
 t.drop();
@@ -116,7 +114,7 @@ assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
 // Query, with error.
 opCounters = newdb.serverStatus().opcounters;
 assert.throws(function() { t.findOne({_id:{$invalidOp:1}}) });
-assert.eq(opCounters.query + (isMongos ? 0 : 1), newdb.serverStatus().opcounters.query);
+assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
 
 //
 // 5. Getmore.
@@ -177,8 +175,8 @@ assert.eq(countVal.failed + 1,
     "failed count command counter did not increment"); // "serverStatus", "count" counted
 
 // Command, unrecognized.
-res = t.runCommand("invalid"); // "invalid" command only counted on MongoS
+res = t.runCommand("invalid");
 assert.eq(0, res.ok);
-assert.eq(opCounters.command + (isMongos ? 9 : 8), newdb.serverStatus().opcounters.command); // "serverStatus" counted
+assert.eq(opCounters.command + 8, newdb.serverStatus().opcounters.command); // "serverStatus" counted
 assert.eq(null, newdb.serverStatus().metrics.commands.invalid);
 assert.eq(metricsObj['<UNKNOWN>'] + 1, newdb.serverStatus().metrics.commands['<UNKNOWN>']);
