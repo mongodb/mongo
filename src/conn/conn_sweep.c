@@ -35,7 +35,8 @@ __sweep_mark(WT_SESSION_IMPL *session, int *dead_handlesp)
 			continue;
 		}
 		if (dhandle->session_inuse != 0 ||
-		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
+		    now <= dhandle->timeofdeath + conn->sweep_idle_time ||
+		    conn->sweep_idle_time == 0)
 			continue;
 		if (dhandle->timeofdeath == 0) {
 			dhandle->timeofdeath = now;
@@ -139,7 +140,8 @@ __sweep_expire(WT_SESSION_IMPL *session)
 		    F_ISSET(dhandle, WT_DHANDLE_DEAD))
 			continue;
 		if (dhandle->session_inuse != 0 ||
-		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
+		    now <= dhandle->timeofdeath + conn->sweep_idle_time ||
+		    conn->sweep_idle_time == 0)
 			continue;
 
 		WT_WITH_DHANDLE(session, dhandle,
