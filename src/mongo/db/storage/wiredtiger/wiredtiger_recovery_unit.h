@@ -150,7 +150,7 @@ private:
 class WiredTigerCursor {
 public:
     WiredTigerCursor(const std::string& uri,
-                     uint64_t uriID,
+                     uint64_t tableID,
                      bool forRecordStore,
                      OperationContext* txn);
 
@@ -178,7 +178,7 @@ public:
     }
 
 private:
-    uint64_t _uriID;
+    uint64_t _tableID;
     WiredTigerRecoveryUnit* _ru;  // not owned
     WiredTigerSession* _session;
     WT_CURSOR* _cursor;  // owned, but pulled

@@ -107,8 +107,8 @@ public:
         return _uri;
     }
 
-    uint64_t instanceId() const {
-        return _instanceId;
+    uint64_t tableId() const {
+        return _tableId;
     }
     Ordering ordering() const {
         return _ordering;
@@ -135,7 +135,7 @@ protected:
 
     const Ordering _ordering;
     std::string _uri;
-    uint64_t _instanceId;
+    uint64_t _tableId;
     std::string _collectionNamespace;
     std::string _indexName;
 };

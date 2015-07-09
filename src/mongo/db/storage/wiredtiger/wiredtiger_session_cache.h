@@ -91,12 +91,12 @@ public:
         return _cursorsOut;
     }
 
-    static uint64_t genCursorId();
+    static uint64_t genTableId();
 
     /**
-     * For "metadata:" cursors. Guaranteed never to collide with genCursorId() ids.
+     * For "metadata:" cursors. Guaranteed never to collide with genTableId() ids.
      */
-    static const uint64_t kMetadataCursorId = 0;
+    static const uint64_t kMetadataTableId = 0;
 
 private:
     friend class WiredTigerSessionCache;

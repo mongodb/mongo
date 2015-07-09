@@ -394,20 +394,20 @@ void WiredTigerRecoveryUnit::beingSetOnOperationContext() {
 // ---------------------
 
 WiredTigerCursor::WiredTigerCursor(const std::string& uri,
-                                   uint64_t id,
+                                   uint64_t tableId,
                                    bool forRecordStore,
                                    OperationContext* txn) {
-    _uriID = id;
+    _tableID = tableId;
     _ru = WiredTigerRecoveryUnit::get(txn);
     _session = _ru->getSession(txn);
-    _cursor = _session->getCursor(uri, id, forRecordStore);
+    _cursor = _session->getCursor(uri, tableId, forRecordStore);
     if (!_cursor) {
         error() << "no cursor for uri: " << uri;
     }
 }
 
 WiredTigerCursor::~WiredTigerCursor() {
-    _session->releaseCursor(_uriID, _cursor);
+    _session->releaseCursor(_tableID, _cursor);
     _cursor = NULL;
 }
 

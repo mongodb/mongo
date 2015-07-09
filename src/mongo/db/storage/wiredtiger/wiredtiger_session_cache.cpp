@@ -111,11 +111,11 @@ void WiredTigerSession::closeAllCursors() {
 }
 
 namespace {
-AtomicUInt64 nextCursorId(1);
+AtomicUInt64 nextTableId(1);
 }
 // static
-uint64_t WiredTigerSession::genCursorId() {
-    return nextCursorId.fetchAndAdd(1);
+uint64_t WiredTigerSession::genTableId() {
+    return nextTableId.fetchAndAdd(1);
 }
 
 // -----------------------
