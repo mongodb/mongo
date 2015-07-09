@@ -66,6 +66,7 @@ public:
         struct OtherFields {
             BSONObj metadata;
         } otherFields;
+        Milliseconds elapsedMillis = Milliseconds(0);
         bool first;
     };
 
