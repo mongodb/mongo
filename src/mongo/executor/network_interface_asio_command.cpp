@@ -45,7 +45,94 @@
 namespace mongo {
 namespace executor {
 
-void NetworkInterfaceASIO::_asyncRunCommand(AsyncOp* op) {
+/**
+ * The following send - receive utility functions are "stateless" in that they exist
+ * apart from the AsyncOp state machine.
+ */
+
+namespace {
+
+using asio::ip::tcp;
+using NetworkOpHandler = stdx::function<void(std::error_code, size_t)>;
+
+// TODO: Consider templatizing on handler here to avoid using stdx::functions.
+void asyncSendMessage(tcp::socket& sock, Message* m, NetworkOpHandler handler) {
+    // TODO: Some day we may need to support vector messages.
+    fassert(28708, m->buf() != 0);
+    asio::const_buffer buf(m->buf(), m->size());
+    asio::async_write(sock, asio::buffer(buf), handler);
+}
+
+void asyncRecvMessageHeader(tcp::socket& sock, MSGHEADER::Value* header, NetworkOpHandler handler) {
+    asio::async_read(
+        sock, asio::buffer(header->view().view2ptr(), sizeof(MSGHEADER::Value)), handler);
+}
+
+void asyncRecvMessageBody(tcp::socket& sock,
+                          MSGHEADER::Value* header,
+                          Message* m,
+                          NetworkOpHandler handler) {
+    // TODO: This error code should be more meaningful.
+    std::error_code ec;
+
+    // validate message length
+    int len = header->constView().getMessageLength();
+    if (len == 542393671) {
+        LOG(3) << "attempt to access MongoDB over HTTP on the native driver port.";
+        return handler(ec, 0);
+    } else if (static_cast<size_t>(len) < sizeof(MSGHEADER::Value) ||
+               static_cast<size_t>(len) > MaxMessageSizeBytes) {
+        warning() << "recv(): message len " << len << " is invalid. "
+                  << "Min " << sizeof(MSGHEADER::Value) << " Max: " << MaxMessageSizeBytes;
+        return handler(ec, 0);
+    }
+
+    int z = (len + 1023) & 0xfffffc00;
+    invariant(z >= len);
+    m->setData(reinterpret_cast<char*>(mongoMalloc(z)), true);
+    MsgData::View mdView = m->buf();
+
+    // copy header data into master buffer
+    int headerLen = sizeof(MSGHEADER::Value);
+    memcpy(mdView.view2ptr(), header, headerLen);
+    int bodyLength = len - headerLen;
+    invariant(bodyLength >= 0);
+
+    // receive remaining data into md->data
+    asio::async_read(sock, asio::buffer(mdView.data(), bodyLength), handler);
+}
+
+}  // namespace
+
+NetworkInterfaceASIO::AsyncCommand::AsyncCommand(AsyncConnection* conn) : _conn(conn) {}
+
+void NetworkInterfaceASIO::AsyncCommand::reset() {
+    // TODO: Optimize reuse of Messages to be more space-efficient.
+    _toSend.reset();
+    _toRecv.reset();
+}
+
+NetworkInterfaceASIO::AsyncConnection& NetworkInterfaceASIO::AsyncCommand::conn() {
+    return *_conn;
+}
+
+Message& NetworkInterfaceASIO::AsyncCommand::toSend() {
+    return _toSend;
+}
+
+void NetworkInterfaceASIO::AsyncCommand::setToSend(Message&& message) {
+    _toSend = std::move(message);
+}
+
+Message& NetworkInterfaceASIO::AsyncCommand::toRecv() {
+    return _toRecv;
+}
+
+MSGHEADER::Value& NetworkInterfaceASIO::AsyncCommand::header() {
+    return _header;
+}
+
+void NetworkInterfaceASIO::_startCommand(AsyncOp* op) {
     LOG(3) << "running command " << op->request().cmdObj << " against database "
            << op->request().dbname << " across network to " << op->request().target.toString();
     if (inShutdown()) {
@@ -75,14 +162,6 @@ std::unique_ptr<Message> NetworkInterfaceASIO::_messageFromRequest(
     return toSend;
 }
 
-void NetworkInterfaceASIO::_asyncSendSimpleMessage(AsyncOp* op, const asio::const_buffer& buf) {
-    asio::async_write(op->connection()->sock(),
-                      asio::buffer(buf),
-                      [this, op](std::error_code ec, std::size_t bytes) {
-                          _validateAndRun(op, ec, [this, op]() { _receiveResponse(op); });
-                      });
-}
-
 void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
     auto negotiatedProtocol =
         rpc::negotiate(op->connection()->serverProtocols(), op->connection()->clientProtocols());
@@ -93,40 +172,37 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
 
     op->setOperationProtocol(negotiatedProtocol.getValue());
 
-    op->setToSend(std::move(*_messageFromRequest(op->request(), negotiatedProtocol.getValue())));
+    auto& cmd = op->beginCommand(
+        std::move(*_messageFromRequest(op->request(), negotiatedProtocol.getValue())));
 
-    // TODO: Is this logic actually necessary (SERVER-19320)?
-    if (op->toSend()->empty())
-        return _completedWriteCallback(op);
-
-    // TODO: Some day we may need to support vector messages.
-    fassert(28708, op->toSend()->buf() != 0);
-    asio::const_buffer buf(op->toSend()->buf(), op->toSend()->size());
-    return _asyncSendSimpleMessage(op, buf);
+    _asyncRunCommand(&cmd,
+                     [this, op](std::error_code ec, size_t bytes) {
+                         _validateAndRun(op, ec, [this, op]() { _completedOpCallback(op); });
+                     });
 }
 
-void NetworkInterfaceASIO::_completedWriteCallback(AsyncOp* op) {
+void NetworkInterfaceASIO::_completedOpCallback(AsyncOp* op) {
     // If we were told to send an empty message, toRecv will be empty here.
 
     // TODO: handle metadata readers
     const auto elapsed = [this, op]() { return now() - op->start(); };
 
-    if (op->toRecv()->empty()) {
+    if (op->command().toRecv().empty()) {
         LOG(3) << "received an empty message";
         return _completeOperation(op, RemoteCommandResponse(BSONObj(), BSONObj(), elapsed()));
     }
 
     try {
-        auto reply = rpc::makeReply(op->toRecv());
+        auto reply = rpc::makeReply(&(op->command().toRecv()));
 
         if (reply->getProtocol() != op->operationProtocol()) {
-            return _completeOperation(op,
-                                      Status(ErrorCodes::RPCProtocolNegotiationFailed,
-                                             str::stream()
-                                                 << "Mismatched RPC protocols - request was '"
-                                                 << opToString(op->toSend()->operation()) << "' '"
-                                                 << " but reply was '"
-                                                 << opToString(op->toRecv()->operation()) << "'"));
+            return _completeOperation(
+                op,
+                Status(ErrorCodes::RPCProtocolNegotiationFailed,
+                       str::stream() << "Mismatched RPC protocols - request was '"
+                                     << opToString(op->command().toSend().operation()) << "' '"
+                                     << " but reply was '"
+                                     << opToString(op->command().toRecv().operation()) << "'"));
         }
 
         _completeOperation(op,
@@ -160,65 +236,48 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
     signalWorkAvailable();
 }
 
-void NetworkInterfaceASIO::_recvMessageHeader(AsyncOp* op) {
-    asio::async_read(op->connection()->sock(),
-                     asio::buffer(reinterpret_cast<char*>(op->header()), sizeof(MSGHEADER::Value)),
-                     [this, op](asio::error_code ec, size_t bytes) {
-                         _validateAndRun(op, ec, [this, op]() { _recvMessageBody(op); });
-                     });
-}
+void NetworkInterfaceASIO::_asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler handler) {
+    // We invert the following steps below to run a command:
+    // 1 - send the given command
+    // 2 - receive a header for the response
+    // 3 - validate and receive response body
+    // 4 - advance the state machine by calling handler()
 
-void NetworkInterfaceASIO::_recvMessageBody(AsyncOp* op) {
-    // TODO: This error code should be more meaningful.
-    std::error_code ec;
+    // Step 4
+    auto recvMessageCallback =
+        [this, cmd, handler](std::error_code ec, size_t bytes) { handler(ec, bytes); };
 
-    // validate message length
-    int len = op->header()->constView().getMessageLength();
-    if (len == 542393671) {
-        LOG(3) << "attempt to access MongoDB over HTTP on the native driver port.";
-        return _networkErrorCallback(op, ec);
-    } else if (len == -1) {
-        // TODO: An endian check is run after the client connects, we should
-        // set that we've received the client's handshake
-        LOG(3) << "Endian check received from client";
-        return _networkErrorCallback(op, ec);
-    } else if (static_cast<size_t>(len) < sizeof(MSGHEADER::Value) ||
-               static_cast<size_t>(len) > MaxMessageSizeBytes) {
-        warning() << "recv(): message len " << len << " is invalid. "
-                  << "Min " << sizeof(MSGHEADER::Value) << " Max: " << MaxMessageSizeBytes;
-        return _networkErrorCallback(op, ec);
-    }
+    // Step 3
+    auto recvHeaderCallback = [this, cmd, handler, recvMessageCallback](std::error_code ec,
+                                                                        size_t bytes) {
+        if (ec)
+            return handler(ec, bytes);
 
-    // validate response id
-    uint32_t expectedId = op->toSend()->header().getId();
-    uint32_t actualId = op->header()->constView().getResponseTo();
-    if (actualId != expectedId) {
-        LOG(3) << "got wrong response:"
-               << " expected response id: " << expectedId << ", got response id: " << actualId;
-        return _networkErrorCallback(op, ec);
-    }
+        // validate response id
+        uint32_t expectedId = cmd->toSend().header().getId();
+        uint32_t actualId = cmd->header().constView().getResponseTo();
+        if (actualId != expectedId) {
+            LOG(3) << "got wrong response:"
+                   << " expected response id: " << expectedId << ", got response id: " << actualId;
+            // TODO: This error code should be more meaningful.
+            return handler(ec, bytes);
+        }
 
-    int z = (len + 1023) & 0xfffffc00;
-    invariant(z >= len);
-    op->toRecv()->setData(reinterpret_cast<char*>(mongoMalloc(z)), true);
-    MsgData::View mdView = op->toRecv()->buf();
+        asyncRecvMessageBody(
+            cmd->conn().sock(), &cmd->header(), &cmd->toRecv(), std::move(recvMessageCallback));
+    };
 
-    // copy header data into master buffer
-    int headerLen = sizeof(MSGHEADER::Value);
-    memcpy(mdView.view2ptr(), op->header(), headerLen);
-    int bodyLength = len - headerLen;
-    invariant(bodyLength >= 0);
+    // Step 2
+    auto sendMessageCallback = [this, cmd, handler, recvHeaderCallback](std::error_code ec,
+                                                                        size_t bytes) {
+        if (ec)
+            return handler(ec, bytes);
 
-    // receive remaining data into md->data
-    asio::async_read(op->connection()->sock(),
-                     asio::buffer(mdView.data(), bodyLength),
-                     [this, op, mdView](asio::error_code ec, size_t bytes) {
-                         _validateAndRun(op, ec, [this, op]() { _completedWriteCallback(op); });
-                     });
-}
+        asyncRecvMessageHeader(cmd->conn().sock(), &cmd->header(), std::move(recvHeaderCallback));
+    };
 
-void NetworkInterfaceASIO::_receiveResponse(AsyncOp* op) {
-    _recvMessageHeader(op);
+    // Step 1
+    asyncSendMessage(cmd->conn().sock(), &cmd->toSend(), std::move(sendMessageCallback));
 }
 
 }  // namespace executor

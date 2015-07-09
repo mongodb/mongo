@@ -75,6 +75,7 @@ public:
 private:
     using ResponseStatus = TaskExecutor::ResponseStatus;
     using NetworkInterface::RemoteCommandCompletionFn;
+    using NetworkOpHandler = stdx::function<void(std::error_code, size_t)>;
 
     enum class State { kReady, kRunning, kShutdown };
 
@@ -118,6 +119,35 @@ private:
     };
 
     /**
+     * AsyncCommand holds state for a currently running or soon-to-be-run command.
+     */
+    class AsyncCommand {
+    public:
+        AsyncCommand(AsyncConnection* conn);
+
+        // This method resets the Messages and associated information held inside
+        // an AsyncCommand so that it may be reused to run a new network roundtrip.
+        void reset();
+
+        NetworkInterfaceASIO::AsyncConnection& conn();
+
+        Message& toSend();
+        void setToSend(Message&& message);
+
+        Message& toRecv();
+        MSGHEADER::Value& header();
+
+    private:
+        NetworkInterfaceASIO::AsyncConnection* const _conn;
+
+        Message _toSend;
+        Message _toRecv;
+
+        // TODO: Investigate efficiency of storing header separately.
+        MSGHEADER::Value _header;
+    };
+
+    /**
      * Helper object to manage individual network operations.
      */
     class AsyncOp {
@@ -125,8 +155,7 @@ private:
         AsyncOp(const TaskExecutor::CallbackHandle& cbHandle,
                 const RemoteCommandRequest& request,
                 const RemoteCommandCompletionFn& onFinish,
-                Date_t now,
-                int id);
+                Date_t now);
 
         std::string toString() const;
 
@@ -141,19 +170,17 @@ private:
         void setConnection(AsyncConnection&& conn);
         bool connected() const;
 
-        void finish(const TaskExecutor::ResponseStatus& status);
+        // AsyncOp may run multiple commands over its lifetime (for example, an ismaster
+        // command, the command provided to the NetworkInterface via startCommand(), etc.)
+        // Calling beginCommand() resets internal state to prepare to run newCommand.
+        AsyncCommand& beginCommand(Message&& newCommand);
+        AsyncCommand& command();
 
-        MSGHEADER::Value* header();
+        void finish(const TaskExecutor::ResponseStatus& status);
 
         const RemoteCommandRequest& request() const;
 
         Date_t start() const;
-
-        Message* toSend();
-
-        void setToSend(Message&& message);
-
-        Message* toRecv();
 
         rpc::Protocol operationProtocol() const;
 
@@ -168,7 +195,8 @@ private:
             kCompleted
         };
 
-        // Information describing an in-flight command.
+        // Information describing a task enqueued on the NetworkInterface
+        // via a call to startCommand().
         TaskExecutor::CallbackHandle _cbHandle;
         RemoteCommandRequest _request;
         RemoteCommandCompletionFn _onFinish;
@@ -191,17 +219,14 @@ private:
         AtomicUInt64 _canceled;
 
         /**
-         * The outgoing command associated with this operation.
+         * An AsyncOp may run 0, 1, or multiple commands over its lifetime.
+         * AsyncOp only holds at most a single AsyncCommand object at a time,
+         * representing its current running or next-to-be-run command, if there is one.
          */
-        boost::optional<Message> _toSend;
-
-        Message _toRecv;
-        MSGHEADER::Value _header;
-
-        const int _id;
+        boost::optional<AsyncCommand> _command;
     };
 
-    void _asyncRunCommand(AsyncOp* op);
+    void _startCommand(AsyncOp* op);
 
     /**
      * Wraps a completion handler in pre-condition checks.
@@ -225,8 +250,6 @@ private:
     std::unique_ptr<Message> _messageFromRequest(const RemoteCommandRequest& request,
                                                  rpc::Protocol protocol);
 
-    void _asyncSendSimpleMessage(AsyncOp* op, const asio::const_buffer& buf);
-
     // Connection
     void _connectASIO(AsyncOp* op);
     void _connectWithDBClientConnection(AsyncOp* op);
@@ -236,16 +259,13 @@ private:
 
     // Communication state machine
     void _beginCommunication(AsyncOp* op);
-    void _completedWriteCallback(AsyncOp* op);
+    void _completedOpCallback(AsyncOp* op);
     void _networkErrorCallback(AsyncOp* op, const std::error_code& ec);
-
     void _completeOperation(AsyncOp* op, const TaskExecutor::ResponseStatus& resp);
 
-    void _recvMessageHeader(AsyncOp* op);
-    void _recvMessageBody(AsyncOp* op);
-    void _receiveResponse(AsyncOp* op);
-
     void _signalWorkAvailable_inlock();
+
+    void _asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler handler);
 
     asio::io_service _io_service;
     stdx::thread _serviceRunner;
@@ -262,8 +282,6 @@ private:
     stdx::condition_variable _isExecutorRunnableCondition;
 
     std::unique_ptr<ConnectionPool> _connPool;
-
-    AtomicUInt64 _numOps;
 };
 
 }  // namespace executor

@@ -43,11 +43,7 @@ namespace mongo {
 namespace executor {
 
 NetworkInterfaceASIO::NetworkInterfaceASIO()
-    : _io_service(),
-      _resolver(_io_service),
-      _state(State::kReady),
-      _isExecutorRunnable(false),
-      _numOps(0) {
+    : _io_service(), _resolver(_io_service), _state(State::kReady), _isExecutorRunnable(false) {
     _connPool = stdx::make_unique<ConnectionPool>(kMessagingPortKeepOpen);
 }
 
@@ -55,7 +51,6 @@ std::string NetworkInterfaceASIO::getDiagnosticString() {
     str::stream output;
     output << "NetworkInterfaceASIO";
     output << " inShutdown: " << inShutdown();
-    output << " _numOps: " << _numOps.loadRelaxed();
     return output;
 }
 
@@ -118,8 +113,7 @@ Date_t NetworkInterfaceASIO::now() {
 void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                         const RemoteCommandRequest& request,
                                         const RemoteCommandCompletionFn& onFinish) {
-    auto ownedOp =
-        stdx::make_unique<AsyncOp>(cbHandle, request, onFinish, now(), _numOps.fetchAndAdd(1));
+    auto ownedOp = stdx::make_unique<AsyncOp>(cbHandle, request, onFinish, now());
 
     AsyncOp* op = ownedOp.get();
 
@@ -128,7 +122,7 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         _inProgress.emplace(op, std::move(ownedOp));
     }
 
-    asio::post(_io_service, [this, op]() { _asyncRunCommand(op); });
+    asio::post(_io_service, [this, op]() { _startCommand(op); });
 }
 
 void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {
