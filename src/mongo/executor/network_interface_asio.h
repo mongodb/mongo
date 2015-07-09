@@ -71,7 +71,6 @@ public:
     bool inShutdown() const;
 
 private:
-
     using ResponseStatus = TaskExecutor::ResponseStatus;
     using NetworkInterface::RemoteCommandCompletionFn;
 
