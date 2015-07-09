@@ -338,6 +338,7 @@ inline int ConstView::dataLen() const {
 
 class Message {
     MONGO_DISALLOW_COPYING(Message);
+
 public:
     // we assume here that a vector with initial size 0 does no allocation (0 is the default, but
     // wanted to make it explicit).
