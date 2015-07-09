@@ -144,13 +144,11 @@ std::string OplogFetcher::toString() const {
 
 void OplogFetcher::_delegateCallback(const Fetcher::QueryResponseStatus& fetchResult,
                                      Fetcher::NextAction* nextAction) {
-    const bool checkStartTS = _getResponses() == 0;
-
     if (fetchResult.isOK()) {
         Fetcher::Documents::const_iterator firstDoc = fetchResult.getValue().documents.begin();
         auto hasDoc = firstDoc != fetchResult.getValue().documents.end();
 
-        if (checkStartTS) {
+        if (fetchResult.getValue().first) {
             if (!hasDoc) {
                 // Set next action to none.
                 *nextAction = Fetcher::NextAction::kNoAction;

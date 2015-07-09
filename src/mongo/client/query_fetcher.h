@@ -78,7 +78,6 @@ public:
     std::string getDiagnosticString() const;
 
 protected:
-    int _getResponses() const;
     void _onFetchCallback(const Fetcher::QueryResponseStatus& fetchResult,
                           Fetcher::NextAction* nextAction,
                           BSONObjBuilder* getMoreBob);
@@ -95,7 +94,6 @@ protected:
 private:
     executor::TaskExecutor* _exec;
     Fetcher _fetcher;
-    int _responses;
     const QueryFetcher::CallbackFn _work;
 };
 

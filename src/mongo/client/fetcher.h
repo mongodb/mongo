@@ -66,6 +66,7 @@ public:
         struct OtherFields {
             BSONObj metadata;
         } otherFields;
+        bool first;
     };
 
     using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
@@ -190,6 +191,11 @@ private:
 
     // _active is true when Fetcher is scheduled to be run by the executor.
     bool _active;
+
+    // _first is true for first query response and false for subsequent responses.
+    // Using boolean instead of a counter to avoid issues with wrap around.
+    bool _first;
+
     // Callback handle to the scheduled remote command.
     executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;
 };

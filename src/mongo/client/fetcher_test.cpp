@@ -72,6 +72,7 @@ protected:
     CursorId cursorId;
     NamespaceString nss;
     Fetcher::Documents documents;
+    bool first;
     Fetcher::NextAction nextAction;
     std::unique_ptr<Fetcher> fetcher;
     // Called at end of _callback
@@ -112,6 +113,7 @@ void FetcherTest::clear() {
     cursorId = -1;
     nss = NamespaceString();
     documents.clear();
+    first = false;
     nextAction = Fetcher::NextAction::kInvalid;
     callbackHook = Fetcher::CallbackFn();
 }
@@ -171,6 +173,7 @@ void FetcherTest::_callback(const StatusWith<Fetcher::QueryResponse>& result,
         cursorId = batchData.cursorId;
         nss = batchData.nss;
         documents = batchData.documents;
+        first = batchData.first;
     }
 
     if (callbackHook) {
@@ -465,6 +468,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_EQUALS(doc, documents.front());
+    ASSERT_TRUE(first);
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
     ASSERT_TRUE(fetcher->isActive());
 
@@ -480,6 +484,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_EQUALS(doc2, documents.front());
+    ASSERT_FALSE(first);
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
     ASSERT_TRUE(fetcher->isActive());
 
@@ -495,6 +500,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_EQUALS(doc3, documents.front());
+    ASSERT_FALSE(first);
     ASSERT_TRUE(Fetcher::NextAction::kNoAction == nextAction);
     ASSERT_FALSE(fetcher->isActive());
 
