@@ -83,8 +83,6 @@ m0.getDB("db1").createRole({
     ]
 });
 
-delete m0;
-
 //
 // Add a second node to the set, and add a third role, dependent on the first two.
 //
