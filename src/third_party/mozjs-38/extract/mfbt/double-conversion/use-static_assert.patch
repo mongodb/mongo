@@ -1,0 +1,25 @@
+diff --git a/mfbt/double-conversion/utils.h b/mfbt/double-conversion/utils.h
+--- a/mfbt/double-conversion/utils.h
++++ b/mfbt/double-conversion/utils.h
+@@ -275,19 +275,18 @@ class StringBuilder {
+ // There is an additional use for BitCast.
+ // Recent gccs will warn when they see casts that may result in breakage due to
+ // the type-based aliasing rule.  If you have checked that there is no breakage
+ // you can use BitCast to cast one pointer type to another.  This confuses gcc
+ // enough that it can no longer see that you have cast one pointer type to
+ // another thus avoiding the warning.
+ template <class Dest, class Source>
+ inline Dest BitCast(const Source& source) {
+-  // Compile time assertion: sizeof(Dest) == sizeof(Source)
+-  // A compile error here means your Dest and Source have different sizes.
+-  typedef char VerifySizesAreEqual[sizeof(Dest) == sizeof(Source) ? 1 : -1];
++  static_assert(sizeof(Dest) == sizeof(Source),
++                "BitCast's source and destination types must be the same size");
+ 
+   Dest dest;
+   memmove(&dest, &source, sizeof(dest));
+   return dest;
+ }
+ 
+ template <class Dest, class Source>
+ inline Dest BitCast(Source* source) {

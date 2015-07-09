@@ -1,0 +1,522 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+if CONFIG['DEHYDRA_PATH']:
+    DIRS += ['analysis-tests']
+
+if CONFIG['JS_BUNDLED_EDITLINE']:
+    DIRS += ['editline']
+
+# editline needs to get built before the shell
+if not CONFIG['JS_DISABLE_SHELL']:
+    DIRS += ['shell']
+
+TEST_DIRS += ['jsapi-tests', 'tests', 'gdb']
+
+CONFIGURE_SUBST_FILES += [
+    'devtools/rootAnalysis/Makefile',
+    'js-confdefs.h',
+    'js-config',
+    'js.pc',
+]
+
+if CONFIG['JS_STANDALONE']:
+    DEFINES['IMPL_MFBT'] = True
+    USE_LIBS += [
+        'mfbt',
+    ]
+else:
+    CONFIGURE_SUBST_FILES += [
+        '../../config/autoconf-js.mk',
+        '../../config/emptyvars-js.mk',
+    ]
+
+CONFIGURE_DEFINE_FILES += [
+    'js-config.h',
+]
+
+# Changes to internal header files, used externally, massively slow down
+# browser builds.  Don't add new files here unless you know what you're
+# doing!
+EXPORTS += [
+    'js.msg',
+    'jsalloc.h',
+    'jsapi.h',
+    'jsbytecode.h',
+    'jsclist.h',
+    'jscpucfg.h',
+    'jsfriendapi.h',
+    'jsprf.h',
+    'jsprototypes.h',
+    'jspubtd.h',
+    'jstypes.h',
+    'jsversion.h',
+    'jswrapper.h',
+    'perf/jsperf.h',
+]
+
+# If you add a header here, add it to js/src/jsapi-tests/testIntTypesABI.cpp so
+# that we ensure we don't over-expose our internal integer typedefs.  Note that
+# LegacyIntTypes.h below is deliberately exempted from this requirement.
+EXPORTS.js += [
+    '../public/CallArgs.h',
+    '../public/CallNonGenericMethod.h',
+    '../public/CharacterEncoding.h',
+    '../public/Class.h',
+    '../public/Conversions.h',
+    '../public/Date.h',
+    '../public/Debug.h',
+    '../public/GCAPI.h',
+    '../public/HashTable.h',
+    '../public/HeapAPI.h',
+    '../public/Id.h',
+    '../public/LegacyIntTypes.h',
+    '../public/MemoryMetrics.h',
+    '../public/Principals.h',
+    '../public/ProfilingFrameIterator.h',
+    '../public/ProfilingStack.h',
+    '../public/Proxy.h',
+    '../public/RequiredDefines.h',
+    '../public/RootingAPI.h',
+    '../public/SliceBudget.h',
+    '../public/StructuredClone.h',
+    '../public/TracingAPI.h',
+    '../public/TrackedOptimizationInfo.h',
+    '../public/TypeDecls.h',
+    '../public/UbiNode.h',
+    '../public/UbiNodeTraverse.h',
+    '../public/Utility.h',
+    '../public/Value.h',
+    '../public/Vector.h',
+    '../public/WeakMapPtr.h',
+]
+
+UNIFIED_SOURCES += [
+    'asmjs/AsmJSFrameIterator.cpp',
+    'asmjs/AsmJSLink.cpp',
+    'asmjs/AsmJSModule.cpp',
+    'asmjs/AsmJSSignalHandlers.cpp',
+    'asmjs/AsmJSValidate.cpp',
+    'builtin/AtomicsObject.cpp',
+    'builtin/Eval.cpp',
+    'builtin/Intl.cpp',
+    'builtin/MapObject.cpp',
+    'builtin/Object.cpp',
+    'builtin/Profilers.cpp',
+    'builtin/SIMD.cpp',
+    'builtin/SymbolObject.cpp',
+    'builtin/TestingFunctions.cpp',
+    'builtin/TypedObject.cpp',
+    'builtin/WeakSetObject.cpp',
+    'devtools/sharkctl.cpp',
+    'ds/LifoAlloc.cpp',
+    'frontend/BytecodeCompiler.cpp',
+    'frontend/BytecodeEmitter.cpp',
+    'frontend/FoldConstants.cpp',
+    'frontend/NameFunctions.cpp',
+    'frontend/ParseMaps.cpp',
+    'frontend/ParseNode.cpp',
+    'frontend/TokenStream.cpp',
+    'gc/Barrier.cpp',
+    'gc/GCTrace.cpp',
+    'gc/Iteration.cpp',
+    'gc/Marking.cpp',
+    'gc/Memory.cpp',
+    'gc/Nursery.cpp',
+    'gc/RootMarking.cpp',
+    'gc/Statistics.cpp',
+    'gc/StoreBuffer.cpp',
+    'gc/Tracer.cpp',
+    'gc/Verifier.cpp',
+    'gc/Zone.cpp',
+    'irregexp/NativeRegExpMacroAssembler.cpp',
+    'irregexp/RegExpAST.cpp',
+    'irregexp/RegExpEngine.cpp',
+    'irregexp/RegExpInterpreter.cpp',
+    'irregexp/RegExpMacroAssembler.cpp',
+    'irregexp/RegExpParser.cpp',
+    'irregexp/RegExpStack.cpp',
+    'jit/AliasAnalysis.cpp',
+    'jit/BacktrackingAllocator.cpp',
+    'jit/Bailouts.cpp',
+    'jit/BaselineBailouts.cpp',
+    'jit/BaselineCompiler.cpp',
+    'jit/BaselineDebugModeOSR.cpp',
+    'jit/BaselineFrame.cpp',
+    'jit/BaselineFrameInfo.cpp',
+    'jit/BaselineIC.cpp',
+    'jit/BaselineInspector.cpp',
+    'jit/BaselineJIT.cpp',
+    'jit/BitSet.cpp',
+    'jit/BytecodeAnalysis.cpp',
+    'jit/C1Spewer.cpp',
+    'jit/CodeGenerator.cpp',
+    'jit/CompileWrappers.cpp',
+    'jit/Disassembler.cpp',
+    'jit/EdgeCaseAnalysis.cpp',
+    'jit/EffectiveAddressAnalysis.cpp',
+    'jit/ExecutableAllocator.cpp',
+    'jit/Ion.cpp',
+    'jit/IonAnalysis.cpp',
+    'jit/IonBuilder.cpp',
+    'jit/IonCaches.cpp',
+    'jit/IonOptimizationLevels.cpp',
+    'jit/JitcodeMap.cpp',
+    'jit/JitFrames.cpp',
+    'jit/JitOptions.cpp',
+    'jit/JitSpewer.cpp',
+    'jit/JSONSpewer.cpp',
+    'jit/LICM.cpp',
+    'jit/LinearScan.cpp',
+    'jit/LIR.cpp',
+    'jit/LiveRangeAllocator.cpp',
+    'jit/LoopUnroller.cpp',
+    'jit/Lowering.cpp',
+    'jit/MacroAssembler.cpp',
+    'jit/MCallOptimize.cpp',
+    'jit/MIR.cpp',
+    'jit/MIRGraph.cpp',
+    'jit/MoveResolver.cpp',
+    'jit/OptimizationTracking.cpp',
+    'jit/PerfSpewer.cpp',
+    'jit/RangeAnalysis.cpp',
+    'jit/Recover.cpp',
+    'jit/RegisterAllocator.cpp',
+    'jit/RematerializedFrame.cpp',
+    'jit/Safepoints.cpp',
+    'jit/ScalarReplacement.cpp',
+    'jit/shared/BaselineCompiler-shared.cpp',
+    'jit/shared/CodeGenerator-shared.cpp',
+    'jit/shared/Lowering-shared.cpp',
+    'jit/Sink.cpp',
+    'jit/Snapshots.cpp',
+    'jit/StupidAllocator.cpp',
+    'jit/TypedObjectPrediction.cpp',
+    'jit/TypePolicy.cpp',
+    'jit/ValueNumbering.cpp',
+    'jit/VMFunctions.cpp',
+    'jsalloc.cpp',
+    'jsapi.cpp',
+    'jsbool.cpp',
+    'jscntxt.cpp',
+    'jscompartment.cpp',
+    'jsdate.cpp',
+    'jsdtoa.cpp',
+    'jsexn.cpp',
+    'jsfriendapi.cpp',
+    'jsfun.cpp',
+    'jsgc.cpp',
+    'jsiter.cpp',
+    'jsnativestack.cpp',
+    'jsnum.cpp',
+    'jsobj.cpp',
+    'json.cpp',
+    'jsopcode.cpp',
+    'jsprf.cpp',
+    'jspropertytree.cpp',
+    'jsreflect.cpp',
+    'jsscript.cpp',
+    'jsstr.cpp',
+    'jswatchpoint.cpp',
+    'jsweakmap.cpp',
+    'perf/jsperf.cpp',
+    'prmjtime.cpp',
+    'proxy/BaseProxyHandler.cpp',
+    'proxy/CrossCompartmentWrapper.cpp',
+    'proxy/DeadObjectProxy.cpp',
+    'proxy/DirectProxyHandler.cpp',
+    'proxy/Proxy.cpp',
+    'proxy/ScriptedDirectProxyHandler.cpp',
+    'proxy/ScriptedIndirectProxyHandler.cpp',
+    'proxy/SecurityWrapper.cpp',
+    'proxy/Wrapper.cpp',
+    'vm/ArgumentsObject.cpp',
+    'vm/ArrayBufferObject.cpp',
+    'vm/CallNonGenericMethod.cpp',
+    'vm/CharacterEncoding.cpp',
+    'vm/Compression.cpp',
+    'vm/DateTime.cpp',
+    'vm/Debugger.cpp',
+    'vm/DebuggerMemory.cpp',
+    'vm/ErrorObject.cpp',
+    'vm/ForOfIterator.cpp',
+    'vm/GeneratorObject.cpp',
+    'vm/GlobalObject.cpp',
+    'vm/HelperThreads.cpp',
+    'vm/Id.cpp',
+    'vm/Interpreter.cpp',
+    'vm/JSONParser.cpp',
+    'vm/MemoryMetrics.cpp',
+    'vm/Monitor.cpp',
+    'vm/NativeObject.cpp',
+    'vm/ObjectGroup.cpp',
+    'vm/PIC.cpp',
+    'vm/Probes.cpp',
+    'vm/ProxyObject.cpp',
+    'vm/RegExpObject.cpp',
+    'vm/RegExpStatics.cpp',
+    'vm/Runtime.cpp',
+    'vm/SavedStacks.cpp',
+    'vm/ScopeObject.cpp',
+    'vm/SelfHosting.cpp',
+    'vm/Shape.cpp',
+    'vm/SharedArrayObject.cpp',
+    'vm/SharedTypedArrayObject.cpp',
+    'vm/SPSProfiler.cpp',
+    'vm/Stack.cpp',
+    'vm/String.cpp',
+    'vm/StringBuffer.cpp',
+    'vm/StructuredClone.cpp',
+    'vm/Symbol.cpp',
+    'vm/TypedArrayObject.cpp',
+    'vm/TypeInference.cpp',
+    'vm/UbiNode.cpp',
+    'vm/UnboxedObject.cpp',
+    'vm/Unicode.cpp',
+    'vm/Value.cpp',
+    'vm/WeakMapPtr.cpp',
+    'vm/Xdr.cpp'
+]
+
+# jsarray.cpp and jsatom.cpp cannot be built in unified mode because
+# xpcshell is broken during packaging when compiled with gcc-4.8.2
+# builtin/RegExp.cpp cannot be built in unified mode because it is built
+# without PGO
+# frontend/Parser.cpp cannot be built in unified mode because of explicit
+# template instantiations.
+# jsmath.cpp cannot be built in unified mode because it needs to pull rand_s
+# from <stdlib.h> on Windows through a preprocessor define.
+# jsutil.cpp cannot be built in unified mode because it is needed for
+# check-vanilla-allocations.
+SOURCES += [
+    'builtin/RegExp.cpp',
+    'frontend/Parser.cpp',
+    'jsarray.cpp',
+    'jsatom.cpp',
+    'jsmath.cpp',
+    'jsutil.cpp',
+]
+
+if CONFIG['JS_POSIX_NSPR']:
+    UNIFIED_SOURCES += [
+        'vm/PosixNSPR.cpp',
+    ]
+
+if CONFIG['MOZ_INSTRUMENTS']:
+    SOURCES += [
+        'devtools/Instruments.cpp',
+    ]
+
+if CONFIG['ENABLE_TRACE_LOGGING']:
+    SOURCES += [
+        'vm/TraceLogging.cpp',
+        'vm/TraceLoggingGraph.cpp',
+        'vm/TraceLoggingTypes.cpp',
+    ]
+
+if not CONFIG['ENABLE_ION']:
+    UNIFIED_SOURCES += [
+        'jit/none/Trampoline-none.cpp'
+    ]
+elif CONFIG['JS_CODEGEN_X86'] or CONFIG['JS_CODEGEN_X64']:
+    UNIFIED_SOURCES += [
+        'jit/shared/Assembler-x86-shared.cpp',
+        'jit/shared/AssemblerBuffer-x86-shared.cpp',
+        'jit/shared/BaselineCompiler-x86-shared.cpp',
+        'jit/shared/BaselineIC-x86-shared.cpp',
+        'jit/shared/CodeGenerator-x86-shared.cpp',
+        'jit/shared/Disassembler-x86-shared.cpp',
+        'jit/shared/Lowering-x86-shared.cpp',
+        'jit/shared/MacroAssembler-x86-shared.cpp',
+        'jit/shared/MoveEmitter-x86-shared.cpp',
+    ]
+    if CONFIG['JS_CODEGEN_X64']:
+        UNIFIED_SOURCES += [
+            'jit/x64/Assembler-x64.cpp',
+            'jit/x64/Bailouts-x64.cpp',
+            'jit/x64/BaselineCompiler-x64.cpp',
+            'jit/x64/BaselineIC-x64.cpp',
+            'jit/x64/CodeGenerator-x64.cpp',
+            'jit/x64/Lowering-x64.cpp',
+            'jit/x64/MacroAssembler-x64.cpp',
+            'jit/x64/Trampoline-x64.cpp',
+        ]
+    else:
+        UNIFIED_SOURCES += [
+            'jit/x86/Assembler-x86.cpp',
+            'jit/x86/Bailouts-x86.cpp',
+            'jit/x86/BaselineCompiler-x86.cpp',
+            'jit/x86/BaselineIC-x86.cpp',
+            'jit/x86/CodeGenerator-x86.cpp',
+            'jit/x86/Lowering-x86.cpp',
+            'jit/x86/MacroAssembler-x86.cpp',
+            'jit/x86/Trampoline-x86.cpp',
+        ]
+elif CONFIG['JS_CODEGEN_ARM']:
+    UNIFIED_SOURCES += [
+        'jit/arm/Architecture-arm.cpp',
+        'jit/arm/Assembler-arm.cpp',
+        'jit/arm/Bailouts-arm.cpp',
+        'jit/arm/BaselineCompiler-arm.cpp',
+        'jit/arm/BaselineIC-arm.cpp',
+        'jit/arm/CodeGenerator-arm.cpp',
+        'jit/arm/Lowering-arm.cpp',
+        'jit/arm/MacroAssembler-arm.cpp',
+        'jit/arm/MoveEmitter-arm.cpp',
+        'jit/arm/Trampoline-arm.cpp',
+    ]
+    if CONFIG['JS_ARM_SIMULATOR']:
+        UNIFIED_SOURCES += [
+            'jit/arm/Simulator-arm.cpp'
+        ]
+elif CONFIG['JS_CODEGEN_MIPS']:
+    UNIFIED_SOURCES += [
+        'jit/mips/Architecture-mips.cpp',
+        'jit/mips/Assembler-mips.cpp',
+        'jit/mips/Bailouts-mips.cpp',
+        'jit/mips/BaselineCompiler-mips.cpp',
+        'jit/mips/BaselineIC-mips.cpp',
+        'jit/mips/CodeGenerator-mips.cpp',
+        'jit/mips/Lowering-mips.cpp',
+        'jit/mips/MacroAssembler-mips.cpp',
+        'jit/mips/MoveEmitter-mips.cpp',
+        'jit/mips/Trampoline-mips.cpp',
+    ]
+    if CONFIG['JS_MIPS_SIMULATOR']:
+        UNIFIED_SOURCES += [
+            'jit/mips/Simulator-mips.cpp'
+        ]
+
+if CONFIG['OS_ARCH'] == 'WINNT':
+    SOURCES += [
+        'jit/ExecutableAllocatorWin.cpp',
+    ]
+    # _CRT_RAND_S must be #defined before #including stdlib.h to get rand_s()
+    DEFINES['_CRT_RAND_S'] = True
+else:
+    SOURCES += [
+        'jit/ExecutableAllocatorPosix.cpp',
+    ]
+
+if CONFIG['JS_HAS_CTYPES']:
+    SOURCES += [
+        'ctypes/CTypes.cpp',
+        'ctypes/Library.cpp',
+    ]
+    if not CONFIG['MOZ_NATIVE_FFI']:
+        GENERATED_INCLUDES += [
+            'ctypes/libffi/include',
+        ]
+
+if CONFIG['MOZ_VTUNE']:
+    SOURCES += [
+        'vtune/jitprofiling.c'
+    ]
+
+if CONFIG['HAVE_LINUX_PERF_EVENT_H']:
+    SOURCES += [
+        'perf/pm_linux.cpp'
+    ]
+    SOURCES['perf/pm_linux.cpp'].flags += [CONFIG['LINUX_HEADERS_INCLUDES']]
+else:
+    SOURCES += [
+        'perf/pm_stub.cpp'
+    ]
+
+MSVC_ENABLE_PGO = True
+
+HostSimplePrograms([
+    'host_jskwgen',
+])
+
+# JavaScript must be built shared, even for static builds, as it is used by
+# other modules which are always built shared. Failure to do so results in
+# the js code getting copied into xpinstall and jsd as well as mozilla-bin,
+# and then the static data cells used for locking no longer work.
+#
+# In fact, we now build both a static and a shared library, as the
+# JS shell would like to link to the static library.
+
+if CONFIG['JS_SHARED_LIBRARY']:
+    GeckoSharedLibrary('js', linkage=None)
+    SHARED_LIBRARY_NAME = CONFIG['JS_LIBRARY_NAME']
+    SDK_LIBRARY = True
+else:
+    Library('js')
+
+FORCE_STATIC_LIB = True
+STATIC_LIBRARY_NAME = 'js_static'
+
+if CONFIG['JS_HAS_CTYPES']:
+    USE_LIBS += [
+        'ffi',
+    ]
+
+if CONFIG['ENABLE_INTL_API']:
+    USE_LIBS += [
+        'icu',
+    ]
+
+USE_LIBS += [
+    'nspr',
+    'zlib',
+]
+
+if CONFIG['MOZ_ETW']:
+    GENERATED_FILES = [
+        'ETWProvider.h',
+    ]
+    # This will get the ETW provider resources into the library mozjs.dll
+    RESFILE = 'ETWProvider.res'
+
+if CONFIG['NIGHTLY_BUILD']:
+    DEFINES['ENABLE_BINARYDATA'] = True
+    DEFINES['ENABLE_SHARED_ARRAY_BUFFER'] = True
+
+DEFINES['EXPORT_JS_API'] = True
+
+if CONFIG['JS_HAS_CTYPES']:
+    DEFINES['JS_HAS_CTYPES'] = True
+    for var in ('DLL_PREFIX', 'DLL_SUFFIX'):
+        DEFINES[var] = '"%s"' % CONFIG[var]
+
+if CONFIG['MOZ_LINKER']:
+    DEFINES['MOZ_LINKER'] = True
+
+if CONFIG['_MSC_VER']:
+    if CONFIG['CPU_ARCH'] == 'x86':
+        SOURCES['builtin/RegExp.cpp'].no_pgo = True # Bug 772303
+    elif CONFIG['CPU_ARCH'] == 'x86_64' and CONFIG['JS_HAS_CTYPES']:
+        SOURCES['ctypes/CTypes.cpp'].no_pgo = True # Bug 810661
+    # Prevent floating point errors caused by VC++ optimizations
+    # XXX We should add this to CXXFLAGS, too?
+    CFLAGS += ['-fp:precise']
+
+if CONFIG['OS_ARCH'] not in ('WINNT', 'HP-UX'):
+    OS_LIBS += [
+        'm',
+    ]
+
+if CONFIG['OS_ARCH'] == 'FreeBSD':
+    OS_LIBS += [
+        '-pthread',
+    ]
+
+if CONFIG['OS_ARCH'] == 'Linux':
+    OS_LIBS += [
+        'dl',
+    ]
+
+if CONFIG['OS_ARCH'] == 'SunOS':
+    OS_LIBS += [
+        'posix4',
+        'dl',
+        'nsl',
+        'socket',
+    ]
+
+if CONFIG['GNU_CXX']:
+    FAIL_ON_WARNINGS = True

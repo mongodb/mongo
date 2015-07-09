@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cd $SOURCE
+exec env MOZCONFIG=$SOURCE/mozconfig-b2g-ra ./mach build

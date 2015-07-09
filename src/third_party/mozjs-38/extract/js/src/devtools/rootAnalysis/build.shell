@@ -1,0 +1,7 @@
+#!/bin/sh -x
+
+mkdir $ANALYZED_OBJDIR
+cd $ANALYZED_OBJDIR
+$SOURCE/js/src/configure --enable-debug --enable-optimize --enable-root-analysis
+# perl -i -pe 's!ccache ([gc])!$1!' "$TARGET_BUILDROOT/config/autoconf.mk"
+make -j12 -s

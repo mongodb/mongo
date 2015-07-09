@@ -1,0 +1,26 @@
+diff --git a/src/third_party/mozjs-38/extract/js/src/prmjtime.cpp b/src/third_party/mozjs-38/extract/js/src/prmjtime.cpp
+index b5a454a..2372791 100644
+--- a/src/third_party/mozjs-38/extract/js/src/prmjtime.cpp
++++ b/src/third_party/mozjs-38/extract/js/src/prmjtime.cpp
+@@ -133,7 +133,7 @@ PRMJ_NowInit()
+     InitializeCriticalSectionAndSpinCount(&calibration.data_lock, DataLockSpinCount);
+ 
+     // Windows 8 has a new API function we can use.
+-    if (HMODULE h = GetModuleHandle(L"kernel32.dll")) {
++    if (HMODULE h = GetModuleHandle("kernel32.dll")) {
+         pGetSystemTimePreciseAsFileTime =
+             (void (WINAPI*)(LPFILETIME))GetProcAddress(h, "GetSystemTimePreciseAsFileTime");
+     }
+diff --git a/src/third_party/mozjs-38/extract/mfbt/lz4.c b/src/third_party/mozjs-38/extract/mfbt/lz4.c
+index e05665f..042a220 100644
+--- a/src/third_party/mozjs-38/extract/mfbt/lz4.c
++++ b/src/third_party/mozjs-38/extract/mfbt/lz4.c
+@@ -877,7 +877,7 @@ FORCE_INLINE int LZ4_decompress_generic(
+                  )
+ {
+     /* Local Variables */
+-    const BYTE* ip = (const BYTE*) source;
++    const BYTE* restrict ip = (const BYTE*) source;
+     const BYTE* ref;
+     const BYTE* const iend = ip + inputSize;
+ 

@@ -1,0 +1,375 @@
+#!/usr/bin/perl
+
+# Sixgill: Static assertion checker for C/C++ programs.
+# Copyright (C) 2009-2010  Stanford University
+# Author: Brian Hackett
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# do a complete run of the system from raw source to reports. this requires
+# various run_monitor processes to be running in the background (maybe on other
+# machines) and watching a shared poll_file for jobs. if the output directory
+# for this script already exists then an incremental analysis will be performed
+# and the reports will only reflect the changes since the earlier run.
+
+use strict;
+use warnings;
+use IO::Handle;
+use File::Basename qw(dirname);
+use Getopt::Long;
+use Cwd;
+
+#################################
+# environment specific settings #
+#################################
+
+my $WORKDIR;
+my $SIXGILL_BIN;
+
+# poll file shared with the run_monitor script.
+my $poll_file;
+
+# root directory of the project.
+my $build_dir;
+
+# directory containing gcc wrapper scripts.
+my $wrap_dir;
+
+# optional file with annotations from the web interface.
+my $ann_file = "";
+
+# optional output directory to do a diff against.
+my $old_dir = "";
+
+# run in the foreground
+my $foreground;
+
+my $builder = "make -j4";
+
+my $suppress_logs;
+GetOptions("build-root|b=s" => \$build_dir,
+           "poll-file=s" => \$poll_file,
+           "no-logs!" => \$suppress_logs,
+           "work-dir=s" => \$WORKDIR,
+           "sixgill-binaries|binaries|b=s" => \$SIXGILL_BIN,
+           "wrap-dir=s" => \$wrap_dir,
+           "annotations-file|annotations|a=s" => \$ann_file,
+           "old-dir|old=s" => \$old_dir,
+           "foreground!" => \$foreground,
+           "buildcommand=s" => \$builder,
+           )
+    or die;
+
+if (not -d $build_dir) {
+    mkdir($build_dir);
+}
+if ($old_dir ne "" && not -d $old_dir) {
+    die "Old directory '$old_dir' does not exist\n";
+}
+
+$WORKDIR ||= "sixgill-work";
+mkdir($WORKDIR, 0755) if ! -d $WORKDIR;
+$poll_file ||= "$WORKDIR/poll.file";
+$build_dir ||= "$WORKDIR/js-inbound-xgill";
+
+if (!defined $SIXGILL_BIN) {
+    chomp(my $path = `which xmanager`);
+    if ($path) {
+        use File::Basename qw(dirname);
+        $SIXGILL_BIN = dirname($path);
+    } else {
+        die "Cannot find sixgill binaries. Use the -b option.";
+    }
+}
+
+$wrap_dir ||= "$WORKDIR/xgill-inbound/wrap_gcc";
+$wrap_dir = "$SIXGILL_BIN/../scripts/wrap_gcc" if not (-e "$wrap_dir/basecc");
+die "Bad wrapper directory: $wrap_dir" if not (-e "$wrap_dir/basecc");
+
+# code to clean the project from $build_dir.
+sub clean_project {
+    system("make clean");
+}
+
+# code to build the project from $build_dir.
+sub build_project {
+    return system($builder) >> 8;
+}
+
+our %kill_on_exit;
+END {
+    for my $pid (keys %kill_on_exit) {
+        kill($pid);
+    }
+}
+
+# commands to start the various xgill binaries. timeouts can be specified
+# for the backend analyses here, and a memory limit can be specified for
+# xmanager if desired (and USE_COUNT_ALLOCATOR is defined in util/alloc.h).
+my $xmanager = "$SIXGILL_BIN/xmanager";
+my $xsource = "$SIXGILL_BIN/xsource";
+my $xmemlocal = "$SIXGILL_BIN/xmemlocal -timeout=20";
+my $xinfer = "$SIXGILL_BIN/xinfer -timeout=60";
+my $xcheck = "$SIXGILL_BIN/xcheck -timeout=30";
+
+# prefix directory to strip off source files.
+my $prefix_dir = $build_dir;
+
+##########################
+# general purpose script #
+##########################
+
+# Prevent ccache from being used. I don't think this does any good. The problem
+# I'm struggling with is that if autoconf.mk still has 'ccache gcc' in it, the
+# builds fail in a mysterious way.
+$ENV{CCACHE_COMPILERCHECK} = 'date +%s.%N';
+delete $ENV{CCACHE_PREFIX};
+
+my $usage = "USAGE: run_complete result-dir\n";
+my $result_dir = shift or die $usage;
+
+if (not $foreground) {
+    my $pid = fork();
+    if ($pid != 0) {
+        print "Forked, exiting...\n";
+        exit(0);
+    }
+}
+
+# if the result directory does not already exist, mark for a clean build.
+my $do_clean = 0;
+if (not (-d $result_dir)) {
+    $do_clean = 1;
+    mkdir $result_dir;
+}
+
+if (!$suppress_logs) {
+    my $log_file = "$result_dir/complete.log";
+    open(OUT, ">>", $log_file) or die "append to $log_file: $!";
+    OUT->autoflush(1);  # don't buffer writes to the main log.
+
+    # redirect stdout and stderr to the log.
+    STDOUT->fdopen(\*OUT, "w");
+    STDERR->fdopen(\*OUT, "w");
+}
+
+# pids to wait on before exiting. these are collating worker output.
+my @waitpids;
+
+chdir $result_dir;
+
+# to do a partial run, comment out the commands here you don't want to do.
+
+my $status = run_build();
+
+# end of run commands.
+
+for my $pid (@waitpids) {
+    waitpid($pid, 0);
+    $status ||= $? >> 8;
+}
+
+print "Exiting run_complete with status $status\n";
+exit $status;
+
+# get the IP address which a freshly created manager is listening on.
+sub get_manager_address
+{
+    my $log_file = shift or die;
+
+    # give the manager one second to start, any longer and something's broken.
+    sleep(1);
+
+    my $log_data = `cat $log_file`;
+    my ($port) = $log_data =~ /Listening on ([\.\:0-9]*)/
+      or die "no manager found";
+    print OUT "Connecting to manager on port $port\n" unless $suppress_logs;
+    print "Connecting to manager on port $port.\n";
+    return $1;
+}
+
+sub logging_suffix {
+    my ($show_logs, $log_file) = @_;
+    return $show_logs ? "2>&1 | tee $log_file"
+                      : "> $log_file 2>&1";
+}
+
+sub run_build
+{
+    print "build started: ";
+    print scalar(localtime());
+    print "\n";
+
+    # fork off a process to run the build.
+    defined(my $pid = fork) or die;
+
+    # log file for the manager.
+    my $manager_log_file = "$result_dir/build_manager.log";
+
+    if (!$pid) {
+        # this is the child process, fork another process to run a manager.
+        defined(my $pid = fork) or die;
+        my $logging = logging_suffix($suppress_logs, $manager_log_file);
+        exec("$xmanager -terminate-on-assert $logging") if (!$pid);
+        $kill_on_exit{$pid} = 1;
+
+        if (!$suppress_logs) {
+            # open new streams to redirect stdout and stderr.
+            open(LOGOUT, "> $result_dir/build.log");
+            open(LOGERR, "> $result_dir/build_err.log");
+            STDOUT->fdopen(\*LOGOUT, "w");
+            STDERR->fdopen(\*LOGERR, "w");
+        }
+
+        my $address = get_manager_address($manager_log_file);
+
+        # write the configuration file for the wrapper script.
+        my $config_file = "$WORKDIR/xgill.config";
+        open(CONFIG, ">", $config_file) or die "create $config_file: $!";
+        print CONFIG "$prefix_dir\n";
+        print CONFIG Cwd::abs_path("$result_dir/build_xgill.log")."\n";
+        print CONFIG "$address\n";
+        my @extra = ("-fplugin-arg-xgill-mangle=1");
+        push(@extra, "-fplugin-arg-xgill-annfile=$ann_file")
+            if ($ann_file ne "" && -e $ann_file);
+        print CONFIG join(" ", @extra) . "\n";
+        close(CONFIG);
+
+	# Tell the wrapper where to find the config
+	$ENV{"XGILL_CONFIG"} = Cwd::abs_path($config_file);
+
+        # update the PATH so that the build will see the wrappers.
+        $ENV{"PATH"} = "$wrap_dir:" . $ENV{"PATH"};
+
+        # do the build, cleaning if necessary.
+        chdir $build_dir;
+        clean_project() if ($do_clean);
+        my $exit_status = build_project();
+
+        # signal the manager that it's over.
+        system("$xsource -remote=$address -end-manager");
+
+        # wait for the manager to clean up and terminate.
+        print "Waiting for manager to finish (build status $exit_status)...\n";
+        waitpid($pid, 0);
+        my $manager_status = $?;
+        delete $kill_on_exit{$pid};
+
+        # build is finished, the complete run can resume.
+        # return value only useful if --foreground
+        print "Exiting with status " . ($manager_status || $exit_status) . "\n";
+        exit($manager_status || $exit_status);
+    }
+
+    # this is the complete process, wait for the build to finish.
+    waitpid($pid, 0);
+    my $status = $? >> 8;
+    print "build finished (status $status): ";
+    print scalar(localtime());
+    print "\n";
+
+    return $status;
+}
+
+sub run_pass
+{
+    my ($name, $command) = @_;
+    my $log_file = "$result_dir/manager.$name.log";
+
+    # extra commands to pass to the manager.
+    my $manager_extra = "";
+    $manager_extra .= "-modset-wait=10" if ($name eq "xmemlocal");
+
+    # fork off a manager process for the analysis.
+    defined(my $pid = fork) or die;
+    my $logging = logging_suffix($suppress_logs, $log_file);
+    exec("$xmanager $manager_extra $logging") if (!$pid);
+
+    my $address = get_manager_address($log_file);
+
+    # write the poll file for this pass.
+    if (! -d dirname($poll_file)) {
+        system("mkdir", "-p", dirname($poll_file));
+    }
+    open(POLL, "> $poll_file");
+    print POLL "$command\n";
+    print POLL "$result_dir/$name\n";
+    print POLL "$address\n";
+    close(POLL);
+
+    print "$name started: ";
+    print scalar(localtime());
+    print "\n";
+
+    waitpid($pid, 0);
+    unlink($poll_file);
+
+    print "$name finished: ";
+    print scalar(localtime());
+    print "\n";
+
+    # collate the worker's output into a single file. make this asynchronous
+    # so we can wait a bit and make sure we get all worker output.
+    defined($pid = fork) or die;
+
+    if (!$pid) {
+        sleep(20);
+        exec("cat $name.*.log > $name.log");
+    }
+
+    push(@waitpids, $pid);
+}
+
+# the names of all directories containing reports to archive.
+my $indexes;
+
+sub run_index
+{
+    my ($name, $kind) = @_;
+
+    return if (not (-e "report_$kind.xdb"));
+
+    print "$name started: ";
+    print scalar(localtime());
+    print "\n";
+
+    # make an index for the report diff if applicable.
+    if ($old_dir ne "") {
+        system("make_index $kind $old_dir > $name.diff.log");
+        system("mv $kind diff_$kind");
+        $indexes .= " diff_$kind";
+    }
+
+    # make an index for the full set of reports.
+    system("make_index $kind > $name.log");
+    $indexes .= " $kind";
+
+    print "$name finished: ";
+    print scalar(localtime());
+    print "\n";
+}
+
+sub archive_indexes
+{
+    print "archive started: ";
+    print scalar(localtime());
+    print "\n";
+
+    system("tar -czf reports.tgz $indexes");
+    system("rm -rf $indexes");
+
+    print "archive finished: ";
+    print scalar(localtime());
+    print "\n";
+}
