@@ -42,10 +42,6 @@ namespace executor {
 
 using asio::ip::tcp;
 
-namespace {
-const auto kCanceledStatus = Status(ErrorCodes::CallbackCanceled, "Callback canceled");
-}  // namespace
-
 NetworkInterfaceASIO::AsyncConnection::AsyncConnection(asio::ip::tcp::socket&& sock,
                                                        rpc::ProtocolSet protocols)
     : AsyncConnection(std::move(sock), protocols, boost::none) {}
@@ -92,16 +88,7 @@ void NetworkInterfaceASIO::_connectASIO(AsyncOp* op) {
     _resolver.async_resolve(
         query,
         [this, op](std::error_code ec, asio::ip::basic_resolver_iterator<tcp> endpoints) {
-            if (ec) {
-                LOG(3) << "could not resolve address " << op->request().target.host() << ":"
-                       << std::to_string(op->request().target.port()) << ", " << ec.message();
-                return _networkErrorCallback(op, ec);
-            }
-
-            if (op->canceled())
-                return _completeOperation(op, kCanceledStatus);
-
-            _setupSocket(op, endpoints);
+            _validateAndRun(op, ec, [this, op, endpoints]() { _setupSocket(op, endpoints); });
         });
 }
 
@@ -124,14 +111,7 @@ void NetworkInterfaceASIO::_connectWithDBClientConnection(AsyncOp* op) {
             auto status = exceptionToStatus();
 
             asio::post(_io_service,
-                       [this, op, status]() {
-
-                           if (op->canceled()) {
-                               return _completeOperation(op, kCanceledStatus);
-                           }
-
-                           return _completeOperation(op, status);
-                       });
+                       [this, op, status]() { return _completeOperation(op, status); });
             return;
         }
 
@@ -152,16 +132,7 @@ void NetworkInterfaceASIO::_setupSocket(AsyncOp* op, const tcp::resolver::iterat
     asio::async_connect(op->connection()->sock(),
                         std::move(endpoints),
                         [this, op](std::error_code ec, tcp::resolver::iterator iter) {
-                            if (ec) {
-                                LOG(3) << "could not connect to host at " << iter->host_name()
-                                       << ":" << iter->endpoint().port() << ", " << ec.message();
-                                return _networkErrorCallback(op, ec);
-                            }
-
-                            if (op->canceled())
-                                return _completeOperation(op, kCanceledStatus);
-
-                            _sslHandshake(op);
+                            _validateAndRun(op, ec, [this, op]() { _sslHandshake(op); });
                         });
 }
 

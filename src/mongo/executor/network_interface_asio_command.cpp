@@ -45,10 +45,6 @@
 namespace mongo {
 namespace executor {
 
-namespace {
-const auto kCanceledStatus = Status(ErrorCodes::CallbackCanceled, "Callback canceled");
-}  // namespace
-
 void NetworkInterfaceASIO::_asyncRunCommand(AsyncOp* op) {
     LOG(3) << "running command " << op->request().cmdObj << " against database "
            << op->request().dbname << " across network to " << op->request().target.toString();
@@ -83,24 +79,11 @@ void NetworkInterfaceASIO::_asyncSendSimpleMessage(AsyncOp* op, const asio::cons
     asio::async_write(op->connection()->sock(),
                       asio::buffer(buf),
                       [this, op](std::error_code ec, std::size_t bytes) {
-
-                          if (op->canceled()) {
-                              return _completeOperation(op, kCanceledStatus);
-                          }
-
-                          if (ec) {
-                              return _networkErrorCallback(op, ec);
-                          }
-
-                          _receiveResponse(op);
+                          _validateAndRun(op, ec, [this, op]() { _receiveResponse(op); });
                       });
 }
 
 void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
-    if (op->canceled()) {
-        return _completeOperation(op, kCanceledStatus);
-    }
-
     auto negotiatedProtocol =
         rpc::negotiate(op->connection()->serverProtocols(), op->connection()->clientProtocols());
 
@@ -181,16 +164,7 @@ void NetworkInterfaceASIO::_recvMessageHeader(AsyncOp* op) {
     asio::async_read(op->connection()->sock(),
                      asio::buffer(reinterpret_cast<char*>(op->header()), sizeof(MSGHEADER::Value)),
                      [this, op](asio::error_code ec, size_t bytes) {
-
-                         if (op->canceled()) {
-                             return _completeOperation(op, kCanceledStatus);
-                         }
-
-                         if (ec) {
-                             LOG(3) << "error receiving header";
-                             return _networkErrorCallback(op, ec);
-                         }
-                         _recvMessageBody(op);
+                         _validateAndRun(op, ec, [this, op]() { _recvMessageBody(op); });
                      });
 }
 
@@ -239,17 +213,7 @@ void NetworkInterfaceASIO::_recvMessageBody(AsyncOp* op) {
     asio::async_read(op->connection()->sock(),
                      asio::buffer(mdView.data(), bodyLength),
                      [this, op, mdView](asio::error_code ec, size_t bytes) {
-
-                         if (op->canceled()) {
-                             return _completeOperation(op, kCanceledStatus);
-                         }
-
-                         if (ec) {
-                             LOG(3) << "error receiving message body";
-                             return _networkErrorCallback(op, ec);
-                         }
-
-                         return _completedWriteCallback(op);
+                         _validateAndRun(op, ec, [this, op]() { _completedWriteCallback(op); });
                      });
 }
 

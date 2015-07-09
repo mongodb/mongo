@@ -202,6 +202,25 @@ private:
 
     void _asyncRunCommand(AsyncOp* op);
 
+    /**
+     * Wraps a completion handler in pre-condition checks.
+     * When we resume after an asynchronous call, we may find the following:
+     *    - the AsyncOp has been canceled in the interim (via cancelCommand())
+     *    - the asynchronous call has returned a non-OK error code
+     * Should both conditions be present, we handle cancelation over errors. States use
+     * _validateAndRun() to perform these checks before advancing the state machine.
+     */
+    template <typename Handler>
+    void _validateAndRun(AsyncOp* op, std::error_code ec, Handler&& handler) {
+        if (op->canceled())
+            return _completeOperation(op,
+                                      Status(ErrorCodes::CallbackCanceled, "Callback canceled"));
+        if (ec)
+            return _networkErrorCallback(op, ec);
+
+        handler();
+    }
+
     std::unique_ptr<Message> _messageFromRequest(const RemoteCommandRequest& request,
                                                  rpc::Protocol protocol);
 
