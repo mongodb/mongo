@@ -214,6 +214,7 @@ fi
 %doc GNU-AGPL-3.0
 %doc README
 %doc THIRD-PARTY-NOTICES
+%doc MPL-2
 
 %files shell
 %defattr(-,root,root,-)

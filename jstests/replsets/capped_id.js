@@ -39,6 +39,12 @@ var masterdb = master.getDB( dbname );
 var slave1db = slave1.getDB( dbname );
 var slave2db = slave2.getDB( dbname );
 
+function countIdIndexes(theDB, coll) {
+       return theDB[coll].getIndexes().filter(function(idx) {
+           return friendlyEqual(idx.key, {_id: 1});
+       }).length;
+}
+
 var numtests = 4;
 for( testnum=0; testnum < numtests; testnum++ ){
 
@@ -70,11 +76,6 @@ for( testnum=0; testnum < numtests; testnum++ ){
         }
         replTest.awaitReplication();
 
-        function countIdIndexes(theDB, coll) {
-               return theDB[coll].getIndexes().filter(function(idx) {
-                   return friendlyEqual(idx.key, {_id: 1});
-               }).length;
-        }
         // make sure _id index exists on primary
         assert.eq( 1 ,
                    countIdIndexes(masterdb, coll),

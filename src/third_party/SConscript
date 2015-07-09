@@ -1,11 +1,12 @@
 # -*- mode: python -*-
 
-Import("env use_system_version_of_library usev8 v8suffix boostSuffix")
+Import("env use_system_version_of_library usemozjs usev8 v8suffix boostSuffix")
 Import("wiredtiger")
 
 snappySuffix = '-1.1.2'
 zlibSuffix = '-1.2.8'
 pcreSuffix = "-8.37"
+mozjsSuffix = '-38'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
@@ -35,6 +36,17 @@ if not use_system_version_of_library('zlib'):
 if not use_system_version_of_library('v8'):
     thirdPartyIncludePathList.append(
         ('v8', '#/src/third_party/v8' + v8suffix + '/include'))
+
+# TODO: figure out if we want to offer system versions of mozjs.  Mozilla
+# hasn't offered a source tarball since 24, but in theory they could.
+#
+#if not use_system_version_of_library('mozjs'):
+if True:
+    thirdPartyIncludePathList.append(
+        ('mozjs', ['#/src/third_party/mozjs' + mozjsSuffix + '/include',
+                   '#/src/third_party/mozjs' + mozjsSuffix + '/mongo_sources',
+                   '#/src/third_party/mozjs' + mozjsSuffix + '/platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] + "/include",
+        ]))
 
 if not use_system_version_of_library('stemmer'):
     thirdPartyIncludePathList.append(
@@ -199,6 +211,20 @@ if usev8:
             'shim_v8.cpp',
         ])
 
+if usemozjs:
+    mozjsEnv = env.Clone()
+    mozjsEnv.SConscript('mozjs' + mozjsSuffix + '/SConscript', exports={'env' : mozjsEnv })
+    mozjsEnv = mozjsEnv.Clone(
+        LIBDEPS=[
+            'mozjs' + mozjsSuffix + '/mozjs',
+            'shim_zlib',
+        ])
+
+    mozjsEnv.Library(
+        target="shim_mozjs",
+        source=[
+            'shim_mozjs.cpp',
+        ])
 
 gperftoolsEnv = env
 if (GetOption("allocator") == "tcmalloc"):

@@ -15,6 +15,7 @@ Import("env")
 Import("has_option")
 Import("get_option")
 Import("usev8")
+Import("usemozjs")
 Import("use_system_version_of_library")
 
 # Boost we need everywhere. 's2' is spammed in all over the place by
@@ -269,7 +270,7 @@ if env.TargetOSIs('osx') or env["_HAVEPCAP"]:
 
 # --- shell ---
 
-if not has_option('noshell') and usev8:
+if not has_option('noshell') and (usev8 or usemozjs):
     shell_core_env = env.Clone()
     if has_option("safeshell"):
         shell_core_env.Append(CPPDEFINES=["MONGO_SAFE_SHELL"])
@@ -415,7 +416,8 @@ env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ), add_exe( "mongod"
 # Stage the top-level mongodb banners
 distsrc = env.Dir('#distsrc')
 env.Append(MODULE_BANNERS = [distsrc.File('README'),
-                             distsrc.File('THIRD-PARTY-NOTICES')])
+                             distsrc.File('THIRD-PARTY-NOTICES'),
+                             distsrc.File('MPL-2')])
 
 # If no module has introduced a file named LICENSE.txt, then inject the AGPL.
 if sum(itertools.imap(lambda x: x.name == "LICENSE.txt", env['MODULE_BANNERS'])) == 0:

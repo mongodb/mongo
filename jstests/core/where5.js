@@ -1,4 +1,4 @@
-// Tests toString() on _v8_function in object constructor.
+// Tests toString() in object constructor.
 // Verifies that native functions do not expose the _native_function and _native_data properties.
 
 var t = db.where5;
@@ -13,9 +13,6 @@ function printIdConstructor(doc) {
     if (!doc) {
         doc = this;
     }
-
-    // This used to crash.
-    doc._id.constructor._v8_function.toString();
 
     // Verify that function and data fields are hidden.
     assert(!('_native_function' in sleep));

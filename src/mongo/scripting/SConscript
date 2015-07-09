@@ -4,6 +4,7 @@ Import([
     'env',
     'serverJs',
     'usev8',
+    'usemozjs',
     'v8suffix',
 ])
 
@@ -68,6 +69,79 @@ if usev8:
             '$BUILD_DIR/mongo/db/service_context',
         ],
     )
+elif usemozjs:
+    scriptingEnv = env.Clone()
+    scriptingEnv.InjectThirdPartyIncludePaths(libraries=['mozjs'])
+
+    # TODO: get rid of all of this /FI and -include stuff and migrate to a shim
+    # header we include in all of our files.
+    if env.TargetOSIs('windows'):
+        scriptingEnv.Append(CCFLAGS=[
+            '/FI', 'js-config.h',
+            '/FI', 'js/RequiredDefines.h',
+        ])
+    else:
+        scriptingEnv.Append(
+            CCFLAGS=[
+                '-include', 'js-config.h',
+                '-include', 'js/RequiredDefines.h',
+                '-Wno-invalid-offsetof',
+            ],
+            CXXFLAGS=[
+                '-Wno-non-virtual-dtor',
+            ],
+        )
+
+    scriptingEnv.Prepend(CPPDEFINES=[
+        'JS_USE_CUSTOM_ALLOCATOR',
+        'STATIC_JS_API=1',
+    ])
+
+    scriptingEnv.Library(
+        target='scripting',
+        source=[
+            'mozjs/base.cpp',
+            'mozjs/bindata.cpp',
+            'mozjs/bson.cpp',
+            'mozjs/countdownlatch.cpp',
+            'mozjs/cursor.cpp',
+            'mozjs/dbcollection.cpp',
+            'mozjs/db.cpp',
+            'mozjs/dbpointer.cpp',
+            'mozjs/dbquery.cpp',
+            'mozjs/dbref.cpp',
+            'mozjs/engine.cpp',
+            'mozjs/exception.cpp',
+            'mozjs/global.cpp',
+            'mozjs/idwrapper.cpp',
+            'mozjs/implscope.cpp',
+            'mozjs/jscustomallocator.cpp',
+            'mozjs/jsstringwrapper.cpp',
+            'mozjs/jsthread.cpp',
+            'mozjs/maxkey.cpp',
+            'mozjs/minkey.cpp',
+            'mozjs/mongo.cpp',
+            'mozjs/nativefunction.cpp',
+            'mozjs/numberint.cpp',
+            'mozjs/numberlong.cpp',
+            'mozjs/object.cpp',
+            'mozjs/objectwrapper.cpp',
+            'mozjs/oid.cpp',
+            'mozjs/PosixNSPR.cpp',
+            'mozjs/proxyscope.cpp',
+            'mozjs/regexp.cpp',
+            'mozjs/timestamp.cpp',
+            'mozjs/valuereader.cpp',
+            'mozjs/valuewriter.cpp',
+        ],
+        LIBDEPS=[
+            'bson_template_evaluator',
+            'scripting_common',
+            '$BUILD_DIR/third_party/shim_mozjs',
+            '$BUILD_DIR/mongo/shell/mongojs',
+            '$BUILD_DIR/mongo/db/service_context',
+        ],
+    )
 else:
     env.Library(
         target='scripting',
@@ -88,9 +162,9 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='v8_deadline_monitor_test',
+    target='deadline_monitor_test',
     source=[
-        'v8_deadline_monitor_test.cpp',
+        'deadline_monitor_test.cpp',
     ],
     LIBDEPS=[
     ],

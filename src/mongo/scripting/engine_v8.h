@@ -38,7 +38,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/scripting/v8_deadline_monitor.h"
+#include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/v8_profiler.h"
 
 /**

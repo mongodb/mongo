@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/scripting/v8_deadline_monitor.h"
+#include "mongo/scripting/deadline_monitor.h"
 
 
 #include "mongo/unittest/unittest.h"

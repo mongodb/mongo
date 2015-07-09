@@ -99,5 +99,5 @@ for (var i = 0; i < (versionArray.length - 1); i++) if (versionArray[i] >= 0) { 
 assert.eq(serverStatus.version, latestStartUpLog.buildinfo.version, "Mongo version doesn't match that from ServerStatus");
 assert.eq(version, versionArrayCleaned.join('.'), "version doesn't match that from the versionArray");
 var jsEngine = latestStartUpLog.buildinfo.javascriptEngine;
-assert((jsEngine.startsWith("v8") || jsEngine == "none"));
+assert((jsEngine.startsWith("v8") || jsEngine == "none" || jsEngine.startsWith("mozjs")));
 assert.eq(isMaster.maxBsonObjectSize, latestStartUpLog.buildinfo.maxBsonObjectSize, "maxBsonObjectSize doesn't match one from ismaster");

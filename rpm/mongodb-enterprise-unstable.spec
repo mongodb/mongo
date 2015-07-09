@@ -220,6 +220,7 @@ fi
 %doc LICENSE.txt
 %doc README
 %doc THIRD-PARTY-NOTICES
+%doc MPL-2
 
 %files shell
 %defattr(-,root,root,-)

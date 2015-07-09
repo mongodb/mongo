@@ -32,6 +32,8 @@
 
 #include "mongo/config.h"
 
+#include "mongo/base/disallow_copying.h"
+
 #if defined(MONGO_CONFIG_HAVE_THREAD_LOCAL)
 #define MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL thread_local
 #elif defined(MONGO_CONFIG_HAVE___THREAD)
