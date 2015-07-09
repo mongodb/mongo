@@ -120,10 +120,10 @@ protected:
 
             ASSERT_EQUALS(nss.toString(), actualBatchedUpdate.getNS().toString());
 
-            auto updatedCount = actualBatchedUpdate.getUpdates().size();
-            ASSERT_EQUALS(1, updatedCount);
+            auto updatesList = actualBatchedUpdate.getUpdates();
+            ASSERT_EQUALS(1U, updatesList.size());
 
-            auto updated = actualBatchedUpdate.getUpdates().front();
+            auto updated = updatesList.front();
             ASSERT(updated->getUpsert());
 
             const DatabaseType dbt = assertGet(DatabaseType::fromBSON(updated->getUpdateExpr()));
