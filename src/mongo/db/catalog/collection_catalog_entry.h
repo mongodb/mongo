@@ -102,7 +102,10 @@ public:
      *
      * An empty validator removes all validation.
      */
-    virtual void updateValidator(OperationContext* txn, const BSONObj& validator) = 0;
+    virtual void updateValidator(OperationContext* txn,
+                                 const BSONObj& validator,
+                                 StringData validationLevel,
+                                 StringData validationState) = 0;
 
 private:
     NamespaceString _ns;

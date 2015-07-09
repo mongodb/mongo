@@ -152,6 +152,10 @@ Collection::Collection(OperationContext* txn,
       _indexCatalog(this),
       _validatorDoc(_details->getCollectionOptions(txn).validator.getOwned()),
       _validator(uassertStatusOK(parseValidator(_validatorDoc))),
+      _validationState(uassertStatusOK(
+          _parseValidationState(_details->getCollectionOptions(txn).validationState))),
+      _validationLevel(uassertStatusOK(
+          _parseValidationLevel(_details->getCollectionOptions(txn).validationLevel))),
       _cursorManager(fullNS),
       _cappedNotifier(_recordStore->isCapped() ? new CappedInsertNotifier() : nullptr),
       _mustTakeCappedLockOnInsert(isCapped() && !_ns.isSystemDotProfile() && !_ns.isOplog()) {
@@ -228,11 +232,20 @@ Status Collection::checkValidation(OperationContext* txn, const BSONObj& documen
     if (!_validator)
         return Status::OK();
 
+    if (_validationLevel == OFF)
+        return Status::OK();
+
     if (documentValidationDisabled(txn))
         return Status::OK();
 
     if (_validator->matchesBSON(document))
         return Status::OK();
+
+    if (_validationState == WARN) {
+        warning() << "Document would fail validation"
+                  << " collection: " << ns() << " doc: " << document;
+        return Status::OK();
+    }
 
     return {ErrorCodes::DocumentValidationFailure, "Document failed validation"};
 }
@@ -446,8 +459,18 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
                                                 oplogUpdateEntryArgs& args) {
     {
         auto status = checkValidation(txn, newDoc);
-        if (!status.isOK())
-            return status;
+        if (!status.isOK()) {
+            if (_validationLevel == STRICT_V) {
+                return status;
+            }
+            // moderate means we have to check the old doc
+            auto oldDocStatus = checkValidation(txn, oldDoc.value());
+            if (oldDocStatus.isOK()) {
+                // transitioning from good -> bad is not ok
+                return status;
+            }
+            // bad -> bad is ok in moderate mode
+        }
     }
 
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
@@ -715,12 +738,95 @@ Status Collection::setValidator(OperationContext* txn, BSONObj validatorDoc) {
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 
-    _details->updateValidator(txn, validatorDoc);
+    _details->updateValidator(txn, validatorDoc, getValidationLevel(), getValidationState());
 
     _validator = std::move(statusWithMatcher.getValue());
     _validatorDoc = std::move(validatorDoc);
     return Status::OK();
 }
+
+StatusWith<Collection::ValidationLevel> Collection::_parseValidationLevel(StringData newLevel) {
+    if (newLevel == "") {
+        // default
+        return STRICT_V;
+    } else if (newLevel == "off") {
+        return OFF;
+    } else if (newLevel == "moderate") {
+        return MODERATE;
+    } else if (newLevel == "strict") {
+        return STRICT_V;
+    } else {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "invalid validation level: " << newLevel);
+    }
+}
+
+StatusWith<Collection::ValidationState> Collection::_parseValidationState(StringData newState) {
+    if (newState == "") {
+        // default
+        return ENFORCE;
+    } else if (newState == "warn") {
+        return WARN;
+    } else if (newState == "enforce") {
+        return ENFORCE;
+    } else {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "invalid validation state: " << newState);
+    }
+}
+
+StringData Collection::getValidationLevel() const {
+    switch (_validationLevel) {
+        case STRICT_V:
+            return "strict";
+        case OFF:
+            return "off";
+        case MODERATE:
+            return "moderate";
+    }
+    MONGO_UNREACHABLE;
+}
+
+StringData Collection::getValidationState() const {
+    switch (_validationState) {
+        case ENFORCE:
+            return "enforce";
+        case WARN:
+            return "warn";
+    }
+    MONGO_UNREACHABLE;
+}
+
+Status Collection::setValidationLevel(OperationContext* txn, StringData newLevel) {
+    invariant(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+
+    StatusWith<ValidationLevel> status = _parseValidationLevel(newLevel);
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
+
+    _validationLevel = status.getValue();
+
+    _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationState());
+
+    return Status::OK();
+}
+
+Status Collection::setValidationState(OperationContext* txn, StringData newState) {
+    invariant(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+
+    StatusWith<ValidationState> status = _parseValidationState(newState);
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
+
+    _validationState = status.getValue();
+
+    _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationState());
+
+    return Status::OK();
+}
+
 
 namespace {
 class MyValidateAdaptor : public ValidateAdaptor {

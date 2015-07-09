@@ -92,7 +92,10 @@ public:
 
     void updateFlags(OperationContext* txn, int newValue) final;
 
-    void updateValidator(OperationContext* txn, const BSONObj& validator) final;
+    void updateValidator(OperationContext* txn,
+                         const BSONObj& validator,
+                         StringData validationLevel,
+                         StringData validationState) final;
 
     // not part of interface, but available to my storage engine
 

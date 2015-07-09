@@ -130,6 +130,14 @@ Status collMod(OperationContext* txn,
             auto status = coll->setValidator(txn, e.Obj());
             if (!status.isOK())
                 errorStatus = std::move(status);
+        } else if (str::equals("validationLevel", e.fieldName())) {
+            auto status = coll->setValidationLevel(txn, e.String());
+            if (!status.isOK())
+                errorStatus = std::move(status);
+        } else if (str::equals("validationState", e.fieldName())) {
+            auto status = coll->setValidationState(txn, e.String());
+            if (!status.isOK())
+                errorStatus = std::move(status);
         } else {
             // As of SERVER-17312 we only support these two options. When SERVER-17320 is
             // resolved this will need to be enhanced to handle other options.

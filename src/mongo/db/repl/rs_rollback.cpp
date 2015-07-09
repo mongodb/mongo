@@ -232,7 +232,8 @@ Status refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
                     continue;  // Skipping command name.
                 }
 
-                if (modification == "validator" || modification == "usePowerOf2Sizes" ||
+                if (modification == "validator" || modification == "validationState" ||
+                    modification == "validationLevel" || modification == "usePowerOf2Sizes" ||
                     modification == "noPadding") {
                     fixUpInfo.collectionsToResyncMetadata.insert(ns.ns());
                     continue;
@@ -400,6 +401,18 @@ void syncFixUp(OperationContext* txn,
                 throw RSFatalException(str::stream()
                                        << "Failed to set validator: " << status.toString());
             }
+            status = collection->setValidationState(txn, options.validationState);
+            if (!status.isOK()) {
+                throw RSFatalException(str::stream()
+                                       << "Failed to set validationState: " << status.toString());
+            }
+
+            status = collection->setValidationLevel(txn, options.validationLevel);
+            if (!status.isOK()) {
+                throw RSFatalException(str::stream()
+                                       << "Failed to set validationLevel: " << status.toString());
+            }
+
             wuow.commit();
         }
 

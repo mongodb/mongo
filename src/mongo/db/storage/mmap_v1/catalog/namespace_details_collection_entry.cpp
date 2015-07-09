@@ -385,8 +385,15 @@ void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* txn, 
 }
 
 void NamespaceDetailsCollectionCatalogEntry::updateValidator(OperationContext* txn,
-                                                             const BSONObj& validator) {
+                                                             const BSONObj& validator,
+                                                             StringData validationLevel,
+                                                             StringData validationState) {
     updateSystemNamespaces(
-        txn, _namespacesRecordStore, ns(), BSON("$set" << BSON("options.validator" << validator)));
+        txn,
+        _namespacesRecordStore,
+        ns(),
+        BSON("$set" << BSON("options.validator" << validator << "options.validationLevel"
+                                                << validationLevel << "options.validationState"
+                                                << validationState)));
 }
 }
