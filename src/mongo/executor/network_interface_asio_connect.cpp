@@ -81,6 +81,10 @@ rpc::ProtocolSet NetworkInterfaceASIO::AsyncConnection::clientProtocols() const 
     return _clientProtocols;
 }
 
+void NetworkInterfaceASIO::AsyncConnection::setServerProtocols(rpc::ProtocolSet protocols) {
+    _serverProtocols = protocols;
+}
+
 void NetworkInterfaceASIO::_connectASIO(AsyncOp* op) {
     tcp::resolver::query query(op->request().target.host(),
                                std::to_string(op->request().target.port()));

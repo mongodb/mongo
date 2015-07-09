@@ -94,6 +94,7 @@ private:
 
         rpc::ProtocolSet serverProtocols() const;
         rpc::ProtocolSet clientProtocols() const;
+        void setServerProtocols(rpc::ProtocolSet protocols);
 
 // Explicit move construction and assignment to support MSVC
 #if defined(_MSC_VER) && _MSC_VER < 1900
@@ -254,6 +255,7 @@ private:
     void _connectASIO(AsyncOp* op);
     void _connectWithDBClientConnection(AsyncOp* op);
     void _setupSocket(AsyncOp* op, const asio::ip::tcp::resolver::iterator& endpoints);
+    void _runIsMaster(AsyncOp* op);
     void _authenticate(AsyncOp* op);
     void _sslHandshake(AsyncOp* op);
 

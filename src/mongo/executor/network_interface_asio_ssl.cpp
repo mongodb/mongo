@@ -37,7 +37,9 @@ namespace executor {
 
 void NetworkInterfaceASIO::_sslHandshake(AsyncOp* op) {
     // TODO: Implement asynchronous SSL, SERVER-19221
-    _authenticate(op);
+
+    // Advance the state machine
+    _runIsMaster(op);
 }
 
 }  // namespace executor

@@ -32,8 +32,51 @@
 
 #include "mongo/executor/network_interface_asio.h"
 
+#include "mongo/rpc/factory.h"
+#include "mongo/rpc/legacy_request_builder.h"
+
 namespace mongo {
 namespace executor {
+
+void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
+    // We use a legacy builder to create our ismaster request because we may
+    // have to communicate with servers that do not support OP_COMMAND
+    rpc::LegacyRequestBuilder requestBuilder{};
+    requestBuilder.setDatabase("admin");
+    requestBuilder.setCommandName("ismaster");
+    requestBuilder.setMetadata(rpc::makeEmptyMetadata());
+    requestBuilder.setCommandArgs(BSON("ismaster" << 1));
+
+    // Set current command to ismaster request and run
+    auto& cmd = op->beginCommand(std::move(*(requestBuilder.done())));
+    cmd.toSend().header().setResponseTo(0);
+
+    // Callback to parse protocol information out of received ismaster response
+    auto parseIsMaster = [this, op]() {
+        try {
+            auto commandReply = rpc::makeReply(&(op->command().toRecv()));
+            BSONObj isMasterReply = commandReply->getCommandReply();
+
+            auto protocolSet = rpc::parseProtocolSetFromIsMasterReply(isMasterReply);
+            if (!protocolSet.isOK())
+                return _completeOperation(op, protocolSet.getStatus());
+
+            op->connection()->setServerProtocols(protocolSet.getValue());
+
+            // Advance the state machine
+            _authenticate(op);
+
+        } catch (...) {
+            // makeReply will throw if the rely was invalid.
+            _completeOperation(op, exceptionToStatus());
+        }
+    };
+
+    _asyncRunCommand(&cmd,
+                     [this, op, parseIsMaster](std::error_code ec, size_t bytes) {
+                         _validateAndRun(op, ec, std::move(parseIsMaster));
+                     });
+}
 
 void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     // TODO: Implement asynchronous authentication, SERVER-19155
