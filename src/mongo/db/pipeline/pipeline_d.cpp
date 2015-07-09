@@ -30,7 +30,6 @@
 
 #include "mongo/db/pipeline/pipeline_d.h"
 
-
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -41,7 +40,8 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/s/d_state.h"
+#include "mongo/db/s/sharded_connection_info.h"
+#include "mongo/db/s/sharding_state.h"
 
 namespace mongo {
 

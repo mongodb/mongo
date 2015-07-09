@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/init.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -33,7 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/d_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/d_merge.h"
 
 namespace mongo {
@@ -147,7 +149,7 @@ public:
                 return false;
             }
 
-            ShardingState::initialize(config);
+            shardingState.initialize(config);
         }
 
         // ShardName is optional, but might not be set yet

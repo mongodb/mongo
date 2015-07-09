@@ -1,5 +1,5 @@
-/*
- *    Copyright (C) 2010 10gen Inc.
+/**
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,54 +26,57 @@
  *    then also delete it in the license file.
  */
 
-
 #pragma once
 
+#include <map>
 #include <string>
+
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
-class BSONObj;
+struct ChunkVersion;
 class Client;
-class OperationContext;
-class ShardedConnectionInfo;
 
-struct ShardForceVersionOkModeBlock {
-    ShardForceVersionOkModeBlock(Client* client);
-    ~ShardForceVersionOkModeBlock();
+/**
+ * There is one instance of these per each connection from mongos. Holds version state for each
+ * namespace.
+ */
+class ShardedConnectionInfo {
+    MONGO_DISALLOW_COPYING(ShardedConnectionInfo);
 
-    ShardedConnectionInfo* info;
+public:
+    ShardedConnectionInfo();
+    ~ShardedConnectionInfo();
+
+    const ChunkVersion getVersion(const std::string& ns) const;
+    void setVersion(const std::string& ns, const ChunkVersion& version);
+
+    static ShardedConnectionInfo* get(Client* client, bool create);
+    static void reset(Client* client);
+    static void addHook();
+
+    bool inForceVersionOkMode() const {
+        return _forceVersionOk;
+    }
+
+    void enterForceVersionOkMode() {
+        _forceVersionOk = true;
+    }
+    void leaveForceVersionOkMode() {
+        _forceVersionOk = false;
+    }
+
+private:
+    typedef std::map<std::string, ChunkVersion> NSVersionMap;
+
+    // Map from a namespace string to the chunk version with which this connection has been
+    // initialized for the specified namespace
+    NSVersionMap _versions;
+
+    // If this is true, then chunk versions aren't checked, and all operations are allowed
+    bool _forceVersionOk;
 };
 
-// -----------------
-// --- core ---
-// -----------------
 
-/**
- * @return true if we have any shard info for the ns
- */
-bool haveLocalShardingInfo(Client* client, const std::string& ns);
-
-/**
- * Validates whether the shard chunk version for the specified collection is up to date and if
- * not, throws SendStaleConfigException.
- *
- * It is important (but not enforced) that method be called with the collection locked in at
- * least IS mode in order to ensure that the shard version won't change.
- *
- * @param ns Complete collection namespace to be cheched.
- */
-void ensureShardVersionOKOrThrow(Client* client, const std::string& ns);
-
-/**
- * If a migration for the chunk in 'ns' where 'obj' lives is occurring, save this log entry
- * if it's relevant. The entries saved here are later transferred to the receiving side of
- * the migration. A relevant entry is an insertion, a deletion, or an update.
- */
-void logOpForSharding(OperationContext* txn,
-                      const char* opstr,
-                      const char* ns,
-                      const BSONObj& obj,
-                      BSONObj* patt,
-                      bool forMigrateCleanup);
-}
+}  // namespace mongo

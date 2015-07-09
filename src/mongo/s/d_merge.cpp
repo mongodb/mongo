@@ -33,13 +33,15 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/collection_metadata.h"
 #include "mongo/s/config.h"
-#include "mongo/s/d_state.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -47,7 +49,7 @@
 
 namespace mongo {
 
-using std::endl;
+using std::shared_ptr;
 using std::string;
 using mongoutils::str::stream;
 
@@ -58,8 +60,6 @@ static Status runApplyOpsCmd(const std::vector<ChunkType>&,
 static BSONObj buildMergeLogEntry(const std::vector<ChunkType>&,
                                   const ChunkVersion&,
                                   const ChunkVersion&);
-
-static bool isEmptyChunk(const ChunkType&);
 
 bool mergeChunks(OperationContext* txn,
                  const NamespaceString& nss,
@@ -73,7 +73,7 @@ bool mergeChunks(OperationContext* txn,
 
     ConnectionString configLoc = ConnectionString::parse(shardingState.getConfigServer(), *errMsg);
     if (!configLoc.isValid()) {
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
@@ -90,7 +90,7 @@ bool mergeChunks(OperationContext* txn,
                            << " to merge chunks in [" << minKey << "," << maxKey << ")"
                            << causedBy(scopedDistLock.getStatus());
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
@@ -105,7 +105,7 @@ bool mergeChunks(OperationContext* txn,
         *errMsg = str::stream() << "could not merge chunks, failed to refresh metadata for "
                                 << nss.ns() << causedBy(status.reason());
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
@@ -115,17 +115,17 @@ bool mergeChunks(OperationContext* txn,
                            << "(sent epoch : " << epoch.toString()
                            << ", current epoch : " << shardVersion.epoch().toString() << ")";
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
-    CollectionMetadataPtr metadata = shardingState.getCollectionMetadata(nss.ns());
+    shared_ptr<CollectionMetadata> metadata = shardingState.getCollectionMetadata(nss.ns());
 
     if (!metadata || metadata->getKeyPattern().isEmpty()) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
                            << " is not sharded";
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
@@ -137,7 +137,7 @@ bool mergeChunks(OperationContext* txn,
                            << " for collection " << nss.ns() << " with key pattern "
                            << metadata->getKeyPattern();
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
@@ -166,7 +166,7 @@ bool mergeChunks(OperationContext* txn,
                            << " range starting at " << minKey << " and ending at " << maxKey
                            << " does not belong to shard " << shardingState.getShardName();
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
@@ -184,7 +184,7 @@ bool mergeChunks(OperationContext* txn,
                            << " range starting at " << minKey << " does not belong to shard "
                            << shardingState.getShardName();
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
@@ -198,7 +198,7 @@ bool mergeChunks(OperationContext* txn,
                            << " range ending at " << maxKey << " does not belong to shard "
                            << shardingState.getShardName();
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
@@ -212,7 +212,7 @@ bool mergeChunks(OperationContext* txn,
                            << (!validRangeStartKey && !validRangeEndKey ? " or " : "")
                            << (!validRangeEndKey ? "ending at " + maxKey.toString() : "");
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
@@ -220,7 +220,7 @@ bool mergeChunks(OperationContext* txn,
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
                            << " already contains chunk for " << rangeToString(minKey, maxKey);
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return false;
     }
 
@@ -232,7 +232,7 @@ bool mergeChunks(OperationContext* txn,
                          << " has a hole in the range " << rangeToString(minKey, maxKey) << " at "
                          << rangeToString(chunksToMerge[i - 1].getMax(), chunksToMerge[i].getMin());
 
-            warning() << *errMsg << endl;
+            warning() << *errMsg;
             return false;
         }
     }

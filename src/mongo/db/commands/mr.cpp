@@ -32,7 +32,6 @@
 
 #include "mongo/db/commands/mr.h"
 
-
 #include "mongo/client/connpool.h"
 #include "mongo/client/parallel.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -56,6 +55,8 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/sharded_connection_info.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/collection_metadata.h"
@@ -510,9 +511,9 @@ void State::appendResults(BSONObjBuilder& final) {
 
     BSONArrayBuilder b((int)(_size * 1.2));  // _size is data size, doesn't count overhead and keys
 
-    for (InMemory::iterator i = _temp->begin(); i != _temp->end(); ++i) {
-        BSONObj key = i->first;
-        BSONList& all = i->second;
+    for (const auto& entry : *_temp) {
+        const BSONObj& key = entry.first;
+        const BSONList& all = entry.second;
 
         verify(all.size() == 1);
 

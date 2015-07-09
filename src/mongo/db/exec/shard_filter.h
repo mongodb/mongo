@@ -28,13 +28,11 @@
 
 #pragma once
 
-
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/record_id.h"
-#include "mongo/s/d_state.h"
 
 namespace mongo {
+
+class CollectionMetadata;
 
 /**
  * This stage drops documents that didn't belong to the shard we're executing on at the time of
@@ -73,7 +71,9 @@ namespace mongo {
  */
 class ShardFilterStage : public PlanStage {
 public:
-    ShardFilterStage(const CollectionMetadataPtr& metadata, WorkingSet* ws, PlanStage* child);
+    ShardFilterStage(const std::shared_ptr<CollectionMetadata>& metadata,
+                     WorkingSet* ws,
+                     PlanStage* child);
     virtual ~ShardFilterStage();
 
     virtual bool isEOF();
@@ -107,7 +107,7 @@ private:
 
     // Note: it is important that this is the metadata from the time this stage is constructed.
     // See class comment for details.
-    const CollectionMetadataPtr _metadata;
+    const std::shared_ptr<CollectionMetadata> _metadata;
 };
 
 }  // namespace mongo

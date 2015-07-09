@@ -28,17 +28,21 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/exec/shard_filter.h"
 
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/s/collection_metadata.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
+using std::shared_ptr;
 using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
@@ -46,7 +50,7 @@ using stdx::make_unique;
 // static
 const char* ShardFilterStage::kStageType = "SHARDING_FILTER";
 
-ShardFilterStage::ShardFilterStage(const CollectionMetadataPtr& metadata,
+ShardFilterStage::ShardFilterStage(const shared_ptr<CollectionMetadata>& metadata,
                                    WorkingSet* ws,
                                    PlanStage* child)
     : _ws(ws), _child(child), _commonStats(kStageType), _metadata(metadata) {}

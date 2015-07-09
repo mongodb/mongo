@@ -47,7 +47,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/s/d_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {

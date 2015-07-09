@@ -61,7 +61,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/d_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"

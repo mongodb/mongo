@@ -26,14 +26,16 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/range_arithmetic.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/dbtests/config_server_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk.h"  // for genID
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/collection_metadata.h"
-#include "mongo/s/d_state.h"
 #include "mongo/s/d_merge.h"
 #include "mongo/unittest/unittest.h"
 
@@ -331,4 +333,4 @@ TEST_F(MergeChunkTests, CompoundMerge) {
     assertWrittenAsMerged(ranges);
 }
 
-}  // end namespace
+}  // namespace mongo

@@ -53,12 +53,12 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
-#include "mongo/s/d_state.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -623,8 +623,9 @@ public:
                 warning() << errmsg << endl;
                 return false;
             }
-            string configdb = cmdObj["configdb"].String();
-            ShardingState::initialize(configdb);
+
+            const string configdb = cmdObj["configdb"].String();
+            shardingState.initialize(configdb);
         }
 
         // Initialize our current shard name in the shard state if needed
