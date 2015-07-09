@@ -2209,6 +2209,152 @@ TEST_F(ReplCoordTest, ReadAfterDeferredEqualOpTime) {
     ASSERT_OK(result.getStatus());
 }
 
+TEST_F(ReplCoordTest, CantUseReadAfterCommittedIfNotReplSet) {
+    init(ReplSettings());
+    OperationContextNoop txn;
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn, ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 0), true));
+
+    ASSERT_FALSE(result.didWait());
+    ASSERT_EQUALS(ErrorCodes::NotAReplicaSet, result.getStatus());
+}
+
+TEST_F(ReplCoordTest, ReadAfterCommittedWhileShutdown) {
+    OperationContextNoop txn;
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
+                                                                              << "node1:12345"
+                                                                              << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(10, 0), 0));
+
+    shutdown();
+
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn, ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 0), true));
+
+    ASSERT_TRUE(result.didWait());
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result.getStatus());
+}
+
+TEST_F(ReplCoordTest, ReadAfterCommittedInterrupted) {
+    OperationContextReplMock txn;
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
+                                                                              << "node1:12345"
+                                                                              << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(10, 0), 0));
+
+    txn.setCheckForInterruptStatus(Status(ErrorCodes::Interrupted, "test"));
+
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn, ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 0), true));
+
+    ASSERT_TRUE(result.didWait());
+    ASSERT_EQUALS(ErrorCodes::Interrupted, result.getStatus());
+}
+
+TEST_F(ReplCoordTest, ReadAfterCommittedGreaterOpTime) {
+    OperationContextNoop txn;
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
+                                                                              << "node1:12345"
+                                                                              << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
+    getReplCoord()->onSnapshotCreate(OpTime(Timestamp(100, 0), 0));
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn, ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 0), true));
+
+    ASSERT_TRUE(result.didWait());
+    ASSERT_OK(result.getStatus());
+}
+
+TEST_F(ReplCoordTest, ReadAfterCommittedEqualOpTime) {
+    OperationContextNoop txn;
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
+                                                                              << "node1:12345"
+                                                                              << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+
+    OpTime time(Timestamp(100, 0), 0);
+    getReplCoord()->setMyLastOptime(time);
+    getReplCoord()->onSnapshotCreate(time);
+    auto result = getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(time, true));
+
+    ASSERT_TRUE(result.didWait());
+    ASSERT_OK(result.getStatus());
+}
+
+TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
+    OperationContextNoop txn;
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
+                                                                              << "node1:12345"
+                                                                              << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(0, 0), 0));
+    OpTime committedOpTime(Timestamp(200, 0), 0);
+    auto pseudoLogOp = stdx::async(stdx::launch::async,
+                                   [this, &committedOpTime]() {
+                                       // Not guaranteed to be scheduled after waitUntil blocks...
+                                       getReplCoord()->setMyLastOptime(committedOpTime);
+                                       getReplCoord()->onSnapshotCreate(committedOpTime);
+                                   });
+
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn, ReadAfterOpTimeArgs(OpTime(Timestamp(100, 0), 0), true));
+    pseudoLogOp.get();
+
+    ASSERT_TRUE(result.didWait());
+    ASSERT_OK(result.getStatus());
+}
+
+TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
+    OperationContextNoop txn;
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
+                                                                              << "node1:12345"
+                                                                              << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(0, 0), 0));
+
+    OpTime opTimeToWait(Timestamp(100, 0), 0);
+
+    auto pseudoLogOp = stdx::async(stdx::launch::async,
+                                   [this, &opTimeToWait]() {
+                                       // Not guaranteed to be scheduled after waitUntil blocks...
+                                       getReplCoord()->setMyLastOptime(opTimeToWait);
+                                       getReplCoord()->onSnapshotCreate(opTimeToWait);
+                                   });
+
+    auto result = getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(opTimeToWait, true));
+    pseudoLogOp.get();
+
+    ASSERT_TRUE(result.didWait());
+    ASSERT_OK(result.getStatus());
+}
+
 TEST_F(ReplCoordTest, MetadataWrongConfigVersion) {
     // Ensure that we do not process ReplicationMetadata when ConfigVersions do not match.
     assertStartSuccess(BSON("_id"

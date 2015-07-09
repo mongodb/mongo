@@ -793,8 +793,13 @@ ReadAfterOpTimeResponse ReplicationCoordinatorImpl::waitUntilOpTime(
 
     Timer timer;
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+    auto loopCondition = [this, settings, ts] {
+        return settings.isReadCommitted()
+            ? !_currentCommittedSnapshot || ts > *_currentCommittedSnapshot
+            : ts > _getMyLastOptime_inlock();
+    };
 
-    while (ts > _getMyLastOptime_inlock()) {
+    while (loopCondition()) {
         Status interruptedStatus = txn->checkForInterruptNoAssert();
         if (!interruptedStatus.isOK()) {
             return ReadAfterOpTimeResponse(interruptedStatus, Milliseconds(timer.millis()));
@@ -806,10 +811,13 @@ ReadAfterOpTimeResponse ReplicationCoordinatorImpl::waitUntilOpTime(
         }
 
         stdx::condition_variable condVar;
+        WriteConcernOptions writeConcern;
+        writeConcern.wMode = WriteConcernOptions::kMajority;
+
         WaiterInfo waitInfo(&_opTimeWaiterList,
                             txn->getOpID(),
                             &ts,
-                            nullptr,  // Don't care about write concern.
+                            settings.isReadCommitted() ? &writeConcern : nullptr,
                             &condVar);
 
         if (CurOp::get(txn)->isMaxTimeSet()) {

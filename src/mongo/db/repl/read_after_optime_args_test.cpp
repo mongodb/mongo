@@ -45,6 +45,22 @@ TEST(ReadAfterParse, BasicFullSpecification) {
 
     ASSERT_EQ(Timestamp(20, 30), readAfterOpTime.getOpTime().getTimestamp());
     ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
+    ASSERT_FALSE(readAfterOpTime.isReadCommitted());
+}
+
+TEST(ReadAfterParse, ReadCommittedFullSpecification) {
+    ReadAfterOpTimeArgs readAfterOpTime;
+    ASSERT_OK(readAfterOpTime.initialize(BSON("find"
+                                              << "test" << ReadAfterOpTimeArgs::kRootFieldName
+                                              << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName << BSON(
+                                                          ReadAfterOpTimeArgs::kOpTimestampFieldName
+                                                          << Timestamp(20, 30)
+                                                          << ReadAfterOpTimeArgs::kOpTermFieldName
+                                                          << 2)) << "committed" << true)));
+
+    ASSERT_EQ(Timestamp(20, 30), readAfterOpTime.getOpTime().getTimestamp());
+    ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
+    ASSERT(readAfterOpTime.isReadCommitted());
 }
 
 TEST(ReadAfterParse, Empty) {

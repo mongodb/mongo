@@ -45,10 +45,16 @@ const string ReadAfterOpTimeArgs::kRootFieldName("$readConcern");
 const string ReadAfterOpTimeArgs::kOpTimeFieldName("afterOpTime");
 const string ReadAfterOpTimeArgs::kOpTimestampFieldName("ts");
 const string ReadAfterOpTimeArgs::kOpTermFieldName("term");
+const string ReadAfterOpTimeArgs::kReadCommittedFieldName("committed");
 
 ReadAfterOpTimeArgs::ReadAfterOpTimeArgs() : ReadAfterOpTimeArgs(OpTime()) {}
 
-ReadAfterOpTimeArgs::ReadAfterOpTimeArgs(OpTime opTime) : _opTime(std::move(opTime)) {}
+ReadAfterOpTimeArgs::ReadAfterOpTimeArgs(OpTime opTime, bool readCommitted)
+    : _opTime(std::move(opTime)), _isReadCommitted(readCommitted) {}
+
+bool ReadAfterOpTimeArgs::isReadCommitted() const {
+    return _isReadCommitted;
+}
 
 const OpTime& ReadAfterOpTimeArgs::getOpTime() const {
     return _opTime;
@@ -94,6 +100,12 @@ Status ReadAfterOpTimeArgs::initialize(const BSONObj& cmdObj) {
     }
 
     _opTime = OpTime(timestamp, termNumber);
+
+    auto readCommittedStatus = bsonExtractBooleanFieldWithDefault(
+        cmdObj, ReadAfterOpTimeArgs::kReadCommittedFieldName, false, &_isReadCommitted);
+    if (!readCommittedStatus.isOK()) {
+        return readCommittedStatus;
+    }
 
     return Status::OK();
 }

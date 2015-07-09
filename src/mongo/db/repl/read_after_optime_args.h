@@ -46,9 +46,10 @@ public:
     static const std::string kOpTimeFieldName;
     static const std::string kOpTimestampFieldName;
     static const std::string kOpTermFieldName;
+    static const std::string kReadCommittedFieldName;
 
     ReadAfterOpTimeArgs();
-    explicit ReadAfterOpTimeArgs(OpTime opTime);
+    explicit ReadAfterOpTimeArgs(OpTime opTime, bool readCommitted = false);
 
     /**
      * Format:
@@ -56,17 +57,20 @@ public:
      *    find: “coll”,
      *    filter: <Query Object>,
      *    $readConcern: { // optional
+     *      committed: 1, // optional
      *      afterOpTime: { ts: <timestamp>, term: <NumberLong> },
      *    }
      * }
      */
     Status initialize(const BSONObj& cmdObj);
 
+    bool isReadCommitted() const;
     const OpTime& getOpTime() const;
     const Milliseconds& getTimeout() const;
 
 private:
     OpTime _opTime;
+    bool _isReadCommitted = false;
 };
 
 }  // namespace repl
