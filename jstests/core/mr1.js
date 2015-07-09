@@ -166,7 +166,7 @@ if ( true ){
     }
     x.drop();
     
-    res = db.runCommand( { mapreduce : "mr1" , out : "mr1_foo" , map : m2 , reduce : r2 , out : "mr1_out" } );
+    res = db.runCommand( { mapreduce : "mr1" , out : "mr1_out" , map : m2 , reduce : r2 } );
     d(res);
     print( "t3: " + res.timeMillis + " (~3500 on 2.8ghz)" );
 
