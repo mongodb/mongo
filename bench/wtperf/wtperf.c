@@ -492,7 +492,7 @@ worker(void *arg)
 		    (double)thread->workload->truncate_pct / 100;
 		/* How many entries between each milestone */
 		truncate_milestone_gap =
-		    thread->workload->truncate_count*truncation_percentage;
+		    thread->workload->truncate_count * truncation_percentage;
 		/* How many milestones we need */
 		needed_milestones = thread->workload->truncate_count /
 		    truncate_milestone_gap;
@@ -502,9 +502,16 @@ worker(void *arg)
 		/* Reset this value for use again */
 		truncate_milestone_gap = 0;
 
-		cursor->next(cursor);
-		ret = cursor->get_key(cursor, &key);
+		/*
+		 * Here we check if there is data in the collection. If there is
+		 * data available, then we need to setup some initial truncation
+		 * milestones.
+		 */
+		ret = cursor->next(cursor);
 
+		if (ret == 0) {
+			ret = cursor->get_key(cursor, &key);
+		}
 		/* We have data */
 		if (ret == 0) {
 			start_point_val = decode_key(cfg, key);
@@ -529,7 +536,8 @@ worker(void *arg)
 					truncate_milestone_gap =
 					    (end_point_val - start_point_val)
 					    / needed_milestones;
-		} else if ( ret != WT_NOTFOUND ) {
+		}
+		if ( ret != WT_NOTFOUND ) {
 			lprintf(cfg, ret, 0,
 				    "truncate setup start: get_key failed");
 			goto err;
@@ -2305,6 +2313,10 @@ main(int argc, char *argv[])
 
 	/* You can't have truncate on a random collection */
 	if (cfg->has_truncate && cfg->random_range)
+		goto err;
+
+	/* We can't run truncate with more than one table */
+	if (cfg->has_truncate && cfg->table_count > 1)
 		goto err;
 
 	/* Build the URI from the table name. */
