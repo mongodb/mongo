@@ -45,6 +45,7 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/sasl_options.h"
+#include "mongo/db/auth/security_file.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
@@ -55,7 +56,7 @@ namespace mongo {
 using std::string;
 
 bool setUpSecurityKey(const string& filename) {
-    StatusWith<std::string> keyString = readSecurityFile(filename);
+    StatusWith<std::string> keyString = mongo::readSecurityFile(filename);
     if (!keyString.isOK()) {
         log() << keyString.getStatus().reason();
         return false;
@@ -96,68 +97,6 @@ bool setUpSecurityKey(const string& filename) {
     }
 
     return true;
-}
-
-StatusWith<std::string> readSecurityFile(const std::string& filename) {
-    struct stat stats;
-
-    // check obvious file errors
-    if (stat(filename.c_str(), &stats) == -1) {
-        return StatusWith<std::string>(ErrorCodes::InvalidPath,
-                                       str::stream() << "error getting file " << filename << ": "
-                                                     << strerror(errno));
-    }
-
-#if !defined(_WIN32)
-    // check permissions: must be X00, where X is >= 4
-    if ((stats.st_mode & (S_IRWXG | S_IRWXO)) != 0) {
-        return StatusWith<std::string>(ErrorCodes::InvalidPath,
-                                       str::stream() << "permissions on " << filename
-                                                     << " are too open");
-    }
-#endif
-
-    FILE* file = fopen(filename.c_str(), "rb");
-    if (!file) {
-        return StatusWith<std::string>(ErrorCodes::InvalidPath,
-                                       str::stream() << "error opening file: " << filename << ": "
-                                                     << strerror(errno));
-    }
-
-    string str = "";
-
-    // strip key file
-    const unsigned long long fileLength = stats.st_size;
-    unsigned long long read = 0;
-    while (read < fileLength) {
-        char buf;
-        int readLength = fread(&buf, 1, 1, file);
-        if (readLength < 1) {
-            fclose(file);
-            return StatusWith<std::string>(ErrorCodes::UnsupportedFormat,
-                                           str::stream() << "error reading file: " << filename);
-        }
-        read++;
-
-        // check for whitespace
-        if ((buf >= '\x09' && buf <= '\x0D') || buf == ' ') {
-            continue;
-        }
-
-        // check valid base64
-        if ((buf < 'A' || buf > 'Z') && (buf < 'a' || buf > 'z') && (buf < '0' || buf > '9') &&
-            buf != '+' && buf != '/' && buf != '=') {
-            fclose(file);
-            return StatusWith<std::string>(ErrorCodes::UnsupportedFormat,
-                                           str::stream() << "invalid char in key file " << filename
-                                                         << ": " << buf);
-        }
-
-        str += buf;
-    }
-
-    fclose(file);
-    return StatusWith<std::string>(str);
 }
 
 }  // namespace mongo

@@ -84,7 +84,11 @@ env.Library('authservercommon',
                 'authmocks',
                 'authorization_manager_global',
                 'saslauth',
+                'security_file',
             ])
+
+env.Library('security_file',
+            ['security_file.cpp'])
 
 env.Library('sasl_options',
             ['sasl_options.cpp'])

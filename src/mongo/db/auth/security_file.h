@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2009 10gen Inc.
+*    Copyright (C) 2015 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -35,12 +35,9 @@ template <class T>
 class StatusWith;
 
 /**
- * This method checks the validity of filename as a security key, hashes its
- * contents, and stores it in the internalSecurity variable.  Prints an
- * error message to the logs if there's an error.
- * @param filename the file containing the key
- * @return if the key was successfully stored
+ * This method takes in a filename and returns the contents as a string.
+ * It checks that the contents are valid base 64 characters.
  */
-bool setUpSecurityKey(const std::string& filename);
+StatusWith<std::string> readSecurityFile(const std::string& filename);
 
 }  // namespace mongo
