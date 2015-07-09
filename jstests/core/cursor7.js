@@ -24,12 +24,10 @@ function testMultipleInequalities( db ) {
 
     checkResults( [ z[ 2 ], z[ 3 ] ], r.find( { a: { $gt: 3 } } ).sort( idx ).hint( idx ) );
     checkResults( [ z[ 2 ] ], r.find( { a: { $gt: 3, $lt: 7 } } ).sort( idx ).hint( idx ) );
-    checkResults( [ z[ 2 ] ], r.find( { a: { $gt: 1, $lt: 7, $gt: 3 } } ).sort( idx ).hint( idx ) );
     checkResults( [ z[ 2 ] ], r.find( { a: { $gt: 3, $lt: 7, $lte: 5 } } ).sort( idx ).hint( idx ) );
 
     checkResults( [ z[ 3 ], z[ 2 ] ], r.find( { a: { $gt: 3 } } ).sort( rIdx ).hint( idx ) );
     checkResults( [ z[ 2 ] ], r.find( { a: { $gt: 3, $lt: 7 } } ).sort( rIdx ).hint( idx ) );
-    checkResults( [ z[ 2 ] ], r.find( { a: { $gt: 1, $lt: 7, $gt: 3 } } ).sort( rIdx ).hint( idx ) );
     checkResults( [ z[ 2 ] ], r.find( { a: { $gt: 3, $lt: 7, $lte: 5 } } ).sort( rIdx ).hint( idx ) );
 
     checkResults( [ z[ 1 ], z[ 2 ] ], r.find( { a: { $gt: 1, $lt: 7, $gte: 3, $lte: 5 }, b: { $gt: 2, $lt: 8, $gte: 4, $lte: 6 } } ).sort( idx ).hint( idx ) );
