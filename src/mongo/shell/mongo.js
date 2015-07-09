@@ -287,14 +287,19 @@ Mongo.prototype.writeMode = function() {
     return this._writeMode;
 };
 
-//
-// Whether to use find command versus OP_QUERY style find.
-//
-
-Mongo.prototype.useFindCommand = function() {
+/**
+ * Returns true if the shell is configured to use find/getMore commands rather than the C++ client.
+ *
+ * Currently, the C++ client will always use OP_QUERY find and OP_GET_MORE.
+ */
+Mongo.prototype.useReadCommands = function() {
     return (this.readMode() === "commands");
 }
 
+/**
+ * Get the readMode string (either "commands" for find/getMore commands or "compatibility" for
+ * OP_QUERY find and OP_GET_MORE).
+ */
 Mongo.prototype.readMode = function() {
     if ("_readMode" in this) {
         // We already have determined our read mode. Just return it.

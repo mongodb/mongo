@@ -93,10 +93,10 @@ DBQuery.prototype._exec = function(){
         assert.eq( 0 , this._numReturned );
         this._cursorSeen = 0;
 
-        if (this._mongo.useFindCommand() && this._canUseFindCommand()) {
+        if (this._mongo.useReadCommands() && this._canUseFindCommand()) {
             var findCmd = this._convertToCommand();
             var cmdRes = this._db.runCommand(findCmd);
-            this._cursor = new DBCommandCursor(this._mongo, cmdRes);
+            this._cursor = new DBCommandCursor(this._mongo, cmdRes, this._batchSize);
         }
         else {
             this._cursor = this._mongo.find(this._ns,
@@ -516,18 +516,93 @@ DBQuery.Option = {
 
 function DBCommandCursor(mongo, cmdResult, batchSize) {
     assert.commandWorked(cmdResult)
-    this._firstBatch = cmdResult.cursor.firstBatch.reverse(); // modifies input to allow popping
-    this._cursor = mongo.cursorFromId(cmdResult.cursor.ns, cmdResult.cursor.id, batchSize);
+    this._batch = cmdResult.cursor.firstBatch.reverse(); // modifies input to allow popping
+
+    if (mongo.useReadCommands()) {
+        this._useReadCommands = true;
+        this._cursorid = cmdResult.cursor.id.toNumber();
+        this._batchSize = batchSize;
+
+        this._ns = cmdResult.cursor.ns;
+        this._db = mongo.getDB(this._ns.substr(0, this._ns.indexOf(".")));
+        this._collName = this._ns.substr(this._ns.indexOf(".") + 1);
+    }
+    else {
+        this._cursor = mongo.cursorFromId(cmdResult.cursor.ns, cmdResult.cursor.id, batchSize);
+    }
 }
 
 DBCommandCursor.prototype = {};
-DBCommandCursor.prototype.hasNext = function() {
-    return this._firstBatch.length || this._cursor.hasNext();
+
+/**
+ * Fills out this._batch by running a getMore command. If the cursor is exhausted, also resets
+ * this._cursorid to 0.
+ *
+ * Throws on error.
+ */
+DBCommandCursor.prototype._runGetMoreCommand = function() {
+    // Construct the getMore command.
+    var getMoreCmd = {
+        getMore: NumberLong(this._cursorid.toString()),
+        collection: this._collName
+    };
+
+    if (this._batchSize) {
+        getMoreCmd["batchSize"] = this._batchSize;
+    }
+
+    // Deliver the getMore command, and check for errors in the response.
+    var cmdRes = this._db.runCommand(getMoreCmd);
+    assert.commandWorked(cmdRes);
+
+    if (this._ns !== cmdRes.cursor.ns) {
+        throw Error("unexpected collection in getMore response: " +
+                    this._ns + " != " + cmdRes.cursor.ns);
+    }
+
+    if (cmdRes.cursor.id.toNumber() === 0) {
+        this._cursorid = 0;
+    }
+    else if (this._cursorid !== cmdRes.cursor.id.toNumber()) {
+        throw Error("unexpected cursor id: " + this._cursorid + " != " + cmdRes.cursor.id);
+    }
+
+    // Successfully retrieved the next batch.
+    this._batch = cmdRes.cursor.nextBatch.reverse();
 }
+
+DBCommandCursor.prototype._hasNextUsingCommands = function() {
+    assert(this._useReadCommands);
+
+    if (!this._batch.length) {
+        if (this._cursorid === 0) {
+            return false;
+        }
+
+        this._runGetMoreCommand();
+    }
+
+    return this._batch.length > 0;
+}
+
+DBCommandCursor.prototype.hasNext = function() {
+    if (this._useReadCommands) {
+        return this._hasNextUsingCommands();
+    }
+
+    return this._batch.length || this._cursor.hasNext();
+}
+
 DBCommandCursor.prototype.next = function() {
-    if (this._firstBatch.length) {
+    if (this._batch.length) {
         // $err wouldn't be in _firstBatch since ok was true.
-        return this._firstBatch.pop();
+        return this._batch.pop();
+    }
+    else if (this._useReadCommands) {
+        // Have to call hasNext() here, as this is where we may issue a getMore in order to retrieve
+        // the next batch of results.
+        if (!this.hasNext()) throw Error("error hasNext: false");
+        return this._batch.pop();
     }
     else {
         if (!this._cursor.hasNext()) throw Error("error hasNext: false");
@@ -539,8 +614,11 @@ DBCommandCursor.prototype.next = function() {
     }
 }
 DBCommandCursor.prototype.objsLeftInBatch = function() {
-    if (this._firstBatch.length) {
-        return this._firstBatch.length;
+    if (this._useReadCommands) {
+        return this._batch.length;
+    }
+    else if (this._batch.length) {
+        return this._batch.length;
     }
     else {
         return this._cursor.objsLeftInBatch();
