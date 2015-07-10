@@ -283,8 +283,10 @@ PlanStage* buildStages(OperationContext* txn,
         if (NULL == childStage) {
             return NULL;
         }
-        return new ShardFilterStage(
-            shardingState.getCollectionMetadata(collection->ns().ns()), ws, childStage);
+        return new ShardFilterStage(ShardingState::get(getGlobalServiceContext())
+                                        ->getCollectionMetadata(collection->ns().ns()),
+                                    ws,
+                                    childStage);
     } else if (STAGE_KEEP_MUTATIONS == root->getType()) {
         const KeepMutationsNode* km = static_cast<const KeepMutationsNode*>(root);
         PlanStage* childStage = buildStages(txn, collection, qsol, km->children[0], ws);

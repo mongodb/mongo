@@ -171,9 +171,9 @@ public:
      *   6) Save state for getMore.
      *   7) Generate response to send to the client.
      *
-     * TODO: Rather than using the sharding version available in thread-local storage
-     * (i.e. call to shardingState.needCollectionMetadata() below), shard version
-     * information should be passed as part of the command parameter.
+     * TODO: Rather than using the sharding version available in thread-local storage (i.e. the
+     *       call to ShardingState::needCollectionMetadata() below), shard version information
+     *       should be passed as part of the command parameter.
      */
     bool run(OperationContext* txn,
              const std::string& dbname,
@@ -236,10 +236,12 @@ public:
         const int dbProfilingLevel =
             ctx.getDb() ? ctx.getDb()->getProfilingLevel() : serverGlobalParams.defaultProfile;
 
+        ShardingState* const shardingState = ShardingState::get(txn);
+
         // It is possible that the sharding version will change during yield while we are
         // retrieving a plan executor. If this happens we will throw an error and mongos will
         // retry.
-        const ChunkVersion shardingVersionAtStart = shardingState.getVersion(nss.ns());
+        const ChunkVersion shardingVersionAtStart = shardingState->getVersion(nss.ns());
 
         // 3) Get the execution plan for the query.
         auto statusWithPlanExecutor =
@@ -247,18 +249,19 @@ public:
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
+
         std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // TODO: Currently, chunk ranges are kept around until all ClientCursors created while
         // the chunk belonged on this node are gone. Separating chunk lifetime management from
         // ClientCursor should allow this check to go away.
-        if (!shardingState.getVersion(nss.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
+        if (!shardingState->getVersion(nss.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
             // Version changed while retrieving a PlanExecutor. Terminate the operation,
             // signaling that mongos should retry.
             throw SendStaleConfigException(nss.ns(),
                                            "version changed during find command",
                                            shardingVersionAtStart,
-                                           shardingState.getVersion(nss.ns()));
+                                           shardingState->getVersion(nss.ns()));
         }
 
         if (!collection) {

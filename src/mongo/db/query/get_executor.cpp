@@ -170,7 +170,8 @@ void fillOutPlannerParams(OperationContext* txn,
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
         std::shared_ptr<CollectionMetadata> collMetadata =
-            shardingState.getCollectionMetadata(canonicalQuery->ns());
+            ShardingState::get(getGlobalServiceContext())
+                ->getCollectionMetadata(canonicalQuery->ns());
         if (collMetadata) {
             plannerParams->shardKey = collMetadata->getKeyPattern();
         } else {
@@ -245,8 +246,10 @@ Status prepareExecution(OperationContext* opCtx,
 
         // Might have to filter out orphaned docs.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            *rootOut = new ShardFilterStage(
-                shardingState.getCollectionMetadata(collection->ns().ns()), ws, *rootOut);
+            *rootOut = new ShardFilterStage(ShardingState::get(getGlobalServiceContext())
+                                                ->getCollectionMetadata(collection->ns().ns()),
+                                            ws,
+                                            *rootOut);
         }
 
         // There might be a projection. The idhack stage will always fetch the full
@@ -470,8 +473,10 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutor(OperationContext* txn,
 
     // Might have to filter out orphaned docs.
     if (plannerOptions & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        root = make_unique<ShardFilterStage>(
-            shardingState.getCollectionMetadata(collection->ns().ns()), ws.get(), root.release());
+        root = make_unique<ShardFilterStage>(ShardingState::get(getGlobalServiceContext())
+                                                 ->getCollectionMetadata(collection->ns().ns()),
+                                             ws.get(),
+                                             root.release());
     }
 
     return PlanExecutor::make(txn, std::move(ws), std::move(root), collection, yieldPolicy);
@@ -599,7 +604,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorFind(OperationContext* txn,
     }
 
     size_t options = QueryPlannerParams::DEFAULT;
-    if (shardingState.needCollectionMetadata(txn->getClient(), nss.ns())) {
+    if (ShardingState::get(getGlobalServiceContext())
+            ->needCollectionMetadata(txn->getClient(), nss.ns())) {
         options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
     return getExecutor(

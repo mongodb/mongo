@@ -46,6 +46,7 @@ struct ChunkVersion;
 class Client;
 class CollectionMetadata;
 class OperationContext;
+class ServiceContext;
 class Status;
 
 /**
@@ -57,6 +58,17 @@ class ShardingState {
 public:
     ShardingState();
     ~ShardingState();
+
+    /**
+     * Retrieves the sharding state object associated with the specified service context. This
+     * method must only be called if ShardingState decoration has been created on the service
+     * context, otherwise it will fassert. In other words, it may only be called on MongoD and
+     * tests, which specifically require and instantiate ShardingState.
+     *
+     * Returns the instance's ShardingState.
+     */
+    static ShardingState* get(ServiceContext* serviceContext);
+    static ShardingState* get(OperationContext* operationContext);
 
     bool enabled();
 
@@ -303,8 +315,5 @@ private:
 
     CollectionMetadataMap _collMetadata;
 };
-
-// Global sharding state instance
-extern ShardingState shardingState;
 
 }  // namespace mongo

@@ -388,13 +388,13 @@ long long Helpers::removeRange(OperationContext* txn,
 
                 // We should never be able to turn off the sharding state once enabled, but
                 // in the future we might want to.
-                verify(shardingState.enabled());
+                verify(ShardingState::get(getGlobalServiceContext())->enabled());
 
                 bool docIsOrphan;
 
                 // In write lock, so will be the most up-to-date version
                 std::shared_ptr<CollectionMetadata> metadataNow =
-                    shardingState.getCollectionMetadata(ns);
+                    ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(ns);
                 if (metadataNow) {
                     ShardKeyPattern kp(metadataNow->getKeyPattern());
                     BSONObj key = kp.extractShardKeyFromDoc(obj);

@@ -42,6 +42,7 @@ class Client;
 class CurOp;
 class Locker;
 class ProgressMeter;
+class ServiceContext;
 class StringData;
 class WriteUnitOfWork;
 
@@ -135,6 +136,11 @@ public:
      * TODO: We return a string because of hopefully transient CurOp thread-unsafe insanity.
      */
     virtual std::string getNS() const = 0;
+
+    /**
+     * Returns the service context under which this operation context runs.
+     */
+    ServiceContext* getServiceContext() const;
 
     /**
      * Returns the client under which this context runs.

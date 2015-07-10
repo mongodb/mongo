@@ -614,9 +614,11 @@ public:
         // Get sharding state up-to-date
         //
 
+        ShardingState* shardingState = ShardingState::get(txn);
+
         // This could be the first call that enables sharding - make sure we initialize the
         // sharding state for this shard.
-        if (!shardingState.enabled()) {
+        if (!shardingState->enabled()) {
             if (cmdObj["configdb"].type() != String) {
                 errmsg = "sharding not enabled";
                 warning() << errmsg << endl;
@@ -624,16 +626,15 @@ public:
             }
 
             const string configdb = cmdObj["configdb"].String();
-            shardingState.initialize(configdb);
+            shardingState->initialize(configdb);
         }
 
         // Initialize our current shard name in the shard state if needed
-        shardingState.gotShardName(shardName);
+        shardingState->gotShardName(shardName);
 
-        ConnectionString configLoc =
-            ConnectionString::parse(shardingState.getConfigServer(), errmsg);
-        if (!configLoc.isValid()) {
-            warning() << errmsg;
+        auto configLocStatus = ConnectionString::parse(shardingState->getConfigServer());
+        if (!configLocStatus.isOK()) {
+            warning() << configLocStatus.getStatus();
             return false;
         }
 
@@ -657,7 +658,8 @@ public:
 
         // Always check our version remotely
         ChunkVersion shardVersion;
-        Status refreshStatus = shardingState.refreshMetadataNow(txn, ns, &shardVersion);
+        Status refreshStatus = ShardingState::get(getGlobalServiceContext())
+                                   ->refreshMetadataNow(txn, ns, &shardVersion);
 
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "splitChunk cannot split chunk "
@@ -696,7 +698,7 @@ public:
 
         // Get collection metadata
         const std::shared_ptr<CollectionMetadata> collMetadata(
-            shardingState.getCollectionMetadata(ns));
+            ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(ns));
         // With nonzero shard version, we must have metadata
         invariant(NULL != collMetadata);
 
@@ -832,12 +834,14 @@ public:
             // other chunk version, so it's also implicitly the newCollVersion
             ChunkVersion newShardVersion = collVersion;
 
-            // Increment the minor version once, shardingState.splitChunk increments once
+            // Increment the minor version once,
+            // ShardingState::get(getGlobalServiceContext())->splitChunk increments once
             // per split point (resulting in the correct final shard/collection version)
             // TODO: Revisit this interface, it's a bit clunky
             newShardVersion.incMinor();
 
-            shardingState.splitChunk(txn, ns, min, max, splitKeys, newShardVersion);
+            ShardingState::get(getGlobalServiceContext())
+                ->splitChunk(txn, ns, min, max, splitKeys, newShardVersion);
         }
 
         //

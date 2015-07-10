@@ -119,7 +119,7 @@ int runDbTests(int argc, char** argv) {
     getGlobalServiceContext()->initializeGlobalStorageEngine();
 
     // Initialize the sharding state so we can run starding tests in isolation
-    shardingState.initialize("$dummy:10000");
+    ShardingState::get(getGlobalServiceContext())->initialize("$dummy:10000");
 
     // Note: ShardingState::initialize also initializes the distLockMgr.
     auto distLockMgr =

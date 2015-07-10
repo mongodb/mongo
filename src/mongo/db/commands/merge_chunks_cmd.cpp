@@ -28,13 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/d_merge.h"
 
@@ -43,6 +43,8 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 using std::vector;
+
+namespace {
 
 /**
  * Mongod-side command for merging chunks.
@@ -135,13 +137,13 @@ public:
 
         //
         // This might be the first call from mongos, so we may need to pass the config and shard
-        // information to initialize the shardingState.
+        // information to initialize the ShardingState::get(getGlobalServiceContext())->
         //
 
         string config;
         FieldParser::FieldState extracted =
             FieldParser::extract(cmdObj, configField, &config, &errmsg);
-        if (!shardingState.enabled()) {
+        if (!ShardingState::get(getGlobalServiceContext())->enabled()) {
             if (!extracted || extracted == FieldParser::FIELD_NONE) {
                 errmsg =
                     "sharding state must be enabled or "
@@ -149,7 +151,7 @@ public:
                 return false;
             }
 
-            shardingState.initialize(config);
+            ShardingState::get(getGlobalServiceContext())->initialize(config);
         }
 
         // ShardName is optional, but might not be set yet
@@ -159,7 +161,7 @@ public:
         if (!extracted)
             return false;
         if (extracted != FieldParser::FIELD_NONE) {
-            shardingState.gotShardName(shardName);
+            ShardingState::get(getGlobalServiceContext())->gotShardName(shardName);
         }
 
         //
@@ -173,7 +175,8 @@ public:
 
         return mergeChunks(txn, NamespaceString(ns), minKey, maxKey, epoch, &errmsg);
     }
-};
+
+} mergeChunksCmd;
 
 BSONField<string> MergeChunksCommand::nsField("mergeChunks");
 BSONField<vector<BSONObj>> MergeChunksCommand::boundsField("bounds");
@@ -182,9 +185,5 @@ BSONField<string> MergeChunksCommand::configField("config");
 BSONField<string> MergeChunksCommand::shardNameField("shardName");
 BSONField<OID> MergeChunksCommand::epochField("epoch");
 
-MONGO_INITIALIZER(InitMergeChunksCommand)(InitializerContext* context) {
-    // Leaked intentionally: a Command registers itself when constructed.
-    new MergeChunksCommand();
-    return Status::OK();
-}
-}
+}  // namespace
+}  // namespace mongo

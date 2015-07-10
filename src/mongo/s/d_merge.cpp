@@ -72,7 +72,8 @@ bool mergeChunks(OperationContext* txn,
     // Get sharding state up-to-date
     //
 
-    ConnectionString configLoc = ConnectionString::parse(shardingState.getConfigServer(), *errMsg);
+    ConnectionString configLoc = ConnectionString::parse(
+        ShardingState::get(txn)->getConfigServer(), *errMsg);
     if (!configLoc.isValid()) {
         warning() << *errMsg;
         return false;
@@ -95,12 +96,14 @@ bool mergeChunks(OperationContext* txn,
         return false;
     }
 
+    ShardingState* shardingState = ShardingState::get(txn);
+
     //
     // We now have the collection lock, refresh metadata to latest version and sanity check
     //
 
     ChunkVersion shardVersion;
-    Status status = shardingState.refreshMetadataNow(txn, nss.ns(), &shardVersion);
+    Status status = shardingState->refreshMetadataNow(txn, nss.ns(), &shardVersion);
 
     if (!status.isOK()) {
         *errMsg = str::stream() << "could not merge chunks, failed to refresh metadata for "
@@ -120,7 +123,8 @@ bool mergeChunks(OperationContext* txn,
         return false;
     }
 
-    shared_ptr<CollectionMetadata> metadata = shardingState.getCollectionMetadata(nss.ns());
+    shared_ptr<CollectionMetadata> metadata =
+        shardingState->getCollectionMetadata(nss.ns());
 
     if (!metadata || metadata->getKeyPattern().isEmpty()) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
@@ -155,7 +159,7 @@ bool mergeChunks(OperationContext* txn,
     itChunk.setMin(minKey);
     itChunk.setMax(minKey);
     itChunk.setNS(nss.ns());
-    itChunk.setShard(shardingState.getShardName());
+    itChunk.setShard(shardingState->getShardName());
 
     while (itChunk.getMax().woCompare(maxKey) < 0 &&
            metadata->getNextChunk(itChunk.getMax(), &itChunk)) {
@@ -165,7 +169,8 @@ bool mergeChunks(OperationContext* txn,
     if (chunksToMerge.empty()) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
                            << " range starting at " << minKey << " and ending at " << maxKey
-                           << " does not belong to shard " << shardingState.getShardName();
+                           << " does not belong to shard "
+                           << shardingState->getShardName();
 
         warning() << *errMsg;
         return false;
@@ -183,7 +188,7 @@ bool mergeChunks(OperationContext* txn,
     if (!minKeyInRange) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
                            << " range starting at " << minKey << " does not belong to shard "
-                           << shardingState.getShardName();
+                           << shardingState->getShardName();
 
         warning() << *errMsg;
         return false;
@@ -197,7 +202,7 @@ bool mergeChunks(OperationContext* txn,
     if (!maxKeyInRange) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
                            << " range ending at " << maxKey << " does not belong to shard "
-                           << shardingState.getShardName();
+                           << shardingState->getShardName();
 
         warning() << *errMsg;
         return false;
@@ -255,7 +260,8 @@ bool mergeChunks(OperationContext* txn,
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock writeLk(txn->lockState(), nss.db(), MODE_IX);
         Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_X);
-        shardingState.mergeChunks(txn, nss.ns(), minKey, maxKey, mergeVersion);
+
+        shardingState->mergeChunks(txn, nss.ns(), minKey, maxKey, mergeVersion);
     }
 
     //

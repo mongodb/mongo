@@ -302,7 +302,7 @@ void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationCon
 }
 
 void ReplicationCoordinatorExternalStateImpl::clearShardingState() {
-    shardingState.clearCollectionMetadata();
+    ShardingState::get(getGlobalServiceContext())->clearCollectionMetadata();
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {

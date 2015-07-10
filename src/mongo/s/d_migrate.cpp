@@ -62,7 +62,6 @@
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharded_connection_info.h"
@@ -1122,7 +1121,7 @@ public:
 
         // This could be the first call that enables sharding - make sure we initialize the
         // sharding state for this shard.
-        if (!shardingState.enabled()) {
+        if (!ShardingState::get(txn)->enabled()) {
             if (cmdObj["configdb"].type() != String) {
                 errmsg = "sharding not enabled";
                 warning() << errmsg;
@@ -1130,11 +1129,11 @@ public:
             }
 
             const string configdb = cmdObj["configdb"].String();
-            shardingState.initialize(configdb);
+            ShardingState::get(txn)->initialize(configdb);
         }
 
         // Initialize our current shard name in the shard state if needed
-        shardingState.gotShardName(fromShardName);
+        ShardingState::get(txn)->gotShardName(fromShardName);
 
         // Make sure we're as up-to-date as possible with shard information
         // This catches the case where we had to previously changed a shard's host by
@@ -1142,7 +1141,7 @@ public:
         Shard::reloadShardInfo();
 
         ConnectionString configLoc =
-            ConnectionString::parse(shardingState.getConfigServer(), errmsg);
+            ConnectionString::parse(ShardingState::get(txn)->getConfigServer(), errmsg);
         if (!configLoc.isValid()) {
             warning() << errmsg;
             return false;
@@ -1189,7 +1188,8 @@ public:
 
         // Always refresh our metadata remotely
         ChunkVersion origShardVersion;
-        Status refreshStatus = shardingState.refreshMetadataNow(txn, ns, &origShardVersion);
+        Status refreshStatus =
+            ShardingState::get(txn)->refreshMetadataNow(txn, ns, &origShardVersion);
 
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
@@ -1228,7 +1228,7 @@ public:
 
         // Get collection metadata
         const std::shared_ptr<CollectionMetadata> origCollMetadata(
-            shardingState.getCollectionMetadata(ns));
+            ShardingState::get(txn)->getCollectionMetadata(ns));
 
         // With nonzero shard version, we must have metadata
         invariant(NULL != origCollMetadata);
@@ -1312,7 +1312,8 @@ public:
             recvChunkStartBuilder.append("min", min);
             recvChunkStartBuilder.append("max", max);
             recvChunkStartBuilder.append("shardKeyPattern", shardKeyPattern);
-            recvChunkStartBuilder.append("configServer", shardingState.getConfigServer());
+            recvChunkStartBuilder.append("configServer",
+                                         ShardingState::get(txn)->getConfigServer());
             recvChunkStartBuilder.append("secondaryThrottle", isSecondaryThrottle);
 
             // Follow the same convention in moveChunk.
@@ -1466,12 +1467,12 @@ public:
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
                 Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
-                verify(myVersion > shardingState.getVersion(ns));
+                verify(myVersion > ShardingState::get(txn)->getVersion(ns));
 
                 // bump the metadata's version up and "forget" about the chunk being moved
                 // this is not the commit point but in practice the state in this shard won't
                 // until the commit it done
-                shardingState.donateChunk(txn, ns, min, max, myVersion);
+                ShardingState::get(txn)->donateChunk(txn, ns, min, max, myVersion);
             }
 
             log() << "moveChunk setting version to: " << myVersion << migrateLog;
@@ -1508,7 +1509,7 @@ public:
 
                     // revert the chunk manager back to the state before "forgetting" about the
                     // chunk
-                    shardingState.undoDonateChunk(txn, ns, origCollMetadata);
+                    ShardingState::get(txn)->undoDonateChunk(txn, ns, origCollMetadata);
                 }
                 log() << "Shard version successfully reset to clean up failed migration";
 
@@ -1562,7 +1563,7 @@ public:
             // well.  we can figure that out by grabbing the metadata installed on 5.a
 
             const std::shared_ptr<CollectionMetadata> bumpedCollMetadata(
-                shardingState.getCollectionMetadata(ns));
+                ShardingState::get(txn)->getCollectionMetadata(ns));
             if (bumpedCollMetadata->getNumChunks() > 0) {
                 // get another chunk on that shard
                 ChunkType bumpChunk;
@@ -1634,7 +1635,7 @@ public:
 
                 if (MONGO_FAIL_POINT(failMigrationApplyOps)) {
                     throw SocketException(SocketException::RECV_ERROR,
-                                          shardingState.getConfigServer());
+                                          ShardingState::get(txn)->getConfigServer());
                 }
             } catch (const DBException& ex) {
                 warning() << ex << migrateLog;
@@ -1658,7 +1659,7 @@ public:
 
                     // Revert the metadata back to the state before "forgetting"
                     // about the chunk.
-                    shardingState.undoDonateChunk(txn, ns, origCollMetadata);
+                    ShardingState::get(txn)->undoDonateChunk(txn, ns, origCollMetadata);
                 }
 
                 log() << "Shard version successfully reset to clean up failed migration";
@@ -1890,7 +1891,7 @@ public:
             Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
 
             string errMsg;
-            if (!shardingState.forgetPending(txn, ns, min, max, epoch, &errMsg)) {
+            if (!ShardingState::get(txn)->forgetPending(txn, ns, min, max, epoch, &errMsg)) {
                 warning() << errMsg;
             }
         }
@@ -2065,7 +2066,7 @@ public:
                 Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
                 Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
 
-                if (!shardingState.notePending(txn, ns, min, max, epoch, &errmsg)) {
+                if (!ShardingState::get(txn)->notePending(txn, ns, min, max, epoch, &errmsg)) {
                     warning() << errmsg;
                     setState(FAIL);
                     return;
@@ -2682,10 +2683,10 @@ public:
             return false;
         }
 
-        if (!shardingState.enabled()) {
+        if (!ShardingState::get(txn)->enabled()) {
             if (!cmdObj["configServer"].eoo()) {
                 dassert(cmdObj["configServer"].type() == String);
-                shardingState.initialize(cmdObj["configServer"].String());
+                ShardingState::get(txn)->initialize(cmdObj["configServer"].String());
             } else {
                 errmsg = str::stream()
                     << "cannot start recv'ing chunk, "
@@ -2698,7 +2699,7 @@ public:
 
         if (!cmdObj["toShardName"].eoo()) {
             dassert(cmdObj["toShardName"].type() == String);
-            shardingState.gotShardName(cmdObj["toShardName"].String());
+            ShardingState::get(txn)->gotShardName(cmdObj["toShardName"].String());
         }
 
         string ns = cmdObj.firstElement().String();
@@ -2710,7 +2711,7 @@ public:
         // We force the remote refresh here to make the behavior consistent and predictable,
         // generally we'd refresh anyway, and to be paranoid.
         ChunkVersion currentVersion;
-        Status status = shardingState.refreshMetadataNow(txn, ns, &currentVersion);
+        Status status = ShardingState::get(txn)->refreshMetadataNow(txn, ns, &currentVersion);
 
         if (!status.isOK()) {
             errmsg = str::stream() << "cannot start recv'ing chunk "

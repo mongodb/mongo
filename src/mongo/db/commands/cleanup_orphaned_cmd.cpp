@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -45,25 +44,22 @@
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/util/log.h"
 
+namespace mongo {
+
+using std::string;
+using str::stream;
+
 namespace {
-using mongo::WriteConcernOptions;
 
 const int kDefaultWTimeoutMs = 60 * 1000;
 const WriteConcernOptions DefaultWriteConcern(WriteConcernOptions::kMajority,
                                               WriteConcernOptions::NONE,
                                               kDefaultWTimeoutMs);
-}
-
-namespace mongo {
-
-using std::endl;
-using std::string;
-
-using mongoutils::str::stream;
 
 enum CleanupResult { CleanupResult_Done, CleanupResult_Continue, CleanupResult_Error };
 
@@ -85,10 +81,11 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
                                   string* errMsg) {
     BSONObj startingFromKey = startingFromKeyConst;
 
-    CollectionMetadataPtr metadata = shardingState.getCollectionMetadata(ns.toString());
+    std::shared_ptr<CollectionMetadata> metadata =
+        ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(ns.toString());
     if (!metadata || metadata->getKeyPattern().isEmpty()) {
         warning() << "skipping orphaned data cleanup for " << ns.toString()
-                  << ", collection is not sharded" << endl;
+                  << ", collection is not sharded";
 
         return CleanupResult_Done;
     }
@@ -99,7 +96,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
             *errMsg = stream() << "could not cleanup orphaned data, start key " << startingFromKey
                                << " does not match shard key pattern " << keyPattern;
 
-            warning() << *errMsg << endl;
+            warning() << *errMsg;
             return CleanupResult_Error;
         }
     } else {
@@ -109,7 +106,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
     KeyRange orphanRange;
     if (!metadata->getNextOrphanRange(startingFromKey, &orphanRange)) {
         LOG(1) << "orphaned data cleanup requested for " << ns.toString() << " starting from "
-               << startingFromKey << ", no orphan ranges remain" << endl;
+               << startingFromKey << ", no orphan ranges remain";
 
         return CleanupResult_Done;
     }
@@ -121,7 +118,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
 
     LOG(1) << "orphaned data cleanup requested for " << ns.toString() << " starting from "
            << startingFromKey << ", removing next orphan range"
-           << " [" << orphanRange.minKey << "," << orphanRange.maxKey << ")" << endl;
+           << " [" << orphanRange.minKey << "," << orphanRange.maxKey << ")";
 
     // Metadata snapshot may be stale now, but deleter checks metadata again in write lock
     // before delete.
@@ -135,7 +132,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
     deleterOptions.removeSaverReason = "cleanup-cmd";
 
     if (!getDeleter()->deleteNow(txn, deleterOptions, errMsg)) {
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return CleanupResult_Error;
     }
 
@@ -258,18 +255,19 @@ public:
             writeConcern.wTimeout = kDefaultWTimeoutMs;
         }
 
-        if (!shardingState.enabled()) {
+        if (!ShardingState::get(getGlobalServiceContext())->enabled()) {
             errmsg = str::stream() << "server is not part of a sharded cluster or "
                                    << "the sharding metadata is not yet initialized.";
             return false;
         }
 
         ChunkVersion shardVersion;
-        status = shardingState.refreshMetadataNow(txn, ns, &shardVersion);
+        status = ShardingState::get(getGlobalServiceContext())
+                     ->refreshMetadataNow(txn, ns, &shardVersion);
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::RemoteChangeDetected) {
                 warning() << "Shard version in transition detected while refreshing "
-                          << "metadata for " << ns << " at version " << shardVersion << endl;
+                          << "metadata for " << ns << " at version " << shardVersion;
             } else {
                 errmsg = str::stream() << "failed to refresh shard metadata: " << status.reason();
                 return false;
@@ -292,16 +290,12 @@ public:
 
         return true;
     }
-};
+
+} cleanupOrphanedCmd;
 
 BSONField<string> CleanupOrphanedCommand::nsField("cleanupOrphaned");
 BSONField<BSONObj> CleanupOrphanedCommand::startingFromKeyField("startingFromKey");
 BSONField<BSONObj> CleanupOrphanedCommand::stoppedAtKeyField("stoppedAtKey");
 
-MONGO_INITIALIZER(RegisterCleanupOrphanedCommand)(InitializerContext* context) {
-    // Leaked intentionally: a Command registers itself when constructed.
-    new CleanupOrphanedCommand();
-    return Status::OK();
-}
-
+}  // namespace
 }  // namespace mongo

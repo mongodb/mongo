@@ -273,20 +273,22 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
         dassert(requestMetadata);
 
         // Make sure our shard name is set or is the same as what was set previously
-        if (shardingState.setShardName(requestMetadata->getShardName())) {
+        if (ShardingState::get(getGlobalServiceContext())
+                ->setShardName(requestMetadata->getShardName())) {
             //
             // First, we refresh metadata if we need to based on the requested version.
             //
 
             ChunkVersion latestShardVersion;
-            shardingState.refreshMetadataIfNeeded(_txn,
-                                                  request.getTargetingNS(),
-                                                  requestMetadata->getShardVersion(),
-                                                  &latestShardVersion);
+            ShardingState::get(getGlobalServiceContext())
+                ->refreshMetadataIfNeeded(_txn,
+                                          request.getTargetingNS(),
+                                          requestMetadata->getShardVersion(),
+                                          &latestShardVersion);
 
             // Report if we're still changing our metadata
             // TODO: Better reporting per-collection
-            if (shardingState.inCriticalMigrateSection()) {
+            if (ShardingState::get(getGlobalServiceContext())->inCriticalMigrateSection()) {
                 noteInCriticalSection(writeErrors.back());
             }
 
@@ -309,12 +311,14 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
 
                 if (requestShardVersion.isOlderThan(latestShardVersion) &&
                     !requestShardVersion.isWriteCompatibleWith(latestShardVersion)) {
-                    while (shardingState.inCriticalMigrateSection()) {
+                    while (
+                        ShardingState::get(getGlobalServiceContext())->inCriticalMigrateSection()) {
                         log() << "write request to old shard version "
                               << requestMetadata->getShardVersion().toString()
                               << " waiting for migration commit" << endl;
 
-                        shardingState.waitTillNotInCriticalSection(10 /* secs */);
+                        ShardingState::get(getGlobalServiceContext())
+                            ->waitTillNotInCriticalSection(10 /* secs */);
                     }
                 }
             }
@@ -395,7 +399,6 @@ static void buildStaleError(const ChunkVersion& shardVersionRecvd,
 }
 
 static bool checkShardVersion(OperationContext* txn,
-                              ShardingState* shardingState,
                               const BatchedCommandRequest& request,
                               WriteOpResult* result) {
     const NamespaceString& nss = request.getTargetingNSS();
@@ -406,6 +409,7 @@ static bool checkShardVersion(OperationContext* txn,
         ? request.getMetadata()->getShardVersion()
         : ChunkVersion::IGNORED();
 
+    ShardingState* shardingState = ShardingState::get(getGlobalServiceContext());
     if (shardingState->enabled()) {
         CollectionMetadataPtr metadata = shardingState->getCollectionMetadata(nss.ns());
 
@@ -445,7 +449,6 @@ static void buildUniqueIndexError(const BSONObj& keyPattern,
 }
 
 static bool checkIndexConstraints(OperationContext* txn,
-                                  ShardingState* shardingState,
                                   const BatchedCommandRequest& request,
                                   WriteOpResult* result) {
     const NamespaceString& nss = request.getTargetingNSS();
@@ -454,6 +457,7 @@ static bool checkIndexConstraints(OperationContext* txn,
     if (!request.isUniqueIndexRequest())
         return true;
 
+    ShardingState* shardingState = ShardingState::get(getGlobalServiceContext());
     if (shardingState->enabled()) {
         CollectionMetadataPtr metadata = shardingState->getCollectionMetadata(nss.ns());
 
@@ -944,10 +948,10 @@ bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* resu
     if (!checkIsMasterForDatabase(nss, result)) {
         return false;
     }
-    if (!checkShardVersion(txn, &shardingState, *request, result)) {
+    if (!checkShardVersion(txn, *request, result)) {
         return false;
     }
-    if (!checkIndexConstraints(txn, &shardingState, *request, result)) {
+    if (!checkIndexConstraints(txn, *request, result)) {
         return false;
     }
 
@@ -1181,8 +1185,9 @@ static void multiUpdate(OperationContext* txn,
             return;
         }
 
-        if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
+        if (!checkShardVersion(txn, *updateItem.getRequest(), result)) {
             return;
+        }
 
         Database* const db = dbHolder().get(txn, nsString.db());
 
@@ -1324,7 +1329,7 @@ static void multiRemove(OperationContext* txn,
             }
             // Check version once we're locked
 
-            if (!checkShardVersion(txn, &shardingState, *removeItem.getRequest(), result)) {
+            if (!checkShardVersion(txn, *removeItem.getRequest(), result)) {
                 // Version error
                 return;
             }

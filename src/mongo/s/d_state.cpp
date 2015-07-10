@@ -91,10 +91,10 @@ public:
 
 
 bool haveLocalShardingInfo(Client* client, const string& ns) {
-    if (!shardingState.enabled())
+    if (!ShardingState::get(client->getServiceContext())->enabled())
         return false;
 
-    if (!shardingState.hasVersion(ns))
+    if (!ShardingState::get(client->getServiceContext())->hasVersion(ns))
         return false;
 
     return ShardedConnectionInfo::get(client, false) != NULL;
@@ -170,15 +170,16 @@ public:
             return false;
         }
 
-        if (shardingState.enabled()) {
-            if (configdb == shardingState.getConfigServer())
+        if (ShardingState::get(txn)->enabled()) {
+            if (configdb == ShardingState::get(txn)->getConfigServer())
                 return true;
 
             result.append("configdb",
-                          BSON("stored" << shardingState.getConfigServer() << "given" << configdb));
+                          BSON("stored" << ShardingState::get(txn)->getConfigServer() << "given"
+                                        << configdb));
 
             errmsg = str::stream() << "mongos specified a different config database string : "
-                                   << "stored : " << shardingState.getConfigServer()
+                                   << "stored : " << ShardingState::get(txn)->getConfigServer()
                                    << " vs given : " << configdb;
             return false;
         }
@@ -190,7 +191,7 @@ public:
         }
 
         if (locked) {
-            shardingState.initialize(configdb);
+            ShardingState::get(txn)->initialize(configdb);
             return true;
         }
 
@@ -240,7 +241,8 @@ public:
         if (cmdObj["shard"].type() == String) {
             // The shard host is also sent when using setShardVersion, report this host if there
             // is an error.
-            shardingState.gotShardNameAndHost(cmdObj["shard"].String(), cmdObj["shardHost"].str());
+            ShardingState::get(txn)
+                ->gotShardNameAndHost(cmdObj["shard"].String(), cmdObj["shardHost"].str());
         }
 
         // Handle initial shard connection
@@ -280,7 +282,7 @@ public:
         // step 3
 
         const ChunkVersion oldVersion = info->getVersion(ns);
-        const ChunkVersion globalVersion = shardingState.getVersion(ns);
+        const ChunkVersion globalVersion = ShardingState::get(txn)->getVersion(ns);
 
         oldVersion.addToBSON(result, "oldVersion");
 
@@ -332,9 +334,9 @@ public:
 
             // TODO: Refactor all of this
             if (version < globalVersion && version.hasEqualEpoch(globalVersion)) {
-                while (shardingState.inCriticalMigrateSection()) {
+                while (ShardingState::get(txn)->inCriticalMigrateSection()) {
                     log() << "waiting till out of critical section";
-                    shardingState.waitTillNotInCriticalSection(10);
+                    ShardingState::get(txn)->waitTillNotInCriticalSection(10);
                 }
                 errmsg = str::stream() << "shard global version for collection is higher "
                                        << "than trying to set to '" << ns << "'";
@@ -348,9 +350,9 @@ public:
             if (!globalVersion.isSet() && !authoritative) {
                 // Needed b/c when the last chunk is moved off a shard,
                 // the version gets reset to zero, which should require a reload.
-                while (shardingState.inCriticalMigrateSection()) {
+                while (ShardingState::get(txn)->inCriticalMigrateSection()) {
                     log() << "waiting till out of critical section";
-                    shardingState.waitTillNotInCriticalSection(10);
+                    ShardingState::get(txn)->waitTillNotInCriticalSection(10);
                 }
 
                 // need authoritative for first look
@@ -364,7 +366,8 @@ public:
         }
 
         ChunkVersion currVersion;
-        Status status = shardingState.refreshMetadataIfNeeded(txn, ns, version, &currVersion);
+        Status status =
+            ShardingState::get(txn)->refreshMetadataIfNeeded(txn, ns, version, &currVersion);
 
         if (!status.isOK()) {
             // The reload itself was interrupted or confused here
@@ -459,13 +462,13 @@ public:
             return false;
         }
 
-        if (shardingState.enabled()) {
-            result.append("configServer", shardingState.getConfigServer());
+        if (ShardingState::get(txn)->enabled()) {
+            result.append("configServer", ShardingState::get(txn)->getConfigServer());
         } else {
             result.append("configServer", "");
         }
 
-        result.appendTimestamp("global", shardingState.getVersion(ns).toLong());
+        result.appendTimestamp("global", ShardingState::get(txn)->getVersion(ns).toLong());
 
         ShardedConnectionInfo* const info = ShardedConnectionInfo::get(txn->getClient(), false);
         result.appendBool("inShardedMode", info != NULL);
@@ -476,7 +479,8 @@ public:
         }
 
         if (cmdObj["fullMetadata"].trueValue()) {
-            shared_ptr<CollectionMetadata> metadata = shardingState.getCollectionMetadata(ns);
+            shared_ptr<CollectionMetadata> metadata =
+                ShardingState::get(txn)->getCollectionMetadata(ns);
             if (metadata) {
                 result.append("metadata", metadata->toBSON());
             } else {
@@ -515,7 +519,7 @@ public:
         Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
         OldClientContext ctx(txn, dbname);
 
-        shardingState.appendInfo(result);
+        ShardingState::get(txn)->appendInfo(result);
         return true;
     }
 
@@ -530,8 +534,10 @@ static bool shardVersionOk(Client* client,
                            string& errmsg,
                            ChunkVersion& received,
                            ChunkVersion& wanted) {
-    if (!shardingState.enabled())
+    ShardingState* shardingState = ShardingState::get(client->getServiceContext());
+    if (!shardingState->enabled()) {
         return true;
+    }
 
     if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsToDatabase(ns))) {
         // right now connections to secondaries aren't versioned at all
@@ -559,7 +565,7 @@ static bool shardVersionOk(Client* client,
         return true;
     }
 
-    wanted = shardingState.getVersion(ns);
+    wanted = shardingState->getVersion(ns);
 
     if (received.isWriteCompatibleWith(wanted))
         return true;
@@ -602,9 +608,7 @@ static bool shardVersionOk(Client* client,
     }
 
     // Those are all the reasons the versions can mismatch
-    verify(false);
-
-    return false;
+    MONGO_UNREACHABLE;
 }
 
 void ensureShardVersionOKOrThrow(Client* client, const std::string& ns) {

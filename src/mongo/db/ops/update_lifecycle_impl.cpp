@@ -43,8 +43,8 @@ namespace mongo {
 namespace {
 
 std::shared_ptr<CollectionMetadata> getMetadata(const NamespaceString& nsString) {
-    if (shardingState.enabled()) {
-        return shardingState.getCollectionMetadata(nsString.ns());
+    if (ShardingState::get(getGlobalServiceContext())->enabled()) {
+        return ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(nsString.ns());
     }
 
     return nullptr;

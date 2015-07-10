@@ -58,8 +58,11 @@ using std::shared_ptr;
 using std::string;
 using std::vector;
 
-// Global sharding state instance
-ShardingState shardingState;
+namespace {
+
+const auto getShardingState = ServiceContext::declareDecoration<ShardingState>();
+
+}  // namespace
 
 bool isMongos() {
     return false;
@@ -70,6 +73,14 @@ ShardingState::ShardingState()
       _configServerTickets(3 /* max number of concurrent config server refresh threads */) {}
 
 ShardingState::~ShardingState() = default;
+
+ShardingState* ShardingState::get(ServiceContext* serviceContext) {
+    return &getShardingState(serviceContext);
+}
+
+ShardingState* ShardingState::get(OperationContext* operationContext) {
+    return ShardingState::get(operationContext->getServiceContext());
+}
 
 bool ShardingState::enabled() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);

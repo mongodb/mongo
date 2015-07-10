@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 
@@ -65,7 +66,9 @@ public:
 
     bool isSharded(const NamespaceString& ns) final {
         const ChunkVersion unsharded(0, 0, OID());
-        return !(shardingState.getVersion(ns.ns()).isWriteCompatibleWith(unsharded));
+        return !(ShardingState::get(getGlobalServiceContext())
+                     ->getVersion(ns.ns())
+                     .isWriteCompatibleWith(unsharded));
     }
 
     bool isCapped(const NamespaceString& ns) final {
