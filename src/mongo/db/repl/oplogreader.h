@@ -35,6 +35,7 @@
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -91,7 +92,7 @@ public:
     }
 
     /* SO_TIMEOUT (send/recv time out) for our DBClientConnections */
-    static const int tcp_timeout = 30;
+    static const Seconds kSocketTimeout;
 
     /* ok to call if already connected */
     bool connect(const HostAndPort& host);

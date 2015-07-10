@@ -76,6 +76,8 @@ bool replAuthenticate(DBClientBase* conn) {
     return authenticateInternalUser(conn);
 }
 
+const Seconds OplogReader::kSocketTimeout(30);
+
 OplogReader::OplogReader() {
     _tailingQueryOptions = QueryOption_SlaveOk;
     _tailingQueryOptions |= QueryOption_CursorTailable | QueryOption_OplogReplay;
@@ -89,7 +91,8 @@ OplogReader::OplogReader() {
 bool OplogReader::connect(const HostAndPort& host) {
     if (conn() == NULL || _host != host) {
         resetConnection();
-        _conn = shared_ptr<DBClientConnection>(new DBClientConnection(false, tcp_timeout));
+        _conn =
+            shared_ptr<DBClientConnection>(new DBClientConnection(false, kSocketTimeout.count()));
         string errmsg;
         if (!_conn->connect(host, errmsg) ||
             (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate(_conn.get()))) {

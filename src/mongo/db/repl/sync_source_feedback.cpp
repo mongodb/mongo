@@ -79,7 +79,7 @@ bool SyncSourceFeedback::_connect(OperationContext* txn, const HostAndPort& host
         return true;
     }
     log() << "setting syncSourceFeedback to " << host.toString();
-    _connection.reset(new DBClientConnection(false, OplogReader::tcp_timeout));
+    _connection.reset(new DBClientConnection(false, OplogReader::kSocketTimeout.count()));
     string errmsg;
     try {
         if (!_connection->connect(host, errmsg) ||
