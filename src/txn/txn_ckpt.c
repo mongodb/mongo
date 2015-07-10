@@ -880,7 +880,7 @@ nockpt:			F_SET(btree, WT_BTREE_SKIP_CKPT);
 	 * Hold the lock until we're done (blocking hot backups from starting),
 	 * we don't want to race with a future hot backup.
 	 */
-	__wt_spin_lock(session, &conn->hot_backup_lock);
+	WT_ERR(__wt_readlock(session, conn->hot_backup_lock));
 	hot_backup_locked = 1;
 	if (conn->hot_backup)
 		WT_CKPT_FOREACH(ckptbase, ckpt) {
@@ -1099,7 +1099,7 @@ err:	/*
 		btree->modified = 1;
 
 	if (hot_backup_locked)
-		__wt_spin_unlock(session, &conn->hot_backup_lock);
+		WT_RET(__wt_readunlock(session, conn->hot_backup_lock));
 
 	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);

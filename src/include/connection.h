@@ -266,7 +266,7 @@ struct __wt_connection_impl {
 
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
-	WT_SPINLOCK hot_backup_lock;	/* Hot backup serialization */
+	WT_RWLOCK *hot_backup_lock;	/* Hot backup serialization */
 	int hot_backup;
 
 	WT_SESSION_IMPL *ckpt_session;	/* Checkpoint thread session */
