@@ -362,7 +362,7 @@ tasks:
           set -o errexit
           set -o verbose
 
-          git clone git@github.com:10gen/jstestfuzz.git || true
+          git clone git@github.com:10gen/jstestfuzz.git
     - command: shell.exec
       params:
         working_dir: src
@@ -370,8 +370,8 @@ tasks:
           set -o errexit
           set -o verbose
 
-          curl -s -m 600 http://nodejs.org/dist/v0.12.4/node-v0.12.4-linux-x64.tar.gz --output node.tar.gz || true
-          ${decompress} node.tar.gz || true
+          curl --silent --max-time 600 http://boxes.10gen.com/build/node-v0.12.4-linux-x64.tar.gz --output node.tar.gz
+          ${decompress} node.tar.gz
     - command: shell.exec
       params:
         working_dir: src/jstestfuzz
@@ -381,8 +381,22 @@ tasks:
 
           export PATH="$PATH":${workdir}/src/node-v0.12.4-linux-x64/bin
 
+          # Create an output directory for the generated test cases and ensure it always contains at least one JS file
+          # for resmoke to run so that glob expansion cannot result in an error.
+          mkdir -p out
+          touch out/dummy.js
+
           npm install || true
-          npm start || true
+          npm start -- --jsTestsDir ../jstests || true
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          cp mongodb*/bin/* .
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --log=buildlogger --reportFile=report.json jstestfuzz/out/*.js
 
 ## integration test suites ##
 
