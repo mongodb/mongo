@@ -24,17 +24,29 @@
     var secondary = replSet.getSecondary();
 
     // Do an initial insert to prevent the secondary from going into recovery
+    var numDocuments = 20;
     var bulk = primary.getDB("foo").foo.initializeUnorderedBulkOp();
     var bigString = Array(1024*1024).toString();
     primary.getDB("foo").foo.insert({ big: bigString});
     replSet.awaitReplication();
     secondary.getDB("admin").runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 
-    for (var i = 0; i < 99; ++i) {
+    var bufferCountBefore = secondary.getDB('foo').serverStatus().metrics.repl.buffer.count;
+    for (var i = 1; i < numDocuments; ++i) {
         bulk.insert({ big: bigString});
     }
     bulk.execute();
-    assert.eq(primary.getDB("foo").foo.count(), 100);
+    print('Number of documents inserted into collection on primary: ' + numDocuments);
+    assert.eq(numDocuments, primary.getDB("foo").foo.count());
+
+    assert.soon(function() {
+        var serverStatus = secondary.getDB('foo').serverStatus();
+        var bufferCount = serverStatus.metrics.repl.buffer.count;
+        var bufferCountChange = bufferCount - bufferCountBefore;
+        print('Number of operations buffered on secondary since stopping applier: ' +
+              bufferCountChange);
+        return bufferCountChange >= numDocuments - 1;
+    }, 'secondary did not buffer operations for new inserts on primary', 30000, 1000);
 
     // Kill primary; secondary will enter drain mode to catch up
     primary.getDB("admin").shutdownServer({force:true});

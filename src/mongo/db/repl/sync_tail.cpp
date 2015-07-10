@@ -540,6 +540,11 @@ void SyncTail::oplogApplication() {
                     break;
                 }
             }
+
+            if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+                break;
+            }
+
             // keep fetching more ops as long as we haven't filled up a full batch yet
         } while (!tryPopAndWaitForMore(&txn, &ops, replCoord) &&  // tryPopAndWaitForMore returns
                                                                   // true when we need to end a
