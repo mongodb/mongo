@@ -653,7 +653,7 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 			glf.Writer.WriteCell(line.NodeType)
 		}
 
-		glf.Writer.WriteCell(fmt.Sprintf("%v", line.Time.Format("15:04:05")))
+		glf.Writer.WriteCell(fmt.Sprintf("%v", line.Time.Format("2006-01-02T15:04:05Z07:00")))
 		glf.Writer.EndRow()
 	}
 	glf.Writer.Flush(buf)
