@@ -42,7 +42,7 @@ function doCommittedRead() {
 }
 
 // Do a write, wait for it to replicate, and ensure it is visible.
-assert.writeOK(t.save({_id: 1, state: 0}, {writeConcern: {w: 2, wtimeout: 60*1000}}));
+assert.writeOK(t.save({_id: 1, state: 0}, {writeConcern: {w: "majority", wtimeout: 60*1000}}));
 assert.eq(doDirtyRead(), 0);
 assert.eq(doCommittedRead(), 0);
 
@@ -60,7 +60,7 @@ assert.eq(doCommittedRead(), 0);
 
 // Restart the node and ensure the committed view is updated.
 replTest.restart(slaveId);
-db.getLastError(2, 60*1000);
+db.getLastError("majority", 60*1000);
 assert.eq(doDirtyRead(), 1);
 assert.eq(doCommittedRead(), 1);
 }());
