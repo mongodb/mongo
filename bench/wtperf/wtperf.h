@@ -102,6 +102,21 @@ typedef struct {
 	uint8_t ops[100];		/* Operation schedule */
 } WORKLOAD;
 
+/* Steering items for the truncate workload */
+typedef struct __truncate_struct TRUNCATE_CONFIG;
+struct __truncate_struct {
+	double truncation_percentage;
+	uint64_t truncate_milestone_gap;
+	uint64_t needed_milestones;
+	uint64_t final_milestone_gap;
+	uint64_t expected_total;
+	uint64_t total_gross_inserts;
+	uint64_t last_total_inserts;
+	uint64_t num_milestones;
+	uint64_t last_key;
+
+};
+
 /* Queue entry for use with the Truncate Logic */
 struct __truncate_queue_entry {
 	char *key;			/* Truncation point */
