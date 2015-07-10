@@ -89,11 +89,10 @@ public:
     virtual ConnectionString connectionString() const = 0;
 
     /**
-     * Performs implementation-specific startup tasks including but not limited to doing any
-     * necessary config schema upgrade work.  Must be run after the catalog manager
+     * Performs implementation-specific startup tasks. Must be run after the catalog manager
      * has been installed into the global 'grid' object.
      */
-    virtual Status startup(bool upgrade) = 0;
+    virtual Status startup() = 0;
 
     /**
      * Performs necessary cleanup when shutting down cleanly.
@@ -400,6 +399,13 @@ public:
                   const BSONObj& query,
                   int limit,
                   BatchedCommandResponse* response);
+
+    /**
+     * Performs the necessary checks for version compatibility and can run the upgrade procedure.
+     * A new version document will be created if the current cluster config is empty. Otherwise,
+     * checkOnly should be false to perform the upgrade.
+     */
+    virtual Status checkAndUpgrade(bool checkOnly) = 0;
 
 protected:
     CatalogManager() = default;

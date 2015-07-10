@@ -47,10 +47,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
@@ -112,7 +114,7 @@ Status CatalogManagerReplicaSet::init(const ConnectionString& configCS,
     return Status::OK();
 }
 
-Status CatalogManagerReplicaSet::startup(bool upgrade) {
+Status CatalogManagerReplicaSet::startup() {
     return Status::OK();
 }
 
@@ -866,6 +868,123 @@ StatusWith<long long> CatalogManagerReplicaSet::_runCountCommand(const HostAndPo
     }
 
     return result;
+}
+
+Status CatalogManagerReplicaSet::checkAndUpgrade(bool checkOnly) {
+    auto versionStatus = _getConfigVersion();
+    if (!versionStatus.isOK()) {
+        return versionStatus.getStatus();
+    }
+
+    auto versionInfo = versionStatus.getValue();
+    if (versionInfo.getMinCompatibleVersion() > CURRENT_CONFIG_VERSION) {
+        return {ErrorCodes::IncompatibleShardingConfigVersion,
+                str::stream() << "current version v" << CURRENT_CONFIG_VERSION
+                              << " is older than the cluster min compatible v"
+                              << versionInfo.getMinCompatibleVersion()};
+    }
+
+    if (versionInfo.getCurrentVersion() == UpgradeHistory_EmptyVersion) {
+        VersionType newVersion;
+        newVersion.setClusterId(OID::gen());
+
+        // For v3.2, only v3.2 binaries can talk to RS Config servers.
+        newVersion.setMinCompatibleVersion(CURRENT_CONFIG_VERSION);
+        newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
+
+        BSONObj versionObj(newVersion.toBSON());
+
+        return update(VersionType::ConfigNS,
+                      versionObj,
+                      versionObj,
+                      true /* upsert*/,
+                      false /* multi */,
+                      nullptr);
+    }
+
+    if (versionInfo.getCurrentVersion() == UpgradeHistory_UnreportedVersion) {
+        return {ErrorCodes::IncompatibleShardingConfigVersion,
+                "Assuming config data is old since the version document cannot be found in the"
+                "config server and it contains databases aside 'local' and 'admin'. "
+                "Please upgrade if this is the case. Otherwise, make sure that the config "
+                "server is clean."};
+    }
+
+    if (versionInfo.getCurrentVersion() < CURRENT_CONFIG_VERSION) {
+        return {ErrorCodes::IncompatibleShardingConfigVersion,
+                str::stream() << "need to upgrade current cluster version to v"
+                              << CURRENT_CONFIG_VERSION << "; currently at v"
+                              << versionInfo.getCurrentVersion()};
+    }
+
+    return Status::OK();
+}
+
+StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion() {
+    const auto configShard = grid.shardRegistry()->getShard("config");
+    const auto readHostStatus = configShard->getTargeter()->findHost(kConfigReadSelector);
+    if (!readHostStatus.isOK()) {
+        return readHostStatus.getStatus();
+    }
+
+    auto readHost = readHostStatus.getValue();
+    auto findStatus = grid.shardRegistry()->exhaustiveFind(readHost,
+                                                           NamespaceString(VersionType::ConfigNS),
+                                                           BSONObj(),
+                                                           BSONObj(),
+                                                           boost::none /* no limit */);
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    auto queryResults = findStatus.getValue();
+
+    if (queryResults.size() > 1) {
+        return {ErrorCodes::RemoteValidationError,
+                str::stream() << "should only have 1 document in " << VersionType::ConfigNS};
+    }
+
+    if (queryResults.empty()) {
+        auto cmdStatus =
+            grid.shardRegistry()->runCommand(readHost, "admin", BSON("listDatabases" << 1));
+        if (!cmdStatus.isOK()) {
+            return cmdStatus.getStatus();
+        }
+
+        const BSONObj& cmdResult = cmdStatus.getValue();
+
+        Status cmdResultStatus = getStatusFromCommandResult(cmdResult);
+        if (!cmdResultStatus.isOK()) {
+            return cmdResultStatus;
+        }
+
+        for (const auto& dbEntry : cmdResult["databases"].Obj()) {
+            const string& dbName = dbEntry["name"].String();
+
+            if (dbName != "local" && dbName != "admin") {
+                VersionType versionInfo;
+                versionInfo.setMinCompatibleVersion(UpgradeHistory_UnreportedVersion);
+                versionInfo.setCurrentVersion(UpgradeHistory_UnreportedVersion);
+                return versionInfo;
+            }
+        }
+
+        VersionType versionInfo;
+        versionInfo.setMinCompatibleVersion(UpgradeHistory_EmptyVersion);
+        versionInfo.setCurrentVersion(UpgradeHistory_EmptyVersion);
+        return versionInfo;
+    }
+
+    BSONObj versionDoc = queryResults.front();
+    VersionType versionInfo;
+    string errMsg;
+    if (!versionInfo.parseBSON(versionDoc, &errMsg) || !versionInfo.isValid(&errMsg)) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "invalid config version document " << versionDoc
+                                    << causedBy(errMsg.c_str()));
+    }
+
+    return versionInfo;
 }
 
 }  // namespace mongo

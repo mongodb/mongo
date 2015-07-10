@@ -46,6 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/config_coordinator.h"
 #include "mongo/s/catalog/legacy/config_upgrade.h"
@@ -53,6 +54,7 @@
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -217,23 +219,22 @@ Status CatalogManagerLegacy::init(const ConnectionString& configDBCS) {
     return Status::OK();
 }
 
-Status CatalogManagerLegacy::startup(bool upgrade) {
+Status CatalogManagerLegacy::startup() {
     Status status = _startConfigServerChecker();
     if (!status.isOK()) {
         return status;
     }
 
-    status = _checkAndUpgradeConfigMetadata(upgrade);
     return status;
 }
 
-Status CatalogManagerLegacy::_checkAndUpgradeConfigMetadata(bool doUpgrade) {
+Status CatalogManagerLegacy::checkAndUpgrade(bool checkOnly) {
     VersionType initVersionInfo;
     VersionType versionInfo;
     string errMsg;
 
     bool upgraded =
-        checkAndUpgradeConfigVersion(this, doUpgrade, &initVersionInfo, &versionInfo, &errMsg);
+        checkAndUpgradeConfigVersion(this, !checkOnly, &initVersionInfo, &versionInfo, &errMsg);
     if (!upgraded) {
         return Status(ErrorCodes::IncompatibleShardingMetadata,
                       str::stream() << "error upgrading config database to v"

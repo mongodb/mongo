@@ -36,6 +36,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/mongo_version_range.h"

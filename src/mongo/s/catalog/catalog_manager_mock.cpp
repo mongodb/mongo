@@ -53,7 +53,7 @@ ConnectionString CatalogManagerMock::connectionString() const {
     return kConfigHost;
 }
 
-Status CatalogManagerMock::startup(bool upgrade) {
+Status CatalogManagerMock::startup() {
     return Status::OK();
 }
 
@@ -176,6 +176,10 @@ Status CatalogManagerMock::_checkDbDoesNotExist(const std::string& dbName, Datab
 
 StatusWith<std::string> CatalogManagerMock::_generateNewShardName() const {
     return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
+Status CatalogManagerMock::checkAndUpgrade(bool checkOnly) {
+    return Status::OK();
 }
 
 }  // namespace mongo

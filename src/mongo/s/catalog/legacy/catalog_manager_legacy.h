@@ -51,7 +51,7 @@ public:
      */
     Status init(const ConnectionString& configCS);
 
-    Status startup(bool upgrade) override;
+    Status startup() override;
 
     ConnectionString connectionString() const override;
 
@@ -122,15 +122,12 @@ public:
 
     DistLockManager* getDistLockManager() const override;
 
+    Status checkAndUpgrade(bool checkOnly) override;
+
 private:
     Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const override;
 
     StatusWith<std::string> _generateNewShardName() const override;
-
-    /**
-     * Updates the config server's metadata to the current version.
-     */
-    Status _checkAndUpgradeConfigMetadata(bool doUpgrade);
 
     /**
      * Starts the thread that periodically checks data consistency amongst the config servers.

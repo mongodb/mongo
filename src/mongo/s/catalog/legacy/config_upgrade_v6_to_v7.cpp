@@ -33,6 +33,7 @@
 #include "mongo/s/catalog/legacy/config_upgrade.h"
 
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/config_upgrade_helpers.h"
 #include "mongo/s/catalog/type_config_version.h"

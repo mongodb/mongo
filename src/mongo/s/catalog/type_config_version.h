@@ -58,8 +58,6 @@ namespace mongo {
  *
  */
 class VersionType {
-    MONGO_DISALLOW_COPYING(VersionType);
-
 public:
     //
     // schema declarations

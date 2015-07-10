@@ -27,6 +27,7 @@
  */
 
 #include "mongo/dbtests/config_server_fixture.h"
+#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/config_upgrade.h"
 #include "mongo/s/catalog/type_chunk.h"

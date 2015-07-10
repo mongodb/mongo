@@ -43,7 +43,7 @@ public:
 
     ConnectionString connectionString() const override;
 
-    Status startup(bool upgrade) override;
+    Status startup() override;
 
     void shutDown() override;
 
@@ -118,6 +118,8 @@ public:
                                  BatchedCommandResponse* response) override;
 
     DistLockManager* getDistLockManager() const override;
+
+    Status checkAndUpgrade(bool checkOnly) override;
 
 private:
     Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const override;

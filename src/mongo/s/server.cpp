@@ -238,14 +238,20 @@ static ExitCode runMongosServer(bool doUpgrade) {
     grid.init(std::move(catalogManager), std::move(shardRegistry));
 
     {
-        Status startupStatus = grid.catalogManager()->startup(doUpgrade);
-        if (!startupStatus.isOK()) {
-            error() << "Mongos catalog manager startup failed: " << startupStatus;
+        auto upgradeStatus = grid.catalogManager()->checkAndUpgrade(!doUpgrade);
+        if (!upgradeStatus.isOK()) {
+            error() << causedBy(upgradeStatus);
             return EXIT_SHARDING_ERROR;
         }
 
         if (doUpgrade) {
             return EXIT_CLEAN;
+        }
+
+        Status startupStatus = grid.catalogManager()->startup();
+        if (!startupStatus.isOK()) {
+            error() << "Mongos catalog manager startup failed: " << startupStatus;
+            return EXIT_SHARDING_ERROR;
         }
     }
 
