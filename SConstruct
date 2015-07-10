@@ -2126,6 +2126,12 @@ def doConfigure(myenv):
             Exit(1)
         conf.FindSysLibDep("wiredtiger", ["wiredtiger"])
 
+    conf.env.Append(
+        CPPDEFINES=[
+            "BOOST_SYSTEM_NO_DEPRECATED",
+        ]
+    )
+
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
             print( "can't find boost headers" )
