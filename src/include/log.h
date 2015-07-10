@@ -156,7 +156,7 @@ typedef struct {
 	 * slot count of one.
 	 */
 #define	SLOT_ACTIVE	1
-#define	SLOT_POOL	16
+#define	SLOT_POOL	128
 	uint32_t	 pool_index;		/* Global pool index */
 	WT_LOGSLOT	*slot_array[SLOT_ACTIVE];	/* Active slots */
 	WT_LOGSLOT	 slot_pool[SLOT_POOL];	/* Pool of all slots */
