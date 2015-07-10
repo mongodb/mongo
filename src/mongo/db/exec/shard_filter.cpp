@@ -35,7 +35,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/s/collection_metadata.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"

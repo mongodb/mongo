@@ -35,19 +35,18 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/metadata_loader.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/collection_metadata.h"
-#include "mongo/s/metadata_loader.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
 
 using std::unique_ptr;
 using std::string;
@@ -920,5 +919,6 @@ TEST_F(MultipleMetadataFixture, PromotePendingBadOverlap) {
         vector<ChunkVersion> _maxShardVersion;
     };
 #endif
-}
-// unnamed namespace
+
+}  // namespace
+}  // namespace mongo

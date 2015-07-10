@@ -31,12 +31,10 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
-#include "mongo/s/collection_metadata.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 
-class ClientCursor;
 class Collection;
 class CursorManager;
 class RecoveryUnit;
@@ -289,13 +287,6 @@ private:
 
     // TODO: Document.
     uint64_t _leftoverMaxTimeMicros;
-
-    // For chunks that are being migrated, there is a period of time when that chunks data is in
-    // two shards, the donor and the receiver one. That data is picked up by a cursor on the
-    // receiver side, even before the migration was decided.  The CollectionMetadata allow one
-    // to inquiry if any given document of the collection belongs indeed to this shard or if it
-    // is coming from (or a vestige of) an ongoing migration.
-    CollectionMetadataPtr _collMetadata;
 
     // Only one of these is not-NULL.
     RecoveryUnit* _unownedRU;

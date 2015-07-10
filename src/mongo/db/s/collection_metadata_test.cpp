@@ -32,20 +32,19 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/metadata_loader.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/collection_metadata.h"
-#include "mongo/s/metadata_loader.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
 
 using std::make_pair;
 using std::string;
@@ -1318,4 +1317,5 @@ TEST_F(ThreeChunkWithRangeGapFixture, CannotMergeWithHole) {
     ASSERT(!errMsg.empty());
 }
 
-}  // unnamed namespace
+}  // namespace
+}  // namespace mongo

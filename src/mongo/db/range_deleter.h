@@ -37,7 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/range_arithmetic.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"

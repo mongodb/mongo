@@ -30,25 +30,24 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/collection_metadata.h"
+#include "mongo/db/s/collection_metadata.h"
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 using std::unique_ptr;
-using std::endl;
 using std::make_pair;
 using std::string;
 using std::vector;
+using str::stream;
 
-using mongoutils::str::stream;
+CollectionMetadata::CollectionMetadata() = default;
 
-CollectionMetadata::CollectionMetadata() {}
-
-CollectionMetadata::~CollectionMetadata() {}
+CollectionMetadata::~CollectionMetadata() = default;
 
 CollectionMetadata* CollectionMetadata::cloneMigrate(const ChunkType& chunk,
                                                      const ChunkVersion& newShardVersion,
@@ -72,7 +71,7 @@ CollectionMetadata* CollectionMetadata::cloneMigrate(const ChunkType& chunk,
             *errMsg += stream() << " and it overlaps " << overlapToString(overlap);
         }
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -83,7 +82,7 @@ CollectionMetadata* CollectionMetadata::cloneMigrate(const ChunkType& chunk,
                                << newShardVersion.toString() << " when removing last chunk "
                                << rangeToString(chunk.getMin(), chunk.getMax());
 
-            warning() << *errMsg << endl;
+            warning() << *errMsg;
             return NULL;
         }
     }
@@ -96,7 +95,7 @@ CollectionMetadata* CollectionMetadata::cloneMigrate(const ChunkType& chunk,
                            << " is not greater than the current shard version "
                            << _shardVersion.toString();
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -130,7 +129,7 @@ CollectionMetadata* CollectionMetadata::clonePlusChunk(const ChunkType& chunk,
         *errMsg = stream() << "cannot add chunk " << rangeToString(chunk.getMin(), chunk.getMax())
                            << " with zero shard version";
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -144,7 +143,7 @@ CollectionMetadata* CollectionMetadata::clonePlusChunk(const ChunkType& chunk,
         *errMsg = stream() << "cannot add chunk " << rangeToString(chunk.getMin(), chunk.getMax())
                            << " because the chunk overlaps " << overlapToString(overlap);
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -184,7 +183,7 @@ CollectionMetadata* CollectionMetadata::cloneMinusPending(const ChunkType& pendi
             *errMsg += stream() << " and it overlaps " << overlapToString(overlap);
         }
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -219,7 +218,7 @@ CollectionMetadata* CollectionMetadata::clonePlusPending(const ChunkType& pendin
                            << rangeToString(pending.getMin(), pending.getMax())
                            << " because the chunk overlaps " << overlapToString(overlap);
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -245,7 +244,7 @@ CollectionMetadata* CollectionMetadata::clonePlusPending(const ChunkType& pendin
 
         warning() << "new pending chunk " << rangeToString(pending.getMin(), pending.getMax())
                   << " overlaps existing pending chunks " << overlapToString(pendingOverlap)
-                  << ", a migration may not have completed" << endl;
+                  << ", a migration may not have completed";
 
         for (RangeVector::iterator it = pendingOverlap.begin(); it != pendingOverlap.end(); ++it) {
             metadata->_pendingMap.erase(it->first);
@@ -281,7 +280,7 @@ CollectionMetadata* CollectionMetadata::cloneSplit(const ChunkType& chunk,
                            << ", new shard version " << newShardVersion.toString()
                            << " is not greater than current version " << _shardVersion.toString();
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -297,7 +296,7 @@ CollectionMetadata* CollectionMetadata::cloneSplit(const ChunkType& chunk,
             *errMsg += stream() << " and it overlaps " << overlapToString(overlap);
         }
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -308,7 +307,7 @@ CollectionMetadata* CollectionMetadata::cloneSplit(const ChunkType& chunk,
                                << rangeToString(chunk.getMin(), chunk.getMax()) << " at key "
                                << *it;
 
-            warning() << *errMsg << endl;
+            warning() << *errMsg;
             return NULL;
         }
     }
@@ -348,7 +347,7 @@ CollectionMetadata* CollectionMetadata::cloneMerge(const BSONObj& minKey,
                            << ", new shard version " << newShardVersion.toString()
                            << " is not greater than current version " << _shardVersion.toString();
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -360,7 +359,7 @@ CollectionMetadata* CollectionMetadata::cloneMerge(const BSONObj& minKey,
                            << (overlap.empty() ? ", no chunks found in this range"
                                                : ", only one chunk found in this range");
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -390,7 +389,7 @@ CollectionMetadata* CollectionMetadata::cloneMerge(const BSONObj& minKey,
                            << (!validStartEnd ? " do not have the same min and max key"
                                               : " are not all adjacent");
 
-        warning() << *errMsg << endl;
+        warning() << *errMsg;
         return NULL;
     }
 
@@ -436,10 +435,10 @@ bool CollectionMetadata::keyBelongsToMe(const BSONObj& key) const {
         // Logs if the point doesn't belong here.
         if ( !good ) {
             log() << "bad: " << key << " " << it->first << " " << key.woCompare( it->first ) << " "
-                  << key.woCompare( it->second ) << endl;
+                  << key.woCompare( it->second );
 
             for ( RangeMap::const_iterator i = _rangesMap.begin(); i != _rangesMap.end(); ++i ) {
-                log() << "\t" << i->first << "\t" << i->second << "\t" << endl;
+                log() << "\t" << i->first << "\t" << i->second << "\t";
             }
         }
 #endif

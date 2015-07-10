@@ -30,26 +30,27 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/metadata_loader.h"
+#include "mongo/db/s/metadata_loader.h"
 
 #include <vector>
 
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/collection_metadata.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 using std::unique_ptr;
-using std::endl;
 using std::make_pair;
 using std::map;
 using std::pair;
 using std::string;
+
+namespace {
 
 /**
  * This is an adapter so we can use config diffs - mongos and mongod do them slightly
@@ -57,7 +58,7 @@ using std::string;
  *
  * The mongod adapter here tracks only a single shard, and stores ranges by (min, max).
  */
-class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj, string> {
+class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj> {
 public:
     SCMConfigDiffTracker(const string& currShard) : _currShard(currShard) {}
 
@@ -77,16 +78,19 @@ public:
         return shard;
     }
 
-    string _currShard;
+private:
+    const string _currShard;
 };
+
+}  // namespace
 
 //
 // MetadataLoader implementation
 //
 
-MetadataLoader::MetadataLoader() {}
+MetadataLoader::MetadataLoader() = default;
 
-MetadataLoader::~MetadataLoader() {}
+MetadataLoader::~MetadataLoader() = default;
 
 Status MetadataLoader::makeCollectionMetadata(CatalogManager* catalogManager,
                                               const string& ns,
@@ -153,11 +157,11 @@ Status MetadataLoader::initChunks(CatalogManager* catalogManager,
 
             LOG(2) << "loading new chunks for collection " << ns
                    << " using old metadata w/ version " << oldMetadata->getShardVersion() << " and "
-                   << metadata->_chunksMap.size() << " chunks" << endl;
+                   << metadata->_chunksMap.size() << " chunks";
         } else {
             warning() << "reloading collection metadata for " << ns << " with new epoch "
                       << epoch.toString() << ", the current epoch is "
-                      << oldMetadata->getCollVersion().epoch().toString() << endl;
+                      << oldMetadata->getCollVersion().epoch().toString();
         }
     }
 
@@ -169,9 +173,9 @@ Status MetadataLoader::initChunks(CatalogManager* catalogManager,
 
     try {
         std::vector<ChunkType> chunks;
-        Query diffQuery = differ.configDiffQuery();
-        Status status = catalogManager->getChunks(
-            diffQuery.getFilter(), diffQuery.getSort(), boost::none, &chunks);
+        const auto diffQuery = differ.configDiffQuery();
+        Status status =
+            catalogManager->getChunks(diffQuery.query, diffQuery.sort, boost::none, &chunks);
         if (!status.isOK()) {
             if (status == ErrorCodes::HostUnreachable) {
                 // Make our metadata invalid
@@ -207,7 +211,7 @@ Status MetadataLoader::initChunks(CatalogManager* catalogManager,
                 << "no chunks found when reloading " << ns << ", previous version was "
                 << metadata->_collVersion.toString() << (fullReload ? ", this is a drop" : "");
 
-            warning() << errMsg << endl;
+            warning() << errMsg;
 
             metadata->_collVersion = ChunkVersion(0, 0, OID());
             metadata->_chunksMap.clear();
@@ -263,7 +267,7 @@ Status MetadataLoader::promotePendingChunks(const CollectionMetadata* afterMetad
         if (rangeMapContains(remoteMetadata->_chunksMap, it->first, it->second)) {
             // Chunk was promoted from pending, successful migration
             LOG(2) << "verified chunk " << rangeToString(it->first, it->second)
-                   << " was migrated earlier to this shard" << endl;
+                   << " was migrated earlier to this shard";
 
             remoteMetadata->_pendingMap.erase(it++);
         } else {

@@ -70,6 +70,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/oplog_hack.h"
@@ -168,9 +169,8 @@ void fillOutPlannerParams(OperationContext* txn,
 
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        CollectionMetadataPtr collMetadata =
+        std::shared_ptr<CollectionMetadata> collMetadata =
             shardingState.getCollectionMetadata(canonicalQuery->ns());
-
         if (collMetadata) {
             plannerParams->shardKey = collMetadata->getKeyPattern();
         } else {

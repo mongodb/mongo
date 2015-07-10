@@ -11,6 +11,17 @@ env.SConscript(
     ],
 )
 
+# Functionality shared between mongod and mongos
+env.Library(
+    target='common',
+    source=[
+        'chunk_diff.cpp',
+    ],
+    LIBDEPS=[
+        'catalog/catalog_types',
+    ]
+)
+
 env.Library(
     target='shard_util',
     source=[
@@ -21,45 +32,25 @@ env.Library(
     ]
 )
 
-env.CppUnitTest('chunk_version_test', 'chunk_version_test.cpp',
-                LIBDEPS=['$BUILD_DIR/mongo/db/common'])
-
-#
-# Support for maintaining persistent sharding state and data.
-#
-
-env.Library(
-    target='metadata',
+env.CppUnitTest(
+    target='chunk_version_test',
     source=[
-        'collection_metadata.cpp',
-        'metadata_loader.cpp',
+        'chunk_version_test.cpp',
     ],
     LIBDEPS=[
-        'catalog/catalog_types',
-        '$BUILD_DIR/mongo/bson/bson',
-        '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/range_arithmetic',
+        '$BUILD_DIR/mongo/db/common',
     ]
 )
 
 env.CppUnitTest(
-    target='metadata_test',
+    target='chunk_diff_test',
     source=[
         'chunk_diff_test.cpp',
-        'metadata_loader_test.cpp',
-        'collection_metadata_test.cpp',
     ],
     LIBDEPS=[
-        'catalog/legacy/catalog_manager_legacy',
-        'coreshard',
-        'metadata',
-        'mongoscore',
-        '$BUILD_DIR/mongo/db/coredb',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/db/common',
-    ])
+        'common',
+    ]
+)
 
 #
 # Write Operations
@@ -211,7 +202,6 @@ env.Library(
         # This is only here temporarily for auto-split logic in chunk.cpp.
         'balancer_policy.cpp',
         'chunk.cpp',
-        'chunk_diff.cpp',
         'chunk_manager.cpp',
         'config.cpp',
         'grid.cpp',
@@ -223,6 +213,7 @@ env.Library(
         'catalog/catalog_types',
         'client/sharding_client',
         'cluster_ops_impl',
+        'common',
         'shard_util',
     ]
 )

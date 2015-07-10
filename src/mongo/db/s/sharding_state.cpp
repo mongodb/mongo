@@ -37,16 +37,17 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/metadata_loader.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/collection_metadata.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/metadata_loader.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
@@ -59,6 +60,10 @@ using std::vector;
 
 // Global sharding state instance
 ShardingState shardingState;
+
+bool isMongos() {
+    return false;
+}
 
 ShardingState::ShardingState()
     : _enabled(false),

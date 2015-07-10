@@ -73,7 +73,7 @@ namespace {
  *
  * The mongos adapter here tracks all shards, and stores ranges by (max, Chunk) in the map.
  */
-class CMConfigDiffTracker : public ConfigDiffTracker<shared_ptr<Chunk>, string> {
+class CMConfigDiffTracker : public ConfigDiffTracker<shared_ptr<Chunk>> {
 public:
     CMConfigDiffTracker(ChunkManager* manager) : _manager(manager) {}
 
@@ -254,7 +254,14 @@ bool ChunkManager::_load(ChunkMap& chunkMap,
     differ.attach(_ns, chunkMap, _version, *shardVersions);
 
     // Diff tracker should *always* find at least one chunk if collection exists
-    int diffsApplied = differ.calculateConfigDiff(grid.catalogManager());
+    // Get the diff query required
+    auto diffQuery = differ.configDiffQuery();
+
+    std::vector<ChunkType> chunks;
+    uassertStatusOK(
+        grid.catalogManager()->getChunks(diffQuery.query, diffQuery.sort, boost::none, &chunks));
+
+    int diffsApplied = differ.calculateConfigDiff(chunks);
     if (diffsApplied > 0) {
         LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _ns
                << " with version " << _version;

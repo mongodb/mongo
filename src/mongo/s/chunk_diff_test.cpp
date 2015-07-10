@@ -26,32 +26,34 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/chunk_diff.h"
 
 #include <string>
+#include <map>
 #include <utility>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/random.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using mongo::BSONObj;
-using mongo::ChunkType;
-using mongo::ConfigDiffTracker;
 using std::string;
 using std::pair;
 using std::make_pair;
+using std::map;
 
-// XXX
-// We'd move ChunkDiffUnitTest here
-// We can check the queries it generates.
-// We can check if is populating the attaching structures properly
-//
+// Generates pseudorandom values
+PseudoRandom rand(1);
 
-// The default pass-through adapter for using config diffs.
-class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj, string> {
+/**
+ * The default pass-through adapter for using config diffs.
+ */
+class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj> {
 public:
     DefaultDiffAdapter() {}
     virtual ~DefaultDiffAdapter() {}
@@ -64,14 +66,363 @@ public:
         return make_pair(chunk.getMin(), chunk.getMax());
     }
 
-    virtual string shardFor(const string& name) const {
+    virtual ShardId shardFor(const string& name) const {
         return name;
     }
 };
 
-TEST(Basics, Simple) {
-    DefaultDiffAdapter differ;
-    ASSERT_TRUE(true);
+/**
+ * Inverts the storage order for chunks from min to max.
+ */
+class InverseDiffAdapter : public DefaultDiffAdapter {
+public:
+    InverseDiffAdapter() {}
+    virtual ~InverseDiffAdapter() {}
+
+    virtual bool isMinKeyIndexed() const {
+        return false;
+    }
+
+    virtual pair<BSONObj, BSONObj> rangeFor(const ChunkType& chunk) const {
+        return make_pair(chunk.getMax(), chunk.getMin());
+    }
+};
+
+/**
+ * Converts array of raw BSONObj chunks to a vector of ChunkType.
+ */
+void convertBSONArrayToChunkTypes(const BSONArray& chunksArray,
+                                  std::vector<ChunkType>* chunksVector) {
+    for (const BSONElement& obj : chunksArray) {
+        auto chunkTypeRes = ChunkType::fromBSON(obj.Obj());
+        ASSERT(chunkTypeRes.isOK());
+        chunksVector->push_back(chunkTypeRes.getValue());
+    }
 }
 
-}  // unnamed namespace
+class ChunkDiffUnitTest : public mongo::unittest::Test {
+protected:
+    typedef map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
+    typedef map<string, ChunkVersion> VersionMap;
+
+    ChunkDiffUnitTest() = default;
+    ~ChunkDiffUnitTest() = default;
+
+    void runTest(bool isInverse) {
+        int numShards = 10;
+        int numInitialChunks = 5;
+
+        // Needed to not overflow the BSONArray's max bytes
+        int maxChunks = 100000;
+        int keySize = 2;
+
+        BSONArrayBuilder chunksB;
+
+        BSONObj lastSplitPt;
+        ChunkVersion version(1, 0, OID());
+
+        // Generate numChunks with a given key size over numShards. All chunks have double key
+        // values, so we can split them a bunch.
+
+        for (int i = -1; i < numInitialChunks; i++) {
+            BSONObjBuilder splitPtB;
+            for (int k = 0; k < keySize; k++) {
+                string field = string("k") + string(1, (char)('0' + k));
+                if (i < 0)
+                    splitPtB.appendMinKey(field);
+                else if (i < numInitialChunks - 1)
+                    splitPtB.append(field, (double)i);
+                else
+                    splitPtB.appendMaxKey(field);
+            }
+            BSONObj splitPt = splitPtB.obj();
+
+            if (i >= 0) {
+                BSONObjBuilder chunkB;
+
+                chunkB.append(ChunkType::name(), "$dummyname");
+                chunkB.append(ChunkType::ns(), "$dummyns");
+
+                chunkB.append(ChunkType::min(), lastSplitPt);
+                chunkB.append(ChunkType::max(), splitPt);
+
+                int shardNum = rand(numShards);
+                chunkB.append(ChunkType::shard(), "shard" + string(1, (char)('A' + shardNum)));
+
+                rand(2) ? version.incMajor() : version.incMinor();
+                version.addToBSON(chunkB, ChunkType::DEPRECATED_lastmod());
+
+                chunksB.append(chunkB.obj());
+            }
+
+            lastSplitPt = splitPt;
+        }
+
+        BSONArray chunks = chunksB.arr();
+
+        // Setup the empty ranges and versions first
+        RangeMap ranges;
+        ChunkVersion maxVersion = ChunkVersion(0, 0, OID());
+        VersionMap maxShardVersions;
+
+        // Create a differ which will track our progress
+        std::shared_ptr<DefaultDiffAdapter> differ(isInverse ? new InverseDiffAdapter()
+                                                             : new DefaultDiffAdapter());
+        differ->attach("test", ranges, maxVersion, maxShardVersions);
+
+        std::vector<ChunkType> chunksVector;
+        convertBSONArrayToChunkTypes(chunks, &chunksVector);
+
+        // Validate initial load
+        differ->calculateConfigDiff(chunksVector);
+        validate(isInverse, chunksVector, ranges, maxVersion, maxShardVersions);
+
+        // Generate a lot of diffs, and keep validating that updating from the diffs always gives us
+        // the right ranges and versions
+
+        // Makes about 100000 chunks overall
+        int numDiffs = 135;
+        int numChunks = numInitialChunks;
+
+        for (int i = 0; i < numDiffs; i++) {
+            BSONArrayBuilder diffsB;
+            BSONArrayBuilder newChunksB;
+            BSONObjIterator chunksIt(chunks);
+
+            while (chunksIt.more()) {
+                BSONObj chunk = chunksIt.next().Obj();
+
+                int randChoice = rand(10);
+
+                if (randChoice < 2 && numChunks < maxChunks) {
+                    // Simulate a split
+                    BSONObjBuilder leftB;
+                    BSONObjBuilder rightB;
+                    BSONObjBuilder midB;
+
+                    for (int k = 0; k < keySize; k++) {
+                        string field = string("k") + string(1, (char)('0' + k));
+
+                        BSONType maxType = chunk[ChunkType::max()].Obj()[field].type();
+                        double max =
+                            maxType == NumberDouble ? chunk["max"].Obj()[field].Number() : 0.0;
+                        BSONType minType = chunk[ChunkType::min()].Obj()[field].type();
+                        double min = minType == NumberDouble
+                            ? chunk[ChunkType::min()].Obj()[field].Number()
+                            : 0.0;
+
+                        if (minType == MinKey) {
+                            midB.append(field, max - 1.0);
+                        } else if (maxType == MaxKey) {
+                            midB.append(field, min + 1.0);
+                        } else {
+                            midB.append(field, (max + min) / 2.0);
+                        }
+                    }
+
+                    BSONObj midPt = midB.obj();
+
+                    // Only happens if we can't split the min chunk
+                    if (midPt.isEmpty()) {
+                        continue;
+                    }
+
+                    leftB.append(chunk[ChunkType::min()]);
+                    leftB.append(ChunkType::max(), midPt);
+                    rightB.append(ChunkType::min(), midPt);
+                    rightB.append(chunk[ChunkType::max()]);
+
+                    // Add required fields for ChunkType
+                    leftB.append(chunk[ChunkType::name()]);
+                    leftB.append(chunk[ChunkType::ns()]);
+                    rightB.append(chunk[ChunkType::name()]);
+                    rightB.append(chunk[ChunkType::ns()]);
+
+                    leftB.append(chunk[ChunkType::shard()]);
+                    rightB.append(chunk[ChunkType::shard()]);
+
+                    version.incMajor();
+                    version._minor = 0;
+                    version.addToBSON(leftB, ChunkType::DEPRECATED_lastmod());
+                    version.incMinor();
+                    version.addToBSON(rightB, ChunkType::DEPRECATED_lastmod());
+
+                    BSONObj left = leftB.obj();
+                    BSONObj right = rightB.obj();
+
+                    newChunksB.append(left);
+                    newChunksB.append(right);
+
+                    diffsB.append(right);
+                    diffsB.append(left);
+
+                    numChunks++;
+                } else if (randChoice < 4 && chunksIt.more()) {
+                    // Simulate a migrate
+                    BSONObj prevShardChunk;
+                    while (chunksIt.more()) {
+                        prevShardChunk = chunksIt.next().Obj();
+
+                        if (prevShardChunk[ChunkType::shard()].String() ==
+                            chunk[ChunkType::shard()].String()) {
+                            break;
+                        }
+
+                        newChunksB.append(prevShardChunk);
+
+                        prevShardChunk = BSONObj();
+                    }
+
+                    // We need to move between different shards, hence the weirdness in logic here
+                    if (!prevShardChunk.isEmpty()) {
+                        BSONObjBuilder newShardB;
+                        BSONObjBuilder prevShardB;
+
+                        newShardB.append(chunk[ChunkType::min()]);
+                        newShardB.append(chunk[ChunkType::max()]);
+                        prevShardB.append(prevShardChunk[ChunkType::min()]);
+                        prevShardB.append(prevShardChunk[ChunkType::max()]);
+
+                        // add required fields for ChunkType
+                        newShardB.append(chunk[ChunkType::name()]);
+                        newShardB.append(chunk[ChunkType::ns()]);
+                        prevShardB.append(chunk[ChunkType::name()]);
+                        prevShardB.append(chunk[ChunkType::ns()]);
+
+                        int shardNum = rand(numShards);
+                        newShardB.append(ChunkType::shard(),
+                                         "shard" + string(1, (char)('A' + shardNum)));
+                        prevShardB.append(prevShardChunk[ChunkType::shard()]);
+
+                        version.incMajor();
+                        version._minor = 0;
+                        version.addToBSON(newShardB, ChunkType::DEPRECATED_lastmod());
+                        version.incMinor();
+                        version.addToBSON(prevShardB, ChunkType::DEPRECATED_lastmod());
+
+                        BSONObj newShard = newShardB.obj();
+                        BSONObj prevShard = prevShardB.obj();
+
+                        newChunksB.append(newShard);
+                        newChunksB.append(prevShard);
+
+                        diffsB.append(newShard);
+                        diffsB.append(prevShard);
+
+                    } else {
+                        newChunksB.append(chunk);
+                    }
+                } else {
+                    newChunksB.append(chunk);
+                }
+            }
+
+            BSONArray diffs = diffsB.arr();
+            chunks = newChunksB.arr();
+
+            // Rarely entirely clear out our data
+            if (rand(10) < 1) {
+                diffs = chunks;
+                ranges.clear();
+                maxVersion = ChunkVersion(0, 0, OID());
+                maxShardVersions.clear();
+            }
+
+            std::vector<ChunkType> chunksVector;
+            convertBSONArrayToChunkTypes(chunks, &chunksVector);
+
+            differ->calculateConfigDiff(chunksVector);
+
+            validate(isInverse, chunksVector, ranges, maxVersion, maxShardVersions);
+        }
+    }
+
+private:
+    // Allow validating with and without ranges (b/c our splits won't actually be updated by the
+    // diffs)
+    void validate(bool isInverse,
+                  const std::vector<ChunkType>& chunks,
+                  ChunkVersion maxVersion,
+                  const VersionMap& maxShardVersions) {
+        validate(isInverse, chunks, NULL, maxVersion, maxShardVersions);
+    }
+
+    void validate(bool isInverse,
+                  const std::vector<ChunkType>& chunks,
+                  const RangeMap& ranges,
+                  ChunkVersion maxVersion,
+                  const VersionMap& maxShardVersions) {
+        validate(isInverse, chunks, (RangeMap*)&ranges, maxVersion, maxShardVersions);
+    }
+
+    // Validates that the ranges and versions are valid given the chunks
+    void validate(bool isInverse,
+                  const std::vector<ChunkType>& chunks,
+                  RangeMap* ranges,
+                  ChunkVersion maxVersion,
+                  const VersionMap& maxShardVersions) {
+        int chunkCount = chunks.size();
+        ChunkVersion foundMaxVersion;
+        VersionMap foundMaxShardVersions;
+
+        //
+        // Validate that all the chunks are there and collect versions
+        //
+
+        for (const ChunkType& chunk : chunks) {
+            if (ranges != NULL) {
+                // log() << "Validating chunk " << chunkDoc << " size : " << ranges->size() << " vs
+                // " << chunkCount << endl;
+
+                RangeMap::iterator chunkRange =
+                    ranges->find(isInverse ? chunk.getMax() : chunk.getMin());
+
+                ASSERT(chunkRange != ranges->end());
+                ASSERT(chunkRange->second.woCompare(isInverse ? chunk.getMin() : chunk.getMax()) ==
+                       0);
+            }
+
+            ChunkVersion version =
+                ChunkVersion::fromBSON(chunk.toBSON()[ChunkType::DEPRECATED_lastmod()]);
+            if (version > foundMaxVersion)
+                foundMaxVersion = version;
+
+            ChunkVersion shardMaxVersion = foundMaxShardVersions[chunk.getShard()];
+            if (version > shardMaxVersion) {
+                foundMaxShardVersions[chunk.getShard()] = version;
+            }
+        }
+
+        // Make sure all chunks are accounted for
+        if (ranges != NULL)
+            ASSERT(chunkCount == (int)ranges->size());
+
+        // log() << "Validating that all shard versions are up to date..." << endl;
+
+        // Validate that all the versions are the same
+        ASSERT(foundMaxVersion.equals(maxVersion));
+
+        for (VersionMap::iterator it = foundMaxShardVersions.begin();
+             it != foundMaxShardVersions.end();
+             it++) {
+            ChunkVersion foundVersion = it->second;
+            VersionMap::const_iterator maxIt = maxShardVersions.find(it->first);
+
+            ASSERT(maxIt != maxShardVersions.end());
+            ASSERT(foundVersion.equals(maxIt->second));
+        }
+        // Make sure all shards are accounted for
+        ASSERT(foundMaxShardVersions.size() == maxShardVersions.size());
+    }
+};
+
+TEST_F(ChunkDiffUnitTest, Normal) {
+    runTest(false);
+}
+
+TEST_F(ChunkDiffUnitTest, Inverse) {
+    runTest(true);
+}
+
+}  // namespace
+}  // namespace mongo

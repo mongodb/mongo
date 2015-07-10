@@ -45,8 +45,8 @@
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/s/collection_metadata.h"
 #include "mongo/util/log.h"
 
 namespace {

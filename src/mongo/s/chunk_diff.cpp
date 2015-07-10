@@ -32,17 +32,15 @@
 
 #include "mongo/s/chunk_diff.h"
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-template <class ValType, class ShardType>
-ConfigDiffTracker<ValType, ShardType>::ConfigDiffTracker() {
+template <class ValType>
+ConfigDiffTracker<ValType>::ConfigDiffTracker() {
     _ns.clear();
     _currMap = NULL;
     _maxVersion = NULL;
@@ -50,14 +48,14 @@ ConfigDiffTracker<ValType, ShardType>::ConfigDiffTracker() {
     _validDiffs = 0;
 }
 
-template <class ValType, class ShardType>
-ConfigDiffTracker<ValType, ShardType>::~ConfigDiffTracker() = default;
+template <class ValType>
+ConfigDiffTracker<ValType>::~ConfigDiffTracker() = default;
 
-template <class ValType, class ShardType>
-void ConfigDiffTracker<ValType, ShardType>::attach(const std::string& ns,
-                                                   RangeMap& currMap,
-                                                   ChunkVersion& maxVersion,
-                                                   MaxChunkVersionMap& maxShardVersions) {
+template <class ValType>
+void ConfigDiffTracker<ValType>::attach(const std::string& ns,
+                                        RangeMap& currMap,
+                                        ChunkVersion& maxVersion,
+                                        MaxChunkVersionMap& maxShardVersions) {
     _ns = ns;
     _currMap = &currMap;
     _maxVersion = &maxVersion;
@@ -65,16 +63,15 @@ void ConfigDiffTracker<ValType, ShardType>::attach(const std::string& ns,
     _validDiffs = 0;
 }
 
-template <class ValType, class ShardType>
-bool ConfigDiffTracker<ValType, ShardType>::isOverlapping(const BSONObj& min, const BSONObj& max) {
+template <class ValType>
+bool ConfigDiffTracker<ValType>::isOverlapping(const BSONObj& min, const BSONObj& max) {
     RangeOverlap overlap = overlappingRange(min, max);
 
     return overlap.first != overlap.second;
 }
 
-template <class ValType, class ShardType>
-void ConfigDiffTracker<ValType, ShardType>::removeOverlapping(const BSONObj& min,
-                                                              const BSONObj& max) {
+template <class ValType>
+void ConfigDiffTracker<ValType>::removeOverlapping(const BSONObj& min, const BSONObj& max) {
     _assertAttached();
 
     RangeOverlap overlap = overlappingRange(min, max);
@@ -82,9 +79,9 @@ void ConfigDiffTracker<ValType, ShardType>::removeOverlapping(const BSONObj& min
     _currMap->erase(overlap.first, overlap.second);
 }
 
-template <class ValType, class ShardType>
-typename ConfigDiffTracker<ValType, ShardType>::RangeOverlap
-ConfigDiffTracker<ValType, ShardType>::overlappingRange(const BSONObj& min, const BSONObj& max) {
+template <class ValType>
+typename ConfigDiffTracker<ValType>::RangeOverlap ConfigDiffTracker<ValType>::overlappingRange(
+    const BSONObj& min, const BSONObj& max) {
     _assertAttached();
 
     typename RangeMap::iterator low;
@@ -111,29 +108,8 @@ ConfigDiffTracker<ValType, ShardType>::overlappingRange(const BSONObj& min, cons
     return RangeOverlap(low, high);
 }
 
-template <class ValType, class ShardType>
-int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(CatalogManager* catalogManager) {
-    _assertAttached();
-
-    // Get the diff query required
-    Query diffQuery = configDiffQuery();
-
-    try {
-        std::vector<ChunkType> chunks;
-        uassertStatusOK(catalogManager->getChunks(
-            diffQuery.getFilter(), diffQuery.getSort(), boost::none, &chunks));
-
-        return calculateConfigDiff(chunks);
-    } catch (DBException& e) {
-        // Should only happen on connection errors
-        e.addContext(str::stream() << "could not calculate config difference for ns " << _ns);
-        throw;
-    }
-}
-
-template <class ValType, class ShardType>
-int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(
-    const std::vector<ChunkType>& chunks) {
+template <class ValType>
+int ConfigDiffTracker<ValType>::calculateConfigDiff(const std::vector<ChunkType>& chunks) {
     _assertAttached();
 
     // Apply the chunk changes to the ranges and versions
@@ -173,7 +149,7 @@ int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(
         }
 
         // Chunk version changes
-        ShardType shard = shardFor(chunk.getShard());
+        ShardId shard = shardFor(chunk.getShard());
 
         typename MaxChunkVersionMap::const_iterator shardVersionIt = _maxShardVersions->find(shard);
         if (shardVersionIt == _maxShardVersions->end() || shardVersionIt->second < chunkVersion) {
@@ -211,12 +187,13 @@ int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(
     return _validDiffs;
 }
 
-template <class ValType, class ShardType>
-Query ConfigDiffTracker<ValType, ShardType>::configDiffQuery() const {
+template <class ValType>
+typename ConfigDiffTracker<ValType>::QueryAndSort ConfigDiffTracker<ValType>::configDiffQuery()
+    const {
     _assertAttached();
 
-    // Basic idea behind the query is to find all the chunks $gte the current max version.
-    // Currently, any splits and merges will increment the current max version.
+    // The query has to find all the chunks $gte the current max version. Currently, any splits and
+    // merges will increment the current max version.
     BSONObjBuilder queryB;
     queryB.append(ChunkType::ns(), _ns);
 
@@ -226,14 +203,13 @@ Query ConfigDiffTracker<ValType, ShardType>::configDiffQuery() const {
         tsBuilder.done();
     }
 
-    // NOTE: IT IS IMPORTANT FOR CONSISTENCY THAT WE SORT BY ASC VERSION, IN ORDER TO HANDLE
-    // CURSOR YIELDING BETWEEN CHUNKS BEING MIGRATED.
+    // NOTE: IT IS IMPORTANT FOR CONSISTENCY THAT WE SORT BY ASC VERSION, IN ORDER TO HANDLE CURSOR
+    // YIELDING BETWEEN CHUNKS BEING MIGRATED.
     //
-    // This ensures that changes to chunk version (which will always be higher) will always
-    // come *after* our current position in the chunk cursor.
+    // This ensures that changes to chunk version (which will always be higher) will always come
+    // *after* our current position in the chunk cursor.
 
-    Query queryObj(queryB.obj());
-    queryObj.sort(BSON("lastmod" << 1));
+    QueryAndSort queryObj(queryB.obj(), BSON("lastmod" << 1));
 
     LOG(2) << "major version query from " << *_maxVersion << " and over "
            << _maxShardVersions->size() << " shards is " << queryObj;
@@ -241,16 +217,21 @@ Query ConfigDiffTracker<ValType, ShardType>::configDiffQuery() const {
     return queryObj;
 }
 
-template <class ValType, class ShardType>
-void ConfigDiffTracker<ValType, ShardType>::_assertAttached() const {
+template <class ValType>
+void ConfigDiffTracker<ValType>::_assertAttached() const {
     invariant(_currMap);
     invariant(_maxVersion);
     invariant(_maxShardVersions);
 }
 
+std::string ConfigDiffTrackerBase::QueryAndSort::toString() const {
+    return str::stream() << "query: " << query << ", sort: " << sort;
+}
 
 // Ensures that these instances of the template are compiled
-template class ConfigDiffTracker<BSONObj, std::string>;
-template class ConfigDiffTracker<std::shared_ptr<Chunk>, std::string>;
+class Chunk;
+
+template class ConfigDiffTracker<BSONObj>;
+template class ConfigDiffTracker<std::shared_ptr<Chunk>>;
 
 }  // namespace mongo
