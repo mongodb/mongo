@@ -50,6 +50,7 @@ class CollectionType;
 class ConnectionString;
 class DatabaseType;
 class DistLockManager;
+class NamespaceString;
 class OperationContext;
 class SettingsType;
 class ShardKeyPattern;
@@ -213,7 +214,7 @@ public:
      * some of the known failures:
      *  - NamespaceNotFound - collection does not exist
      */
-    virtual Status dropCollection(OperationContext* txn, const std::string& collectionNs) = 0;
+    Status dropCollection(OperationContext* txn, const NamespaceString& ns);
 
     /**
      * Retrieves all databases for a shard.

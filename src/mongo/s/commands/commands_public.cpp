@@ -453,7 +453,7 @@ public:
             return passthrough(conf, cmdObj, result);
         }
 
-        uassertStatusOK(grid.catalogManager()->dropCollection(txn, fullns));
+        uassertStatusOK(grid.catalogManager()->dropCollection(txn, NamespaceString(fullns)));
 
         if (!conf->removeSharding(fullns)) {
             warning() << "collection " << fullns

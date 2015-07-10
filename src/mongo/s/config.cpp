@@ -599,7 +599,7 @@ bool DBConfig::_dropShardedCollections(OperationContext* txn,
 
         i->second.getCM()->getAllShardIds(&shardIds);
 
-        uassertStatusOK(grid.catalogManager()->dropCollection(txn, i->first));
+        uassertStatusOK(grid.catalogManager()->dropCollection(txn, NamespaceString(i->first)));
 
         // We should warn, but it's not a fatal error if someone else reloaded the db/coll as
         // unsharded in the meantime

@@ -101,10 +101,6 @@ Status CatalogManagerMock::getCollections(const string* dbName,
     return Status::OK();
 }
 
-Status CatalogManagerMock::dropCollection(OperationContext* txn, const string& collectionNs) {
-    return Status::OK();
-}
-
 Status CatalogManagerMock::getDatabasesForShard(const string& shardName, vector<string>* dbs) {
     return Status::OK();
 }

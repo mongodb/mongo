@@ -32,6 +32,8 @@
 
 #include "mongo/s/catalog/catalog_manager.h"
 
+#include <map>
+
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
@@ -43,6 +45,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
@@ -621,6 +624,130 @@ Status CatalogManager::enableSharding(const std::string& dbName) {
     log() << "Enabling sharding for database [" << dbName << "] in config db";
 
     return updateDatabase(dbName, db);
+}
+
+Status CatalogManager::dropCollection(OperationContext* txn, const NamespaceString& ns) {
+    logChange(txn->getClient()->clientAddress(true), "dropCollection.start", ns.ns(), BSONObj());
+
+    vector<ShardType> allShards;
+    Status status = getAllShards(&allShards);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    LOG(1) << "dropCollection " << ns << " started";
+
+    // Lock the collection globally so that split/migrate cannot run
+    auto scopedDistLock = getDistLockManager()->lock(ns.ns(), "drop");
+    if (!scopedDistLock.isOK()) {
+        return scopedDistLock.getStatus();
+    }
+
+    LOG(1) << "dropCollection " << ns << " locked";
+
+    std::map<string, BSONObj> errors;
+    auto* shardRegistry = grid.shardRegistry();
+
+    for (const auto& shardEntry : allShards) {
+        const auto shard = shardRegistry->getShard(shardEntry.getName());
+
+        auto shardTargetStatus =
+            shard->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
+        if (!shardTargetStatus.isOK()) {
+            return shardTargetStatus.getStatus();
+        }
+
+        auto dropResult = shardRegistry->runCommand(
+            shardTargetStatus.getValue(), ns.db().toString(), BSON("drop" << ns.coll()));
+
+        if (!dropResult.isOK()) {
+            return dropResult.getStatus();
+        }
+
+        auto dropStatus = getStatusFromCommandResult(dropResult.getValue());
+        if (!dropStatus.isOK()) {
+            if (dropStatus.code() == ErrorCodes::NamespaceNotFound) {
+                continue;
+            }
+
+            errors.emplace(shard->getConnString().toString(), dropResult.getValue());
+        }
+    }
+
+    if (!errors.empty()) {
+        StringBuilder sb;
+        sb << "Dropping collection failed on the following hosts: ";
+
+        for (auto it = errors.cbegin(); it != errors.cend(); ++it) {
+            if (it != errors.cbegin()) {
+                sb << ", ";
+            }
+
+            sb << it->first << ": " << it->second;
+        }
+
+        return {ErrorCodes::OperationFailed, sb.str()};
+    }
+
+    LOG(1) << "dropCollection " << ns << " shard data deleted";
+
+    // remove chunk data
+    Status result = remove(ChunkType::ConfigNS, BSON(ChunkType::ns(ns.ns())), 0, nullptr);
+    if (!result.isOK()) {
+        return result;
+    }
+
+    LOG(1) << "dropCollection " << ns << " chunk data deleted";
+
+    for (const auto& shardEntry : allShards) {
+        const auto shard = grid.shardRegistry()->getShard(shardEntry.getName());
+
+        auto shardTargetStatus =
+            shard->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
+        if (!shardTargetStatus.isOK()) {
+            return shardTargetStatus.getStatus();
+        }
+
+        BSONObjBuilder cmdBuilder;
+        cmdBuilder.append("setShardVersion", ns.ns());
+        cmdBuilder.append("configdb", connectionString().toString());
+        cmdBuilder.append("shard", shardEntry.getName());
+        cmdBuilder.append("shardHost", shard->getConnString().toString());
+
+        ChunkVersion::DROPPED().addToBSON(cmdBuilder);
+
+        cmdBuilder.append("authoritative", true);
+
+        auto ssvResult =
+            shardRegistry->runCommand(shardTargetStatus.getValue(), "admin", cmdBuilder.obj());
+
+        if (!ssvResult.isOK()) {
+            return ssvResult.getStatus();
+        }
+
+        auto ssvStatus = getStatusFromCommandResult(ssvResult.getValue());
+        if (!ssvStatus.isOK()) {
+            return ssvStatus;
+        }
+
+        auto unsetShardingStatus = shardRegistry->runCommand(
+            shardTargetStatus.getValue(), "admin", BSON("unsetSharding" << 1));
+
+        if (!unsetShardingStatus.isOK()) {
+            return unsetShardingStatus.getStatus();
+        }
+
+        auto unsetShardingResult = getStatusFromCommandResult(unsetShardingStatus.getValue());
+        if (!unsetShardingResult.isOK()) {
+            return unsetShardingResult;
+        }
+    }
+
+    LOG(1) << "dropCollection " << ns << " completed";
+
+    logChange(txn->getClient()->clientAddress(true), "dropCollection", ns.ns(), BSONObj());
+
+    return Status::OK();
 }
 
 }  // namespace mongo
