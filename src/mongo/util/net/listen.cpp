@@ -125,7 +125,7 @@ namespace mongo {
     
     Listener::Listener(const string& name, const string &ip, int port, bool logConnect ) 
         : _port(port), _name(name), _ip(ip), _setupSocketsSuccessful(false),
-          _logConnect(logConnect), _elapsedTime(0) {
+          _logConnect(logConnect), _elapsedTime(0), _ready(false) {
 #ifdef MONGO_SSL
         _ssl = getSSLManager();
 #endif
