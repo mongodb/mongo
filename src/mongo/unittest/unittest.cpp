@@ -241,8 +241,6 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
 
         bool passes = false;
 
-        onCurrentTestNameChange(tc->getName());
-
         log() << "\t going to run test: " << tc->getName() << std::endl;
 
         std::stringstream err;
@@ -272,8 +270,6 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
         r->_rc = 17;
 
     r->_millis = timer.millis();
-
-    onCurrentTestNameChange("");
 
     log() << "\t DONE running tests" << std::endl;
 

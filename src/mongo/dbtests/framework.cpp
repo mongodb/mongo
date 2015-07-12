@@ -46,63 +46,11 @@
 #include "mongo/s/catalog/legacy/legacy_dist_lock_manager.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/background.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
-
-namespace {
-
-stdx::mutex globalCurrentTestNameMutex;
-std::string globalCurrentTestName;
-
-class TestWatchDog : public BackgroundJob {
-public:
-    virtual std::string name() const {
-        return "TestWatchDog";
-    }
-
-    virtual void run() {
-        int minutesRunning = 0;
-        std::string lastRunningTestName, currentTestName;
-
-        {
-            stdx::lock_guard<stdx::mutex> lk(globalCurrentTestNameMutex);
-            lastRunningTestName = globalCurrentTestName;
-        }
-
-        while (true) {
-            sleepsecs(60);
-            minutesRunning++;
-
-            {
-                stdx::lock_guard<stdx::mutex> lk(globalCurrentTestNameMutex);
-                currentTestName = globalCurrentTestName;
-            }
-
-            if (currentTestName != lastRunningTestName) {
-                minutesRunning = 0;
-                lastRunningTestName = currentTestName;
-            }
-
-            if (minutesRunning > 30) {
-                log() << currentTestName << " has been running for more than 30 minutes. aborting.";
-                ::abort();
-            } else if (minutesRunning > 1) {
-                warning() << currentTestName << " has been running for more than "
-                          << minutesRunning - 1 << " minutes.";
-
-                // See what is stuck
-                getGlobalLockManager()->dump();
-            }
-        }
-    }
-};
-
-}  // namespace
-
 namespace dbtests {
 
 int runDbTests(int argc, char** argv) {
@@ -128,9 +76,6 @@ int runDbTests(int argc, char** argv) {
         distLockMgr->enablePinger(false);
     }
 
-    TestWatchDog twd;
-    twd.go();
-
     int ret = unittest::Suite::run(frameworkGlobalParams.suites,
                                    frameworkGlobalParams.filter,
                                    frameworkGlobalParams.runsPerTest);
@@ -141,15 +86,6 @@ int runDbTests(int argc, char** argv) {
 }
 
 }  // namespace dbtests
-
-namespace unittest {
-
-void onCurrentTestNameChange(const std::string& testName) {
-    stdx::lock_guard<stdx::mutex> lk(globalCurrentTestNameMutex);
-    globalCurrentTestName = testName;
-}
-
-}  // namespace unittest
 
 #ifdef _WIN32
 namespace ntservice {
