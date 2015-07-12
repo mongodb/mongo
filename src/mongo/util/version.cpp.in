@@ -108,6 +108,10 @@ namespace mongo {
         return "Windows 7/Windows Server 2008 R2";
 #elif (NTDDI_VERSION >= NTDDI_VISTA)
         return "Windows Vista/Windows Server 2008";
+#elif (NTDDI_VERSION >= NTDDI_WS03SP2)
+        return "Windows Server 2003 SP2";
+#elif (NTDDI_VERSION >= NTDDI_WINXPSP3)
+        return "Windows XP SP3";
 #else
 #error This targeted Windows version is not supported
 #endif // NTDDI_VERSION
