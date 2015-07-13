@@ -150,7 +150,7 @@ namespace repl {
         invariant(conn() == NULL);
 
         while (true) {
-            HostAndPort candidate = replCoord->chooseNewSyncSource();
+            HostAndPort candidate = replCoord->chooseNewSyncSource(lastOpTimeFetched);
 
             if (candidate.empty()) {
                 if (oldestOpTimeSeen == sentinel) {
@@ -200,7 +200,7 @@ namespace repl {
             }
             OpTime remoteOldOpTime = tsElem._opTime();
 
-            if (lastOpTimeFetched < remoteOldOpTime) {
+            if (!lastOpTimeFetched.isNull() && lastOpTimeFetched < remoteOldOpTime) {
                 // We're too stale to use this sync source.
                 resetConnection();
                 replCoord->blacklistSyncSource(candidate, 

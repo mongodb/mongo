@@ -2287,19 +2287,21 @@ namespace {
 
     void ReplicationCoordinatorImpl::_chooseNewSyncSource(
             const ReplicationExecutor::CallbackData& cbData,
+            const OpTime& lastOpTimeFetched,
             HostAndPort* newSyncSource) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;
         }
-        *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), getMyLastOptime());
+        *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), lastOpTimeFetched);
     }
 
-    HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource() {
+    HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOpTimeFetched) {
         HostAndPort newSyncSource;
         CBHStatus cbh = _replExecutor.scheduleWork(
             stdx::bind(&ReplicationCoordinatorImpl::_chooseNewSyncSource,
                        this,
                        stdx::placeholders::_1,
+                       lastOpTimeFetched,
                        &newSyncSource));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return newSyncSource; // empty

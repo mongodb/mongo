@@ -216,7 +216,7 @@ namespace repl {
 
         virtual bool isReplEnabled() const;
 
-        virtual HostAndPort chooseNewSyncSource();
+        virtual HostAndPort chooseNewSyncSource(const OpTime& lastOpTimeFetched);
 
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
 
@@ -660,6 +660,7 @@ namespace repl {
          * the most appropriate sync source.
          */
         void _chooseNewSyncSource(const ReplicationExecutor::CallbackData& cbData,
+                                  const OpTime& lastOpTimeFetched,
                                   HostAndPort* newSyncSource);
 
         /**

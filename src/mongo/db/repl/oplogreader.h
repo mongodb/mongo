@@ -144,6 +144,8 @@ namespace repl {
          * In the process of connecting, this function may add items to the repl coordinator's
          * sync source blacklist.
          * This function may throw DB exceptions.
+         * If "lastOpTimeFetched" is (0, 0), we do not check staleness as this indicates an initial
+         * sync.
          */
         void connectToSyncSource(OperationContext* txn, 
                                  OpTime lastOpTimeFetched,

@@ -276,7 +276,7 @@ namespace repl {
         return Status::OK();
     }
 
-    HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource() {
+    HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource(const OpTime& lastOpTimeFetched) {
         invariant(false);
         return HostAndPort();
     }
