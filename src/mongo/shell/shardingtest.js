@@ -809,6 +809,20 @@ printShardingStatus = function( configDB , verbose ){
     output( "  databases:" );
     configDB.databases.find().sort( { name : 1 } ).forEach( 
         function(db){
+            var truthy = function (value) {
+                return !!value;
+            }
+            var nonBooleanNote = function (name, value) {
+                // If the given value is not a boolean, return a string of the
+                // form " (<name>: <value>)", where <value> is converted to JSON.
+                var t = typeof(value);
+                var s = "";
+                if (t != "boolean" && t != "undefined") {
+                    s = " (" + name + ": " + tojson(value) + ")";
+                }
+                return s;
+            }
+
             output( "\t" + tojsononeline(db,"",true) );
         
             if (db.partitioned){
@@ -818,6 +832,10 @@ printShardingStatus = function( configDB , verbose ){
                         if ( ! coll.dropped ){
                             output( "\t\t" + coll._id );
                             output( "\t\t\tshard key: " + tojson(coll.key) );
+                            output( "\t\t\tunique: " + truthy(coll.unique)
+                                    + nonBooleanNote("unique", coll.unique) );
+                            output( "\t\t\tbalancing: " + !truthy(coll.noBalance)
+                                    + nonBooleanNote("noBalance", coll.noBalance) );
                             output( "\t\t\tchunks:" );
 
                             res = configDB.chunks.aggregate( { $match : { ns : coll._id } } ,
