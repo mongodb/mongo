@@ -139,7 +139,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 * We can only archive files if a hot backup is not in progress or
 	 * if we are the backup.
 	 */
-	__wt_spin_lock(session, &conn->hot_backup_lock);
+	WT_RET(__wt_readlock(session, conn->hot_backup_lock));
 	locked = 1;
 	if (conn->hot_backup == 0 || backup_file != 0) {
 		for (i = 0; i < logcount; i++) {
@@ -151,7 +151,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 			}
 		}
 	}
-	__wt_spin_unlock(session, &conn->hot_backup_lock);
+	WT_ERR(__wt_readunlock(session, conn->hot_backup_lock));
 	locked = 0;
 	__wt_log_files_free(session, logfiles, logcount);
 	logfiles = NULL;
@@ -167,7 +167,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	if (0)
 err:		__wt_err(session, ret, "log archive server error");
 	if (locked)
-		__wt_spin_unlock(session, &conn->hot_backup_lock);
+		WT_TRET(__wt_readunlock(session, conn->hot_backup_lock));
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	return (ret);
