@@ -477,6 +477,32 @@ MongoRunner.mongodOptions = function( opts ){
         opts.keyFile = jsTestOptions().keyFile
     }
 
+    if (opts.hasOwnProperty("enableEncryption")) {
+        // opts.enableEncryption, if set, must be an empty string
+        if (opts.enableEncryption !== "") {
+            throw new Error("The enableEncryption option must be an empty string if it is " +
+                            "specified");
+        }
+    } else if (jsTestOptions().enableEncryption !== undefined) {
+        if (jsTestOptions().enableEncryption !== "") {
+            throw new Error("The enableEncryption option must be an empty string if it is " +
+                            "specified");
+        }
+        opts.enableEncryption = "";
+    }
+
+    if (opts.hasOwnProperty("encryptionKeyFile")) {
+        // opts.encryptionKeyFile, if set, must be a string
+        if (typeof opts.encryptionKeyFile !== "string") {
+            throw new Error("The encryptionKeyFile option must be a string if it is specified");
+        }
+    } else if (jsTestOptions().encryptionKeyFile !== undefined) {
+        if (typeof(jsTestOptions().encryptionKeyFile) !== "string") {
+            throw new Error("The encryptionKeyFile option must be a string if it is specified");
+        }
+        opts.encryptionKeyFile = jsTestOptions().encryptionKeyFile;
+    }
+
     if( opts.noReplSet ) opts.replSet = null
     if( opts.arbiter ) opts.oplogSize = 1
             

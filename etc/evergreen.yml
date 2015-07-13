@@ -491,6 +491,14 @@ tasks:
       resmoke_args: --suites=dur_jscore_passthrough
 
 - <<: *task_template
+  name: ese_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=ese --storageEngine=wiredTiger
+
+- <<: *task_template
   name: failpoints
   commands:
   - func: "do setup"
@@ -619,6 +627,14 @@ tasks:
     vars:
       resmoke_args: --suites=core --storageEngine=wiredTiger
       run_multiple_jobs: true
+
+- <<: *task_template
+  name: jsCore_WT_ese
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_ese --storageEngine=wiredTiger
 
 - <<: *task_template
   name: jsCore_compatibility
@@ -947,6 +963,14 @@ tasks:
       resmoke_args: --suites=replica_sets --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: replica_sets_WT_ese
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_ese --storageEngine=wiredTiger
+
+- <<: *task_template
   name: replicasets_auth
   commands:
   - func: "do setup"
@@ -1001,6 +1025,14 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: sharding_WT_ese
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharding_auth
@@ -2386,6 +2418,10 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
+  - name: jsCore_WT_ese
+  - name: replica_sets_WT_ese
+  - name: sharding_WT_ese
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -2789,6 +2825,10 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
+  - name: jsCore_WT_ese
+  - name: replica_sets_WT_ese
+  - name: sharding_WT_ese
   - name: mmap
   - name: jsCore_auth
   - name: replicasets_auth

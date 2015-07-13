@@ -1,0 +1,19 @@
+# Section that is ignored by resmoke.py.
+config_variables:
+- &keyFile src/mongo/db/modules/enterprise/jstests/libs/ekf2
+
+selector:
+  js_test:
+    roots:
+    - jstests/sharding/*.js
+    - jstests/sharding/replset_config/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''
+        global_vars:
+          TestData:
+            enableEncryption: ''
+            encryptionKeyFile: *keyFile

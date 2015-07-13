@@ -174,7 +174,11 @@ jsTestOptions = function(){
                               authMechanism : TestData.authMechanism,
                               adminUser : TestData.adminUser || "admin",
                               adminPassword : TestData.adminPassword || "password",
-                              useLegacyConfigServers: TestData.useLegacyConfigServers || false });
+                              useLegacyConfigServers: TestData.useLegacyConfigServers || false,
+                              enableEncryption: TestData.enableEncryption,
+                              encryptionKeyFile: TestData.encryptionKeyFile,
+                            }
+                        );
     }
     return _jsTestOptions;
 }
