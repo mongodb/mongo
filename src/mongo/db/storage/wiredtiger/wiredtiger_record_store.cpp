@@ -310,21 +310,16 @@ StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj o
     StringBuilder ss;
     BSONForEach(elem, options) {
         if (elem.fieldNameStringData() == "configString") {
-            if (elem.type() != String) {
-                return StatusWith<std::string>(ErrorCodes::TypeMismatch,
-                                               str::stream()
-                                                   << "storageEngine.wiredTiger.configString "
-                                                   << "must be a string. "
-                                                   << "Not adding 'configString' value " << elem
-                                                   << " to collection configuration");
+            Status status = WiredTigerUtil::checkTableCreationOptions(elem);
+            if (!status.isOK()) {
+                return status;
             }
             ss << elem.valueStringData() << ',';
         } else {
             // Return error on first unrecognized field.
             return StatusWith<std::string>(ErrorCodes::InvalidOptions,
                                            str::stream() << '\'' << elem.fieldNameStringData()
-                                                         << '\'' << " is not a supported option in "
-                                                         << "storageEngine.wiredTiger");
+                                                         << '\'' << " is not a supported option.");
         }
     }
     return StatusWith<std::string>(ss.str());

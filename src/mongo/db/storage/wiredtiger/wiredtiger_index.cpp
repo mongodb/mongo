@@ -132,11 +132,9 @@ StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& option
     StringBuilder ss;
     BSONForEach(elem, options) {
         if (elem.fieldNameStringData() == "configString") {
-            if (elem.type() != String) {
-                return StatusWith<std::string>(ErrorCodes::TypeMismatch,
-                                               str::stream() << "configString must be a string. "
-                                                             << "Not adding 'configString' value "
-                                                             << elem << " to index configuration");
+            Status status = WiredTigerUtil::checkTableCreationOptions(elem);
+            if (!status.isOK()) {
+                return status;
             }
             ss << elem.valueStringData() << ',';
         } else {

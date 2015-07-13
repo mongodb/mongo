@@ -129,13 +129,14 @@ TEST(WiredTigerIndexTest, GenerateCreateStringEmptyConfigString) {
     ASSERT_EQ(result.getValue(), ",");  // "" would also be valid.
 }
 
-TEST(WiredTigerIndexTest, GenerateCreateStringValidConfigFormat) {
-    // TODO eventually this should fail since "abc" is not a valid WT option.
+TEST(WiredTigerIndexTest, GenerateCreateStringInvalidConfigStringOption) {
     BSONObj spec = fromjson("{configString: 'abc=def'}");
-    StatusWith<std::string> result = WiredTigerIndex::parseIndexOptions(spec);
-    const Status& status = result.getStatus();
-    ASSERT_OK(status);
-    ASSERT_EQ(result.getValue(), "abc=def,");
+    ASSERT_EQ(WiredTigerIndex::parseIndexOptions(spec), ErrorCodes::BadValue);
+}
+
+TEST(WiredTigerIndexTest, GenerateCreateStringValidConfigStringOption) {
+    BSONObj spec = fromjson("{configString: 'prefix_compression=true'}");
+    ASSERT_EQ(WiredTigerIndex::parseIndexOptions(spec), std::string("prefix_compression=true,"));
 }
 
 }  // namespace mongo

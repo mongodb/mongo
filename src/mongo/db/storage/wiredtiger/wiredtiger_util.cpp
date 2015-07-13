@@ -231,6 +231,34 @@ Status WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* o
 }
 
 // static
+Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) {
+    invariant(configElem.fieldNameStringData() == "configString");
+
+    if (configElem.type() != String) {
+        return {ErrorCodes::TypeMismatch, "'configString' must be a string."};
+    }
+
+    std::vector<std::string> errors;
+    ErrorAccumulator eventHandler(&errors);
+
+    StringData config = configElem.valueStringData();
+    Status status = wtRCToStatus(wiredtiger_config_validate(nullptr,
+                                                            &eventHandler,
+                                                            "WT_SESSION.create",
+                                                            config.rawData()));
+    if (!status.isOK()) {
+        StringBuilder errorMsg;
+        errorMsg << status.reason();
+        for (std::string error : errors) {
+            errorMsg << ". " << error;
+        }
+        errorMsg << ".";
+        return {status.code(), errorMsg.str()};
+    }
+    return Status::OK();
+}
+
+// static
 StatusWith<uint64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
                                                         const std::string& uri,
                                                         const std::string& config,
@@ -327,37 +355,33 @@ WT_EVENT_HANDLER WiredTigerUtil::defaultEventHandlers() {
     return handlers;
 }
 
+WiredTigerUtil::ErrorAccumulator::ErrorAccumulator(std::vector<std::string>* errors)
+    : WT_EVENT_HANDLER(defaultEventHandlers()),
+      _errors(errors),
+      _defaultErrorHandler(handle_error) {
+    if (errors) {
+        handle_error = onError;
+    }
+}
+
+// static
+int WiredTigerUtil::ErrorAccumulator::onError(WT_EVENT_HANDLER* handler,
+                                              WT_SESSION* session,
+                                              int error,
+                                              const char* message) {
+    try {
+        ErrorAccumulator* self = static_cast<ErrorAccumulator*>(handler);
+        self->_errors->push_back(message);
+        return self->_defaultErrorHandler(handler, session, error, message);
+    } catch (...) {
+        std::terminate();
+    }
+}
+
 int WiredTigerUtil::verifyTable(OperationContext* txn,
                                 const std::string& uri,
                                 std::vector<std::string>* errors) {
-    class MyEventHandlers : public WT_EVENT_HANDLER {
-    public:
-        MyEventHandlers(std::vector<std::string>* errors)
-            : WT_EVENT_HANDLER(defaultEventHandlers()),
-              _errors(errors),
-              _defaultErrorHandler(handle_error) {
-            handle_error = onError;
-        }
-
-    private:
-        static int onError(WT_EVENT_HANDLER* handler,
-                           WT_SESSION* session,
-                           int error,
-                           const char* message) {
-            try {
-                MyEventHandlers* self = static_cast<MyEventHandlers*>(handler);
-                self->_errors->push_back(message);
-                return self->_defaultErrorHandler(handler, session, error, message);
-            } catch (...) {
-                std::terminate();
-            }
-        }
-
-        typedef int (*ErrorHandler)(WT_EVENT_HANDLER*, WT_SESSION*, int, const char*);
-
-        std::vector<std::string>* const _errors;
-        const ErrorHandler _defaultErrorHandler;
-    } eventHandler(errors);
+    ErrorAccumulator eventHandler(errors);
 
     // Try to close as much as possible to avoid EBUSY errors.
     WiredTigerRecoveryUnit::get(txn)->getSession(txn)->closeAllCursors();
@@ -367,7 +391,7 @@ int WiredTigerUtil::verifyTable(OperationContext* txn,
     // Open a new session with custom error handlers.
     WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(txn)->getSessionCache()->conn();
     WT_SESSION* session;
-    invariantWTOK(conn->open_session(conn, errors ? &eventHandler : NULL, NULL, &session));
+    invariantWTOK(conn->open_session(conn, &eventHandler, NULL, &session));
     ON_BLOCK_EXIT(session->close, session, "");
 
     // Do the verify. Weird parens prevent treating "verify" as a macro.

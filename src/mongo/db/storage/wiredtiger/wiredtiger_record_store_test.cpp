@@ -192,13 +192,15 @@ TEST(WiredTigerRecordStoreTest, GenerateCreateStringEmptyConfigString) {
     ASSERT_EQ(result.getValue(), ",");  // "" would also be valid.
 }
 
-TEST(WiredTigerRecordStoreTest, GenerateCreateStringValidConfigFormat) {
-    // TODO eventually this should fail since "abc" is not a valid WT option.
+TEST(WiredTigerRecordStoreTest, GenerateCreateStringInvalidConfigStringOption) {
     BSONObj spec = fromjson("{configString: 'abc=def'}");
-    StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
-    const Status& status = result.getStatus();
-    ASSERT_OK(status);
-    ASSERT_EQ(result.getValue(), "abc=def,");
+    ASSERT_EQ(WiredTigerRecordStore::parseOptionsField(spec), ErrorCodes::BadValue);
+}
+
+TEST(WiredTigerRecordStoreTest, GenerateCreateStringValidConfigStringOption) {
+    BSONObj spec = fromjson("{configString: 'prefix_compression=true'}");
+    ASSERT_EQ(WiredTigerRecordStore::parseOptionsField(spec),
+              std::string("prefix_compression=true,"));
 }
 
 TEST(WiredTigerRecordStoreTest, Isolation1) {
