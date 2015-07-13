@@ -61,7 +61,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
             if (!protocolSet.isOK())
                 return _completeOperation(op, protocolSet.getStatus());
 
-            op->connection()->setServerProtocols(protocolSet.getValue());
+            op->connection().setServerProtocols(protocolSet.getValue());
 
             // Advance the state machine
             _authenticate(op);

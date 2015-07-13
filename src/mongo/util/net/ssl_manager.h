@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <string>
 
@@ -109,9 +110,13 @@ public:
      * Fetches a peer certificate and validates it if it exists
      * Throws SocketException on failure
      * @return a std::string containing the certificate's subject name.
+     *
+     * This version of parseAndValidatePeerCertificate is deprecated because it throws a
+     * SocketException upon failure. New code should prefer the version that returns
+     * a StatusWith instead.
      */
-    virtual std::string parseAndValidatePeerCertificate(const SSLConnection* conn,
-                                                        const std::string& remoteHost) = 0;
+    virtual std::string parseAndValidatePeerCertificateDeprecated(
+        const SSLConnection* conn, const std::string& remoteHost) = 0;
 
     /**
      * Cleans up SSL thread local memory; use at thread exit
@@ -146,11 +151,33 @@ public:
     virtual int SSL_shutdown(SSLConnection* conn) = 0;
 
     virtual void SSL_free(SSLConnection* conn) = 0;
+
+    /**
+     * Initializes an OpenSSL context according to the provided settings. Only settings which are
+     * acceptable on non-blocking connections are set.
+     */
+    virtual Status initSSLContext(SSL_CTX* context, const SSLParams& params) = 0;
+
+    /**
+     * Fetches a peer certificate and validates it if it exists. If validation fails, but weak
+     * validation is enabled, boost::none will be returned. If validation fails, and invalid
+     * certificates are not allowed, a non-OK status will be returned. If validation is successful,
+     * an engaged optional containing the certificate's subject name will be returned.
+     */
+    virtual StatusWith<boost::optional<std::string>> parseAndValidatePeerCertificate(
+        SSL* ssl, const std::string& remoteHost) = 0;
 };
 
 // Access SSL functions through this instance.
 SSLManagerInterface* getSSLManager();
 
 extern bool isSSLServer;
+
+/**
+ * The global SSL configuration. This should be accessed only after global initialization has
+ * completed. If it must be accessed in an initializer, the initializer should have
+ * "EndStartupOptionStorage" as a prerequisite.
+ */
+const SSLParams& getSSLGlobalParams();
 }
 #endif  // #ifdef MONGO_CONFIG_SSL

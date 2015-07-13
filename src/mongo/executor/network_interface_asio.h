@@ -28,12 +28,19 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #include <asio.hpp>
+
 #include <boost/optional.hpp>
 #include <memory>
 #include <string>
 #include <system_error>
 #include <unordered_map>
+
+#ifdef MONGO_CONFIG_SSL
+#include <asio/ssl.hpp>
+#endif
 
 #include "mongo/base/status.h"
 #include "mongo/client/connection_pool.h"
@@ -43,12 +50,37 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace executor {
+
+/**
+ * A two-way stream supporting asynchronous reads and writes.
+ */
+class AsyncStreamInterface {
+    MONGO_DISALLOW_COPYING(AsyncStreamInterface);
+
+public:
+    virtual ~AsyncStreamInterface() = default;
+
+    using ConnectHandler = stdx::function<void(std::error_code)>;
+
+    using StreamHandler = stdx::function<void(std::error_code, std::size_t)>;
+
+    virtual void connect(const asio::ip::tcp::resolver::iterator endpoints,
+                         ConnectHandler&& connectHandler) = 0;
+
+    virtual void write(asio::const_buffer buf, StreamHandler&& writeHandler) = 0;
+
+    virtual void read(asio::mutable_buffer buf, StreamHandler&& readHandler) = 0;
+
+protected:
+    AsyncStreamInterface() = default;
+};
 
 /**
  * Implementation of the replication system's network interface using Christopher
@@ -80,18 +112,21 @@ private:
 
     enum class State { kReady, kRunning, kShutdown };
 
+    class AsyncStream;
+    class AsyncSecureStream;
+
     /**
      * AsyncConnection encapsulates the per-connection state we maintain.
      */
     class AsyncConnection {
     public:
-        AsyncConnection(asio::ip::tcp::socket&& sock, rpc::ProtocolSet serverProtocols);
+        AsyncConnection(std::unique_ptr<AsyncStreamInterface>, rpc::ProtocolSet serverProtocols);
 
-        AsyncConnection(asio::ip::tcp::socket&& sock,
+        AsyncConnection(std::unique_ptr<AsyncStreamInterface>,
                         rpc::ProtocolSet serverProtocols,
                         boost::optional<ConnectionPool::ConnectionPtr>&& bootstrapConn);
 
-        asio::ip::tcp::socket& sock();
+        AsyncStreamInterface& stream();
 
         rpc::ProtocolSet serverProtocols() const;
         rpc::ProtocolSet clientProtocols() const;
@@ -107,7 +142,7 @@ private:
 #endif
 
     private:
-        asio::ip::tcp::socket _sock;
+        std::unique_ptr<AsyncStreamInterface> _stream;
 
         rpc::ProtocolSet _serverProtocols;
         rpc::ProtocolSet _clientProtocols{rpc::supports::kAll};
@@ -159,18 +194,14 @@ private:
                 const RemoteCommandCompletionFn& onFinish,
                 Date_t now);
 
-        std::string toString() const;
-
         void cancel();
         bool canceled() const;
 
         const TaskExecutor::CallbackHandle& cbHandle() const;
 
-        AsyncConnection* connection();
+        AsyncConnection& connection();
 
-        void connect(ConnectionPool* const pool, asio::io_service* service, Date_t now);
         void setConnection(AsyncConnection&& conn);
-        bool connected() const;
 
         // AsyncOp may run multiple commands over its lifetime (for example, an ismaster
         // command, the command provided to the NetworkInterface via startCommand(), etc.)
@@ -189,14 +220,6 @@ private:
         void setOperationProtocol(rpc::Protocol proto);
 
     private:
-        enum class OpState {
-            kReady,
-            kConnectionAcquired,
-            kConnectionVerified,
-            kConnected,
-            kCompleted
-        };
-
         // Information describing a task enqueued on the NetworkInterface
         // via a call to startCommand().
         TaskExecutor::CallbackHandle _cbHandle;
@@ -217,7 +240,6 @@ private:
 
         const Date_t _start;
 
-        OpState _state;
         AtomicUInt64 _canceled;
 
         /**
@@ -255,10 +277,17 @@ private:
     // Connection
     void _connectASIO(AsyncOp* op);
     void _connectWithDBClientConnection(AsyncOp* op);
-    void _setupSocket(AsyncOp* op, const asio::ip::tcp::resolver::iterator& endpoints);
+
+    // setup plaintext TCP socket
+    void _setupSocket(AsyncOp* op, const asio::ip::tcp::resolver::iterator endpoints);
+
+#ifdef MONGO_CONFIG_SSL
+    // setup SSL socket
+    void _setupSecureSocket(AsyncOp* op, asio::ip::tcp::resolver::iterator endpoints);
+#endif
+
     void _runIsMaster(AsyncOp* op);
     void _authenticate(AsyncOp* op);
-    void _sslHandshake(AsyncOp* op);
 
     // Communication state machine
     void _beginCommunication(AsyncOp* op);
@@ -285,6 +314,13 @@ private:
     stdx::condition_variable _isExecutorRunnableCondition;
 
     std::unique_ptr<ConnectionPool> _connPool;
+
+#ifdef MONGO_CONFIG_SSL
+    // The SSL context. This declaration is wrapped in an ifdef because the asio::ssl::context
+    // type does not exist unless SSL support is compiled in. We also use a boost::optional as
+    // even if SSL support is compiled in, it can be disabled at runtime.
+    boost::optional<asio::ssl::context> _sslContext;
+#endif
 };
 
 }  // namespace executor
