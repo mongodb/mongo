@@ -55,7 +55,7 @@ var db;
              // commands weren't implemented:
              // clean cloneCollectionAsCapped copydbgetnonce dataSize
              // datasize dbstats deleteIndexes dropIndexes forceerror
-             // getnonce logout medianKey profile reIndex repairDatabase
+             // getnonce logout profile reIndex repairDatabase
              // reseterror splitVector validate top
 
              /* missing commands :

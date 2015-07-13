@@ -21,6 +21,8 @@ env.Library(
 env.Library(
     target='sharding',
     source=[
+        'migration_destination_manager.cpp',
+        'migration_source_manager.cpp',
         'sharded_connection_info.cpp',
         'sharding_state.cpp',
     ],

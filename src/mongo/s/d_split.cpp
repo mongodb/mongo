@@ -74,35 +74,6 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-class CmdMedianKey : public Command {
-public:
-    CmdMedianKey() : Command("medianKey") {}
-    virtual bool slaveOk() const {
-        return true;
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
-    virtual void help(stringstream& help) const {
-        help << "Deprecated internal command. Use splitVector command instead. \n";
-    }
-    // No auth required as this command no longer does anything.
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}
-    bool run(OperationContext* txn,
-             const string& dbname,
-             BSONObj& jsobj,
-             int,
-             string& errmsg,
-             BSONObjBuilder& result) {
-        errmsg =
-            "medianKey command no longer supported. Calling this indicates mismatch between mongo "
-            "versions.";
-        return false;
-    }
-} cmdMedianKey;
-
 class CheckShardingIndex : public Command {
 public:
     CheckShardingIndex() : Command("checkShardingIndex", false) {}
