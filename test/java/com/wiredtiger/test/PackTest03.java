@@ -27,9 +27,14 @@
  */
 package com.wiredtiger.test;
 
+import com.wiredtiger.db.Connection;
+import com.wiredtiger.db.Cursor;
 import com.wiredtiger.db.PackOutputStream;
 import com.wiredtiger.db.PackInputStream;
+import com.wiredtiger.db.Session;
+import com.wiredtiger.db.WiredTigerException;
 import com.wiredtiger.db.WiredTigerPackingException;
+import com.wiredtiger.db.wiredtiger;
 
 import static org.junit.Assert.assertEquals;
 
@@ -38,11 +43,23 @@ import org.junit.Assert;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+/*
+ * PackTest03 tests packing/unpacking in three ways:
+ *  1) using PackInputStream/PackOutputStream
+ *  2) putting values into a main table and rereading them.
+ *  3) checking that values are stored in a reverse index on the main table.
+ */
 public class PackTest03 {
+
+    private Connection connection;
+    private Session session;
 
     public interface PackingAdaptor {
         public void addval(PackOutputStream packer, long val);
         public long getval(PackInputStream unpacker);
+        public void addval(Cursor cur, long val);
+        public void addkey(Cursor cur, long key);
+        public long getval(Cursor cur);
     }
     public static class Scenario {
         public Scenario(String format, long low, long high, int nbits,
@@ -71,22 +88,37 @@ public class PackTest03 {
                 public void addval(PackOutputStream packer, long val) {
                     packer.addByte((byte)val); }
                 public long getval(PackInputStream unpacker) {
-                    return unpacker.getByte();
-                }
+                    return unpacker.getByte(); }
+                public void addval(Cursor cur, long val) {
+                    cur.putValueByte((byte)val); }
+                public void addkey(Cursor cur, long key) {
+                    cur.putKeyByte((byte)key); }
+                public long getval(Cursor cur) {
+                    return cur.getValueByte(); }
             }),
         new Scenario("B", 0, 255, 8, new PackingAdaptor() {
                 public void addval(PackOutputStream packer, long val) {
                     packer.addByte((byte)val); }
                 public long getval(PackInputStream unpacker) {
-                    return unpacker.getByte();
-                }
+                    return unpacker.getByte(); }
+                public void addval(Cursor cur, long val) {
+                    cur.putValueByte((byte)val); }
+                public void addkey(Cursor cur, long key) {
+                    cur.putKeyByte((byte)key); }
+                public long getval(Cursor cur) {
+                    return cur.getValueByte(); }
             }),
         new Scenario("h", -32768, 32767, 16, new PackingAdaptor() {
                 public void addval(PackOutputStream packer, long val) {
                     packer.addShort((short)val); }
                 public long getval(PackInputStream unpacker) {
-                    return unpacker.getShort();
-                }
+                    return unpacker.getShort(); }
+                public void addval(Cursor cur, long val) {
+                    cur.putValueShort((short)val); }
+                public void addkey(Cursor cur, long key) {
+                    cur.putKeyShort((short)key); }
+                public long getval(Cursor cur) {
+                    return cur.getValueShort(); }
             }),
         /*
          * Note: high should be 65535, there's not currently a way to insert
@@ -96,15 +128,25 @@ public class PackTest03 {
                 public void addval(PackOutputStream packer, long val) {
                     packer.addShort((short)val); }
                 public long getval(PackInputStream unpacker) {
-                    return unpacker.getShort();
-                }
+                    return unpacker.getShort(); }
+                public void addval(Cursor cur, long val) {
+                    cur.putValueShort((short)val); }
+                public void addkey(Cursor cur, long key) {
+                    cur.putKeyShort((short)key); }
+                public long getval(Cursor cur) {
+                    return cur.getValueShort(); }
             }),
         new Scenario("i", -2147483648, 2147483647, 32, new PackingAdaptor() {
                 public void addval(PackOutputStream packer, long val) {
                     packer.addInt((int)val); }
                 public long getval(PackInputStream unpacker) {
-                    return unpacker.getInt();
-                }
+                    return unpacker.getInt(); }
+                public void addval(Cursor cur, long val) {
+                    cur.putValueInt((int)val); }
+                public void addkey(Cursor cur, long key) {
+                    cur.putKeyInt((int)key); }
+                public long getval(Cursor cur) {
+                    return cur.getValueInt(); }
             }),
         /*
          * Note: high should be 4294967295L, there's not currently a way to
@@ -114,16 +156,26 @@ public class PackTest03 {
                 public void addval(PackOutputStream packer, long val) {
                     packer.addInt((int)val); }
                 public long getval(PackInputStream unpacker) {
-                    return unpacker.getInt();
-                }
+                    return unpacker.getInt(); }
+                public void addval(Cursor cur, long val) {
+                    cur.putValueInt((int)val); }
+                public void addkey(Cursor cur, long key) {
+                    cur.putKeyInt((int)key); }
+                public long getval(Cursor cur) {
+                    return cur.getValueInt(); }
             }),
         new Scenario("q", -9223372036854775808L,
                      9223372036854775807L, 64, new PackingAdaptor() {
                 public void addval(PackOutputStream packer, long val) {
                     packer.addLong(val); }
                 public long getval(PackInputStream unpacker) {
-                    return unpacker.getLong();
-                }
+                    return unpacker.getLong(); }
+                public void addval(Cursor cur, long val) {
+                    cur.putValueLong(val); }
+                public void addkey(Cursor cur, long key) {
+                    cur.putKeyLong(key); }
+                public long getval(Cursor cur) {
+                    return cur.getValueLong(); }
             }),
 
         /* 'unsigned long' numbers larger than 2^63 cannot be
@@ -133,46 +185,110 @@ public class PackTest03 {
                 public void addval(PackOutputStream packer, long val) {
                     packer.addLong(val); }
                 public long getval(PackInputStream unpacker) {
-                    return unpacker.getLong();
-                }
+                    return unpacker.getLong(); }
+                public void addval(Cursor cur, long val) {
+                    cur.putValueLong(val); }
+                public void addkey(Cursor cur, long key) {
+                    cur.putKeyLong(key); }
+                public long getval(Cursor cur) {
+                    return cur.getValueLong(); }
             }),
     };
 
-    void tryPackSingle(Scenario scen, long value)
+    void packSingle(Scenario scen, Cursor cur, Cursor curinv, long value)
     throws WiredTigerPackingException {
         if ((value < scen.low || value > scen.high) && scen.low < scen.high)
             throw new IllegalArgumentException("value out of range: " + value);
         
+        // The Java API does not handle large unsigned values
+        // via the cursor interface.  We can fake it via the
+        // Packing interface.
+        if (scen.low == 0 && value > (scen.high / 2)) {
+            // disable cursor checks
+            cur = null;
+            curinv = null;
+        }
         PackOutputStream packer = new PackOutputStream(scen.format);
         scen.adaptor.addval(packer, value);
         byte[] bytes = packer.getValue();
         PackInputStream unpacker =
             new PackInputStream(scen.format, packer.getValue());
-        //long unpacked = scen.adaptor.getval(unpacker) & scen.mask;
         long unpacked = scen.adaptor.getval(unpacker);
+
+        // We jump through hoops to allow values to be packed/unpacked.
         if (scen.low < 0 && unpacked < 0) {
             unpacked = (unpacked & scen.mask) | ~scen.mask;
         }
         else {
             unpacked = unpacked & scen.mask;
         }
+
         if (value != unpacked) {
-            String arg = "ERROR: format " + scen.format + ": wanted=" +
-                value + " did not match got=" + unpacked;
-            System.out.println(arg);
-            throw new IllegalArgumentException(arg);
+            System.err.println("ERROR: format " + scen.format +
+                               ": wanted=" + value +
+                               " did not match got=" + unpacked);
+            assertEquals(value, unpacked);
+        }
+        if (cur != null) {
+            cur.reset();
+            cur.putKeyInt(9999);
+            scen.adaptor.addval(cur, value);
+            cur.insert();
+            cur.reset();
+            cur.putKeyInt(9999);
+            assertEquals(0, cur.search());
+            long unpacked2 = scen.adaptor.getval(cur);
+            if (value != unpacked2) {
+                System.out.println("ERROR: format " + scen.format +
+                                   ": cursor wanted=" + value +
+                                   " did not match got=" + unpacked2);
+                assertEquals(value, unpacked2);
+            }
+            curinv.reset();
+            scen.adaptor.addkey(curinv, value);
+            assertEquals(0, curinv.search());
+            assertEquals(9999, curinv.getValueInt());
+        }
+    }
+
+    /**
+     * An envelope method around tryPackSingle() that reports any exceptions
+     */
+    void tryPackSingle(Scenario scen, Cursor cur, Cursor curinv, long value)
+    throws WiredTigerPackingException {
+        try {
+            packSingle(scen, cur, curinv, value);
+        }
+        catch (WiredTigerPackingException pe) {
+            System.err.println("ERROR: scenario " + scen.format +
+                               ": value=" + value);
+            throw pe;
+        }
+        catch (AssertionError ae) {
+            System.err.println("ERROR: scenario " + scen.format +
+                               ": value=" + value);
+            throw ae;
         }
     }
 
     void tryPackRange(Scenario scen, long lowRange, long highRange)
     throws WiredTigerPackingException {
+        //System.out.println("Scenario " + scen.format +
+        //                   ": [" + lowRange + "," + highRange + "]");
+        String uri = "table:PackTest03";
+        String uriinv = "index:PackTest03:inverse";
+        session.create(uri, "columns=(k,v),key_format=i,value_format=" +
+                       scen.format);
+        session.create(uriinv, "columns=(v)");
+        Cursor cur = session.open_cursor(uri, null, null);
+        Cursor curinv = session.open_cursor(uriinv + "(k)", null, null);
         if (lowRange < scen.low)
             lowRange = scen.low;
         if (highRange > scen.high && scen.high != -1L)
             highRange = scen.high;
         for (long val = lowRange; val <= highRange; val++) {
             try {
-                tryPackSingle(scen, val);
+                tryPackSingle(scen, cur, curinv, val);
             }
             catch (Exception ex) {
                 System.out.println("EXCEPTION: format " + scen.format +
@@ -183,6 +299,10 @@ public class PackTest03 {
             if (val == Long.MAX_VALUE)
                 break;
         }
+        cur.close();
+        curinv.close();
+        session.drop(uriinv, null);
+        session.drop(uri, null);
     }
 
     // A debug helper method
@@ -205,6 +325,7 @@ public class PackTest03 {
         long lmin = Long.MIN_VALUE;
         long lmax = Long.MAX_VALUE;
 
+        setup();
         for (int scenidx = 0; scenidx < scenarios.length; scenidx++) {
             Scenario scen = scenarios[scenidx];
             tryPackRange(scen, -100000, 100000);
@@ -215,6 +336,17 @@ public class PackTest03 {
             tryPackRange(scen, lmin, lmin + 100);
             tryPackRange(scen, lmax - 100, lmax);
         }
+        teardown();
+    }
+
+    private void setup() {
+        connection = wiredtiger.open("WT_HOME", "create");
+        session = connection.open_session(null);
+    }
+
+    private void teardown() {
+        session.close(null);
+        connection.close(null);
     }
 
     public static void main(String[] args) {
