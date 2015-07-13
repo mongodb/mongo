@@ -32,7 +32,8 @@
 
 /*
  * __curmetadata_setkv --
- *	Copy the key/value pair from
+ *	Copy key/value into the public cursor, stripping internal metadata for
+ *	"create-only" cursors.
  */
 static int
 __curmetadata_setkv(WT_CURSOR_METADATA *mdc, WT_CURSOR *fc)
