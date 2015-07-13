@@ -382,6 +382,23 @@ public:
 template <typename SubClass>
 class ExpressionVariadic : public ExpressionNaryBase<SubClass> {};
 
+/**
+ * Inherit from this class if your expression can take a range of arguments, e.g. if it has some
+ * optional arguments.
+ */
+template <typename SubClass, int MinArgs, int MaxArgs>
+class ExpressionRangedArity : public ExpressionNaryBase<SubClass> {
+public:
+    void validateArguments(const Expression::ExpressionVector& args) const override {
+        uassert(28667,
+                mongoutils::str::stream()
+                    << "Expression " << this->getOpName() << " takes at least " << MinArgs
+                    << " arguments, and at most " << MaxArgs << ", but " << args.size()
+                    << " were passed in.",
+                MinArgs <= args.size() && args.size() <= MaxArgs);
+    }
+};
+
 /// Inherit from this class if your expression takes a fixed number of arguments.
 template <typename SubClass, int NArgs>
 class ExpressionFixedArity : public ExpressionNaryBase<SubClass> {
@@ -1001,6 +1018,20 @@ public:
 };
 
 
+class ExpressionSize final : public ExpressionFixedArity<ExpressionSize, 1> {
+public:
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+};
+
+
+class ExpressionSlice final : public ExpressionRangedArity<ExpressionSlice, 2, 3> {
+public:
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+};
+
+
 class ExpressionIsArray final : public ExpressionFixedArity<ExpressionIsArray, 1> {
 public:
     Value evaluateInternal(Variables* vars) const final;
@@ -1008,16 +1039,11 @@ public:
 };
 
 
-class ExpressionSize final : public ExpressionFixedArity<ExpressionSize, 1> {
-public:
-    Value evaluateInternal(Variables* vars) const final;
-    const char* getOpName() const final;
-};
-
 class ExpressionSqrt final : public ExpressionFixedArity<ExpressionSqrt, 1> {
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;
 };
+
 
 class ExpressionStrcasecmp final : public ExpressionFixedArity<ExpressionStrcasecmp, 2> {
 public:
