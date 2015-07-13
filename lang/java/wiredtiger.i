@@ -299,6 +299,7 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 %ignore __wt_cursor::set_value;
 %ignore __wt_cursor::insert;
 %ignore __wt_cursor::remove;
+%ignore __wt_cursor::reset;
 %ignore __wt_cursor::search;
 %ignore __wt_cursor::search_near;
 %ignore __wt_cursor::update;
@@ -1138,6 +1139,11 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		return $self->remove($self);
 	}
 
+	%javamethodmodifiers reset_wrap "protected";
+	int reset_wrap() {
+		return $self->reset($self);
+	}
+
 	%javamethodmodifiers search_wrap "protected";
 	int search_wrap(WT_ITEM *k) {
 		$self->set_key($self, k);
@@ -1702,6 +1708,21 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		valuePacker.reset();
 		keyUnpacker = initKeyUnpacker(ret == 0);
 		valueUnpacker = initValueUnpacker(ret == 0);
+		return ret;
+	}
+
+	/**
+	 * Reset a cursor.
+	 *
+	 * \return The status of the operation.
+	 */
+	public int reset()
+	throws WiredTigerException {
+		int ret = reset_wrap();
+		keyPacker.reset();
+		valuePacker.reset();
+		keyUnpacker = null;
+		valueUnpacker = null;
 		return ret;
 	}
 
