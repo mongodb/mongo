@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_sweep01.py
-# Test lots of tables, number of open files and sweeping.  Run both
-# with and without checkpoints.
+# test_sweep03.py
+# Test to confirm if setting close_idle_time to 0 does not sweep old handles
 #
 
 import fnmatch, os, shutil, run, time
@@ -37,8 +36,8 @@ from wiredtiger import wiredtiger_open, stat
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
-class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
-    tablebase = 'test_sweep01'
+class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
+    tablebase = 'test_sweep03'
     uri = 'table:' + tablebase
     numfiles = 50
     numkv = 1000
@@ -47,10 +46,6 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('row', dict(tabletype='row',
                     create_params = 'key_format=i,value_format=i')),
-        ('var', dict(tabletype='var',
-                    create_params = 'key_format=r,value_format=i')),
-        ('fix', dict(tabletype='fix',
-                    create_params = 'key_format=r,value_format=8t')),
     ]
 
     scenarios = types
@@ -131,6 +126,31 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print "XX: sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
         self.assertEqual(close1, 0)
         self.assertEqual(close2, 0)
+
+        # Create a table to drop. A drop should close its associated handles
+        drop_uri = '%s.%s' % (self.uri, "droptest")
+
+        self.session.create(drop_uri, self.create_params)
+
+        c = self.session.open_cursor(drop_uri, None)
+        for k in range(self.numkv):
+            c[k+1] = 1
+        c.close()
+
+        self.session.drop(drop_uri, "force=true")
+
+        time.sleep(12)
+
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        close3 = stat_cursor[stat.conn.dh_conn_handles][2]
+        sweep3 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        stat_cursor.close()
+
+        # We dropped the table, something should have been cleaned up
+        if (close3 != 1):
+            print "close3: " + str(close3) + " close2: " + str(close2)
+            print "XX: sweep3: " + str(sweep3) + " sweep2: " + str(sweep2)
+        self.assertEqual(close3, 1)
 
 if __name__ == '__main__':
     wttest.run()

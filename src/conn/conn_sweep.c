@@ -268,7 +268,8 @@ __sweep_server(void *arg)
 		WT_ERR(__sweep_mark(session, &dead_handles));
 
 		if (dead_handles == 0 &&
-		    conn->open_file_count < conn->sweep_handles_min)
+		    conn->open_file_count < conn->sweep_handles_min &&
+		    conn->sweep_idle_time != 0)
 			continue;
 
 		/* Close handles if we have reached the configured limit */
