@@ -256,9 +256,9 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 			    session, uri, 0, NULL, &colgroup));
 			WT_RET(__wt_open_cursor(
 			    session, colgroup->source, owner, cfg, cursorp));
-		} else if (WT_STREQ(uri, "config:"))
-			WT_RET(__wt_curmetadata_open(
-			    session, uri, owner, cfg, cursorp));
+		} else if (WT_PREFIX_MATCH(uri, "config:"))
+			WT_RET(__wt_curconfig_open(
+			    session, uri, cfg, cursorp));
 		break;
 	case 'i':
 		if (WT_PREFIX_MATCH(uri, "index:"))
@@ -282,7 +282,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 			    session, uri, owner, cfg, cursorp));
 		break;
 	case 'm':
-		if (WT_STREQ(uri, WT_METADATA_URI))
+		if (WT_PREFIX_MATCH(uri, WT_METADATA_URI))
 			WT_RET(__wt_curmetadata_open(
 			    session, uri, owner, cfg, cursorp));
 		break;
@@ -347,7 +347,6 @@ __session_open_cursor(WT_SESSION *wt_session,
 	if (to_dup != NULL) {
 		uri = to_dup->uri;
 		if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
-		    !WT_STREQ(uri, "config:") &&
 		    !WT_PREFIX_MATCH(uri, "index:") &&
 		    !WT_PREFIX_MATCH(uri, "file:") &&
 		    !WT_PREFIX_MATCH(uri, "lsm:") &&

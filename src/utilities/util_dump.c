@@ -149,9 +149,9 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 
 	/* Open a metadata cursor. */
 	if ((ret = session->open_cursor(
-	    session, "config:", NULL, NULL, &cursor)) != 0) {
-		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, "config:", session->strerror(session, ret));
+	    session, "metadata:create", NULL, NULL, &cursor)) != 0) {
+		fprintf(stderr, "%s: %s: session.open_cursor: %s\n", progname,
+		    "metadata:create", session->strerror(session, ret));
 		return (1);
 	}
 	/*
@@ -358,9 +358,9 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 	/* Dump the config. */
 	/* Open a metadata cursor. */
 	if ((ret = session->open_cursor(
-	    session, "config:", NULL, NULL, &cursor)) != 0) {
+	    session, "metadata:create", NULL, NULL, &cursor)) != 0) {
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, "config:",
+		    progname, "metadata:create",
 		    session->strerror(session, ret));
 		return (1);
 	}

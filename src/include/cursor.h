@@ -291,7 +291,7 @@ struct __wt_cursor_metadata {
 
 	WT_CURSOR *file_cursor;		/* Queries of regular metadata */
 
-#define	WT_MDC_CONFIGONLY	0x01
+#define	WT_MDC_CREATEONLY	0x01
 #define	WT_MDC_POSITIONED	0x02
 #define	WT_MDC_ONMETADATA	0x04
 	uint32_t flags;

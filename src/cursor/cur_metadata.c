@@ -47,7 +47,7 @@ __curmetadata_setkv(WT_CURSOR_METADATA *mdc, WT_CURSOR *fc)
 
 	c->key.data = fc->key.data;
 	c->key.size = fc->key.size;
-	if (F_ISSET(mdc, WT_MDC_CONFIGONLY)) {
+	if (F_ISSET(mdc, WT_MDC_CREATEONLY)) {
 		WT_RET(__wt_schema_create_strip(
 		    session, fc->value.data, NULL, &value));
 		ret = __wt_buf_set(
@@ -90,7 +90,7 @@ __curmetadata_metadata_search(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	/* The metadata search interface allocates a new string in value. */
 	WT_RET(__wt_metadata_search(session, WT_METAFILE_URI, &value));
 
-	if (F_ISSET(mdc, WT_MDC_CONFIGONLY)) {
+	if (F_ISSET(mdc, WT_MDC_CREATEONLY)) {
 		ret = __wt_schema_create_strip(
 		    session, value, NULL, &stripped);
 		__wt_free(session, value);
@@ -468,9 +468,9 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
-	/* If this is a "config:" cursor, strip internal metadata. */
-	if (WT_STREQ(uri, "config:"))
-		F_SET(mdc, WT_MDC_CONFIGONLY);
+	/* If we are only returning create config, strip internal metadata. */
+	if (WT_STREQ(uri, "metadata:create"))
+		F_SET(mdc, WT_MDC_CREATEONLY);
 
 	/*
 	 * Metadata cursors default to readonly; if not set to not-readonly,
