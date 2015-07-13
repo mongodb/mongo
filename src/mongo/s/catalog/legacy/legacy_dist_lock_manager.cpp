@@ -120,14 +120,14 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
         if (acquired) {
             verify(!lockDoc.isEmpty());
 
-            LocksType lock;
-            string errMsg;
-            if (!lock.parseBSON(lockDoc, &errMsg)) {
+            auto locksTypeResult = LocksType::fromBSON(lockDoc);
+            if (!locksTypeResult.isOK()) {
                 return StatusWith<ScopedDistLock>(
                     ErrorCodes::UnsupportedFormat,
-                    str::stream() << "error while parsing lock document: " << errMsg);
+                    str::stream() << "error while parsing lock document: " << lockDoc << " : "
+                                  << locksTypeResult.getStatus().toString());
             }
-
+            const LocksType& lock = locksTypeResult.getValue();
             dassert(lock.isLockIDSet());
 
             {

@@ -299,7 +299,7 @@ Status DistributedLock::checkStatus(double timeout) {
                                     << " exists in the locks collection");
     }
 
-    if (lockObj[LocksType::state()].numberInt() < 2) {
+    if (lockObj[LocksType::state()].numberInt() < LocksType::LOCKED) {
         return Status(ErrorCodes::LockFailed,
                       str::stream() << "lock " << _name << " current state is not held ("
                                     << lockObj[LocksType::state()].numberInt() << ")");
@@ -347,7 +347,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
 
     BSONObjBuilder queryBuilder;
     queryBuilder.append(LocksType::name(), _name);
-    queryBuilder.append(LocksType::state(), 0);
+    queryBuilder.append(LocksType::state(), LocksType::UNLOCKED);
 
     {
         // make sure its there so we can use simple update logic below
@@ -359,7 +359,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                 LOG(logLvl) << "inserting initial doc in " << LocksType::ConfigNS << " for lock "
                             << _name << endl;
                 conn->insert(LocksType::ConfigNS,
-                             BSON(LocksType::name(_name) << LocksType::state(0)
+                             BSON(LocksType::name(_name) << LocksType::state(LocksType::UNLOCKED)
                                                          << LocksType::who("")
                                                          << LocksType::lockID(OID())));
             } catch (UserException& e) {
@@ -369,7 +369,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
         }
 
         // Case 2: A set lock that we might be able to force
-        else if (o[LocksType::state()].numberInt() > 0) {
+        else if (o[LocksType::state()].numberInt() > LocksType::UNLOCKED) {
             string lockName =
                 o[LocksType::name()].String() + string("/") + o[LocksType::process()].String();
 
@@ -399,7 +399,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                 // Timeout the elapsed time using comparisons of remote clock
                 // For non-finalized locks, timeout 15 minutes since last seen (ts)
                 // For finalized locks, timeout 15 minutes since last ping
-                bool recPingChange = o[LocksType::state()].numberInt() == 2 &&
+                bool recPingChange = o[LocksType::state()].numberInt() == LocksType::LOCKED &&
                     (lastPingEntry.processId != pingDocProcessId ||
                      lastPingEntry.lastPing != pingDocPingValue);
                 bool recTSChange = lastPingEntry.lockSessionId != o[LocksType::lockID()].OID();
@@ -461,9 +461,9 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                     // we can overwrite a new lock inserted in the meantime.
                     conn->update(LocksType::ConfigNS,
                                  BSON(LocksType::name(_name)
-                                      << LocksType::state(o[LocksType::state()].numberInt())
+                                      << LocksType::state() << o[LocksType::state()].numberInt()
                                       << LocksType::lockID(o[LocksType::lockID()].OID())),
-                                 BSON("$set" << BSON(LocksType::state(0))));
+                                 BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
 
                     BSONObj err = conn->getLastErrorDetailed();
                     string errMsg = DBClientWithCommands::getLastErrorString(err);
@@ -507,9 +507,9 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                     // Test the lock with the correct "ts" (OID) value
                     conn->update(LocksType::ConfigNS,
                                  BSON(LocksType::name(_name)
-                                      << LocksType::state(2)
+                                      << LocksType::state(LocksType::LOCKED)
                                       << LocksType::lockID(o[LocksType::lockID()].OID())),
-                                 BSON("$set" << BSON(LocksType::state(2))));
+                                 BSON("$set" << BSON(LocksType::state(LocksType::LOCKED))));
 
                     BSONObj err = conn->getLastErrorDetailed();
                     string errMsg = DBClientWithCommands::getLastErrorString(err);
@@ -566,9 +566,9 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
     BSONObj currLock;
 
     BSONObj lockDetails =
-        BSON(LocksType::state(1) << LocksType::who(getDistLockId())
-                                 << LocksType::process(_processId) << LocksType::when(jsTime())
-                                 << LocksType::why(why) << LocksType::lockID(OID::gen()));
+        BSON(LocksType::state(LocksType::LOCK_PREP)
+             << LocksType::who(getDistLockId()) << LocksType::process(_processId)
+             << LocksType::when(jsTime()) << LocksType::why(why) << LocksType::lockID(OID::gen()));
     BSONObj whatIWant = BSON("$set" << lockDetails);
 
     BSONObj query = queryBuilder.obj();
@@ -622,7 +622,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                 // competing in this round.  Cleanup of crashes during finalizing may take a few
                 // tries.
                 if (indUpdate[LocksType::lockID()] < lockDetails[LocksType::lockID()] ||
-                    indUpdate[LocksType::state()].numberInt() == 0) {
+                    indUpdate[LocksType::state()].numberInt() == LocksType::UNLOCKED) {
                     BSONObj grabQuery =
                         BSON(LocksType::name(_name)
                              << LocksType::lockID(indUpdate[LocksType::lockID()].OID()));
@@ -630,7 +630,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                     // Change ts so we won't be forced, state so we won't be relocked
                     BSONObj grabChanges =
                         BSON(LocksType::lockID(lockDetails[LocksType::lockID()].OID())
-                             << LocksType::state(1));
+                             << LocksType::state(LocksType::LOCK_PREP));
 
                     // Either our update will succeed, and we'll grab the lock, or it will fail b/c
                     // some other process grabbed the lock (which will change the ts), but the lock
@@ -643,7 +643,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                     // One case this could happen is when the LockPinger processes old
                     // entries from addUnlockOID. See SERVER-10688 for more detailed
                     // description of race.
-                    if (indUpdate[LocksType::state()].numberInt() <= 0) {
+                    if (indUpdate[LocksType::state()].numberInt() <= LocksType::UNLOCKED) {
                         LOG(logLvl - 1) << "lock tournament interrupted, "
                                         << "so no lock was taken; "
                                         << "new state of lock: " << indUpdate << endl;
@@ -710,7 +710,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
             while (bi.more()) {
                 BSONElement el = bi.next();
                 if ((string)(el.fieldName()) == LocksType::state())
-                    finalLockDetails.append(LocksType::state(), 2);
+                    finalLockDetails.append(LocksType::state(), LocksType::LOCKED);
                 else
                     finalLockDetails.append(el);
             }
@@ -777,7 +777,7 @@ bool DistributedLock::unlock(const DistLockHandle& lockID) {
             // Use ts when updating lock, so that new locks can be sure they won't get trampled.
             conn->update(LocksType::ConfigNS,
                          BSON(LocksType::name(_name) << LocksType::lockID(lockID)),
-                         BSON("$set" << BSON(LocksType::state(0))));
+                         BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
 
             // Check that the lock was actually unlocked... if not, try again
             BSONObj err = conn->getLastErrorDetailed();

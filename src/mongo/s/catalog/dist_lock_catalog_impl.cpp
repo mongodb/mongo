@@ -263,13 +263,15 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
         return findAndModifyStatus.getStatus();
     }
 
-    LocksType lockDoc;
-    string errMsg;
-    if (!lockDoc.parseBSON(findAndModifyStatus.getValue(), &errMsg)) {
-        return {ErrorCodes::FailedToParse, errMsg};
+    BSONObj doc = findAndModifyStatus.getValue();
+    auto locksTypeResult = LocksType::fromBSON(doc);
+    if (!locksTypeResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "failed to parse: " << doc << " : "
+                              << locksTypeResult.getStatus().toString()};
     }
 
-    return lockDoc;
+    return locksTypeResult.getValue();
 }
 
 StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
@@ -314,13 +316,15 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
         return findAndModifyStatus.getStatus();
     }
 
-    LocksType lockDoc;
-    string errMsg;
-    if (!lockDoc.parseBSON(findAndModifyStatus.getValue(), &errMsg)) {
-        return {ErrorCodes::FailedToParse, errMsg};
+    BSONObj doc = findAndModifyStatus.getValue();
+    auto locksTypeResult = LocksType::fromBSON(doc);
+    if (!locksTypeResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "failed to parse: " << doc << " : "
+                              << locksTypeResult.getStatus().toString()};
     }
 
-    return lockDoc;
+    return locksTypeResult.getValue();
 }
 
 Status DistLockCatalogImpl::unlock(const OID& lockSessionID) {
@@ -417,14 +421,15 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& lockSessionID)
                 str::stream() << "lock with ts " << lockSessionID << " not found"};
     }
 
-    LocksType lockDoc;
-
-    string errMsg;
-    if (!lockDoc.parseBSON(findResultSet.front(), &errMsg)) {
-        return {ErrorCodes::FailedToParse, errMsg};
+    BSONObj doc = findResultSet.front();
+    auto locksTypeResult = LocksType::fromBSON(doc);
+    if (!locksTypeResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "failed to parse: " << doc << " : "
+                              << locksTypeResult.getStatus().toString()};
     }
 
-    return lockDoc;
+    return locksTypeResult.getValue();
 }
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByName(StringData name) {
@@ -448,14 +453,15 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByName(StringData name) {
                 str::stream() << "lock with name " << name << " not found"};
     }
 
-    LocksType lockDoc;
-
-    string errMsg;
-    if (!lockDoc.parseBSON(findResultSet.front(), &errMsg)) {
-        return {ErrorCodes::FailedToParse, errMsg};
+    BSONObj doc = findResultSet.front();
+    auto locksTypeResult = LocksType::fromBSON(doc);
+    if (!locksTypeResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "failed to parse: " << doc << " : "
+                              << locksTypeResult.getStatus().toString()};
     }
 
-    return lockDoc;
+    return locksTypeResult.getValue();
 }
 
 Status DistLockCatalogImpl::stopPing(StringData processId) {

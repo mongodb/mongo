@@ -328,7 +328,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWithNewDoc) {
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& lockDoc = resultStatus.getValue();
-        ASSERT_TRUE(lockDoc.isValid(nullptr));
+        ASSERT_OK(lockDoc.validate());
         ASSERT_EQUALS("test", lockDoc.getName());
         ASSERT_EQUALS(myID, lockDoc.getLockID());
         ASSERT_EQUALS("me", lockDoc.getWho());
@@ -613,7 +613,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWithNewDoc) {
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& lockDoc = resultStatus.getValue();
-        ASSERT_TRUE(lockDoc.isValid(nullptr));
+        ASSERT_OK(lockDoc.validate());
         ASSERT_EQUALS("test", lockDoc.getName());
         ASSERT_EQUALS(myID, lockDoc.getLockID());
         ASSERT_EQUALS("me", lockDoc.getWho());
