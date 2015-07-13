@@ -46,6 +46,10 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('row', dict(tabletype='row',
                     create_params = 'key_format=i,value_format=i')),
+        ('var', dict(tabletype='var',
+                    create_params = 'key_format=r,value_format=i')),
+        ('fix', dict(tabletype='fix',
+                    create_params = 'key_format=r,value_format=8t')),
     ]
 
     scenarios = types
@@ -53,7 +57,6 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
         self.home = dir
-        self.backup_dir = os.path.join(self.home, "WT_BACKUP")
 
         conn_params = \
                 ',create,error_prefix="%s: ",' % self.shortid() + \
@@ -118,6 +121,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         close2 = stat_cursor[stat.conn.dh_conn_handles][2]
         sweep2 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        cache2 = stat_cursor[stat.conn.cache_bytes_inuse][2]
         stat_cursor.close()
 
         # We expect nothing to have been closed, so dh_conn_handles should be 0
@@ -128,7 +132,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(close2, 0)
 
         # Create a table to drop. A drop should close its associated handles
-        drop_uri = '%s.%s' % (self.uri, "droptest")
+        drop_uri = '%s.%s' % (self.uri, "force_drop_test")
 
         self.session.create(drop_uri, self.create_params)
 
@@ -137,20 +141,70 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
             c[k+1] = 1
         c.close()
 
-        self.session.drop(drop_uri, "force=true")
-
-        time.sleep(12)
-
+        # We just filled the table, now check what the stats are
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         close3 = stat_cursor[stat.conn.dh_conn_handles][2]
         sweep3 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        cache3 = stat_cursor[stat.conn.cache_bytes_inuse][2]
         stat_cursor.close()
 
+        # We force the drop in this case to confirm that the handle is closed
+        self.session.drop(drop_uri, "force=true")
+
+        time.sleep(10)
+
+        # Grab the stats post table drop to see things have decremented
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        close4 = stat_cursor[stat.conn.dh_conn_handles][2]
+        sweep4 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        cache4 = stat_cursor[stat.conn.cache_bytes_inuse][2]
+        stat_cursor.close()
+
+
         # We dropped the table, something should have been cleaned up
-        if (close3 != 1):
-            print "close3: " + str(close3) + " close2: " + str(close2)
-            print "XX: sweep3: " + str(sweep3) + " sweep2: " + str(sweep2)
-        self.assertEqual(close3, 1)
+        if (close4 != 1):
+            print "close4: " + str(close3) + " close3: " + str(close3)
+            print "XX: sweep4: " + str(sweep4) + " sweep3: " + str(sweep3)
+        self.assertEqual(close4, 1)
+
+        if (cache4 >= cache3):
+            print "cache4: " + str(cache4) + " cache3: " + str(cache3)
+        self.assertEqual(cache4 < cache3, True)
+
+        # Create a table to drop. A drop should close its associated handles
+        drop_uri = '%s.%s' % (self.uri, "drop_test")
+        self.session.create(drop_uri, self.create_params)
+
+        c = self.session.open_cursor(drop_uri, None)
+        for k in range(self.numkv):
+            c[k+1] = 1
+        c.close()
+
+        # We just filled the table, now check what the stats are
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        close5 = stat_cursor[stat.conn.dh_conn_handles][2]
+        sweep5 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        cache5 = stat_cursor[stat.conn.cache_bytes_inuse][2]
+        stat_cursor.close()
+
+        self.session.drop(drop_uri, None)
+
+        time.sleep(10)
+
+        # Grab the stats post table drop to see things have decremented
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        close6 = stat_cursor[stat.conn.dh_conn_handles][2]
+        sweep6 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        cache6 = stat_cursor[stat.conn.cache_bytes_inuse][2]
+        stat_cursor.close()
+
+        #
+        # Without the force drop there is no guarantee that the handle will be
+        # closed yet, so we only check that the cache has shrunk
+        #
+        if (cache6 >= cache5):
+            print "cache6: " + str(cache6) + " cache5: " + str(cache5)
+        self.assertEqual(cache6 < cache5, True)
 
 if __name__ == '__main__':
     wttest.run()
