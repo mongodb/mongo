@@ -1099,7 +1099,7 @@ err:	/*
 		btree->modified = 1;
 
 	if (hot_backup_locked)
-		WT_RET(__wt_readunlock(session, conn->hot_backup_lock));
+		WT_TRET(__wt_readunlock(session, conn->hot_backup_lock));
 
 	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);

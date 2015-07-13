@@ -167,7 +167,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	if (0)
 err:		__wt_err(session, ret, "log archive server error");
 	if (locked)
-		WT_RET(__wt_readunlock(session, conn->hot_backup_lock));
+		WT_TRET(__wt_readunlock(session, conn->hot_backup_lock));
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	return (ret);
