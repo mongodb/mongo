@@ -34,7 +34,7 @@ function doMapReduce(connection, outputDb) {
 function assertSuccess(configDb, outputDb) {
     adminDb.printShardingStatus();
     assert.eq(outputDb.numbers_out.count(), 50, "map/reduce failed");
-    assert.eq(configDb.collections.findOne().dropped, undefined, "no sharded collections");
+    assert( ! configDb.collections.findOne().dropped, "no sharded collections");
 }
 
 function assertFailure(configDb, outputDb) {

@@ -180,13 +180,10 @@ BSONObj CollectionType::toBSON() const {
     }
     builder.append(epoch.name(), _epoch.get_value_or(OID()));
     builder.append(updatedAt.name(), _updatedAt.get_value_or(Date_t()));
+    builder.append(dropped.name(), _dropped.get_value_or(false));
 
     // These fields are optional, so do not include them in the metadata for the purposes of
     // consuming less space on the config servers.
-
-    if (_dropped.is_initialized()) {
-        builder.append(dropped.name(), _dropped.get());
-    }
 
     if (_keyPattern.is_initialized()) {
         builder.append(keyPattern.name(), _keyPattern->toBSON());

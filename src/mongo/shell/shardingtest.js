@@ -795,7 +795,7 @@ printShardingStatus = function( configDB , verbose ){
                 configDB.collections.find( { _id : new RegExp( "^" +
                     RegExp.escape(db._id) + "\\." ) } ).
                     sort( { _id : 1 } ).forEach( function( coll ){
-                        if ( coll.dropped == false ){
+                        if ( ! coll.dropped ){
                             output( "\t\t" + coll._id );
                             output( "\t\t\tshard key: " + tojson(coll.key) );
                             output( "\t\t\tchunks:" );
