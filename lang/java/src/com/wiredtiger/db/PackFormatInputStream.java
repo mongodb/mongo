@@ -180,5 +180,12 @@ public class PackFormatInputStream {
         }
         return valueLen;
     }
-}
 
+    /**
+     * Return whether there is an explicit length indicated in the format
+     * string.
+     */
+    protected boolean hasLength() {
+        return (getIntFromFormat(false) > 0);
+    }
+}
