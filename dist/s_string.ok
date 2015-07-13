@@ -844,6 +844,7 @@ sd
 secretkey
 sed
 sessionp
+setkv
 setstr
 setv
 sfence
