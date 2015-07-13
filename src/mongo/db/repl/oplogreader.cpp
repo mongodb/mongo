@@ -147,7 +147,7 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
     invariant(conn() == NULL);
 
     while (true) {
-        HostAndPort candidate = replCoord->chooseNewSyncSource();
+        HostAndPort candidate = replCoord->chooseNewSyncSource(lastOpTimeFetched.getTimestamp());
 
         if (candidate.empty()) {
             if (oldestOpTimeSeen == sentinel) {
@@ -186,7 +186,8 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
         OpTime remoteOldOpTime = extractOpTime(remoteOldestOp);
 
         // remoteOldOpTime may come from a very old config, so we cannot compare their terms.
-        if (lastOpTimeFetched.getTimestamp() < remoteOldOpTime.getTimestamp()) {
+        if (!lastOpTimeFetched.isNull() &&
+            lastOpTimeFetched.getTimestamp() < remoteOldOpTime.getTimestamp()) {
             // We're too stale to use this sync source.
             resetConnection();
             replCoord->blacklistSyncSource(candidate, Date_t::now() + Minutes(10));

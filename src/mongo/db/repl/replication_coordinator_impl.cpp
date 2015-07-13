@@ -2411,19 +2411,22 @@ bool ReplicationCoordinatorImpl::isReplEnabled() const {
 }
 
 void ReplicationCoordinatorImpl::_chooseNewSyncSource(
-    const ReplicationExecutor::CallbackArgs& cbData, HostAndPort* newSyncSource) {
+    const ReplicationExecutor::CallbackArgs& cbData,
+    const Timestamp& lastTimestampFetched,
+    HostAndPort* newSyncSource) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
-    *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), getMyLastOptime());
+    *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), lastTimestampFetched);
 }
 
-HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource() {
+HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const Timestamp& lastTimestampFetched) {
     HostAndPort newSyncSource;
     CBHStatus cbh =
         _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_chooseNewSyncSource,
                                               this,
                                               stdx::placeholders::_1,
+                                              lastTimestampFetched,
                                               &newSyncSource));
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return newSyncSource;  // empty

@@ -234,7 +234,7 @@ public:
 
     virtual bool isReplEnabled() const override;
 
-    virtual HostAndPort chooseNewSyncSource() override;
+    virtual HostAndPort chooseNewSyncSource(const Timestamp& lastTimestampFetched) override;
 
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) override;
 
@@ -778,6 +778,7 @@ private:
      * the most appropriate sync source.
      */
     void _chooseNewSyncSource(const ReplicationExecutor::CallbackArgs& cbData,
+                              const Timestamp& lastTimestampFetched,
                               HostAndPort* newSyncSource);
 
     /**

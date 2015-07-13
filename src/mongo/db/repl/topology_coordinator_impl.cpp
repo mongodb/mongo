@@ -147,7 +147,8 @@ HostAndPort TopologyCoordinatorImpl::getSyncSourceAddress() const {
     return _syncSource;
 }
 
-HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied) {
+HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
+                                                         const Timestamp& lastTimestampApplied) {
     // If we are primary, then we aren't syncing from anyone (else).
     if (_iAmPrimary()) {
         return HostAndPort();
@@ -255,7 +256,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now, const OpTim
             }
 
             // only consider candidates that are ahead of where we are
-            if (it->getOpTime().getTimestamp() <= lastOpApplied.getTimestamp()) {
+            if (it->getOpTime().getTimestamp() <= lastTimestampApplied) {
                 continue;
             }
 

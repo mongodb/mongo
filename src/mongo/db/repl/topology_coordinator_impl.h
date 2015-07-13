@@ -138,7 +138,7 @@ public:
     virtual long long getTerm() const;
     virtual bool updateTerm(long long term);
     virtual void setForceSyncSourceIndex(int index);
-    virtual HostAndPort chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied);
+    virtual HostAndPort chooseNewSyncSource(Date_t now, const Timestamp& lastTimestampApplied);
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
     virtual void unblacklistSyncSource(const HostAndPort& host, Date_t now);
     virtual void clearSyncSourceBlacklist();

@@ -300,7 +300,7 @@ Status ReplicationCoordinatorMock::checkReplEnabledForCommand(BSONObjBuilder* re
     return Status::OK();
 }
 
-HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource() {
+HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource(const Timestamp& lastTimestampFetched) {
     return HostAndPort();
 }
 

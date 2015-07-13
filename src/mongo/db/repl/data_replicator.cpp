@@ -975,7 +975,7 @@ void DataReplicator::_doNextActions_Rollback_inlock() {
 void DataReplicator::_doNextActions_Steady_inlock() {
     // Check sync source is still good.
     if (_syncSource.empty()) {
-        _syncSource = _opts.syncSourceSelector->chooseNewSyncSource();
+        _syncSource = _opts.syncSourceSelector->chooseNewSyncSource(_lastTimestampFetched);
     }
     if (_syncSource.empty()) {
         // No sync source, reschedule check
@@ -1191,7 +1191,7 @@ void DataReplicator::_setState_inlock(const DataReplicatorState& newState) {
 
 Status DataReplicator::_ensureGoodSyncSource_inlock() {
     if (_syncSource.empty()) {
-        _syncSource = _opts.syncSourceSelector->chooseNewSyncSource();
+        _syncSource = _opts.syncSourceSelector->chooseNewSyncSource(_lastTimestampFetched);
         if (!_syncSource.empty()) {
             return Status::OK();
         }
