@@ -218,7 +218,6 @@ connection_stats = [
     ##########################################
     # Logging statistics
     ##########################################
-    LogStat('log_buffer_grow', 'log buffer size increases'),
     LogStat('log_buffer_size', 'total log buffer size', 'no_clear,no_scale'),
     LogStat('log_bytes_payload', 'log bytes of payload data'),
     LogStat('log_bytes_written', 'log bytes written'),
