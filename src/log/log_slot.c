@@ -54,13 +54,17 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	 * Allocate memory for buffers now that the arrays are setup. Split
 	 * this out to make error handling simpler.
 	 */
+	/*
+	 * Cap the slot buffer to the log file size.
+	 */
+	log->slot_buf_size = WT_MIN(conn->log_file_max, WT_LOG_SLOT_BUF_SIZE);
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		WT_ERR(__wt_buf_init(session,
-		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_SIZE));
+		    &log->slot_pool[i].slot_buf, log->slot_buf_size));
 		F_SET(&log->slot_pool[i], WT_SLOT_INIT_FLAGS);
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
-	    log_buffer_size, WT_LOG_SLOT_BUF_SIZE * WT_SLOT_POOL);
+	    log_buffer_size, log->slot_buf_size * WT_SLOT_POOL);
 	if (0) {
 err:		while (--i >= 0)
 			__wt_buf_free(session, &log->slot_pool[i].slot_buf);
@@ -106,7 +110,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	conn = S2C(session);
 	log = conn->log;
 
-	if (mysize >= WT_LOG_SLOT_BUF_SIZE) {
+	if (mysize >= (uint64_t)log->slot_buf_size) {
 		WT_STAT_FAST_CONN_INCR(session, log_slot_toobig);
 		return (ENOMEM);
 	}
@@ -311,6 +315,7 @@ __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 	WT_DECL_RET;
 
+	WT_UNUSED(session);
 	ret = 0;
 	/*
 	 * Make sure flags don't get retained between uses.
