@@ -63,18 +63,22 @@ const Seconds kConfigCommandTimeout{30};
 
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                              std::unique_ptr<executor::TaskExecutor> executor,
-                             executor::NetworkInterface* network,
-                             CatalogManager* catalogManager)
+                             executor::NetworkInterface* network)
     : _targeterFactory(std::move(targeterFactory)),
       _executor(std::move(executor)),
       _network(network),
-      _catalogManager(catalogManager) {
+      _catalogManager(nullptr) {}
+
+ShardRegistry::~ShardRegistry() = default;
+
+void ShardRegistry::init(CatalogManager* catalogManager) {
+    invariant(!_catalogManager);
+    _catalogManager = catalogManager;
+
     // add config shard registry entry so know it's always there
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _addConfigShard_inlock();
 }
-
-ShardRegistry::~ShardRegistry() = default;
 
 void ShardRegistry::startup() {
     _executor->startup();

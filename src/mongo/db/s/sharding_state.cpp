@@ -125,12 +125,13 @@ void ShardingState::initialize(const string& server) {
     auto catalogManager = stdx::make_unique<CatalogManagerLegacy>();
     uassertStatusOK(catalogManager->init(configServerCS));
 
+    auto network = executor::makeNetworkInterface();
+    auto networkPtr = network.get();
     auto shardRegistry(stdx::make_unique<ShardRegistry>(
         stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
-        stdx::make_unique<repl::ReplicationExecutor>(
-            executor::makeNetworkInterface().release(), nullptr, 0),
-        nullptr,
-        catalogManager.get()));
+        stdx::make_unique<repl::ReplicationExecutor>(network.release(), nullptr, 0),
+        networkPtr));
+    shardRegistry->init(catalogManager.get());
     shardRegistry->startup();
 
     grid.init(std::move(catalogManager), std::move(shardRegistry));

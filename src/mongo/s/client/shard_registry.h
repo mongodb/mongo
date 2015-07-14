@@ -76,10 +76,15 @@ public:
      */
     ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                   std::unique_ptr<executor::TaskExecutor> executor,
-                  executor::NetworkInterface* network,
-                  CatalogManager* catalogManager);
+                  executor::NetworkInterface* network);
 
     ~ShardRegistry();
+
+    /**
+     * Stores the given CatalogManager into _catalogManager for use for retrieving the list of
+     * registered shards, and creates the hard-coded config shard.
+     */
+    void init(CatalogManager* catalogManager);
 
     /**
      * Invokes the executor's startup method, which will start any networking/async execution
@@ -178,8 +183,8 @@ private:
     executor::NetworkInterface* const _network;
 
     // Catalog manager from which to load the shard information. Not owned and must outlive
-    // the shard registry object.
-    CatalogManager* const _catalogManager;
+    // the shard registry object.  Should be set once by a call to init() then never modified again.
+    CatalogManager* _catalogManager;
 
     // Protects the maps below
     mutable stdx::mutex _mutex;

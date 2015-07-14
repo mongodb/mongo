@@ -196,6 +196,41 @@ DBClientBase* createDirectClient(OperationContext* txn) {
 
 using namespace mongo;
 
+static Status initializeSharding(bool doUpgrade) {
+    auto network = executor::makeNetworkInterface();
+    auto networkPtr = network.get();
+    auto shardRegistry(stdx::make_unique<ShardRegistry>(
+        stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
+        stdx::make_unique<repl::ReplicationExecutor>(network.release(), nullptr, 0),
+        networkPtr));
+
+    auto catalogManager = stdx::make_unique<CatalogManagerLegacy>();
+    Status status = catalogManager->init(mongosGlobalParams.configdbs);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    shardRegistry->init(catalogManager.get());
+    shardRegistry->startup();
+    grid.init(std::move(catalogManager), std::move(shardRegistry));
+
+
+    status = grid.catalogManager()->checkAndUpgrade(!doUpgrade);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (doUpgrade) {
+        return Status::OK();
+    }
+
+    status = grid.catalogManager()->startup();
+    if (!status.isOK()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 static ExitCode runMongosServer(bool doUpgrade) {
     setThreadName("mongosMain");
     printShardingVersionInfo(false);
@@ -217,42 +252,13 @@ static ExitCode runMongosServer(bool doUpgrade) {
         dbexit(EXIT_BADOPTIONS);
     }
 
-    auto catalogManager = stdx::make_unique<CatalogManagerLegacy>();
-
-    {
-        Status statusCatalogManagerInit = catalogManager->init(mongosGlobalParams.configdbs);
-        if (!statusCatalogManagerInit.isOK()) {
-            error() << "couldn't initialize catalog manager " << statusCatalogManagerInit;
-            return EXIT_SHARDING_ERROR;
-        }
+    Status status = initializeSharding(doUpgrade);
+    if (!status.isOK()) {
+        error() << "Error initializing sharding system: " << status;
+        return EXIT_SHARDING_ERROR;
     }
-
-    auto shardRegistry(stdx::make_unique<ShardRegistry>(
-        stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
-        stdx::make_unique<repl::ReplicationExecutor>(
-            executor::makeNetworkInterface().release(), nullptr, 0),
-        nullptr,
-        catalogManager.get()));
-    shardRegistry->startup();
-
-    grid.init(std::move(catalogManager), std::move(shardRegistry));
-
-    {
-        auto upgradeStatus = grid.catalogManager()->checkAndUpgrade(!doUpgrade);
-        if (!upgradeStatus.isOK()) {
-            error() << causedBy(upgradeStatus);
-            return EXIT_SHARDING_ERROR;
-        }
-
-        if (doUpgrade) {
-            return EXIT_CLEAN;
-        }
-
-        Status startupStatus = grid.catalogManager()->startup();
-        if (!startupStatus.isOK()) {
-            error() << "Mongos catalog manager startup failed: " << startupStatus;
-            return EXIT_SHARDING_ERROR;
-        }
+    if (doUpgrade) {
+        return EXIT_CLEAN;
     }
 
     ConfigServer::reloadSettings();
@@ -270,7 +276,7 @@ static ExitCode runMongosServer(bool doUpgrade) {
         web.detach();
     }
 
-    Status status = getGlobalAuthorizationManager()->initialize(NULL);
+    status = getGlobalAuthorizationManager()->initialize(NULL);
     if (!status.isOK()) {
         error() << "Initializing authorization data failed: " << status;
         return EXIT_SHARDING_ERROR;
