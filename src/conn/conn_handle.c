@@ -137,7 +137,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->dhandle_lock);
 	__wt_spin_destroy(session, &conn->encryptor_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
-	__wt_rwlock_destroy(session, &conn->hot_backup_lock);
+	WT_TRET(__wt_rwlock_destroy(session, &conn->hot_backup_lock));
 	__wt_spin_destroy(session, &conn->reconfig_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_spin_destroy(session, &conn->table_lock);
