@@ -40,8 +40,12 @@ assert.soon(
 );
 
 print("Black-hole and freeze B");
-B.runCommand({configureFailPoint: 'rsStopGetMore', mode: 'alwaysOn'});
-B.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
+assert.commandWorked(B.runCommand({configureFailPoint: 'rsStopGetMore', mode: 'alwaysOn'}),
+                     'failed to enable rsStopGetMore fail point');
+assert.commandWorked(B.runCommand({configureFailPoint: 'rsStopGetMoreCmd', mode: 'alwaysOn'}),
+                     'failed to enable rsStopGetMoreCmd fail point');
+assert.commandWorked(B.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}),
+                     'failed to enable rsSyncApplyStop fail point');
 
 // Do another write, to make node 0 a viable sync source
 assert.writeOK(master.getDB("foo").bar.insert({x:2}));
@@ -51,10 +55,14 @@ print("Check that A switches sync targets after 30 second socket timeout");
 assert.soon(
     function() {
         return A.runCommand({replSetGetStatus : 1}).syncingTo === primaryAddress;
-    }, "did not switch sync sources", 60000);
+    }, "did not switch sync sources", 60000, 1000);
 
 print("Un-black-hole B and make sure nothing stupid happens");
-B.runCommand({configureFailPoint: 'rsStopGetMore', mode: 'off'});
-B.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+assert.commandWorked(B.runCommand({configureFailPoint: 'rsStopGetMore', mode: 'off'}),
+                     'failed to disable rsStopGetMore fail point');
+assert.commandWorked(B.runCommand({configureFailPoint: 'rsStopGetMoreCmd', mode: 'off'}),
+                     'failed to disable rsStopGetMoreCmd fail point');
+assert.commandWorked(B.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
+                     'failed to disable rsSyncApplyStop fail point');
 replSet.awaitReplication();
 replSet.stopSet();

@@ -52,10 +52,15 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+namespace {
+MONGO_FP_DECLARE(rsStopGetMoreCmd);
+}  // namespace
 
 /**
  * A command for running getMore() against an existing cursor registered with a CursorManager.
@@ -196,6 +201,14 @@ public:
                 Status(ErrorCodes::Unauthorized,
                        str::stream() << "Requested getMore on namespace '" << request.nss.ns()
                                      << "', but cursor belongs to a different namespace"));
+        }
+
+        if (request.nss.isOplog() && MONGO_FAIL_POINT(rsStopGetMoreCmd)) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::CommandFailed,
+                       str::stream() << "getMore on " << request.nss.ns()
+                                     << " rejected due to active fail point rsStopGetMoreCmd"));
         }
 
         const bool hasOwnMaxTime = CurOp::get(txn)->isMaxTimeSet();
