@@ -94,7 +94,7 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 #define	WT_SLOT_BUFFERED	0x01		/* Buffer writes */
 #define	WT_SLOT_CLOSEFH		0x02		/* Close old fh on release */
 #define	WT_SLOT_SYNC		0x04		/* Needs sync on release */
-#define	WT_SLOT_SYNC_DIR	0x18		/* Directory sync on release */
+#define	WT_SLOT_SYNC_DIR	0x08		/* Directory sync on release */
 	uint32_t flags;			/* Flags */
 } WT_LOGSLOT;
 
