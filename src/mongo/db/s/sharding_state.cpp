@@ -36,18 +36,15 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/metadata_loader.h"
 #include "mongo/db/s/sharded_connection_info.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_initialization.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
@@ -122,19 +119,7 @@ void ShardingState::initialize(const string& server) {
             str::stream() << "Invalid config server connection string: " << errmsg,
             configServerCS.isValid());
 
-    auto catalogManager = stdx::make_unique<CatalogManagerLegacy>();
-    uassertStatusOK(catalogManager->init(configServerCS));
-
-    auto network = executor::makeNetworkInterface();
-    auto networkPtr = network.get();
-    auto shardRegistry(stdx::make_unique<ShardRegistry>(
-        stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
-        stdx::make_unique<repl::ReplicationExecutor>(network.release(), nullptr, 0),
-        networkPtr));
-    shardRegistry->init(catalogManager.get());
-    shardRegistry->startup();
-
-    grid.init(std::move(catalogManager), std::move(shardRegistry));
+    uassertStatusOK(initializeGlobalShardingState(configServerCS));
 
     _enabled = true;
 }

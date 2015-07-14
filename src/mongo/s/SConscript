@@ -11,6 +11,20 @@ env.SConscript(
     ],
 )
 
+# Functionality for initializing global sharding state
+env.Library(
+    target='sharding_initialization',
+    source=[
+        'sharding_initialization.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/replication_executor', # TODO: change to thread pool executor
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy',
+        '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set',
+    ]
+)
+
 # Functionality shared between mongod and mongos
 env.Library(
     target='common',
