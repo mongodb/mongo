@@ -206,6 +206,28 @@ buildvariants:
   - name: misc
   - name: singleThreaded
 
+- name: linux-mmap-standalone
+  display_name: Linux MMAPv1 Standalone
+  batchtime: 180 # 3 hours
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    mongod_exec_wrapper: "numactl --physcpubind=4,5,6,7 -i 1"
+    perf_exec_wrapper: "numactl --physcpubind=1,2,3 -i 0"
+    mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false"
+
+  run_on:
+  - "centos6-perf"
+  tasks:
+  - name: compile
+    distros:
+    - rhel55
+  - name: query
+  - name: update
+  - name: insert
+  - name: geo
+  - name: misc
+  - name: singleThreaded
+
 - name: linux-wt-repl
   display_name: Linux WT 1-Node ReplSet
   batchtime: 4320 # 3 day
