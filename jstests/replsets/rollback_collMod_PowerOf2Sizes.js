@@ -26,7 +26,10 @@ var AID = replTest.getNodeId(a_conn);
 var BID = replTest.getNodeId(b_conn);
 
 // Create collection with custom options.
-var originalCollectionOptions = {flags: 0, validator: {x : {$exists: 1}}};
+var originalCollectionOptions = {flags: 0,
+                                 validator: {x: {$exists: 1}},
+                                 validationLevel: "moderate",
+                                 validationState: "warn"};
 assert.commandWorked(a_conn.getDB(name).createCollection('foo', originalCollectionOptions));
 
 var options = {writeConcern: {w: 2, wtimeout: 60000}, upsert: true};
@@ -43,7 +46,10 @@ assert.commandWorked(a_conn.getDB(name).runCommand({collMod: "foo",
                                                     usePowerOf2Sizes: false,
                                                     noPadding: true,
                                                     validator: {a: 1}}));
-assert.eq(getOptions(a_conn), {flags: 2, validator: {a: 1}});
+assert.eq(getOptions(a_conn), {flags: 2,
+                               validator: {a: 1},
+                               validationLevel: "moderate",
+                               validationState: "warn"});
 
 // Shut down A and fail over to B.
 replTest.stop(AID);
