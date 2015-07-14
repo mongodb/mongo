@@ -30,7 +30,6 @@
 
 #include "mongo/s/client/dbclient_multi_command.h"
 
-
 #include "mongo/db/audit.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/wire_version.h"
@@ -38,6 +37,7 @@
 #include "mongo/rpc/request_builder_interface.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -45,22 +45,6 @@ namespace mongo {
 using std::unique_ptr;
 using std::deque;
 using std::string;
-
-DBClientMultiCommand::PendingCommand::PendingCommand(const ConnectionString& endpoint,
-                                                     StringData dbName,
-                                                     const BSONObj& cmdObj)
-    : endpoint(endpoint),
-      dbName(dbName.toString()),
-      cmdObj(cmdObj),
-      conn(NULL),
-      status(Status::OK()) {}
-
-void DBClientMultiCommand::addCommand(const ConnectionString& endpoint,
-                                      StringData dbName,
-                                      const BSONObj& request) {
-    PendingCommand* command = new PendingCommand(endpoint, dbName, request);
-    _pendingCommands.push_back(command);
-}
 
 namespace {
 
@@ -133,44 +117,52 @@ static void recvAsCmd(DBClientBase* conn, Message* toRecv, BSONObj* result) {
     *result = reply->getCommandReply();
 }
 
+DBClientMultiCommand::DBClientMultiCommand() = default;
+
+DBClientMultiCommand::~DBClientMultiCommand() {
+    // Cleanup anything outstanding, do *not* return stuff to the pool, that might error
+    for (deque<PendingCommand*>::iterator it = _pendingCommands.begin();
+         it != _pendingCommands.end();
+         ++it) {
+        PendingCommand* command = *it;
+        delete command;
+    }
+
+    _pendingCommands.clear();
+}
+
+void DBClientMultiCommand::addCommand(const ConnectionString& endpoint,
+                                      StringData dbName,
+                                      const BSONObj& request) {
+    PendingCommand* command = new PendingCommand(endpoint, dbName, request);
+    _pendingCommands.push_back(command);
+}
+
 void DBClientMultiCommand::sendAll() {
     for (deque<PendingCommand*>::iterator it = _pendingCommands.begin();
          it != _pendingCommands.end();
          ++it) {
         PendingCommand* command = *it;
-        dassert(NULL == command->conn);
+        dassert(!command->conn);
 
         try {
             dassert(command->endpoint.type() == ConnectionString::MASTER ||
                     command->endpoint.type() == ConnectionString::CUSTOM);
 
-            // TODO: Fix the pool up to take millis directly
-            int timeoutSecs = _timeoutMillis / 1000;
-            command->conn = shardConnectionPool.get(command->endpoint, timeoutSecs);
+            command->conn = stdx::make_unique<ShardConnection>(command->endpoint, "");
 
             // Sanity check if we're sending a batch write that we're talking to a new-enough
             // server.
             massert(28563,
                     str::stream() << "cannot send batch write operation to server "
-                                  << command->conn->toString(),
-                    !isBatchWriteCommand(command->cmdObj) || hasBatchWriteFeature(command->conn));
+                                  << command->conn->get()->toString(),
+                    !isBatchWriteCommand(command->cmdObj) ||
+                        hasBatchWriteFeature(command->conn->get()));
 
-            sayAsCmd(command->conn, command->dbName, command->cmdObj);
+            sayAsCmd(command->conn->get(), command->dbName, command->cmdObj);
         } catch (const DBException& ex) {
             command->status = ex.toStatus();
-
-            if (NULL != command->conn) {
-                // Confusingly, the pool needs to know about failed connections so that it can
-                // invalidate other connections which might be bad.  But if the connection
-                // doesn't seem bad, don't send it back, because we don't want to reuse it.
-                if (!command->conn->isFailed()) {
-                    delete command->conn;
-                } else {
-                    shardConnectionPool.release(command->endpoint.toString(), command->conn);
-                }
-
-                command->conn = NULL;
-            }
+            command->conn.reset();
         }
     }
 }
@@ -187,56 +179,34 @@ Status DBClientMultiCommand::recvAny(ConnectionString* endpoint, BSONSerializabl
     if (!command->status.isOK())
         return command->status;
 
-    dassert(NULL != command->conn);
+    dassert(command->conn);
 
     try {
         // Holds the data and BSONObj for the command result
         Message toRecv;
         BSONObj result;
 
-        recvAsCmd(command->conn, &toRecv, &result);
-
-        shardConnectionPool.release(command->endpoint.toString(), command->conn);
-        command->conn = NULL;
+        recvAsCmd(command->conn->get(), &toRecv, &result);
+        command->conn->done();
+        command->conn.reset();
 
         string errMsg;
         if (!response->parseBSON(result, &errMsg) || !response->isValid(&errMsg)) {
             return Status(ErrorCodes::FailedToParse, errMsg);
         }
     } catch (const DBException& ex) {
-        // Confusingly, the pool needs to know about failed connections so that it can
-        // invalidate other connections which might be bad.  But if the connection doesn't seem
-        // bad, don't send it back, because we don't want to reuse it.
-        if (!command->conn->isFailed()) {
-            delete command->conn;
-        } else {
-            shardConnectionPool.release(command->endpoint.toString(), command->conn);
-        }
-        command->conn = NULL;
-
+        command->conn.reset();
         return ex.toStatus();
     }
 
     return Status::OK();
 }
 
-DBClientMultiCommand::~DBClientMultiCommand() {
-    // Cleanup anything outstanding, do *not* return stuff to the pool, that might error
-    for (deque<PendingCommand*>::iterator it = _pendingCommands.begin();
-         it != _pendingCommands.end();
-         ++it) {
-        PendingCommand* command = *it;
+DBClientMultiCommand::PendingCommand::PendingCommand(const ConnectionString& endpoint,
+                                                     StringData dbName,
+                                                     const BSONObj& cmdObj)
+    : endpoint(endpoint), dbName(dbName.toString()), cmdObj(cmdObj), status(Status::OK()) {}
 
-        if (NULL != command->conn)
-            delete command->conn;
-        delete command;
-        command = NULL;
-    }
+DBClientMultiCommand::PendingCommand::~PendingCommand() = default;
 
-    _pendingCommands.clear();
-}
-
-void DBClientMultiCommand::setTimeoutMillis(int milliSecs) {
-    _timeoutMillis = milliSecs;
-}
-}
+}  // namespace mongo

@@ -123,13 +123,11 @@ public:
     static void forgetNS(const std::string& ns);
 
 private:
-    void _init();
     void _finishInit();
 
     const ConnectionString _cs;
     const std::string _ns;
-
-    std::shared_ptr<ChunkManager> _manager;
+    const std::shared_ptr<ChunkManager> _manager;
 
     bool _finishedInit;
 

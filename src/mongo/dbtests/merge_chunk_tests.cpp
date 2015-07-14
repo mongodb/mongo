@@ -45,13 +45,13 @@ namespace mongo {
 using std::string;
 using std::vector;
 
+namespace {
+
 /**
  * Specialization of the config server fixture with helpers for the tests below.
  */
 class MergeChunkFixture : public ConfigServerFixture {
 public:
-    MergeChunkFixture() : ConfigServerFixture() {}
-
     /**
      * Stores ranges for a particular collection and shard starting from some version
      */
@@ -340,4 +340,5 @@ TEST_F(MergeChunkTests, CompoundMerge) {
     assertWrittenAsMerged(ranges);
 }
 
+}  // namespace
 }  // namespace mongo

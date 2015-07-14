@@ -118,8 +118,8 @@ protected:
     CustomDirectClient _client;
     CustomConnectHook* _connectHook;
 
-private:
     virtual void setUp();
     virtual void tearDown();
 };
-}
+
+}  // namespace mongo

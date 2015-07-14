@@ -45,6 +45,7 @@ dbtest = env.Program(
     source=[
         'basictests.cpp',
         'chunktests.cpp',
+        'chunk_manager_tests.cpp',
         'clienttests.cpp',
         'commandtests.cpp',
         'config_server_fixture.cpp',
@@ -94,7 +95,6 @@ dbtest = env.Program(
         'replica_set_monitor_test.cpp',
         'repltests.cpp',
         'rollbacktests.cpp',
-        'sharding.cpp',
         'socktests.cpp',
         'threadedtests.cpp',
         'updatetests.cpp',

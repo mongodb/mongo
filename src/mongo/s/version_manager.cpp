@@ -196,9 +196,11 @@ bool initShardVersionEmptyNS(DBClientBase* conn_in) {
         conn = getVersionable(conn_in);
         dassert(conn);  // errors thrown above
 
-        // Check to see if we've already initialized this connection
-        if (connectionShardStatus.hasAnySequenceSet(conn))
+        // Check to see if we've already initialized this connection. This avoids sending
+        // setShardVersion multiple times.
+        if (connectionShardStatus.hasAnySequenceSet(conn)) {
             return false;
+        }
 
         // Check to see if this is actually a shard and not a single config server
         // NOTE: Config servers are registered only by the name "config" in the shard cache, not

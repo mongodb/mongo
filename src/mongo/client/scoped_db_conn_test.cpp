@@ -98,10 +98,6 @@ void exitCleanly(ExitCode rc) {
     dbexit(rc, "");
 }
 
-bool haveLocalShardingInfo(Client* client, const string& ns) {
-    return false;
-}
-
 namespace {
 
 const string TARGET_HOST = "localhost:27017";

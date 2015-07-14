@@ -108,11 +108,6 @@ bool inShutdown() {
     return dbexitCalled;
 }
 
-bool haveLocalShardingInfo(Client* client, const string& ns) {
-    verify(0);
-    return false;
-}
-
 static BSONObj buildErrReply(const DBException& ex) {
     BSONObjBuilder errB;
     errB.append("$err", ex.what());
@@ -213,11 +208,12 @@ static Status initializeSharding(bool doUpgrade) {
     if (!status.isOK()) {
         return status;
     }
+
     return Status::OK();
 }
 
 static ExitCode runMongosServer(bool doUpgrade) {
-    setThreadName("mongosMain");
+    Client::initThread("mongosMain");
     printShardingVersionInfo(false);
 
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks

@@ -44,13 +44,13 @@ namespace mongo {
 
 using std::string;
 
+namespace {
+
 /**
  * Specialization of the config server fixture with helpers for the tests below.
  */
 class ConfigUpgradeFixture : public ConfigServerFixture {
 public:
-    ConfigUpgradeFixture() : ConfigServerFixture() {}
-
     void stopBalancer() {
         // Note: The balancer key is needed in the update portion, for some reason related to
         // DBDirectClient
@@ -265,4 +265,5 @@ TEST_F(ConfigUpgradeTests, CheckMongoVersion) {
     ASSERT(status.code() == ErrorCodes::RemoteValidationError);
 }
 
-}  // end namespace
+}  // namespace
+}  // namespace mongo

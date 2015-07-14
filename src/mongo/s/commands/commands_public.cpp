@@ -33,7 +33,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/connpool.h"
-#include "mongo/client/parallel.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"

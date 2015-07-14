@@ -1137,9 +1137,16 @@ ShardingTest.prototype.stopMongos = function(n) {
 };
 
 /**
- * Restarts a previously stopped mongos using the same parameter as before.
+ * Kills the mongod with index n.
+ */
+ShardingTest.prototype.stopMongod = function(n) {
+    MongoRunner.stopMongod(this['d' + n].port);
+};
+
+/**
+ * Restarts a previously stopped mongos using the same parameters as before.
  *
- * Warning: Overwrites the old s (if n = 0) and sn member variables
+ * Warning: Overwrites the old s (if n = 0) and sn member variables.
  */
 ShardingTest.prototype.restartMongos = function(n) {
     this.stopMongos(n);
@@ -1149,6 +1156,22 @@ ShardingTest.prototype.restartMongos = function(n) {
     if (n == 0) {
         this.s = newConn;
     }
+};
+
+/**
+ * Restarts a previously stopped mongod using the same parameters as before.
+ *
+ * Warning: Overwrites the old dn member variables.
+ */
+ShardingTest.prototype.restartMongod = function(n) {
+    this.stopMongod(n);
+
+    var cmdLine = this['d' + n].commandLine;
+    cmdLine['restart'] = true;
+
+    var newConn = MongoRunner.runMongod(cmdLine);
+
+    this['d' + n] = newConn;
 };
 
 /**
