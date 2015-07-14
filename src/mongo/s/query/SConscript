@@ -17,7 +17,38 @@ env.Library(
     target="cluster_client_cursor",
     source=[
         "cluster_client_cursor_impl.cpp",
-        "async_cluster_client_cursor.cpp",
+    ],
+    LIBDEPS=[
+        "router_exec_stage",
+    ],
+)
+
+env.Library(
+    target="router_exec_stage",
+    source=[
+        "router_stage_limit.cpp",
+        "router_stage_merge.cpp",
+        "router_stage_mock.cpp",
+    ],
+    LIBDEPS=[
+        "async_results_merger",
+    ],
+)
+
+env.CppUnitTest(
+    target="router_exec_stage_test",
+    source=[
+        "router_stage_limit_test.cpp",
+    ],
+    LIBDEPS=[
+        "router_exec_stage",
+    ],
+)
+
+env.Library(
+    target="async_results_merger",
+    source=[
+        "async_results_merger.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/command_request_response",
@@ -26,12 +57,12 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target="async_cluster_client_cursor_test",
+    target="async_results_merger_test",
     source=[
-        "async_cluster_client_cursor_test.cpp",
+        "async_results_merger_test.cpp",
     ],
     LIBDEPS=[
-        "cluster_client_cursor",
+        "async_results_merger",
         # TODO dependencies shouldn't have repl
         "$BUILD_DIR/mongo/db/repl/replication_executor_test_fixture",
         "$BUILD_DIR/mongo/db/query/lite_parsed_query",

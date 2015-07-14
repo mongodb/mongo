@@ -26,44 +26,56 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <memory>
 
-#include "mongo/s/query/cluster_client_cursor_impl.h"
-
-#include "mongo/s/query/router_stage_limit.h"
-#include "mongo/s/query/router_stage_merge.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
-ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
-                                                 const ClusterClientCursorParams& params,
-                                                 const std::vector<HostAndPort>& remotes)
-    : _root(buildMergerPlan(executor, params, remotes)) {}
+/**
+ * This is the lightweight mongoS analogue of the PlanStage abstraction used to execute queries on
+ * mongoD (see mongo/db/plan_stage.h).
+ *
+ * Each subclass is a query execution stage which executes on the merging node. In general, the
+ * execution plan on mongos could have a tree of execution stages, but currently each node has at
+ * most one child. The leaf stage of the pipeline receives query result documents merged from the
+ * shards. The pipeline may then transform the result set in various ways before being returned by
+ * the root stage.
+ */
+class RouterExecStage {
+public:
+    RouterExecStage() = default;
+    RouterExecStage(std::unique_ptr<RouterExecStage> child) : _child(std::move(child)) {}
 
-StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
-    return _root->next();
-}
+    virtual ~RouterExecStage() = default;
 
-void ClusterClientCursorImpl::kill() {
-    _root->kill();
-}
+    /**
+     * Returns the next query result, or an error.
+     *
+     * If there are no more results, returns boost::none.
+     */
+    virtual StatusWith<boost::optional<BSONObj>> next() = 0;
 
-std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
-    executor::TaskExecutor* executor,
-    const ClusterClientCursorParams& params,
-    const std::vector<HostAndPort>& remotes) {
-    // The first stage is always the one which merges from the remotes.
-    auto leaf = stdx::make_unique<RouterStageMerge>(executor, params, remotes);
+    /**
+     * Must be called before destruction to abandon a not-yet-exhausted plan. May block waiting for
+     * responses from remote hosts.
+     */
+    virtual void kill() = 0;
 
-    std::unique_ptr<RouterExecStage> root = std::move(leaf);
-    if (params.limit) {
-        root = stdx::make_unique<RouterStageLimit>(std::move(root), *params.limit);
+protected:
+    /**
+     * Returns an unowned pointer to the child stage, or nullptr if there is no child.
+     */
+    RouterExecStage* getChildStage() {
+        return _child.get();
     }
 
-    return root;
-}
+private:
+    std::unique_ptr<RouterExecStage> _child;
+};
 
 }  // namespace mongo

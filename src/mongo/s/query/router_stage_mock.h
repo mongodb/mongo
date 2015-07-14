@@ -26,44 +26,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <queue>
 
-#include "mongo/s/query/cluster_client_cursor_impl.h"
-
-#include "mongo/s/query/router_stage_limit.h"
-#include "mongo/s/query/router_stage_merge.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/s/query/router_exec_stage.h"
 
 namespace mongo {
 
-ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
-                                                 const ClusterClientCursorParams& params,
-                                                 const std::vector<HostAndPort>& remotes)
-    : _root(buildMergerPlan(executor, params, remotes)) {}
+/**
+ * Passes through the first n results and then returns boost::none.
+ */
+class RouterStageMock : public RouterExecStage {
+public:
+    ~RouterStageMock() final {}
 
-StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
-    return _root->next();
-}
+    StatusWith<boost::optional<BSONObj>> next() final;
 
-void ClusterClientCursorImpl::kill() {
-    _root->kill();
-}
+    void kill() final;
 
-std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
-    executor::TaskExecutor* executor,
-    const ClusterClientCursorParams& params,
-    const std::vector<HostAndPort>& remotes) {
-    // The first stage is always the one which merges from the remotes.
-    auto leaf = stdx::make_unique<RouterStageMerge>(executor, params, remotes);
+    /**
+     * Queues a BSONObj to be returned.
+     */
+    void queueResult(BSONObj obj);
 
-    std::unique_ptr<RouterExecStage> root = std::move(leaf);
-    if (params.limit) {
-        root = stdx::make_unique<RouterStageLimit>(std::move(root), *params.limit);
-    }
+    /**
+     * Queues an error response.
+     */
+    void queueError(Status status);
 
-    return root;
-}
+private:
+    std::queue<StatusWith<BSONObj>> _resultsQueue;
+};
 
 }  // namespace mongo

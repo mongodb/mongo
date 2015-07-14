@@ -30,40 +30,35 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/query/cluster_client_cursor_impl.h"
-
-#include "mongo/s/query/router_stage_limit.h"
-#include "mongo/s/query/router_stage_merge.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/s/query/router_stage_mock.h"
 
 namespace mongo {
 
-ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
-                                                 const ClusterClientCursorParams& params,
-                                                 const std::vector<HostAndPort>& remotes)
-    : _root(buildMergerPlan(executor, params, remotes)) {}
-
-StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
-    return _root->next();
+void RouterStageMock::queueResult(BSONObj obj) {
+    _resultsQueue.push({obj});
 }
 
-void ClusterClientCursorImpl::kill() {
-    _root->kill();
+void RouterStageMock::queueError(Status status) {
+    _resultsQueue.push({status});
 }
 
-std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
-    executor::TaskExecutor* executor,
-    const ClusterClientCursorParams& params,
-    const std::vector<HostAndPort>& remotes) {
-    // The first stage is always the one which merges from the remotes.
-    auto leaf = stdx::make_unique<RouterStageMerge>(executor, params, remotes);
-
-    std::unique_ptr<RouterExecStage> root = std::move(leaf);
-    if (params.limit) {
-        root = stdx::make_unique<RouterStageLimit>(std::move(root), *params.limit);
+StatusWith<boost::optional<BSONObj>> RouterStageMock::next() {
+    if (_resultsQueue.empty()) {
+        return {boost::none};
     }
 
-    return root;
+    auto out = _resultsQueue.front();
+    _resultsQueue.pop();
+
+    if (!out.isOK()) {
+        return out.getStatus();
+    }
+
+    return boost::optional<BSONObj>(out.getValue());
+}
+
+void RouterStageMock::kill() {
+    // No child to kill.
 }
 
 }  // namespace mongo

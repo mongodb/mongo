@@ -26,44 +26,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#pragma once
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/query/cluster_client_cursor_impl.h"
-
-#include "mongo/s/query/router_stage_limit.h"
-#include "mongo/s/query/router_stage_merge.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/s/query/router_exec_stage.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
+#include "mongo/s/query/async_results_merger.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
-ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
-                                                 const ClusterClientCursorParams& params,
-                                                 const std::vector<HostAndPort>& remotes)
-    : _root(buildMergerPlan(executor, params, remotes)) {}
+/**
+ * Draws results from the AsyncShardResultsMerger, which is the underlying source of the stream of
+ * merged documents manipulated by the MergerPlanStage pipeline. Used to present a stream of
+ * documents merged from the shards to the stages later in the pipeline.
+ */
+class RouterStageMerge : public RouterExecStage {
+public:
+    RouterStageMerge(executor::TaskExecutor* executor,
+                     const ClusterClientCursorParams& params,
+                     const std::vector<HostAndPort>& remotes);
 
-StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
-    return _root->next();
-}
+    ~RouterStageMerge() final = default;
 
-void ClusterClientCursorImpl::kill() {
-    _root->kill();
-}
+    StatusWith<boost::optional<BSONObj>> next() final;
 
-std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
-    executor::TaskExecutor* executor,
-    const ClusterClientCursorParams& params,
-    const std::vector<HostAndPort>& remotes) {
-    // The first stage is always the one which merges from the remotes.
-    auto leaf = stdx::make_unique<RouterStageMerge>(executor, params, remotes);
+    void kill() final;
 
-    std::unique_ptr<RouterExecStage> root = std::move(leaf);
-    if (params.limit) {
-        root = stdx::make_unique<RouterStageLimit>(std::move(root), *params.limit);
-    }
+private:
+    // Not owned here.
+    executor::TaskExecutor* _executor;
 
-    return root;
-}
+    // Schedules remote work and merges results from 'remotes'.
+    AsyncResultsMerger _arm;
+};
 
 }  // namespace mongo

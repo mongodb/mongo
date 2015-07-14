@@ -44,14 +44,15 @@
 namespace mongo {
 
 /**
- * AsyncClusterClientCursor is used to generate results from cursor-generating commands on one or
- * more remote hosts. A cursor-generating command (e.g. the find command) is one that establishes a
+ * AsyncResultsMerger is used to generate results from cursor-generating commands on one or more
+ * remote hosts. A cursor-generating command (e.g. the find command) is one that establishes a
  * ClientCursor and a matching cursor id on the remote host. In order to retrieve all command
- * results, getMores must be issued against each of the remote cursors until they are exhausted.
+ * results, getMores must be issued against each of the remote cursors until they are exhausted. The
+ * results from the remote nodes are merged to present either a single sorted or unsorted stream.
  *
- * The ACCC offers a non-blocking interface: if no results are immediately available on this host
- * for retrieval, calling nextEvent() schedules work on the remote hosts in order to generate
- * further results. The event is signaled when further results are available.
+ * The ARM offers a non-blocking interface: if no results are immediately available on this host for
+ * retrieval, calling nextEvent() schedules work on the remote hosts in order to generate further
+ * results. The event is signaled when further results are available.
  *
  * Work on remote nodes is accomplished by scheduling remote work in TaskExecutor's event loop.
  *
@@ -60,21 +61,21 @@ namespace mongo {
  * This requires waiting until we have a response from every remote before returning results.
  * Without a sort, we are ready to return results as soon as we have *any* response from a remote.
  *
- * On any error, the caller is responsible for shutting down the ACCC using the kill() method.
+ * On any error, the caller is responsible for shutting down the ARM using the kill() method.
  *
  * Does not throw exceptions.
  */
-class AsyncClusterClientCursor {
-    MONGO_DISALLOW_COPYING(AsyncClusterClientCursor);
+class AsyncResultsMerger {
+    MONGO_DISALLOW_COPYING(AsyncResultsMerger);
 
 public:
     /**
-     * Constructs a new AsyncClusterClientCursor. The TaskExecutor* and ClusterClientCursorParams&
-     * must remain valid for the lifetime of the ACCC.
+     * Constructs a new AsyncResultsMerger. The TaskExecutor* and ClusterClientCursorParams& must
+     * remain valid for the lifetime of the ARM.
      */
-    AsyncClusterClientCursor(executor::TaskExecutor* executor,
-                             const ClusterClientCursorParams& params,
-                             const std::vector<HostAndPort>& remotes);
+    AsyncResultsMerger(executor::TaskExecutor* executor,
+                       const ClusterClientCursorParams& params,
+                       const std::vector<HostAndPort>& remotes);
 
     /**
      * In order to be destroyed, either
@@ -82,7 +83,7 @@ public:
      *   signaled, or
      *   --all cursors must have been exhausted.
      */
-    virtual ~AsyncClusterClientCursor();
+    virtual ~AsyncResultsMerger();
 
     /**
      * Returns true if there is no need to schedule remote work in order to take the next action.
@@ -90,7 +91,7 @@ public:
      *   --there is a buffered result which we can return,
      *   --or all of the remote cursors have been closed and we are done,
      *   --or an error was received and the next call to nextReady() will return an error status,
-     *   --or the ACCC has been killed and is in the process of shutting down. In this case,
+     *   --or the ARM has been killed and is in the process of shutting down. In this case,
      *   nextReady() will report an error when called.
      *
      * A return value of true indicates that it is safe to call nextReady().
@@ -128,13 +129,13 @@ public:
     StatusWith<executor::TaskExecutor::EventHandle> nextEvent();
 
     /**
-     * Starts shutting down this ACCC. Returns a handle to an event which is signaled when this
+     * Starts shutting down this ARM. Returns a handle to an event which is signaled when this
      * cursor is safe to destroy.
      *
      * Returns an invalid handle if the underlying task executor is shutting down. In this case, it
      * is legal to destroy the cursor only after the task executor shutdown process is complete.
      *
-     * An ACCC can only be destroyed if either 1) all its results have been exhausted or 2) the kill
+     * An ARM can only be destroyed if either 1) all its results have been exhausted or 2) the kill
      * event returned by this method has been signaled.
      *
      * May be called multiple times (idempotent).
@@ -262,7 +263,7 @@ private:
     LifecycleState _lifecycleState = kAlive;
 
     // Signaled when all outstanding batch request callbacks have run, and all killCursors commands
-    // have been scheduled. This means that the ACCC is safe to delete.
+    // have been scheduled. This means that the ARM is safe to delete.
     executor::TaskExecutor::EventHandle _killCursorsScheduledEvent;
 };
 

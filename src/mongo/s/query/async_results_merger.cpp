@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/query/async_cluster_client_cursor.h"
+#include "mongo/s/query/async_results_merger.h"
 
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/getmore_response.h"
@@ -42,16 +42,16 @@
 
 namespace mongo {
 
-AsyncClusterClientCursor::AsyncClusterClientCursor(executor::TaskExecutor* executor,
-                                                   const ClusterClientCursorParams& params,
-                                                   const std::vector<HostAndPort>& remotes)
+AsyncResultsMerger::AsyncResultsMerger(executor::TaskExecutor* executor,
+                                       const ClusterClientCursorParams& params,
+                                       const std::vector<HostAndPort>& remotes)
     : _executor(executor), _params(params), _mergeQueue(MergingComparator(_remotes, _params.sort)) {
     for (const auto& remote : remotes) {
         _remotes.emplace_back(remote);
     }
 }
 
-AsyncClusterClientCursor::~AsyncClusterClientCursor() {
+AsyncResultsMerger::~AsyncResultsMerger() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     bool allExhausted = true;
@@ -64,12 +64,12 @@ AsyncClusterClientCursor::~AsyncClusterClientCursor() {
     invariant(allExhausted || _lifecycleState == kKillComplete);
 }
 
-bool AsyncClusterClientCursor::ready() {
+bool AsyncResultsMerger::ready() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return ready_inlock();
 }
 
-bool AsyncClusterClientCursor::ready_inlock() {
+bool AsyncResultsMerger::ready_inlock() {
     if (_lifecycleState != kAlive) {
         return true;
     }
@@ -86,7 +86,7 @@ bool AsyncClusterClientCursor::ready_inlock() {
     return hasSort ? readySorted_inlock() : readyUnsorted_inlock();
 }
 
-bool AsyncClusterClientCursor::readySorted_inlock() {
+bool AsyncResultsMerger::readySorted_inlock() {
     for (const auto& remote : _remotes) {
         if (!remote.hasNext() && !remote.exhausted()) {
             return false;
@@ -96,7 +96,7 @@ bool AsyncClusterClientCursor::readySorted_inlock() {
     return true;
 }
 
-bool AsyncClusterClientCursor::readyUnsorted_inlock() {
+bool AsyncResultsMerger::readyUnsorted_inlock() {
     bool allExhausted = true;
     for (const auto& remote : _remotes) {
         if (!remote.exhausted()) {
@@ -111,7 +111,7 @@ bool AsyncClusterClientCursor::readyUnsorted_inlock() {
     return allExhausted;
 }
 
-StatusWith<boost::optional<BSONObj>> AsyncClusterClientCursor::nextReady() {
+StatusWith<boost::optional<BSONObj>> AsyncResultsMerger::nextReady() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     dassert(ready_inlock());
     if (_lifecycleState != kAlive) {
@@ -126,7 +126,7 @@ StatusWith<boost::optional<BSONObj>> AsyncClusterClientCursor::nextReady() {
     return hasSort ? nextReadySorted() : nextReadyUnsorted();
 }
 
-boost::optional<BSONObj> AsyncClusterClientCursor::nextReadySorted() {
+boost::optional<BSONObj> AsyncResultsMerger::nextReadySorted() {
     if (_mergeQueue.empty()) {
         return boost::none;
     }
@@ -149,7 +149,7 @@ boost::optional<BSONObj> AsyncClusterClientCursor::nextReadySorted() {
     return front;
 }
 
-boost::optional<BSONObj> AsyncClusterClientCursor::nextReadyUnsorted() {
+boost::optional<BSONObj> AsyncResultsMerger::nextReadyUnsorted() {
     size_t remotesAttempted = 0;
     while (remotesAttempted < _remotes.size()) {
         // It is illegal to call this method if there is an error received from any shard.
@@ -171,11 +171,11 @@ boost::optional<BSONObj> AsyncClusterClientCursor::nextReadyUnsorted() {
     return boost::none;
 }
 
-StatusWith<executor::TaskExecutor::EventHandle> AsyncClusterClientCursor::nextEvent() {
+StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_lifecycleState != kAlive) {
-        // Can't schedule further network operations if the ACCC is being killed.
+        // Can't schedule further network operations if the ARM is being killed.
         return Status(ErrorCodes::IllegalOperation,
                       "nextEvent() called on a killed async cluster client cursor");
     }
@@ -208,10 +208,8 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncClusterClientCursor::nextEv
 
             auto callbackStatus = _executor->scheduleRemoteCommand(
                 request,
-                stdx::bind(&AsyncClusterClientCursor::handleBatchResponse,
-                           this,
-                           stdx::placeholders::_1,
-                           i));
+                stdx::bind(
+                    &AsyncResultsMerger::handleBatchResponse, this, stdx::placeholders::_1, i));
             if (!callbackStatus.isOK()) {
                 return callbackStatus.getStatus();
             }
@@ -228,7 +226,7 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncClusterClientCursor::nextEv
     return _currentEvent;
 }
 
-void AsyncClusterClientCursor::handleBatchResponse(
+void AsyncResultsMerger::handleBatchResponse(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, size_t remoteIndex) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -264,7 +262,7 @@ void AsyncClusterClientCursor::handleBatchResponse(
     }
 
     // Early return from this point on signal anyone waiting on an event, if ready() is true.
-    ScopeGuard signaller = MakeGuard(&AsyncClusterClientCursor::signalCurrentEvent_inlock, this);
+    ScopeGuard signaller = MakeGuard(&AsyncResultsMerger::signalCurrentEvent_inlock, this);
 
     if (!cbData.response.isOK()) {
         _remotes[remoteIndex].status = cbData.response.getStatus();
@@ -308,7 +306,7 @@ void AsyncClusterClientCursor::handleBatchResponse(
     signalCurrentEvent_inlock();
 }
 
-void AsyncClusterClientCursor::signalCurrentEvent_inlock() {
+void AsyncResultsMerger::signalCurrentEvent_inlock() {
     if (ready_inlock() && _currentEvent.isValid()) {
         // To prevent ourselves from signalling the event twice, we set '_currentEvent' as
         // invalid after signalling it.
@@ -317,7 +315,7 @@ void AsyncClusterClientCursor::signalCurrentEvent_inlock() {
     }
 }
 
-bool AsyncClusterClientCursor::haveOutstandingBatchRequests_inlock() {
+bool AsyncResultsMerger::haveOutstandingBatchRequests_inlock() {
     for (const auto& remote : _remotes) {
         if (remote.cbHandle.isValid()) {
             return true;
@@ -327,7 +325,7 @@ bool AsyncClusterClientCursor::haveOutstandingBatchRequests_inlock() {
     return false;
 }
 
-void AsyncClusterClientCursor::scheduleKillCursors_inlock() {
+void AsyncResultsMerger::scheduleKillCursors_inlock() {
     invariant(_lifecycleState == kKillStarted);
     invariant(_killCursorsScheduledEvent.isValid());
 
@@ -342,18 +340,17 @@ void AsyncClusterClientCursor::scheduleKillCursors_inlock() {
 
             _executor->scheduleRemoteCommand(
                 request,
-                stdx::bind(&AsyncClusterClientCursor::handleKillCursorsResponse,
-                           stdx::placeholders::_1));
+                stdx::bind(&AsyncResultsMerger::handleKillCursorsResponse, stdx::placeholders::_1));
         }
     }
 }
 
-void AsyncClusterClientCursor::handleKillCursorsResponse(
+void AsyncResultsMerger::handleKillCursorsResponse(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
     // We just ignore any killCursors command responses.
 }
 
-executor::TaskExecutor::EventHandle AsyncClusterClientCursor::kill() {
+executor::TaskExecutor::EventHandle AsyncResultsMerger::kill() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_killCursorsScheduledEvent.isValid()) {
         invariant(_lifecycleState != kAlive);
@@ -395,25 +392,25 @@ executor::TaskExecutor::EventHandle AsyncClusterClientCursor::kill() {
 }
 
 //
-// AsyncClusterClientCursor::RemoteCursorData
+// AsyncResultsMerger::RemoteCursorData
 //
 
-AsyncClusterClientCursor::RemoteCursorData::RemoteCursorData(const HostAndPort& host)
+AsyncResultsMerger::RemoteCursorData::RemoteCursorData(const HostAndPort& host)
     : hostAndPort(host) {}
 
-bool AsyncClusterClientCursor::RemoteCursorData::hasNext() const {
+bool AsyncResultsMerger::RemoteCursorData::hasNext() const {
     return !docBuffer.empty();
 }
 
-bool AsyncClusterClientCursor::RemoteCursorData::exhausted() const {
+bool AsyncResultsMerger::RemoteCursorData::exhausted() const {
     return cursorId && (*cursorId == 0);
 }
 
 //
-// AsyncClusterClientCursor::MergingComparator
+// AsyncResultsMerger::MergingComparator
 //
 
-bool AsyncClusterClientCursor::MergingComparator::operator()(const size_t& lhs, const size_t& rhs) {
+bool AsyncResultsMerger::MergingComparator::operator()(const size_t& lhs, const size_t& rhs) {
     const BSONObj& leftDoc = _remotes[lhs].docBuffer.front();
     const BSONObj& rightDoc = _remotes[rhs].docBuffer.front();
 

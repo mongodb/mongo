@@ -28,10 +28,12 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/query/async_cluster_client_cursor.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
+#include "mongo/s/query/router_exec_stage.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -52,13 +54,15 @@ public:
     void kill() final;
 
 private:
-    // Not owned here.
-    executor::TaskExecutor* _executor;
+    /**
+     * Constructs the pipeline of MergerPlanStages which will be used to answer the query.
+     */
+    std::unique_ptr<RouterExecStage> buildMergerPlan(executor::TaskExecutor* executor,
+                                                     const ClusterClientCursorParams& params,
+                                                     const std::vector<HostAndPort>& remotes);
 
-    const ClusterClientCursorParams _params;
-
-    // Does work of scheduling remote work and merging results.
-    AsyncClusterClientCursor _accc;
+    // The root stage of the pipeline used to return the result set, merged from the remote nodes.
+    std::unique_ptr<RouterExecStage> _root;
 };
 
 }  // namespace mongo

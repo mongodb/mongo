@@ -30,40 +30,42 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/query/cluster_client_cursor_impl.h"
-
-#include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
-#include "mongo/stdx/memory.h"
+
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
-                                                 const ClusterClientCursorParams& params,
-                                                 const std::vector<HostAndPort>& remotes)
-    : _root(buildMergerPlan(executor, params, remotes)) {}
+RouterStageMerge::RouterStageMerge(executor::TaskExecutor* executor,
+                                   const ClusterClientCursorParams& params,
+                                   const std::vector<HostAndPort>& remotes)
+    : _executor(executor), _arm(executor, params, remotes) {}
 
-StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
-    return _root->next();
-}
+StatusWith<boost::optional<BSONObj>> RouterStageMerge::next() {
+    // On error, kill the underlying ACCC.
+    auto killer = MakeGuard(&RouterStageMerge::kill, this);
 
-void ClusterClientCursorImpl::kill() {
-    _root->kill();
-}
+    while (!_arm.ready()) {
+        auto nextEventStatus = _arm.nextEvent();
+        if (!nextEventStatus.isOK()) {
+            return nextEventStatus.getStatus();
+        }
+        auto event = nextEventStatus.getValue();
 
-std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
-    executor::TaskExecutor* executor,
-    const ClusterClientCursorParams& params,
-    const std::vector<HostAndPort>& remotes) {
-    // The first stage is always the one which merges from the remotes.
-    auto leaf = stdx::make_unique<RouterStageMerge>(executor, params, remotes);
-
-    std::unique_ptr<RouterExecStage> root = std::move(leaf);
-    if (params.limit) {
-        root = stdx::make_unique<RouterStageLimit>(std::move(root), *params.limit);
+        // Block until there are further results to return.
+        _executor->waitForEvent(event);
     }
 
-    return root;
+    auto statusWithNext = _arm.nextReady();
+    if (statusWithNext.isOK()) {
+        killer.Dismiss();
+    }
+    return statusWithNext;
+}
+
+void RouterStageMerge::kill() {
+    auto killEvent = _arm.kill();
+    _executor->waitForEvent(killEvent);
 }
 
 }  // namespace mongo

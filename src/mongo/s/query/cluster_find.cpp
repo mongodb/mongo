@@ -89,10 +89,11 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         remotes.emplace_back(std::move(hostAndPort.getValue()));
     }
 
-    // TODO: handle other query options (skip, limit, projection).
+    // TODO: handle other query options (skip and projection).
     ClusterClientCursorParams params(query.nss());
     params.cmdObj = query.getParsed().asFindCommand();
     params.sort = query.getParsed().getSort();
+    params.limit = query.getParsed().getLimit();
 
     ClusterClientCursorImpl ccc(shardRegistry->getExecutor(), params, remotes);
 

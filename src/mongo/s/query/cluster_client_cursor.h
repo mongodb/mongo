@@ -44,8 +44,7 @@ class StatusWith;
  * all command results, getMores must be issued against each of the remote cursors until they
  * are exhausted.
  *
- * ClusterClientCursor provides a simple blocking interface wrapping AsyncClientCursor's
- * non-blocking interface.
+ * Results are generated using a pipeline of mongoS query execution stages called RouterExecStage.
  *
  * Does not throw exceptions.
  */
