@@ -377,7 +377,7 @@ public:
 /**
  * Test the subplan stage's ability to answer a contained $or query.
  */
-class QueryStageSubplanPlanRootedOr : public QueryStageSubplanBase {
+class QueryStageSubplanPlanContainedOr : public QueryStageSubplanBase {
 public:
     void run() {
         OldClientWriteContext ctx(&_txn, ns());
@@ -405,7 +405,7 @@ public:
             new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
 
         // Plan selection should succeed due to falling back on regular planning.
-        PlanYieldPolicy yieldPolicy(NULL, PlanExecutor::YIELD_MANUAL);
+        PlanYieldPolicy yieldPolicy(nullptr, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         // Work the stage until it produces all results.
@@ -430,6 +430,57 @@ public:
     }
 };
 
+/**
+ * Test the subplan stage's ability to answer a rooted $or query with a $ne and a sort.
+ *
+ * Regression test for SERVER-19388.
+ */
+class QueryStageSubplanPlanRootedOrNE : public QueryStageSubplanBase {
+public:
+    void run() {
+        OldClientWriteContext ctx(&_txn, ns());
+        addIndex(BSON("a" << 1 << "b" << 1));
+        addIndex(BSON("a" << 1 << "c" << 1));
+
+        // Every doc matches.
+        insert(BSON("_id" << 1 << "a" << 1));
+        insert(BSON("_id" << 2 << "a" << 2));
+        insert(BSON("_id" << 3 << "a" << 3));
+        insert(BSON("_id" << 4));
+
+        BSONObj query = fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}");
+        BSONObj sort = BSON("d" << 1);
+        BSONObj projection;
+        auto cq = unittest::assertGet(CanonicalQuery::canonicalize(ns(), query, sort, projection));
+
+        Collection* collection = ctx.getCollection();
+
+        QueryPlannerParams plannerParams;
+        fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
+
+        WorkingSet ws;
+        std::unique_ptr<SubplanStage> subplan(
+            new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
+
+        PlanYieldPolicy yieldPolicy(nullptr, PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+
+        size_t numResults = 0;
+        PlanStage::StageState stageState = PlanStage::NEED_TIME;
+        while (stageState != PlanStage::IS_EOF) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            stageState = subplan->work(&id);
+            ASSERT_NE(stageState, PlanStage::DEAD);
+            ASSERT_NE(stageState, PlanStage::FAILURE);
+            if (stageState == PlanStage::ADVANCED) {
+                ++numResults;
+            }
+        }
+
+        ASSERT_EQ(numResults, 4U);
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("query_stage_subplan") {}
@@ -439,7 +490,8 @@ public:
         add<QueryStageSubplanPlanFromCache>();
         add<QueryStageSubplanCanUseSubplanning>();
         add<QueryStageSubplanRewriteToRootedOr>();
-        add<QueryStageSubplanPlanRootedOr>();
+        add<QueryStageSubplanPlanContainedOr>();
+        add<QueryStageSubplanPlanRootedOrNE>();
     }
 };
 

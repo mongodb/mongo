@@ -235,19 +235,14 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     const CanonicalQuery& baseQuery,
     MatchExpression* root,
     const MatchExpressionParser::WhereCallback& whereCallback) {
-    // Obtain filter for our LPQ by serializing the new match expression root.
-    BSONObjBuilder bob;
-    root->toBSON(&bob);
-    BSONObj filter = bob.obj();
-
-    // Pass empty sort and projection.
+    // TODO: we should be passing the filter corresponding to 'root' to the LPQ rather than the base
+    // query's filter, baseQuery.getParsed().getFilter().
     BSONObj emptyObj;
-
     auto lpqStatus = LiteParsedQuery::makeAsOpQuery(baseQuery.nss(),
                                                     0,  // ntoskip
                                                     0,  // ntoreturn
                                                     0,  // queryOptions
-                                                    filter,
+                                                    baseQuery.getParsed().getFilter(),
                                                     baseQuery.getParsed().getProj(),
                                                     baseQuery.getParsed().getSort(),
                                                     emptyObj,  // hint
