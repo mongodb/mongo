@@ -26,48 +26,43 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/base/status_with.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
 namespace {
 
-using std::string;
-using mongo::BSONObj;
-using mongo::LockpingsType;
-using mongo::Date_t;
+using namespace mongo;
 
-TEST(Validity, MissingFields) {
-    LockpingsType lockPing;
+TEST(Validity, MissingProcess) {
     BSONObj objNoProcess = BSON(LockpingsType::ping(Date_t::now()));
-    string errMsg;
-    ASSERT(lockPing.parseBSON(objNoProcess, &errMsg));
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT_FALSE(lockPing.isValid(NULL));
+    auto lockpingsResult = LockpingsType::fromBSON(objNoProcess);
+    ASSERT_NOT_OK(lockpingsResult.getStatus());
+}
 
+TEST(Validity, MissingPing) {
     BSONObj objNoPing = BSON(LockpingsType::process("host.local:27017:1352918870:16807"));
-    ASSERT(lockPing.parseBSON(objNoPing, &errMsg));
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT_FALSE(lockPing.isValid(NULL));
+    auto lockpingsResult = LockpingsType::fromBSON(objNoPing);
+    ASSERT_NOT_OK(lockpingsResult.getStatus());
 }
 
 TEST(Validity, Valid) {
-    LockpingsType lockPing;
     BSONObj obj = BSON(LockpingsType::process("host.local:27017:1352918870:16807")
                        << LockpingsType::ping(Date_t::fromMillisSinceEpoch(1)));
-    string errMsg;
-    ASSERT(lockPing.parseBSON(obj, &errMsg));
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT_TRUE(lockPing.isValid(NULL));
+    auto lockpingsResult = LockpingsType::fromBSON(obj);
+    ASSERT_OK(lockpingsResult.getStatus());
+
+    const LockpingsType& lockPing = lockpingsResult.getValue();
     ASSERT_EQUALS(lockPing.getProcess(), "host.local:27017:1352918870:16807");
     ASSERT_EQUALS(lockPing.getPing(), Date_t::fromMillisSinceEpoch(1));
 }
 
 TEST(Validity, BadType) {
-    LockpingsType lockPing;
     BSONObj obj = BSON(LockpingsType::process() << 0);
-    string errMsg;
-    ASSERT((!lockPing.parseBSON(obj, &errMsg)) && (errMsg != ""));
+    auto lockpingsResult = LockpingsType::fromBSON(obj);
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, lockpingsResult.getStatus());
 }
 
 }  // unnamed namespace

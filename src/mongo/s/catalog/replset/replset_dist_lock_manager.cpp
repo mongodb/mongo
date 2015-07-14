@@ -150,10 +150,11 @@ StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc) {
     }
 
     const auto& pingDoc = pingStatus.getValue();
-    string errMsg;
-    if (!pingDoc.isValid(&errMsg)) {
+    Status pingDocValidationStatus = pingDoc.validate();
+    if (!pingDocValidationStatus.isOK()) {
         return {ErrorCodes::UnsupportedFormat,
-                str::stream() << "invalid ping document for " << processID << ": " << errMsg};
+                str::stream() << "invalid ping document for " << processID << ": "
+                              << pingDocValidationStatus.toString()};
     }
 
     Timer timer(_serviceContext->getTickSource());

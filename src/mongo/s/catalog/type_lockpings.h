@@ -28,10 +28,11 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -39,29 +40,9 @@ namespace mongo {
  * This class represents the layout and contents of documents contained in the
  * config.lockpings collection. All manipulation of documents coming from that
  * collection should be done with this class.
- *
- * Usage Example:
- *
- *     // Contact the config. 'conn' has been obtained before.
- *     DBClientBase* conn;
- *     BSONObj query = QUERY(LockpingsType::exampleField("exampleFieldName"));
- *     exampleDoc = conn->findOne(LockpingsType::ConfigNS, query);
- *
- *     // Process the response.
- *     LockpingsType exampleType;
- *     std::string errMsg;
- *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
- *         // Can't use 'exampleType'. Take action.
- *     }
- *     // use 'exampleType'
- *
  */
 class LockpingsType {
 public:
-    //
-    // schema declarations
-    //
-
     // Name of the lockpings collection in the config server.
     static const std::string ConfigNS;
 
@@ -69,96 +50,45 @@ public:
     static const BSONField<std::string> process;
     static const BSONField<Date_t> ping;
 
-    //
-    // lockpings type methods
-    //
-
-    LockpingsType();
-    ~LockpingsType();
-
-    /**
-     * Returns true if all the mandatory fields are present and have valid
-     * representations. Otherwise returns false and fills in the optional 'errMsg' string.
-     */
-    bool isValid(std::string* errMsg) const;
-
     /**
      * Returns the BSON representation of the entry.
      */
     BSONObj toBSON() const;
 
     /**
-     * Clears and populates the internal state using the 'source' BSON object if the
-     * latter contains valid values. Otherwise sets errMsg and returns false.
+     * Constructs a new LockpingsType object from BSON.
+     * Also does validation of the contents.
      */
-    bool parseBSON(const BSONObj& source, std::string* errMsg);
+    static StatusWith<LockpingsType> fromBSON(const BSONObj& source);
 
     /**
-     * Clears the internal state.
+     * Returns OK if all fields have been set. Otherwise, retruns NoSuchKey
+     * and information about the first field that is missing.
      */
-    void clear();
-
-    /**
-     * Copies all the fields present in 'this' to 'other'.
-     */
-    void cloneTo(LockpingsType* other) const;
+    Status validate() const;
 
     /**
      * Returns a std::string representation of the current internal state.
      */
     std::string toString() const;
 
-    //
-    // individual field accessors
-    //
-
-    // Mandatory Fields
-    void setProcess(StringData process) {
-        _process = process.toString();
-        _isProcessSet = true;
-    }
-
-    void unsetProcess() {
-        _isProcessSet = false;
-    }
-
-    bool isProcessSet() const {
-        return _isProcessSet;
-    }
-
-    // Calling get*() methods when the member is not set results in undefined behavior
     const std::string& getProcess() const {
-        dassert(_isProcessSet);
-        return _process;
+        return _process.get();
     }
+    void setProcess(const std::string& process);
 
-    void setPing(const Date_t ping) {
-        _ping = ping;
-        _isPingSet = true;
-    }
-
-    void unsetPing() {
-        _isPingSet = false;
-    }
-
-    bool isPingSet() const {
-        return _isPingSet;
-    }
-
-    // Calling get*() methods when the member is not set results in undefined behavior
     const Date_t getPing() const {
-        dassert(_isPingSet);
-        return _ping;
+        return _ping.get();
     }
-
-    // Optional Fields
+    void setPing(const Date_t ping);
 
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-    std::string _process;  // (M)  std::string describing the process holding the lock
-    bool _isProcessSet;
-    Date_t _ping;  // (M)  last time the holding process updated this document
-    bool _isPingSet;
+
+    // (M) string describing the process holding the lock
+    boost::optional<std::string> _process;
+    // (M) last time the holding process updated this document
+    boost::optional<Date_t> _ping;
 };
 
 }  // namespace mongo

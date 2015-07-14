@@ -175,14 +175,15 @@ StatusWith<LockpingsType> DistLockCatalogImpl::getPing(StringData processID) {
                 str::stream() << "ping entry for " << processID << " not found"};
     }
 
-    LockpingsType pingDoc;
-
-    string errMsg;
-    if (!pingDoc.parseBSON(findResultSet.front(), &errMsg)) {
-        return {ErrorCodes::FailedToParse, errMsg};
+    BSONObj doc = findResultSet.front();
+    auto pingDocResult = LockpingsType::fromBSON(doc);
+    if (!pingDocResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "failed to parse document: " << doc << " : "
+                              << pingDocResult.getStatus().toString()};
     }
 
-    return pingDoc;
+    return pingDocResult.getValue();
 }
 
 Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {

@@ -27,93 +27,71 @@
  */
 #include "mongo/s/catalog/type_lockpings.h"
 
-#include "mongo/db/field_parser.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-using std::string;
-
-using mongoutils::str::stream;
-
 const std::string LockpingsType::ConfigNS = "config.lockpings";
 
 const BSONField<std::string> LockpingsType::process("_id");
 const BSONField<Date_t> LockpingsType::ping("ping");
 
-LockpingsType::LockpingsType() {
-    clear();
+StatusWith<LockpingsType> LockpingsType::fromBSON(const BSONObj& source) {
+    LockpingsType lpt;
+
+    {
+        std::string lptProcess;
+        Status status = bsonExtractStringField(source, process.name(), &lptProcess);
+        if (!status.isOK())
+            return status;
+        lpt._process = lptProcess;
+    }
+
+    {
+        BSONElement lptPingElem;
+        Status status = bsonExtractTypedField(source, ping.name(), BSONType::Date, &lptPingElem);
+        if (!status.isOK())
+            return status;
+        lpt._ping = lptPingElem.date();
+    }
+
+    return lpt;
 }
 
-LockpingsType::~LockpingsType() {}
-
-bool LockpingsType::isValid(std::string* errMsg) const {
-    std::string dummy;
-    if (errMsg == NULL) {
-        errMsg = &dummy;
+Status LockpingsType::validate() const {
+    if (!_process.is_initialized() || _process->empty()) {
+        return {ErrorCodes::NoSuchKey, str::stream() << "missing " << process.name() << " field"};
     }
 
-    // All the mandatory fields must be present.
-    if (!_isProcessSet) {
-        *errMsg = stream() << "missing " << process.name() << " field";
-        return false;
-    }
-    if (!_isPingSet) {
-        *errMsg = stream() << "missing " << ping.name() << " field";
-        return false;
+    if (!_ping.is_initialized()) {
+        return {ErrorCodes::NoSuchKey, str::stream() << "missing " << ping.name() << " field"};
     }
 
-    return true;
+    return Status::OK();
 }
 
 BSONObj LockpingsType::toBSON() const {
     BSONObjBuilder builder;
 
-    if (_isProcessSet)
-        builder.append(process(), _process);
-    if (_isPingSet)
-        builder.append(ping(), _ping);
+    if (_process)
+        builder.append(process.name(), getProcess());
+    if (_ping)
+        builder.append(ping.name(), getPing());
 
     return builder.obj();
 }
 
-bool LockpingsType::parseBSON(const BSONObj& source, string* errMsg) {
-    clear();
-
-    std::string dummy;
-    if (!errMsg)
-        errMsg = &dummy;
-
-    FieldParser::FieldState fieldState;
-    fieldState = FieldParser::extract(source, process, &_process, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isProcessSet = fieldState == FieldParser::FIELD_SET;
-
-    fieldState = FieldParser::extract(source, ping, &_ping, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isPingSet = fieldState == FieldParser::FIELD_SET;
-
-    return true;
+void LockpingsType::setProcess(const std::string& process) {
+    invariant(!process.empty());
+    _process = process;
 }
 
-void LockpingsType::clear() {
-    _process.clear();
-    _isProcessSet = false;
-
-    _ping = Date_t();
-    _isPingSet = false;
-}
-
-void LockpingsType::cloneTo(LockpingsType* other) const {
-    other->clear();
-
-    other->_process = _process;
-    other->_isProcessSet = _isProcessSet;
-
-    other->_ping = _ping;
-    other->_isPingSet = _isPingSet;
+void LockpingsType::setPing(const Date_t ping) {
+    _ping = ping;
 }
 
 std::string LockpingsType::toString() const {
