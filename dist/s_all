@@ -69,26 +69,25 @@ run "sh ./s_typedef -b"
 run "sh ./s_copyright"
 run "sh ./s_style"
 
-read -d '' COMMANDS <<EOM
-'sh ./s_tags > ${t_pfx}tags'
-'sh ./s_define > ${t_pfx}s_define'
-'sh ./s_typedef -c > ${t_pfx}s_typedef_c'
-'sh ./s_funcs > ${t_pfx}s_funcs'
-'sh ./s_export > ${t_pfx}s_export'
-'sh ./s_getopt > ${t_pfx}s_getopt'
-'sh ./s_label > ${t_pfx}s_label'
-'sh ./s_lang > ${t_pfx}s_lang'
-'sh ./s_longlines > ${t_pfx}s_longlines'
-'sh ./s_stat > ${t_pfx}_stat'
-'sh ./s_string > ${t_pfx}s_string'
-'python style.py > ${t_pfx}py_style'
-'sh ./s_python > ${t_pfx}s_python'
-'sh ./s_whitespace > ${t_pfx}s_whitespace'
-'sh ./s_win > ${t_pfx}s_win'
-'sh ./s_docs > ${t_pfx}s_docs'
-EOM
+COMMANDS="
+./s_tags > ${t_pfx}tags
+./s_define > ${t_pfx}s_define
+./s_typedef -c > ${t_pfx}s_typedef_c
+./s_funcs > ${t_pfx}s_funcs
+./s_export > ${t_pfx}s_export
+./s_getopt > ${t_pfx}s_getopt
+./s_label > ${t_pfx}s_label
+./s_lang > ${t_pfx}s_lang
+./s_longlines > ${t_pfx}s_longlines
+./s_stat > ${t_pfx}_stat
+./s_string > ${t_pfx}s_string
+python style.py > ${t_pfx}py_style
+./s_python > ${t_pfx}s_python
+./s_whitespace > ${t_pfx}s_whitespace
+./s_win > ${t_pfx}s_win
+./s_docs > ${t_pfx}s_docs"
 
-echo "$COMMANDS" | xargs -P 20 -n 1 -I{} /bin/sh -c {}
+echo "$COMMANDS" | xargs -P 20 -I{} /bin/sh -c {}
 
 for f in `find . -name ${t_pfx}\*`; do
 	if ! `test -s $f`; then
