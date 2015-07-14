@@ -9,14 +9,7 @@ c4=__wt.copyright.4
 
 check()
 {
-	# Skip files in which WiredTiger holds no rights. 3rdparty and
-	# node_modules are used by wtstats
-	if expr "$1" : '*3rdparty*' > /dev/null; then
-		return;
-	fi
-	if expr "$1" : '*node_modules*' > /dev/null; then
-		return;
-	fi
+	# Skip files in which WiredTiger holds no rights.
 	if `egrep "skip	$1" dist/s_copyright.list > /dev/null`; then
 		return;
 	fi
@@ -100,8 +93,8 @@ ENDOFTEXT
 	-e '/api\/leveldb\/hyperleveldb\//d' \
 	-e '/api\/leveldb\/leveldb\//d' \
 	-e '/api\/leveldb\/rocksdb\//d' \
-	-e '/test\/3rdparty\//d' \
-	-e '/tools\/wtperf_stats\/3rdparty\//d' \
+	-e '/\/3rdparty\//d' \
+	-e '/\/node_modules\//d' \
 	-e '/dist\/__/d' \
 	-e 's/^\.\///' |
     xargs -P 20 -n 1 -I{} sh dist/s_copyright {})
