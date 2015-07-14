@@ -552,7 +552,9 @@ public:
 
       @returns the value
      */
-    Value getValue() const;
+    Value getValue() const {
+        return pValue;
+    }
 
 private:
     explicit ExpressionConstant(const Value& pValue);
@@ -898,7 +900,9 @@ public:
 
       @returns how many fields have been added
      */
-    size_t getFieldCount() const;
+    size_t getFieldCount() const {
+        return _expressions.size();
+    };
 
     /*
       Specialized BSON conversion that allows for writing out a
@@ -1099,18 +1103,4 @@ public:
         return tm.tm_year + 1900;
     }
 };
-}
-
-
-/* ======================= INLINED IMPLEMENTATIONS ========================== */
-
-namespace mongo {
-
-inline Value ExpressionConstant::getValue() const {
-    return pValue;
-}
-
-inline size_t ExpressionObject::getFieldCount() const {
-    return _expressions.size();
-}
 }
