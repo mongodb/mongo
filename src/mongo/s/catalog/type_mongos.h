@@ -72,12 +72,6 @@ public:
     Status validate() const;
 
     /**
-     * Clears and populates the internal state using the 'source' BSON object if the
-     * latter contains valid values. Otherwise sets errMsg and returns false.
-     */
-    bool parseBSON(const BSONObj& source, std::string* errMsg);
-
-    /**
      * Returns a std::string representation of the current internal state.
      */
     std::string toString() const;
