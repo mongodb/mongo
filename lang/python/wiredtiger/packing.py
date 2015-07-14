@@ -97,7 +97,8 @@ def unpack(fmt, s):
                     size = len(s)
                 else:
                     # Note: 'U' is used internally, and may be exposed to us.
-                    # It indicates that the size is always stored.
+                    # It indicates that the size is always stored unless there
+                    # is a size in the format.
                     size, s = unpack_int(s)
             result.append(s[:size])
             if f == 'S' and not havesize:
