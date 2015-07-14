@@ -36,7 +36,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace executor {
@@ -94,29 +94,16 @@ private:
         RemoteCommandCompletionFn onFinish;
     };
     typedef stdx::list<CommandData> CommandDataList;
-    typedef std::vector<std::shared_ptr<stdx::thread>> ThreadList;
 
     /**
-     * Thread body for threads that synchronously perform network requests from
-     * the _pending list.
+     * Executes one pending network operation, if there is at least one in the pending queue.
      */
-    static void _requestProcessorThreadBody(NetworkInterfaceImpl* net,
-                                            const std::string& threadName);
-
-    /**
-     * Run loop that iteratively consumes network requests in a request processor thread.
-     */
-    void _consumeNetworkRequests();
+    void _runOneCommand();
 
     /**
      * Notifies the network threads that there is work available.
      */
     void _signalWorkAvailable_inlock();
-
-    /**
-     * Starts a new network thread.
-     */
-    void _startNewNetworkThread_inlock();
 
     // Mutex guarding the state of this network interface, except for the remote command
     // executor, which has its own concurrency control.
@@ -128,34 +115,24 @@ private:
     // Queue of yet-to-be-executed network operations.
     CommandDataList _pending;
 
-    // List of threads serving as the worker pool.
-    ThreadList _threads;
-
-    // Count of idle threads.
-    size_t _numIdleThreads;
-
-    // Id counter for assigning thread names
-    size_t _nextThreadId;
-
-    // The last time that _pending.size() + _numActiveNetworkRequests grew to be at least
-    // _threads.size().
-    Date_t _lastFullUtilizationDate;
+    // Worker thread pool.
+    ThreadPool _pool;
 
     // Condition signaled to indicate that the executor, blocked in waitForWorkUntil or
     // waitForWork, should wake up.
     stdx::condition_variable _isExecutorRunnableCondition;
 
     // Flag indicating whether or not the executor associated with this interface is runnable.
-    bool _isExecutorRunnable;
+    bool _isExecutorRunnable = false;
 
     // Flag indicating when this interface is being shut down (because shutdown() has executed).
-    bool _inShutdown;
+    bool _inShutdown = false;
 
     // Interface for running remote commands
-    RemoteCommandRunnerImpl _commandRunner;
+    RemoteCommandRunnerImpl _commandRunner{kMessagingPortKeepOpen};
 
     // Number of active network requests
-    size_t _numActiveNetworkRequests;
+    size_t _numActiveNetworkRequests = 0;
 };
 
 }  // namespace executor
