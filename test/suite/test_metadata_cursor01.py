@@ -94,8 +94,8 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
             nextret = cursor.next()
             if nextret != 0:
                 break
-            key = cursor.get_key()
-            value = cursor.get_value()
+            self.assertIsNotNone(cursor.get_key())
+            self.assertIsNotNone(cursor.get_value())
 
         self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
         cursor.reset()
@@ -112,8 +112,8 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
             prevret = cursor.prev()
             if prevret != 0:
                 break
-            key = cursor.get_key
-            value = cursor.get_value
+            self.assertIsNotNone(cursor.get_key())
+            self.assertIsNotNone(cursor.get_value())
 
         self.assertEqual(prevret, wiredtiger.WT_NOTFOUND)
         self.assertCursorHasNoKeyValue(cursor)

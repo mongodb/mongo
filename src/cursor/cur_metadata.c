@@ -56,8 +56,8 @@ __curmetadata_setkv(WT_CURSOR_METADATA *mdc, WT_CURSOR *fc)
 		__wt_free(session, value);
 		WT_RET(ret);
 	} else {
-		c->key.data = fc->key.data;
-		c->key.size = fc->key.size;
+		c->value.data = fc->value.data;
+		c->value.size = fc->value.size;
 	}
 
 	F_SET(c, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
