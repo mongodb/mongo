@@ -72,8 +72,8 @@ bool mergeChunks(OperationContext* txn,
     // Get sharding state up-to-date
     //
 
-    ConnectionString configLoc = ConnectionString::parse(
-        ShardingState::get(txn)->getConfigServer(), *errMsg);
+    ConnectionString configLoc =
+        ConnectionString::parse(ShardingState::get(txn)->getConfigServer(), *errMsg);
     if (!configLoc.isValid()) {
         warning() << *errMsg;
         return false;
@@ -123,8 +123,7 @@ bool mergeChunks(OperationContext* txn,
         return false;
     }
 
-    shared_ptr<CollectionMetadata> metadata =
-        shardingState->getCollectionMetadata(nss.ns());
+    shared_ptr<CollectionMetadata> metadata = shardingState->getCollectionMetadata(nss.ns());
 
     if (!metadata || metadata->getKeyPattern().isEmpty()) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
@@ -169,8 +168,7 @@ bool mergeChunks(OperationContext* txn,
     if (chunksToMerge.empty()) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
                            << " range starting at " << minKey << " and ending at " << maxKey
-                           << " does not belong to shard "
-                           << shardingState->getShardName();
+                           << " does not belong to shard " << shardingState->getShardName();
 
         warning() << *errMsg;
         return false;
