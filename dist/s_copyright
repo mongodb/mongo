@@ -46,10 +46,10 @@ check()
 {
 	# Skip files in which WiredTiger holds no rights. 3rdparty and
 	# node_modules are used by wtstats
-	if `egrep "3rdparty" <<< $1 > /dev/null`; then
+	if expr "$1" : '*3rdparty*' > /dev/null; then
 		return;
 	fi
-	if `egrep "node_modules" <<< $1 > /dev/null`; then
+	if expr "$1" : '*node_modules*' > /dev/null; then
 		return;
 	fi
 	if `egrep "skip	$1" s_copyright.list > /dev/null`; then
