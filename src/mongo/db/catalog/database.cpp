@@ -534,6 +534,7 @@ void dropAllDatabasesExceptLocal(OperationContext* txn) {
         return;
     log() << "dropAllDatabasesExceptLocal " << n.size() << endl;
 
+    repl::getGlobalReplicationCoordinator()->dropAllSnapshots();
     for (vector<string>::iterator i = n.begin(); i != n.end(); i++) {
         if (*i != "local") {
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {

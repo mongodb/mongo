@@ -635,6 +635,11 @@ public:
      */
     virtual void onSnapshotCreate(OpTime timeOfSnapshot) = 0;
 
+    /**
+     * Resets all information related to snapshotting.
+     */
+    virtual void dropAllSnapshots() = 0;
+
 protected:
     ReplicationCoordinator();
 };

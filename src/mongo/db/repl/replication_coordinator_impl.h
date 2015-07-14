@@ -260,6 +260,7 @@ public:
 
     virtual void summarizeAsHtml(ReplSetHtmlSummary* s) override;
 
+    virtual void dropAllSnapshots() override;
     /**
      * Get current term from topology coordinator
      */

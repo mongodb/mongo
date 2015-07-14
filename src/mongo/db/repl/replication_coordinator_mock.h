@@ -204,6 +204,8 @@ public:
 
     virtual void onSnapshotCreate(OpTime timeOfSnapshot);
 
+    virtual void dropAllSnapshots() override;
+
 private:
     const ReplSettings _settings;
     MemberState _memberState;

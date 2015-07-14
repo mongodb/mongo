@@ -2520,6 +2520,10 @@ TEST_F(ReplCoordTest, SnapshotCommitting) {
     // ensure current snapshot updates on new snapshot if we are that far
     getReplCoord()->onSnapshotCreate(time6);
     ASSERT_EQUALS(time6, getReplCoord()->getCurrentCommittedSnapshot_forTest());
+
+    // ensure dropping all snapshots should reset the current committed snapshot
+    getReplCoord()->dropAllSnapshots();
+    ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshot_forTest());
 }
 
 // TODO(schwerin): Unit test election id updating

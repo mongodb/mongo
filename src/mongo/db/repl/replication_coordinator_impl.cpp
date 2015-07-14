@@ -249,7 +249,10 @@ ReplicaSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
 
 OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshot_forTest() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return *_currentCommittedSnapshot;
+    if (_currentCommittedSnapshot) {
+        return *_currentCommittedSnapshot;
+    }
+    return OpTime();
 }
 
 void ReplicationCoordinatorImpl::_updateLastVote(const LastVote& lastVote) {
@@ -2904,6 +2907,11 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(OpTime newCommi
     //   committed view.
     // * SERVER-19212 make new indexes not be used for any queries until the index is in the
     //   committed view.
+}
+
+void ReplicationCoordinatorImpl::dropAllSnapshots() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _dropAllSnapshots_inlock();
 }
 
 void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
