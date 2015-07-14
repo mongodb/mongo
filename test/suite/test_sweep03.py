@@ -60,10 +60,9 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
 
         conn_params = \
                 ',create,error_prefix="%s: ",' % self.shortid() + \
-                'file_manager=(close_handle_minimum=0,' + \
-                'close_idle_time=0,close_scan_interval=2' + \
-                ',close_handle_minimum=10),checkpoint=(wait=%d),' \
-                % self.ckpt + 'statistics=(fast),'
+                'file_manager=(close_handle_minimum=10,' + \
+                'close_idle_time=0,close_scan_interval=2),' + \
+                'statistics=(fast),'
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
         try:
             conn = wiredtiger_open(dir, conn_params)
@@ -95,28 +94,11 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor.close()
 
         #
-        # We've configured checkpoints to run every 5 seconds, sweep server to
-        # run every 2 seconds and idle time to 0, disabled. It should take
-        # about 2~ seconds for a handle to be closed assuming any are.
-        # Sleep for 12 seconds to be safe.
+        # Sweep server should run every 2 seconds and idle time to 0, disabled.
+        # It should take about 2~ seconds for a handle to be closed assuming any
+        # are. Sleep for 10 seconds to be safe.
         #
-        uri = '%s.test' % self.uri
-        self.session.create(uri, self.create_params)
-
-        #
-        # Keep inserting data to keep at least one handle active and give
-        # checkpoint something to do.  Make sure checkpoint doesn't adjust
-        # the time of death for inactive handles.
-        #
-        c = self.session.open_cursor(uri, None)
-        k = 0
-        sleep = 0
-        while sleep < 12:
-            k = k+1
-            c[k] = 1
-            sleep += 2
-            time.sleep(2)
-        c.close()
+        time.sleep(10)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         close2 = stat_cursor[stat.conn.dh_conn_handles][2]
