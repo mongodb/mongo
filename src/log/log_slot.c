@@ -105,10 +105,11 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
 	int64_t new_state, old_state;
-	uint32_t allocated_slot;
+	uint32_t allocated_slot, slot_attempts;
 
 	conn = S2C(session);
 	log = conn->log;
+	slot_attempts = 0;
 
 	if (mysize >= (uint64_t)log->slot_buf_size) {
 		WT_STAT_FAST_CONN_INCR(session, log_slot_toobig);
@@ -153,12 +154,15 @@ join_slot:
 		goto find_slot;
 	}
 	/*
-	 * If the slot buffer isn't big enough to hold this update, mark
-	 * the slot for a buffer size increase and find another slot.
+	 * If the slot buffer isn't big enough to hold this update, try
+	 * to find another slot.
 	 */
 	if (new_state > (int64_t)slot->slot_buf.memsize) {
-		WT_STAT_FAST_CONN_INCR(session, log_slot_toosmall);
-		return (ENOMEM);
+		if (++slot_attempts > 5) {
+			WT_STAT_FAST_CONN_INCR(session, log_slot_toosmall);
+			return (ENOMEM);
+		}
+		goto find_slot;
 	}
 	/*
 	 * We lost a race to add our size into this slot.  Check the state
