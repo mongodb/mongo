@@ -322,8 +322,8 @@ SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
 
 Status WiredTigerRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
     if (!_sessionCache->snapshotManager().haveCommittedSnapshot()) {
-        return {ErrorCodes::XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable,
-                "XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable message"};
+        return {ErrorCodes::ReadConcernMajorityNotAvailableYet,
+                "Read concern majority reads are currently not possible."};
     }
 
     _readFromMajorityCommittedSnapshot = true;

@@ -47,7 +47,8 @@ const string ReadConcernArgs::kOpTimestampFieldName("ts");
 const string ReadConcernArgs::kOpTermFieldName("term");
 const string ReadConcernArgs::kLevelFieldName("level");
 
-ReadConcernArgs::ReadConcernArgs() : ReadConcernArgs(OpTime(), ReadConcernLevel::kLocalReadConcern) {}
+ReadConcernArgs::ReadConcernArgs()
+    : ReadConcernArgs(OpTime(), ReadConcernLevel::kLocalReadConcern) {}
 
 ReadConcernArgs::ReadConcernArgs(OpTime opTime, ReadConcernLevel level)
     : _opTime(std::move(opTime)), _level(level) {}

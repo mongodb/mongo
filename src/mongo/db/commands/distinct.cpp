@@ -64,7 +64,7 @@ public:
     virtual bool isWriteCommandForConfigServer() const {
         return false;
     }
-    bool supportsReadMajority() const final {
+    bool supportsReadConcern() const final {
         return true;
     }
 

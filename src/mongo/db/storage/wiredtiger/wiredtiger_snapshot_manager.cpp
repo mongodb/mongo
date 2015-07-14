@@ -85,7 +85,7 @@ void WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(WT_SESSION* 
                                                                     bool sync) const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    uassert(ErrorCodes::XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable,
+    uassert(ErrorCodes::ReadConcernMajorityNotAvailableYet,
             "Committed view disappeared while running operation",
             _committedSnapshot);
 

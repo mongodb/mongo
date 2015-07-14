@@ -1164,34 +1164,14 @@ void Command::execCommand(OperationContext* txn,
             return;
         }
 
-        if (request.getCommandArgs()["$readMajorityTemporaryName"].trueValue()) {
-            if (!command->supportsReadMajority()) {
-                replyBuilder->setMetadata(rpc::makeEmptyMetadata())
-                    .setCommandReply({ErrorCodes::InvalidOptions,
-                                      str::stream()
-                                          << "Command " << command->name
-                                          << " does not support $readMajorityTemporaryName"});
-                return;
-            }
-
-            // TODO SERVER-19210 we should only do this if running in a replica set.
-            Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-            if (!status.isOK()) {
-                // TODO SERVER-19207 if code is XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable,
-                // block until a committed snapshot is available.
-                replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
-                return;
-            }
-        }
-
+        repl::ReplicationCoordinator* replCoord =
+            repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
         ImpersonationSessionGuard guard(txn);
 
         uassertStatusOK(
             _checkAuthorization(command, txn->getClient(), dbname, request.getCommandArgs()));
 
         {
-            repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-
             bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
             bool commandCanRunOnSecondary = command->slaveOk();
 
@@ -1276,22 +1256,62 @@ bool Command::run(OperationContext* txn,
     BSONObjBuilder replyBuilderBob;
 
     repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+
     {
-        // Handle read after opTime.
-        repl::ReadConcernArgs readAfterOptimeSettings;
-        auto readAfterParseStatus = readAfterOptimeSettings.initialize(request.getCommandArgs());
-        if (!readAfterParseStatus.isOK()) {
+        // parse and validate ReadConcernArgs
+        repl::ReadConcernArgs readConcern;
+        auto readConcernParseStatus = readConcern.initialize(request.getCommandArgs());
+        if (!readConcernParseStatus.isOK()) {
             replyBuilder->setMetadata(rpc::makeEmptyMetadata())
-                .setCommandReply(readAfterParseStatus);
+                .setCommandReply(readConcernParseStatus);
             return false;
         }
 
-        auto readAfterResult = replCoord->waitUntilOpTime(txn, readAfterOptimeSettings);
-        readAfterResult.appendInfo(&replyBuilderBob);
-        if (!readAfterResult.getStatus().isOK()) {
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata())
-                .setCommandReply(readAfterResult.getStatus(), replyBuilderBob.done());
-            return false;
+        if (!supportsReadConcern()) {
+            // Only return an error if a non-nullish readConcern was parsed, but do not process
+            // readConcern regardless.
+            if (!readConcern.getOpTime().isNull() ||
+                readConcern.getLevel() !=
+                    repl::ReadConcernArgs::ReadConcernLevel::kLocalReadConcern) {
+                replyBuilder->setMetadata(rpc::makeEmptyMetadata())
+                    .setCommandReply({ErrorCodes::InvalidOptions,
+                                      str::stream()
+                                          << "Command " << name << " does not support "
+                                          << repl::ReadConcernArgs::kReadConcernFieldName});
+                return false;
+            }
+        } else {
+            if (readConcern.getLevel() ==
+                repl::ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern) {
+                // wait for a committed snapshot to exist
+                Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+                while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
+                    WriteConcernOptions writeConcern;
+                    writeConcern.wMode = WriteConcernOptions::kMajority;
+                    // must be a non-null OpTime that is from before any write
+                    repl::ReplicationCoordinator::StatusAndDuration awaitStatus =
+                        replCoord->awaitReplication(
+                            txn, repl::OpTime(Timestamp(1, 0), -1), writeConcern);
+                    if (!awaitStatus.status.isOK()) {
+                        replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
+                        return false;
+                    }
+                    status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+                }
+                if (!status.isOK()) {
+                    replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
+                    return false;
+                }
+            }  // end of readConcernMajority specific work
+
+            // wait for readConcern to be satisfied
+            auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcern);
+            readConcernResult.appendInfo(&replyBuilderBob);
+            if (!readConcernResult.getStatus().isOK()) {
+                replyBuilder->setMetadata(rpc::makeEmptyMetadata())
+                    .setCommandReply(readConcernResult.getStatus(), replyBuilderBob.done());
+                return false;
+            }
         }
     }
 

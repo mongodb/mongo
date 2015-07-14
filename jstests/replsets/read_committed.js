@@ -30,13 +30,13 @@ if (!db.serverStatus().storageEngine.supportsCommittedReads) {
 }
 
 function doDirtyRead() {
-    var res = t.runCommand('find', {$readMajorityTemporaryName: false});
+    var res = t.runCommand('find', {"readConcern": {"level": "local"}});
     assert.commandWorked(res);
     return new DBCommandCursor(db.getMongo(), res).toArray()[0].state;
 }
 
 function doCommittedRead() {
-    var res = t.runCommand('find', {$readMajorityTemporaryName: true});
+    var res = t.runCommand('find', {"readConcern": {"level": "majority"}});
     assert.commandWorked(res);
     return new DBCommandCursor(db.getMongo(), res).toArray()[0].state;
 }
@@ -63,4 +63,7 @@ replTest.restart(slaveId);
 db.getLastError("majority", 60*1000);
 assert.eq(doDirtyRead(), 1);
 assert.eq(doCommittedRead(), 1);
+
+// Disable snapshots via failpoint and see the maxTimeMS works properly
+
 }());

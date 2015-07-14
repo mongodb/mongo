@@ -48,7 +48,11 @@ public:
     static const std::string kOpTimestampFieldName;
     static const std::string kLevelFieldName;
 
-    enum class ReadConcernLevel { kLocalReadConcern, kMajorityReadConcern, kLinearizableReadConcern };
+    enum class ReadConcernLevel {
+        kLocalReadConcern,
+        kMajorityReadConcern,
+        kLinearizableReadConcern
+    };
 
     ReadConcernArgs();
     ReadConcernArgs(OpTime opTime, ReadConcernLevel level);

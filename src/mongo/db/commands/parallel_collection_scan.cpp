@@ -66,7 +66,7 @@ public:
         return true;
     }
 
-    bool supportsReadMajority() const final {
+    bool supportsReadConcern() const final {
         return true;
     }
 

@@ -84,6 +84,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -100,6 +101,8 @@ namespace repl {
 std::string rsOplogName = "local.oplog.rs";
 std::string masterSlaveOplogName = "local.oplog.$main";
 int OPLOG_VERSION = 2;
+
+MONGO_FP_DECLARE(disableSnapshotting);
 
 namespace {
 // cached copies of these...so don't rename them, drop them, etc.!!!
@@ -875,6 +878,14 @@ void SnapshotThread::run() {
                 }
 
                 newTimestampNotifier.wait(lock);
+            }
+        }
+
+        while (MONGO_FAIL_POINT(disableSnapshotting)) {
+            sleepsecs(1);
+            stdx::unique_lock<stdx::mutex> lock(newOpMutex);
+            if (_inShutdown) {
+                return;
             }
         }
 

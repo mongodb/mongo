@@ -776,9 +776,17 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
     const auto& ts = settings.getOpTime();
 
     if (getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
-        return ReadConcernResponse(
-            Status(ErrorCodes::NotAReplicaSet,
-                   "node needs to be a replica set member to use read after opTime"));
+        // For master/slave and standalone nodes, readAfterOpTime is not supported, so we return
+        // an error. However, we consider all writes "committed" and can treat MajorityReadConcern
+        // as LocalReadConcern, which is immediately satisfied since there is no OpTime to wait for.
+        if (!ts.isNull()) {
+            return ReadConcernResponse(
+                Status(ErrorCodes::NotAReplicaSet,
+                       "node needs to be a replica set member to use read after opTime"));
+
+        } else {
+            return ReadConcernResponse(Status::OK(), Milliseconds(0));
+        }
     }
 
     Timer timer;

@@ -216,18 +216,18 @@ public:
     }
 
     /**
-     * Returns true if this Command supports the $readMajorityTemporaryName argument.
+     * Returns true if this Command supports the readConcern argument.
      *
-     * If the $readMajorityTemporaryName argument is sent to a command that returns false the
-     * command processor will reject the command, returning an appropriate error message. For
-     * commands that support the argument, the command processor will instruct the RecoveryUnit
-     * to only return "committed" data, failing if this isn't supported by the storage engine.
+     * If the readConcern argument is sent to a command that returns false the command processor
+     * will reject the command, returning an appropriate error message. For commands that support
+     * the argument, the command processor will instruct the RecoveryUnit to only return
+     * "committed" data, failing if this isn't supported by the storage engine.
      *
      * Note that this is never called on mongos. Sharded commands are responsible for forwarding
      * the option to the shards as needed. We rely on the shards to fail the commands in the
      * cases where it isn't supported.
      */
-    virtual bool supportsReadMajority() const {
+    virtual bool supportsReadConcern() const {
         return false;
     }
 

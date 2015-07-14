@@ -95,7 +95,7 @@ public:
         return false;
     }
 
-    bool supportsReadMajority() const final {
+    bool supportsReadConcern() const final {
         // Uses the $readMajorityTemporaryName setting from whatever created the cursor.
         return false;
     }
