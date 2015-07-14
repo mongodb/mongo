@@ -46,10 +46,6 @@ namespace mongo {
  * between the two.
  */
 struct MongoVersionRange {
-    static bool parseBSONArray(const BSONArray& arr,
-                               std::vector<MongoVersionRange>* excludes,
-                               std::string* errMsg);
-
     static BSONArray toBSONArray(const std::vector<MongoVersionRange>& ranges);
 
     bool parseBSONElement(const BSONElement& el, std::string* errMsg);

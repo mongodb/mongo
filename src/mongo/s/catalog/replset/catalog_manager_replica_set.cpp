@@ -1060,15 +1060,14 @@ StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion() {
     }
 
     BSONObj versionDoc = queryResults.front();
-    VersionType versionInfo;
-    string errMsg;
-    if (!versionInfo.parseBSON(versionDoc, &errMsg) || !versionInfo.isValid(&errMsg)) {
+    auto versionTypeResult = VersionType::fromBSON(versionDoc);
+    if (!versionTypeResult.isOK()) {
         return Status(ErrorCodes::UnsupportedFormat,
-                      str::stream() << "invalid config version document " << versionDoc
-                                    << causedBy(errMsg.c_str()));
+                      str::stream() << "invalid config version document: " << versionDoc
+                                    << versionTypeResult.getStatus().toString());
     }
 
-    return versionInfo;
+    return versionTypeResult.getValue();
 }
 
 }  // namespace mongo

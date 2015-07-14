@@ -75,7 +75,7 @@ bool doUpgradeV0ToV7(CatalogManager* catalogManager,
     versionInfo.setCurrentVersion(CURRENT_CONFIG_VERSION);
     versionInfo.setClusterId(newClusterId);
 
-    verify(versionInfo.isValid(NULL));
+    verify(versionInfo.validate().isOK());
 
     // If the cluster has not previously been initialized, we need to set the version before
     // using so subsequent mongoses use the config data the same way.  This requires all three

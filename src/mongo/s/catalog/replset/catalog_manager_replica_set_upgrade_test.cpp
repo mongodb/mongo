@@ -175,8 +175,9 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
         ASSERT_TRUE(update->getUpsert());
         ASSERT_FALSE(update->getMulti());
 
-        VersionType versionDoc;
-        ASSERT_TRUE(versionDoc.parseBSON(update->getUpdateExpr(), &errmsg));
+        auto versionDocRes = VersionType::fromBSON(update->getUpdateExpr());
+        ASSERT_OK(versionDocRes.getStatus());
+        const VersionType& versionDoc = versionDocRes.getValue();
 
         ASSERT_EQ(CURRENT_CONFIG_VERSION, versionDoc.getCurrentVersion());
         ASSERT_EQ(CURRENT_CONFIG_VERSION, versionDoc.getMinCompatibleVersion());

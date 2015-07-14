@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/legacy/mongo_version_range.h"
+#include "mongo/s/catalog/mongo_version_range.h"
 
 #include "mongo/util/stringutils.h"
 
@@ -36,25 +36,6 @@ namespace mongo {
 
 using std::string;
 using std::vector;
-
-bool MongoVersionRange::parseBSONArray(const BSONArray& arr,
-                                       vector<MongoVersionRange>* excludes,
-                                       std::string* errMsg) {
-    string dummy;
-    if (!errMsg)
-        errMsg = &dummy;
-
-    BSONObjIterator it(arr);
-
-    while (it.more()) {
-        MongoVersionRange range;
-        if (!range.parseBSONElement(it.next(), errMsg))
-            return false;
-        excludes->push_back(range);
-    }
-
-    return true;
-}
 
 BSONArray MongoVersionRange::toBSONArray(const vector<MongoVersionRange>& ranges) {
     BSONArrayBuilder barr;

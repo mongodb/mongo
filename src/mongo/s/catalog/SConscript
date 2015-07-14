@@ -26,10 +26,22 @@ env.Library(
         'type_tags.cpp',
     ],
     LIBDEPS=[
+        'mongo_version_range',
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
+    ]
+)
+
+env.Library(
+    target='mongo_version_range',
+    source=[
+        'mongo_version_range.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/bson/bson',
     ]
 )
 

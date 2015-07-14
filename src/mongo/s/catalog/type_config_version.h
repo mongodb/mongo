@@ -28,11 +28,12 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
+#include <vector>
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/catalog/mongo_version_range.h"
 
 namespace mongo {
 
@@ -40,29 +41,9 @@ namespace mongo {
  * This class represents the layout and contents of documents contained in the
  * config.version collection. All manipulation of documents coming from that
  * collection should be done with this class.
- *
- * Usage Example:
- *
- *     // Contact the config. 'conn' has been obtained before.
- *     DBClientBase* conn;
- *     BSONObj query = QUERY(VersionType::exampleField("exampleFieldName"));
- *     exampleDoc = conn->findOne(VersionType::ConfigNS, query);
- *
- *     // Process the response.
- *     VersionType exampleType;
- *     std::string errMsg;
- *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
- *         // Can't use 'exampleType'. Take action.
- *     }
- *     // use 'exampleType'
- *
  */
 class VersionType {
 public:
-    //
-    // schema declarations
-    //
-
     // Name of the version collection in the config server.
     static const std::string ConfigNS;
 
@@ -74,29 +55,10 @@ public:
     static const BSONField<OID> upgradeId;
     static const BSONField<BSONObj> upgradeState;
 
-    //
-    // version type methods
-    //
-
-    VersionType();
-    ~VersionType();
-
-    /**
-     * Returns true if all the mandatory fields are present and have valid
-     * representations. Otherwise returns false and fills in the optional 'errMsg' string.
-     */
-    bool isValid(std::string* errMsg) const;
-
     /**
      * Returns the BSON representation of the entry.
      */
     BSONObj toBSON() const;
-
-    /**
-     * Clears and populates the internal state using the 'source' BSON object if the
-     * latter contains valid values. Otherwise sets errMsg and returns false.
-     */
-    bool parseBSON(const BSONObj& source, std::string* errMsg);
 
     /**
      * Clears the internal state.
@@ -109,158 +71,82 @@ public:
     void cloneTo(VersionType* other) const;
 
     /**
+     * Constructs a new ChangeLogType object from BSON.
+     * Also does validation of the contents.
+     */
+    static StatusWith<VersionType> fromBSON(const BSONObj& source);
+
+    /**
+     * Returns OK if all fields have been set. Otherwise, returns NoSuchKey
+     * and information about the first field that is missing.
+     */
+    Status validate() const;
+
+    /**
      * Returns a std::string representation of the current internal state.
      */
     std::string toString() const;
 
-    //
-    // individual field accessors
-    //
-
-    // Mandatory Fields
-    void setMinCompatibleVersion(const int minCompatibleVersion) {
-        _minCompatibleVersion = minCompatibleVersion;
-        _isMinCompatibleVersionSet = true;
-    }
-
-    void unsetMinCompatibleVersion() {
-        _isMinCompatibleVersionSet = false;
-    }
-
-    bool isMinCompatibleVersionSet() const {
-        return _isMinCompatibleVersionSet;
-    }
-
-    // Calling get*() methods when the member is not set results in undefined behavior
     int getMinCompatibleVersion() const {
-        dassert(_isMinCompatibleVersionSet);
-        return _minCompatibleVersion;
+        return _minCompatibleVersion.get();
     }
+    void setMinCompatibleVersion(const int minCompatibleVersion);
 
-    void setCurrentVersion(const int currentVersion) {
-        _currentVersion = currentVersion;
-        _isCurrentVersionSet = true;
-    }
-
-    void unsetCurrentVersion() {
-        _isCurrentVersionSet = false;
-    }
-
-    bool isCurrentVersionSet() const {
-        return _isCurrentVersionSet;
-    }
-
-    // Calling get*() methods when the member is not set results in undefined behavior
     int getCurrentVersion() const {
-        dassert(_isCurrentVersionSet);
-        return _currentVersion;
+        return _currentVersion.get();
     }
+    void setCurrentVersion(const int currentVersion);
 
-    void setExcludingMongoVersions(const BSONArray& excludingMongoVersions) {
-        _excludingMongoVersions = excludingMongoVersions;
-        _isExcludingMongoVersionsSet = true;
+    const OID& getClusterId() const {
+        return _clusterId.get();
     }
-
-    void unsetExcludingMongoVersions() {
-        _isExcludingMongoVersionsSet = false;
-    }
-
-    bool isExcludingMongoVersionsSet() const {
-        return _isExcludingMongoVersionsSet || excludingMongoVersions.hasDefault();
-    }
-
-    // Calling get*() methods when the member is not set and has no default results in undefined
-    // behavior
-    const BSONArray getExcludingMongoVersions() const {
-        if (_isExcludingMongoVersionsSet) {
-            return _excludingMongoVersions;
-        } else {
-            dassert(excludingMongoVersions.hasDefault());
-            return excludingMongoVersions.getDefault();
-        }
-    }
-
-    void setClusterId(const OID clusterId) {
-        _clusterId = clusterId;
-        _isClusterIdSet = true;
-    }
-
-    void unsetClusterId() {
-        _isClusterIdSet = false;
-    }
-
     bool isClusterIdSet() const {
-        return _isClusterIdSet;
+        return _clusterId.is_initialized();
     }
+    void setClusterId(const OID& clusterId);
 
-    // Calling get*() methods when the member is not set results in undefined behavior
-    const OID getClusterId() const {
-        dassert(_isClusterIdSet);
-        return _clusterId;
+    const std::vector<MongoVersionRange> getExcludingMongoVersions() const {
+        if (!isExcludingMongoVersionsSet()) {
+            return std::vector<MongoVersionRange>();
+        }
+        return _excludingMongoVersions.get();
     }
-
-    // Optional Fields
-    void setUpgradeId(OID upgradeId) {
-        _upgradeId = upgradeId;
-        _isUpgradeIdSet = true;
+    bool isExcludingMongoVersionsSet() const {
+        return _excludingMongoVersions.is_initialized();
     }
+    void setExcludingMongoVersions(const std::vector<MongoVersionRange>& excludingMongoVersions);
 
-    void unsetUpgradeId() {
-        _isUpgradeIdSet = false;
+    const OID& getUpgradeId() const {
+        return _upgradeId.get();
     }
-
     bool isUpgradeIdSet() const {
-        return _isUpgradeIdSet || upgradeId.hasDefault();
+        return _upgradeId.is_initialized();
     }
+    void setUpgradeId(const OID& upgradeId);
 
-    // Calling get*() methods when the member is not set and has no default results in undefined
-    // behavior
-    OID getUpgradeId() const {
-        if (_isUpgradeIdSet) {
-            return _upgradeId;
-        } else {
-            dassert(upgradeId.hasDefault());
-            return upgradeId.getDefault();
-        }
+    const BSONObj& getUpgradeState() const {
+        return _upgradeState.get();
     }
-    void setUpgradeState(const BSONObj& upgradeState) {
-        _upgradeState = upgradeState.getOwned();
-        _isUpgradeStateSet = true;
-    }
-
-    void unsetUpgradeState() {
-        _isUpgradeStateSet = false;
-    }
-
     bool isUpgradeStateSet() const {
-        return _isUpgradeStateSet || upgradeState.hasDefault();
+        return _upgradeState.is_initialized();
     }
-
-    // Calling get*() methods when the member is not set and has no default results in undefined
-    // behavior
-    BSONObj getUpgradeState() const {
-        if (_isUpgradeStateSet) {
-            return _upgradeState;
-        } else {
-            dassert(upgradeState.hasDefault());
-            return upgradeState.getDefault();
-        }
-    }
+    void setUpgradeState(const BSONObj& upgradeState);
 
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-    int _minCompatibleVersion;  // (M)  minimum compatible version
-    bool _isMinCompatibleVersionSet;
-    int _currentVersion;  // (M)  current version
-    bool _isCurrentVersionSet;
-    BSONArray _excludingMongoVersions;  // (O)  range of disallowed versions to upgrade to
-    bool _isExcludingMongoVersionsSet;
-    OID _clusterId;  // (M)  clusterId
-    bool _isClusterIdSet;
-    OID _upgradeId;  // (O)  upgrade id of current or last upgrade
-    bool _isUpgradeIdSet;
-    BSONObj _upgradeState;  // (O)  upgrade state of current or last upgrade
-    bool _isUpgradeStateSet;
+
+    // (M) minimum compatible version
+    boost::optional<int> _minCompatibleVersion;
+    // (M) current version
+    boost::optional<int> _currentVersion;
+    // (S) clusterId -- required if current version > UpgradeHistory::UpgradeHistory_NoEpochVersion
+    boost::optional<OID> _clusterId;
+    // (O) range of disallowed versions to upgrade to
+    boost::optional<std::vector<MongoVersionRange>> _excludingMongoVersions;
+    // (O) upgrade id of current or last upgrade
+    boost::optional<OID> _upgradeId;
+    // (O)  upgrade state of current or last upgrade
+    boost::optional<BSONObj> _upgradeState;
 };
 
 }  // namespace mongo

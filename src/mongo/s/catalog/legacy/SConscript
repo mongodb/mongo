@@ -18,28 +18,7 @@ env.Library(
         'legacy_dist_lock_pinger.cpp',
     ],
     LIBDEPS=[
-        'mongo_version_range',
         '$BUILD_DIR/mongo/s/catalog/catalog_manager',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
-    ]
-)
-
-env.Library(
-    target='mongo_version_range',
-    source=[
-        'mongo_version_range.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/s/catalog/catalog_types',
-    ]
-)
-
-env.CppUnitTest(
-    target='mongo_version_range_test',
-    source=[
-        'mongo_version_range_test.cpp',
-    ],
-    LIBDEPS=[
-        'mongo_version_range',
     ]
 )
