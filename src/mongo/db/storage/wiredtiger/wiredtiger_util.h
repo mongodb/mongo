@@ -195,7 +195,7 @@ public:
                            int error,
                            const char* message);
 
-        using ErrorHandler = int(*)(WT_EVENT_HANDLER*, WT_SESSION*, int, const char*);
+        using ErrorHandler = int (*)(WT_EVENT_HANDLER*, WT_SESSION*, int, const char*);
 
         std::vector<std::string>* const _errors;
         const ErrorHandler _defaultErrorHandler;

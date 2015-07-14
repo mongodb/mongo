@@ -242,10 +242,8 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     ErrorAccumulator eventHandler(&errors);
 
     StringData config = configElem.valueStringData();
-    Status status = wtRCToStatus(wiredtiger_config_validate(nullptr,
-                                                            &eventHandler,
-                                                            "WT_SESSION.create",
-                                                            config.rawData()));
+    Status status = wtRCToStatus(
+        wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.rawData()));
     if (!status.isOK()) {
         StringBuilder errorMsg;
         errorMsg << status.reason();
