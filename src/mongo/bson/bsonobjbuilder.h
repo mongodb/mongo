@@ -303,11 +303,6 @@ public:
         return *this;
     }
 
-    /** tries to append the data as a number
-     * @return true if the data was able to be converted to a number
-     */
-    bool appendAsNumber(StringData fieldName, const std::string& data);
-
     /** Append a BSON Object ID (OID type).
         @deprecated Generally, it is preferred to use the append append(name, oid)
         method for this.

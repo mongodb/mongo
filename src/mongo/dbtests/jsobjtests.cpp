@@ -1964,35 +1964,6 @@ struct ArrayMacroTest {
     }
 };
 
-class NumberParsing {
-public:
-    void run() {
-        BSONObjBuilder a;
-        BSONObjBuilder b;
-
-        a.append("a", (int)1);
-        ASSERT(b.appendAsNumber("a", "1"));
-
-        a.append("b", 1.1);
-        ASSERT(b.appendAsNumber("b", "1.1"));
-
-        a.append("c", (int)-1);
-        ASSERT(b.appendAsNumber("c", "-1"));
-
-        a.append("d", -1.1);
-        ASSERT(b.appendAsNumber("d", "-1.1"));
-
-        a.append("e", (long long)32131231231232313LL);
-        ASSERT(b.appendAsNumber("e", "32131231231232313"));
-
-        ASSERT(!b.appendAsNumber("f", "zz"));
-        ASSERT(!b.appendAsNumber("f", "5zz"));
-        ASSERT(!b.appendAsNumber("f", "zz5"));
-
-        ASSERT_EQUALS(a.obj(), b.obj());
-    }
-};
-
 class bson2settest {
 public:
     void run() {
@@ -2412,7 +2383,6 @@ public:
         add<NestedDottedConversions>();
         add<BSONArrayBuilderTest>();
         add<ArrayMacroTest>();
-        add<NumberParsing>();
         add<bson2settest>();
         add<BSONArrayIteratorSorted>();
         add<checkForStorageTests>();
