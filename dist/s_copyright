@@ -6,6 +6,7 @@ c1=__wt.1$$
 c2=__wt.2$$
 c3=__wt.3$$
 c4=__wt.4$$
+
 trap 'rm -f $c1 $c2 $c3 $c4; exit 0' 0 1 2 3 13 15
 
 year=`date +%Y`
@@ -43,7 +44,6 @@ ENDOFTEXT
 
 check()
 {
-	cd dist
 	# Skip files in which WiredTiger holds no rights. 3rdparty and
 	# node_modules are used by wtstats
 	if `egrep "3rdparty" <<< $1 > /dev/null`; then
@@ -121,5 +121,7 @@ if [ $# -ne 1 ]; then
 else
 	# s_copyright is re-entrant. It calls itself with individual file
 	# names. Any single arg call is a file name - check it's copyright.
-	check $1
+	# Run the check from the dist directory, but ensure trap starts in
+	# the right place to cleanup temporary files.
+	(cd dist && check $1)
 fi
