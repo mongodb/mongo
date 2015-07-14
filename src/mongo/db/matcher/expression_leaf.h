@@ -525,7 +525,11 @@ private:
     bool needFurtherBitTests(bool isBitSet) const;
 
     // Vector of bit positions to test, with bit position 0 being the least significant bit.
+    // Used to perform bit tests against BinData.
     std::vector<uint32_t> _bitPositions;
+
+    // Used to perform bit tests against numbers using a single bitwise operation.
+    uint64_t _bitMask = 0;
 };
 
 class BitsAllSetMatchExpression : public BitTestMatchExpression {

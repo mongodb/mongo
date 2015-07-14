@@ -1819,7 +1819,8 @@ TEST(BitTestMatchExpression, MatchBinaryWithLongBitMask) {
 }
 
 TEST(BitTestMatchExpression, MatchLongWithBinaryBitMask) {
-    const char* bitMask = "\x36\x00\x00\x00";
+    const char* bitMaskSet = "\x36\x00\x00\x00";
+    const char* bitMaskClear = "\xC9\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
 
     BSONObj match = fromjson("{a: 54}");
 
@@ -1828,14 +1829,14 @@ TEST(BitTestMatchExpression, MatchLongWithBinaryBitMask) {
     BitsAnySetMatchExpression banys;
     BitsAnyClearMatchExpression banyc;
 
-    ASSERT_OK(balls.init("a", bitMask, 4));
-    ASSERT_OK(ballc.init("a", bitMask, 4));
-    ASSERT_OK(banys.init("a", bitMask, 4));
-    ASSERT_OK(banyc.init("a", bitMask, 4));
+    ASSERT_OK(balls.init("a", bitMaskSet, 4));
+    ASSERT_OK(ballc.init("a", bitMaskClear, 9));
+    ASSERT_OK(banys.init("a", bitMaskSet, 4));
+    ASSERT_OK(banyc.init("a", bitMaskClear, 9));
     ASSERT(balls.matchesSingleElement(match["a"]));
-    ASSERT(!ballc.matchesSingleElement(match["a"]));
+    ASSERT(ballc.matchesSingleElement(match["a"]));
     ASSERT(banys.matchesSingleElement(match["a"]));
-    ASSERT(!banyc.matchesSingleElement(match["a"]));
+    ASSERT(banyc.matchesSingleElement(match["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchesEmpty) {

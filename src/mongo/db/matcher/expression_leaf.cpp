@@ -669,12 +669,25 @@ const double BitTestMatchExpression::kLongLongMaxPlusOneAsDouble =
 
 Status BitTestMatchExpression::init(StringData path, std::vector<uint32_t> bitPositions) {
     _bitPositions = std::move(bitPositions);
+
+    // Process bit positions into bitmask.
+    for (auto bitPosition : _bitPositions) {
+        // Checking bits > 63 is just checking the sign bit, since we sign-extend numbers. For
+        // example, the 100th bit of -1 is considered set if and only if the 63rd bit position is
+        // set.
+        bitPosition = std::min(bitPosition, 63U);
+        _bitMask |= 1ULL << bitPosition;
+    }
+
     return initPath(path);
 }
 
 Status BitTestMatchExpression::init(StringData path, uint64_t bitMask) {
+    _bitMask = bitMask;
+
+    // Process bitmask into bit positions.
     for (int bit = 0; bit < 64; bit++) {
-        if (bitMask & (1LL << bit)) {
+        if (_bitMask & (1ULL << bit)) {
             _bitPositions.push_back(bit);
         }
     }
@@ -689,6 +702,16 @@ Status BitTestMatchExpression::init(StringData path,
         char byteAt = bitMaskBinary[byte];
         if (!byteAt) {
             continue;
+        }
+
+        // Build _bitMask with the first 8 bytes of the bitMaskBinary.
+        if (byte < 8) {
+            _bitMask |= static_cast<uint64_t>(byteAt) << byte * 8;
+        } else {
+            // Checking bits > 63 is just checking the sign bit, since we sign-extend numbers. For
+            // example, the 100th bit of -1 is considered set if and only if the 63rd bit position
+            // is set.
+            _bitMask |= 1ULL << 63;
         }
 
         for (int bit = 0; bit < 8; bit++) {
@@ -711,25 +734,18 @@ bool BitTestMatchExpression::needFurtherBitTests(bool isBitSet) const {
 bool BitTestMatchExpression::performBitTest(long long eValue) const {
     const MatchType mt = matchType();
 
-    // Test each bit position.
-    for (auto bitPosition : _bitPositions) {
-        bool isBitSet;
-        if (bitPosition >= 63) {
-            // If position to test is longer than 64 bits, sign-extend.
-            isBitSet = eValue < 0;
-        } else {
-            isBitSet = eValue & (1LL << bitPosition);
-        }
-
-        if (!needFurtherBitTests(isBitSet)) {
-            // If we can skip the rest of the tests, that means we succeeded with _ANY_ or failed
-            // with _ALL_.
-            return mt == BITS_ANY_SET || mt == BITS_ANY_CLEAR;
-        }
+    switch (mt) {
+        case BITS_ALL_SET:
+            return (eValue & _bitMask) == _bitMask;
+        case BITS_ALL_CLEAR:
+            return (~eValue & _bitMask) == _bitMask;
+        case BITS_ANY_SET:
+            return eValue & _bitMask;
+        case BITS_ANY_CLEAR:
+            return ~eValue & _bitMask;
+        default:
+            invariant(false);
     }
-
-    // If we finished all the tests, that means we succeeded with _ALL_ or failed with _ANY_.
-    return mt == BITS_ALL_SET || mt == BITS_ALL_CLEAR;
 }
 
 bool BitTestMatchExpression::performBitTest(const char* eBinary, uint32_t eBinaryLen) const {
