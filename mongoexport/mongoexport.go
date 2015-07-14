@@ -164,6 +164,7 @@ func (exp *MongoExport) getCount() (c int, err error) {
 	if err != nil {
 		return 0, err
 	}
+	defer session.Close()
 	if exp.InputOpts != nil && exp.InputOpts.Limit != 0 {
 		return exp.InputOpts.Limit, nil
 	}
@@ -222,11 +223,6 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 	session, err := exp.SessionProvider.GetSession()
 	if err != nil {
 		return nil, nil, err
-	}
-	session.SetSocketTimeout(0)
-
-	if exp.InputOpts.SlaveOk {
-		session.SetMode(mgo.Monotonic, true)
 	}
 
 	skip := 0

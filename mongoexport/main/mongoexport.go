@@ -52,6 +52,13 @@ func main() {
 	opts.ReplicaSetName = setName
 
 	provider, err := db.NewSessionProvider(*opts)
+
+	providerFlags := db.DisableSocketTimeout
+	if inputOpts.SlaveOk {
+		providerFlags = providerFlags | db.Monotonic
+	}
+	provider.SetFlags(providerFlags)
+
 	if err != nil {
 		log.Logf(log.Always, "error connecting to host: %v", err)
 		os.Exit(util.ExitError)
