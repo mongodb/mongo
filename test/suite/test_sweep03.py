@@ -61,9 +61,9 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         conn_params = \
                 ',create,error_prefix="%s: ",' % self.shortid() + \
                 'file_manager=(close_handle_minimum=0,' + \
-                'close_idle_time=0,close_scan_interval=2),' + \
-                'checkpoint=(wait=%d),' % self.ckpt + \
-                'statistics=(fast),'
+                'close_idle_time=0,close_scan_interval=2' + \
+                ',close_handle_minimum=10),checkpoint=(wait=%d),' \
+                % self.ckpt + 'statistics=(fast),'
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
         try:
             conn = wiredtiger_open(dir, conn_params)

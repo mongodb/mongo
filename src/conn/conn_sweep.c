@@ -122,6 +122,9 @@ __sweep_expire(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
+	if (conn->sweep_idle_time == 0)
+		return (0);
+
 	/* Don't discard handles that have been open recently. */
 	WT_RET(__wt_seconds(session, &now));
 
@@ -140,8 +143,7 @@ __sweep_expire(WT_SESSION_IMPL *session)
 		    F_ISSET(dhandle, WT_DHANDLE_DEAD))
 			continue;
 		if (dhandle->session_inuse != 0 ||
-		    now <= dhandle->timeofdeath + conn->sweep_idle_time ||
-		    conn->sweep_idle_time == 0)
+		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
 			continue;
 
 		WT_WITH_DHANDLE(session, dhandle,
@@ -268,8 +270,8 @@ __sweep_server(void *arg)
 		WT_ERR(__sweep_mark(session, &dead_handles));
 
 		if (dead_handles == 0 &&
-		    conn->open_file_count < conn->sweep_handles_min &&
-		    conn->sweep_idle_time != 0)
+		    (conn->open_file_count < conn->sweep_handles_min ||
+		    conn->sweep_idle_time != 0))
 			continue;
 
 		/* Close handles if we have reached the configured limit */
