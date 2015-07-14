@@ -42,9 +42,7 @@ class ShardRegistry;
 
 class DistLockCatalogImpl final : public DistLockCatalog {
 public:
-    DistLockCatalogImpl(RemoteCommandTargeter* targeter,
-                        ShardRegistry* shardRegistry,
-                        Milliseconds writeConcernTimeout);
+    DistLockCatalogImpl(ShardRegistry* shardRegistry, Milliseconds writeConcernTimeout);
 
     virtual ~DistLockCatalogImpl();
 
@@ -78,8 +76,9 @@ public:
     virtual Status stopPing(StringData processId) override;
 
 private:
+    RemoteCommandTargeter* _targeter();
+
     ShardRegistry* _client;
-    RemoteCommandTargeter* _targeter;
 
     // These are not static to avoid initialization order fiasco.
     const WriteConcernOptions _writeConcern;
