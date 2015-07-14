@@ -9,6 +9,11 @@
     
     jsTest.log('Testing restoration to a different collection');
 
+    if (dump_targets == 'archive') {
+        jsTest.log('Skipping test unsupported against archive targets');
+        return assert(true);
+    }
+
     var toolTest = getToolTest('different_collection');
     var commonToolArgs = getCommonToolArguments();
 
