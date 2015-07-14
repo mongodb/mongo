@@ -45,7 +45,9 @@ replTest.stop(BID);
 assert.commandWorked(a_conn.getDB(name).runCommand({collMod: "foo",
                                                     usePowerOf2Sizes: false,
                                                     noPadding: true,
-                                                    validator: {a: 1}}));
+                                                    validator: {a: 1},
+                                                    validationLevel: "moderate",
+                                                    validationState: "warn"}));
 assert.eq(getOptions(a_conn), {flags: 2,
                                validator: {a: 1},
                                validationLevel: "moderate",
