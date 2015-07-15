@@ -35,7 +35,8 @@ __sweep_mark(WT_SESSION_IMPL *session, int *dead_handlesp)
 			continue;
 		}
 		if (dhandle->session_inuse != 0 ||
-		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
+		    now <= dhandle->timeofdeath + conn->sweep_idle_time ||
+		    conn->sweep_idle_time == 0)
 			continue;
 		if (dhandle->timeofdeath == 0) {
 			dhandle->timeofdeath = now;
@@ -120,6 +121,10 @@ __sweep_expire(WT_SESSION_IMPL *session)
 	time_t now;
 
 	conn = S2C(session);
+
+	/* If sweep_idle_time is 0, then we won't expire any cursors */
+	if (conn->sweep_idle_time == 0)
+		return (0);
 
 	/* Don't discard handles that have been open recently. */
 	WT_RET(__wt_seconds(session, &now));
@@ -265,8 +270,14 @@ __sweep_server(void *arg)
 		 */
 		WT_ERR(__sweep_mark(session, &dead_handles));
 
+		/*
+		 * We only want to flush and expire if there are no dead handles
+		 * and if either the sweep_idle_time is not 0, or if we have
+		 * reached the configured limit of handles.
+		 */
 		if (dead_handles == 0 &&
-		    conn->open_file_count < conn->sweep_handles_min)
+		    (conn->open_file_count < conn->sweep_handles_min ||
+		    conn->sweep_idle_time != 0))
 			continue;
 
 		/* Close handles if we have reached the configured limit */
