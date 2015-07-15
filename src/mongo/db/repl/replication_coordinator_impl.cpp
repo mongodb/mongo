@@ -813,7 +813,7 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
         WriteConcernOptions writeConcern;
         writeConcern.wMode = WriteConcernOptions::kMajority;
 
-        WaiterInfo waitInfo(&_opTimeWaiterList,
+        WaiterInfo waitInfo(isMajorityReadConcern ? &_replicationWaiterList : &_opTimeWaiterList,
                             txn->getOpID(),
                             &ts,
                             isMajorityReadConcern ? &writeConcern : nullptr,
@@ -900,7 +900,6 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
     if (slaveInfo->opTime < args.ts) {
         _updateSlaveInfoOptime_inlock(slaveInfo, args.ts);
     }
-    _updateLastCommittedOpTime_inlock();
     return Status::OK();
 }
 
@@ -2565,6 +2564,11 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& co
         // Forget about all snapshots <= the new commit point.
         _uncommittedSnapshots.erase(_uncommittedSnapshots.begin(), onePastCommitPoint);
 
+        // Update committed snapshot and wake up any threads waiting on read concern or
+        // write concern.
+        //
+        // This function is only called on secondaries, so only threads waiting for
+        // committed snapshot need to be woken up.
         _updateCommittedSnapshot_inlock(newSnapshot);
     }
 }
@@ -2896,6 +2900,9 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(OpTime newCommi
     _currentCommittedSnapshot = newCommittedSnapshot;
 
     _externalState->updateCommittedSnapshot(newCommittedSnapshot);
+
+    // Wake up any threads waiting for read concern or write concern.
+    _wakeReadyWaiters_inlock();
 
     // TODO use _currentCommittedSnapshot for the following things:
     // * SERVER-19206 make w:majority writes block until they are in the committed snapshot.
