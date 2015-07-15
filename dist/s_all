@@ -69,33 +69,34 @@ run "sh ./s_typedef -b"
 run "sh ./s_copyright"
 run "sh ./s_style"
 
-read -d '' COMMANDS <<EOM
-'sh ./s_tags > ${t_pfx}tags'
-'sh ./s_define > ${t_pfx}s_define'
-'sh ./s_typedef -c > ${t_pfx}s_typedef_c'
-'sh ./s_funcs > ${t_pfx}s_funcs'
-'sh ./s_export > ${t_pfx}s_export'
-'sh ./s_getopt > ${t_pfx}s_getopt'
-'sh ./s_label > ${t_pfx}s_label'
-'sh ./s_lang > ${t_pfx}s_lang'
-'sh ./s_longlines > ${t_pfx}s_longlines'
-'sh ./s_stat > ${t_pfx}_stat'
-'sh ./s_string > ${t_pfx}s_string'
-'python style.py > ${t_pfx}py_style'
-'sh ./s_python > ${t_pfx}s_python'
-'sh ./s_whitespace > ${t_pfx}s_whitespace'
-'sh ./s_win > ${t_pfx}s_win'
-'sh ./s_docs > ${t_pfx}s_docs'
-EOM
+COMMANDS="
+2>&1 ./s_tags > ${t_pfx}tags
+2>&1 ./s_define > ${t_pfx}s_define
+2>&1 ./s_typedef -c > ${t_pfx}s_typedef_c
+2>&1 ./s_funcs > ${t_pfx}s_funcs
+2>&1 ./s_export > ${t_pfx}s_export
+2>&1 ./s_getopt > ${t_pfx}s_getopt
+2>&1 ./s_label > ${t_pfx}s_label
+2>&1 ./s_lang > ${t_pfx}s_lang
+2>&1 ./s_longlines > ${t_pfx}s_longlines
+2>&1 ./s_stat > ${t_pfx}_stat
+2>&1 ./s_string > ${t_pfx}s_string
+2>&1 python style.py > ${t_pfx}py_style
+2>&1 ./s_python > ${t_pfx}s_python
+2>&1 ./s_whitespace > ${t_pfx}s_whitespace
+2>&1 ./s_win > ${t_pfx}s_win
+2>&1 ./s_docs > ${t_pfx}s_docs"
 
-echo "$COMMANDS" | xargs -P 20 -n 1 -I{} /bin/sh -c {}
+echo "$COMMANDS" | xargs -P 20 -I{} /bin/sh -c {}
 
 for f in `find . -name ${t_pfx}\*`; do
 	if ! `test -s $f`; then
 		continue
 	fi
 	LOCAL_NAME=`basename $f`
-	FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | cut -d '>' -f 1`
+	# Find original command and trim redirect garbage
+	FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | \
+		cut -d ' ' -f 2- | cut -d '>' -f 1`
 	echo "$FAIL_HEADER"
 	echo "s_all run failed: $FAILED_CMD produced"
 	cat $f
