@@ -70,22 +70,22 @@ run "sh ./s_copyright"
 run "sh ./s_style"
 
 COMMANDS="
-./s_tags > ${t_pfx}tags
-./s_define > ${t_pfx}s_define
-./s_typedef -c > ${t_pfx}s_typedef_c
-./s_funcs > ${t_pfx}s_funcs
-./s_export > ${t_pfx}s_export
-./s_getopt > ${t_pfx}s_getopt
-./s_label > ${t_pfx}s_label
-./s_lang > ${t_pfx}s_lang
-./s_longlines > ${t_pfx}s_longlines
-./s_stat > ${t_pfx}_stat
-./s_string > ${t_pfx}s_string
-python style.py > ${t_pfx}py_style
-./s_python > ${t_pfx}s_python
-./s_whitespace > ${t_pfx}s_whitespace
-./s_win > ${t_pfx}s_win
-./s_docs > ${t_pfx}s_docs"
+2>&1 ./s_tags > ${t_pfx}tags
+2>&1 ./s_define > ${t_pfx}s_define
+2>&1 ./s_typedef -c > ${t_pfx}s_typedef_c
+2>&1 ./s_funcs > ${t_pfx}s_funcs
+2>&1 ./s_export > ${t_pfx}s_export
+2>&1 ./s_getopt > ${t_pfx}s_getopt
+2>&1 ./s_label > ${t_pfx}s_label
+2>&1 ./s_lang > ${t_pfx}s_lang
+2>&1 ./s_longlines > ${t_pfx}s_longlines
+2>&1 ./s_stat > ${t_pfx}_stat
+2>&1 ./s_string > ${t_pfx}s_string
+2>&1 python style.py > ${t_pfx}py_style
+2>&1 ./s_python > ${t_pfx}s_python
+2>&1 ./s_whitespace > ${t_pfx}s_whitespace
+2>&1 ./s_win > ${t_pfx}s_win
+2>&1 ./s_docs > ${t_pfx}s_docs"
 
 echo "$COMMANDS" | xargs -P 20 -I{} /bin/sh -c {}
 
