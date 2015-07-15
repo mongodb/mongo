@@ -1202,6 +1202,14 @@ tasks:
     vars:
       resmoke_args: --suites=decimal
 
+- <<: *task_template
+  name: jsDecimalCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=decimal --storageEngine=wiredTiger
+
 - name: push
   depends_on:
   - name: "*"
@@ -2329,6 +2337,7 @@ buildvariants:
   - name: dbtest_WT
   - name: jsCore
   - name: jsDecimalCore
+  - name: jsDecimalCore_WT
   - name: jstestfuzz
   - name: push
     distros:
