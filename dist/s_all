@@ -5,6 +5,7 @@ t=__wt.$$
 t_pfx=__s_all_tmp
 trap 'rm -f $t *.pyc __tmp __wt.* __s_all_tmp*' 0 1 2 3 13 15
 FAIL_HEADER="####################### ERROR ############################"
+FAIL_FOOTER="#######################"
 
 # We require python which may not be installed.
 type python > /dev/null 2>&1 || {
@@ -21,11 +22,13 @@ run()
 		echo "$FAIL_HEADER"
 		printf "$error_prefix"
 	        printf "	" && cat $t
+		echo "$FAIL_FOOTER"
 	elif `test -s $t`; then
 		echo "$FAIL_HEADER"
 		printf "$error_prefix"
 		echo
 		sed -e 's/^/	/' $t
+		echo "$FAIL_FOOTER"
 	fi
 	rm -f $t
 	return 0
@@ -100,6 +103,7 @@ for f in `find . -name ${t_pfx}\*`; do
 	echo "$FAIL_HEADER"
 	echo "s_all run failed: $FAILED_CMD produced"
 	cat $f
+	echo "$FAIL_FOOTER"
 done
 
 echo 'dist/s_all run finished'
