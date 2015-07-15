@@ -62,10 +62,10 @@ public:
     }
 
     /**
-     * Returns the ID of the current primary from the perspective of the sender.
+     * Returns the index of the current primary from the perspective of the sender.
      */
-    long long getPrimaryId() const {
-        return _primaryId;
+    long long getPrimaryIndex() const {
+        return _primaryIndex;
     }
 
     /**
@@ -78,7 +78,7 @@ public:
 private:
     OpTime _lastOpCommitted;
     long long _configVersion = -1;
-    long long _primaryId = -1;
+    long long _primaryIndex = -1;
     long long _term = -1;
 };
 

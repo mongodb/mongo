@@ -42,14 +42,14 @@ namespace {
 const std::string kLastOpCommittedTimestampFieldName = "lastOpCommittedTimestamp";
 const std::string kLastOpCommittedTermFieldName = "lastOpCommittedTerm";
 const std::string kConfigVersionFieldName = "configVersion";
-const std::string kPrimaryIdFieldName = "primaryId";
+const std::string kPrimaryIndexFieldName = "primaryIndex";
 const std::string kTermFieldName = "term";
 
 const std::string kLegalReplicationMetadataFieldNames[] = {
     kLastOpCommittedTimestampFieldName,
     kLastOpCommittedTermFieldName,
     kConfigVersionFieldName,
-    kPrimaryIdFieldName,
+    kPrimaryIndexFieldName,
     kTermFieldName,
 };
 
@@ -65,7 +65,7 @@ Status ReplicationMetadata::initialize(const BSONObj& metadataObj) {
     if (!status.isOK())
         return status;
 
-    status = bsonExtractIntegerField(metadataObj, kPrimaryIdFieldName, &_primaryId);
+    status = bsonExtractIntegerField(metadataObj, kPrimaryIndexFieldName, &_primaryIndex);
     if (!status.isOK())
         return status;
 

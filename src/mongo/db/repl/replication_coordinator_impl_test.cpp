@@ -2374,8 +2374,8 @@ TEST_F(ReplCoordTest, MetadataWrongConfigVersion) {
     // lower configVersion
     ReplicationMetadata metadata;
     metadata.initialize(BSON("lastOpCommittedTimestamp" << Timestamp(10, 0) << "lastOpCommittedTerm"
-                                                        << 2 << "configVersion" << 1 << "primaryId"
-                                                        << 2 << "term" << 2));
+                                                        << 2 << "configVersion" << 1
+                                                        << "primaryIndex" << 2 << "term" << 2));
     getReplCoord()->processReplicationMetadata(metadata);
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 
@@ -2383,7 +2383,7 @@ TEST_F(ReplCoordTest, MetadataWrongConfigVersion) {
     ReplicationMetadata metadata2;
     metadata2.initialize(BSON("lastOpCommittedTimestamp"
                               << Timestamp(10, 0) << "lastOpCommittedTerm" << 2 << "configVersion"
-                              << 100 << "primaryId" << 2 << "term" << 2));
+                              << 100 << "primaryIndex" << 2 << "term" << 2));
     getReplCoord()->processReplicationMetadata(metadata2);
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 }
@@ -2415,8 +2415,8 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
     // higher OpTime, should change
     ReplicationMetadata metadata;
     metadata.initialize(BSON("lastOpCommittedTimestamp" << Timestamp(10, 0) << "lastOpCommittedTerm"
-                                                        << 1 << "configVersion" << 2 << "primaryId"
-                                                        << 2 << "term" << 1));
+                                                        << 1 << "configVersion" << 2
+                                                        << "primaryIndex" << 2 << "term" << 1));
     getReplCoord()->processReplicationMetadata(metadata);
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(time, getReplCoord()->getCurrentCommittedSnapshot_forTest());
@@ -2424,8 +2424,8 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
     // lower OpTime, should not change
     ReplicationMetadata metadata2;
     metadata2.initialize(BSON("lastOpCommittedTimestamp" << Timestamp(9, 0) << "lastOpCommittedTerm"
-                                                         << 1 << "configVersion" << 2 << "primaryId"
-                                                         << 2 << "term" << 1));
+                                                         << 1 << "configVersion" << 2
+                                                         << "primaryIndex" << 2 << "term" << 1));
     getReplCoord()->processReplicationMetadata(metadata2);
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getLastCommittedOpTime());
 }
@@ -2453,8 +2453,8 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
     // higher term, should change
     ReplicationMetadata metadata;
     metadata.initialize(BSON("lastOpCommittedTimestamp" << Timestamp(10, 0) << "lastOpCommittedTerm"
-                                                        << 3 << "configVersion" << 2 << "primaryId"
-                                                        << 2 << "term" << 3));
+                                                        << 3 << "configVersion" << 2
+                                                        << "primaryIndex" << 2 << "term" << 3));
     getReplCoord()->processReplicationMetadata(metadata);
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 3), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
@@ -2464,7 +2464,7 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
     ReplicationMetadata metadata2;
     metadata2.initialize(BSON("lastOpCommittedTimestamp"
                               << Timestamp(11, 0) << "lastOpCommittedTerm" << 3 << "configVersion"
-                              << 2 << "primaryId" << 1 << "term" << 2));
+                              << 2 << "primaryIndex" << 1 << "term" << 2));
     getReplCoord()->processReplicationMetadata(metadata2);
     ASSERT_EQUALS(OpTime(Timestamp(11, 0), 3), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
@@ -2474,7 +2474,7 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
     ReplicationMetadata metadata3;
     metadata3.initialize(BSON("lastOpCommittedTimestamp"
                               << Timestamp(11, 0) << "lastOpCommittedTerm" << 3 << "configVersion"
-                              << 2 << "primaryId" << 1 << "term" << 3));
+                              << 2 << "primaryIndex" << 1 << "term" << 3));
     getReplCoord()->processReplicationMetadata(metadata3);
     ASSERT_EQUALS(OpTime(Timestamp(11, 0), 3), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());

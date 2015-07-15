@@ -433,9 +433,9 @@ public:
     virtual void prepareForStepDown() = 0;
 
     /**
-     * Updates the current primary index given the "memberId" of the current primary.
+     * Updates the current primary index.
      */
-    virtual void setPrimaryByMemberId(long long memberId) = 0;
+    virtual void setPrimaryIndex(long long primaryIndex) = 0;
 
 protected:
     TopologyCoordinator() {}

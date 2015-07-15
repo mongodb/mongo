@@ -1602,7 +1602,7 @@ void ReplicationCoordinatorImpl::_processReplicationMetadata_incallback(
     }
     _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
     if (_updateTerm_incallback(replMetadata.getTerm(), nullptr)) {
-        _topCoord->setPrimaryByMemberId(replMetadata.getPrimaryId());
+        _topCoord->setPrimaryIndex(replMetadata.getPrimaryIndex());
     }
 }
 

@@ -2131,7 +2131,7 @@ void TopologyCoordinatorImpl::prepareReplResponseMetadata(BSONObjBuilder* objBui
     objBuilder->append("lastOpCommittedTimestamp", lastCommittedOpTime.getTimestamp());
     objBuilder->append("lastOpCommittedTerm", lastCommittedOpTime.getTerm());
     objBuilder->append("configVersion", _rsConfig.getConfigVersion());
-    objBuilder->append("primaryId", _rsConfig.getMemberAt(_currentPrimaryIndex).getId());
+    objBuilder->append("primaryIndex", _currentPrimaryIndex);
 }
 
 void TopologyCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {
@@ -2206,8 +2206,8 @@ void TopologyCoordinatorImpl::voteForMyselfV1() {
     _lastVote.setCandidateId(_selfConfig().getId());
 }
 
-void TopologyCoordinatorImpl::setPrimaryByMemberId(long long memberId) {
-    _currentPrimaryIndex = _rsConfig.findMemberIndexByConfigId(memberId);
+void TopologyCoordinatorImpl::setPrimaryIndex(long long primaryIndex) {
+    _currentPrimaryIndex = primaryIndex;
 }
 
 }  // namespace repl
