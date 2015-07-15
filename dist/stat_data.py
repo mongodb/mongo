@@ -241,6 +241,7 @@ connection_stats = [
     LogStat('log_writes', 'log write operations'),
     LogStat('log_write_lsn', 'log server thread advances write LSN'),
 
+    LogStat('log_slot_coalesced', 'written slots coalesced'),
     LogStat('log_slot_consolidated', 'logging bytes consolidated'),
     LogStat('log_slot_closes', 'consolidated slot closures'),
     LogStat('log_slot_joins', 'consolidated slot joins'),
