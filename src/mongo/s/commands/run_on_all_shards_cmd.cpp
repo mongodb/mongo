@@ -36,9 +36,9 @@
 #include <set>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/client/parallel.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 

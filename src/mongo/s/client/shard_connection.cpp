@@ -508,42 +508,4 @@ void ShardConnection::forgetNS(const string& ns) {
     ClientConnections::threadInstance()->forgetNS(ns);
 }
 
-
-bool setShardVersion(DBClientBase& conn,
-                     const string& ns,
-                     const string& configServerPrimary,
-                     ChunkVersion version,
-                     ChunkManager* manager,
-                     bool authoritative,
-                     BSONObj& result) {
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("setShardVersion", ns);
-    cmdBuilder.append("configdb", configServerPrimary);
-
-    ShardId shardId;
-    {
-        const auto shard = grid.shardRegistry()->getShard(conn.getServerAddress());
-        shardId = shard->getId();
-        cmdBuilder.append("shard", shardId);
-        cmdBuilder.append("shardHost", shard->getConnString().toString());
-    }
-
-    if (ns.size() > 0) {
-        version.addToBSON(cmdBuilder);
-    } else {
-        cmdBuilder.append("init", true);
-    }
-
-    if (authoritative) {
-        cmdBuilder.appendBool("authoritative", 1);
-    }
-
-    BSONObj cmd = cmdBuilder.obj();
-
-    LOG(1) << "    setShardVersion  " << shardId << " " << conn.getServerAddress() << "  " << ns
-           << "  " << cmd
-           << (manager ? string(str::stream() << " " << manager->getSequenceNumber()) : "");
-
-    return conn.runCommand("admin", cmd, result, 0);
-}
-}
+}  // namespace mongo

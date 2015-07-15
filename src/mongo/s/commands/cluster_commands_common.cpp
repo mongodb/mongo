@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/commands/cluster_commands_common.h"
@@ -33,8 +35,141 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/query/cursor_responses.h"
 #include "mongo/s/cursors.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/s/version_manager.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+using std::shared_ptr;
+using std::string;
+
+Future::CommandResult::CommandResult(const string& server,
+                                     const string& db,
+                                     const BSONObj& cmd,
+                                     int options,
+                                     DBClientBase* conn,
+                                     bool useShardedConn)
+    : _server(server),
+      _db(db),
+      _options(options),
+      _cmd(cmd),
+      _conn(conn),
+      _useShardConn(useShardedConn),
+      _done(false) {
+    init();
+}
+
+void Future::CommandResult::init() {
+    try {
+        if (!_conn) {
+            if (_useShardConn) {
+                _connHolder.reset(new ShardConnection(
+                    uassertStatusOK(ConnectionString::parse(_server)), "", NULL));
+            } else {
+                _connHolder.reset(new ScopedDbConnection(_server));
+            }
+
+            _conn = _connHolder->get();
+        }
+
+        if (_conn->lazySupported()) {
+            _cursor.reset(
+                new DBClientCursor(_conn, _db + ".$cmd", _cmd, -1 /*limit*/, 0, NULL, _options, 0));
+            _cursor->initLazy();
+        } else {
+            _done = true;  // we set _done first because even if there is an error we're done
+            _ok = _conn->runCommand(_db, _cmd, _res, _options);
+        }
+    } catch (std::exception& e) {
+        error() << "Future::spawnCommand (part 1) exception: " << e.what();
+        _ok = false;
+        _done = true;
+    }
+}
+
+bool Future::CommandResult::join(int maxRetries) {
+    if (_done) {
+        return _ok;
+    }
+
+    _ok = false;
+
+    for (int i = 1; i <= maxRetries; i++) {
+        try {
+            bool retry = false;
+            bool finished = _cursor->initLazyFinish(retry);
+
+            // Shouldn't need to communicate with server any more
+            if (_connHolder)
+                _connHolder->done();
+
+            uassert(
+                14812, str::stream() << "Error running command on server: " << _server, finished);
+            massert(14813, "Command returned nothing", _cursor->more());
+
+            // Rethrow stale config errors stored in this cursor for correct handling
+            throwCursorStale(_cursor.get());
+
+            _res = _cursor->nextSafe();
+            _ok = _res["ok"].trueValue();
+
+            break;
+        } catch (const RecvStaleConfigException& e) {
+            verify(versionManager.isVersionableCB(_conn));
+
+            // For legacy reasons, we may not always have a namespace :-(
+            string staleNS = e.getns();
+            if (staleNS.size() == 0)
+                staleNS = _db;
+
+            if (i >= maxRetries) {
+                error() << "Future::spawnCommand (part 2) stale config exception" << causedBy(e);
+                throw e;
+            }
+
+            if (i >= maxRetries / 2) {
+                if (!versionManager.forceRemoteCheckShardVersionCB(staleNS)) {
+                    error() << "Future::spawnCommand (part 2) no config detected" << causedBy(e);
+                    throw e;
+                }
+            }
+
+            // We may not always have a collection, since we don't know from a generic command what
+            // collection is supposed to be acted on, if any
+            if (nsGetCollection(staleNS).size() == 0) {
+                warning() << "no collection namespace in stale config exception "
+                          << "for lazy command " << _cmd << ", could not refresh " << staleNS;
+            } else {
+                versionManager.checkShardVersionCB(_conn, staleNS, false, 1);
+            }
+
+            LOG(i > 1 ? 0 : 1) << "retrying lazy command" << causedBy(e);
+
+            verify(_conn->lazySupported());
+            _done = false;
+            init();
+            continue;
+        } catch (std::exception& e) {
+            error() << "Future::spawnCommand (part 2) exception: " << causedBy(e);
+            break;
+        }
+    }
+
+    _done = true;
+    return _ok;
+}
+
+shared_ptr<Future::CommandResult> Future::spawnCommand(const string& server,
+                                                       const string& db,
+                                                       const BSONObj& cmd,
+                                                       int options,
+                                                       DBClientBase* conn,
+                                                       bool useShardConn) {
+    shared_ptr<Future::CommandResult> res(
+        new Future::CommandResult(server, db, cmd, options, conn, useShardConn));
+    return res;
+}
 
 int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& results) {
     int commonErrCode = -1;

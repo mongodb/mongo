@@ -31,13 +31,10 @@
 #include <string>
 
 #include "mongo/client/connpool.h"
-#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
 class ChunkManager;
-typedef std::shared_ptr<ChunkManager> ChunkManagerPtr;
-
 
 class ShardConnection : public AScopedConnection {
 public:
@@ -140,19 +137,7 @@ private:
     bool _setVersion;
 };
 
-
-/**
- * Sends the setShardVersion command on the specified connection.
- */
-bool setShardVersion(DBClientBase& conn,
-                     const std::string& ns,
-                     const std::string& configServerPrimary,
-                     ChunkVersion version,
-                     ChunkManager* manager,
-                     bool authoritative,
-                     BSONObj& result);
-
-
+typedef std::shared_ptr<ChunkManager> ChunkManagerPtr;
 typedef std::shared_ptr<ShardConnection> ShardConnectionPtr;
 
 extern DBConnectionPool shardConnectionPool;

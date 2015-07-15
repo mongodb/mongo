@@ -28,14 +28,95 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/s/strategy.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 class BSONObj;
+
+class AScopedConnection;
+class DBClientBase;
+class DBClientCursor;
+
+/**
+ * DEPRECATED - do not use in any new code. All new code must use the TaskExecutor interface
+ * instead.
+ */
+class Future {
+public:
+    class CommandResult {
+    public:
+        std::string getServer() const {
+            return _server;
+        }
+
+        bool isDone() const {
+            return _done;
+        }
+
+        bool ok() const {
+            verify(_done);
+            return _ok;
+        }
+
+        BSONObj result() const {
+            verify(_done);
+            return _res;
+        }
+
+        /**
+           blocks until command is done
+           returns ok()
+         */
+        bool join(int maxRetries = 1);
+
+    private:
+        CommandResult(const std::string& server,
+                      const std::string& db,
+                      const BSONObj& cmd,
+                      int options,
+                      DBClientBase* conn,
+                      bool useShardedConn);
+        void init();
+
+        std::string _server;
+        std::string _db;
+        int _options;
+        BSONObj _cmd;
+        DBClientBase* _conn;
+        std::unique_ptr<AScopedConnection> _connHolder;  // used if not provided a connection
+        bool _useShardConn;
+
+        std::unique_ptr<DBClientCursor> _cursor;
+
+        BSONObj _res;
+        bool _ok;
+        bool _done;
+
+        friend class Future;
+    };
+
+
+    /**
+     * @param server server name
+     * @param db db name
+     * @param cmd cmd to exec
+     * @param conn optional connection to use.  will use standard pooled if non-specified
+     * @param useShardConn use ShardConnection
+     */
+    static std::shared_ptr<CommandResult> spawnCommand(const std::string& server,
+                                                       const std::string& db,
+                                                       const BSONObj& cmd,
+                                                       int options,
+                                                       DBClientBase* conn = 0,
+                                                       bool useShardConn = false);
+};
 
 /**
  * Utility function to compute a single error code from a vector of command results.
