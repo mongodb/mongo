@@ -188,10 +188,10 @@ public class PackTest {
     throws WiredTigerPackingException {
         // Verify that we can pack and unpack single signed longs.
         for (long i:testers) {
-            PackOutputStream packer = new PackOutputStream("Q");
+            PackOutputStream packer = new PackOutputStream("q");
             packer.addLong(i);
             PackInputStream unpacker =
-                new PackInputStream("Q", packer.getValue());
+                new PackInputStream("q", packer.getValue());
             long unpacked = unpacker.getLong();
             if (i != unpacked)
                 System.out.println(
@@ -209,11 +209,11 @@ public class PackTest {
             long val1 = testers[i];
             long val2 = testers[i+1];
 
-            PackOutputStream packer = new PackOutputStream("QQ");
+            PackOutputStream packer = new PackOutputStream("qq");
             packer.addLong(val1);
             packer.addLong(val2);
             PackInputStream unpacker =
-                new PackInputStream("QQ", packer.getValue());
+                new PackInputStream("qq", packer.getValue());
             long unpacked = unpacker.getLong();
             if (val1 != unpacked) {
                 System.out.println(i + " did not match " + unpacked);

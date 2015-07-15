@@ -4,12 +4,38 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-cd ..
+# s_style is re-entrant, when run with no parameters it calls itself
+# again for each file that needs checking.
+if [ $# -ne 1 ]; then
+	cd ..
 
-for f in \
-    `find bench examples ext src test -name '*.[chisy]' -o -name '*.in' |
-    sed -e '/Makefile.in/d' \
-	-e '/build_win\/wiredtiger_config.h/d'`; do
+	find bench examples ext src test \
+	    -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
+	sed -e '/Makefile.in/d' -e '/build_win\/wiredtiger_config.h/d' |
+	xargs -P 20 -n 1 -I{} sh ./dist/s_style {}
+else
+	# General style correction and cleanup for a single file
+	f=$1
+	fname=`basename $f`
+	t=__wt_s_style.$fname.$$
+
+	if [ ! -e $f ]; then
+		echo "$0 error $1 does not exist"
+		exit 1;
+	fi
+
+	egrep -w 'a a|an an|and and|are are|be be|by by|for for|from from|if if|in in|is is|it it|of of|the the|this this|to to|was was|were were|when when|with with|a an|an a|a the|the a' $f > $t
+	test -s $t && {
+		echo "paired typo"
+		echo "============================"
+		cat $t
+	}
+
+	extension="${fname##*.}"
+	if [ "x$extension" = "xdox" ]; then
+		exit 0;
+	fi
+
 	if grep "^[^}]*while (0);" $f > $t; then
 		echo "$f: while (0) has trailing semi-colon"
 		cat $t
@@ -111,14 +137,4 @@ for f in \
 	    -e 's/^#define /#define	/' >$t
 
 	cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)
-done
-
-# Check for common typos (Wikipedia's list).
-find bench examples ext src test \
-    -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
-xargs egrep -w 'a a|an an|and and|are are|be be|by by|for for|from from|if if|in in|is is|it it|of of|the the|this this|to to|was was|were were|when when|with with|a an|an a|a the|the a' > $t
-	test -s $t && {
-		echo "paired typo"
-		echo "============================"
-		cat $t
-	}
+fi

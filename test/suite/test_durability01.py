@@ -32,6 +32,7 @@
 #
 
 import fnmatch, os, shutil, time
+from helper import copy_wiredtiger_home
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
@@ -44,13 +45,7 @@ class test_durability01(wttest.WiredTigerTestCase, suite_subprocess):
     def check_crash_restart(self, olddir, newdir):
         ''' Simulate a crash from olddir and restart in newdir. '''
         # with the connection still open, copy files to new directory
-        shutil.rmtree(newdir, ignore_errors=True)
-        os.mkdir(newdir)
-        for fname in os.listdir(olddir):
-            fullname = os.path.join(olddir, fname)
-            # Skip lock file on Windows since it is locked
-            if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname:
-                shutil.copy(fullname, newdir)
+        copy_wiredtiger_home(olddir, newdir)
 
         # Open the new directory
         conn = self.setUpConnectionOpen(newdir)

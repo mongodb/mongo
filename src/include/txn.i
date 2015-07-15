@@ -105,19 +105,20 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t checkpoint_pinned, oldest_id;
-	uint32_t checkpoint_gen;
+	uint64_t checkpoint_gen, checkpoint_pinned, oldest_id;
 
 	txn_global = &S2C(session)->txn_global;
 	btree = S2BT_SAFE(session);
 
 	/*
 	 * Take a local copy of these IDs in case they are updated while we are
-	 * checking visibility.
+	 * checking visibility.  Only the generation needs to be carefully
+	 * ordered: if a checkpoint is starting and the generation is bumped,
+	 * we take the minimum of the other two IDs, which is what we want.
 	 */
-	WT_ORDERED_READ(oldest_id, txn_global->oldest_id);
+	oldest_id = txn_global->oldest_id;
 	WT_ORDERED_READ(checkpoint_gen, txn_global->checkpoint_gen);
-	WT_ORDERED_READ(checkpoint_pinned, txn_global->checkpoint_pinned);
+	checkpoint_pinned = txn_global->checkpoint_pinned;
 
 	/*
 	 * Checkpoint transactions often fall behind ordinary application

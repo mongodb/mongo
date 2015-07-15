@@ -156,6 +156,7 @@ public class ExceptionTest {
                 sess2.close("");
         }
         Assert.assertEquals(caught, true);
+        teardown();
     }
 
     private void setup(String uriparam, String keyFormat, String valueFormat) {

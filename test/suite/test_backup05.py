@@ -33,10 +33,11 @@
 #   manipulations.  Manually copy the directory and verify it.
 #
 
-import fnmatch, os, shutil, subprocess, time
+import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
+from helper import copy_wiredtiger_home
 import wttest
 
 class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
@@ -56,25 +57,11 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
         ''' Simulate a manual backup from olddir and restart in newdir. '''
         self.session.checkpoint()
         cbkup = self.session.open_cursor('backup:', None, None)
-        # with the connection still open, copy files to new directory
-        shutil.rmtree(newdir, ignore_errors=True)
 
-        if os.name == "nt":
-            copy_windows(olddir, newdir)
-        else:
-            # Half the time use copytree, the other half use a dd command that
-            # does not align on a block boundary.
-            if i % (self.freq * 2) == 0:
-                os.mkdir(newdir)
-                for fname in os.listdir(olddir):
-                    fullname = os.path.join(olddir, fname)
-                    inpf = 'if=' + fullname
-                    outf = 'of=' + newdir + '/' + fullname
-                    cmd_list = ['dd', inpf, outf, 'bs=300']
-                    a = subprocess.Popen(cmd_list)
-                    a.wait()
-            else:
-                shutil.copytree(olddir, newdir)
+        # With the connection still open, copy files to new directory.
+        # Half the time use an unaligned copy.
+        aligned = (i % (self.freq * 2) != 0) or os.name == "nt"
+        copy_wiredtiger_home(olddir, newdir, aligned)
 
         # Now simulate fsyncUnlock by closing the backup cursor.
         cbkup.close()
