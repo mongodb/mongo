@@ -197,6 +197,8 @@ TEST_F(DropColl2ShardTest, Basic) {
 
     expectChangeLogInsert(
         configHost(), testClient(), network()->now(), "dropCollection", dropNS().ns(), BSONObj());
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DropColl2ShardTest, NSNotFound) {
@@ -241,6 +243,8 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
 
     expectChangeLogInsert(
         configHost(), testClient(), network()->now(), "dropCollection", dropNS().ns(), BSONObj());
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DropColl2ShardTest, ConfigTargeterError) {
@@ -251,6 +255,8 @@ TEST_F(DropColl2ShardTest, ConfigTargeterError) {
         ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DropColl2ShardTest, DistLockBusy) {
@@ -270,6 +276,10 @@ TEST_F(DropColl2ShardTest, DistLockBusy) {
                           "dropCollection.start",
                           dropNS().ns(),
                           BSONObj());
+
+    expectGetShards({shard1(), shard2()});
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DropColl2ShardTest, FirstShardTargeterError) {
@@ -292,12 +302,14 @@ TEST_F(DropColl2ShardTest, FirstShardTargeterError) {
                           BSONObj());
 
     expectGetShards({shard1(), shard2()});
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DropColl2ShardTest, FirstShardDropError) {
     auto future = launchAsync([this] {
         auto status = catalogManager()->dropCollection(operationContext(), dropNS());
-        ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
+        ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
@@ -311,9 +323,12 @@ TEST_F(DropColl2ShardTest, FirstShardDropError) {
 
     expectGetShards({shard1(), shard2()});
 
-    onCommand([](const RemoteCommandRequest& request) {
-        return Status{ErrorCodes::HostUnreachable, "drop bad network"};
+    onCommand([this](const RemoteCommandRequest& request) {
+        shutdownExecutor();  // shutdown executor so drop command will fail.
+        return BSON("ok" << 1);
     });
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DropColl2ShardTest, FirstShardDropCmdError) {
@@ -333,9 +348,14 @@ TEST_F(DropColl2ShardTest, FirstShardDropCmdError) {
 
     expectGetShards({shard1(), shard2()});
 
+    // drop command will be sent to all shards even if we get a not ok response from one shard.
     onCommand([](const RemoteCommandRequest& request) {
         return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized);
     });
+
+    expectDrop(shard2());
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DropColl2ShardTest, SecondShardTargeterError) {
@@ -360,12 +380,14 @@ TEST_F(DropColl2ShardTest, SecondShardTargeterError) {
     expectGetShards({shard1(), shard2()});
 
     expectDrop(shard1());
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DropColl2ShardTest, SecondShardDropError) {
     auto future = launchAsync([this] {
         auto status = catalogManager()->dropCollection(operationContext(), dropNS());
-        ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
+        ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
@@ -381,9 +403,12 @@ TEST_F(DropColl2ShardTest, SecondShardDropError) {
 
     expectDrop(shard1());
 
-    onCommand([](const RemoteCommandRequest& request) {
-        return Status{ErrorCodes::HostUnreachable, "drop bad network"};
+    onCommand([this](const RemoteCommandRequest& request) {
+        shutdownExecutor();  // shutdown executor so drop command will fail.
+        return BSON("ok" << 1);
     });
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DropColl2ShardTest, SecondShardDropCmdError) {
@@ -408,6 +433,8 @@ TEST_F(DropColl2ShardTest, SecondShardDropCmdError) {
     onCommand([](const RemoteCommandRequest& request) {
         return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized);
     });
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(DropColl2ShardTest, CleanupChunkError) {
@@ -434,12 +461,14 @@ TEST_F(DropColl2ShardTest, CleanupChunkError) {
         return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized << "errmsg"
                          << "bad delete");
     });
+
+    future.timed_get(kFutureTimeout);
 }
 
-TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
+TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard1) {
     auto future = launchAsync([this] {
         auto status = catalogManager()->dropCollection(operationContext(), dropNS());
-        ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
+        ASSERT_EQ(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
@@ -459,14 +488,47 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
     expectRemoveChunks();
 
     onCommand([](const RemoteCommandRequest& request) {
-        return Status{ErrorCodes::HostUnreachable, "bad test network"};
+        return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized << "errmsg"
+                         << "bad");
     });
+
+    future.timed_get(kFutureTimeout);
 }
 
-TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
+TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
     auto future = launchAsync([this] {
         auto status = catalogManager()->dropCollection(operationContext(), dropNS());
-        ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
+        ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    expectChangeLogCreate(configHost(), BSON("ok" << 1));
+    expectChangeLogInsert(configHost(),
+                          testClient(),
+                          network()->now(),
+                          "dropCollection.start",
+                          dropNS().ns(),
+                          BSONObj());
+
+    expectGetShards({shard1(), shard2()});
+
+    expectDrop(shard1());
+    expectDrop(shard2());
+
+    expectRemoveChunks();
+
+    onCommand([this](const RemoteCommandRequest& request) {
+        shutdownExecutor();  // shutdown executor so ssv command will fail.
+        return BSON("ok" << 1);
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard1) {
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        ASSERT_EQ(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
@@ -488,14 +550,49 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
     expectSetShardVersionZero(shard1());
 
     onCommand([](const RemoteCommandRequest& request) {
-        return Status{ErrorCodes::HostUnreachable, "bad test network"};
+        return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized << "errmsg"
+                         << "bad");
     });
+
+    future.timed_get(kFutureTimeout);
 }
 
-TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
+TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
     auto future = launchAsync([this] {
         auto status = catalogManager()->dropCollection(operationContext(), dropNS());
-        ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
+        ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    expectChangeLogCreate(configHost(), BSON("ok" << 1));
+    expectChangeLogInsert(configHost(),
+                          testClient(),
+                          network()->now(),
+                          "dropCollection.start",
+                          dropNS().ns(),
+                          BSONObj());
+
+    expectGetShards({shard1(), shard2()});
+
+    expectDrop(shard1());
+    expectDrop(shard2());
+
+    expectRemoveChunks();
+
+    expectSetShardVersionZero(shard1());
+
+    onCommand([this](const RemoteCommandRequest& request) {
+        shutdownExecutor();  // shutdown executor so ssv command will fail.
+        return BSON("ok" << 1);
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        ASSERT_EQ(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
@@ -518,14 +615,50 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
     expectUnsetSharding(shard1());
 
     onCommand([](const RemoteCommandRequest& request) {
-        return Status{ErrorCodes::HostUnreachable, "bad test network"};
+        return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized << "errmsg"
+                         << "bad");
     });
+
+    future.timed_get(kFutureTimeout);
 }
 
-TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
+TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
     auto future = launchAsync([this] {
         auto status = catalogManager()->dropCollection(operationContext(), dropNS());
-        ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
+        ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    expectChangeLogCreate(configHost(), BSON("ok" << 1));
+    expectChangeLogInsert(configHost(),
+                          testClient(),
+                          network()->now(),
+                          "dropCollection.start",
+                          dropNS().ns(),
+                          BSONObj());
+
+    expectGetShards({shard1(), shard2()});
+
+    expectDrop(shard1());
+    expectDrop(shard2());
+
+    expectRemoveChunks();
+
+    expectSetShardVersionZero(shard1());
+    expectUnsetSharding(shard1());
+
+    onCommand([this](const RemoteCommandRequest& request) {
+        shutdownExecutor();  // shutdown executor so ssv command will fail.
+        return BSON("ok" << 1);
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard2) {
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        ASSERT_EQ(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
@@ -550,8 +683,46 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
     expectSetShardVersionZero(shard2());
 
     onCommand([](const RemoteCommandRequest& request) {
-        return Status{ErrorCodes::HostUnreachable, "bad test network"};
+        return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized << "errmsg"
+                         << "bad");
     });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    expectChangeLogCreate(configHost(), BSON("ok" << 1));
+    expectChangeLogInsert(configHost(),
+                          testClient(),
+                          network()->now(),
+                          "dropCollection.start",
+                          dropNS().ns(),
+                          BSONObj());
+
+    expectGetShards({shard1(), shard2()});
+
+    expectDrop(shard1());
+    expectDrop(shard2());
+
+    expectRemoveChunks();
+
+    expectSetShardVersionZero(shard1());
+    expectUnsetSharding(shard1());
+
+    expectSetShardVersionZero(shard2());
+
+    onCommand([this](const RemoteCommandRequest& request) {
+        shutdownExecutor();  // shutdown executor so unset command will fail.
+        return BSON("ok" << 1);
+    });
+
+    future.timed_get(kFutureTimeout);
 }
 
 }  // unnamed namespace

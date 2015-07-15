@@ -50,6 +50,7 @@ class StatusWith;
 
 namespace executor {
 class NetworkInterfaceMock;
+class TaskExecutor;
 }  // namespace executor
 
 /**
@@ -138,6 +139,8 @@ protected:
 
     void tearDown() override;
 
+    void shutdownExecutor();
+
 private:
     std::unique_ptr<ServiceContext> _service;
     ServiceContext::UniqueClient _client;
@@ -148,6 +151,7 @@ private:
     RemoteCommandTargeterMock* _configTargeter;
 
     executor::NetworkInterfaceMock* _mockNetwork;
+    executor::TaskExecutor* _executor;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
 };
 
