@@ -363,7 +363,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	if (!__log_size_fit(session, &log->alloc_lsn, recsize)) {
 		WT_RET(__wt_log_newfile(session, 0, &created_log));
 		if (log->log_close_fh != NULL)
-			F_SET(slot, SLOT_CLOSEFH);
+			F_SET(slot, WT_SLOT_CLOSEFH);
 	}
 
 	/*
@@ -456,8 +456,9 @@ __log_fill(WT_SESSION_IMPL *session,
 	logrec = (WT_LOG_RECORD *)record->mem;
 	/*
 	 * Call __wt_write.  For now the offset is the real byte offset.
-	 * If the offset becomes a unit of LOG_ALIGN this is where we would
-	 * multiply by LOG_ALIGN to get the real file byte offset for write().
+	 * If the offset becomes a unit of WT_LOG_ALIGN this is where we would
+	 * multiply by WT_LOG_ALIGN to get the real file byte offset for
+	 * write().
 	 */
 	if (direct)
 		WT_ERR(__wt_write(session, myslot->slot->slot_fh,
@@ -567,7 +568,7 @@ __log_openfile(WT_SESSION_IMPL *session,
 
 	log = S2C(session)->log;
 	if (log == NULL)
-		allocsize = LOG_ALIGN;
+		allocsize = WT_LOG_ALIGN;
 	else
 		allocsize = log->allocsize;
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
@@ -943,7 +944,7 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *eof)
 	*eof = 0;
 	WT_RET(__wt_filesize(session, fh, &log_size));
 	if (log == NULL)
-		allocsize = LOG_ALIGN;
+		allocsize = WT_LOG_ALIGN;
 	else
 		allocsize = log->allocsize;
 
@@ -1031,7 +1032,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	*freep = 1;
 
 	/* Write the buffered records */
-	if (F_ISSET(slot, SLOT_BUFFERED)) {
+	if (F_ISSET(slot, WT_SLOT_BUFFERED)) {
 		write_size = (size_t)
 		    (slot->slot_end_lsn.offset - slot->slot_start_offset);
 		WT_ERR(__wt_write(session, slot->slot_fh,
@@ -1045,8 +1046,8 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * off to the worker thread.  The caller is responsible for freeing
 	 * the slot in that case.  Otherwise the worker thread will free it.
 	 */
-	if (F_ISSET(slot, SLOT_BUFFERED) &&
-	    !F_ISSET(slot, SLOT_SYNC | SLOT_SYNC_DIR)) {
+	if (F_ISSET(slot, WT_SLOT_BUFFERED) &&
+	    !F_ISSET(slot, WT_SLOT_SYNC | WT_SLOT_SYNC_DIR)) {
 		*freep = 0;
 		slot->slot_state = WT_LOG_SLOT_WRITTEN;
 		/*
@@ -1076,7 +1077,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	/*
 	 * Signal the close thread if needed.
 	 */
-	if (F_ISSET(slot, SLOT_CLOSEFH))
+	if (F_ISSET(slot, WT_SLOT_CLOSEFH))
 		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
 
 	/*
@@ -1084,7 +1085,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * so that threads finishing writing to the log will wait while the
 	 * current fsync completes and advance log->sync_lsn.
 	 */
-	while (F_ISSET(slot, SLOT_SYNC | SLOT_SYNC_DIR)) {
+	while (F_ISSET(slot, WT_SLOT_SYNC | WT_SLOT_SYNC_DIR)) {
 		/*
 		 * We have to wait until earlier log files have finished their
 		 * sync operations.  The most recent one will set the LSN to the
@@ -1109,7 +1110,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		 * not yet stable in its parent directory.  Do that
 		 * now if needed.
 		 */
-		if (F_ISSET(slot, SLOT_SYNC_DIR) &&
+		if (F_ISSET(slot, WT_SLOT_SYNC_DIR) &&
 		    (log->sync_dir_lsn.file < sync_lsn.file)) {
 			WT_ASSERT(session, log->log_dir_fh != NULL);
 			WT_ERR(__wt_verbose(session, WT_VERB_LOG,
@@ -1124,7 +1125,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		/*
 		 * Sync the log file if needed.
 		 */
-		if (F_ISSET(slot, SLOT_SYNC) &&
+		if (F_ISSET(slot, WT_SLOT_SYNC) &&
 		    LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
 			WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 			    "log_release: sync log %s", log->log_fh->name));
@@ -1136,7 +1137,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		/*
 		 * Clear the flags before leaving the loop.
 		 */
-		F_CLR(slot, SLOT_SYNC | SLOT_SYNC_DIR);
+		F_CLR(slot, WT_SLOT_SYNC | WT_SLOT_SYNC_DIR);
 		locked = 0;
 		__wt_spin_unlock(session, &log->log_sync_lock);
 		break;
@@ -1421,7 +1422,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * records and larger allocation boundaries should always be
 		 * a multiple of this.
 		 */
-		allocsize = LOG_ALIGN;
+		allocsize = WT_LOG_ALIGN;
 		lastlog = 0;
 		firstlog = UINT32_MAX;
 		WT_RET(__log_get_files(session,
@@ -1447,7 +1448,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	    session, 0, &log_fh, WT_LOG_FILENAME, start_lsn.file));
 	WT_ERR(__log_filesize(session, log_fh, &log_size));
 	rd_lsn = start_lsn;
-	WT_ERR(__wt_buf_initsize(session, &buf, LOG_ALIGN));
+	WT_ERR(__wt_buf_initsize(session, &buf, WT_LOG_ALIGN));
 	for (;;) {
 		if (rd_lsn.offset + allocsize > log_size) {
 advance:
@@ -1620,9 +1621,9 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	locked = 1;
 
 	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC))
-		F_SET(&tmp, SLOT_SYNC_DIR);
+		F_SET(&tmp, WT_SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FSYNC))
-		F_SET(&tmp, SLOT_SYNC);
+		F_SET(&tmp, WT_SLOT_SYNC);
 	WT_ERR(__log_acquire(session, record->size, &tmp));
 	__wt_spin_unlock(session, &log->log_slot_lock);
 	locked = 0;
@@ -1820,11 +1821,6 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		    session, record, lsnp, flags)) == EAGAIN)
 			;
 		WT_ERR(ret);
-		/*
-		 * Increase the buffer size of any slots we can get access
-		 * to, so future consolidations are likely to succeed.
-		 */
-		WT_ERR(__wt_log_slot_grow_buffers(session, 4 * rdup_len));
 		return (0);
 	}
 	WT_ERR(ret);
