@@ -57,10 +57,11 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	/*
 	 * Cap the slot buffer to the log file size.
 	 */
-	log->slot_buf_size = WT_MIN(conn->log_file_max, WT_LOG_SLOT_BUF_SIZE);
+	log->slot_buf_size = (uint32_t)WT_MIN(
+	    conn->log_file_max, WT_LOG_SLOT_BUF_SIZE);
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		WT_ERR(__wt_buf_init(session,
-		    &log->slot_pool[i].slot_buf, log->slot_buf_size));
+		    &log->slot_pool[i].slot_buf, (size_t)log->slot_buf_size));
 		F_SET(&log->slot_pool[i], WT_SLOT_INIT_FLAGS);
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
