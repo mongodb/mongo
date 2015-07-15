@@ -52,6 +52,10 @@ using std::unique_ptr;
 using stdx::chrono::milliseconds;
 using stdx::chrono::duration_cast;
 
+const stdx::chrono::seconds ReplSetDistLockManager::kDistLockWriteConcernTimeout{5};
+const stdx::chrono::seconds ReplSetDistLockManager::kDistLockPingInterval{30};
+const stdx::chrono::minutes ReplSetDistLockManager::kDistLockExpirationTime{15};
+
 ReplSetDistLockManager::ReplSetDistLockManager(ServiceContext* globalContext,
                                                StringData processID,
                                                unique_ptr<DistLockCatalog> catalog,

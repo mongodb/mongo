@@ -37,6 +37,7 @@
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/dist_lock_ping_info.h"
+#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -47,6 +48,10 @@ class ServiceContext;
 
 class ReplSetDistLockManager final : public DistLockManager {
 public:
+    static const stdx::chrono::seconds kDistLockWriteConcernTimeout;
+    static const stdx::chrono::seconds kDistLockPingInterval;
+    static const stdx::chrono::minutes kDistLockExpirationTime;
+
     ReplSetDistLockManager(ServiceContext* globalContext,
                            StringData processID,
                            std::unique_ptr<DistLockCatalog> catalog,

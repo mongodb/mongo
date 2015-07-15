@@ -267,12 +267,11 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
 
     std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();
 
-    if (!(mongosGlobalParams.configdbs.type() == ConnectionString::SYNC) &&
-        !(mongosGlobalParams.configdbs.type() == ConnectionString::SET &&
-          configServers.size() == 1)) {
-        return Status(ErrorCodes::BadValue,
-                      "Must have either 3 node old-style config servers, or a single server "
-                      "replica set config server");
+    if (mongosGlobalParams.configdbs.type() != ConnectionString::SYNC &&
+        mongosGlobalParams.configdbs.type() != ConnectionString::SET) {
+        return Status(
+            ErrorCodes::BadValue,
+            "Must have either 3 node legacy config servers, or a replica set config server");
     }
 
     if (configServers.size() < 3) {

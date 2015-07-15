@@ -20,8 +20,10 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_impl',
         '$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy',
         '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set',
+        '$BUILD_DIR/mongo/s/catalog/replset/replset_dist_lock_manager',
     ]
 )
 
