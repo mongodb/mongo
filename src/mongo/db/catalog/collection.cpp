@@ -295,6 +295,13 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
     // we cannot call into the OpObserver here because the document being written is not present
     // fortunately, this is currently only used for adding entries to the oplog.
 
+    // If there is a notifier object and another thread is waiting on it, then we notify waiters
+    // of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so there are
+    // waiters if this Collection's shared_ptr is not unique.
+    if (_cappedNotifier && !_cappedNotifier.unique()) {
+        _cappedNotifier->notifyOfInsert();
+    }
+
     return StatusWith<RecordId>(loc);
 }
 
