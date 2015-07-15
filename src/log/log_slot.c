@@ -317,10 +317,8 @@ __wt_log_slot_release(WT_LOGSLOT *slot, uint64_t size)
 int
 __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
-	WT_DECL_RET;
 
 	WT_UNUSED(session);
-	ret = 0;
 	/*
 	 * Make sure flags don't get retained between uses.
 	 * We have to reset them them here because multiple threads may
@@ -328,5 +326,5 @@ __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 */
 	slot->flags = WT_SLOT_INIT_FLAGS;
 	slot->slot_state = WT_LOG_SLOT_FREE;
-	return (ret);
+	return (0);
 }
