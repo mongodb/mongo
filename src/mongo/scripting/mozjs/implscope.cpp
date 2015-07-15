@@ -101,11 +101,23 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
     auto scope = getScope(cx);
 
     if (!JSREPORT_IS_WARNING(report->flags)) {
+        str::stream ss;
+        ss << message;
+
+        // TODO: something far more elaborate that mimics the stack printing from v8
+        JS::RootedValue excn(cx);
+        if (JS_GetPendingException(cx, &excn) && excn.isObject()) {
+            JS::RootedValue stack(cx);
+
+            ObjectWrapper(cx, excn).getValue("stack", &stack);
+
+            ss << " :\n" << ValueWriter(cx, stack).toString();
+        }
+
         scope->_status =
             Status(report->errorNumber ? static_cast<ErrorCodes::Error>(report->errorNumber)
                                        : ErrorCodes::JSInterpreterFailure,
-                   str::stream() << message << ":\n"
-                                 << JS::FormatStackDump(cx, nullptr, true, true, false) << "\n");
+                   ss);
     }
 }
 

@@ -68,7 +68,6 @@
 #define JS_NUNBOX32 1
 #define JS_POSIX_NSPR 1
 #define JS_STANDALONE 1
-#define JS_TRACE_LOGGING 1
 #define MALLOC_H <malloc.h>
 #define MOZILLA_UAVERSION "38.0"
 #define MOZILLA_VERSION "38.0.1"

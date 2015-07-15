@@ -12,7 +12,7 @@ fi
 
 cd mozilla-release/js/src
 
-PYTHON=python CCFLAGS="-m32" CFLAGS="-m32" LINKFLAGS="-m32" ./configure --without-intl-api --enable-posix-nspr-emulation --target=i686
+PYTHON=python CCFLAGS="-m32" CFLAGS="-m32" LINKFLAGS="-m32" ./configure --without-intl-api --enable-posix-nspr-emulation --target=i686 --disable-trace-logging
 
 cd ../../..
 

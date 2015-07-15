@@ -22,7 +22,6 @@
 #define JS_DEFAULT_JITREPORT_GRANULARITY 3
 #define JS_POSIX_NSPR 1
 #define JS_PUNBOX64 1
-#define JS_TRACE_LOGGING 1
 #define MALLOC_H <malloc.h>
 #define MALLOC_H <malloc.h>
 #define MOZILLA_UAVERSION "38.0"

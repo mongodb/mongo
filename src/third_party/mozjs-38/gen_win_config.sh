@@ -15,6 +15,7 @@ fi
 #cat mozconfig >>EOF
 #ac_add_options --without-intl-api
 #ac_add_options --enable-posix-nspr-emulation
+#ac_add_options --disable-trace-logging
 
 #ac_add_options --target=x86_64-pc-mingw32
 #ac_add_options --host=x86_64-pc-mingw32

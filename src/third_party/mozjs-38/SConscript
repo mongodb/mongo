@@ -73,9 +73,6 @@ sources = [
     "extract/js/src/jsutil.cpp",
     "extract/js/src/mfbt/Unified_cpp_mfbt0.cpp",
     "extract/js/src/perf/pm_stub.cpp",
-    "extract/js/src/vm/TraceLogging.cpp",
-    "extract/js/src/vm/TraceLoggingGraph.cpp",
-    "extract/js/src/vm/TraceLoggingTypes.cpp",
     "extract/mfbt/Compression.cpp",
 ]
 

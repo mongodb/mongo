@@ -12,7 +12,7 @@ fi
 
 cd mozilla-release/js/src
 
-PYTHON=python ./configure --without-intl-api --enable-posix-nspr-emulation
+PYTHON=python ./configure --without-intl-api --enable-posix-nspr-emulation --disable-trace-logging
 
 cd ../../..
 

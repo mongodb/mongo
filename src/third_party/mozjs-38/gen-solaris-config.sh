@@ -16,7 +16,7 @@ fi
 
 cd mozilla-release/js/src
 
-PYTHON=/home/mci/python/bin/python CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ CFLAGS=-m64 CCFLAGS=-m64 LINKFLAGS=-m64 -static-libstdc++ -static-libgcc OBJCOPY=/opt/mongodbtoolchain/bin/objcopy ./configure -without-intl-api --enable-posix-nspr-emulation --disable-ion
+PYTHON=/home/mci/python/bin/python CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ CFLAGS=-m64 CCFLAGS=-m64 LINKFLAGS=-m64 -static-libstdc++ -static-libgcc OBJCOPY=/opt/mongodbtoolchain/bin/objcopy ./configure -without-intl-api --enable-posix-nspr-emulation --disable-ion --disable-trace-logging
 
 cd ../../..
 

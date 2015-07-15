@@ -77,7 +77,7 @@ Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, Stri
      */
     return Status(report->errorNumber ? static_cast<ErrorCodes::Error>(report->errorNumber)
                                       : altCode,
-                  jsstr.toStringData().rawData());
+                  jsstr.toStringData().toString());
 }
 
 void throwCurrentJSException(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {

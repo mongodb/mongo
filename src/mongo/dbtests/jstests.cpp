@@ -128,7 +128,7 @@ public:
 class SimpleFunctions {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         s->invoke("x=5;", 0, 0);
         ASSERT(5 == s->getNumber("x"));
@@ -150,8 +150,6 @@ public:
         BSONObj obj = BSON("" << 11.0);
         s->invoke("function( z ){ return 5 + z; }", &obj, 0);
         ASSERT_EQUALS(16, s->getNumber("__returnValue"));
-
-        delete s;
     }
 };
 
@@ -196,7 +194,7 @@ private:
 class ExecLogError {
 public:
     void run() {
-        Scope* scope = globalScriptEngine->newScope();
+        unique_ptr<Scope> scope(globalScriptEngine->newScope());
 
         // No error is logged when reportError == false.
         ASSERT(!scope->exec("notAFunction()", "foo", false, false, false));
@@ -213,7 +211,8 @@ public:
         // this test
         // TODO: figure out a way to check for SpiderMonkey
         auto ivs = globalScriptEngine->getInterpreterVersionString();
-        if (ivs.compare(0, ivs.length(), "MozJS") != 0) {
+        std::string prefix("MozJS");
+        if (ivs.compare(0, prefix.length(), prefix) != 0) {
             ASSERT(_logger.logged());
         }
     }
@@ -226,7 +225,7 @@ private:
 class InvokeLogError {
 public:
     void run() {
-        Scope* scope = globalScriptEngine->newScope();
+        unique_ptr<Scope> scope(globalScriptEngine->newScope());
 
         // No error is logged for a valid statement.
         ASSERT_EQUALS(0, scope->invoke("validStatement = true", 0, 0));
@@ -243,7 +242,8 @@ public:
         // this test
         // TODO: figure out a way to check for SpiderMonkey
         auto ivs = globalScriptEngine->getInterpreterVersionString();
-        if (ivs.compare(0, ivs.length(), "MozJS") != 0) {
+        std::string prefix("MozJS");
+        if (ivs.compare(0, prefix.length(), prefix) != 0) {
             ASSERT(_logger.logged());
         }
     }
@@ -255,7 +255,7 @@ private:
 class ObjectMapping {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         BSONObj o = BSON("x" << 17.0 << "y"
                              << "eliot"
@@ -306,15 +306,13 @@ public:
 
         s->invoke("x = 5; for( ; x <10; x++){ a = 1; }", 0, &o);
         ASSERT_EQUALS(10, s->getNumber("x"));
-
-        delete s;
     }
 };
 
 class ObjectDecoding {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         s->invoke("z = { num : 1 };", 0, 0);
         BSONObj out = s->getObject("z");
@@ -330,8 +328,6 @@ public:
         s->setObject("blah", o);
         out = s->getObject("blah");
         ASSERT_EQUALS(17, out["x"].number());
-
-        delete s;
     }
 };
 
@@ -339,7 +335,7 @@ class JSOIDTests {
 public:
     void run() {
 #ifdef MOZJS
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         s->localConnect("blah");
 
@@ -363,8 +359,6 @@ public:
         ASSERT_EQUALS(125, out["a"].number());
         ASSERT_EQUALS(jstOID, out["_id"].type());
         ASSERT_EQUALS(out["_id"].__oid().str(), save.str());
-
-        delete s;
 #endif
     }
 };
@@ -372,7 +366,7 @@ public:
 class SetImplicit {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         BSONObj o = BSON("foo"
                          << "bar");
@@ -394,7 +388,7 @@ public:
 class ObjectModReadonlyTests {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         BSONObj o = BSON("x" << 17 << "y"
                              << "eliot"
@@ -413,11 +407,12 @@ public:
          * logging to stdout and silently failing otherwise.
          */
         auto ivs = globalScriptEngine->getInterpreterVersionString();
-        if (ivs.compare(0, ivs.length(), "MozJS") == 0) {
+        std::string prefix("MozJS");
+        if (ivs.compare(0, prefix.length(), prefix) == 0) {
             ASSERT_THROWS(s->invoke("blah.y = 'e'", 0, 0), mongo::UserException);
             ASSERT_THROWS(s->invoke("blah.a = 19;", 0, 0), mongo::UserException);
             ASSERT_THROWS(s->invoke("blah.zz.a = 19;", 0, 0), mongo::UserException);
-            ASSERT_THROWS(s->setObject("blah.zz", BSON("a" << 19)), mongo::UserException);
+            ASSERT_THROWS(s->invoke("blah.zz = { a : 19 };", 0, 0), mongo::UserException);
             ASSERT_THROWS(s->invoke("delete blah['x']", 0, 0), mongo::UserException);
         } else {
             s->invoke("blah.y = 'e'", 0, 0);
@@ -455,15 +450,13 @@ public:
         //            out = s->getObject( "blah" );
         //            ASSERT_EQUALS( 1.0, out[ "a" ].embeddedObject()[ 0 ].number() );
         //            ASSERT_EQUALS( 3.0, out[ "a" ].embeddedObject()[ 2 ].number() );
-
-        delete s;
     }
 };
 
 class OtherJSTypes {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         {
             // date
@@ -554,15 +547,13 @@ public:
             out = s->getObject("x");
             ASSERT_EQUALS(Symbol, out.firstElement().type());
         }
-
-        delete s;
     }
 };
 
 class SpecialDBTypes {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         BSONObjBuilder b;
         b.appendTimestamp("a", 123456789);
@@ -590,15 +581,13 @@ public:
         ASSERT_EQUALS(9876U, out["d"].timestampInc());
         ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(1234000), out["d"].timestampTime());
         ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(123456789), out["a"].date());
-
-        delete s;
     }
 };
 
 class TypeConservation {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         //  --  A  --
 
@@ -690,8 +679,6 @@ public:
         //            ASSERT_EQUALS( NumberDouble , out["b"].type() );
         //            ASSERT_EQUALS( NumberDouble , out["a"].type() );
         //
-
-        delete s;
     }
 };
 
@@ -859,7 +846,7 @@ public:
     }
 
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         for (int i = 5; i < 100; i += 10) {
             s->setObject("a", build(i), false);
@@ -868,8 +855,6 @@ public:
             s->setObject("a", build(5), true);
             s->invokeSafe("tojson( a )", 0, 0);
         }
-
-        delete s;
     }
 };
 
@@ -1061,7 +1046,7 @@ public:
 class CodeTests {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         {
             BSONObjBuilder b;
@@ -1083,9 +1068,6 @@ public:
         // s->invokeSafe( "foo.d() " , BSONObj() );
         // out = s->getObject( "out" );
         // ASSERT_EQUALS( 18 , out["d"].number() );
-
-
-        delete s;
     }
 };
 
@@ -1967,7 +1949,7 @@ public:
     }
 
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         const char* foo = "asdas\0asdasd";
         const char* base64 = "YXNkYXMAYXNkYXNk";
@@ -2011,22 +1993,19 @@ public:
         out["f"].binData(len);
         ASSERT_EQUALS(0, len);
         ASSERT_EQUALS(128, out["f"].binDataType());
-
-        delete s;
     }
 };
 
 class VarTests {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         ASSERT(s->exec("a = 5;", "a", false, true, false));
         ASSERT_EQUALS(5, s->getNumber("a"));
 
         ASSERT(s->exec("var b = 6;", "b", false, true, false));
         ASSERT_EQUALS(6, s->getNumber("b"));
-        delete s;
     }
 };
 
@@ -2125,7 +2104,7 @@ public:
 class NoReturnSpecified {
 public:
     void run() {
-        Scope* s = globalScriptEngine->newScope();
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
 
         s->invoke("x=5;", 0, 0);
         ASSERT_EQUALS(5, s->getNumber("__returnValue"));
