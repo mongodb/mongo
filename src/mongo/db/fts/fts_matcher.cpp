@@ -31,26 +31,15 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/fts/fts_matcher.h"
+#include "mongo/db/fts/fts_phrase_matcher.h"
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/fts_element_iterator.h"
-#include "mongo/platform/strcasestr.h"
 
 namespace mongo {
 
 namespace fts {
 
 using std::string;
-
-/**
- * Does the string 'phrase' occur in the string 'haystack'?  Match is case-insensitive if
- * 'caseSensitive' is false; otherwise, an exact substring match is performed.
- */
-static bool phraseMatches(const string& phrase, const string& haystack, bool caseSensitive) {
-    if (caseSensitive) {
-        return haystack.find(phrase) != string::npos;
-    }
-    return strcasestr(haystack.c_str(), phrase.c_str()) != NULL;
-}
 
 FTSMatcher::FTSMatcher(const FTSQuery& query, const FTSSpec& spec) : _query(query), _spec(spec) {}
 
@@ -163,7 +152,12 @@ bool FTSMatcher::_phraseMatch(const string& phrase, const BSONObj& obj) const {
 
     while (it.more()) {
         FTSIteratorValue val = it.next();
-        if (phraseMatches(phrase, val._text, _query.getCaseSensitive())) {
+
+        if (val._language->getPhraseMatcher().phraseMatches(phrase,
+                                                            val._text,
+                                                            _query.getCaseSensitive()
+                                                                ? FTSPhraseMatcher::kCaseSensitive
+                                                                : FTSPhraseMatcher::kNone)) {
             return true;
         }
     }

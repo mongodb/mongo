@@ -26,66 +26,39 @@
  *    it in the license file.
  */
 
-
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/string_data.h"
+#include <cstdint>
+#include <string>
 
 namespace mongo {
 namespace fts {
 
-class FTSLanguage;
-class StopWords;
-
 /**
- * FTSTokenizer
- * A iterator of "documents" where a document contains space delimited words. For each word returns
- * a stem or lemma version of a word optimized for full text indexing. Supports various options to
- * control how tokens are generated.
+ * An interface for substring matching routines.
  */
-class FTSTokenizer {
+class FTSPhraseMatcher {
 public:
-    virtual ~FTSTokenizer() = default;
+    virtual ~FTSPhraseMatcher() = default;
+
+    using PhraseMatcherOptions = uint8_t;
 
     /**
-     * Options for generating tokens
+     * Use no options.
      */
-    enum Options {
-        /**
-         * Default means lower cased, and stop words are not filtered.
-         */
-        None = 0,
-
-        /**
-         * Do not lower case terms.
-         */
-        GenerateCaseSensitiveTokens = 1 << 0,
-
-        /**
-         * Filter out stop words from return tokens.
-         */
-        FilterStopWords = 1 << 1,
-    };
+    static const int kNone = 0;
 
     /**
-     * Process a new document, and discards any previous results.
-     * May be called multiple times on an instance of an iterator.
+     * Lowercase strings as part of phrase matching.
      */
-    virtual void reset(StringData document, Options options) = 0;
+    static const int kCaseSensitive = 1 << 0;
 
     /**
-     * Moves to the next token in the iterator.
-     * Returns false when the iterator reaches end of the document.
+     * Does the string 'phrase' occur in the string 'haystack'?
      */
-    virtual bool moveNext() = 0;
-
-    /**
-     * Returns stemmed form, normalized, and lowercased depending on the parameter
-     * to the reset method.
-     * Returned StringData is valid until next call to moveNext().
-     */
-    virtual StringData get() const = 0;
+    virtual bool phraseMatches(const std::string& phrase,
+                               const std::string& haystack,
+                               PhraseMatcherOptions options) const = 0;
 };
 
 }  // namespace fts

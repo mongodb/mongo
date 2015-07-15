@@ -106,10 +106,11 @@ Status FTSQuery::parse(const string& query,
                     unsigned phraseStart = quoteOffset + 1;
                     unsigned phraseLength = t.offset - phraseStart;
                     StringData phrase = StringData(query).substr(phraseStart, phraseLength);
-                    if (inNegation)
-                        _negatedPhrases.push_back(normalizeString(phrase));
-                    else
-                        _positivePhrases.push_back(normalizeString(phrase));
+                    if (inNegation) {
+                        _negatedPhrases.push_back(phrase.toString());
+                    } else {
+                        _positivePhrases.push_back(phrase.toString());
+                    }
                     inNegation = false;
                     inPhrase = false;
                 } else {
@@ -168,13 +169,6 @@ void FTSQuery::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bool n
 
         activeTerms.insert(word);
     }
-}
-
-string FTSQuery::normalizeString(StringData str) const {
-    if (_caseSensitive) {
-        return str.toString();
-    }
-    return tolowerString(str);
 }
 
 namespace {

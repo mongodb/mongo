@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include "mongo/db/fts/fts_basic_phrase_matcher.h"
+#include "mongo/db/fts/fts_phrase_matcher.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/base/status_with.h"
 
@@ -87,6 +89,11 @@ public:
     virtual std::unique_ptr<FTSTokenizer> createTokenizer() const = 0;
 
     /**
+     * Returns a reference to the phrase matcher instance that this language owns.
+     */
+    virtual const FTSPhraseMatcher& getPhraseMatcher() const = 0;
+
+    /**
      * Register std::string 'languageName' as a new language with text index version
      * 'textIndexVersion'.  Saves the resulting language to out-argument 'languageOut'.
      * Subsequent calls to FTSLanguage::make() will recognize the newly-registered language
@@ -133,7 +140,11 @@ typedef StatusWith<const FTSLanguage*> StatusWithFTSLanguage;
 
 class BasicFTSLanguage : public FTSLanguage {
 public:
-    std::unique_ptr<FTSTokenizer> createTokenizer() const override;
+    std::unique_ptr<FTSTokenizer> createTokenizer() const final;
+    const FTSPhraseMatcher& getPhraseMatcher() const final;
+
+private:
+    BasicFTSPhraseMatcher _basicPhraseMatcher;
 };
 
 extern BasicFTSLanguage languagePorterV1;

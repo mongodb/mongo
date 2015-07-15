@@ -26,66 +26,27 @@
  *    it in the license file.
  */
 
-
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/string_data.h"
+#include "mongo/db/fts/fts_phrase_matcher.h"
 
 namespace mongo {
 namespace fts {
 
-class FTSLanguage;
-class StopWords;
-
 /**
- * FTSTokenizer
- * A iterator of "documents" where a document contains space delimited words. For each word returns
- * a stem or lemma version of a word optimized for full text indexing. Supports various options to
- * control how tokens are generated.
+ * A phrase matcher that looks for exact substring matches with optional ASCII-aware case
+ * insensitivity.
  */
-class FTSTokenizer {
+class BasicFTSPhraseMatcher final : public FTSPhraseMatcher {
+    MONGO_DISALLOW_COPYING(BasicFTSPhraseMatcher);
+
 public:
-    virtual ~FTSTokenizer() = default;
+    BasicFTSPhraseMatcher() = default;
 
-    /**
-     * Options for generating tokens
-     */
-    enum Options {
-        /**
-         * Default means lower cased, and stop words are not filtered.
-         */
-        None = 0,
-
-        /**
-         * Do not lower case terms.
-         */
-        GenerateCaseSensitiveTokens = 1 << 0,
-
-        /**
-         * Filter out stop words from return tokens.
-         */
-        FilterStopWords = 1 << 1,
-    };
-
-    /**
-     * Process a new document, and discards any previous results.
-     * May be called multiple times on an instance of an iterator.
-     */
-    virtual void reset(StringData document, Options options) = 0;
-
-    /**
-     * Moves to the next token in the iterator.
-     * Returns false when the iterator reaches end of the document.
-     */
-    virtual bool moveNext() = 0;
-
-    /**
-     * Returns stemmed form, normalized, and lowercased depending on the parameter
-     * to the reset method.
-     * Returned StringData is valid until next call to moveNext().
-     */
-    virtual StringData get() const = 0;
+    bool phraseMatches(const std::string& phrase,
+                       const std::string& haystack,
+                       PhraseMatcherOptions options) const final;
 };
 
 }  // namespace fts

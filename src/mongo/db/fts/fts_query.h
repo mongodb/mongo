@@ -84,11 +84,6 @@ public:
 
     BSONObj toBSON() const;
 
-    /**
-     * Lowercases "str" if _caseSensitive is set, else returns a copy of "str" unchanged.
-     */
-    std::string normalizeString(StringData str) const;
-
     static const bool caseSensitiveDefault;
 
 private:
