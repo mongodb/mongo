@@ -51,8 +51,8 @@ done
 run "sh ./s_version $force" "Updating files that include the package version"
 
 test "$reconf" -eq 0 || {
-	(cd ../build_posix &&
-	run "sh ./reconf" "Rebuilding GNU tools library support")
+	(echo "Rebuilding GNU tools library support" &&
+	    cd ../build_posix && sh ./reconf)
 }
 
 # Non parallelizable scripts The following scripts either modify files or
