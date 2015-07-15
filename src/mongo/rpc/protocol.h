@@ -101,5 +101,10 @@ StatusWith<ProtocolSet> parseProtocolSet(StringData repr);
  */
 StatusWith<ProtocolSet> parseProtocolSetFromIsMasterReply(const BSONObj& isMasterReply);
 
+/**
+ * Returns true if wire version supports OP_COMMAND in mongod (not mongos).
+ */
+bool supportsWireVersionForOpCommandInMongod(int minWireVersion, int maxWireVersion);
+
 }  // namespace rpc
 }  // namespace mongo

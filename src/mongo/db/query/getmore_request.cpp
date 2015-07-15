@@ -42,13 +42,14 @@ namespace mongo {
 
 namespace {
 
-const char kCmdName[] = "getMore";
 const char kCollectionField[] = "collection";
 const char kBatchSizeField[] = "batchSize";
 const char kMaxTimeMSField[] = "maxTimeMS";
 const char kTermField[] = "term";
 
 }  // namespace
+
+const char GetMoreRequest::kGetMoreCommandName[] = "getMore";
 
 GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 
@@ -100,7 +101,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
 
     for (BSONElement el : cmdObj) {
         const char* fieldName = el.fieldName();
-        if (str::equals(fieldName, kCmdName)) {
+        if (str::equals(fieldName, kGetMoreCommandName)) {
             if (el.type() != BSONType::NumberLong) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << "Field 'getMore' must be of type long in: " << cmdObj};
@@ -161,7 +162,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
 BSONObj GetMoreRequest::toBSON() const {
     BSONObjBuilder builder;
 
-    builder.append(kCmdName, cursorid);
+    builder.append(kGetMoreCommandName, cursorid);
     builder.append(kCollectionField, nss.coll());
 
     if (batchSize) {

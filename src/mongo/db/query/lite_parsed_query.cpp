@@ -71,7 +71,6 @@ Status checkFieldType(const BSONElement& el, BSONType type) {
 }
 
 // Find command field names.
-const char kCmdName[] = "find";
 const char kFilterField[] = "filter";
 const char kProjectionField[] = "projection";
 const char kSortField[] = "sort";
@@ -96,6 +95,8 @@ const char kTermField[] = "term";
 
 }  // namespace
 
+const char LiteParsedQuery::kFindCommandName[] = "find";
+
 LiteParsedQuery::LiteParsedQuery(NamespaceString nss) : _nss(std::move(nss)) {}
 
 // static
@@ -111,7 +112,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
     while (it.more()) {
         BSONElement el = it.next();
         const char* fieldName = el.fieldName();
-        if (str::equals(fieldName, kCmdName)) {
+        if (str::equals(fieldName, kFindCommandName)) {
             Status status = checkFieldType(el, String);
             if (!status.isOK()) {
                 return status;
@@ -422,7 +423,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(
 BSONObj LiteParsedQuery::asFindCommand() const {
     BSONObjBuilder bob;
 
-    bob.append(kCmdName, _nss.coll());
+    bob.append(kFindCommandName, _nss.coll());
 
     if (!_filter.isEmpty()) {
         bob.append(kFilterField, _filter);

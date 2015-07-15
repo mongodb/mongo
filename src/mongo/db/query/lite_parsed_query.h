@@ -47,6 +47,8 @@ class StatusWith;
  */
 class LiteParsedQuery {
 public:
+    static const char kFindCommandName[];
+
     /**
      * Parses a find command object, 'cmdObj'. Caller must indicate whether or not this lite
      * parsed query is an explained query or not via 'isExplain'.

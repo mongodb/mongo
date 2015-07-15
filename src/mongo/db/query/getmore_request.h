@@ -39,6 +39,8 @@
 namespace mongo {
 
 struct GetMoreRequest {
+    static const char kGetMoreCommandName[];
+
     /**
      * Construct an empty request.
      */

@@ -127,9 +127,6 @@ StatusWith<ProtocolSet> parseProtocolSetFromIsMasterReply(const BSONObj& isMaste
         return minWireExtractStatus;
     }
 
-    bool hasWireVersionForOpCommandInMongod = (minWireVersion <= WireVersion::RELEASE_3_1_5) &&
-        (maxWireVersion >= WireVersion::RELEASE_3_1_5);
-
     bool isMongos = false;
 
     std::string msgField;
@@ -143,10 +140,15 @@ StatusWith<ProtocolSet> parseProtocolSetFromIsMasterReply(const BSONObj& isMaste
         isMongos = (msgField == "isdbgrid");
     }
 
-    return (!isMongos && hasWireVersionForOpCommandInMongod) ? supports::kAll
-                                                             : supports::kOpQueryOnly;
+    return (!isMongos && supportsWireVersionForOpCommandInMongod(minWireVersion, maxWireVersion))
+        ? supports::kAll
+        : supports::kOpQueryOnly;
 }
 
+bool supportsWireVersionForOpCommandInMongod(int minWireVersion, int maxWireVersion) {
+    return (minWireVersion <= WireVersion::RELEASE_3_1_5) &&
+        (maxWireVersion >= WireVersion::RELEASE_3_1_5);
+}
 
 }  // namespace rpc
 }  // namespace mongo

@@ -118,6 +118,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/lite_parsed_query',
         '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/rpc/protocol',
     ]
 )
 
