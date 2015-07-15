@@ -85,6 +85,7 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/static_observer.h"
 #include "mongo/util/stringutils.h"
+#include "mongo/util/system_tick_source.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
@@ -365,6 +366,7 @@ MONGO_INITIALIZER(CreateAuthorizationExternalStateFactory)(InitializerContext* c
 
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
+    getGlobalServiceContext()->setTickSource(stdx::make_unique<SystemTickSource>());
     return Status::OK();
 }
 
