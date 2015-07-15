@@ -96,7 +96,7 @@ for f in `find . -name ${t_pfx}\*`; do
 	LOCAL_NAME=`basename $f`
 	# Find original command and trim redirect garbage
 	FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | \
-		cut -d ' ' -f 2- | cut -d '>' -f 1`
+	    sed -e 's/ >.*//' -e 's/.* //'`
 	echo "$FAIL_HEADER"
 	echo "s_all run failed: $FAILED_CMD produced"
 	cat $f
