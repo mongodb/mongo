@@ -94,7 +94,7 @@ for f in `find . -name ${t_pfx}\*`; do
 		continue
 	fi
 	LOCAL_NAME=`basename $f`
-	FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | cut -d '>' -f 1`
+	FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | cut -d ' ' -f 2`
 	echo "$FAIL_HEADER"
 	echo "s_all run failed: $FAILED_CMD produced"
 	cat $f
