@@ -440,6 +440,14 @@ add_option('cache-dir',
     help='Specify the directory to use for caching objects if --cache is in use',
 )
 
+add_option("experimental-decimal-support",
+    choices=['on', 'off'],
+    default='off',
+    const='on',
+    help="Enable experimental decimal128 type support",
+    nargs='?',
+)
+
 def find_mongo_custom_variables():
     files = []
     for path in sys.path:
@@ -1363,6 +1371,9 @@ if get_option('wiredtiger') == 'on':
             "Re-run scons with --wiredtiger=off to build on 32-bit platforms")
     else:
         wiredtiger = True
+
+if get_option('experimental-decimal-support') == 'on':
+    env.SetConfigHeaderDefine("MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT")
 
 if env['TARGET_ARCH'] == 'i386':
     # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',

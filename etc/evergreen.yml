@@ -1138,6 +1138,14 @@ tasks:
     vars:
       resmoke_args: --suites=tool --storageEngine=wiredTiger
 
+- <<: *task_template
+  name: jsDecimalCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=decimal
+
 - name: push
   depends_on:
   - name: "*"
@@ -2184,6 +2192,35 @@ buildvariants:
   - name: jsCore
   - name: jsCore_compatibility
   - name: mmap
+  - name: push
+    distros:
+    - rhel55-test
+
+- name: linux-64-decimal
+  display_name: Linux 64-bit (Decimal Enabled)
+  modules: ~
+  run_on:
+  - rhel55
+  expansions:
+    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --experimental-decimal-support=on
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
+  tasks:
+  - name: compile
+    distros:
+    - rhel55
+  - name: dbtest
+  - name: dbtest_WT
+  - name: jsCore
+  - name: jsDecimalCore
+  - name: jstestfuzz
   - name: push
     distros:
     - rhel55-test
