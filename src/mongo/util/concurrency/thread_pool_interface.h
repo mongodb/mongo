@@ -40,6 +40,7 @@ class Status;
  */
 class ThreadPoolInterface {
     MONGO_DISALLOW_COPYING(ThreadPoolInterface);
+
 public:
     using Task = stdx::function<void()>;
 
@@ -84,7 +85,6 @@ public:
 
 protected:
     ThreadPoolInterface() = default;
-
 };
 
 }  // namespace mongo
