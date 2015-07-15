@@ -192,14 +192,16 @@ TEST(query_stage_near, Basic) {
     // First set of results
     mockData.clear();
     mockData.push_back(BSON("distance" << 0.5));
-    mockData.push_back(BSON("distance" << 2.0 << "$included" << false));  // Not included
+    // Not included in this interval, but will be buffered and included in the last interval
+    mockData.push_back(BSON("distance" << 2.0));
     mockData.push_back(BSON("distance" << 0.0));
+    mockData.push_back(BSON("distance" << 3.5));  // Not included
     nearStage.addInterval(mockData, 0.0, 1.0);
 
     // Second set of results
     mockData.clear();
     mockData.push_back(BSON("distance" << 1.5));
-    mockData.push_back(BSON("distance" << 2.0 << "$included" << false));  // Not included
+    mockData.push_back(BSON("distance" << 0.5));  // Not included
     mockData.push_back(BSON("distance" << 1.0));
     nearStage.addInterval(mockData, 1.0, 2.0);
 
@@ -208,10 +210,11 @@ TEST(query_stage_near, Basic) {
     mockData.push_back(BSON("distance" << 2.5));
     mockData.push_back(BSON("distance" << 3.0));  // Included
     mockData.push_back(BSON("distance" << 2.0));
+    mockData.push_back(BSON("distance" << 3.5));  // Not included
     nearStage.addInterval(mockData, 2.0, 3.0);
 
     vector<BSONObj> results = advanceStage(&nearStage, &workingSet);
-    ASSERT_EQUALS(results.size(), 7u);
+    ASSERT_EQUALS(results.size(), 8u);
     assertAscendingAndValid(results);
 }
 
@@ -225,7 +228,7 @@ TEST(query_stage_near, EmptyResults) {
     mockData.clear();
     nearStage.addInterval(mockData, 0.0, 1.0);
 
-    // Non-empty sest of results
+    // Non-empty set of results
     mockData.clear();
     mockData.push_back(BSON("distance" << 1.5));
     mockData.push_back(BSON("distance" << 2.0));

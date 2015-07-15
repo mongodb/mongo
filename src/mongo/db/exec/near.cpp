@@ -51,8 +51,9 @@ NearStage::NearStage(OperationContext* txn,
       _workingSet(workingSet),
       _collection(collection),
       _searchState(SearchState_Initializing),
+      _nextIntervalStats(nullptr),
       _stageType(type),
-      _nextInterval(NULL) {}
+      _nextInterval(nullptr) {}
 
 NearStage::~NearStage() {}
 
@@ -164,7 +165,8 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
         // CoveredInterval and its child stage are owned by _childrenIntervals
         _childrenIntervals.push_back(intervalStatus.getValue());
         _nextInterval = _childrenIntervals.back();
-        _nextIntervalStats.reset(new IntervalStats());
+        _specificStats.intervalStats.emplace_back();
+        _nextIntervalStats = &_specificStats.intervalStats.back();
         _nextIntervalStats->minDistanceAllowed = _nextInterval->minDistance;
         _nextIntervalStats->maxDistanceAllowed = _nextInterval->maxDistance;
         _nextIntervalStats->inclusiveMaxDistanceAllowed = _nextInterval->inclusiveMax;
@@ -174,9 +176,6 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     PlanStage::StageState intervalState = _nextInterval->covering->work(&nextMemberID);
 
     if (PlanStage::IS_EOF == intervalState) {
-        _specificStats.intervalStats.push_back(*_nextIntervalStats);
-        _nextIntervalStats.reset();
-        _nextInterval = NULL;
         _searchState = SearchState_Advancing;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::FAILURE == intervalState) {
@@ -197,7 +196,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
 
     // The child stage may not dedup so we must dedup them ourselves.
     if (_nextInterval->dedupCovering && nextMember->hasLoc()) {
-        if (_nextIntervalSeen.end() != _nextIntervalSeen.find(nextMember->loc)) {
+        if (_seenDocuments.end() != _seenDocuments.find(nextMember->loc)) {
             _workingSet->free(nextMemberID);
             return PlanStage::NEED_TIME;
         }
@@ -216,9 +215,6 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     // If the member's distance is in the current distance interval, add it to our buffered
     // results.
     double memberDistance = distanceStatus.getValue();
-    bool inInterval = memberDistance >= _nextInterval->minDistance &&
-        (_nextInterval->inclusiveMax ? memberDistance <= _nextInterval->maxDistance
-                                     : memberDistance < _nextInterval->maxDistance);
 
     // Update found distance stats
     if (_nextIntervalStats->minDistanceFound < 0 ||
@@ -226,55 +222,77 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
         _nextIntervalStats->minDistanceFound = memberDistance;
     }
 
-    if (_nextIntervalStats->maxDistanceFound < 0 ||
-        memberDistance > _nextIntervalStats->maxDistanceFound) {
-        _nextIntervalStats->maxDistanceFound = memberDistance;
-    }
+    _resultBuffer.push(SearchResult(nextMemberID, memberDistance));
 
-    if (inInterval) {
-        _resultBuffer.push(SearchResult(nextMemberID, memberDistance));
-
-        // Store the member's RecordId, if available, for quick invalidation
-        if (nextMember->hasLoc()) {
-            _nextIntervalSeen.insert(std::make_pair(nextMember->loc, nextMemberID));
-        }
-
-        ++_nextIntervalStats->numResultsBuffered;
-
-        // Update buffered distance stats
-        if (_nextIntervalStats->minDistanceBuffered < 0 ||
-            memberDistance < _nextIntervalStats->minDistanceBuffered) {
-            _nextIntervalStats->minDistanceBuffered = memberDistance;
-        }
-
-        if (_nextIntervalStats->maxDistanceBuffered < 0 ||
-            memberDistance > _nextIntervalStats->maxDistanceBuffered) {
-            _nextIntervalStats->maxDistanceBuffered = memberDistance;
-        }
-    } else {
-        _workingSet->free(nextMemberID);
+    // Store the member's RecordId, if available, for quick invalidation
+    if (nextMember->hasLoc()) {
+        _seenDocuments.insert(std::make_pair(nextMember->loc, nextMemberID));
     }
 
     return PlanStage::NEED_TIME;
 }
 
 PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
-    if (_resultBuffer.empty()) {
-        // We're done returning the documents buffered for this annulus, so we can
-        // clear out our buffered RecordIds.
-        _nextIntervalSeen.clear();
+    // Returns documents to the parent stage.
+    // If the document does not fall in the current interval, it will be buffered so that
+    // it might be returned in a following interval.
+
+    // Check if the next member is in the search interval and that the buffer isn't empty
+    WorkingSetID resultID = WorkingSet::INVALID_ID;
+    // memberDistance is initialized to produce an error if used before its value is changed
+    double memberDistance = std::numeric_limits<double>::lowest();
+    if (!_resultBuffer.empty()) {
+        SearchResult result = _resultBuffer.top();
+        memberDistance = result.distance;
+
+        // Throw out all documents with memberDistance < minDistance
+        if (memberDistance < _nextInterval->minDistance) {
+            WorkingSetMember* member = _workingSet->get(result.resultID);
+            if (member->hasLoc()) {
+                _seenDocuments.erase(member->loc);
+            }
+            _resultBuffer.pop();
+            _workingSet->free(result.resultID);
+            return PlanStage::NEED_TIME;
+        }
+
+        bool inInterval = _nextInterval->inclusiveMax ? memberDistance <= _nextInterval->maxDistance
+                                                      : memberDistance < _nextInterval->maxDistance;
+        if (inInterval) {
+            resultID = result.resultID;
+        }
+    } else {
+        // A document should be in _seenDocuments if and only if it's in _resultBuffer
+        invariant(_seenDocuments.empty());
+    }
+
+    // memberDistance is not in the interval or _resultBuffer is empty,
+    // so we need to move to the next interval.
+    if (WorkingSet::INVALID_ID == resultID) {
+        _nextInterval = nullptr;
+        _nextIntervalStats = nullptr;
         _searchState = SearchState_Buffering;
         return PlanStage::NEED_TIME;
     }
 
-    *toReturn = _resultBuffer.top().resultID;
+    // The next document in _resultBuffer is in the search interval, so we can return it
     _resultBuffer.pop();
 
     // If we're returning something, take it out of our RecordId -> WSID map so that future
     // calls to invalidate don't cause us to take action for a RecordId we're done with.
+    *toReturn = resultID;
     WorkingSetMember* member = _workingSet->get(*toReturn);
     if (member->hasLoc()) {
-        _nextIntervalSeen.erase(member->loc);
+        _seenDocuments.erase(member->loc);
+    }
+
+    // TODO: SERVER-19480 Find a more appropriate place to increment numResultsBuffered
+    ++_nextIntervalStats->numResultsBuffered;
+
+    // Update buffered distance stats
+    if (_nextIntervalStats->minDistanceBuffered < 0 ||
+        memberDistance < _nextIntervalStats->minDistanceBuffered) {
+        _nextIntervalStats->minDistanceBuffered = memberDistance;
     }
 
     return PlanStage::ADVANCED;
@@ -289,19 +307,19 @@ void NearStage::doReattachToOperationContext(OperationContext* opCtx) {
 }
 
 void NearStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    // If a result is in _resultBuffer and has a RecordId it will be in _nextIntervalSeen as
+    // If a result is in _resultBuffer and has a RecordId it will be in _seenDocuments as
     // well. It's safe to return the result w/o the RecordId, so just fetch the result.
     unordered_map<RecordId, WorkingSetID, RecordId::Hasher>::iterator seenIt =
-        _nextIntervalSeen.find(dl);
+        _seenDocuments.find(dl);
 
-    if (seenIt != _nextIntervalSeen.end()) {
+    if (seenIt != _seenDocuments.end()) {
         WorkingSetMember* member = _workingSet->get(seenIt->second);
         verify(member->hasLoc());
         WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
         verify(!member->hasLoc());
 
         // Don't keep it around in the seen map since there's no valid RecordId anymore
-        _nextIntervalSeen.erase(seenIt);
+        _seenDocuments.erase(seenIt);
     }
 }
 

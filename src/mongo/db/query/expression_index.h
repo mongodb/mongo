@@ -30,6 +30,7 @@
 
 #include "third_party/s2/s2region.h"
 
+#include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/index/s2_indexing_params.h"
 #include "mongo/db/jsobj.h"
@@ -46,10 +47,19 @@ class ExpressionMapping {
 public:
     static BSONObj hash(const BSONElement& value);
 
+    static std::vector<GeoHash> get2dCovering(const R2Region& region,
+                                              const BSONObj& indexInfoObj,
+                                              int maxCoveringCells);
+
+    static void GeoHashsToIntervalsWithParents(const std::vector<GeoHash>& unorderedCovering,
+                                               OrderedIntervalList* oilOut);
+
     static void cover2d(const R2Region& region,
                         const BSONObj& indexInfoObj,
                         int maxCoveringCells,
-                        OrderedIntervalList* oil);
+                        OrderedIntervalList* oilOut);
+
+    static std::vector<S2CellId> get2dsphereCovering(const S2Region& region);
 
     static void cover2dsphere(const S2Region& region,
                               const S2IndexingParams& indexParams,

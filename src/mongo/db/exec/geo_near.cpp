@@ -41,11 +41,11 @@
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/hash.h"
+#include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/s2_keys.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"
-#include "mongo/db/index/expression_params.h"
-#include "mongo/db/index/s2_keys.h"
 #include "mongo/util/log.h"
 
 #include <algorithm>
@@ -498,70 +498,6 @@ private:
     R2Annulus _annulus;
 };
 
-/**
- * Expression which checks whether a 2D key for a point (2D hash) intersects our search
- * region.  The search region may have been formed by more granular hashes.
- */
-class TwoDKeyInRegionExpression : public LeafMatchExpression {
-public:
-    TwoDKeyInRegionExpression(R2Region* region,
-                              const GeoHashConverter::Parameters& hashParams,
-                              StringData twoDKeyPath)
-        : LeafMatchExpression(INTERNAL_2D_KEY_IN_REGION), _region(region), _unhasher(hashParams) {
-        initPath(twoDKeyPath);
-    }
-
-    virtual ~TwoDKeyInRegionExpression() {}
-
-    virtual void toBSON(BSONObjBuilder* out) const {
-        out->append("TwoDKeyInRegionExpression", true);
-    }
-
-    virtual bool matchesSingleElement(const BSONElement& e) const {
-        // Something has gone terribly wrong if this doesn't hold.
-        invariant(BinData == e.type());
-        return !_region->fastDisjoint(_unhasher.unhashToBoxCovering(_unhasher.hash(e)));
-    }
-
-    //
-    // These won't be called.
-    //
-
-    virtual void debugString(StringBuilder& debug, int level = 0) const {
-        invariant(false);
-    }
-
-    virtual bool equivalent(const MatchExpression* other) const {
-        invariant(false);
-        return true;
-    }
-
-    virtual unique_ptr<MatchExpression> shallowClone() const {
-        invariant(false);
-        return NULL;
-    }
-
-private:
-    const unique_ptr<R2Region> _region;
-    const GeoHashConverter _unhasher;
-};
-
-// Helper class to maintain ownership of a match expression alongside an index scan
-class IndexScanWithMatch : public IndexScan {
-public:
-    IndexScanWithMatch(OperationContext* txn,
-                       const IndexScanParams& params,
-                       WorkingSet* workingSet,
-                       MatchExpression* filter)
-        : IndexScan(txn, params, workingSet, filter), _matcher(filter) {}
-
-    virtual ~IndexScanWithMatch() {}
-
-private:
-    // Owns matcher
-    const unique_ptr<MatchExpression> _matcher;
-};
-
 // Helper class to maintain ownership of a match expression alongside an index scan
 class FetchStageWithMatch : public FetchStage {
 public:
@@ -707,11 +643,8 @@ StatusWith<NearStage::CoveredInterval*>  //
     IndexScanParams scanParams;
     scanParams.descriptor = _twoDIndex;
     scanParams.direction = 1;
-    // We use a filter on the key.  The filter rejects keys that don't intersect with the
-    // annulus.  An object that is in the annulus might have a key that's not in it and a key
-    // that's in it.  As such we can't just look at one key per object.
-    //
-    // This does force us to do our own deduping of results, though.
+
+    // This does force us to do our own deduping of results.
     scanParams.doNotDedup = true;
 
     // Scan bounds on 2D indexes are only over the 2D field - other bounds aren't applicable.
@@ -722,13 +655,23 @@ StatusWith<NearStage::CoveredInterval*>  //
     const string twoDFieldName = _nearParams.nearQuery->field;
     const int twoDFieldPosition = 0;
 
+    std::vector<GeoHash> unorderedCovering = ExpressionMapping::get2dCovering(
+        *coverRegion, _twoDIndex->infoObj(), internalGeoNearQuery2DMaxCoveringCells);
+
+    // Make sure the same index key isn't visited twice
+    R2CellUnion diffUnion;
+    diffUnion.init(unorderedCovering);
+    diffUnion.getDifference(_scannedCells);
+    // After taking the difference, there may be cells in the covering that don't intersect
+    // with the annulus.
+    diffUnion.detach(&unorderedCovering);
+
+    // Add the cells in this covering to the _scannedCells union
+    _scannedCells.add(unorderedCovering);
+
     OrderedIntervalList coveredIntervals;
     coveredIntervals.name = scanParams.bounds.fields[twoDFieldPosition].name;
-
-    ExpressionMapping::cover2d(*coverRegion,
-                               _twoDIndex->infoObj(),
-                               internalGeoNearQuery2DMaxCoveringCells,
-                               &coveredIntervals);
+    ExpressionMapping::GeoHashsToIntervalsWithParents(unorderedCovering, &coveredIntervals);
 
     // Intersect the $near bounds we just generated into the bounds we have for anything else
     // in the scan (i.e. $within)
@@ -739,24 +682,13 @@ StatusWith<NearStage::CoveredInterval*>  //
     GeoHashConverter::Parameters hashParams;
     GeoHashConverter::parseParameters(_twoDIndex->infoObj(), &hashParams);
 
-    MatchExpression* keyMatcher =
-        new TwoDKeyInRegionExpression(coverRegion.release(), hashParams, twoDFieldName);
-
     // 2D indexes support covered search over additional fields they contain
-    // TODO: Don't need to clone, can just attach to custom matcher above
-    if (_nearParams.filter) {
-        AndMatchExpression* andMatcher = new AndMatchExpression();
-        andMatcher->add(keyMatcher);
-        andMatcher->add(_nearParams.filter->shallowClone().release());
-        keyMatcher = andMatcher;
-    }
+    IndexScan* scan = new IndexScan(txn, scanParams, workingSet, _nearParams.filter);
 
-    // IndexScanWithMatch owns the matcher
-    IndexScan* scan = new IndexScanWithMatch(txn, scanParams, workingSet, keyMatcher);
-
-    MatchExpression* docMatcher = NULL;
+    MatchExpression* docMatcher = nullptr;
 
     // FLAT searches need to add an additional annulus $within matcher, see above
+    // TODO: Find out if this matcher is actually needed
     if (FLAT == queryCRS) {
         docMatcher = new TwoDPtInAnnulusExpression(_fullBounds, twoDFieldName);
     }
@@ -855,68 +787,6 @@ S2Region* buildS2Region(const R2Annulus& sphereBounds) {
     // Takes ownership of caps
     return new S2RegionIntersection(&regions);
 }
-
-/**
- * Expression which checks whether a 2DSphere key for a point (S2 hash) intersects our
- * search region.  The search region may have been formed by more granular hashes.
- */
-class TwoDSphereKeyInRegionExpression : public LeafMatchExpression {
-public:
-    TwoDSphereKeyInRegionExpression(const R2Annulus& bounds,
-                                    S2IndexVersion indexVersion,
-                                    StringData twoDSpherePath)
-        : LeafMatchExpression(INTERNAL_2DSPHERE_KEY_IN_REGION),
-          _region(buildS2Region(bounds)),
-          _indexVersion(indexVersion) {
-        initPath(twoDSpherePath);
-    }
-
-    virtual ~TwoDSphereKeyInRegionExpression() {}
-
-    virtual void toBSON(BSONObjBuilder* out) const {
-        out->append("TwoDSphereKeyInRegionExpression", true);
-    }
-
-    virtual bool matchesSingleElement(const BSONElement& e) const {
-        S2Cell keyCell;
-        if (_indexVersion < S2_INDEX_VERSION_3) {
-            // Something has gone terribly wrong if this doesn't hold.
-            invariant(String == e.type());
-            keyCell = S2Cell(S2CellId::FromString(e.str()));
-        } else {
-            // Something has gone terribly wrong if this doesn't hold.
-            invariant(NumberLong == e.type());
-            keyCell = S2Cell(S2CellIdFromIndexKey(e.numberLong()));
-        }
-        return _region->MayIntersect(keyCell);
-    }
-
-    const S2Region& getRegion() {
-        return *_region;
-    }
-
-    //
-    // These won't be called.
-    //
-
-    virtual void debugString(StringBuilder& debug, int level = 0) const {
-        invariant(false);
-    }
-
-    virtual bool equivalent(const MatchExpression* other) const {
-        invariant(false);
-        return true;
-    }
-
-    virtual unique_ptr<MatchExpression> shallowClone() const {
-        invariant(false);
-        return NULL;
-    }
-
-private:
-    const unique_ptr<S2Region> _region;
-    const S2IndexVersion _indexVersion;
-};
 }
 
 // Estimate the density of data by search the nearest cells level by level around center.
@@ -1103,11 +973,8 @@ StatusWith<NearStage::CoveredInterval*>  //
     IndexScanParams scanParams;
     scanParams.descriptor = _s2Index;
     scanParams.direction = 1;
-    // We use a filter on the key.  The filter rejects keys that don't intersect with the
-    // annulus.  An object that is in the annulus might have a key that's not in it and a key
-    // that's in it.  As such we can't just look at one key per object.
-    //
-    // This does force us to do our own deduping of results, though.
+
+    // This does force us to do our own deduping of results.
     scanParams.doNotDedup = true;
     scanParams.bounds = _nearParams.baseBounds;
 
@@ -1116,15 +983,29 @@ StatusWith<NearStage::CoveredInterval*>  //
     const int s2FieldPosition = getFieldPosition(_s2Index, s2Field);
     fassert(28678, s2FieldPosition >= 0);
     scanParams.bounds.fields[s2FieldPosition].intervals.clear();
+    std::unique_ptr<S2Region> region(buildS2Region(_currBounds));
+
+    std::vector<S2CellId> cover = ExpressionMapping::get2dsphereCovering(*region);
+
+    // Generate a covering that does not intersect with any previous coverings
+    S2CellUnion coverUnion;
+    coverUnion.InitSwap(&cover);
+    invariant(cover.empty());
+    S2CellUnion diffUnion;
+    diffUnion.GetDifference(&coverUnion, &_scannedCells);
+    for (auto cellId : diffUnion.cell_ids()) {
+        if (region->MayIntersect(S2Cell(cellId))) {
+            cover.push_back(cellId);
+        }
+    }
+
+    // Add the cells in this covering to the _scannedCells union
+    _scannedCells.Add(cover);
+
     OrderedIntervalList* coveredIntervals = &scanParams.bounds.fields[s2FieldPosition];
+    S2CellIdsToIntervalsWithParents(cover, _indexParams, coveredIntervals);
 
-    TwoDSphereKeyInRegionExpression* keyMatcher =
-        new TwoDSphereKeyInRegionExpression(_currBounds, _indexParams.indexVersion, s2Field);
-
-    ExpressionMapping::cover2dsphere(keyMatcher->getRegion(), _indexParams, coveredIntervals);
-
-    // IndexScan owns the hash matcher
-    IndexScan* scan = new IndexScanWithMatch(txn, scanParams, workingSet, keyMatcher);
+    IndexScan* scan = new IndexScan(txn, scanParams, workingSet, nullptr);
 
     // FetchStage owns index scan
     _children.emplace_back(new FetchStage(txn, workingSet, scan, _nearParams.filter, collection));

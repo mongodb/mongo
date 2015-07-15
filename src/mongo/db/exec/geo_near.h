@@ -28,16 +28,17 @@
 
 #pragma once
 
-
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_indexing_params.h"
+#include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/index_bounds.h"
+#include "third_party/s2/s2cellunion.h"
 
 namespace mongo {
 
@@ -98,6 +99,9 @@ private:
     // Amount to increment the next bounds by
     double _boundsIncrement;
 
+    // Keeps track of the region that has already been scanned
+    R2CellUnion _scannedCells;
+
     class DensityEstimator;
     std::unique_ptr<DensityEstimator> _densityEstimator;
 };
@@ -144,6 +148,9 @@ private:
 
     // Amount to increment the next bounds by
     double _boundsIncrement;
+
+    // Keeps track of the region that has already been scanned
+    S2CellUnion _scannedCells;
 
     class DensityEstimator;
     std::unique_ptr<DensityEstimator> _densityEstimator;

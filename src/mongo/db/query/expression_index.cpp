@@ -33,7 +33,6 @@
 #include "third_party/s2/s2regioncoverer.h"
 
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/expression_params.h"
@@ -69,10 +68,9 @@ static std::string toCoveringString(const GeoHashConverter& hashConverter,
     return result + "]";
 }
 
-void ExpressionMapping::cover2d(const R2Region& region,
-                                const BSONObj& indexInfoObj,
-                                int maxCoveringCells,
-                                OrderedIntervalList* oil) {
+std::vector<GeoHash> ExpressionMapping::get2dCovering(const R2Region& region,
+                                                      const BSONObj& indexInfoObj,
+                                                      int maxCoveringCells) {
     GeoHashConverter::Parameters hashParams;
     Status paramStatus = GeoHashConverter::parseParameters(indexInfoObj, &hashParams);
     verify(paramStatus.isOK());  // We validated the parameters when creating the index
@@ -83,23 +81,34 @@ void ExpressionMapping::cover2d(const R2Region& region,
     coverer.setMaxCells(maxCoveringCells);
 
     // TODO: Maybe slightly optimize by returning results in order
-    vector<GeoHash> unorderedCovering;
+    std::vector<GeoHash> unorderedCovering;
     coverer.getCovering(region, &unorderedCovering);
-    set<GeoHash> covering(unorderedCovering.begin(), unorderedCovering.end());
+    return unorderedCovering;
+}
 
+void ExpressionMapping::GeoHashsToIntervalsWithParents(
+    const std::vector<GeoHash>& unorderedCovering, OrderedIntervalList* oilOut) {
+    set<GeoHash> covering(unorderedCovering.begin(), unorderedCovering.end());
     for (set<GeoHash>::const_iterator it = covering.begin(); it != covering.end(); ++it) {
         const GeoHash& geoHash = *it;
         BSONObjBuilder builder;
         geoHash.appendHashMin(&builder, "");
         geoHash.appendHashMax(&builder, "");
 
-        oil->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(builder.obj(), true, true));
+        oilOut->intervals.push_back(
+            IndexBoundsBuilder::makeRangeInterval(builder.obj(), true, true));
     }
 }
 
-void ExpressionMapping::cover2dsphere(const S2Region& region,
-                                      const S2IndexingParams& indexingParams,
-                                      OrderedIntervalList* oilOut) {
+void ExpressionMapping::cover2d(const R2Region& region,
+                                const BSONObj& indexInfoObj,
+                                int maxCoveringCells,
+                                OrderedIntervalList* oilOut) {
+    std::vector<GeoHash> unorderedCovering = get2dCovering(region, indexInfoObj, maxCoveringCells);
+    GeoHashsToIntervalsWithParents(unorderedCovering, oilOut);
+}
+
+std::vector<S2CellId> ExpressionMapping::get2dsphereCovering(const S2Region& region) {
     uassert(28739,
             "Geo coarsest level must be in range [0,30]",
             0 <= internalQueryS2GeoCoarsestLevel && internalQueryS2GeoCoarsestLevel <= 30);
@@ -117,7 +126,13 @@ void ExpressionMapping::cover2dsphere(const S2Region& region,
 
     std::vector<S2CellId> cover;
     coverer.GetCovering(region, &cover);
+    return cover;
+}
 
+void ExpressionMapping::cover2dsphere(const S2Region& region,
+                                      const S2IndexingParams& indexingParams,
+                                      OrderedIntervalList* oilOut) {
+    std::vector<S2CellId> cover = get2dsphereCovering(region);
     S2CellIdsToIntervalsWithParents(cover, indexingParams, oilOut);
 }
 

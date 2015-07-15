@@ -50,7 +50,7 @@ namespace mongo {
  * Child stages need to implement functionality which:
  *
  * - defines a distance metric
- * - iterates through ordered distance intervals, nearest to furthest
+ * - iterates through ordered distance intervals, nearest to farthest
  * - provides a covering for each distance interval
  *
  * For example - given a distance search over documents with distances from [0 -> 10], the child
@@ -58,7 +58,8 @@ namespace mongo {
  *
  * Each interval requires a PlanStage which *covers* the interval (returns all results in the
  * interval).  Results in each interval are buffered fully before being returned to ensure that
- * ordering is preserved.
+ * ordering is preserved. Results that are in the cover, but not in the interval will remain
+ * buffered to be returned in subsequent search intervals.
  *
  * For efficient search, the child stage which covers the distance interval in question should
  * not return too many results outside the interval, but correctness only depends on the child
@@ -69,6 +70,15 @@ namespace mongo {
  *
  * Also for efficient search, the intervals should not be too large or too small - though again
  * correctness does not depend on interval size.
+ *
+ * The child stage may return duplicate documents, so it is the responsibility of NearStage to
+ * deduplicate. Every document in _resultBuffer is kept track of in _seenDocuments. When a
+ * document is returned or invalidated, it is removed from _seenDocuments.
+ *
+ * TODO: If a document is indexed in multiple cells (Polygons, PolyLines, etc.), there is a
+ * possibility that it will be returned more than once. Since doInvalidate() force fetches a
+ * document and removes it from _seenDocuments, NearStage will not deduplicate if it encounters
+ * another instance of this document.
  *
  * TODO: Right now the interface allows the nextCovering() to be adaptive, but doesn't allow
  * aborting and shrinking a covered range being buffered if we guess wrong.
@@ -167,10 +177,11 @@ private:
 
     // May need to track disklocs from the child stage to do our own deduping, also to do
     // invalidation of buffered results.
-    unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _nextIntervalSeen;
+    unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _seenDocuments;
 
     // Stats for the stage covering this interval
-    std::unique_ptr<IntervalStats> _nextIntervalStats;
+    // This is owned by _specificStats
+    IntervalStats* _nextIntervalStats;
 
     // Sorted buffered results to be returned - the current interval
     struct SearchResult;
