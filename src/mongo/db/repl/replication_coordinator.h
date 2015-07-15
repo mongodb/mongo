@@ -56,8 +56,8 @@ class HandshakeArgs;
 class IsMasterResponse;
 class OplogReader;
 class OpTime;
-class ReadAfterOpTimeArgs;
-class ReadAfterOpTimeResponse;
+class ReadConcernArgs;
+class ReadConcernResponse;
 class ReplSetDeclareElectionWinnerArgs;
 class ReplSetDeclareElectionWinnerResponse;
 class ReplSetHeartbeatArgs;
@@ -294,18 +294,13 @@ public:
      * Waits until the optime of the current node is at least the opTime specified in
      * 'settings'.
      *
-     * The returned ReadAfterOpTimeResponse object's didWait() method returns true if
-     * an attempt was made to wait for the specified opTime. Cases when this can be
-     * false could include:
+     * The returned ReadConcernResponse object's didWait() method returns true if
+     * an attempt was made to wait for the specified opTime. This will return false when
+     * attempting to do read after opTime when node is not a replica set member.
      *
-     * 1. No read after opTime was specified.
-     * 2. Attempting to do read after opTime when node is not a replica set member.
-     *
-     * Note: getDuration() on the returned ReadAfterOpTimeResponse will only be valid if
-     * its didWait() method returns true.
      */
-    virtual ReadAfterOpTimeResponse waitUntilOpTime(OperationContext* txn,
-                                                    const ReadAfterOpTimeArgs& settings) = 0;
+    virtual ReadConcernResponse waitUntilOpTime(OperationContext* txn,
+                                                const ReadConcernArgs& settings) = 0;
 
     /**
      * Retrieves and returns the current election id, which is a unique id that is local to

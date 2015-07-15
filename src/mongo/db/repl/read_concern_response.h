@@ -26,53 +26,64 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include <string>
 
-#include "mongo/db/repl/read_after_optime_response.h"
-
-#include "mongo/bson/bsonobjbuilder.h"
-
-using std::string;
+#include "mongo/base/status.h"
+#include "mongo/stdx/chrono.h"
 
 namespace mongo {
+
+class BSONObjBuilder;
+
 namespace repl {
 
-const string ReadAfterOpTimeResponse::kWaitedMSFieldName("waitedMS");
+class ReadConcernResponse {
+public:
+    static const std::string kWaitedMSFieldName;
 
-ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status)
-    : ReadAfterOpTimeResponse(status, stdx::chrono::milliseconds(0), false) {}
+    /**
+     * Constructs a default response that has OK status, and wait is false.
+     */
+    ReadConcernResponse();
 
-ReadAfterOpTimeResponse::ReadAfterOpTimeResponse() : ReadAfterOpTimeResponse(Status::OK()) {}
+    /**
+     * Constructs a response with the given status with wait equals to false.
+     */
+    explicit ReadConcernResponse(Status status);
 
-ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status, stdx::chrono::milliseconds duration)
-    : ReadAfterOpTimeResponse(status, duration, true) {}
+    /**
+     * Constructs a response with wait set to true along with the given parameters.
+     */
+    ReadConcernResponse(Status status, stdx::chrono::milliseconds duration);
 
-ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status,
-                                                 stdx::chrono::milliseconds duration,
-                                                 bool waited)
-    : _waited(waited), _duration(duration), _status(status) {}
+    /**
+     * Appends to the builder the timeout and duration info if didWait() is true.
+     * Note: does not include status.
+     */
+    void appendInfo(BSONObjBuilder* builder);
 
-void ReadAfterOpTimeResponse::appendInfo(BSONObjBuilder* builder) {
-    if (!_waited) {
-        return;
-    }
+    bool didWait() const;
 
-    builder->append(kWaitedMSFieldName, durationCount<Milliseconds>(_duration));
-}
+    /**
+     * Returns the duration waited for the ReadConcern to be satisfied.
+     * Returns 0 if didWait is false.
+     */
+    stdx::chrono::milliseconds getDuration() const;
 
-bool ReadAfterOpTimeResponse::didWait() const {
-    return _waited;
-}
+    /**
+     * Returns more details about an error if it occurred.
+     */
+    Status getStatus() const;
 
-stdx::chrono::milliseconds ReadAfterOpTimeResponse::getDuration() const {
-    return _duration;
-}
+private:
+    ReadConcernResponse(Status status, stdx::chrono::milliseconds duration, bool waited);
 
-Status ReadAfterOpTimeResponse::getStatus() const {
-    return _status;
-}
+    bool _waited;
+    stdx::chrono::milliseconds _duration = stdx::chrono::milliseconds(0);
+    Status _status;
+};
 
 }  // namespace repl
 }  // namespace mongo

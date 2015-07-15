@@ -26,52 +26,53 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 
-#include <string>
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/status.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/util/time_support.h"
+#include "mongo/db/repl/read_concern_response.h"
+
+#include "mongo/bson/bsonobjbuilder.h"
+
+using std::string;
 
 namespace mongo {
-
-class BSONObj;
-
 namespace repl {
 
-class ReadAfterOpTimeArgs {
-public:
-    static const std::string kRootFieldName;
-    static const std::string kOpTimeFieldName;
-    static const std::string kOpTimestampFieldName;
-    static const std::string kOpTermFieldName;
-    static const std::string kReadCommittedFieldName;
+const string ReadConcernResponse::kWaitedMSFieldName("waitedMS");
 
-    ReadAfterOpTimeArgs();
-    explicit ReadAfterOpTimeArgs(OpTime opTime, bool readCommitted = false);
+ReadConcernResponse::ReadConcernResponse(Status status)
+    : ReadConcernResponse(status, stdx::chrono::milliseconds(0), false) {}
 
-    /**
-     * Format:
-     * {
-     *    find: “coll”,
-     *    filter: <Query Object>,
-     *    $readConcern: { // optional
-     *      committed: 1, // optional
-     *      afterOpTime: { ts: <timestamp>, term: <NumberLong> },
-     *    }
-     * }
-     */
-    Status initialize(const BSONObj& cmdObj);
+ReadConcernResponse::ReadConcernResponse() : ReadConcernResponse(Status::OK()) {}
 
-    bool isReadCommitted() const;
-    const OpTime& getOpTime() const;
-    const Milliseconds& getTimeout() const;
+ReadConcernResponse::ReadConcernResponse(Status status, stdx::chrono::milliseconds duration)
+    : ReadConcernResponse(status, duration, true) {}
 
-private:
-    OpTime _opTime;
-    bool _isReadCommitted = false;
-};
+ReadConcernResponse::ReadConcernResponse(Status status,
+                                         stdx::chrono::milliseconds duration,
+                                         bool waited)
+    : _waited(waited), _duration(duration), _status(status) {}
+
+void ReadConcernResponse::appendInfo(BSONObjBuilder* builder) {
+    if (!_waited) {
+        return;
+    }
+
+    builder->append(kWaitedMSFieldName, durationCount<Milliseconds>(_duration));
+}
+
+bool ReadConcernResponse::didWait() const {
+    return _waited;
+}
+
+stdx::chrono::milliseconds ReadConcernResponse::getDuration() const {
+    return _duration;
+}
+
+Status ReadConcernResponse::getStatus() const {
+    return _status;
+}
 
 }  // namespace repl
 }  // namespace mongo

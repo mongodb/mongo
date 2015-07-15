@@ -10,7 +10,7 @@ var futureOpTime = new Timestamp((currentTime / 1000 + 3600), 0);
 var res = assert.commandFailed(db.runCommand({
     find: 'user',
     filter: { x: 1 },
-    $readConcern: {
+    readConcern: {
         afterOpTime: { ts: futureOpTime, term: 0 }
     }
 }));

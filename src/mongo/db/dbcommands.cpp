@@ -78,8 +78,8 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/read_after_optime_args.h"
-#include "mongo/db/repl/read_after_optime_response.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -1278,7 +1278,7 @@ bool Command::run(OperationContext* txn,
     repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
     {
         // Handle read after opTime.
-        repl::ReadAfterOpTimeArgs readAfterOptimeSettings;
+        repl::ReadConcernArgs readAfterOptimeSettings;
         auto readAfterParseStatus = readAfterOptimeSettings.initialize(request.getCommandArgs());
         if (!readAfterParseStatus.isOK()) {
             replyBuilder->setMetadata(rpc::makeEmptyMetadata())

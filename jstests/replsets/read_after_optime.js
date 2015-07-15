@@ -23,7 +23,7 @@ var runTest = function(testDB, primaryConn) {
     var res = assert.commandFailed(testDB.runCommand({
         find: 'user',
         filter: { x: 1 },
-        $readConcern: {
+        readConcern: {
             afterOpTime: { ts: twoSecTS, term: 0 }
         },
         maxTimeMS: 1000
@@ -41,7 +41,7 @@ var runTest = function(testDB, primaryConn) {
     res = assert.commandWorked(testDB.runCommand({
         find: 'user',
         filter: { x: 1 },
-        $readConcern: {
+        readConcern: {
             afterOpTime: { ts: twoSecTS, term: 0 },
             maxTimeMS: 10 * 1000
         }

@@ -47,8 +47,8 @@
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/last_vote.h"
-#include "mongo/db/repl/read_after_optime_args.h"
-#include "mongo/db/repl/read_after_optime_response.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_declare_election_winner_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -771,46 +771,34 @@ OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
     return _getMyLastOptime_inlock();
 }
 
-ReadAfterOpTimeResponse ReplicationCoordinatorImpl::waitUntilOpTime(
-    OperationContext* txn, const ReadAfterOpTimeArgs& settings) {
+ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext* txn,
+                                                                const ReadConcernArgs& settings) {
     const auto& ts = settings.getOpTime();
 
-    if (ts.isNull()) {
-        return ReadAfterOpTimeResponse();
-    }
-
     if (getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
-        return ReadAfterOpTimeResponse(
+        return ReadConcernResponse(
             Status(ErrorCodes::NotAReplicaSet,
                    "node needs to be a replica set member to use read after opTime"));
     }
 
-// TODO: SERVER-18298 enable code once V1 protocol is fully implemented.
-#if 0
-        if (!isV1ElectionProtocol()) {
-            return ReadAfterOpTimeResponse(Status(ErrorCodes::IncompatibleElectionProtocol,
-                    "node needs to be running on v1 election protocol to "
-                    "use read after opTime"));
-        }
-#endif
-
     Timer timer;
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    auto loopCondition = [this, settings, ts] {
-        return settings.isReadCommitted()
-            ? !_currentCommittedSnapshot || ts > *_currentCommittedSnapshot
-            : ts > _getMyLastOptime_inlock();
+    bool isMajorityReadConcern =
+        settings.getLevel() == ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern;
+    auto loopCondition = [this, isMajorityReadConcern, ts] {
+        return isMajorityReadConcern ? !_currentCommittedSnapshot || ts > *_currentCommittedSnapshot
+                                     : ts > _getMyLastOptime_inlock();
     };
 
     while (loopCondition()) {
         Status interruptedStatus = txn->checkForInterruptNoAssert();
         if (!interruptedStatus.isOK()) {
-            return ReadAfterOpTimeResponse(interruptedStatus, Milliseconds(timer.millis()));
+            return ReadConcernResponse(interruptedStatus, Milliseconds(timer.millis()));
         }
 
         if (_inShutdown) {
-            return ReadAfterOpTimeResponse(Status(ErrorCodes::ShutdownInProgress, "shutting down"),
-                                           Milliseconds(timer.millis()));
+            return ReadConcernResponse(Status(ErrorCodes::ShutdownInProgress, "shutting down"),
+                                       Milliseconds(timer.millis()));
         }
 
         stdx::condition_variable condVar;
@@ -820,7 +808,7 @@ ReadAfterOpTimeResponse ReplicationCoordinatorImpl::waitUntilOpTime(
         WaiterInfo waitInfo(&_opTimeWaiterList,
                             txn->getOpID(),
                             &ts,
-                            settings.isReadCommitted() ? &writeConcern : nullptr,
+                            isMajorityReadConcern ? &writeConcern : nullptr,
                             &condVar);
 
         if (CurOp::get(txn)->isMaxTimeSet()) {
@@ -830,7 +818,7 @@ ReadAfterOpTimeResponse ReplicationCoordinatorImpl::waitUntilOpTime(
         }
     }
 
-    return ReadAfterOpTimeResponse(Status::OK(), Milliseconds(timer.millis()));
+    return ReadConcernResponse(Status::OK(), Milliseconds(timer.millis()));
 }
 
 OpTime ReplicationCoordinatorImpl::_getMyLastOptime_inlock() const {

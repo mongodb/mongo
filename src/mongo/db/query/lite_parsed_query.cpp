@@ -35,7 +35,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/read_after_optime_args.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -335,8 +335,8 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                                             << ". "
                                             << "You may need to update your shell or driver.");
             }
-        } else if (str::equals(fieldName, repl::ReadAfterOpTimeArgs::kRootFieldName.c_str())) {
-            // read after optime parsing is handled elsewhere.
+        } else if (str::equals(fieldName, repl::ReadConcernArgs::kReadConcernFieldName.c_str())) {
+            // read concern parsing is handled elsewhere.
             continue;
         } else if (str::equals(fieldName, kTermField)) {
             Status status = checkFieldType(el, NumberLong);

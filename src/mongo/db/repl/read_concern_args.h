@@ -31,58 +31,47 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/chrono.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class BSONObjBuilder;
+class BSONObj;
 
 namespace repl {
 
-class ReadAfterOpTimeResponse {
+class ReadConcernArgs {
 public:
-    static const std::string kWaitedMSFieldName;
+    static const std::string kReadConcernFieldName;
+    static const std::string kOpTermFieldName;
+    static const std::string kOpTimeFieldName;
+    static const std::string kOpTimestampFieldName;
+    static const std::string kLevelFieldName;
+
+    enum class ReadConcernLevel { kLocalReadConcern, kMajorityReadConcern, kLinearizableReadConcern };
+
+    ReadConcernArgs();
+    ReadConcernArgs(OpTime opTime, ReadConcernLevel level);
 
     /**
-     * Constructs a default response that has OK status, and wait is false.
+     * Format:
+     * {
+     *    find: “coll”,
+     *    filter: <Query Object>,
+     *    readConcern: { // optional
+     *      level: "[majority|local|linearizable]",
+     *      afterOpTime: { ts: <timestamp>, term: <NumberLong> },
+     *    }
+     * }
      */
-    ReadAfterOpTimeResponse();
+    Status initialize(const BSONObj& cmdObj);
 
-    /**
-     * Constructs a response with the given status with wait equals to false.
-     */
-    explicit ReadAfterOpTimeResponse(Status status);
-
-    /**
-     * Constructs a response with wait set to true along with the given parameters.
-     */
-    ReadAfterOpTimeResponse(Status status, stdx::chrono::milliseconds duration);
-
-    /**
-     * Appends to the builder the timeout and duration info if didWait() is true.
-     * Note: does not include status.
-     */
-    void appendInfo(BSONObjBuilder* builder);
-
-    bool didWait() const;
-
-    /**
-     * Returns the amount of duration waiting for opTime to pass.
-     * Valid only if didWait is true.
-     */
-    stdx::chrono::milliseconds getDuration() const;
-
-    /**
-     * Returns more details about an error if it occurred.
-     */
-    Status getStatus() const;
+    ReadConcernLevel getLevel() const;
+    const OpTime& getOpTime() const;
 
 private:
-    ReadAfterOpTimeResponse(Status status, stdx::chrono::milliseconds duration, bool waited);
-
-    bool _waited;
-    stdx::chrono::milliseconds _duration;
-    Status _status;
+    OpTime _opTime;
+    ReadConcernLevel _level;
 };
 
 }  // namespace repl

@@ -40,8 +40,8 @@
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/read_after_optime_args.h"
-#include "mongo/db/repl/read_after_optime_response.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config.h"
@@ -2064,8 +2064,9 @@ TEST_F(ReplCoordTest, LastCommittedOpTime) {
 TEST_F(ReplCoordTest, CantUseReadAfterIfNotReplSet) {
     init(ReplSettings());
     OperationContextNoop txn;
-    auto result =
-        getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(OpTimeWithTermZero(50, 0)));
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn,
+        ReadConcernArgs(OpTimeWithTermZero(50, 0), ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
 
     ASSERT_FALSE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::NotAReplicaSet, result.getStatus());
@@ -2084,8 +2085,9 @@ TEST_F(ReplCoordTest, ReadAfterWhileShutdown) {
 
     shutdown();
 
-    auto result =
-        getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(OpTimeWithTermZero(50, 0)));
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn,
+        ReadConcernArgs(OpTimeWithTermZero(50, 0), ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result.getStatus());
@@ -2104,8 +2106,9 @@ TEST_F(ReplCoordTest, ReadAfterInterrupted) {
 
     txn.setCheckForInterruptStatus(Status(ErrorCodes::Interrupted, "test"));
 
-    auto result =
-        getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(OpTimeWithTermZero(50, 0)));
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn,
+        ReadConcernArgs(OpTimeWithTermZero(50, 0), ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::Interrupted, result.getStatus());
@@ -2120,9 +2123,9 @@ TEST_F(ReplCoordTest, ReadAfterNoOpTime) {
                                                                               << "_id" << 0))),
                        HostAndPort("node1", 12345));
 
-    auto result = getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs());
+    auto result = getReplCoord()->waitUntilOpTime(&txn, ReadConcernArgs());
 
-    ASSERT_FALSE(result.didWait());
+    ASSERT(result.didWait());
     ASSERT_OK(result.getStatus());
 }
 
@@ -2136,8 +2139,9 @@ TEST_F(ReplCoordTest, ReadAfterGreaterOpTime) {
                        HostAndPort("node1", 12345));
 
     getReplCoord()->setMyLastOptime(OpTimeWithTermZero(100, 0));
-    auto result =
-        getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(OpTimeWithTermZero(50, 0)));
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn,
+        ReadConcernArgs(OpTimeWithTermZero(50, 0), ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_OK(result.getStatus());
@@ -2155,7 +2159,8 @@ TEST_F(ReplCoordTest, ReadAfterEqualOpTime) {
 
     OpTimeWithTermZero time(100, 0);
     getReplCoord()->setMyLastOptime(time);
-    auto result = getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(time));
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn, ReadConcernArgs(time, ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_OK(result.getStatus());
@@ -2178,8 +2183,9 @@ TEST_F(ReplCoordTest, ReadAfterDeferredGreaterOpTime) {
                                        getReplCoord()->setMyLastOptime(OpTimeWithTermZero(200, 0));
                                    });
 
-    auto result =
-        getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(OpTimeWithTermZero(100, 0)));
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn,
+        ReadConcernArgs(OpTimeWithTermZero(100, 0), ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
     pseudoLogOp.get();
 
     ASSERT_TRUE(result.didWait());
@@ -2205,7 +2211,8 @@ TEST_F(ReplCoordTest, ReadAfterDeferredEqualOpTime) {
                                        getReplCoord()->setMyLastOptime(opTimeToWait);
                                    });
 
-    auto result = getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(opTimeToWait));
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn, ReadConcernArgs(opTimeToWait, ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
     pseudoLogOp.get();
 
     ASSERT_TRUE(result.didWait());
@@ -2216,7 +2223,8 @@ TEST_F(ReplCoordTest, CantUseReadAfterCommittedIfNotReplSet) {
     init(ReplSettings());
     OperationContextNoop txn;
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn, ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 0), true));
+        &txn,
+        ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_FALSE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::NotAReplicaSet, result.getStatus());
@@ -2237,7 +2245,8 @@ TEST_F(ReplCoordTest, ReadAfterCommittedWhileShutdown) {
     shutdown();
 
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn, ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 0), true));
+        &txn,
+        ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result.getStatus());
@@ -2258,7 +2267,8 @@ TEST_F(ReplCoordTest, ReadAfterCommittedInterrupted) {
     txn.setCheckForInterruptStatus(Status(ErrorCodes::Interrupted, "test"));
 
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn, ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 0), true));
+        &txn,
+        ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::Interrupted, result.getStatus());
@@ -2277,7 +2287,8 @@ TEST_F(ReplCoordTest, ReadAfterCommittedGreaterOpTime) {
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
     getReplCoord()->onSnapshotCreate(OpTime(Timestamp(100, 0), 0));
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn, ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 0), true));
+        &txn,
+        ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_OK(result.getStatus());
@@ -2297,7 +2308,8 @@ TEST_F(ReplCoordTest, ReadAfterCommittedEqualOpTime) {
     OpTime time(Timestamp(100, 0), 0);
     getReplCoord()->setMyLastOptime(time);
     getReplCoord()->onSnapshotCreate(time);
-    auto result = getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(time, true));
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn, ReadConcernArgs(time, ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_OK(result.getStatus());
@@ -2323,7 +2335,9 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
                                    });
 
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn, ReadAfterOpTimeArgs(OpTime(Timestamp(100, 0), 0), true));
+        &txn,
+        ReadConcernArgs(OpTime(Timestamp(100, 0), 0),
+                        ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
     pseudoLogOp.get();
 
     ASSERT_TRUE(result.didWait());
@@ -2351,7 +2365,8 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
                                        getReplCoord()->onSnapshotCreate(opTimeToWait);
                                    });
 
-    auto result = getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(opTimeToWait, true));
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn, ReadConcernArgs(opTimeToWait, ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
     pseudoLogOp.get();
 
     ASSERT_TRUE(result.didWait());

@@ -27,7 +27,7 @@
  */
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/read_after_optime_response.h"
+#include "mongo/db/repl/read_concern_response.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -35,7 +35,7 @@ namespace repl {
 namespace {
 
 TEST(ReadAfterResponse, Default) {
-    ReadAfterOpTimeResponse response;
+    ReadConcernResponse response;
 
     ASSERT_FALSE(response.didWait());
 
@@ -47,7 +47,7 @@ TEST(ReadAfterResponse, Default) {
 }
 
 TEST(ReadAfterResponse, WithStatus) {
-    ReadAfterOpTimeResponse response(Status(ErrorCodes::InternalError, "test"));
+    ReadConcernResponse response(Status(ErrorCodes::InternalError, "test"));
 
     ASSERT_FALSE(response.didWait());
 
@@ -61,8 +61,8 @@ TEST(ReadAfterResponse, WithStatus) {
 }
 
 TEST(ReadAfterResponse, WaitedWithDuration) {
-    ReadAfterOpTimeResponse response(Status(ErrorCodes::InternalError, "test"),
-                                     stdx::chrono::milliseconds(7));
+    ReadConcernResponse response(Status(ErrorCodes::InternalError, "test"),
+                                 stdx::chrono::milliseconds(7));
 
     ASSERT_TRUE(response.didWait());
     ASSERT_EQUALS(Milliseconds(7), response.getDuration());
@@ -72,7 +72,7 @@ TEST(ReadAfterResponse, WaitedWithDuration) {
     response.appendInfo(&builder);
 
     BSONObj obj(builder.done());
-    auto waitedMSElem = obj[ReadAfterOpTimeResponse::kWaitedMSFieldName];
+    auto waitedMSElem = obj[ReadConcernResponse::kWaitedMSFieldName];
     ASSERT_TRUE(waitedMSElem.isNumber());
     ASSERT_EQ(7, waitedMSElem.numberLong());
 }

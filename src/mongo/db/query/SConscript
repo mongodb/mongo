@@ -150,7 +150,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/bson/bson",
-        "$BUILD_DIR/mongo/db/repl/read_after_optime_args",
+        "$BUILD_DIR/mongo/db/repl/read_concern_args",
     ],
 )
 

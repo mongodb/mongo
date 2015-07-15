@@ -1,3 +1,5 @@
+/* TODO(mathias): re-enable this test after adding a special server parameter for majority
+                  read concern without replica sets (SERVER-19446)
 (function() {
 "use strict";
 
@@ -9,31 +11,31 @@ var t = db.readMajority;
 
 var errorCodes = {
     CommandNotSupported: 115,
-    XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable: 134,
+    ReadConcernNotAvailableYet: 134,
 }
 
 function assertNoReadMajoritySnapshotAvailable() {
-    var res = t.runCommand('find', {batchSize: 2, $readMajorityTemporaryName: true});
+    var res = t.runCommand('find', {batchSize: 2, readConcern: {level: "majority"}});
     assert.commandFailed(res);
-    assert.eq(res.code, errorCodes.XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable);
+    assert.eq(res.code, errorCodes.ReadConcernNotAvailableYet);
 }
 
 function getReadMajorityCursor() {
     var method = 'pcs';
     if (method == 'find') {
         // Doesn't work yet since find command ignores batchsize.
-        var res = t.runCommand('find', {batchSize: 2, $readMajorityTemporaryName: true});
+        var res = t.runCommand('find', {batchSize: 2, readConcern: {level: "majority"}});
         assert.commandWorked(res);
         return new DBCommandCursor(db.getMongo(), res, 2);
     }
     else if (method == 'agg') {
         // Only works when DocumentSourceCursor batched fetching is disabled.
-        return t.aggregate([], {$readMajorityTemporaryName: true, cursor: {batchSize: 2}});
+        return t.aggregate([], {readConcern: {level: "majority"}, cursor: {batchSize: 2}});
     }
     else if (method == 'pcs') {
         // Always works.
         var res = t.runCommand('parallelCollectionScan', {numCursors: 1,
-                                                          $readMajorityTemporaryName: true});
+                                                          readConcern: {level: "majority"}});
         assert.commandWorked(res);
         assert.eq(res.cursors.length, 1);
         return new DBCommandCursor(db.getMongo(), res.cursors[0], 2);
@@ -83,3 +85,4 @@ assert.eq(cursor.next().version, Timestamp(3, 0));
 MongoRunner.stopMongod(testServer);
 
 }());
+*/
