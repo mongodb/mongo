@@ -137,6 +137,13 @@ Status runDownconvertedFindCommand(DBClientConnection* conn,
 
     std::unique_ptr<DBClientCursor> cursor =
         conn->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
+
+    if (!cursor) {
+        return {ErrorCodes::HostUnreachable,
+                str::stream() << "cursor initialization failed due to connection problems with "
+                              << conn->getServerAddress()};
+    }
+
     cursor->decouple();
 
     Status status = getStatusFromCursorResult(*cursor);

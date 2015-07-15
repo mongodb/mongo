@@ -251,6 +251,11 @@ BSONObj Chunk::_getExtremeKey(bool doSplitAtLower) const {
                                                         1, /* nToReturn */
                                                         1 /* nToSkip */);
 
+        uassert(28736,
+                str::stream() << "failed to initialize cursor during auto split due to "
+                              << "connection problem with " << conn->getServerAddress(),
+                cursor.get() != nullptr);
+
         if (cursor->more()) {
             end = cursor->next().getOwned();
         }
