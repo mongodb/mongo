@@ -273,12 +273,6 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
     string ns = "db1.foo";
 
     ShardKeyPattern keyPattern(BSON("_id" << 1));
-    auto future = launchAsync([&] {
-        ASSERT_EQUALS(
-            ErrorCodes::AlreadyInitialized,
-            catalogManager()->shardCollection(
-                operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
-    });
 
     distLock()->expectLock(
         [&](StringData name,
@@ -289,6 +283,13 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
             ASSERT_EQUALS("shardCollection", whyMessage);
         },
         Status::OK());
+
+    auto future = launchAsync([&] {
+        ASSERT_EQUALS(
+            ErrorCodes::AlreadyInitialized,
+            catalogManager()->shardCollection(
+                operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
+    });
 
     expectGetDatabase(db);
 
@@ -333,12 +334,6 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
         expectedChunk.setVersion(expectedVersion);
     }
 
-    // Now start actually sharding the collection.
-    auto future = launchAsync([&] {
-        ASSERT_OK(catalogManager()->shardCollection(
-            operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
-    });
-
     distLock()->expectLock(
         [&](StringData name,
             StringData whyMessage,
@@ -348,6 +343,12 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
             ASSERT_EQUALS("shardCollection", whyMessage);
         },
         Status::OK());
+
+    // Now start actually sharding the collection.
+    auto future = launchAsync([&] {
+        ASSERT_OK(catalogManager()->shardCollection(
+            operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
+    });
 
     expectGetDatabase(db);
 
@@ -504,6 +505,16 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     vector<ChunkType> expectedChunks{
         expectedChunk0, expectedChunk1, expectedChunk2, expectedChunk3, expectedChunk4};
 
+    distLock()->expectLock(
+        [&](StringData name,
+            StringData whyMessage,
+            milliseconds waitFor,
+            milliseconds lockTryInterval) {
+            ASSERT_EQUALS(ns, name);
+            ASSERT_EQUALS("shardCollection", whyMessage);
+        },
+        Status::OK());
+
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
         set<ShardId> shards{shard0.getName(), shard1.getName(), shard2.getName()};
@@ -515,16 +526,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
             vector<BSONObj>{splitPoint0, splitPoint1, splitPoint2, splitPoint3},
             shards));
     });
-
-    distLock()->expectLock(
-        [&](StringData name,
-            StringData whyMessage,
-            milliseconds waitFor,
-            milliseconds lockTryInterval) {
-            ASSERT_EQUALS(ns, name);
-            ASSERT_EQUALS("shardCollection", whyMessage);
-        },
-        Status::OK());
 
     expectGetDatabase(db);
 
@@ -667,12 +668,6 @@ TEST_F(ShardCollectionTest, withInitialData) {
     vector<ChunkType> expectedChunks{
         expectedChunk0, expectedChunk1, expectedChunk2, expectedChunk3, expectedChunk4};
 
-    // Now start actually sharding the collection.
-    auto future = launchAsync([&] {
-        ASSERT_OK(catalogManager()->shardCollection(
-            operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
-    });
-
     distLock()->expectLock(
         [&](StringData name,
             StringData whyMessage,
@@ -682,6 +677,12 @@ TEST_F(ShardCollectionTest, withInitialData) {
             ASSERT_EQUALS("shardCollection", whyMessage);
         },
         Status::OK());
+
+    // Now start actually sharding the collection.
+    auto future = launchAsync([&] {
+        ASSERT_OK(catalogManager()->shardCollection(
+            operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
+    });
 
     expectGetDatabase(db);
 
