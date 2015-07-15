@@ -207,6 +207,7 @@ typedef struct {
 	uint32_t c_logging_archive;
 	char	*c_logging_compression;
 	uint32_t c_logging_prealloc;
+	uint32_t c_long_running_txn;
 	uint32_t c_lsm_worker_threads;
 	uint32_t c_merge_max;
 	uint32_t c_mmap;
@@ -314,6 +315,7 @@ void	 key_gen(uint8_t *, size_t *, uint64_t);
 void	 key_gen_insert(uint64_t *, uint8_t *, size_t *, uint64_t);
 void	 key_gen_setup(uint8_t **);
 void	 key_len_setup(void);
+void	*lrt(void *);
 void	 path_setup(const char *);
 uint32_t rng(uint64_t *);
 void	 track(const char *, uint64_t, TINFO *);
