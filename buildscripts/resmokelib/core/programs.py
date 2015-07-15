@@ -25,9 +25,14 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOD_EXECUTABLE)
     args = [executable]
 
-    # Apply the --setParameter command line argument.
-    set_parameter = kwargs.pop("set_parameters", {})
-    _apply_set_parameters(args, set_parameter)
+    # Apply the --setParameter command line argument. Command line options to resmoke.py override
+    # the YAML configuration.
+    suite_set_parameters = kwargs.pop("set_parameters", {})
+
+    if config.MONGOD_SET_PARAMETERS is not None:
+        suite_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
+
+    _apply_set_parameters(args, suite_set_parameters)
 
     shortcut_opts = {
         "nojournal": config.NO_JOURNAL,
@@ -72,9 +77,14 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOS_EXECUTABLE)
     args = [executable]
 
-    # Apply the --setParameter command line argument.
-    set_parameter = kwargs.pop("set_parameters", {})
-    _apply_set_parameters(args, set_parameter)
+    # Apply the --setParameter command line argument. Command line options to resmoke.py override
+    # the YAML configuration.
+    suite_set_parameters = kwargs.pop("set_parameters", {})
+
+    if config.MONGOS_SET_PARAMETERS is not None:
+        suite_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
+
+    _apply_set_parameters(args, suite_set_parameters)
 
     # Apply the rest of the command line arguments.
     _apply_kwargs(args, kwargs)

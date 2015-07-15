@@ -61,6 +61,15 @@ def dump_yaml(value):
     # Use block (indented) style for formatting YAML.
     return yaml.safe_dump(value, default_flow_style=False).rstrip()
 
+def load_yaml(value):
+    """
+    Attempts to parse 'value' as YAML.
+    """
+    try:
+        return yaml.safe_load(value)
+    except yaml.YAMLError as err:
+        raise ValueError("Attempted to parse invalid YAML value '%s': %s" % (value, err))
+
 
 def new_mongo_client(port, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000):
     """
