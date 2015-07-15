@@ -1,0 +1,15 @@
+selector:
+  js_test:
+    roots:
+    - jstestfuzz/out/*.js
+
+executor:
+  js_test:
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1
+        verbose: ''
+

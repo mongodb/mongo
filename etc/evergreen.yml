@@ -388,15 +388,9 @@ tasks:
 
           npm install || true
           npm start -- --jsTestsDir ../jstests || true
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --log=buildlogger --reportFile=report.json jstestfuzz/out/*.js
+    - func: "run tests"
+      vars:
+        resmoke_args: --suites=jstestfuzz
 
 ## integration test suites ##
 
