@@ -339,6 +339,9 @@ public:
                 16929, "Node argument must be provided to fetch", nodeArgs["node"].isABSONObj());
             PlanStage* subNode =
                 parseQuery(txn, collection, nodeArgs["node"].Obj(), workingSet, exprs);
+            uassert(28731,
+                    "Can't parse sub-node of FETCH: " + nodeArgs["node"].Obj().toString(),
+                    NULL != subNode);
             return new FetchStage(txn, workingSet, subNode, matcher, collection);
         } else if ("limit" == nodeName) {
             uassert(
@@ -348,6 +351,9 @@ public:
             uassert(16931, "Num argument must be provided to limit", nodeArgs["num"].isNumber());
             PlanStage* subNode =
                 parseQuery(txn, collection, nodeArgs["node"].Obj(), workingSet, exprs);
+            uassert(28732,
+                    "Can't parse sub-node of LIMIT: " + nodeArgs["node"].Obj().toString(),
+                    NULL != subNode);
             return new LimitStage(nodeArgs["num"].numberInt(), workingSet, subNode);
         } else if ("skip" == nodeName) {
             uassert(
@@ -356,6 +362,9 @@ public:
             uassert(16933, "Num argument must be provided to skip", nodeArgs["num"].isNumber());
             PlanStage* subNode =
                 parseQuery(txn, collection, nodeArgs["node"].Obj(), workingSet, exprs);
+            uassert(28733,
+                    "Can't parse sub-node of SKIP: " + nodeArgs["node"].Obj().toString(),
+                    NULL != subNode);
             return new SkipStage(nodeArgs["num"].numberInt(), workingSet, subNode);
         } else if ("cscan" == nodeName) {
             CollectionScanParams params;
@@ -457,6 +466,9 @@ public:
                     nodeArgs["shouldCallLogOp"].type() == Bool);
             PlanStage* subNode =
                 parseQuery(txn, collection, nodeArgs["node"].Obj(), workingSet, exprs);
+            uassert(28734,
+                    "Can't parse sub-node of DELETE: " + nodeArgs["node"].Obj().toString(),
+                    NULL != subNode);
             DeleteStageParams params;
             params.isMulti = nodeArgs["isMulti"].Bool();
             params.shouldCallLogOp = nodeArgs["shouldCallLogOp"].Bool();
