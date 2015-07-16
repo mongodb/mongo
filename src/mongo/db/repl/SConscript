@@ -61,7 +61,6 @@ env.Library(
         'database_task',
         'task_runner',
         'storage_interface',
-        '$BUILD_DIR/mongo/client/remote_command_runner',
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/util/foundation',

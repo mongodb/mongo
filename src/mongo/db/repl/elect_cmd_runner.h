@@ -57,8 +57,8 @@ public:
                   OID round);
 
         virtual ~Algorithm();
-        virtual std::vector<RemoteCommandRequest> getRequests() const;
-        virtual void processResponse(const RemoteCommandRequest& request,
+        virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
+        virtual void processResponse(const executor::RemoteCommandRequest& request,
                                      const ResponseStatus& response);
         virtual bool hasReceivedSufficientResponses() const;
 

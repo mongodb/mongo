@@ -57,12 +57,12 @@ public:
     /**
      * Returns the list of requests that should be sent.
      */
-    virtual std::vector<RemoteCommandRequest> getRequests() const = 0;
+    virtual std::vector<executor::RemoteCommandRequest> getRequests() const = 0;
 
     /**
      * Method to call once for each received response.
      */
-    virtual void processResponse(const RemoteCommandRequest& request,
+    virtual void processResponse(const executor::RemoteCommandRequest& request,
                                  const ResponseStatus& response) = 0;
 
     /**

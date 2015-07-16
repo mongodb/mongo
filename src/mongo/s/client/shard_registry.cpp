@@ -314,10 +314,10 @@ StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort
 StatusWith<BSONObj> ShardRegistry::runCommand(const HostAndPort& host,
                                               const std::string& dbName,
                                               const BSONObj& cmdObj) {
-    StatusWith<RemoteCommandResponse> responseStatus =
+    StatusWith<executor::RemoteCommandResponse> responseStatus =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
-    RemoteCommandRequest request(host, dbName, cmdObj, kConfigCommandTimeout);
+    executor::RemoteCommandRequest request(host, dbName, cmdObj, kConfigCommandTimeout);
     auto callStatus =
         _executor->scheduleRemoteCommand(request,
                                          [&responseStatus](const RemoteCommandCallbackArgs& args) {

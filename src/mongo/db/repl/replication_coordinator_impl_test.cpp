@@ -69,6 +69,9 @@ namespace repl {
 namespace {
 
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
+
 typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 Status kInterruptedStatus(ErrorCodes::Interrupted, "operation was interrupted");
 

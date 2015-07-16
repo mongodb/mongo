@@ -61,6 +61,8 @@ namespace mongo {
 namespace {
 
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 using executor::TaskExecutor;
 using std::string;
 using std::vector;

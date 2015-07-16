@@ -42,6 +42,8 @@
 namespace mongo {
 namespace repl {
 
+using executor::RemoteCommandRequest;
+
 ElectCmdRunner::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
                                      int selfIndex,
                                      const std::vector<HostAndPort>& targets,

@@ -41,6 +41,8 @@
 namespace mongo {
 namespace repl {
 
+using executor::RemoteCommandRequest;
+
 ScatterGatherRunner::ScatterGatherRunner(ScatterGatherAlgorithm* algorithm)
     : _algorithm(algorithm), _started(false) {}
 

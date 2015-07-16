@@ -38,6 +38,9 @@
 namespace mongo {
 namespace repl {
 
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
+
 const HostAndPort BaseClonerTest::target("localhost", -1);
 const NamespaceString BaseClonerTest::nss("db.coll");
 const BSONObj BaseClonerTest::idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"

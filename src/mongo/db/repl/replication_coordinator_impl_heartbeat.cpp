@@ -62,6 +62,8 @@ typedef ReplicationExecutor::CallbackHandle CBHandle;
 
 }  // namespace
 
+using executor::RemoteCommandRequest;
+
 void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::CallbackArgs cbData,
                                                     const HostAndPort& target,
                                                     int targetIndex) {

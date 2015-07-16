@@ -57,6 +57,8 @@ namespace mongo {
 using std::vector;
 using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 namespace {
 

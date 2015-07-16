@@ -48,6 +48,9 @@ namespace repl {
 namespace {
 
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
+
 typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 
 TEST_F(ReplCoordTest, ReconfigBeforeInitialized) {

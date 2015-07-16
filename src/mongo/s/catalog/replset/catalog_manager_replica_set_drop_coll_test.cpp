@@ -44,6 +44,8 @@
 namespace mongo {
 namespace {
 
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 using std::string;
 using std::vector;
 using stdx::chrono::milliseconds;

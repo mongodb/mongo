@@ -42,6 +42,8 @@
 namespace mongo {
 namespace repl {
 
+using executor::RemoteCommandRequest;
+
 VoteRequester::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
                                     long long candidateId,
                                     long long term,

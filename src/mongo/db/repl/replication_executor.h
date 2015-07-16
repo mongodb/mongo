@@ -34,7 +34,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/client/remote_command_runner.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/executor/task_executor.h"
@@ -119,7 +118,7 @@ public:
     void waitForEvent(const EventHandle& event) override;
     StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) override;
     StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) override;
-    StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
                                                      const RemoteCommandCallbackFn& cb) override;
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle) override;
@@ -262,8 +261,8 @@ private:
      */
     void finishShutdown();
 
-    void _finishRemoteCommand(const RemoteCommandRequest& request,
-                              const StatusWith<RemoteCommandResponse>& response,
+    void _finishRemoteCommand(const executor::RemoteCommandRequest& request,
+                              const StatusWith<executor::RemoteCommandResponse>& response,
                               const CallbackHandle& cbHandle,
                               const uint64_t expectedHandleGeneration,
                               const RemoteCommandCallbackFn& cb);

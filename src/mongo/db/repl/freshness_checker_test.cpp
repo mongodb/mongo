@@ -49,6 +49,8 @@ namespace repl {
 namespace {
 
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 using unittest::assertGet;
 
 bool stringContains(const std::string& haystack, const std::string& needle) {

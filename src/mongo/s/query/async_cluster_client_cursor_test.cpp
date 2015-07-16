@@ -43,6 +43,9 @@ namespace mongo {
 
 namespace {
 
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
+
 class AsyncClusterClientCursorTest : public repl::ReplicationExecutorTest {
 public:
     AsyncClusterClientCursorTest()

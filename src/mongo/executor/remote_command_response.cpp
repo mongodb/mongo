@@ -26,45 +26,19 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <string>
-
-#include "mongo/base/disallow_copying.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/time_support.h"
+
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace executor {
 
-template <typename T>
-class StatusWith;
+std::string RemoteCommandResponse::toString() const {
+    return str::stream() << "RemoteResponse -- "
+                         << " cmd:" << data.toString();
+}
 
-using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
-
-/**
- * Abstract interface used for executing commands against a MongoDB instance and retrieving
- * results. It abstracts the logic of managing connections and turns the remote instance into
- * a stateless request-response service.
- */
-class RemoteCommandRunner {
-    MONGO_DISALLOW_COPYING(RemoteCommandRunner);
-
-public:
-    virtual ~RemoteCommandRunner() = default;
-
-    /**
-     * Synchronously invokes the command described by "request" and returns the server's
-     * response or any status.
-     */
-    virtual StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request) = 0;
-
-protected:
-    RemoteCommandRunner() = default;
-};
-
+}  // namespace executor
 }  // namespace mongo

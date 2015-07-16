@@ -41,6 +41,8 @@
 namespace mongo {
 namespace repl {
 
+using executor::RemoteCommandRequest;
+
 ElectionWinnerDeclarer::Algorithm::Algorithm(const std::string& setName,
                                              long long winnerId,
                                              long long term,

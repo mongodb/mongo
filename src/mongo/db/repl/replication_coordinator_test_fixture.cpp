@@ -57,6 +57,8 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
 }  // namespace
 
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 ReplicaSetConfig ReplCoordTest::assertMakeRSConfig(const BSONObj& configBson) {
     ReplicaSetConfig config;

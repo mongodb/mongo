@@ -32,10 +32,11 @@
 
 #include "mongo/s/query/async_cluster_client_cursor.h"
 
-#include "mongo/client/remote_command_runner.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/getmore_response.h"
 #include "mongo/db/query/killcursors_request.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
@@ -202,7 +203,7 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncClusterClientCursor::nextEv
                       .toBSON()
                 : _params.cmdObj;
 
-            RemoteCommandRequest request(
+            executor::RemoteCommandRequest request(
                 remote.hostAndPort, _params.nsString.db().toString(), cmdObj);
 
             auto callbackStatus = _executor->scheduleRemoteCommand(
@@ -336,7 +337,7 @@ void AsyncClusterClientCursor::scheduleKillCursors_inlock() {
         if (remote.status.isOK() && remote.cursorId && !remote.exhausted()) {
             BSONObj cmdObj = KillCursorsRequest(_params.nsString, {*remote.cursorId}).toBSON();
 
-            RemoteCommandRequest request(
+            executor::RemoteCommandRequest request(
                 remote.hostAndPort, _params.nsString.db().toString(), cmdObj);
 
             _executor->scheduleRemoteCommand(

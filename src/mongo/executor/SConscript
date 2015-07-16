@@ -5,14 +5,20 @@ Import("env")
 env.InjectThirdPartyIncludePaths('asio')
 
 env.Library(target='task_executor_interface',
-            source=['task_executor.cpp',],
+            source=[
+                'remote_command_request.cpp',
+                'remote_command_response.cpp',
+                'task_executor.cpp',
+            ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/db/service_context',
+                '$BUILD_DIR/mongo/rpc/metadata',
+                '$BUILD_DIR/mongo/util/net/hostandport',
             ])
 
 env.Library(target='network_interface',
             source=['network_interface.cpp',],
             LIBDEPS=[
+                'task_executor_interface',
             ])
 
 env.Library(target='network_interface_impl', # TODO: rename to thread_pool_network_interface
@@ -99,6 +105,5 @@ env.CppUnitTest(
     LIBDEPS=[
         'thread_pool_task_executor',
         'task_executor_test_fixture',
-        '$BUILD_DIR/mongo/client/remote_command_runner',
     ]
 )

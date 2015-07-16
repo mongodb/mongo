@@ -45,6 +45,8 @@
 namespace mongo {
 namespace repl {
 
+using executor::RemoteCommandRequest;
+
 QuorumChecker::QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex)
     : _rsConfig(rsConfig),
       _myIndex(myIndex),

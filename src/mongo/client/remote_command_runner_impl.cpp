@@ -42,6 +42,9 @@
 namespace mongo {
 namespace {
 
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
+
 /**
  * Calculates the timeout for a network operation expiring at "expDate", given
  * that it is now "nowDate".

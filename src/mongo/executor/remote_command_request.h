@@ -30,41 +30,59 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/metadata.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-template <typename T>
-class StatusWith;
-
-using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
+namespace executor {
 
 /**
- * Abstract interface used for executing commands against a MongoDB instance and retrieving
- * results. It abstracts the logic of managing connections and turns the remote instance into
- * a stateless request-response service.
+ * Type of object describing a command to execute against a remote MongoDB node.
  */
-class RemoteCommandRunner {
-    MONGO_DISALLOW_COPYING(RemoteCommandRunner);
+struct RemoteCommandRequest {
+    // Indicates that there is no timeout for the request to complete
+    static const Milliseconds kNoTimeout;
 
-public:
-    virtual ~RemoteCommandRunner() = default;
+    // Indicates that there is no expiration time by when the request needs to complete
+    static const Date_t kNoExpirationDate;
 
-    /**
-     * Synchronously invokes the command described by "request" and returns the server's
-     * response or any status.
-     */
-    virtual StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request) = 0;
+    RemoteCommandRequest() = default;
 
-protected:
-    RemoteCommandRunner() = default;
+    RemoteCommandRequest(const HostAndPort& theTarget,
+                         const std::string& theDbName,
+                         const BSONObj& theCmdObj,
+                         const BSONObj& metadataObj,
+                         const Milliseconds timeoutMillis = kNoTimeout)
+        : target(theTarget),
+          dbname(theDbName),
+          metadata(metadataObj),
+          cmdObj(theCmdObj),
+          timeout(timeoutMillis) {
+        if (timeoutMillis == kNoTimeout) {
+            expirationDate = kNoExpirationDate;
+        }
+    }
+
+    RemoteCommandRequest(const HostAndPort& theTarget,
+                         const std::string& theDbName,
+                         const BSONObj& theCmdObj,
+                         const Milliseconds timeoutMillis = kNoTimeout)
+        : RemoteCommandRequest(
+              theTarget, theDbName, theCmdObj, rpc::makeEmptyMetadata(), timeoutMillis) {}
+
+    std::string toString() const;
+
+    HostAndPort target;
+    std::string dbname;
+    BSONObj metadata{rpc::makeEmptyMetadata()};
+    BSONObj cmdObj;
+    Milliseconds timeout = kNoTimeout;
+
+    // Deadline by when the request must be completed
+    Date_t expirationDate = kNoExpirationDate;
 };
 
+}  // namespace executor
 }  // namespace mongo

@@ -64,6 +64,8 @@ namespace repl {
 namespace {
 
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 class CheckQuorumTest : public mongo::unittest::Test {
 protected:

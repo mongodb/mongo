@@ -42,6 +42,8 @@ namespace repl {
 namespace {
 
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 /**
  * Algorithm for testing the ScatterGatherRunner, which will finish running when finish() is

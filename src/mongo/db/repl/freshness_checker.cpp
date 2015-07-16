@@ -46,6 +46,8 @@
 namespace mongo {
 namespace repl {
 
+using executor::RemoteCommandRequest;
+
 FreshnessChecker::Algorithm::Algorithm(Timestamp lastOpTimeApplied,
                                        const ReplicaSetConfig& rsConfig,
                                        int selfIndex,

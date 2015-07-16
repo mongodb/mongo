@@ -38,6 +38,8 @@
 namespace mongo {
 namespace repl {
 
+using executor::RemoteCommandRequest;
+
 Reporter::Reporter(ReplicationExecutor* executor,
                    PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn,
                    const HostAndPort& target)

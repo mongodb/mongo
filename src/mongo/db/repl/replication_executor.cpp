@@ -49,6 +49,8 @@ stdx::function<void()> makeNoExcept(const stdx::function<void()>& fn);
 }  // namespace
 
 using executor::NetworkInterface;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface,
                                          StorageInterface* storageInterface,

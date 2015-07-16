@@ -40,7 +40,6 @@ namespace mongo {
 class BSONObj;
 class CatalogManagerReplicaSet;
 class DistLockManagerMock;
-struct RemoteCommandRequest;
 class RemoteCommandTargeterFactoryMock;
 class RemoteCommandTargeterMock;
 class ShardRegistry;

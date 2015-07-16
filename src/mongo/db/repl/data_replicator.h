@@ -65,8 +65,8 @@ using Event = ReplicationExecutor::EventHandle;
 using Handle = ReplicationExecutor::CallbackHandle;
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using NextAction = Fetcher::NextAction;
-using Request = RemoteCommandRequest;
-using Response = RemoteCommandResponse;
+using Request = executor::RemoteCommandRequest;
+using Response = executor::RemoteCommandResponse;
 using TimestampStatus = StatusWith<Timestamp>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 

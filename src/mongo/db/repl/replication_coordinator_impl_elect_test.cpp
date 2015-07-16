@@ -49,6 +49,8 @@ namespace repl {
 namespace {
 
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 class ReplCoordElectTest : public ReplCoordTest {
 protected:

@@ -26,35 +26,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/client/remote_command_runner.h"
+#include <string>
 
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
+namespace executor {
 
-const Milliseconds RemoteCommandRequest::kNoTimeout{-1};
-const Date_t RemoteCommandRequest::kNoExpirationDate{Date_t::max()};
 
-std::string RemoteCommandRequest::toString() const {
-    str::stream out;
-    out << "RemoteCommand -- target:" << target.toString() << " db:" << dbname;
+/**
+ * Type of object describing the response of previously sent RemoteCommandRequest.
+ */
+struct RemoteCommandResponse {
+    RemoteCommandResponse() = default;
 
-    if (expirationDate != kNoExpirationDate) {
-        out << " expDate:" << expirationDate.toString();
-    }
+    RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj, Milliseconds millis)
+        : data(std::move(dataObj)), metadata(std::move(metadataObj)), elapsedMillis(millis) {}
 
-    out << " cmd:" << cmdObj.toString();
-    return out;
-}
+    std::string toString() const;
 
-std::string RemoteCommandResponse::toString() const {
-    str::stream out;
-    out << "RemoteResponse -- "
-        << " cmd:" << data.toString();
+    BSONObj data;
+    BSONObj metadata;
+    Milliseconds elapsedMillis = {};
+};
 
-    return out;
-}
-
+}  // namespace executor
 }  // namespace mongo

@@ -42,6 +42,8 @@
 namespace mongo {
 namespace {
 
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 using std::vector;
 
 using CatalogManagerReplSetTest = CatalogManagerReplSetTestFixture;

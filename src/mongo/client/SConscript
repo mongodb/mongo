@@ -94,31 +94,21 @@ env.Library(
 )
 
 env.Library(
-    target='remote_command_runner',
-    source=[
-        'remote_command_runner.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/util/foundation',
-        '$BUILD_DIR/mongo/util/net/hostandport',
-    ]
-)
-
-env.Library(
     target='remote_command_runner_impl',
     source=[
         'remote_command_runner_impl.cpp',
     ],
     LIBDEPS=[
-        'connection_pool',
-        'remote_command_runner',
+        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/lite_parsed_query',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+        'connection_pool',
     ]
 )
 

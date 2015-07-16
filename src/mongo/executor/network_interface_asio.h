@@ -37,8 +37,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/connection_pool.h"
-#include "mongo/client/remote_command_runner.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/stdx/condition_variable.h"
