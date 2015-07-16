@@ -61,7 +61,7 @@ public:
                    const FTSQuery& query,
                    const FTSSpec& spec,
                    WorkingSet* ws);
-    ~TextMatchStage() final;
+    ~TextMatchStage();
 
     void addChild(PlanStage* child);
 

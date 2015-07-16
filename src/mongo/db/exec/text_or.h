@@ -78,7 +78,7 @@ public:
                 WorkingSet* ws,
                 const MatchExpression* filter,
                 IndexDescriptor* index);
-    ~TextOrStage() final;
+    ~TextOrStage();
 
     void addChild(unique_ptr<PlanStage> child);
 

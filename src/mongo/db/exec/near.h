@@ -87,17 +87,17 @@ class NearStage : public PlanStage {
 public:
     struct CoveredInterval;
 
-    virtual ~NearStage();
+    ~NearStage();
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState work(WorkingSetID* out) final;
 
-    virtual void doReattachToOperationContext(OperationContext* opCtx);
-    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
-    virtual StageType stageType() const;
-    virtual std::unique_ptr<PlanStageStats> getStats();
-    virtual const SpecificStats* getSpecificStats() const;
+    StageType stageType() const final;
+    std::unique_ptr<PlanStageStats> getStats() final;
+    const SpecificStats* getSpecificStats() const final;
 
 protected:
     /**

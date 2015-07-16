@@ -41,21 +41,21 @@ namespace mongo {
  *
  * Preconditions: None.
  */
-class SkipStage : public PlanStage {
+class SkipStage final : public PlanStage {
 public:
     SkipStage(long long toSkip, WorkingSet* ws, PlanStage* child);
-    virtual ~SkipStage();
+    ~SkipStage();
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState work(WorkingSetID* out) final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_SKIP;
     }
 
-    virtual std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 

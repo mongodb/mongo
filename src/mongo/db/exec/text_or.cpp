@@ -297,7 +297,7 @@ public:
         return getObj();
     }
 
-    virtual ElementIterator* allocateIterator(const ElementPath* path) const {
+    ElementIterator* allocateIterator(const ElementPath* path) const final {
         WorkingSetMember* member = _ws->get(_id);
         if (!member->hasObj()) {
             // Try to look in the key.
@@ -323,7 +323,7 @@ public:
         return new BSONElementIterator(path, getObj());
     }
 
-    virtual void releaseIterator(ElementIterator* iterator) const {
+    void releaseIterator(ElementIterator* iterator) const final {
         delete iterator;
     }
 

@@ -43,25 +43,25 @@ namespace mongo {
  *
  * If we're deduping, we may fail to dedup any invalidated RecordId properly.
  */
-class OrStage : public PlanStage {
+class OrStage final : public PlanStage {
 public:
     OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter);
 
     void addChild(PlanStage* child);
 
-    virtual bool isEOF();
+    bool isEOF() final;
 
-    virtual StageState work(WorkingSetID* out);
+    StageState work(WorkingSetID* out) final;
 
-    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_OR;
     }
 
-    virtual std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 

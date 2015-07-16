@@ -459,13 +459,11 @@ public:
         initPath(twoDPath);
     }
 
-    virtual ~TwoDPtInAnnulusExpression() {}
-
-    virtual void toBSON(BSONObjBuilder* out) const {
+    void toBSON(BSONObjBuilder* out) const final {
         out->append("TwoDPtInAnnulusExpression", true);
     }
 
-    virtual bool matchesSingleElement(const BSONElement& e) const {
+    bool matchesSingleElement(const BSONElement& e) const final {
         if (!e.isABSONObj())
             return false;
 
@@ -480,16 +478,16 @@ public:
     // These won't be called.
     //
 
-    virtual void debugString(StringBuilder& debug, int level = 0) const {
+    void debugString(StringBuilder& debug, int level = 0) const final {
         invariant(false);
     }
 
-    virtual bool equivalent(const MatchExpression* other) const {
+    bool equivalent(const MatchExpression* other) const final {
         invariant(false);
         return false;
     }
 
-    virtual unique_ptr<MatchExpression> shallowClone() const {
+    unique_ptr<MatchExpression> shallowClone() const final {
         invariant(false);
         return NULL;
     }
@@ -499,7 +497,7 @@ private:
 };
 
 // Helper class to maintain ownership of a match expression alongside an index scan
-class FetchStageWithMatch : public FetchStage {
+class FetchStageWithMatch final : public FetchStage {
 public:
     FetchStageWithMatch(OperationContext* txn,
                         WorkingSet* ws,
@@ -507,8 +505,6 @@ public:
                         MatchExpression* filter,
                         const Collection* collection)
         : FetchStage(txn, ws, child, filter, collection), _matcher(filter) {}
-
-    virtual ~FetchStageWithMatch() {}
 
 private:
     // Owns matcher

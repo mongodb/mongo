@@ -69,23 +69,23 @@ class CollectionMetadata;
  * Preconditions: Child must be fetched.  TODO: when covering analysis is in just build doc
  * and check that against shard key.  See SERVER-5022.
  */
-class ShardFilterStage : public PlanStage {
+class ShardFilterStage final : public PlanStage {
 public:
     ShardFilterStage(const std::shared_ptr<CollectionMetadata>& metadata,
                      WorkingSet* ws,
                      PlanStage* child);
-    virtual ~ShardFilterStage();
+    ~ShardFilterStage();
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState work(WorkingSetID* out) final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_SHARDING_FILTER;
     }
 
-    virtual std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 

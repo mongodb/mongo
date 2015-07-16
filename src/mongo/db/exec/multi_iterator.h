@@ -45,36 +45,34 @@ namespace mongo {
  * special commands that work with RecordCursors. For example, it is used by the
  * parallelCollectionScan and repairCursor commands
  */
-class MultiIteratorStage : public PlanStage {
+class MultiIteratorStage final : public PlanStage {
 public:
     MultiIteratorStage(OperationContext* txn, WorkingSet* ws, Collection* collection);
 
-    ~MultiIteratorStage() {}
-
     void addIterator(std::unique_ptr<RecordCursor> it);
 
-    virtual PlanStage::StageState work(WorkingSetID* out);
+    PlanStage::StageState work(WorkingSetID* out) final;
 
-    virtual bool isEOF();
+    bool isEOF() final;
 
     void kill();
 
-    virtual void doSaveState();
-    virtual void doRestoreState();
-    virtual void doDetachFromOperationContext();
-    virtual void doReattachToOperationContext(OperationContext* opCtx);
-    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doSaveState() final;
+    void doRestoreState() final;
+    void doDetachFromOperationContext() final;
+    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     // Returns empty PlanStageStats object
-    virtual std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
     // Not used.
-    virtual SpecificStats* getSpecificStats() const {
+    SpecificStats* getSpecificStats() const final {
         return NULL;
     }
 
     // Not used.
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_MULTI_ITERATOR;
     }
 

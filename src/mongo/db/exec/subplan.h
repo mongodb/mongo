@@ -64,7 +64,7 @@ class OperationContext;
  *
  *   --Plans for entire rooted $or queries are neither written to nor read from the plan cache.
  */
-class SubplanStage : public PlanStage {
+class SubplanStage final : public PlanStage {
 public:
     SubplanStage(OperationContext* txn,
                  Collection* collection,
@@ -74,18 +74,18 @@ public:
 
     static bool canUseSubplanning(const CanonicalQuery& query);
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState work(WorkingSetID* out) final;
 
-    virtual void doReattachToOperationContext(OperationContext* opCtx);
+    void doReattachToOperationContext(OperationContext* opCtx) final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_SUBPLAN;
     }
 
     std::unique_ptr<PlanStageStats> getStats();
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 

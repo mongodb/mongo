@@ -42,21 +42,21 @@ namespace mongo {
  *
  * Preconditions: None.
  */
-class LimitStage : public PlanStage {
+class LimitStage final : public PlanStage {
 public:
     LimitStage(long long limit, WorkingSet* ws, PlanStage* child);
-    virtual ~LimitStage();
+    ~LimitStage();
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState work(WorkingSetID* out) final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_LIMIT;
     }
 
-    virtual std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 

@@ -58,7 +58,7 @@ namespace mongo {
  * Why is this a stage?  Because we want to yield, and we want to be notified of RecordId
  * invalidations.  :(
  */
-class OplogStart : public PlanStage {
+class OplogStart final : public PlanStage {
 public:
     // Does not take ownership.
     OplogStart(OperationContext* txn,
@@ -66,27 +66,27 @@ public:
                MatchExpression* filter,
                WorkingSet* ws);
 
-    virtual StageState work(WorkingSetID* out);
-    virtual bool isEOF();
+    StageState work(WorkingSetID* out) final;
+    bool isEOF() final;
 
-    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-    virtual void doSaveState();
-    virtual void doRestoreState();
-    virtual void doDetachFromOperationContext();
-    virtual void doReattachToOperationContext(OperationContext* opCtx);
+    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+    void doSaveState() final;
+    void doRestoreState() final;
+    void doDetachFromOperationContext() final;
+    void doReattachToOperationContext(OperationContext* opCtx) final;
 
     // Returns empty PlanStageStats object
-    virtual std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
     //
     // Exec stats -- do not call for the oplog start stage.
     //
 
-    virtual const SpecificStats* getSpecificStats() const {
+    const SpecificStats* getSpecificStats() const final {
         return NULL;
     }
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_OPLOG_START;
     }
 

@@ -49,14 +49,12 @@ using stdx::make_unique;
  * Stage which takes in an array of BSONObjs and returns them.
  * If the BSONObj is in the form of a Status, returns the Status as a FAILURE.
  */
-class MockStage : public PlanStage {
+class MockStage final : public PlanStage {
 public:
     MockStage(const vector<BSONObj>& data, WorkingSet* workingSet)
         : PlanStage("MOCK_STAGE"), _data(data), _pos(0), _workingSet(workingSet) {}
 
-    virtual ~MockStage() {}
-
-    virtual StageState work(WorkingSetID* out) {
+    StageState work(WorkingSetID* out) final {
         ++_commonStats.works;
 
         if (isEOF())
@@ -78,19 +76,19 @@ public:
         return PlanStage::ADVANCED;
     }
 
-    virtual bool isEOF() {
+    bool isEOF() final {
         return _pos == static_cast<int>(_data.size());
     }
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_UNKNOWN;
     }
 
-    virtual unique_ptr<PlanStageStats> getStats() {
+    unique_ptr<PlanStageStats> getStats() final {
         return make_unique<PlanStageStats>(_commonStats, STAGE_UNKNOWN);
     }
 
-    virtual const SpecificStats* getSpecificStats() const {
+    const SpecificStats* getSpecificStats() const final {
         return NULL;
     }
 
@@ -106,7 +104,7 @@ private:
  * Stage which implements a basic distance search, and interprets the "distance" field of
  * fetched documents as the distance.
  */
-class MockNearStage : public NearStage {
+class MockNearStage final : public NearStage {
 public:
     struct MockInterval {
         MockInterval(const vector<BSONObj>& data, double min, double max)
@@ -119,8 +117,6 @@ public:
 
     MockNearStage(WorkingSet* workingSet)
         : NearStage(NULL, "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, NULL), _pos(0) {}
-
-    virtual ~MockNearStage() {}
 
     void addInterval(vector<BSONObj> data, double min, double max) {
         _intervals.mutableVector().push_back(new MockInterval(data, min, max));
@@ -140,7 +136,7 @@ public:
             _children.back().get(), true, interval.min, interval.max, lastInterval));
     }
 
-    virtual StatusWith<double> computeDistance(WorkingSetMember* member) {
+    StatusWith<double> computeDistance(WorkingSetMember* member) final {
         ASSERT(member->hasObj());
         return StatusWith<double>(member->obj.value()["distance"].numberDouble());
     }

@@ -51,7 +51,7 @@ class PlanYieldPolicy;
  * Preconditions: Valid RecordId.
  *
  */
-class CachedPlanStage : public PlanStage {
+class CachedPlanStage final : public PlanStage {
 public:
     CachedPlanStage(OperationContext* txn,
                     Collection* collection,
@@ -61,20 +61,20 @@ public:
                     size_t decisionWorks,
                     PlanStage* root);
 
-    virtual bool isEOF();
+    bool isEOF() final;
 
-    virtual StageState work(WorkingSetID* out);
+    StageState work(WorkingSetID* out) final;
 
-    virtual void doReattachToOperationContext(OperationContext* opCtx);
-    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_CACHED_PLAN;
     }
 
-    virtual std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 

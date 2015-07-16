@@ -69,7 +69,7 @@ struct TextStageParams {
  *
  * Output type: LOC_AND_OBJ.
  */
-class TextStage : public PlanStage {
+class TextStage final : public PlanStage {
 public:
     TextStage(OperationContext* txn,
               const TextStageParams& params,

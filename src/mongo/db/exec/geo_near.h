@@ -63,7 +63,7 @@ struct GeoNearParams {
 /**
  * Implementation of GeoNear on top of a 2D index
  */
-class GeoNear2DStage : public NearStage {
+class GeoNear2DStage final : public NearStage {
 public:
     GeoNear2DStage(const GeoNearParams& nearParams,
                    OperationContext* txn,
@@ -72,16 +72,16 @@ public:
                    IndexDescriptor* twoDIndex);
 
 protected:
-    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
-                                                      WorkingSet* workingSet,
-                                                      Collection* collection);
+    StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
+                                              WorkingSet* workingSet,
+                                              Collection* collection) final;
 
-    virtual StatusWith<double> computeDistance(WorkingSetMember* member);
+    StatusWith<double> computeDistance(WorkingSetMember* member) final;
 
-    virtual PlanStage::StageState initialize(OperationContext* txn,
-                                             WorkingSet* workingSet,
-                                             Collection* collection,
-                                             WorkingSetID* out);
+    PlanStage::StageState initialize(OperationContext* txn,
+                                     WorkingSet* workingSet,
+                                     Collection* collection,
+                                     WorkingSetID* out) final;
 
 private:
     const GeoNearParams _nearParams;
@@ -109,7 +109,7 @@ private:
 /**
  * Implementation of GeoNear on top of a 2DSphere (S2) index
  */
-class GeoNear2DSphereStage : public NearStage {
+class GeoNear2DSphereStage final : public NearStage {
 public:
     GeoNear2DSphereStage(const GeoNearParams& nearParams,
                          OperationContext* txn,
@@ -117,19 +117,19 @@ public:
                          Collection* collection,
                          IndexDescriptor* s2Index);
 
-    virtual ~GeoNear2DSphereStage();
+    ~GeoNear2DSphereStage();
 
 protected:
-    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
-                                                      WorkingSet* workingSet,
-                                                      Collection* collection);
+    StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
+                                              WorkingSet* workingSet,
+                                              Collection* collection) final;
 
-    virtual StatusWith<double> computeDistance(WorkingSetMember* member);
+    StatusWith<double> computeDistance(WorkingSetMember* member) final;
 
-    virtual PlanStage::StageState initialize(OperationContext* txn,
-                                             WorkingSet* workingSet,
-                                             Collection* collection,
-                                             WorkingSetID* out);
+    PlanStage::StageState initialize(OperationContext* txn,
+                                     WorkingSet* workingSet,
+                                     Collection* collection,
+                                     WorkingSetID* out) final;
 
 private:
     const GeoNearParams _nearParams;

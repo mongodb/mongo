@@ -43,7 +43,7 @@ class RecordCursor;
  * A standalone stage implementing the fast path for key-value retrievals
  * via the _id index.
  */
-class IDHackStage : public PlanStage {
+class IDHackStage final : public PlanStage {
 public:
     /** Takes ownership of all the arguments -collection. */
     IDHackStage(OperationContext* txn,
@@ -53,29 +53,29 @@ public:
 
     IDHackStage(OperationContext* txn, Collection* collection, const BSONObj& key, WorkingSet* ws);
 
-    virtual ~IDHackStage();
+    ~IDHackStage();
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState work(WorkingSetID* out) final;
 
-    virtual void doSaveState();
-    virtual void doRestoreState();
-    virtual void doDetachFromOperationContext();
-    virtual void doReattachToOperationContext(OperationContext* opCtx);
-    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doSaveState() final;
+    void doRestoreState() final;
+    void doDetachFromOperationContext() final;
+    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     /**
      * ID Hack has a very strict criteria for the queries it supports.
      */
     static bool supportsQuery(const CanonicalQuery& query);
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_IDHACK;
     }
 
     std::unique_ptr<PlanStageStats> getStats();
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 

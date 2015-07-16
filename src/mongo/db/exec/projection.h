@@ -73,20 +73,20 @@ struct ProjectionStageParams {
 /**
  * This stage computes a projection.
  */
-class ProjectionStage : public PlanStage {
+class ProjectionStage final : public PlanStage {
 public:
     ProjectionStage(const ProjectionStageParams& params, WorkingSet* ws, PlanStage* child);
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState work(WorkingSetID* out) final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_PROJECTION;
     }
 
     std::unique_ptr<PlanStageStats> getStats();
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     typedef unordered_set<StringData, StringData::Hasher> FieldSet;
 

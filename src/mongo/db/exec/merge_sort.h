@@ -53,7 +53,7 @@ class MergeSortStageParams;
  * Preconditions: For each field in 'pattern' all inputs in the child must handle a
  * getFieldDotted for that field.
  */
-class MergeSortStage : public PlanStage {
+class MergeSortStage final : public PlanStage {
 public:
     MergeSortStage(const MergeSortStageParams& params,
                    WorkingSet* ws,
@@ -61,18 +61,18 @@ public:
 
     void addChild(PlanStage* child);
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState work(WorkingSetID* out) final;
 
-    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_SORT_MERGE;
     }
 
     std::unique_ptr<PlanStageStats> getStats();
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 

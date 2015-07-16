@@ -44,21 +44,21 @@ namespace mongo {
  * results when possible.  The query planner is responsible for determining when it's valid to
  * merge these results.
  */
-class KeepMutationsStage : public PlanStage {
+class KeepMutationsStage final : public PlanStage {
 public:
     KeepMutationsStage(const MatchExpression* filter, WorkingSet* ws, PlanStage* child);
-    virtual ~KeepMutationsStage();
+    ~KeepMutationsStage();
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState work(WorkingSetID* out) final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_KEEP_MUTATIONS;
     }
 
-    virtual std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 

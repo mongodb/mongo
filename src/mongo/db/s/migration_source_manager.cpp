@@ -81,19 +81,19 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual bool isEOF() {
+    bool isEOF() final {
         MONGO_UNREACHABLE;
     }
 
-    virtual unique_ptr<PlanStageStats> getStats() {
+    unique_ptr<PlanStageStats> getStats() final {
         MONGO_UNREACHABLE;
     }
 
-    virtual SpecificStats* getSpecificStats() const {
+    SpecificStats* getSpecificStats() const final {
         MONGO_UNREACHABLE;
     }
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_NOTIFY_DELETE;
     }
 

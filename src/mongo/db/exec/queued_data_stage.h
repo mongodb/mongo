@@ -45,15 +45,15 @@ class RecordId;
  * queue.  Calls to QueuedDataStage::work() pop values off that queue and return them in FIFO
  * order, annotating the working set with data when appropriate.
  */
-class QueuedDataStage : public PlanStage {
+class QueuedDataStage final : public PlanStage {
 public:
     QueuedDataStage(WorkingSet* ws);
 
-    virtual StageState work(WorkingSetID* out);
+    StageState work(WorkingSetID* out) final;
 
-    virtual bool isEOF();
+    bool isEOF() final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_QUEUED_DATA;
     }
 
@@ -61,9 +61,9 @@ public:
     // Exec stats
     //
 
-    virtual std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     /**
      * Add a result to the back of the queue.

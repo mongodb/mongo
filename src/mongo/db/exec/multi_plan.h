@@ -49,7 +49,7 @@ namespace mongo {
  *
  * Owns the query solutions and PlanStage roots for all candidate plans.
  */
-class MultiPlanStage : public PlanStage {
+class MultiPlanStage final : public PlanStage {
 public:
     /**
      * Takes no ownership.
@@ -62,22 +62,22 @@ public:
                    CanonicalQuery* cq,
                    bool shouldCache = true);
 
-    virtual bool isEOF();
+    bool isEOF() final;
 
-    virtual StageState work(WorkingSetID* out);
+    StageState work(WorkingSetID* out) final;
 
-    virtual void doReattachToOperationContext(OperationContext* opCtx);
+    void doReattachToOperationContext(OperationContext* opCtx) final;
 
-    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_MULTI_PLAN;
     }
 
-    virtual std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
 
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     /**
      * Takes ownership of QuerySolution and PlanStage. not of WorkingSet
