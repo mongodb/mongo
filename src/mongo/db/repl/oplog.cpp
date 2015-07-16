@@ -738,10 +738,15 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
     const char* opType = fieldOp.valuestrsafe();
     invariant(*opType == 'c');  // only commands are processed here
 
-    BSONObj o;
-    if (fieldO.isABSONObj()) {
-        o = fieldO.embeddedObject();
+    if (fieldO.eoo()) {
+        return Status(ErrorCodes::NoSuchKey, "Missing expected field 'o'");
     }
+
+    if (!fieldO.isABSONObj()) {
+        return Status(ErrorCodes::BadValue, "Expected object for field 'o'");
+    }
+
+    BSONObj o = fieldO.embeddedObject();
 
     const char* ns = fieldNs.valuestrsafe();
 
@@ -752,7 +757,13 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
     bool done = false;
 
     while (!done) {
-        ApplyOpMetadata curOpToApply = opsMap.find(o.firstElementFieldName())->second;
+        auto op = opsMap.find(o.firstElementFieldName());
+        if (op == opsMap.end()) {
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() << "Invalid key '" << o.firstElementFieldName()
+                                                    << "' found in field 'o'");
+        }
+        ApplyOpMetadata curOpToApply = op->second;
         Status status = Status::OK();
         try {
             status = curOpToApply.applyFunc(txn, ns, o);
