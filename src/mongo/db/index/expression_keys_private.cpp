@@ -40,6 +40,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/s2_indexing_params.h"
+#include "mongo/db/index/s2_keys.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -75,20 +76,9 @@ void addKey(const string& root, const BSONElement& e, BSONObjSet* keys) {
 // Helper functions for getS2Keys
 //
 
-static void S2KeysFromRegion(S2RegionCoverer* coverer,
-                             const S2Region& region,
-                             vector<string>* out) {
-    vector<S2CellId> covering;
-    coverer->GetCovering(region, &covering);
-    for (size_t i = 0; i < covering.size(); ++i) {
-        out->push_back(covering[i].toString());
-    }
-}
-
-
 Status S2GetKeysForElement(const BSONElement& element,
                            const S2IndexingParams& params,
-                           vector<string>* out) {
+                           vector<S2CellId>* out) {
     GeometryContainer geoContainer;
     Status status = geoContainer.parseFromStorage(element);
     if (!status.isOK())
@@ -119,7 +109,7 @@ Status S2GetKeysForElement(const BSONElement& element,
 
     invariant(geoContainer.hasS2Region());
 
-    S2KeysFromRegion(&coverer, geoContainer.getS2Region(), out);
+    coverer.GetCovering(geoContainer.getS2Region(), out);
     return Status::OK();
 }
 
@@ -133,7 +123,7 @@ void getS2GeoKeys(const BSONObj& document,
                   const S2IndexingParams& params,
                   BSONObjSet* out) {
     for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
-        vector<string> cells;
+        vector<S2CellId> cells;
         Status status = S2GetKeysForElement(*i, params, &cells);
         uassert(16755,
                 str::stream() << "Can't extract geo keys: " << document << "  " << status.reason(),
@@ -143,9 +133,15 @@ void getS2GeoKeys(const BSONObj& document,
                 "Unable to generate keys for (likely malformed) geometry: " + document.toString(),
                 cells.size() > 0);
 
-        for (vector<string>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
+        for (vector<S2CellId>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
             BSONObjBuilder b;
-            b.append("", *it);
+            if (params.indexVersion < S2_INDEX_VERSION_3) {
+                b.append("", it->toString());
+            } else {
+                b.append("", S2CellIdToIndexKey(*it));
+            }
+
+
             out->insert(b.obj());
         }
     }

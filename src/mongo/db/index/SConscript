@@ -19,11 +19,13 @@ env.Library(
         ],
         LIBDEPS=[
             'expression_params',
+            's2_keys',
             '$BUILD_DIR/mongo/bson/bson',
             '$BUILD_DIR/mongo/db/fts/base',
             '$BUILD_DIR/mongo/db/geo/geoparser',
             '$BUILD_DIR/mongo/db/index_names',
             '$BUILD_DIR/mongo/db/mongohasher',
+            '$BUILD_DIR/mongo/db/query/index_bounds', # needed for s2_keys
             '$BUILD_DIR/third_party/s2/s2',
         ],
 )
@@ -35,6 +37,7 @@ env.Library(
         ],
         LIBDEPS=[
             'key_generator',
+            'expression_params',
             '$BUILD_DIR/mongo/bson/bson',
         ],
 )
@@ -61,5 +64,11 @@ env.CppUnitTest(
         LIBDEPS=[
             'key_generator',
             '$BUILD_DIR/mongo/db/mongohasher',
+        ],
+)
+
+env.Library('s2_keys', [ 's2_keys.cpp' ],
+        LIBDEPS=[
+                '$BUILD_DIR/mongo/db/geo/geometry',
         ],
 )

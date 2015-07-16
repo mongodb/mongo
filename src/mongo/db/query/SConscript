@@ -81,9 +81,10 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/bson/bson",
-        "$BUILD_DIR/mongo/db/matcher/expressions_geo",
         "$BUILD_DIR/mongo/db/index_names",
         "$BUILD_DIR/mongo/db/index/expression_params",
+        "$BUILD_DIR/mongo/db/index/s2_keys",
+        "$BUILD_DIR/mongo/db/matcher/expressions_geo",
         "$BUILD_DIR/mongo/db/mongohasher",
         "$BUILD_DIR/mongo/db/server_parameters",
     ],
