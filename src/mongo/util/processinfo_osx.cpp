@@ -147,8 +147,9 @@ Variant getSysctlByName(const char* sysctlName) {
         log() << sysctlName << " unavailable" << endl;
         return "";
     }
-    value.resize(len);
-    return value;
+
+    // Drop any trailing NULL bytes by constructing Variant from a C string.
+    return value.c_str();
 }
 
 /**
