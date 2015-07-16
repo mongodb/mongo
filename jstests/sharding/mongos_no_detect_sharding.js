@@ -24,6 +24,7 @@ assert.eq( coll.getShardVersion().ok, 0 )
 
 admin.runCommand({ enableSharding : "test" })
 admin.runCommand({ shardCollection : "test.foo", key : { _id : 1 } })
+mongos.getDB('test').foo.findOne(); // TODO remove as part of SERVER-19319
 
 print( "Seeing if data gets inserted unsharded..." )
 print( "No splits occur here!" )

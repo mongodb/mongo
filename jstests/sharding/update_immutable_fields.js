@@ -12,6 +12,7 @@ var shard0 = st.shard0;
 printjson(config.adminCommand({enableSharding : coll.getDB() + ""}))
 st.ensurePrimaryShard(coll.getDB().getName(), 'shard0000');
 printjson(config.adminCommand({shardCollection : "" + coll, key : {a : 1}}))
+coll.findOne(); // TODO remove as part of SERVER-19319
 
 var getDirectShardedConn = function( st, collName ) {
 
