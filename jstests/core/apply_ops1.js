@@ -39,6 +39,22 @@
     assert.commandWorked(db.adminCommand({applyOps: [{op: 'n', ns: ''}]}),
                          'applyOps should work on no op operation with empty "ns" field value');
 
+    // Missing 'o' field value in an operation of type 'c' (command).
+    assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: 'foo'}]}),
+                         'applyOps should fail on command operation without "o" field');
+
+    // Non-object 'o' field value in an operation of type 'c' (command).
+    assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: 'foo', o: 'bar'}]}),
+                         'applyOps should fail on command operation with non-object "o" field');
+
+    // Empty object 'o' field value in an operation of type 'c' (command).
+    assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: 'foo', o: {}}]}),
+                         'applyOps should fail on command operation with empty object "o" field');
+
+    // Unknown key in 'o' field value in an operation of type 'c' (command).
+    assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: 'foo', o: {a: 1}}]}),
+                         'applyOps should fail on command operation on unknown key in "o" field');
+
     // Empty 'ns' field value in operation type other than 'n'.
     assert.commandFailed(
       db.adminCommand({applyOps: [{op: 'c', ns: ''}]}),
