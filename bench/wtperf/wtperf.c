@@ -116,12 +116,7 @@ static inline uint64_t
 decode_key(CONFIG *cfg, char *key_buf)
 {
 	char *endPtr;
-	uint32_t i;
-	i= 0;
-	for (;i < cfg->key_sz; i++)
-		if (key_buf[i] != 0)
-			break;
-	return (strtoull (key_buf + i, &endPtr, 10));
+	return (strtoull (key_buf, &endPtr, 10));
 }
 
 static void
@@ -162,7 +157,7 @@ setup_truncate(CONFIG *cfg,
 	/* We are limited to only one table when running truncate */
 	ret = session->open_cursor(session, cfg->uris[0], NULL, NULL, &cursor);
 	if (ret != 0) {
-		return (ret);
+		goto err;
 	}
 
 	/* Truncation percentage value. eg 10% is 0.1 */
@@ -195,30 +190,25 @@ setup_truncate(CONFIG *cfg,
 		start_point_val = decode_key(cfg, key);
 		cursor->reset(cursor);
 		if ((ret = cursor->prev(cursor)) != 0) {
-			lprintf(cfg, ret, 0,
-			    "truncate setup end: prev failed");
-			return (ret);
+			lprintf(cfg, ret, 0, "truncate setup end: prev failed");
+			goto err;
 		}
-		if ((ret = cursor->get_key(cursor,
-			    &key)) != 0) {
+		if ((ret = cursor->get_key(cursor, &key)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "truncate setup end: get_key failed");
-			return (ret);
+			goto err;
 		}
 		end_point_val = decode_key(cfg, key);
 		/* Not enough documents? */
-			if (start_point_val + trunc->needed_milestones >
-			    end_point_val)
-				trunc->truncate_milestone_gap = 0;
-			else
-				trunc->truncate_milestone_gap =
-				    (end_point_val - start_point_val)
-				    / trunc->needed_milestones;
-	} else if ( ret != WT_NOTFOUND ) {
-		lprintf(cfg, ret, 0,
-			    "truncate setup start: get_key failed");
-		printf("ret was %d\n", ret);
-		return (ret);
+		if (start_point_val + trunc->needed_milestones > end_point_val)
+			trunc->truncate_milestone_gap = 0;
+		else
+			trunc->truncate_milestone_gap =
+			    (end_point_val - start_point_val)
+			    / trunc->needed_milestones;
+	} else if (ret != WT_NOTFOUND) {
+		lprintf(cfg, ret, 0, "truncate setup start: get_key failed");
+		goto err;
 	}
 
 	/* If we have enough data allocate some milestones */
@@ -229,7 +219,8 @@ setup_truncate(CONFIG *cfg,
 			truncate_item =
 			    calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 			if (truncate_item == NULL) {
-				return (enomem(cfg));
+				ret = enomem(cfg);
+				goto err;
 			}
 			generate_key(cfg, truncate_key,
 			    trunc->truncate_milestone_gap * (i+1));
@@ -244,18 +235,19 @@ setup_truncate(CONFIG *cfg,
 		}
 	}
 	trunc->truncate_milestone_gap = final_milestone_gap;
+err:
 	cursor->close(cursor);
-	return (0);
+	return (ret);
 }
 
 static int
 run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
     TRUNCATE_CONFIG *trunc, WT_CURSOR *cursor, WT_SESSION *session) {
 
+	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	char *truncate_key;
 	int ret;
 	size_t i;
-	TRUNCATE_QUEUE_ENTRY *truncate_item;
 
 	/* Update the total inserts */
 	trunc->total_gross_inserts = 0;
@@ -649,7 +641,6 @@ worker(void *arg)
 
 	/* Setup for truncate */
 	if (thread->workload->truncate != 0) {
-		cursor = cursors[cfg->icount % cfg->table_count];
 		if ((ret = setup_truncate(cfg,
 		    thread, &truncate_config, session)) != 0)
 			goto err;
@@ -2337,13 +2328,13 @@ main(int argc, char *argv[])
 
 	/* You can't have truncate on a random collection */
 	if (cfg->has_truncate && cfg->random_range) {
-		fprintf(stderr, "Cannot run truncate and random_range\n");
+		lprintf(cfg, 0, 0, "Cannot run truncate and random_range\n");
 		goto err;
 	}
 
 	/* We can't run truncate with more than one table */
 	if (cfg->has_truncate && cfg->table_count > 1) {
-		fprintf(stderr, "Cannot run truncate when > 1 table\n");
+		lprintf(cfg, 0, 0, "Cannot run truncate when > 1 table\n");
 		goto err;
 	}
 
