@@ -47,7 +47,8 @@ struct KillCursorsResponse {
      */
     KillCursorsResponse(const std::vector<CursorId>& killed,
                         const std::vector<CursorId>& notFound,
-                        const std::vector<CursorId>& alive);
+                        const std::vector<CursorId>& alive,
+                        const std::vector<CursorId>& unknown);
 
     static StatusWith<KillCursorsResponse> parseFromBSON(const BSONObj& cmdResponse);
 
@@ -58,6 +59,7 @@ struct KillCursorsResponse {
     const std::vector<CursorId> cursorsKilled;
     const std::vector<CursorId> cursorsNotFound;
     const std::vector<CursorId> cursorsAlive;
+    const std::vector<CursorId> cursorsUnknown;
 };
 
 }  // namespace mongo

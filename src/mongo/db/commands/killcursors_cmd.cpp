@@ -146,6 +146,7 @@ public:
         std::vector<CursorId> cursorsKilled;
         std::vector<CursorId> cursorsNotFound;
         std::vector<CursorId> cursorsAlive;
+        std::vector<CursorId> cursorsUnknown;
 
         for (CursorId id : killCursorsRequest.cursorIds) {
             Status status = cursorManager->eraseCursor(txn, id, true /*shouldAudit*/);
@@ -161,7 +162,8 @@ public:
                 txn->getClient(), killCursorsRequest.nss, id, status.code());
         }
 
-        KillCursorsResponse killCursorsResponse(cursorsKilled, cursorsNotFound, cursorsAlive);
+        KillCursorsResponse killCursorsResponse(
+            cursorsKilled, cursorsNotFound, cursorsAlive, cursorsUnknown);
         killCursorsResponse.addToBSON(&result);
         return true;
     }

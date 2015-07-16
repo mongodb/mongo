@@ -41,14 +41,12 @@ namespace {
 const char kKilledField[] = "cursorsKilled";
 const char kNotFoundField[] = "cursorsNotFound";
 const char kAliveField[] = "cursorsAlive";
+const char kUnknownField[] = "cursorsUnknown";
 
 Status fillOutCursorArray(const BSONObj& cmdResponse,
                           StringData fieldName,
                           std::vector<CursorId>* cursorIds) {
     BSONElement elt = cmdResponse[fieldName];
-    if (elt.eoo()) {
-        return Status::OK();
-    }
 
     if (elt.type() != BSONType::Array) {
         return {ErrorCodes::FailedToParse,
@@ -64,12 +62,6 @@ Status fillOutCursorArray(const BSONObj& cmdResponse,
                                   << cursorElt};
         }
         cursorIds->push_back(cursorElt.numberLong());
-    }
-
-    if (cursorIds->empty()) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Must specify at least one cursor id for field '" << fieldName
-                              << "' in: " << cmdResponse};
     }
 
     return Status::OK();
@@ -91,8 +83,12 @@ KillCursorsResponse::KillCursorsResponse() {}
 
 KillCursorsResponse::KillCursorsResponse(const std::vector<CursorId>& killed,
                                          const std::vector<CursorId>& notFound,
-                                         const std::vector<CursorId>& alive)
-    : cursorsKilled(killed), cursorsNotFound(notFound), cursorsAlive(alive) {}
+                                         const std::vector<CursorId>& alive,
+                                         const std::vector<CursorId>& unknown)
+    : cursorsKilled(killed),
+      cursorsNotFound(notFound),
+      cursorsAlive(alive),
+      cursorsUnknown(unknown) {}
 
 StatusWith<KillCursorsResponse> KillCursorsResponse::parseFromBSON(const BSONObj& cmdResponse) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);
@@ -118,7 +114,13 @@ StatusWith<KillCursorsResponse> KillCursorsResponse::parseFromBSON(const BSONObj
         return aliveStatus;
     }
 
-    return KillCursorsResponse(cursorsKilled, cursorsNotFound, cursorsAlive);
+    std::vector<CursorId> cursorsUnknown;
+    Status unknownStatus = fillOutCursorArray(cmdResponse, kUnknownField, &cursorsUnknown);
+    if (!unknownStatus.isOK()) {
+        return unknownStatus;
+    }
+
+    return KillCursorsResponse(cursorsKilled, cursorsNotFound, cursorsAlive, cursorsUnknown);
 }
 
 BSONObj KillCursorsResponse::toBSON() const {
@@ -132,6 +134,7 @@ void KillCursorsResponse::addToBSON(BSONObjBuilder* builder) const {
     addCursorArrayToBSON(cursorsKilled, kKilledField, builder);
     addCursorArrayToBSON(cursorsNotFound, kNotFoundField, builder);
     addCursorArrayToBSON(cursorsAlive, kAliveField, builder);
+    addCursorArrayToBSON(cursorsUnknown, kUnknownField, builder);
 }
 
 }  // namespace mongo
