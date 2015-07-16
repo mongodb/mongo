@@ -43,8 +43,8 @@ class Ordering;
 struct BSONArray;  // empty subclass of BSONObj useful for overloading
 struct BSONElementCmpWithoutField;
 
-extern BSONObj maxKey;
-extern BSONObj minKey;
+extern const BSONObj maxKey;
+extern const BSONObj minKey;
 
 /**
     the complete list of valid BSON types
