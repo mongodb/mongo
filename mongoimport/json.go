@@ -70,7 +70,7 @@ var (
 // NewJSONInputReader creates a new JSONInputReader in array mode if specified,
 // configured to read data to the given io.Reader.
 func NewJSONInputReader(isArray bool, in io.Reader, numDecoders int) *JSONInputReader {
-	szCount := &sizeTrackingReader{in, 0}
+	szCount := newSizeTrackingReader(in)
 	return &JSONInputReader{
 		isArray:            isArray,
 		sizeTracker:        szCount,

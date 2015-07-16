@@ -46,7 +46,7 @@ type TSVConverter struct {
 // NewTSVInputReader returns a TSVInputReader configured to read input from the
 // given io.Reader, extracting the specified fields only.
 func NewTSVInputReader(fields []string, in io.Reader, numDecoders int) *TSVInputReader {
-	szCount := &sizeTrackingReader{in, 0}
+	szCount := newSizeTrackingReader(in)
 	return &TSVInputReader{
 		fields:       fields,
 		tsvReader:    bufio.NewReader(in),
