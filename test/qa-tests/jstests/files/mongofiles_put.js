@@ -30,7 +30,7 @@ load('jstests/files/util/mongofiles_common.js');
       inserted += insertString.length;
     }
 
-    assert.writeOK(bulk.execute());
+    assert.writeOK(bulk.execute({w:"majority"}));
 
     // dumping large collection to single large file
     jsTest.log('Dumping collection to filesystem with ' + passthrough.name + ' passthrough');
