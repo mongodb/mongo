@@ -191,7 +191,7 @@ join_slot:
  * __log_slot_find_free --
  * 	Find and return a free log slot.
  */
-int
+static int
 __log_slot_find_free(WT_SESSION_IMPL *session, WT_LOGSLOT **slot)
 {
 	WT_CONNECTION_IMPL *conn;
