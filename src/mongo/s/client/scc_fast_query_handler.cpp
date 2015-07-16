@@ -201,11 +201,8 @@ bool SCCFastQueryHandler::canHandleQuery(const string& ns, Query query) {
 
 static vector<ConnectionString> getHosts(const vector<string> hostStrings) {
     vector<ConnectionString> hosts;
-    for (vector<string>::const_iterator it = hostStrings.begin(); it != hostStrings.end(); ++it) {
-        string errMsg;
-        ConnectionString host;
-        hosts.push_back(ConnectionString::parse(*it, errMsg));
-        invariant(hosts.back().type() != ConnectionString::INVALID);
+    for (const auto& host : hostStrings) {
+        hosts.push_back(fassertStatusOK(28738, ConnectionString::parse(host)));
     }
 
     return hosts;

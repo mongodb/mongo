@@ -34,7 +34,6 @@
 
 #include "mongo/s/version_manager.h"
 
-
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -52,7 +51,6 @@
 namespace mongo {
 
 using std::shared_ptr;
-using std::endl;
 using std::map;
 using std::string;
 
@@ -210,7 +208,7 @@ bool initShardVersionEmptyNS(DBClientBase* conn_in) {
             return false;
         }
 
-        LOG(1) << "initializing shard connection to " << shard->toString() << endl;
+        LOG(1) << "initializing shard connection to " << shard->toString();
 
         ok = setShardVersion(*conn,
                              "",
@@ -234,7 +232,7 @@ bool initShardVersionEmptyNS(DBClientBase* conn_in) {
 
         OCCASIONALLY {
             warning() << "failed to initialize new replica set connection version, "
-                      << "will initialize on first use" << endl;
+                      << "will initialize on first use";
         }
 
         return false;
@@ -248,7 +246,7 @@ bool initShardVersionEmptyNS(DBClientBase* conn_in) {
         conn->setWireVersions(minWireVersion, maxWireVersion);
     }
 
-    LOG(3) << "initial sharding result : " << result << endl;
+    LOG(3) << "initial sharding result : " << result;
 
     connectionShardStatus.setSequence(conn, "", 0);
     return ok;
@@ -382,7 +380,7 @@ bool checkShardVersion(DBClientBase* conn_in,
         return true;
     }
 
-    LOG(1) << "       setShardVersion failed!\n" << result << endl;
+    LOG(1) << "       setShardVersion failed!\n" << result;
 
     if (result["need_authoritative"].trueValue())
         massert(10428, "need_authoritative set but in authoritative mode already", !authoritative);
@@ -420,7 +418,7 @@ bool checkShardVersion(DBClientBase* conn_in,
 
     string errmsg = str::stream() << "setShardVersion failed shard: " << shard->toString() << " "
                                   << result;
-    log() << "     " << errmsg << endl;
+    log() << "     " << errmsg;
     massert(10429, errmsg, 0);
     return true;
 }

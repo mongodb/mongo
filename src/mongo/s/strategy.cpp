@@ -392,9 +392,8 @@ void Strategy::commandOp(const string& db,
         CommandResult result;
         result.shardTargetId = shardId;
 
-        string errMsg;  // ignored, should never be invalid b/c an exception thrown earlier
-        result.target =
-            ConnectionString::parse(cursor.getShardCursor(shardId)->originalHost(), errMsg);
+        result.target = fassertStatusOK(
+            28739, ConnectionString::parse(cursor.getShardCursor(shardId)->originalHost()));
         result.result = cursor.getShardCursor(shardId)->peekFirst().getOwned();
         results->push_back(result);
     }

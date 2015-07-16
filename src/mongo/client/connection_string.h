@@ -109,7 +109,6 @@ public:
 
     DBClientBase* connect(std::string& errmsg, double socketTimeout = 0) const;
 
-    static ConnectionString parse(const std::string& url, std::string& errmsg);
     static StatusWith<ConnectionString> parse(const std::string& url);
 
     static std::string typeToString(ConnectionType type);

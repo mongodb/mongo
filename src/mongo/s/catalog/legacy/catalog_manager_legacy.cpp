@@ -157,8 +157,7 @@ Status CatalogManagerLegacy::init(const ConnectionString& configDBCS) {
         const string host = *i;
 
         // If this is a CUSTOM connection string (for testing) don't do DNS resolution
-        string errMsg;
-        if (ConnectionString::parse(host, errMsg).type() == ConnectionString::CUSTOM) {
+        if (uassertStatusOK(ConnectionString::parse(host)).type() == ConnectionString::CUSTOM) {
             continue;
         }
 

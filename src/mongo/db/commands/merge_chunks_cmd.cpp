@@ -34,7 +34,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/d_merge.h"
 
@@ -137,13 +136,15 @@ public:
 
         //
         // This might be the first call from mongos, so we may need to pass the config and shard
-        // information to initialize the ShardingState::get(getGlobalServiceContext())->
+        // information to initialize the sharding state.
         //
+
+        ShardingState* shardingState = ShardingState::get(txn);
 
         string config;
         FieldParser::FieldState extracted =
             FieldParser::extract(cmdObj, configField, &config, &errmsg);
-        if (!ShardingState::get(getGlobalServiceContext())->enabled()) {
+        if (!shardingState->enabled()) {
             if (!extracted || extracted == FieldParser::FIELD_NONE) {
                 errmsg =
                     "sharding state must be enabled or "
@@ -151,7 +152,7 @@ public:
                 return false;
             }
 
-            ShardingState::get(getGlobalServiceContext())->initialize(config);
+            shardingState->initialize(config);
         }
 
         // ShardName is optional, but might not be set yet
@@ -161,7 +162,7 @@ public:
         if (!extracted)
             return false;
         if (extracted != FieldParser::FIELD_NONE) {
-            ShardingState::get(getGlobalServiceContext())->gotShardName(shardName);
+            shardingState->gotShardName(shardName);
         }
 
         //

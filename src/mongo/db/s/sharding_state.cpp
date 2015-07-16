@@ -113,12 +113,7 @@ void ShardingState::initialize(const string& server) {
 
     ShardedConnectionInfo::addHook();
 
-    std::string errmsg;
-    ConnectionString configServerCS = ConnectionString::parse(server, errmsg);
-    uassert(28633,
-            str::stream() << "Invalid config server connection string: " << errmsg,
-            configServerCS.isValid());
-
+    ConnectionString configServerCS = uassertStatusOK(ConnectionString::parse(server));
     uassertStatusOK(initializeGlobalShardingState(configServerCS));
 
     _enabled = true;

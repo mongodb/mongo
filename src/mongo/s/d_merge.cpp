@@ -32,7 +32,6 @@
 
 #include <vector>
 
-#include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
@@ -68,21 +67,7 @@ bool mergeChunks(OperationContext* txn,
                  const BSONObj& maxKey,
                  const OID& epoch,
                  string* errMsg) {
-    //
-    // Get sharding state up-to-date
-    //
-
-    ConnectionString configLoc =
-        ConnectionString::parse(ShardingState::get(txn)->getConfigServer(), *errMsg);
-    if (!configLoc.isValid()) {
-        warning() << *errMsg;
-        return false;
-    }
-
-    //
     // Get the distributed lock
-    //
-
     string whyMessage = stream() << "merging chunks in " << nss.ns() << " from " << minKey << " to "
                                  << maxKey;
     auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(nss.ns(), whyMessage);

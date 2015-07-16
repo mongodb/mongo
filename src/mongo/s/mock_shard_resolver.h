@@ -42,9 +42,8 @@ public:
     virtual ~MockShardResolver() {}
 
     Status chooseWriteHost(const std::string& shardName, ConnectionString* shardHost) const {
-        std::string errMsg;
-        *shardHost = ConnectionString::parse(std::string("$") + shardName + ":12345", errMsg);
-        ASSERT_EQUALS(errMsg, "");
+        *shardHost =
+            unittest::assertGet(ConnectionString::parse(std::string("$") + shardName + ":12345"));
         return Status::OK();
     }
 };

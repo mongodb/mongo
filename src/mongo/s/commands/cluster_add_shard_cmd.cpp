@@ -79,13 +79,9 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        // get replica set component hosts
+        // Parse the new shard's replica set component hosts
         ConnectionString servers =
-            ConnectionString::parse(cmdObj.firstElement().valuestrsafe(), errmsg);
-        if (!errmsg.empty()) {
-            log() << "addshard request " << cmdObj << " failed: " << errmsg;
-            return false;
-        }
+            uassertStatusOK(ConnectionString::parse(cmdObj.firstElement().valuestrsafe()));
 
         // using localhost in server names implies every other process must use localhost addresses
         // too

@@ -410,13 +410,6 @@ public:
         // removing/adding a shard with the same name
         Shard::reloadShardInfo();
 
-        ConnectionString configLoc =
-            ConnectionString::parse(ShardingState::get(txn)->getConfigServer(), errmsg);
-        if (!configLoc.isValid()) {
-            warning() << errmsg;
-            return false;
-        }
-
         MoveTimingHelper timing(
             txn, "from", ns, min, max, 6 /* steps */, &errmsg, toShardName, fromShardName);
 

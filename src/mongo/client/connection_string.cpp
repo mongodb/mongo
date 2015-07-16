@@ -182,17 +182,6 @@ bool ConnectionString::sameLogicalEndpoint(const ConnectionString& other) const 
     MONGO_UNREACHABLE;
 }
 
-ConnectionString ConnectionString::parse(const std::string& url, std::string& errmsg) {
-    auto status = parse(url);
-    if (status.isOK()) {
-        errmsg = "";
-        return status.getValue();
-    }
-
-    errmsg = status.getStatus().toString();
-    return ConnectionString();
-}
-
 StatusWith<ConnectionString> ConnectionString::parse(const std::string& url) {
     const std::string::size_type i = url.find('/');
 
