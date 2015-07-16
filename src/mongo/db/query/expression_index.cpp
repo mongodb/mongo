@@ -39,6 +39,8 @@
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_indexing_params.h"
 #include "mongo/db/index/s2_keys.h"
+#include "mongo/db/server_parameters.h"
+#include "mongo/db/query/expression_index_knobs.h"
 
 namespace mongo {
 
@@ -98,21 +100,23 @@ void ExpressionMapping::cover2d(const R2Region& region,
 void ExpressionMapping::cover2dsphere(const S2Region& region,
                                       const S2IndexingParams& indexingParams,
                                       OrderedIntervalList* oilOut) {
-    int coarsestIndexedLevel = indexingParams.coarsestIndexedLevel;
-    // The min level of our covering is the level whose cells are the closest match to the
-    // *area* of the region (or the max indexed level, whichever is smaller) The max level
-    // is 4 sizes larger.
-    double edgeLen = sqrt(region.GetRectBound().Area());
+    uassert(28739,
+            "Geo coarsest level must be in range [0,30]",
+            0 <= internalQueryS2GeoCoarsestLevel && internalQueryS2GeoCoarsestLevel <= 30);
+    uassert(28740,
+            "Geo finest level must be in range [0,30]",
+            0 <= internalQueryS2GeoFinestLevel && internalQueryS2GeoFinestLevel <= 30);
+    uassert(28741,
+            "Geo coarsest level must be less than or equal to finest",
+            internalQueryS2GeoCoarsestLevel <= internalQueryS2GeoFinestLevel);
+
     S2RegionCoverer coverer;
-    coverer.set_min_level(min(coarsestIndexedLevel, 2 + S2::kAvgEdge.GetClosestLevel(edgeLen)));
-    coverer.set_max_level(4 + coverer.min_level());
+    coverer.set_min_level(internalQueryS2GeoCoarsestLevel);
+    coverer.set_max_level(internalQueryS2GeoFinestLevel);
+    coverer.set_max_cells(internalQueryS2GeoMaxCells);
 
     std::vector<S2CellId> cover;
     coverer.GetCovering(region, &cover);
-
-    // Look at the cells we cover and all cells that are within our covering and finer.
-    // Anything with our cover as a strict prefix is contained within the cover and should
-    // be intersection tested.
 
     S2CellIdsToIntervalsWithParents(cover, indexingParams, oilOut);
 }

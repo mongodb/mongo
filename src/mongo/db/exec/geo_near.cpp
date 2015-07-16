@@ -931,11 +931,10 @@ public:
           _nearParams(nearParams),
           _indexParams(indexParams),
           _currentLevel(0) {
-        // Since cellId.AppendVertexNeighbors(level, output) requires level < cellId.level(),
-        // we have to start to find documents at most S2::kMaxCellLevel - 1. Thus the finest
-        // search area is 16 * finest cell area at S2::kMaxCellLevel, which is less than
-        // (1.4 inch X 1.4 inch) on the earth.
-        _currentLevel = std::max(0, indexParams.finestIndexedLevel - 1);
+        // cellId.AppendVertexNeighbors(level, output) requires level < finest,
+        // so we use the minimum of max_level - 1 and the user specified finest
+        int level = std::min(S2::kMaxCellLevel - 1, internalQueryS2GeoFinestLevel);
+        _currentLevel = std::max(0, level);
     }
 
     // Search for a document in neighbors at current level.
