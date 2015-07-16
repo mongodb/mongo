@@ -89,8 +89,6 @@ public:
 
     Status getAllShards(std::vector<ShardType>* shards) override;
 
-    bool isShardHost(const ConnectionString& shardConnectionString) override;
-
     bool runUserManagementWriteCommand(const std::string& commandName,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,

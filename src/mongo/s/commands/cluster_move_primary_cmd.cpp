@@ -143,11 +143,6 @@ public:
             return false;
         }
 
-        if (!grid.catalogManager()->isShardHost(toShard->getConnString())) {
-            errmsg = "that server isn't known to me";
-            return false;
-        }
-
         log() << "Moving " << dbname << " primary from: " << fromShard->toString()
               << " to: " << toShard->toString();
 

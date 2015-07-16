@@ -126,10 +126,6 @@ Status CatalogManagerMock::getAllShards(vector<ShardType>* shards) {
     return Status::OK();
 }
 
-bool CatalogManagerMock::isShardHost(const ConnectionString& shardConnectionString) {
-    return false;
-}
-
 bool CatalogManagerMock::runUserManagementWriteCommand(const string& commandName,
                                                        const string& dbname,
                                                        const BSONObj& cmdObj,

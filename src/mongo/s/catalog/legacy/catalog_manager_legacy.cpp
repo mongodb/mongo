@@ -808,10 +808,6 @@ Status CatalogManagerLegacy::getAllShards(vector<ShardType>* shards) {
     return Status::OK();
 }
 
-bool CatalogManagerLegacy::isShardHost(const ConnectionString& connectionString) {
-    return _getShardCount(BSON(ShardType::host(connectionString.toString())));
-}
-
 bool CatalogManagerLegacy::runUserManagementWriteCommand(const string& commandName,
                                                          const string& dbname,
                                                          const BSONObj& cmdObj,

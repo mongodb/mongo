@@ -259,12 +259,6 @@ public:
     virtual Status getAllShards(std::vector<ShardType>* shards) = 0;
 
     /**
-     * Returns true if host is being used as a shard.
-     * Otherwise, returns false.
-     */
-    virtual bool isShardHost(const ConnectionString& shardConnectionString) = 0;
-
-    /**
      * Runs a user management command on the config servers, potentially synchronizing through
      * a distributed lock. Do not use for general write command execution.
      *

@@ -712,10 +712,6 @@ Status CatalogManagerReplicaSet::getAllShards(vector<ShardType>* shards) {
     return Status::OK();
 }
 
-bool CatalogManagerReplicaSet::isShardHost(const ConnectionString& connectionString) {
-    return false;
-}
-
 bool CatalogManagerReplicaSet::runUserManagementWriteCommand(const std::string& commandName,
                                                              const std::string& dbname,
                                                              const BSONObj& cmdObj,

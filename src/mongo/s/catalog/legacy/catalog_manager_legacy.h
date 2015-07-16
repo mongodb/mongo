@@ -89,8 +89,6 @@ public:
 
     Status getAllShards(std::vector<ShardType>* shards) override;
 
-    bool isShardHost(const ConnectionString& shardConnectionString) override;
-
     /**
      * Grabs a distributed lock and runs the command on all config servers.
      */
