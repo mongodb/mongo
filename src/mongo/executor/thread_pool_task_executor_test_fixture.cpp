@@ -26,66 +26,27 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <memory>
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 
-#include "mongo/unittest/unittest.h"
+#include "mongo/executor/thread_pool_mock.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace executor {
 
-class TaskExecutor;
-class NetworkInterface;
-class NetworkInterfaceMock;
+std::unique_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
+    std::unique_ptr<NetworkInterfaceMock> net) {
+    auto netPtr = net.get();
+    return stdx::make_unique<ThreadPoolTaskExecutor>(stdx::make_unique<ThreadPoolMock>(netPtr, 1),
+                                                     std::move(net));
+}
 
-/**
- * Test fixture for tests that require a TaskExecutor backed by a NetworkInterfaceMock.
- */
-class TaskExecutorTest : public unittest::Test {
-public:
-    /**
-     * Creates an initial error status suitable for checking if
-     * component has modified the 'status' field in test fixture.
-     */
-    static Status getDetectableErrorStatus();
-
-protected:
-    virtual ~TaskExecutorTest();
-
-    executor::NetworkInterfaceMock* getNet() {
-        return _net;
-    }
-    TaskExecutor& getExecutor() {
-        return *_executor;
-    }
-
-    /**
-     * Initializes both the NetworkInterfaceMock and TaskExecutor but does not start the executor.
-     */
-    void setUp() override;
-
-    /**
-     * Destroys the replication executor.
-     *
-     * Shuts down and joins the running executor.
-     */
-    void tearDown() override;
-
-    void launchExecutorThread();
-    void joinExecutorThread();
-
-private:
-    virtual std::unique_ptr<TaskExecutor> makeTaskExecutor(
-        std::unique_ptr<NetworkInterfaceMock> net) = 0;
-
-    virtual void postExecutorThreadLaunch();
-
-    NetworkInterfaceMock* _net;
-    std::unique_ptr<TaskExecutor> _executor;
-    bool _executorStarted = false;
-    bool _executorJoined = false;
-};
+std::unique_ptr<TaskExecutor> ThreadPoolExecutorTest::makeTaskExecutor(
+    std::unique_ptr<NetworkInterfaceMock> net) {
+    return makeThreadPoolTestExecutor(std::move(net));
+}
 
 }  // namespace executor
 }  // namespace mongo

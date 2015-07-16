@@ -40,6 +40,7 @@ namespace mongo {
 class BSONObj;
 class CatalogManagerReplicaSet;
 class DistLockManagerMock;
+class NamespaceString;
 class RemoteCommandTargeterFactoryMock;
 class RemoteCommandTargeterMock;
 class ShardRegistry;
@@ -107,7 +108,7 @@ protected:
      * Wait for a single insert request and ensures that the items being inserted exactly match the
      * expected items. Responds with a success status.
      */
-    void expectInserts(const NamespaceString nss, const std::vector<BSONObj>& expected);
+    void expectInserts(const NamespaceString& nss, const std::vector<BSONObj>& expected);
 
     /**
      * Waits for a count command and returns a response reporting the given number of documents

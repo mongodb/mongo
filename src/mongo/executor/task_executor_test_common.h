@@ -36,7 +36,7 @@
 namespace mongo {
 namespace executor {
 
-class NetworkInterface;
+class NetworkInterfaceMock;
 class TaskExecutor;
 
 /**
@@ -49,9 +49,9 @@ class TaskExecutor;
  * presumably after the release of MSVC2015, the signature can be changed to take the unique_ptr
  * by value.
  */
-void addTestsForExecutor(
-    const std::string& suiteName,
-    stdx::function<std::unique_ptr<TaskExecutor>(std::unique_ptr<NetworkInterface>*)> makeExecutor);
+void addTestsForExecutor(const std::string& suiteName,
+                         stdx::function<std::unique_ptr<TaskExecutor>(
+                             std::unique_ptr<NetworkInterfaceMock>*)> makeExecutor);
 
 }  // namespace executor
 }  // namespace mongo

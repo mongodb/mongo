@@ -35,36 +35,23 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_test_common.h"
 #include "mongo/executor/task_executor_test_fixture.h"
+#include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/executor/thread_pool_mock.h"
 
 namespace mongo {
 namespace executor {
 namespace {
 
-std::unique_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
-    std::unique_ptr<NetworkInterface> net) {
-    auto netPtr = checked_cast<NetworkInterfaceMock*>(net.get());
-    return stdx::make_unique<ThreadPoolTaskExecutor>(stdx::make_unique<ThreadPoolMock>(netPtr, 1),
-                                                     std::move(net));
-}
-
 MONGO_INITIALIZER(ThreadPoolExecutorCommonTests)(InitializerContext*) {
     addTestsForExecutor("ThreadPoolExecutorCommon",
-                        [](std::unique_ptr<NetworkInterface>* net) {
+                        [](std::unique_ptr<NetworkInterfaceMock>* net) {
                             return makeThreadPoolTestExecutor(std::move(*net));
                         });
     return Status::OK();
 }
-
-class ThreadPoolExecutorTest : public TaskExecutorTest {
-private:
-    std::unique_ptr<TaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) override {
-        return makeThreadPoolTestExecutor(std::move(net));
-    }
-};
 
 void setStatus(const TaskExecutor::CallbackArgs& cbData, Status* outStatus) {
     *outStatus = cbData.status;

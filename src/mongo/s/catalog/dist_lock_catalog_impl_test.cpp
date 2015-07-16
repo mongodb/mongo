@@ -38,9 +38,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/find_and_modify_request.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/s/catalog/catalog_manager_mock.h"
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/type_lockpings.h"
@@ -105,8 +105,7 @@ private:
     void setUp() override {
         auto networkUniquePtr = stdx::make_unique<executor::NetworkInterfaceMock>();
         executor::NetworkInterfaceMock* network = networkUniquePtr.get();
-        auto executor =
-            stdx::make_unique<repl::ReplicationExecutor>(networkUniquePtr.release(), nullptr, 0);
+        auto executor = executor::makeThreadPoolTestExecutor(std::move(networkUniquePtr));
 
         _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), network);
 

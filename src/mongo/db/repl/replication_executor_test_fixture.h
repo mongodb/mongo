@@ -60,7 +60,7 @@ protected:
 
 private:
     std::unique_ptr<executor::TaskExecutor> makeTaskExecutor(
-        std::unique_ptr<executor::NetworkInterface> net) override;
+        std::unique_ptr<executor::NetworkInterfaceMock> net) override;
 
     StorageInterfaceMock* _storage{nullptr};
 

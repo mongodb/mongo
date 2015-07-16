@@ -31,11 +31,11 @@
 #include <type_traits>
 #include <vector>
 
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/executor/network_interface_mock.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -138,7 +138,7 @@ public:
     /**
      * Create a new environment based on the given network.
      */
-    NetworkTestEnv(repl::ReplicationExecutor* executor, NetworkInterfaceMock* network);
+    NetworkTestEnv(TaskExecutor* executor, NetworkInterfaceMock* network);
 
     /**
      * Blocking methods, which receive one message from the network and respond using the
@@ -150,7 +150,7 @@ public:
 
 private:
     // Task executor used for running asynchronous operations.
-    repl::ReplicationExecutor* _executor;
+    TaskExecutor* _executor;
 
     // Mocked out network under the task executor.
     NetworkInterfaceMock* _mockNetwork;
