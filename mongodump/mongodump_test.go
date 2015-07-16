@@ -227,6 +227,49 @@ func fileDirExists(name string) bool {
 	return true
 }
 
+func testQuery(md *MongoDump, session *mgo.Session) string {
+	origDB := session.DB(testDB)
+	restoredDB := session.DB(testRestoreDB)
+
+	// query to test --query* flags
+	bsonQuery := bson.M{"age": bson.M{"$lt": 10}}
+
+	// we can only dump using query per collection
+	for _, testCollName := range testCollectionNames {
+		md.ToolOptions.Namespace.Collection = testCollName
+
+		err := md.Init()
+		So(err, ShouldBeNil)
+
+		err = md.Dump()
+		So(err, ShouldBeNil)
+	}
+
+	path, err := os.Getwd()
+	So(err, ShouldBeNil)
+
+	dumpDir := util.ToUniversalPath(filepath.Join(path, "dump"))
+	dumpDBDir := util.ToUniversalPath(filepath.Join(dumpDir, testDB))
+	So(fileDirExists(dumpDir), ShouldBeTrue)
+	So(fileDirExists(dumpDBDir), ShouldBeTrue)
+
+	err = readBSONIntoDatabase(dumpDBDir, testRestoreDB)
+	So(err, ShouldBeNil)
+
+	for _, testCollName := range testCollectionNames {
+		// count filtered docs
+		numDocs1, err := origDB.C(testCollName).Find(bsonQuery).Count()
+		So(err, ShouldBeNil)
+
+		// count number of all restored documents
+		numDocs2, err := restoredDB.C(testCollName).Find(nil).Count()
+		So(err, ShouldBeNil)
+
+		So(numDocs1, ShouldEqual, numDocs2)
+	}
+	return dumpDir
+}
+
 func TestMongoDumpValidateOptions(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UnitTestType)
 
@@ -471,43 +514,7 @@ func TestMongoDumpBSON(t *testing.T) {
 				md.InputOptions.Query = string(jsonQueryBytes)
 				md.ToolOptions.Namespace.DB = testDB
 				md.OutputOptions.Out = "dump"
-
-				origDB := session.DB(testDB)
-				restoredDB := session.DB(testRestoreDB)
-
-				// we can only dump using query per collection
-				for _, testCollName := range testCollectionNames {
-					md.ToolOptions.Namespace.Collection = testCollName
-
-					err = md.Init()
-					So(err, ShouldBeNil)
-
-					err = md.Dump()
-					So(err, ShouldBeNil)
-				}
-
-				path, err := os.Getwd()
-				So(err, ShouldBeNil)
-
-				dumpDir := util.ToUniversalPath(filepath.Join(path, "dump"))
-				dumpDBDir := util.ToUniversalPath(filepath.Join(dumpDir, testDB))
-				So(fileDirExists(dumpDir), ShouldBeTrue)
-				So(fileDirExists(dumpDBDir), ShouldBeTrue)
-
-				err = readBSONIntoDatabase(dumpDBDir, testRestoreDB)
-				So(err, ShouldBeNil)
-
-				for _, testCollName := range testCollectionNames {
-					// count filtered docs
-					numDocs1, err := origDB.C(testCollName).Find(bsonQuery).Count()
-					So(err, ShouldBeNil)
-
-					// count number of all restored documents
-					numDocs2, err := restoredDB.C(testCollName).Find(nil).Count()
-					So(err, ShouldBeNil)
-
-					So(numDocs1, ShouldEqual, numDocs2)
-				}
+				dumpDir := testQuery(md, session)
 
 				Reset(func() {
 					So(session.DB(testRestoreDB).DropDatabase(), ShouldBeNil)
@@ -521,43 +528,7 @@ func TestMongoDumpBSON(t *testing.T) {
 				md.InputOptions.QueryFile = "example.json"
 				md.ToolOptions.Namespace.DB = testDB
 				md.OutputOptions.Out = "dump"
-
-				origDB := session.DB(testDB)
-				restoredDB := session.DB(testRestoreDB)
-
-				// we can only dump using query per collection
-				for _, testCollName := range testCollectionNames {
-					md.ToolOptions.Namespace.Collection = testCollName
-
-					err = md.Init()
-					So(err, ShouldBeNil)
-
-					err = md.Dump()
-					So(err, ShouldBeNil)
-				}
-
-				path, err := os.Getwd()
-				So(err, ShouldBeNil)
-
-				dumpDir := util.ToUniversalPath(filepath.Join(path, "dump"))
-				dumpDBDir := util.ToUniversalPath(filepath.Join(dumpDir, testDB))
-				So(fileDirExists(dumpDir), ShouldBeTrue)
-				So(fileDirExists(dumpDBDir), ShouldBeTrue)
-
-				err = readBSONIntoDatabase(dumpDBDir, testRestoreDB)
-				So(err, ShouldBeNil)
-
-				for _, testCollName := range testCollectionNames {
-					// count filtered docs
-					numDocs1, err := origDB.C(testCollName).Find(bsonQuery).Count()
-					So(err, ShouldBeNil)
-
-					// count number of all restored documents
-					numDocs2, err := restoredDB.C(testCollName).Find(nil).Count()
-					So(err, ShouldBeNil)
-
-					So(numDocs1, ShouldEqual, numDocs2)
-				}
+				dumpDir := testQuery(md, session)
 
 				Reset(func() {
 					So(session.DB(testRestoreDB).DropDatabase(), ShouldBeNil)

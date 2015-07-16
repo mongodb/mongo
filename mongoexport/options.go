@@ -1,7 +1,8 @@
 package mongoexport
+
 import (
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
 )
 
 var Usage = `<options>
@@ -39,7 +40,7 @@ func (*OutputFormatOptions) Name() string {
 // InputOptions defines the set of options to use in retrieving data from the server.
 type InputOptions struct {
 	Query          string `long:"query" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
-	QueryFile      string `long:"queryFile" description:"query filter, as a JSON file"`
+	QueryFile      string `long:"queryFile" description:"path to a file containing a query filter (JSON)"`
 	SlaveOk        bool   `long:"slaveOk" short:"k" description:"allow secondary reads if available (default true)" default:"true" default-mask:"-"`
 	ForceTableScan bool   `long:"forceTableScan" description:"force a table scan (do not use $snapshot)"`
 	Skip           int    `long:"skip" description:"number of documents to skip"`
@@ -52,7 +53,7 @@ func (*InputOptions) Name() string {
 	return "querying"
 }
 
-func (inputOptions *InputOptions) HasQuery() (bool) {
+func (inputOptions *InputOptions) HasQuery() bool {
 	return inputOptions.Query != "" || inputOptions.QueryFile != ""
 }
 
@@ -61,11 +62,10 @@ func (inputOptions *InputOptions) GetQuery() ([]byte, error) {
 		return []byte(inputOptions.Query), nil
 	} else if inputOptions.QueryFile != "" {
 		content, err := ioutil.ReadFile(inputOptions.QueryFile)
-		if err != nil{
+		if err != nil {
 			fmt.Errorf("error reading queryFile: %v", err)
 		}
 		return content, err
-	} else {
-		return nil, fmt.Errorf("GetQuery can return valid values only for query or queryFile input")
 	}
+	panic("GetQuery can return valid values only for query or queryFile input")
 }

@@ -78,6 +78,33 @@
     removeFile(exportTarget);
     destColl.remove({});
 
+    // TOOLS-716 export the data, with a queryFile matching a single element
+    ret = toolTest.runTool.apply(
+        toolTest,
+        ['export', '--out', exportTarget, '--db', 'test',
+            '--collection', 'source', '--queryFile', "jstests/export/testdata/query.json"].
+            concat(commonToolArgs)
+    );
+    assert.eq(0, ret);
+
+    // import the data into the destination collection
+    ret = toolTest.runTool.apply(
+        toolTest,
+        ['import', '--file', exportTarget, '--db', 'test',
+            '--collection', 'dest'].
+            concat(commonToolArgs)
+    );
+    assert.eq(0, ret);
+
+    // make sure the query was applied correctly
+    assert.eq(1, destColl.count());
+    assert.eq(1, destColl.count({ a: 1, c: '1' }));
+
+    // remove the export, clear the destination collection
+    removeFile(exportTarget);
+    destColl.remove({});
+
+
     // export the data, with a query on an embedded document
     ret = toolTest.runTool.apply(
         toolTest,

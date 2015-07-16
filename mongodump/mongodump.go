@@ -65,6 +65,8 @@ func (dump *MongoDump) ValidateOptions() error {
 		return fmt.Errorf("cannot dump using a query without a specified collection")
 	case dump.InputOptions.QueryFile != "" && dump.ToolOptions.Namespace.Collection == "":
 		return fmt.Errorf("cannot dump using a queryFile without a specified collection")
+	case dump.InputOptions.Query != "" && dump.InputOptions.QueryFile != "":
+		return fmt.Errorf("either query or queryFile can be specified as a query option, not both")
 	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.Namespace.DB == "":
 		return fmt.Errorf("must specify a database when running with dumpDbUsersAndRoles")
 	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.Namespace.Collection != "":
@@ -133,10 +135,6 @@ func (dump *MongoDump) Init() error {
 
 // Dump handles some final options checking and executes MongoDump.
 func (dump *MongoDump) Dump() (err error) {
-	if dump.InputOptions.Query != "" && dump.InputOptions.QueryFile != ""{
-		return fmt.Errorf("either query or queryFile can be specified as a query option")
-	}
-
 	if dump.InputOptions.HasQuery() {
 		// parse JSON then convert extended JSON values
 		var asJSON interface{}
