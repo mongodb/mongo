@@ -100,11 +100,10 @@ __wt_block_manager_create(
 	WT_TRET(__wt_close(session, &fh));
 
 	/*
-	 * If checkpoint syncing is enabled, some filesystems require that we
-	 * sync the directory to be confident that the file will appear.
+	 * Some filesystems require that we sync the directory to be confident
+	 * that the file will appear.
 	 */
-	if (ret == 0 && F_ISSET(S2C(session), WT_CONN_CKPT_SYNC) &&
-	    (ret = __wt_filename(session, filename, &path)) == 0) {
+	if (ret == 0 && (ret = __wt_filename(session, filename, &path)) == 0) {
 		ret = __wt_directory_sync(session, path);
 		__wt_free(session, path);
 	}
