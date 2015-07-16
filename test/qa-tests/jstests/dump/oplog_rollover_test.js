@@ -34,7 +34,7 @@ if (typeof getToolTest === 'undefined') {
   // Give some time for inserts to actually start before dumping, we only need
   // one document to go in and 0.5 seconds should be enough unless your
   // scheduler is wonky or your HDD is really slow.
-  sleep(500);
+  sleep(2000);
 
   var countBeforeMongodump = db.bar.count();
   // Crash if parallel shell hasn't started inserting yet
