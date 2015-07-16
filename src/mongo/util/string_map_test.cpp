@@ -205,4 +205,14 @@ TEST(StringMapTest, Assign) {
     y = m;
     ASSERT_EQUALS(5, y["eliot"]);
 }
+
+TEST(StringMapTest, InitWithInitializerList) {
+    StringMap<int> smap{
+        {"q", 1}, {"coollog", 2}, {"mango", 3}, {"mango", 4},
+    };
+
+    ASSERT_EQ(1, smap["q"]);
+    ASSERT_EQ(2, smap["coollog"]);
+    ASSERT_EQ(3, smap["mango"]);
+}
 }

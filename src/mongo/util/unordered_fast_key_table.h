@@ -103,6 +103,8 @@ public:
 
     UnorderedFastKeyTable(const UnorderedFastKeyTable& other);
 
+    UnorderedFastKeyTable(std::initializer_list<std::pair<key_type, mapped_type>> entries);
+
     UnorderedFastKeyTable& operator=(const UnorderedFastKeyTable& other) {
         other.copyTo(this);
         return *this;

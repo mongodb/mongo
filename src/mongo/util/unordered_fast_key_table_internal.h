@@ -122,6 +122,19 @@ inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::UnorderedFastKeyTable(
       _convertorOther(other._convertorOther) {}
 
 template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
+inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::UnorderedFastKeyTable(
+    std::initializer_list<std::pair<key_type, mapped_type>> entries)
+    : UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>() {
+    for (auto&& entry : entries) {
+        // Only insert the entry if the key is not equivalent to the key of any other element
+        // already in the table.
+        if (find(entry.first) == end()) {
+            get(entry.first) = entry.second;
+        }
+    }
+}
+
+template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
 inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::copyTo(
     UnorderedFastKeyTable* out) const {
     out->_size = _size;

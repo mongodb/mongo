@@ -55,11 +55,11 @@ struct StringMapDefaultConvertorOther {
 };
 
 template <typename V>
-class StringMap : public UnorderedFastKeyTable<StringData,   // K_L
-                                               std::string,  // K_S
-                                               V,            // V
-                                               StringMapDefaultHash,
-                                               StringMapDefaultEqual,
-                                               StringMapDefaultConvertor,
-                                               StringMapDefaultConvertorOther> {};
-}
+using StringMap = UnorderedFastKeyTable<StringData,   // K_L
+                                        std::string,  // K_S
+                                        V,
+                                        StringMapDefaultHash,
+                                        StringMapDefaultEqual,
+                                        StringMapDefaultConvertor,
+                                        StringMapDefaultConvertorOther>;
+}  // namespace mongo
