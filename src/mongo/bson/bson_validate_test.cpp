@@ -27,7 +27,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-
 #include "mongo/base/data_view.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
@@ -310,4 +309,26 @@ TEST(BSONValidateFast, StringHasSomething) {
                   x.objsize());
     ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize()));
 }
+
+TEST(BSONValidateBool, BoolValuesAreValidated) {
+    BSONObjBuilder bob;
+    bob.append("x", false);
+    const BSONObj obj = bob.done();
+    ASSERT_OK(validateBSON(obj.objdata(), obj.objsize()));
+    const BSONElement x = obj["x"];
+    // Legal, because we know that the BufBuilder gave
+    // us back some heap memory, which isn't oringinally const.
+    auto writable = const_cast<char*>(x.value());
+    for (int val = std::numeric_limits<char>::min();
+         val != (int(std::numeric_limits<char>::max()) + 1);
+         ++val) {
+        *writable = static_cast<char>(val);
+        if ((val == 0) || (val == 1)) {
+            ASSERT_OK(validateBSON(obj.objdata(), obj.objsize()));
+        } else {
+            ASSERT_NOT_OK(validateBSON(obj.objdata(), obj.objsize()));
+        }
+    }
 }
+
+}  // namespace

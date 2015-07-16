@@ -206,10 +206,12 @@ Status validateElementInfo(Buffer* buffer, ValidationState::State* nextState, BS
             return Status::OK();
 
         case Bool:
-            if (!buffer->skip(sizeof(int8_t)))
+            uint8_t val;
+            if (!buffer->readNumber(&val))
                 return makeError("invalid bson", idElem);
+            if ((val != 0) && (val != 1))
+                return makeError("invalid boolean value", idElem);
             return Status::OK();
-
 
         case NumberDouble:
         case NumberLong:
