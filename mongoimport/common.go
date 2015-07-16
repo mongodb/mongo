@@ -44,18 +44,32 @@ type sizeTracker interface {
 // sizeTrackingReader implements Reader and sizeTracker by wrapping an io.Reader and keeping track
 // of the total number of bytes read from each call to Read().
 type sizeTrackingReader struct {
-	reader    io.Reader
-	bytesRead int64
+	reader         io.Reader
+	bytesRead      int64
+	bytesReadMutex sync.Mutex
 }
 
 func (str *sizeTrackingReader) Size() int64 {
-	return str.bytesRead
+	str.bytesReadMutex.Lock()
+	bytes := str.bytesRead
+	str.bytesReadMutex.Unlock()
+	return bytes
 }
 
 func (str *sizeTrackingReader) Read(p []byte) (n int, err error) {
 	n, err = str.reader.Read(p)
+	str.bytesReadMutex.Lock()
 	str.bytesRead += int64(n)
+	str.bytesReadMutex.Unlock()
 	return
+}
+
+func newSizeTrackingReader(reader io.Reader) *sizeTrackingReader {
+	return &sizeTrackingReader{
+		reader:         reader,
+		bytesRead:      0,
+		bytesReadMutex: sync.Mutex{},
+	}
 }
 
 // channelQuorumError takes a channel and a quorum - which specifies how many
