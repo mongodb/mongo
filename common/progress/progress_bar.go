@@ -87,7 +87,8 @@ type Bar struct {
 	// WaitTime is the time to wait between writing the bar
 	WaitTime time.Duration
 
-	stopChan chan struct{}
+	stopChan     chan struct{}
+	stopChanSync chan struct{}
 
 	// hasRendered indicates that the bar has been rendered at least once
 	// and implies that when detaching should be rendered one more time
@@ -105,6 +106,7 @@ func (pb *Bar) Start() {
 		panic("Cannot use a Bar with an unset Writer")
 	}
 	pb.stopChan = make(chan struct{})
+	pb.stopChanSync = make(chan struct{})
 
 	go pb.start()
 }
@@ -125,8 +127,11 @@ func (pb *Bar) validate() {
 //  myBar.Start()
 //  defer myBar.Stop()
 // to stop leakage
+// Stop() needs to be synchronous in order that when pb.Stop() is called
+// all of the rendering has completed
 func (pb *Bar) Stop() {
 	close(pb.stopChan)
+	<-pb.stopChanSync
 }
 
 func (pb *Bar) formatCounts() (string, string) {
@@ -192,6 +197,7 @@ func (pb *Bar) start() {
 				// if we've rendered this bar at least once, render it one last time
 				pb.renderToWriter()
 			}
+			close(pb.stopChanSync)
 			return
 		case <-ticker.C:
 			pb.renderToWriter()
