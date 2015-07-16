@@ -41,6 +41,7 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace str = mongoutils::str;
@@ -281,74 +282,56 @@ string BSONElement::jsonString(JsonStringFormat format, bool includeFieldNames, 
     return s.str();
 }
 
+namespace {
+
+// Map from query operator string name to operator MatchType. Used in BSONElement::getGtLtOp().
+const StringMap<BSONObj::MatchType> queryOperatorMap{
+    // TODO: SERVER-19565 Add $eq after auditing callers.
+    {"lt", BSONObj::LT},
+    {"lte", BSONObj::LTE},
+    {"gte", BSONObj::GTE},
+    {"gt", BSONObj::GT},
+    {"in", BSONObj::opIN},
+    {"ne", BSONObj::NE},
+    {"size", BSONObj::opSIZE},
+    {"all", BSONObj::opALL},
+    {"nin", BSONObj::NIN},
+    {"exists", BSONObj::opEXISTS},
+    {"mod", BSONObj::opMOD},
+    {"type", BSONObj::opTYPE},
+    {"regex", BSONObj::opREGEX},
+    {"options", BSONObj::opOPTIONS},
+    {"elemMatch", BSONObj::opELEM_MATCH},
+    {"near", BSONObj::opNEAR},
+    {"geoNear", BSONObj::opNEAR},
+    {"within", BSONObj::opWITHIN},
+    {"geoWithin", BSONObj::opWITHIN},
+    {"maxDistance", BSONObj::opMAX_DISTANCE},
+    {"geoIntersects", BSONObj::opGEO_INTERSECTS},
+    {"bitsAllSet", BSONObj::opBITS_ALL_SET},
+    {"bitsAllClear", BSONObj::opBITS_ALL_CLEAR},
+    {"bitsAnySet", BSONObj::opBITS_ANY_SET},
+    {"bitsAnyClear", BSONObj::opBITS_ANY_CLEAR},
+};
+
+}  // namespace
+
 int BSONElement::getGtLtOp(int def) const {
     const char* fn = fieldName();
     if (fn[0] == '$' && fn[1]) {
-        if (fn[2] == 't') {
-            if (fn[1] == 'g') {
-                if (fn[3] == 0)
-                    return BSONObj::GT;
-                else if (fn[3] == 'e' && fn[4] == 0)
-                    return BSONObj::GTE;
-            } else if (fn[1] == 'l') {
-                if (fn[3] == 0)
-                    return BSONObj::LT;
-                else if (fn[3] == 'e' && fn[4] == 0)
-                    return BSONObj::LTE;
-            }
-        } else if (fn[1] == 'n' && fn[2] == 'e') {
-            if (fn[3] == 0)
-                return BSONObj::NE;
-            if (fn[3] == 'a' && fn[4] == 'r')  // matches anything with $near prefix
+        StringData opName = fieldNameStringData().substr(1);
+
+        StringMap<BSONObj::MatchType>::const_iterator queryOp = queryOperatorMap.find(opName);
+        if (queryOp == queryOperatorMap.end()) {
+            // Need to handle $near separately because anything starting with $near should map to
+            // BSONObj::opNEAR.
+            if ("near" == opName.substr(0, 4)) {
                 return BSONObj::opNEAR;
-        } else if (fn[1] == 'm') {
-            if (fn[2] == 'o' && fn[3] == 'd' && fn[4] == 0)
-                return BSONObj::opMOD;
-            if (fn[2] == 'a' && fn[3] == 'x' && fn[4] == 'D' && fn[5] == 'i' && fn[6] == 's' &&
-                fn[7] == 't' && fn[8] == 'a' && fn[9] == 'n' && fn[10] == 'c' && fn[11] == 'e' &&
-                fn[12] == 0)
-                return BSONObj::opMAX_DISTANCE;
-        } else if (fn[1] == 't' && fn[2] == 'y' && fn[3] == 'p' && fn[4] == 'e' && fn[5] == 0)
-            return BSONObj::opTYPE;
-        else if (fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0) {
-            return BSONObj::opIN;
-        } else if (fn[1] == 'n' && fn[2] == 'i' && fn[3] == 'n' && fn[4] == 0)
-            return BSONObj::NIN;
-        else if (fn[1] == 'a' && fn[2] == 'l' && fn[3] == 'l' && fn[4] == 0)
-            return BSONObj::opALL;
-        else if (fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fn[5] == 0)
-            return BSONObj::opSIZE;
-        else if (fn[1] == 'e') {
-            if (fn[2] == 'x' && fn[3] == 'i' && fn[4] == 's' && fn[5] == 't' && fn[6] == 's' &&
-                fn[7] == 0)
-                return BSONObj::opEXISTS;
-            if (fn[2] == 'l' && fn[3] == 'e' && fn[4] == 'm' && fn[5] == 'M' && fn[6] == 'a' &&
-                fn[7] == 't' && fn[8] == 'c' && fn[9] == 'h' && fn[10] == 0)
-                return BSONObj::opELEM_MATCH;
-        } else if (fn[1] == 'r' && fn[2] == 'e' && fn[3] == 'g' && fn[4] == 'e' && fn[5] == 'x' &&
-                   fn[6] == 0)
-            return BSONObj::opREGEX;
-        else if (fn[1] == 'o' && fn[2] == 'p' && fn[3] == 't' && fn[4] == 'i' && fn[5] == 'o' &&
-                 fn[6] == 'n' && fn[7] == 's' && fn[8] == 0)
-            return BSONObj::opOPTIONS;
-        else if (fn[1] == 'w' && fn[2] == 'i' && fn[3] == 't' && fn[4] == 'h' && fn[5] == 'i' &&
-                 fn[6] == 'n' && fn[7] == 0)
-            return BSONObj::opWITHIN;
-        else if (str::equals(fn + 1, "geoIntersects"))
-            return BSONObj::opGEO_INTERSECTS;
-        else if (str::equals(fn + 1, "geoNear"))
-            return BSONObj::opNEAR;
-        else if (str::equals(fn + 1, "geoWithin"))
-            return BSONObj::opWITHIN;
-        else if (str::equals(fn + 1, "bitsAllSet")) {
-            return BSONObj::opBITS_ALL_SET;
-        } else if (str::equals(fn + 1, "bitsAllClear")) {
-            return BSONObj::opBITS_ALL_CLEAR;
-        } else if (str::equals(fn + 1, "bitsAnySet")) {
-            return BSONObj::opBITS_ANY_SET;
-        } else if (str::equals(fn + 1, "bitsAnyClear")) {
-            return BSONObj::opBITS_ANY_CLEAR;
+            }
+
+            return def;
         }
+        return queryOp->second;
     }
     return def;
 }
