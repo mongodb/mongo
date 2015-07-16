@@ -80,9 +80,9 @@
     assert.eq(1, t.find().count() , "Valid insert failed");
     assert.eq(true, a.results[0], "Bad result value for valid insert");
 
-    a = db.adminCommand(
-      {applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}
-    );
+    a = assert.commandWorked(db.adminCommand(
+            {applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}
+    ));
     assert.eq(1, t.find().count() , "Duplicate insert failed");
     assert.eq(true, a.results[0], "Bad result value for duplicate insert");
 

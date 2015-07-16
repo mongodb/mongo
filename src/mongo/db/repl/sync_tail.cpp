@@ -173,6 +173,9 @@ Status SyncTail::syncApply(OperationContext* txn,
         DisableDocumentValidation validationDisabler(txn);
 
         Status status = applyOperationInLock(txn, db, op, convertUpdateToUpsert);
+        if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
+            throw WriteConflictException();
+        }
         incrementOpsAppliedStats();
         return status;
     };
@@ -722,8 +725,17 @@ BSONObj SyncTail::getMissingDoc(OperationContext* txn, Database* db, const BSONO
             continue;  // try again
         }
 
-        // might be more than just _id in the update criteria
-        BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj();
+        // get _id from oplog entry to create query to fetch document.
+        const BSONElement opElem = o.getField("op");
+        const bool isUpdate = !opElem.eoo() && opElem.str() == "u";
+        const BSONElement idElem = o.getObjectField(isUpdate ? "o2" : "o")["_id"];
+
+        if (idElem.eoo()) {
+            severe() << "cannot fetch missing document without _id field: " << o.toString();
+            fassertFailedNoTrace(28742);
+        }
+
+        BSONObj query = BSONObjBuilder().append(idElem).obj();
         BSONObj missingObj;
         try {
             missingObj = missingObjReader.findOne(ns, query);
@@ -813,12 +825,14 @@ void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
 
     for (std::vector<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
         try {
-            if (!SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts).isOK()) {
+            const Status s = SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts);
+            if (!s.isOK()) {
+                severe() << "Error applying operation (" << it->toString() << "): " << s;
                 fassertFailedNoTrace(16359);
             }
         } catch (const DBException& e) {
-            error() << "writer worker caught exception: " << causedBy(e)
-                    << " on: " << it->toString();
+            severe() << "writer worker caught exception: " << causedBy(e)
+                     << " on: " << it->toString();
 
             if (inShutdown()) {
                 return;
@@ -844,9 +858,12 @@ void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
 
     for (std::vector<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
         try {
-            if (!SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts).isOK()) {
+            const Status s = SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts);
+            if (!s.isOK()) {
                 if (st->shouldRetry(&txn, *it)) {
-                    if (!SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts).isOK()) {
+                    const Status s2 = SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts);
+                    if (!s2.isOK()) {
+                        severe() << "Error applying operation (" << it->toString() << "): " << s2;
                         fassertFailedNoTrace(15915);
                     }
                 }
@@ -856,8 +873,8 @@ void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
                 // subsequently got deleted and no longer exists on the Sync Target at all
             }
         } catch (const DBException& e) {
-            error() << "writer worker caught exception: " << causedBy(e)
-                    << " on: " << it->toString();
+            severe() << "writer worker caught exception: " << causedBy(e)
+                     << " on: " << it->toString();
 
             if (inShutdown()) {
                 return;

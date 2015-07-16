@@ -21,7 +21,7 @@ t.runTool( "oplog" , "--oplogns" , db.getName() + ".oplog" , "--from" , "127.0.0
 
 assert.eq( 1 , output.count() , "after" );
 
-assert.eq( doc , output.findOne() , "after check" );
+assert.docEq( doc , output.findOne() , "after check" );
 
 t.stop();
 
