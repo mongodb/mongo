@@ -25,7 +25,10 @@ env.Library(target='network_interface_impl', # TODO: rename to thread_pool_netwo
             ])
 
 env.Library('network_interface_mock',
-            'network_interface_mock.cpp',
+            [
+                'network_interface_mock.cpp',
+                'thread_pool_mock.cpp',
+            ],
             LIBDEPS=[
                 'network_interface',
             ])
@@ -66,11 +69,36 @@ env.Library(
         'network_interface_impl',
     ])
 
-env.Library('task_executor_test_fixture',
-            [
-                'task_executor_test_common.cpp',
-                'task_executor_test_fixture.cpp'],
-            LIBDEPS=[
-                'network_interface_mock',
-                'task_executor_interface',
-            ])
+env.Library(
+    target='task_executor_test_fixture',
+    source=[
+        'task_executor_test_common.cpp',
+        'task_executor_test_fixture.cpp'
+    ],
+    LIBDEPS=[
+        'network_interface_mock',
+        'task_executor_interface',
+    ]
+)
+
+env.Library(
+    target='thread_pool_task_executor',
+    source=[
+        'thread_pool_task_executor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool'
+    ]
+)
+
+env.CppUnitTest(
+    target='thread_pool_task_executor_test',
+    source=[
+        'thread_pool_task_executor_test.cpp',
+    ],
+    LIBDEPS=[
+        'thread_pool_task_executor',
+        'task_executor_test_fixture',
+        '$BUILD_DIR/mongo/client/remote_command_runner',
+    ]
+)

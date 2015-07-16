@@ -47,8 +47,8 @@ namespace executor {
 
 namespace {
 
-const size_t kMinThreads = 1;
-const size_t kMaxThreads = 51;  // Set to 1 + max repl set size, for heartbeat + wiggle room.
+const size_t kMinThreads = 2;
+const size_t kMaxThreads = 52;  // Set to 1 + max repl set size, for heartbeat + wiggle room.
 const Seconds kMaxIdleThreadAge(30);
 
 ThreadPool::Options makeOptions() {
@@ -84,6 +84,7 @@ void NetworkInterfaceImpl::startup() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_inShutdown);
     _pool.startup();
+    fassert(27824, _pool.schedule([this]() { _processAlarms(); }));
 }
 
 void NetworkInterfaceImpl::shutdown() {
@@ -91,6 +92,7 @@ void NetworkInterfaceImpl::shutdown() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _inShutdown = true;
     _hasPending.notify_all();
+    _newAlarmReady.notify_all();
     _pool.shutdown();
     lk.unlock();
     _commandRunner.shutdown();
@@ -188,6 +190,32 @@ Date_t NetworkInterfaceImpl::now() {
 
 std::string NetworkInterfaceImpl::getHostName() {
     return getHostNameCached();
+}
+
+void NetworkInterfaceImpl::setAlarm(Date_t when, const stdx::function<void()>& action) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    const bool notify = _alarms.empty() || _alarms.top().when > when;
+    _alarms.emplace(when, action);
+    if (notify) {
+        _newAlarmReady.notify_all();
+    }
+}
+
+void NetworkInterfaceImpl::_processAlarms() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    while (!_inShutdown) {
+        if (_alarms.empty()) {
+            _newAlarmReady.wait(lk);
+        } else if (now() < _alarms.top().when) {
+            _newAlarmReady.wait_until(lk, _alarms.top().when.toSystemTimePoint());
+        } else {
+            auto action = _alarms.top().action;
+            _alarms.pop();
+            lk.unlock();
+            action();
+            lk.lock();
+        }
+    }
 }
 
 }  // namespace executor

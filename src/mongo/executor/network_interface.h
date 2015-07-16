@@ -116,6 +116,14 @@ public:
      */
     virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) = 0;
 
+    /**
+     * Sets an alarm, which schedules "action" to run no sooner than "when".
+     *
+     * "action" should not do anything that requires a lot of computation, or that might block for a
+     * long time, as it may execute in a network thread.
+     */
+    virtual void setAlarm(Date_t when, const stdx::function<void()>& action) = 0;
+
 protected:
     NetworkInterface();
 };

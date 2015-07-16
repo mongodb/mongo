@@ -28,7 +28,9 @@
 
 #pragma once
 
-#include <map>
+#include <queue>
+#include <utility>
+#include <vector>
 
 #include "mongo/executor/network_interface.h"
 #include "mongo/stdx/condition_variable.h"
@@ -87,6 +89,7 @@ public:
                               const RemoteCommandRequest& request,
                               const RemoteCommandCompletionFn& onFinish);
     virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
+    virtual void setAlarm(Date_t when, const stdx::function<void()>& action);
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -164,6 +167,21 @@ public:
     void runReadyNetworkOperations();
 
 private:
+    /**
+     * Information describing a scheduled alarm.
+     */
+    struct AlarmInfo {
+        using AlarmAction = stdx::function<void()>;
+        AlarmInfo(Date_t inWhen, AlarmAction inAction)
+            : when(inWhen), action(std::move(inAction)) {}
+        bool operator>(const AlarmInfo& rhs) const {
+            return when > rhs.when;
+        }
+
+        Date_t when;
+        AlarmAction action;
+    };
+
     /**
      * Type used to identify which thread (network mock or executor) is currently executing.
      *
@@ -251,6 +269,9 @@ private:
 
     // List of network operations that will not be responded to until shutdown() is called.
     NetworkOperationList _blackHoled;  // (M)
+
+    // Heap of alarms, with the next alarm always on top.
+    std::priority_queue<AlarmInfo, std::vector<AlarmInfo>, std::greater<AlarmInfo>> _alarms;  // (M)
 };
 
 /**

@@ -141,6 +141,10 @@ void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbH
     }
 }
 
+void NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>& action) {
+    MONGO_UNREACHABLE;
+};
+
 bool NetworkInterfaceASIO::inShutdown() const {
     return (_state.load() == State::kShutdown);
 }

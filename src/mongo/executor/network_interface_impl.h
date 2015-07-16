@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <queue>
+#include <utility>
 #include <vector>
 
 #include "mongo/client/remote_command_runner_impl.h"
@@ -67,24 +69,40 @@ namespace executor {
  * after they have been connected for a certain maximum period.
  * TODO(spencer): Rename this to ThreadPoolNetworkInterface
  */
-class NetworkInterfaceImpl : public NetworkInterface {
+class NetworkInterfaceImpl final : public NetworkInterface {
 public:
     NetworkInterfaceImpl();
-    virtual ~NetworkInterfaceImpl();
-    virtual std::string getDiagnosticString();
-    virtual void startup();
-    virtual void shutdown();
-    virtual void waitForWork();
-    virtual void waitForWorkUntil(Date_t when);
-    virtual void signalWorkAvailable();
-    virtual Date_t now();
-    virtual std::string getHostName();
-    virtual void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                              const RemoteCommandRequest& request,
-                              const RemoteCommandCompletionFn& onFinish);
-    virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
+    ~NetworkInterfaceImpl();
+    std::string getDiagnosticString() override;
+    void startup() override;
+    void shutdown() override;
+    void waitForWork() override;
+    void waitForWorkUntil(Date_t when) override;
+    void signalWorkAvailable() override;
+    Date_t now() override;
+    std::string getHostName() override;
+    void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                      const RemoteCommandRequest& request,
+                      const RemoteCommandCompletionFn& onFinish) override;
+    void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) override;
+    void setAlarm(Date_t when, const stdx::function<void()>& action) override;
 
 private:
+    /**
+     * Information describing a scheduled alarm.
+     */
+    struct AlarmInfo {
+        using AlarmAction = stdx::function<void()>;
+        AlarmInfo(Date_t inWhen, AlarmAction inAction)
+            : when(inWhen), action(std::move(inAction)) {}
+        bool operator>(const AlarmInfo& rhs) const {
+            return when > rhs.when;
+        }
+
+        Date_t when;
+        AlarmAction action;
+    };
+
     /**
      * Information describing an in-flight command.
      */
@@ -99,6 +117,11 @@ private:
      * Executes one pending network operation, if there is at least one in the pending queue.
      */
     void _runOneCommand();
+
+    /**
+     * Worker function that processes alarms set via setAlarm.
+     */
+    void _processAlarms();
 
     /**
      * Notifies the network threads that there is work available.
@@ -133,6 +156,12 @@ private:
 
     // Number of active network requests
     size_t _numActiveNetworkRequests = 0;
+
+    // Condition variable to signal in order to wake up the alarm processing thread.
+    stdx::condition_variable _newAlarmReady;
+
+    // Heap of alarms, with the next alarm always on top.
+    std::priority_queue<AlarmInfo, std::vector<AlarmInfo>, std::greater<AlarmInfo>> _alarms;
 };
 
 }  // namespace executor
