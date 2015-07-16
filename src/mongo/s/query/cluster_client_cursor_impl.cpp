@@ -26,51 +26,46 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
-#include <boost/optional.hpp>
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/jsobj.h"
+#include "mongo/s/query/cluster_client_cursor_impl.h"
+
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-template <typename T>
-class StatusWith;
+ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
+                                                 const ClusterClientCursorParams& params,
+                                                 const std::vector<HostAndPort>& remotes)
+    : _executor(executor), _params(params), _accc(executor, params, remotes) {}
 
-/**
- * ClusterClientCursor is used to generate results from cursor-generating commands on one or
- * more remote hosts. A cursor-generating command (e.g. the find command) is one that
- * establishes a ClientCursor and a matching cursor id on the remote host. In order to retrieve
- * all command results, getMores must be issued against each of the remote cursors until they
- * are exhausted.
- *
- * ClusterClientCursor provides a simple blocking interface wrapping AsyncClientCursor's
- * non-blocking interface.
- *
- * Does not throw exceptions.
- */
-class ClusterClientCursor {
-public:
-    virtual ~ClusterClientCursor(){};
+StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
+    // On error, kill the underlying ACCC.
+    ScopeGuard cursorKiller = MakeGuard(&ClusterClientCursorImpl::kill, this);
 
-    /**
-     * Returns the next available result document (along with an ok status). May block waiting
-     * for results from remote nodes.
-     *
-     * If there are no further results, the end of the stream is indicated with boost::none and
-     * an ok status.
-     *
-     * A non-ok status is returned in case of any error.
-     */
-    virtual StatusWith<boost::optional<BSONObj>> next() = 0;
+    while (!_accc.ready()) {
+        auto nextEventStatus = _accc.nextEvent();
+        if (!nextEventStatus.isOK()) {
+            return nextEventStatus.getStatus();
+        }
+        auto event = nextEventStatus.getValue();
 
-    /**
-     * Must be called before destruction to abandon a not-yet-exhausted cursor. If next() has
-     * already returned boost::none, then the cursor is exhausted and is safe to destroy.
-     *
-     * May block waiting for responses from remote hosts.
-     */
-    virtual void kill() = 0;
-};
+        // Block until there are further results to return.
+        _executor->waitForEvent(event);
+    }
+
+    auto statusWithNext = _accc.nextReady();
+    if (statusWithNext.isOK()) {
+        cursorKiller.Dismiss();
+    }
+    return statusWithNext;
+}
+
+void ClusterClientCursorImpl::kill() {
+    auto killEvent = _accc.kill();
+    _executor->waitForEvent(killEvent);
+}
 
 }  // namespace mongo

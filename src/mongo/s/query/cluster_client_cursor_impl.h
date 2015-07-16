@@ -26,46 +26,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#pragma once
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/executor/task_executor.h"
+#include "mongo/s/query/async_cluster_client_cursor.h"
 #include "mongo/s/query/cluster_client_cursor.h"
-
-#include "mongo/util/scopeguard.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
-ClusterClientCursor::ClusterClientCursor(executor::TaskExecutor* executor,
-                                         const ClusterClientCursorParams& params,
-                                         const std::vector<HostAndPort>& remotes)
-    : _executor(executor), _params(params), _accc(executor, params, remotes) {}
+class ClusterClientCursorImpl final : public ClusterClientCursor {
+    MONGO_DISALLOW_COPYING(ClusterClientCursorImpl);
 
-StatusWith<boost::optional<BSONObj>> ClusterClientCursor::next() {
-    // On error, kill the underlying ACCC.
-    ScopeGuard cursorKiller = MakeGuard(&ClusterClientCursor::kill, this);
+public:
+    /**
+     * Constructs a cluster client cursor.
+     */
+    ClusterClientCursorImpl(executor::TaskExecutor* executor,
+                            const ClusterClientCursorParams& params,
+                            const std::vector<HostAndPort>& remotes);
 
-    while (!_accc.ready()) {
-        auto nextEventStatus = _accc.nextEvent();
-        if (!nextEventStatus.isOK()) {
-            return nextEventStatus.getStatus();
-        }
-        auto event = nextEventStatus.getValue();
+    StatusWith<boost::optional<BSONObj>> next() final;
 
-        // Block until there are further results to return.
-        _executor->waitForEvent(event);
-    }
+    void kill() final;
 
-    auto statusWithNext = _accc.nextReady();
-    if (statusWithNext.isOK()) {
-        cursorKiller.Dismiss();
-    }
-    return statusWithNext;
-}
+private:
+    // Not owned here.
+    executor::TaskExecutor* _executor;
 
-void ClusterClientCursor::kill() {
-    auto killEvent = _accc.kill();
-    _executor->waitForEvent(killEvent);
-}
+    const ClusterClientCursorParams _params;
+
+    // Does work of scheduling remote work and merging results.
+    AsyncClusterClientCursor _accc;
+};
 
 }  // namespace mongo

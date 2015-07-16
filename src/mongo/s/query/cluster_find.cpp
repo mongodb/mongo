@@ -43,7 +43,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_client_cursor.h"
+#include "mongo/s/query/cluster_client_cursor_impl.h"
 
 namespace mongo {
 
@@ -94,7 +94,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
     params.cmdObj = query.getParsed().asFindCommand();
     params.sort = query.getParsed().getSort();
 
-    ClusterClientCursor ccc(shardRegistry->getExecutor(), params, remotes);
+    ClusterClientCursorImpl ccc(shardRegistry->getExecutor(), params, remotes);
 
     // TODO: this should implement the batching logic rather than fully exhausting the cursor. It
     // should allocate a cursor id and save the ClusterClientCursor rather than always returning a

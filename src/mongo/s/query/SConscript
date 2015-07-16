@@ -15,7 +15,7 @@ env.Library(
 env.Library(
     target="cluster_client_cursor",
     source=[
-        "cluster_client_cursor.cpp",
+        "cluster_client_cursor_impl.cpp",
         "async_cluster_client_cursor.cpp",
     ],
     LIBDEPS=[
