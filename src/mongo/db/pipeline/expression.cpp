@@ -2184,12 +2184,12 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
         if (dynamic_cast<ExpressionConstant*>(expr.get())) {
             constExprs.push_back(expr);
         } else {
-            // If the child operand is the same type as this, then we can
-            // extract its operands and inline them here because we know
-            // this is commutative and associative.  We detect sameness of
-            // the child operator by checking for equality of the opNames
+            // If the child operand is the same type as this and is also associative and
+            // commutative, then we can extract its operands and inline them here. We detect
+            // sameness of the child operator by checking for equality of the opNames
             ExpressionNary* nary = dynamic_cast<ExpressionNary*>(expr.get());
-            if (!nary || !str::equals(nary->getOpName(), getOpName())) {
+            if (!nary || !str::equals(nary->getOpName(), getOpName()) ||
+                !nary->isAssociativeAndCommutative()) {
                 nonConstExprs.push_back(expr);
             } else {
                 // same expression, so flatten by adding to vpOperand which

@@ -29,14 +29,17 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR(max, AccumulatorMinMax::createMax);
-REGISTER_ACCUMULATOR(min, AccumulatorMinMax::createMin);
+REGISTER_ACCUMULATOR(max, AccumulatorMax::create);
+REGISTER_ACCUMULATOR(min, AccumulatorMin::create);
+REGISTER_EXPRESSION(max, ExpressionFromAccumulator<AccumulatorMax>::parse);
+REGISTER_EXPRESSION(min, ExpressionFromAccumulator<AccumulatorMin>::parse);
 
 const char* AccumulatorMinMax::getOpName() const {
     if (_sense == 1)
@@ -57,6 +60,9 @@ void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
 }
 
 Value AccumulatorMinMax::getValue(bool toBeMerged) const {
+    if (_val.missing()) {
+        return Value(BSONNULL);
+    }
     return _val;
 }
 
@@ -69,11 +75,11 @@ void AccumulatorMinMax::reset() {
     _memUsageBytes = sizeof(*this);
 }
 
-intrusive_ptr<Accumulator> AccumulatorMinMax::createMin() {
-    return new AccumulatorMinMax(Sense::MIN);
+intrusive_ptr<Accumulator> AccumulatorMin::create() {
+    return new AccumulatorMin();
 }
 
-intrusive_ptr<Accumulator> AccumulatorMinMax::createMax() {
-    return new AccumulatorMinMax(Sense::MAX);
+intrusive_ptr<Accumulator> AccumulatorMax::create() {
+    return new AccumulatorMax();
 }
 }

@@ -87,6 +87,7 @@ env.Library(
         ],
     LIBDEPS=[
         'document_value',
+        'expression',
         'field_path',
     ]
 )
@@ -141,6 +142,7 @@ env.CppUnitTest(
     target='agg_expression_test',
     source='expression_test.cpp',
     LIBDEPS=[
+        'accumulator',
         'expression',
         ],
     )

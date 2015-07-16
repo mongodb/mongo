@@ -30,14 +30,17 @@
 
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR(stdDevPop, AccumulatorStdDev::createPop);
-REGISTER_ACCUMULATOR(stdDevSamp, AccumulatorStdDev::createSamp);
+REGISTER_ACCUMULATOR(stdDevPop, AccumulatorStdDevPop::create);
+REGISTER_ACCUMULATOR(stdDevSamp, AccumulatorStdDevSamp::create);
+REGISTER_EXPRESSION(stdDevPop, ExpressionFromAccumulator<AccumulatorStdDevPop>::parse);
+REGISTER_EXPRESSION(stdDevSamp, ExpressionFromAccumulator<AccumulatorStdDevSamp>::parse);
 
 const char* AccumulatorStdDev::getOpName() const {
     return (_isSamp ? "$stdDevSamp" : "$stdDevPop");
@@ -90,12 +93,12 @@ Value AccumulatorStdDev::getValue(bool toBeMerged) const {
     }
 }
 
-intrusive_ptr<Accumulator> AccumulatorStdDev::createSamp() {
-    return new AccumulatorStdDev(true);
+intrusive_ptr<Accumulator> AccumulatorStdDevSamp::create() {
+    return new AccumulatorStdDevSamp();
 }
 
-intrusive_ptr<Accumulator> AccumulatorStdDev::createPop() {
-    return new AccumulatorStdDev(false);
+intrusive_ptr<Accumulator> AccumulatorStdDevPop::create() {
+    return new AccumulatorStdDevPop();
 }
 
 AccumulatorStdDev::AccumulatorStdDev(bool isSamp) : _isSamp(isSamp), _count(0), _mean(0), _m2(0) {

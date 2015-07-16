@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/dbtests/dbtests.h"
@@ -40,6 +41,24 @@ using std::numeric_limits;
 using std::set;
 using std::string;
 using std::vector;
+
+/**
+ * Takes the name of an expression as its first argument and a list of pairs of arguments and
+ * expected results as its second argument, and asserts that for the given expression the arguments
+ * evaluate to the expected results.
+ */
+static void assertExpectedResults(
+    std::string expression,
+    std::initializer_list<std::pair<std::vector<Value>, Value>> operations) {
+    for (auto&& op : operations) {
+        VariablesIdGenerator idGenerator;
+        VariablesParseState vps(&idGenerator);
+        const BSONObj obj = BSON(expression << Value(op.first));
+        Value result = Expression::parseExpression(obj.firstElement(), vps)->evaluate(Document());
+        ASSERT_EQUALS(op.second, result);
+        ASSERT_EQUALS(op.second.getType(), result.getType());
+    }
+}
 
 /** Convert BSONObj to a BSONObj with our $const wrappings. */
 static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
@@ -1387,6 +1406,72 @@ private:
 };
 
 }  // namespace Constant
+
+TEST(ExpressionFromAccumulators, Avg) {
+    assertExpectedResults("$avg",
+                          {// $avg ignores non-numeric inputs.
+                           {{Value("string"), Value(BSONNULL), Value(), Value(3)}, Value(3.0)},
+                           // $avg always returns a double.
+                           {{Value(10LL), Value(20LL)}, Value(15.0)},
+                           // $avg returns null when no arguments are provided.
+                           {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, Max) {
+    assertExpectedResults("$max",
+                          {// $max treats non-numeric inputs as valid arguments.
+                           {{Value(1), Value(BSONNULL), Value(), Value("a")}, Value("a")},
+                           {{Value("a"), Value("b")}, Value("b")},
+                           // $max always preserves the type of the result.
+                           {{Value(10LL), Value(0.0), Value(5)}, Value(10LL)},
+                           // $max returns null when no arguments are provided.
+                           {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, Min) {
+    assertExpectedResults("$min",
+                          {// $min treats non-numeric inputs as valid arguments.
+                           {{Value("string")}, Value("string")},
+                           {{Value(1), Value(BSONNULL), Value(), Value("a")}, Value(1)},
+                           {{Value("a"), Value("b")}, Value("a")},
+                           // $min always preserves the type of the result.
+                           {{Value(0LL), Value(20.0), Value(10)}, Value(0LL)},
+                           // $min returns null when no arguments are provided.
+                           {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, Sum) {
+    assertExpectedResults(
+        "$sum",
+        {// $sum ignores non-numeric inputs.
+         {{Value("string"), Value(BSONNULL), Value(), Value(3)}, Value(3)},
+         // If any argument is a double, $sum returns a double
+         {{Value(10LL), Value(10.0)}, Value(20.0)},
+         // If no arguments are doubles and an argument is a long, $sum returns a long
+         {{Value(10LL), Value(10)}, Value(20LL)},
+         // $sum returns 0 when no arguments are provided.
+         {{}, Value(0)}});
+}
+
+TEST(ExpressionFromAccumulators, StdDevPop) {
+    assertExpectedResults("$stdDevPop",
+                          {// $stdDevPop ignores non-numeric inputs.
+                           {{Value("string"), Value(BSONNULL), Value(), Value(3)}, Value(0.0)},
+                           // $stdDevPop always returns a double.
+                           {{Value(1LL), Value(3LL)}, Value(1.0)},
+                           // $stdDevPop returns null when no arguments are provided.
+                           {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, StdDevSamp) {
+    assertExpectedResults("$stdDevSamp",
+                          {// $stdDevSamp ignores non-numeric inputs.
+                           {{Value("string"), Value(BSONNULL), Value(), Value(3)}, Value(BSONNULL)},
+                           // $stdDevSamp always returns a double.
+                           {{Value(1LL), Value(2LL), Value(3LL)}, Value(1.0)},
+                           // $stdDevSamp returns null when no arguments are provided.
+                           {{}, Value(BSONNULL)}});
+}
 
 namespace FieldPath {
 

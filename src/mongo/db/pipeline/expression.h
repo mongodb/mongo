@@ -412,6 +412,50 @@ public:
     }
 };
 
+/**
+ * Used to make Accumulators available as Expressions, e.g., to make $sum available as an Expression
+ * use "REGISTER_EXPRESSION(sum, ExpressionAccumulator<AccumulatorSum>::parse);".
+ */
+template <typename Accumulator>
+class ExpressionFromAccumulator
+    : public ExpressionVariadic<ExpressionFromAccumulator<Accumulator>> {
+public:
+    Value evaluateInternal(Variables* vars) const final {
+        Accumulator accum;
+        const size_t n = this->vpOperand.size();
+        // If a single array arg is given, loop through it passing each member to the accumulator.
+        // If a single, non-array arg is given, pass it directly to the accumulator.
+        if (n == 1) {
+            Value singleVal = this->vpOperand[0]->evaluateInternal(vars);
+            if (singleVal.getType() == Array) {
+                for (const Value& val : singleVal.getArray()) {
+                    accum.process(val, false);
+                }
+            } else {
+                accum.process(singleVal, false);
+            }
+        } else {
+            // If multiple arguments are given, pass all arguments to the accumulator.
+            for (auto&& argument : this->vpOperand) {
+                accum.process(argument->evaluateInternal(vars), false);
+            }
+        }
+        return accum.getValue(false);
+    }
+
+    bool isAssociativeAndCommutative() const final {
+        // Return false if a single argument is given to avoid a single array argument being treated
+        // as an array instead of as a list of arguments.
+        if (this->vpOperand.size() == 1) {
+            return false;
+        }
+        return Accumulator().isAssociativeAndCommutative();
+    }
+
+    const char* getOpName() const final {
+        return Accumulator().getOpName();
+    }
+};
 
 /**
  * Inherit from this class if your expression takes exactly one numeric argument.

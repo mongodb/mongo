@@ -469,7 +469,7 @@ namespace Min {
 class Base : public AccumulatorTests::Base {
 protected:
     void createAccumulator() {
-        _accumulator = AccumulatorMinMax::createMin();
+        _accumulator = AccumulatorMin::create();
         ASSERT_EQUALS(string("$min"), _accumulator->getOpName());
     }
     Accumulator* accumulator() {
@@ -485,8 +485,8 @@ class None : public Base {
 public:
     void run() {
         createAccumulator();
-        // The accumulator returns no value in this case.
-        ASSERT(accumulator()->getValue(false).missing());
+        // The accumulator returns null in this case.
+        ASSERT_EQUALS(Value(BSONNULL), accumulator()->getValue(false));
     }
 };
 
@@ -506,7 +506,7 @@ public:
     void run() {
         createAccumulator();
         accumulator()->process(Value(), false);
-        ASSERT_EQUALS(EOO, accumulator()->getValue(false).getType());
+        ASSERT_EQUALS(Value(BSONNULL), accumulator()->getValue(false));
     }
 };
 
@@ -539,7 +539,7 @@ namespace Max {
 class Base : public AccumulatorTests::Base {
 protected:
     void createAccumulator() {
-        _accumulator = AccumulatorMinMax::createMax();
+        _accumulator = AccumulatorMax::create();
         ASSERT_EQUALS(string("$max"), _accumulator->getOpName());
     }
     Accumulator* accumulator() {
@@ -555,8 +555,8 @@ class None : public Base {
 public:
     void run() {
         createAccumulator();
-        // The accumulator returns no value in this case.
-        ASSERT(accumulator()->getValue(false).missing());
+        // The accumulator returns null in this case.
+        ASSERT_EQUALS(Value(BSONNULL), accumulator()->getValue(false));
     }
 };
 
@@ -576,7 +576,7 @@ public:
     void run() {
         createAccumulator();
         accumulator()->process(Value(), false);
-        ASSERT_EQUALS(EOO, accumulator()->getValue(false).getType());
+        ASSERT_EQUALS(Value(BSONNULL), accumulator()->getValue(false));
     }
 };
 

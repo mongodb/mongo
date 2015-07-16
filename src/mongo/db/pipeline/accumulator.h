@@ -99,6 +99,10 @@ public:
      */
     static Factory getFactory(StringData name);
 
+    virtual bool isAssociativeAndCommutative() const {
+        return false;
+    }
+
 protected:
     /// Update subclass's internal state based on input
     virtual void processInternal(const Value& input, bool merging) = 0;
@@ -118,6 +122,10 @@ public:
     void reset() final;
 
     static boost::intrusive_ptr<Accumulator> create();
+
+    bool isAssociativeAndCommutative() const final {
+        return true;
+    }
 
 private:
     typedef std::unordered_set<Value, Value::Hash> SetType;
@@ -169,6 +177,10 @@ public:
 
     static boost::intrusive_ptr<Accumulator> create();
 
+    bool isAssociativeAndCommutative() const final {
+        return true;
+    }
+
 private:
     BSONType totalType;
     long long longTotal;
@@ -176,7 +188,7 @@ private:
 };
 
 
-class AccumulatorMinMax final : public Accumulator {
+class AccumulatorMinMax : public Accumulator {
 public:
     enum Sense : int {
         MIN = 1,
@@ -190,12 +202,25 @@ public:
     const char* getOpName() const final;
     void reset() final;
 
-    static boost::intrusive_ptr<Accumulator> createMin();
-    static boost::intrusive_ptr<Accumulator> createMax();
+    bool isAssociativeAndCommutative() const final {
+        return true;
+    }
 
 private:
     Value _val;
     const Sense _sense;
+};
+
+class AccumulatorMax final : public AccumulatorMinMax {
+public:
+    AccumulatorMax() : AccumulatorMinMax(MAX) {}
+    static boost::intrusive_ptr<Accumulator> create();
+};
+
+class AccumulatorMin final : public AccumulatorMinMax {
+public:
+    AccumulatorMin() : AccumulatorMinMax(MIN) {}
+    static boost::intrusive_ptr<Accumulator> create();
 };
 
 
@@ -232,7 +257,7 @@ private:
 };
 
 
-class AccumulatorStdDev final : public Accumulator {
+class AccumulatorStdDev : public Accumulator {
 public:
     explicit AccumulatorStdDev(bool isSamp);
 
@@ -241,13 +266,22 @@ public:
     const char* getOpName() const final;
     void reset() final;
 
-    static boost::intrusive_ptr<Accumulator> createSamp();
-    static boost::intrusive_ptr<Accumulator> createPop();
-
 private:
     const bool _isSamp;
     long long _count;
     double _mean;
     double _m2;  // Running sum of squares of delta from mean. Named to match algorithm.
+};
+
+class AccumulatorStdDevPop final : public AccumulatorStdDev {
+public:
+    AccumulatorStdDevPop() : AccumulatorStdDev(false) {}
+    static boost::intrusive_ptr<Accumulator> create();
+};
+
+class AccumulatorStdDevSamp final : public AccumulatorStdDev {
+public:
+    AccumulatorStdDevSamp() : AccumulatorStdDev(true) {}
+    static boost::intrusive_ptr<Accumulator> create();
 };
 }

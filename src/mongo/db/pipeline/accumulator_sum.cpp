@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -36,6 +37,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 REGISTER_ACCUMULATOR(sum, AccumulatorSum::create);
+REGISTER_EXPRESSION(sum, ExpressionFromAccumulator<AccumulatorSum>::parse);
 
 const char* AccumulatorSum::getOpName() const {
     return "$sum";
