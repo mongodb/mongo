@@ -405,14 +405,13 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i)
 	WT_LOG_WRLSN_ENTRY written[WT_SLOT_POOL];
 	WT_LOGSLOT *coalescing, *slot;
 	size_t written_i;
-	uint32_t i, max_i, save_i;
+	uint32_t i, save_i;
 
 	conn = S2C(session);
 	log = conn->log;
 	coalescing = NULL;
 	written_i = 0;
 	i = 0;
-	max_i = WT_MIN(log->max_used + 1, WT_SLOT_POOL - 1);
 	if (free_i != NULL)
 		*free_i = WT_SLOT_POOL;
 
@@ -420,7 +419,7 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i)
 	 * Walk the array once saving any slots that are in the
 	 * WT_LOG_SLOT_WRITTEN state.
 	 */
-	while (i <= max_i) {
+	while (i < WT_SLOT_POOL) {
 		save_i = i;
 		slot = &log->slot_pool[i++];
 		if (free_i != NULL && *free_i == WT_SLOT_POOL &&
@@ -498,17 +497,6 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i)
 				*free_i = save_i;
 		}
 	}
-	/*
-	 * Walk slots again to update max slot used.
-	 */
-	while (log->slot_pool[max_i].slot_state == WT_LOG_SLOT_FREE &&
-	    max_i != 0)
-		--max_i;
-#if 0
-	if (free_i != NULL && *free_i != WT_SLOT_POOL)
-		max_i = WT_MAX(*free_i, max_i);
-#endif
-	log->max_used = max_i;
 	return (0);
 }
 

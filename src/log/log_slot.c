@@ -188,6 +188,36 @@ join_slot:
 }
 
 /*
+ * __log_slot_find_free --
+ * 	Find and return a free log slot.
+ */
+int
+__log_slot_find_free(WT_SESSION_IMPL *session, WT_LOGSLOT **slot)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	uint32_t pool_i;
+
+	conn = S2C(session);
+	log = conn->log;
+	WT_ASSERT(session, slot != NULL);
+	/*
+	 * Encourage processing and moving the write LSN forward.
+	 * That process has to walk the slots anyway, so do that
+	 * work and let it give us the index of a free slot along
+	 * the way.
+	 */
+	WT_RET(__wt_log_wrlsn(session, &pool_i));
+	while (pool_i == WT_SLOT_POOL) {
+		__wt_yield();
+		WT_RET(__wt_log_wrlsn(session, &pool_i));
+	}
+	*slot = &log->slot_pool[pool_i];
+	WT_ASSERT(session, (*slot)->slot_state == WT_LOG_SLOT_FREE);
+	return (0);
+}
+
+/*
  * __wt_log_slot_close --
  *	Close a slot and do not allow any other threads to join this slot.
  *	Remove this from the active slot array and move a new slot from
@@ -201,31 +231,13 @@ __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_LOG *log;
 	WT_LOGSLOT *newslot;
 	int64_t old_state;
-	uint32_t free_i, pool_i;
 
 	conn = S2C(session);
 	log = conn->log;
-retry:
 	/*
 	 * Find an unused slot in the pool.
 	 */
-	pool_i = log->pool_index;
-	newslot = &log->slot_pool[pool_i];
-	if (++log->pool_index >= WT_SLOT_POOL)
-		log->pool_index = 0;
-	if (newslot->slot_state != WT_LOG_SLOT_FREE) {
-		free_i = WT_SLOT_POOL;
-		WT_RET(__wt_log_wrlsn(session, &free_i));
-		/*
-		 * We have the index of a slot that was freed.
-		 * Set the index so we use it.
-		 */
-		if (free_i != WT_SLOT_POOL)
-			log->pool_index = free_i;
-		else
-			__wt_yield();
-		goto retry;
-	}
+	WT_RET(__log_slot_find_free(session, &newslot));
 
 	/*
 	 * Swap out the slot we're going to use and put a free one in the
@@ -234,7 +246,7 @@ retry:
 	WT_STAT_FAST_CONN_INCR(session, log_slot_closes);
 	newslot->slot_state = WT_LOG_SLOT_READY;
 	newslot->slot_index = slot->slot_index;
-	log->slot_array[newslot->slot_index] = &log->slot_pool[pool_i];
+	log->slot_array[newslot->slot_index] = newslot;
 	old_state = WT_ATOMIC_STORE8(slot->slot_state, WT_LOG_SLOT_PENDING);
 	slot->slot_group_size = (uint64_t)(old_state - WT_LOG_SLOT_READY);
 	/*
