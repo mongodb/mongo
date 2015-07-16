@@ -857,12 +857,15 @@ def CheckForToolchain(context, toolchain, lang_name, compiler_var, source_suffix
 
 # These preprocessor macros came from
 # http://nadeausoftware.com/articles/2012/02/c_c_tip_how_detect_processor_type_using_compiler_predefined_macros
+#
+# NOTE: Remember to add a trailing comma to form any required one
+# element tuples, or your configure checks will fail in strange ways.
 processor_macros = {
     'x86_64': ('__x86_64', '_M_AMD64'),
     'i386': ('__i386', '_M_IX86'),
-    'sparc': ('__sparc'),
+    'sparc': ('__sparc',),
     'PowerPC': ('__powerpc__', '__PPC'),
-    'arm' : ('__arm__'),
+    'arm' : ('__arm__',),
     'arm64' : ('__arm64__', '__aarch64__'),
 }
 
