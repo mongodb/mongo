@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/client/fetcher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/condition_variable.h"
@@ -165,6 +166,14 @@ private:
     // Production thread
     void _producerThread(executor::TaskExecutor* taskExecutor);
     void _produce(OperationContext* txn, executor::TaskExecutor* taskExecutor);
+
+    /**
+     * Processes query responses from fetcher.
+     */
+    void _fetcherCallback(const StatusWith<Fetcher::QueryResponse>& result,
+                          BSONObjBuilder* bob,
+                          const HostAndPort& source,
+                          Status* remoteOplogStartStatus);
 
     /**
      * Checks the criteria for rolling back.
