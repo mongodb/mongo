@@ -3,9 +3,7 @@
 Import([
     'env',
     'serverJs',
-    'usev8',
     'usemozjs',
-    'v8suffix',
 ])
 
 env.Library(
@@ -54,26 +52,7 @@ env.Library(
     ],
 )
 
-if usev8:
-    scriptingEnv = env.Clone()
-    scriptingEnv.InjectThirdPartyIncludePaths(libraries=['v8'])
-    scriptingEnv.Library(
-        target='scripting',
-        source=[
-            'engine_v8' + v8suffix + '.cpp',
-            'v8' + v8suffix + '_db.cpp',
-            'v8' + v8suffix + '_utils.cpp',
-            'v8' + v8suffix + '_profiler.cpp',
-        ],
-        LIBDEPS=[
-            'bson_template_evaluator',
-            'scripting_common',
-            '$BUILD_DIR/third_party/shim_v8',
-            '$BUILD_DIR/mongo/shell/mongojs',
-            '$BUILD_DIR/mongo/db/service_context',
-        ],
-    )
-elif usemozjs:
+if usemozjs:
     scriptingEnv = env.Clone()
     scriptingEnv.InjectThirdPartyIncludePaths(libraries=['mozjs'])
 

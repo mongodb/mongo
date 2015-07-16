@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env use_system_version_of_library usemozjs usev8 v8suffix boostSuffix")
+Import("env use_system_version_of_library usemozjs boostSuffix")
 Import("wiredtiger")
 
 snappySuffix = '-1.1.2'
@@ -32,10 +32,6 @@ if not use_system_version_of_library('snappy'):
 if not use_system_version_of_library('zlib'):
     thirdPartyIncludePathList.append(
         ('zlib', '#/src/third_party/zlib' + zlibSuffix))
-
-if not use_system_version_of_library('v8'):
-    thirdPartyIncludePathList.append(
-        ('v8', '#/src/third_party/v8' + v8suffix + '/include'))
 
 # TODO: figure out if we want to offer system versions of mozjs.  Mozilla
 # hasn't offered a source tarball since 24, but in theory they could.
@@ -193,27 +189,6 @@ zlibEnv.Library(
     source=[
         'shim_zlib.cpp',
     ])
-
-if usev8:
-    if use_system_version_of_library("v8"):
-        v8Env = env.Clone(
-            SYSLIBDEPS=[
-                env['LIBDEPS_V8_SYSLIBDEP'],
-            ])
-    else:
-        v8Env = env.Clone()
-        v8Env.InjectThirdPartyIncludePaths(libraries=['v8'])
-        v8Env.SConscript('v8' + v8suffix + '/SConscript', exports={'env' : v8Env })
-        v8Env = v8Env.Clone(
-            LIBDEPS=[
-                'v8' + v8suffix + '/v8'
-            ])
-
-    v8Env.Library(
-        target="shim_v8",
-        source=[
-            'shim_v8.cpp',
-        ])
 
 if usemozjs:
     mozjsEnv = env.Clone()

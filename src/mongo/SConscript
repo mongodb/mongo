@@ -14,7 +14,6 @@ import SCons.Action
 Import("env")
 Import("has_option")
 Import("get_option")
-Import("usev8")
 Import("usemozjs")
 Import("use_system_version_of_library")
 
@@ -348,7 +347,7 @@ if env.TargetOSIs('osx') or env["_HAVEPCAP"]:
 
 # --- shell ---
 
-if not has_option('noshell') and (usev8 or usemozjs):
+if not has_option('noshell') and usemozjs:
     shell_core_env = env.Clone()
     if has_option("safeshell"):
         shell_core_env.Append(CPPDEFINES=["MONGO_SAFE_SHELL"])

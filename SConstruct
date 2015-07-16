@@ -116,7 +116,7 @@ def use_system_version_of_library(name):
 # add a new C++ library dependency that may be shimmed out to the system, add it to the below
 # list.
 def using_system_version_of_cxx_libraries():
-    cxx_library_names = ["tcmalloc", "boost", "v8"]
+    cxx_library_names = ["tcmalloc", "boost"]
     return True in [use_system_version_of_library(x) for x in cxx_library_names]
 
 def make_variant_dir_generator():
@@ -213,11 +213,10 @@ add_option('wiredtiger',
     type='choice',
 )
 
-# library choices
-js_engine_choices = ['v8-3.12', 'v8-3.25', 'mozjs', 'none']
+js_engine_choices = ['mozjs', 'none']
 add_option('js-engine',
     choices=js_engine_choices,
-    default=js_engine_choices[2],
+    default=js_engine_choices[0],
     help='JavaScript scripting engine implementation',
     type='choice',
 )
@@ -355,11 +354,6 @@ add_option('use-system-snappy',
 
 add_option('use-system-zlib',
     help='use system version of zlib library',
-    nargs=0,
-)
-
-add_option('use-system-v8',
-    help='use system version of v8 library',
     nargs=0,
 )
 
@@ -786,14 +780,9 @@ jsEngine = get_option( "js-engine")
 
 serverJs = get_option( "server-js" ) == "on"
 
-usev8 = (jsEngine.startswith('v8'))
-
 usemozjs = (jsEngine.startswith('mozjs'))
 
-v8version = jsEngine[3:] if jsEngine.startswith('v8-') else 'none'
-v8suffix = '' if v8version == '3.12' else '-' + v8version
-
-if not serverJs and not usev8 and not usemozjs:
+if not serverJs and not usemozjs:
     print("Warning: --server-js=off is not needed with --js-engine=none")
 
 # We defer building the env until we have determined whether we want certain values. Some values
@@ -2234,13 +2223,6 @@ def doConfigure(myenv):
     if env.TargetOSIs('solaris'):
         conf.CheckLib( "nsl" )
 
-    if usev8 and use_system_version_of_library("v8"):
-        if debugBuild:
-            v8_lib_choices = ["v8_g", "v8"]
-        else:
-            v8_lib_choices = ["v8"]
-        conf.FindSysLibDep( "v8", v8_lib_choices )
-
     conf.env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
     if conf.env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
             "sasl2", 
@@ -2441,9 +2423,7 @@ Export("env")
 Export("get_option")
 Export("has_option use_system_version_of_library")
 Export("serverJs")
-Export("usev8")
 Export("usemozjs")
-Export("v8version v8suffix")
 Export("boostSuffix")
 Export('module_sconscripts')
 Export("debugBuild optBuild")
