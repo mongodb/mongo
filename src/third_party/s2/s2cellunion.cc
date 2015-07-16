@@ -62,6 +62,11 @@ void S2CellUnion::InitRawSwap(vector<S2CellId>* cell_ids) {
   cell_ids->clear();
 }
 
+void S2CellUnion::Add(const vector<S2CellId>& cell_ids) {
+    cell_ids_.insert(cell_ids_.end(), cell_ids.begin(), cell_ids.end());
+    Normalize();
+}
+
 void S2CellUnion::Detach(vector<S2CellId>* cell_ids) {
   cell_ids_.swap(*cell_ids);
   cell_ids_.clear();

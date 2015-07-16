@@ -28,8 +28,12 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kGeo
 
+#include <chrono>
+#include <random>
+
 #include "mongo/db/geo/r2_region_coverer.h"
 
+#include "mongo/base/init.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/platform/random.h"
 #include "mongo/bson/bsonmisc.h"
@@ -38,9 +42,31 @@
 
 namespace {
 
-using std::unique_ptr;
+using std::auto_ptr;
 using namespace mongo;
 using mongo::Polygon;  // "windows.h" has another Polygon for Windows GDI.
+
+std::default_random_engine generator;
+
+MONGO_INITIALIZER(R2CellUnion_Test)(InitializerContext* context) {
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    for (size_t i = 2; i < context->args().size(); ++i) {
+        if (context->args()[i - 1] == "--seed") {
+            seed = std::stoul(context->args()[i]);
+            break;
+        }
+    }
+    generator.seed(seed);
+    log() << "R2CellUnion Test - Random Number Generator Seed: " << seed;
+    return Status::OK();
+}
+
+// Returns an integral number in [lower, upper]
+template <typename NumType>
+NumType random(NumType lower, NumType upper) {
+    std::uniform_int_distribution<NumType> distribution(lower, upper);
+    return distribution(generator);
+}
 
 //
 // GeoHash
@@ -107,9 +133,6 @@ TEST(R2RegionCoverer, GeoHashContains) {
 // Plane boundary, x: [0.0, 100.0], y: [0.0, 100.0]
 const double MAXBOUND = 100.0;
 
-// Global random number generator, repeatable.
-mongo::PseudoRandom rand(0);
-
 GeoHashConverter::Parameters getConverterParams() {
     GeoHashConverter::Parameters params;
     params.bits = 32;
@@ -160,7 +183,9 @@ TEST(R2RegionCoverer, RandomCells) {
     coverer.setMaxCells(1);
     // Test random cell ids at all levels.
     for (int i = 0; i < 10000; ++i) {
-        GeoHash id((long long)rand.nextInt64(), (unsigned)rand.nextInt32(GeoHash::kMaxBits + 1));
+        GeoHash id(
+            random(std::numeric_limits<long long>::lowest(), std::numeric_limits<long long>::max()),
+            random(0U, GeoHash::kMaxBits));
         vector<GeoHash> covering;
         Box box = converter.unhashToBoxCovering(id);
         // Since the unhashed box is expanded by the error 8Mu, we need to shrink it.
@@ -176,7 +201,9 @@ double randDouble(double lowerBound, double upperBound) {
     verify(lowerBound <= upperBound);
     const int NUMBITS = 53;
     // Random double in [0, 1)
-    double r = ldexp((double)(rand.nextInt64() & ((1ULL << NUMBITS) - 1ULL)), -NUMBITS);
+    long long randLong =
+        random(std::numeric_limits<long long>::lowest(), std::numeric_limits<long long>::max());
+    double r = ldexp(static_cast<double>(randLong & ((1ULL << NUMBITS) - 1ULL)), -NUMBITS);
     return lowerBound + r * (upperBound - lowerBound);
 }
 
@@ -265,11 +292,11 @@ TEST(R2RegionCoverer, RandomCircles) {
         // Using R2BoxRegion, the disjoint with circle gives poor results around the corner,
         // so many small cells are considered as intersected in the priority queue, which is
         // very slow for larger minLevel (smaller cell). So we limit minLevels in [0, 6].
-        coverer.setMinLevel(rand.nextInt32(7));
+        coverer.setMinLevel(random(0, 6));
         coverer.setMaxLevel(coverer.minLevel() + 4);
 
         double radius = randDouble(0.0, MAXBOUND / 2);
-        unique_ptr<GeometryContainer> geometry(getRandomCircle(radius));
+        auto_ptr<GeometryContainer> geometry(getRandomCircle(radius));
         const R2Region& region = geometry->getR2Region();
 
         vector<GeoHash> covering;
@@ -282,17 +309,17 @@ TEST(R2RegionCoverer, RandomCircles) {
 TEST(R2RegionCoverer, RandomTinyCircles) {
     GeoHashConverter converter(getConverterParams());
     R2RegionCoverer coverer(&converter);
-    coverer.setMaxCells(rand.nextInt32(20) + 1);  // [1, 20]
+    coverer.setMaxCells(random(1, 20));  // [1, 20]
 
     for (int i = 0; i < 10000; i++) {
         do {
-            coverer.setMinLevel(rand.nextInt32(GeoHash::kMaxBits + 1));
-            coverer.setMaxLevel(rand.nextInt32(GeoHash::kMaxBits + 1));
+            coverer.setMinLevel(random(0U, GeoHash::kMaxBits));
+            coverer.setMaxLevel(random(0U, GeoHash::kMaxBits));
         } while (coverer.minLevel() > coverer.maxLevel());
 
         // 100 * 2 ^ -32 ~= 2.3E-8 (cell edge length)
         double radius = randDouble(1E-15, ldexp(100.0, -32) * 10);
-        unique_ptr<GeometryContainer> geometry(getRandomCircle(radius));
+        auto_ptr<GeometryContainer> geometry(getRandomCircle(radius));
         const R2Region& region = geometry->getR2Region();
 
         vector<GeoHash> covering;
@@ -621,4 +648,298 @@ TEST(ShapeIntersection, Annulus) {
     ASSERT_FALSE(annulus.fastContains(box));
 }
 
+bool oneIn(unsigned num) {
+    std::uniform_int_distribution<unsigned> distribution(1, num);
+    return distribution(generator) == 1;
+}
+
+void generateRandomCells(GeoHash const& id,
+                         bool selected,
+                         std::vector<GeoHash>* unnormalized,
+                         std::vector<GeoHash>* normalized) {
+    // This function generates an unnormalized and a normalized GeoHash vector to create
+    // a random R2CellUnion.
+    // If selected is true, the region covered by GeoHash id will be covered by the cells
+    // in unnormalized and normalized.
+
+    // This is a leaf cell and cannot be subdivided further, so it must be added.
+    if (id.getBits() == 32) {
+        unnormalized->push_back(id);
+        return;
+    }
+
+    // If the parent cell was not selected, this cell will be selected with a probability
+    // proportional to its level, so smaller cells are more likely to be selected.
+    if (!selected && oneIn(32 - id.getBits())) {
+        normalized->push_back(id);
+        selected = true;
+    }
+
+    // If this cell is selected, we can either add it or another set of cells that
+    // cover the same region.
+    bool added = false;
+    if (selected && !oneIn(6)) {
+        unnormalized->push_back(id);
+        added = true;
+    }
+
+    // Add all the children of this cell if it was selected, but not added.
+    // Randomly add other children cells.
+    // Make sure not to include all 4 children if not selected to ensure that the
+    // normalized union is correct.
+    int numChildren = 0;
+    GeoHash children[4];
+    id.subdivide(children);
+    for (int pos = 0; pos < 4; ++pos) {
+        // If selected, recurse on 4/12 = 1/3 child to add overlapping cells to the
+        // normalized vector.
+        // If not selected, recurse on 4 * 2/7 = 8/7 child.
+        if ((selected ? oneIn(12) : (random(0, 6) < 2)) && numChildren < 3) {
+            generateRandomCells(children[pos], selected, unnormalized, normalized);
+            ++numChildren;
+        }
+        if (selected && !added) {
+            generateRandomCells(children[pos], selected, unnormalized, normalized);
+        }
+    }
+}
+
+TEST(R2CellUnion, Normalize) {
+    int unnormalizedSum = 0, normalizedSum = 0;
+    int kIters = 2000;
+    for (int i = 0; i < kIters; ++i) {
+        std::vector<GeoHash> input, expected;
+        generateRandomCells(GeoHash(), false, &input, &expected);
+        unnormalizedSum += input.size();
+        normalizedSum += expected.size();
+        // Initialize with unnormalized input
+        R2CellUnion cellUnion;
+        cellUnion.init(input);
+
+        // Check to make sure the cells in cellUnion equal the expected cells
+        ASSERT_EQUALS(expected.size(), cellUnion.cellIds().size());
+        for (size_t i = 0; i < expected.size(); ++i) {
+            ASSERT_EQUALS(expected[i], cellUnion.cellIds()[i]);
+        }
+    }
+    log() << "Average Unnormalized Size: " << unnormalizedSum * 1.0 / kIters;
+    log() << "Average Normalized Size: " << normalizedSum * 1.0 / kIters;
+}
+
+void testContains(const R2CellUnion& cellUnion, GeoHash id, int num) {
+    // Breadth first check of the child cells to make sure that each one is contained
+    // in cellUnion
+    std::queue<GeoHash> ids;
+    ids.push(id);
+    int cellsChecked = 0;
+    while (!ids.empty() && cellsChecked < num) {
+        ++cellsChecked;
+        GeoHash currentId = ids.front();
+        ids.pop();
+        ASSERT_TRUE(cellUnion.contains(currentId));
+        ASSERT_TRUE(cellUnion.intersects(currentId));
+        if (currentId.getBits() < 32) {
+            GeoHash children[4];
+            currentId.subdivide(children);
+            for (int i = 0; i < 4; ++i) {
+                ids.push(children[i]);
+            }
+        }
+    }
+}
+
+TEST(R2CellUnion, Contains) {
+    // An R2CellUnion should contain all of its children.
+    std::vector<GeoHash> entirePlaneVector;
+    GeoHash entirePlane;
+    entirePlaneVector.push_back(entirePlane);
+    R2CellUnion entirePlaneUnion;
+    entirePlaneUnion.init(entirePlaneVector);
+    ASSERT_TRUE(entirePlaneUnion.contains(entirePlane));
+    GeoHash childCell1("00");
+    ASSERT_TRUE(entirePlaneUnion.contains(childCell1));
+    GeoHash childCell2("01");
+    ASSERT_TRUE(entirePlaneUnion.contains(childCell2));
+    GeoHash childCell3("10");
+    ASSERT_TRUE(entirePlaneUnion.contains(childCell3));
+    GeoHash childCell4("11");
+    ASSERT_TRUE(entirePlaneUnion.contains(childCell4));
+
+    // An R2CellUnion should contain every cell that is contained by one of its member cells
+    for (int i = 0; i < 2000; ++i) {
+        std::vector<GeoHash> unnormalized, normalized;
+        generateRandomCells(GeoHash(), false, &unnormalized, &normalized);
+        R2CellUnion cellUnion;
+        cellUnion.init(normalized);
+        for (auto cellId : normalized) {
+            testContains(cellUnion, cellId, 100);
+        }
+    }
+}
+
+// Naive implementation of intersects to test correctness
+bool intersects(const R2CellUnion& cellUnion, GeoHash cellId) {
+    for (auto unionCellId : cellUnion.cellIds()) {
+        // Two cells will only intersect if one contains the other
+        if (unionCellId.contains(cellId) || cellId.contains(unionCellId)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+TEST(R2CellUnion, Intersects) {
+    // An R2CellUnion should intersect with every cell it contains.
+    std::vector<GeoHash> entirePlaneVector;
+    GeoHash entirePlane;
+    entirePlaneVector.push_back(entirePlane);
+    R2CellUnion entirePlaneUnion;
+    entirePlaneUnion.init(entirePlaneVector);
+    ASSERT_TRUE(entirePlaneUnion.intersects(entirePlane));
+    GeoHash childCell1("00");
+    ASSERT_TRUE(entirePlaneUnion.intersects(childCell1));
+    GeoHash childCell2("01");
+    ASSERT_TRUE(entirePlaneUnion.intersects(childCell2));
+    GeoHash childCell3("10");
+    ASSERT_TRUE(entirePlaneUnion.intersects(childCell3));
+    GeoHash childCell4("11");
+    ASSERT_TRUE(entirePlaneUnion.intersects(childCell4));
+
+    for (int k = 0; k < 2000; ++k) {
+        R2CellUnion randomUnion;
+        std::vector<GeoHash> unnormalized, normalized;
+        generateRandomCells(GeoHash(), false, &unnormalized, &normalized);
+        randomUnion.init(normalized);
+
+        // An R2CellUnion should intersect with every cell that contains a member of the union.
+        // It should also intersect with cells it contains
+        for (auto cellId : randomUnion.cellIds()) {
+            for (unsigned level = 0; level <= 32; ++level) {
+                ASSERT_TRUE(randomUnion.intersects(GeoHash(cellId.getHash(), level)));
+            }
+        }
+
+        // Check that the output of intersects matches that of the naive implementation
+        std::vector<GeoHash> otherUnnormalized, otherNormalized;
+        generateRandomCells(GeoHash(), false, &otherUnnormalized, &otherNormalized);
+        for (const GeoHash& cellId : otherUnnormalized) {
+            ASSERT_EQUALS(randomUnion.intersects(cellId), intersects(randomUnion, cellId));
+        }
+    }
+}
+
+void testDifference(std::vector<GeoHash>& xCellIds, std::vector<GeoHash>& yCellIds) {
+    // Initialize the two cell unions
+    R2CellUnion x, y;
+    x.init(xCellIds);
+    y.init(yCellIds);
+
+    // Compute the differences x - y and y - x
+    R2CellUnion xMinusY, yMinusX;
+    xMinusY.init(xCellIds);
+    xMinusY.getDifference(y);
+    yMinusX.init(yCellIds);
+    yMinusX.getDifference(x);
+
+    // Check that x contains x - y and y contains y - x
+    // Check that y doesn't intersect x - y and x doesn't intersect y - x
+    // Check that y - x doesn't intersect with x - y
+    for (size_t i = 0; i < xMinusY.cellIds().size(); ++i) {
+        const GeoHash& cellId = xMinusY.cellIds()[i];
+        ASSERT_TRUE(x.contains(cellId));
+        ASSERT_TRUE(x.intersects(cellId));
+        ASSERT_FALSE(y.contains(cellId));
+        ASSERT_FALSE(y.intersects(cellId));
+        ASSERT_FALSE(yMinusX.contains(cellId));
+        ASSERT_FALSE(yMinusX.intersects(cellId));
+    }
+    for (size_t i = 0; i < yMinusX.cellIds().size(); ++i) {
+        const GeoHash& cellId = yMinusX.cellIds()[i];
+        ASSERT_TRUE(y.contains(cellId));
+        ASSERT_TRUE(y.intersects(cellId));
+        ASSERT_FALSE(x.contains(cellId));
+        ASSERT_FALSE(x.intersects(cellId));
+        ASSERT_FALSE(xMinusY.contains(cellId));
+        ASSERT_FALSE(xMinusY.intersects(cellId));
+    }
+
+    // Check that x - y + y contains x U y and y - x + x contains x U y
+    // Check that x U y contains both x - y + y and y - x + x
+    R2CellUnion xMinusYPlusY, yMinusXPlusX, xUnionY;
+    xMinusYPlusY.init(xMinusY.cellIds());
+    xMinusYPlusY.add(y.cellIds());
+    yMinusXPlusX.init(yMinusX.cellIds());
+    yMinusXPlusX.add(x.cellIds());
+    xUnionY.init(x.cellIds());
+    xUnionY.add(y.cellIds());
+
+    for (auto cellId : xUnionY.cellIds()) {
+        ASSERT_TRUE(xMinusYPlusY.contains(cellId));
+        ASSERT_TRUE(yMinusXPlusX.contains(cellId));
+    }
+    for (auto cellId : xMinusYPlusY.cellIds()) {
+        ASSERT_TRUE(xUnionY.contains(cellId));
+    }
+    for (auto cellId : yMinusXPlusX.cellIds()) {
+        ASSERT_TRUE(xUnionY.contains(cellId));
+    }
+}
+
+TEST(R2CellUnion, Difference) {
+    for (int i = 0; i < 2000; ++i) {
+        std::vector<GeoHash> xUnnormalized, xNormalized;
+        generateRandomCells(GeoHash(), false, &xUnnormalized, &xNormalized);
+        std::vector<GeoHash> yUnnormalized, yNormalized;
+        generateRandomCells(GeoHash(), false, &yUnnormalized, &yNormalized);
+        // Test with two unions that contain each other
+        testDifference(xUnnormalized, xNormalized);
+        // Test with random unions
+        testDifference(xUnnormalized, yUnnormalized);
+    }
+}
+
+TEST(R2CellUnion, Empty) {
+    R2CellUnion emptyUnion;
+    R2CellUnion randomUnion;
+    std::vector<GeoHash> unnormalized, normalized;
+    generateRandomCells(GeoHash(), false, &unnormalized, &normalized);
+    randomUnion.init(normalized);
+
+    // normalize()
+    emptyUnion.init(std::vector<GeoHash>());
+    ASSERT_TRUE(emptyUnion.cellIds().empty());
+
+    // contains() and intersects()
+    for (const GeoHash& cellId : unnormalized) {
+        ASSERT_FALSE(emptyUnion.contains(cellId));
+        ASSERT_FALSE(emptyUnion.intersects(cellId));
+    }
+
+    // getDifference()
+    std::vector<GeoHash> originalCellIds;
+    std::copy(randomUnion.cellIds().begin(),
+              randomUnion.cellIds().end(),
+              std::back_inserter(originalCellIds));
+    randomUnion.getDifference(emptyUnion);
+    ASSERT_TRUE(originalCellIds == randomUnion.cellIds());
+    emptyUnion.getDifference(randomUnion);
+    ASSERT_TRUE(emptyUnion.cellIds().empty());
+}
+
+TEST(R2CellUnion, Detach) {
+    GeoHash entirePlaneCell;
+    std::vector<GeoHash> cellIds;
+    cellIds.push_back(entirePlaneCell);
+    R2CellUnion entirePlaneUnion;
+    entirePlaneUnion.init(cellIds);
+    ASSERT_EQUALS(1UL, entirePlaneUnion.cellIds().size());
+    ASSERT_EQUALS(entirePlaneCell, entirePlaneUnion.cellIds()[0]);
+
+    std::vector<GeoHash> otherCellIds;
+    otherCellIds.push_back(GeoHash("01"));
+    entirePlaneUnion.detach(&otherCellIds);
+    ASSERT_EQUALS(1UL, otherCellIds.size());
+    ASSERT_EQUALS(entirePlaneCell, otherCellIds[0]);
+    ASSERT_TRUE(entirePlaneUnion.cellIds().empty());
+}
 }  // namespace

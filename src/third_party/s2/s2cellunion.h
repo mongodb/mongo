@@ -43,6 +43,9 @@ class S2CellUnion : public S2Region {
   void InitRaw(vector<uint64> const& cell_ids);
   void InitRawSwap(vector<S2CellId>* cell_ids);
 
+  // Adds the given S2CellIds to the covered region and calls Normalize()
+  void Add(const vector<S2CellId>& cell_ids);
+
   // Gives ownership of the vector data to the client without copying, and
   // clears the content of the cell union.  The original data in cell_ids
   // is lost if there was any.  This is the opposite of InitRawSwap().
