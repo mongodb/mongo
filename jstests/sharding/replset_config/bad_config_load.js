@@ -44,6 +44,7 @@ for( var i = 0; i < 2; i++ ){
         assert(e.message.indexOf("10276") >= 0 ||       // Transport error
                e.message.indexOf("13328") >= 0 ||       // Connect error
                e.message.indexOf("13639") >= 0 ||       // Connect error to replSet primary
+               e.message.indexOf("network error") >= 0 ||
                e.message.indexOf("socket") >= 0 )
     }
 }
