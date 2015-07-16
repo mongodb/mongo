@@ -192,7 +192,7 @@ MMAPV1DatabaseCatalogEntry::~MMAPV1DatabaseCatalogEntry() {
     _collections.clear();
 }
 
-intmax_t dbSize(const string& database);  // from repair_database.cpp
+intmax_t dbSize(const std::string& database);  // from repair_database.cpp
 
 int64_t MMAPV1DatabaseCatalogEntry::sizeOnDisk(OperationContext* opCtx) const {
     return static_cast<int64_t>(dbSize(name()));
@@ -279,7 +279,7 @@ Status MMAPV1DatabaseCatalogEntry::renameCollection(OperationContext* txn,
         if (!newIndexSpecLoc.isOK())
             return newIndexSpecLoc.getStatus();
 
-        const string& indexName = oldIndexSpec.getStringField("name");
+        const std::string& indexName = oldIndexSpec.getStringField("name");
 
         {
             // fix IndexDetails pointer
@@ -294,8 +294,8 @@ Status MMAPV1DatabaseCatalogEntry::renameCollection(OperationContext* txn,
 
         {
             // move underlying namespac
-            string oldIndexNs = IndexDescriptor::makeIndexNamespace(fromNS, indexName);
-            string newIndexNs = IndexDescriptor::makeIndexNamespace(toNS, indexName);
+            std::string oldIndexNs = IndexDescriptor::makeIndexNamespace(fromNS, indexName);
+            std::string newIndexNs = IndexDescriptor::makeIndexNamespace(toNS, indexName);
 
             Status s = _renameSingleNamespace(txn, oldIndexNs, newIndexNs, false);
             if (!s.isOK())
@@ -711,9 +711,9 @@ RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getRecordStore(StringData ns) co
 IndexAccessMethod* MMAPV1DatabaseCatalogEntry::getIndex(OperationContext* txn,
                                                         const CollectionCatalogEntry* collection,
                                                         IndexCatalogEntry* entry) {
-    const string& type = entry->descriptor()->getAccessMethodName();
+    const std::string& type = entry->descriptor()->getAccessMethodName();
 
-    string ns = collection->ns().ns();
+    std::string ns = collection->ns().ns();
 
     RecordStoreV1Base* rs = _getRecordStore(entry->descriptor()->indexNamespace());
     invariant(rs);

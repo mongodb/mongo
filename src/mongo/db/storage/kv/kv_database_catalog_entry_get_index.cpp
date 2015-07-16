@@ -54,9 +54,9 @@ IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* txn,
                                                     IndexCatalogEntry* index) {
     IndexDescriptor* desc = index->descriptor();
 
-    const string& type = desc->getAccessMethodName();
+    const std::string& type = desc->getAccessMethodName();
 
-    string ident =
+    std::string ident =
         _engine->getCatalog()->getIndexIdent(txn, collection->ns().ns(), desc->indexName());
 
     SortedDataInterface* sdi = _engine->getEngine()->getSortedDataInterface(txn, ident, desc);
