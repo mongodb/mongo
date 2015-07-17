@@ -8,10 +8,10 @@
 
 #include "wt_internal.h"
 
-#define	WT_BLOCK_ERROR(session, block, ...) do {		\
+#define	WT_BLOCK_ERROR(session, block, ...) do {			\
 	if (block->verify)						\
-		WT_RET_MSG(session, __VA_ARGS__);		\
-	WT_PANIC_RET(session, __VA_ARGS__);			\
+		WT_RET_MSG(session, __VA_ARGS__);			\
+	WT_PANIC_RET(session, __VA_ARGS__);				\
 } while (0)
 
 static int __block_append(WT_SESSION_IMPL *,
