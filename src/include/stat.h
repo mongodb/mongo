@@ -203,7 +203,6 @@ struct __wt_connection_stats {
 	WT_STATS dh_session_handles;
 	WT_STATS dh_session_sweeps;
 	WT_STATS file_open;
-	WT_STATS log_buffer_grow;
 	WT_STATS log_buffer_size;
 	WT_STATS log_bytes_payload;
 	WT_STATS log_bytes_written;

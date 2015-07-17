@@ -674,6 +674,7 @@ logtest
 lookup
 lookups
 lossy
+lrt
 lru
 lseek
 lsm

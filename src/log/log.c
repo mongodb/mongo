@@ -1816,11 +1816,6 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		    session, record, lsnp, flags)) == EAGAIN)
 			;
 		WT_ERR(ret);
-		/*
-		 * Increase the buffer size of any slots we can get access
-		 * to, so future consolidations are likely to succeed.
-		 */
-		WT_ERR(__wt_log_slot_grow_buffers(session, 4 * rdup_len));
 		return (0);
 	}
 	WT_ERR(ret);
