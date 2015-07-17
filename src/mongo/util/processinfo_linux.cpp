@@ -432,7 +432,10 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
     // docs claim hblkhd is included in uordblks but it isn't
 
     LinuxProc p(_pid);
-    info.appendNumber("page_faults", static_cast<long long>(p._maj_flt));
+    if (p._maj_flt <= std::numeric_limits<long long>::max())
+        info.appendNumber("page_faults", static_cast<long long>(p._maj_flt));
+    else
+        info.appendNumber("page_faults", static_cast<double>(p._maj_flt));
 }
 
 /**
