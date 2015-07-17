@@ -245,9 +245,8 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 			}
 			if (STRING_MATCH("truncate", k.str, k.len)) {
 				workp->truncate = v.val;
-				if (workp->truncate > 0) {
+				if (workp->truncate > 0)
 					cfg->has_truncate = 1;
-				}
 				continue;
 			}
 			if (STRING_MATCH("truncate_pct", k.str, k.len)) {
@@ -664,7 +663,7 @@ config_print(CONFIG *cfg)
 		    i < cfg->workload_cnt; ++i, ++workp)
 			printf("\t\t%" PRId64 " threads (inserts=%" PRId64
 			    ", reads=%" PRId64 ", updates=%" PRId64 
-			    ", truncate=% " PRId64 ")\n",
+			    ", truncates=% " PRId64 ")\n",
 			    workp->threads,
 			    workp->insert, workp->read,
 			    workp->update, workp->truncate);

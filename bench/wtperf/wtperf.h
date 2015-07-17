@@ -92,7 +92,7 @@ typedef struct {
 	int64_t ops_per_txn;
 	int64_t truncate;		/* Truncate ratio */
 	uint64_t truncate_pct;		/* Truncate Percent */
-	uint64_t truncate_count;		/* Truncate Percent */
+	uint64_t truncate_count;	/* Truncate Percent */
 
 #define	WORKER_INSERT		1	/* Insert */
 #define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */

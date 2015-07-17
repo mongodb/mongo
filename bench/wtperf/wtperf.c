@@ -146,19 +146,18 @@ setup_truncate(CONFIG *cfg,
 
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	WT_CURSOR *cursor;
-	size_t i;
-	uint64_t end_point_val, final_milestone_gap, start_point_val;
 	char *key, *truncate_key;
 	int ret;
+	size_t i;
+	uint64_t end_point_val, final_milestone_gap, start_point_val;
 
 	ret = 0;
 	end_point_val = final_milestone_gap = start_point_val = 0;
 
 	/* We are limited to only one table when running truncate */
 	ret = session->open_cursor(session, cfg->uris[0], NULL, NULL, &cursor);
-	if (ret != 0) {
+	if (ret != 0)
 		goto err;
-	}
 
 	/* Truncation percentage value. eg 10% is 0.1 */
 	trunc->truncation_percentage =
@@ -181,10 +180,9 @@ setup_truncate(CONFIG *cfg,
 	 * milestones.
 	 */
 	ret = cursor->next(cursor);
-
-	if (ret == 0) {
+	if (ret == 0)
 		ret = cursor->get_key(cursor, &key);
-	}
+
 	/* We have data */
 	if (ret == 0) {
 		start_point_val = decode_key(cfg, key);
@@ -216,8 +214,7 @@ setup_truncate(CONFIG *cfg,
 		trunc->expected_total = (end_point_val - start_point_val);
 		for (i = 0; i < trunc->needed_milestones; i++) {
 			truncate_key = calloc(cfg->key_sz, 1);
-			truncate_item =
-			    calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
+			truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 			if (truncate_item == NULL) {
 				ret = enomem(cfg);
 				goto err;
@@ -260,13 +257,14 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
 	trunc->last_total_inserts = trunc->total_gross_inserts;
 
 	/* We have enough data, so we can setup milestones and truncate */
-	if (trunc->expected_total > trunc->needed_milestones)  {
-
+	if (trunc->expected_total > trunc->needed_milestones) {
 		while (trunc->num_milestones < trunc->needed_milestones) {
 			truncate_key = calloc(cfg->key_sz, 1);
 			truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 			if (truncate_item == NULL) {
-				return (enomem(cfg));
+				lprintf(cfg, ENOMEM, 0,
+				    "worker: couldn't allocate cursor array");
+				return (ENOMEM);
 			}
 			generate_key(cfg, truncate_key, trunc->last_key);
 			truncate_item->key = truncate_key;
@@ -278,8 +276,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
 		}
 
 		/* We have too much data, we need to truncate */
-		if (trunc->expected_total >
-		    thread->workload->truncate_count &&
+		if (trunc->expected_total > thread->workload->truncate_count &&
 		    trunc->num_milestones > 0) {
 			truncate_item = STAILQ_FIRST(&cfg->truncate_stone_head);
 			trunc->num_milestones--;
@@ -289,9 +286,8 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
 			ret = session->truncate(session,
 			    NULL, NULL, cursor, NULL);
 			trunc->expected_total -= truncate_item->diff;
-			if ( ret != 0) {
-				lprintf(cfg, ret, 0,
-				    "Truncate failed");
+			if (ret != 0) {
+				lprintf(cfg, ret, 0, "Truncate failed");
 				return (ret);
 			}
 			free(truncate_item->key);
@@ -923,18 +919,19 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 
 	/* Confirm reads, inserts and updates cannot all be zero. */
 	if (workp->insert == 0 && workp->read == 0 &&
-	    workp->update == 0 && workp->truncate == 0) {
+	    workp->truncate == 0 && workp->update == 0) {
 		lprintf(cfg, EINVAL, 0, "no operations scheduled");
 		return (EINVAL);
 	}
 
 	/*
-	 * Check for a simple case where the thread is only doing insert or
-	 * update operations (because the default operation for a job-mix is
-	 * read, the subsequent code works fine if only reads are specified).
+	 * Check for a simple case where the thread is only doing insert,
+	 * truncate or update operations (because the default operation for a
+	 * job-mix is read, the subsequent code works fine if only reads are
+	 * specified).
 	 */
 	if (workp->insert != 0 && workp->read == 0 &&
-	    workp->update == 0 && workp->truncate == 0) {
+	    workp->truncate == 0 && workp->update == 0) {
 		memset(workp->ops,
 		    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT,
 		    sizeof(workp->ops));
@@ -946,7 +943,7 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 		return (0);
 	}
 	if (workp->insert == 0 && workp->read == 0 &&
-	    workp->update == 0 && workp->truncate != 0) {
+	    workp->truncate != 0 && workp->update == 0) {
 		memset(workp->ops, WORKER_TRUNCATE, sizeof(workp->ops));
 		return (0);
 	}
@@ -971,16 +968,16 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 	memset(workp->ops, WORKER_READ, sizeof(workp->ops));
 
 	pct = (workp->insert * 100) /
-	    (workp->insert + workp->read + workp->update + workp->truncate);
+	    (workp->insert + workp->read + workp->truncate + workp->update);
 	if (pct != 0)
 		run_mix_schedule_op(workp,
 		    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT, pct);
 	pct = (workp->update * 100) /
-	    (workp->insert + workp->read + workp->update + workp->truncate);
+	    (workp->insert + workp->read + workp->truncate + workp->update);
 	if (pct != 0)
 		run_mix_schedule_op(workp, WORKER_UPDATE, pct);
 	pct = (workp->truncate * 100) /
-	    (workp->insert + workp->read + workp->update + workp->truncate);
+	    (workp->insert + workp->read + workp->truncate + workp->update);
 	if (pct != 0)
 		run_mix_schedule_op(workp, WORKER_TRUNCATE, pct);
 	return (0);
@@ -1650,11 +1647,11 @@ execute_workload(CONFIG *cfg)
 	void *(*pfunc)(void *);
 
 	cfg->insert_key = 0;
-	cfg->insert_ops = cfg->read_ops =
-	    cfg->truncate_ops = cfg->update_ops = 0;
+	cfg->insert_ops = cfg->read_ops = cfg->truncate_ops = 0;
+	cfg->update_ops = 0;
 
-	last_ckpts = last_inserts =
-	    last_reads =last_truncates = last_updates = 0;
+	last_ckpts = last_inserts = last_reads = last_truncates = 0;
+	last_updates = 0;
 	ret = 0;
 
 	if (cfg->warmup != 0)
@@ -1687,7 +1684,7 @@ execute_workload(CONFIG *cfg)
 		if ((ret = run_mix_schedule(cfg, workp)) != 0)
 			goto err;
 
-		/* Allocate the truncate threads queue */
+		/* Setup the truncate threads queue */
 		if (workp->truncate > 0)
 			STAILQ_INIT(&cfg->truncate_stone_head);
 
@@ -2301,8 +2298,10 @@ main(int argc, char *argv[])
 	 * the compact operation, but not for the workloads.
 	 */
 	if (cfg->async_threads > 0) {
-		if (cfg->has_truncate > 0)
+		if (cfg->has_truncate > 0) {
+			lprintf(cfg, 0, 0, "Cannot run truncate and async\n");
 			goto err;
+		}
 		cfg->use_asyncops = 1;
 	}
 	if (cfg->compact && cfg->async_threads == 0)
