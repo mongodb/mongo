@@ -40,7 +40,7 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	 * is slower.
 	 */
 	i = ref->pindex_hint;
-	if (pindex->index[i]->page == ref->page) {
+	if (i < pindex->entries && pindex->index[i]->page == ref->page) {
 		*pindexp = pindex;
 		*slotp = i;
 		return;
