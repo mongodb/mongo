@@ -60,13 +60,13 @@ long long int BSONElementHasher::hash64(const BSONElement& e, HashSeed seed) {
     recursiveHash(h.get(), e, false);
     HashDigest d;
     h->finish(d);
-    // HashDigest is actually 16 bytes, but we just get 8 via truncation
-    // NOTE: assumes little-endian
-    return *reinterpret_cast<long long int*>(d);
+    // HashDigest is actually 16 bytes, but we just read 8 bytes
+    ConstDataView digestView(reinterpret_cast<const char*>(d));
+    return digestView.read<LittleEndian<long long int>>();
 }
 
 void BSONElementHasher::recursiveHash(Hasher* h, const BSONElement& e, bool includeFieldName) {
-    int canonicalType = e.canonicalType();
+    int canonicalType = endian::nativeToLittle(e.canonicalType());
     h->addData(&canonicalType, sizeof(canonicalType));
 
     if (includeFieldName) {
@@ -77,7 +77,8 @@ void BSONElementHasher::recursiveHash(Hasher* h, const BSONElement& e, bool incl
         // if there are no embedded objects (subobjects or arrays),
         // compute the hash, squashing numeric types to 64-bit ints
         if (e.isNumber()) {
-            long long int i = e.safeNumberLong();  // well-defined for troublesome doubles
+            // Use safeNumberLong, it is well-defined for troublesome doubles.
+            const auto i = endian::nativeToLittle(e.safeNumberLong());
             h->addData(&i, sizeof(i));
         } else {
             h->addData(e.value(), e.valuesize());
