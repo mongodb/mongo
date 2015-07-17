@@ -48,7 +48,7 @@ StatusWith<std::string> readSecurityFile(const std::string& filename) {
     // check obvious file errors
     if (stat(filename.c_str(), &stats) == -1) {
         return StatusWith<std::string>(ErrorCodes::InvalidPath,
-                                       str::stream() << "error getting file " << filename << ": "
+                                       str::stream() << "Error reading file " << filename << ": "
                                                      << strerror(errno));
     }
 
