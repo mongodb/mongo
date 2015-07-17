@@ -397,6 +397,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 
 	txn_global = &S2C(session)->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
+	was_oldest = 0;
 
 	/* Clear the transaction's ID from the global table. */
 	if (WT_SESSION_IS_CHECKPOINT(session)) {
@@ -406,9 +407,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		/* Clear the global checkpoint transaction IDs. */
 		txn_global->checkpoint_id = 0;
 		txn_global->checkpoint_pinned = WT_TXN_NONE;
-
-		/* Assume checkpoints are always the oldest transaction. */
-		was_oldest = 1;
 	} else if (F_ISSET(txn, WT_TXN_HAS_ID)) {
 		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 		    txn->id != WT_TXN_NONE);
