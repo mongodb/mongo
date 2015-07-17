@@ -141,6 +141,10 @@ struct Cloner::Fun {
                                   << "]",
                     !createdCollection);
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                if (_mayBeInterrupted) {
+                    txn->checkForInterrupt();
+                }
+
                 WriteUnitOfWork wunit(txn);
                 Status s = userCreateNS(txn, db, to_collection.toString(), from_options, false);
                 verify(s.isOK());
@@ -212,6 +216,10 @@ struct Cloner::Fun {
 
             ++numSeen;
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                if (_mayBeInterrupted) {
+                    txn->checkForInterrupt();
+                }
+
                 WriteUnitOfWork wunit(txn);
 
                 BSONObj doc = tmp;
@@ -326,6 +334,10 @@ void Cloner::copyIndexes(OperationContext* txn,
     Collection* collection = db->getCollection(to_collection);
     if (!collection) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            if (mayBeInterrupted) {
+                txn->checkForInterrupt();
+            }
+
             WriteUnitOfWork wunit(txn);
             Status s = userCreateNS(txn, db, to_collection.toString(), from_opts, false);
             invariant(s.isOK());
@@ -396,6 +408,9 @@ bool Cloner::copyCollection(OperationContext* txn,
         if (col["options"].isABSONObj()) {
             options = col["options"].Obj();
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                if (mayBeInterrupted)
+                    txn->checkForInterrupt();
+
                 WriteUnitOfWork wunit(txn);
                 Status status = userCreateNS(txn, db, ns, options, false);
                 if (!status.isOK()) {
@@ -580,6 +595,10 @@ Status Cloner::copyDb(OperationContext* txn,
 
             {
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    if (opts.mayBeInterrupted) {
+                        txn->checkForInterrupt();
+                    }
+
                     WriteUnitOfWork wunit(txn);
 
                     // we defer building id index for performance - building it in batch is much
@@ -624,8 +643,9 @@ Status Cloner::copyDb(OperationContext* txn,
                 set<RecordId> dups;
 
                 MultiIndexBlock indexer(txn, c);
-                if (opts.mayBeInterrupted)
+                if (opts.mayBeInterrupted) {
                     indexer.allowInterruption();
+                }
 
                 uassertStatusOK(indexer.init(c->getIndexCatalog()->getDefaultIdIndexSpec()));
                 uassertStatusOK(indexer.insertAllDocumentsInCollection(&dups));

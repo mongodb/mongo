@@ -102,6 +102,7 @@ public:
         CloneOptions opts;
         opts.fromDB = dbname;
         opts.slaveOk = cmdObj["slaveOk"].trueValue();
+        opts.mayBeInterrupted = true;
 
         // See if there's any collections we should ignore
         if (cmdObj["collsToIgnore"].type() == Array) {

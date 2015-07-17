@@ -139,7 +139,7 @@ public:
         cloneOptions.useReplAuth = false;
         cloneOptions.snapshot = true;
         cloneOptions.mayYield = true;
-        cloneOptions.mayBeInterrupted = false;
+        cloneOptions.mayBeInterrupted = true;
 
         string todb = cmdObj.getStringField("todb");
         if (fromhost.empty() || todb.empty() || cloneOptions.fromDB.empty()) {

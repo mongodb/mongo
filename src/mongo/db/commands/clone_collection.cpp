@@ -154,7 +154,8 @@ public:
 
         cloner.setConnection(myconn.release());
 
-        return cloner.copyCollection(txn, collection, query, errmsg, true, false, copyIndexes);
+        return cloner.copyCollection(
+            txn, collection, query, errmsg, true, true /* interruptable */, copyIndexes);
     }
 
 } cmdCloneCollection;
