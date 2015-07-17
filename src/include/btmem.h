@@ -195,6 +195,11 @@ struct __wt_page_modify {
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
 
+#ifdef HAVE_DIAGNOSTIC
+	/* Check that transaction time moves forward. */
+	uint64_t last_oldest_id;
+#endif
+
 	/* Dirty bytes added to the cache. */
 	size_t bytes_dirty;
 

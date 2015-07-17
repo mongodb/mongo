@@ -674,6 +674,7 @@ logtest
 lookup
 lookups
 lossy
+lrt
 lru
 lseek
 lsm
@@ -844,6 +845,7 @@ sd
 secretkey
 sed
 sessionp
+setkv
 setstr
 setv
 sfence

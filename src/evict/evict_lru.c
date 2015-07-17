@@ -1475,7 +1475,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, int pct_full)
 	 * to make sure there is free space in the cache.
 	 */
 	txn_global = &conn->txn_global;
-	txn_state = &txn_global->states[session->id];
+	txn_state = WT_SESSION_TXN_STATE(session);
 	txn_busy = txn_state->id != WT_TXN_NONE ||
 	    session->nhazard > 0 ||
 	    (txn_state->snap_min != WT_TXN_NONE &&
@@ -1512,6 +1512,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, int pct_full)
 		q_found = 0;
 		switch (ret = __evict_page(session, 0)) {
 		case 0:
+			cache->app_evicts++;
 			if (--count == 0)
 				return (0);
 
@@ -1550,6 +1551,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, int pct_full)
 		WT_RET(
 		    __wt_cond_wait(session, cache->evict_waiter_cond, 100000));
 
+		cache->app_waits++;
 		/* Check if things have changed so that we are busy. */
 		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
 		    txn_global->current != txn_global->oldest_id)

@@ -1,4 +1,6 @@
 #! /bin/sh
 
+set -e
+
 # Smoke-test as part of running "make check".
-./t -s
+$TEST_WRAPPER ./t -s

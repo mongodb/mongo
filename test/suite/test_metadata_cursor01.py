@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from wtscenario import check_scenarios
 
 # test_metadata_cursor01.py
 #    Metadata cursor operations
@@ -37,6 +38,11 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
     Test basic operations
     """
     table_name1 = 'test_metadata_cursor01'
+
+    scenarios = check_scenarios([
+        ('plain', {'metauri' : 'metadata:'}),
+        ('create', {'metauri' : 'metadata:create'}),
+    ])
 
     def genkey(self, i):
         if self.tablekind == 'row':
@@ -81,15 +87,15 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
     # Forward iteration.
     def test_forward_iter(self):
         self.create_table()
-        cursor = self.session.open_cursor('metadata:', None, None)
+        cursor = self.session.open_cursor(self.metauri, None, None)
         self.assertCursorHasNoKeyValue(cursor)
 
         while True:
             nextret = cursor.next()
             if nextret != 0:
                 break
-            key = cursor.get_key()
-            value = cursor.get_value()
+            self.assertIsNotNone(cursor.get_key())
+            self.assertIsNotNone(cursor.get_value())
 
         self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
         cursor.reset()
@@ -99,15 +105,15 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
     # Backward iteration.
     def test_backward_iter(self):
         self.create_table()
-        cursor = self.session.open_cursor('metadata:', None, None)
+        cursor = self.session.open_cursor(self.metauri, None, None)
         self.assertCursorHasNoKeyValue(cursor)
         
         while True:
             prevret = cursor.prev()
             if prevret != 0:
                 break
-            key = cursor.get_key
-            value = cursor.get_value
+            self.assertIsNotNone(cursor.get_key())
+            self.assertIsNotNone(cursor.get_value())
 
         self.assertEqual(prevret, wiredtiger.WT_NOTFOUND)
         self.assertCursorHasNoKeyValue(cursor)
@@ -116,7 +122,7 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
     # Test search
     def test_search(self):
         self.create_table()
-        cursor = self.session.open_cursor('metadata:', None, None)
+        cursor = self.session.open_cursor(self.metauri, None, None)
         self.assertCursorHasNoKeyValue(cursor)
         
         # Ensure the 'special' metadata metadata is found.

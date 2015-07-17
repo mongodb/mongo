@@ -87,17 +87,19 @@ def unpack(fmt, s):
                 size = 1
             s = s[size:]
             # Note: no value, don't increment i
-        elif f in 'Ssu':
+        elif f in 'SsUu':
             if not havesize:
                 if f == 's':
                     size = 1
                 elif f == 'S':
                     size = s.find('\0')
-                elif f == 'u':
-                    if offset == len(fmt) - 1:
-                        size = len(s)
-                    else:
-                        size, s = unpack_int(s)
+                elif f == 'u' and offset == len(fmt) - 1:
+                    size = len(s)
+                else:
+                    # Note: 'U' is used internally, and may be exposed to us.
+                    # It indicates that the size is always stored unless there
+                    # is a size in the format.
+                    size, s = unpack_int(s)
             result.append(s[:size])
             if f == 'S' and not havesize:
                 size += 1
@@ -108,6 +110,16 @@ def unpack(fmt, s):
                 size = 1
             result.append(ord(s[0:1]))
             s = s[1:]
+        elif f in 'Bb':
+            # byte type
+            if not havesize:
+                size = 1
+            for i in xrange(size):
+                v = ord(s[0:1])
+                if f != 'B':
+                    v -= 0x80
+                result.append(v)
+                s = s[1:]
         else:
             # integral type
             if not havesize:
@@ -122,7 +134,7 @@ def __pack_iter_fmt(fmt, values):
     for offset, havesize, size, char in __unpack_iter_fmt(fmt):
         if char == 'x':  # padding no value
             yield offset, havesize, size, char, None
-        elif char in 'Ssut':
+        elif char in 'SsUut':
             yield offset, havesize, size, char, values[index]
             index += 1
         else:            # integral type
@@ -147,7 +159,7 @@ def pack(fmt, *values):
             else:
                 result += '\0' * size
             # Note: no value, don't increment i
-        elif f in 'Ssu':
+        elif f in 'SsUu':
             if f == 'S' and '\0' in val:
                 l = val.find('\0')
             else:
@@ -157,7 +169,7 @@ def pack(fmt, *values):
                     l = size
             elif f == 's':
                 havesize = size = 1
-            elif f == 'u' and offset != len(fmt) - 1:
+            elif (f == 'u' and offset != len(fmt) - 1) or f == 'U':
                 result += pack_int(l)
             if type(val) is unicode and f in 'Ss':
                 result += str(val[:l])
@@ -177,6 +189,19 @@ def pack(fmt, *values):
             if (mask & val) != val:
                 raise ValueError("value out of range for 't' encoding")
             result += chr(val)
+        elif f in 'Bb':
+            # byte type
+            if not havesize:
+                size = 1
+            for i in xrange(size):
+                if f == 'B':
+                    v = val
+                else:
+                    # Translate to maintain ordering with the sign bit.
+                    v = val + 0x80
+                if v > 255 or v < 0:
+                    raise ValueError("value out of range for 'B' encoding")
+                result += chr(v)
         else:
             # integral type
             result += pack_int(val)

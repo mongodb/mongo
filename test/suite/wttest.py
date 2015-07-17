@@ -162,6 +162,7 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._stderr = sys.stderr
         WiredTigerTestCase._concurrent = False
         WiredTigerTestCase._globalSetup = True
+        WiredTigerTestCase._ttyDescriptor = None
 
     def fdSetUp(self):
         self.captureout = CapturedFd('stdout.txt', 'standard output')
@@ -431,6 +432,24 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._resultfile.write('\n')
         traceback.print_exception(excinfo[0], excinfo[1], excinfo[2], None, WiredTigerTestCase._resultfile)
         WiredTigerTestCase._resultfile.write('\n')
+
+    # print directly to tty, useful for debugging
+    def tty(self, message):
+        WiredTigerTestCase.tty(message)
+
+    @staticmethod
+    def tty(message):
+        if WiredTigerTestCase._ttyDescriptor == None:
+            WiredTigerTestCase._ttyDescriptor = open('/dev/tty', 'w')
+        WiredTigerTestCase._ttyDescriptor.write(message + '\n')
+
+    def ttyVerbose(self, level, message):
+        WiredTigerTestCase.ttyVerbose(level, message)
+
+    @staticmethod
+    def ttyVerbose(level, message):
+        if level <= WiredTigerTestCase._verbose:
+            WiredTigerTestCase.tty(message)
 
     def shortid(self):
         return self.id().replace("__main__.","")
