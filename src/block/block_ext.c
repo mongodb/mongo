@@ -8,10 +8,15 @@
 
 #include "wt_internal.h"
 
-#define	WT_BLOCK_ERROR(session, block, ...) do {			\
-	if (block->verify)						\
-		WT_RET_MSG(session, __VA_ARGS__);			\
-	WT_PANIC_RET(session, __VA_ARGS__);				\
+/*
+ * WT_BLOCK_RET --
+ *	Handle extension list errors that would normally panic the system but
+ * which should fail gracefully when verifying.
+ */
+#define	WT_BLOCK_RET(session, block, v, ...) do {			\
+	int __ret = (v);                                                \
+	__wt_err(session, __ret, __VA_ARGS__);				\
+	return ((block)->verify ? __ret : __wt_panic(session));		\
 } while (0)
 
 static int __block_append(WT_SESSION_IMPL *,
@@ -378,7 +383,7 @@ __block_off_remove(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	return (0);
 
 corrupt:
-	WT_BLOCK_ERROR(session, block, EINVAL,
+	WT_BLOCK_RET(session, block, EINVAL,
 	    "attempt to remove non-existent offset from an extent list");
 }
 
@@ -1036,7 +1041,7 @@ __block_merge(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	__block_off_srch_pair(el, off, &before, &after);
 	if (before != NULL) {
 		if (before->off + before->size > off)
-			WT_BLOCK_ERROR(session, block, EINVAL,
+			WT_BLOCK_RET(session, block, EINVAL,
 			    "%s: existing range %" PRIdMAX "-%" PRIdMAX
 			    " overlaps with merge range %" PRIdMAX "-%" PRIdMAX,
 			    el->name,
@@ -1048,7 +1053,7 @@ __block_merge(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	}
 	if (after != NULL) {
 		if (off + size > after->off) {
-			WT_BLOCK_ERROR(session, block, EINVAL,
+			WT_BLOCK_RET(session, block, EINVAL,
 			    "%s: merge range %" PRIdMAX "-%" PRIdMAX
 			    " overlaps with existing range %" PRIdMAX
 			    "-%" PRIdMAX,
@@ -1215,7 +1220,7 @@ __wt_block_extlist_read(WT_SESSION_IMPL *session,
 		    size % block->allocsize != 0 ||
 		    off + size > ckpt_size) {
 corrupted:		__wt_scr_free(session, &tmp);
-			WT_BLOCK_ERROR(session, block, WT_ERROR,
+			WT_BLOCK_RET(session, block, WT_ERROR,
 			    "file contains a corrupted %s extent list, range %"
 			    PRIdMAX "-%" PRIdMAX " past end-of-file",
 			    el->name,
