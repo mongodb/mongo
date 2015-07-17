@@ -389,6 +389,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
+	int was_oldest;
 
 	txn = &session->txn;
 	WT_ASSERT(session, txn->mod_count == 0);
@@ -405,10 +406,16 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		/* Clear the global checkpoint transaction IDs. */
 		txn_global->checkpoint_id = 0;
 		txn_global->checkpoint_pinned = WT_TXN_NONE;
+
+		/* Assume checkpoints are always the oldest transaction. */
+		was_oldest = 1;
 	} else if (F_ISSET(txn, WT_TXN_HAS_ID)) {
 		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 		    txn->id != WT_TXN_NONE);
 		WT_PUBLISH(txn_state->id, WT_TXN_NONE);
+
+		/* Quick check for the oldest transaction. */
+		was_oldest = (txn->id == txn_global->last_running);
 		txn->id = WT_TXN_NONE;
 	}
 
@@ -427,6 +434,14 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	txn->isolation = session->isolation;
 	/* Ensure the transaction flags are cleared on exit */
 	txn->flags = 0;
+
+	/*
+	 * When the oldest transaction in the system completes, bump the oldest
+	 * ID.  This is racy and so not guaranteed, but in practice it keeps
+	 * the oldest ID from falling too far behind.
+	 */
+	if (was_oldest)
+		__wt_txn_update_oldest(session, 1);
 }
 
 /*
