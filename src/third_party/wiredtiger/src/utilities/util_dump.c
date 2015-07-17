@@ -149,9 +149,9 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 
 	/* Open a metadata cursor. */
 	if ((ret = session->open_cursor(
-	    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
-		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, WT_METADATA_URI, session->strerror(session, ret));
+	    session, "metadata:create", NULL, NULL, &cursor)) != 0) {
+		fprintf(stderr, "%s: %s: session.open_cursor: %s\n", progname,
+		    "metadata:create", session->strerror(session, ret));
 		return (1);
 	}
 	/*
@@ -225,7 +225,7 @@ dump_json_table_begin(
 {
 	WT_DECL_RET;
 	const char *name;
-	char *jsonconfig, *stripped;
+	char *jsonconfig;
 
 	jsonconfig = NULL;
 
@@ -236,12 +236,7 @@ dump_json_table_begin(
 	}
 	++name;
 
-	if ((ret = 
-	    __wt_session_create_strip(session, config, NULL, &stripped)) != 0)
-		return (util_err(session, ret, NULL));
-	ret = dup_json_string(stripped, &jsonconfig);
-	free(stripped);
-	if (ret != 0)
+	if ((ret = dup_json_string(config, &jsonconfig)) != 0)
 		return (util_cerr(cursor, "config dup", ret));
 	if (printf("    \"%s\" : [\n        {\n", uri) < 0)
 		goto eio;
@@ -278,7 +273,7 @@ dump_json_table_cg(WT_SESSION *session, WT_CURSOR *cursor,
 	WT_DECL_RET;
 	const char *key, *skip, *value;
 	int exact, once;
-	char *jsonconfig, *stripped;
+	char *jsonconfig;
 	static const char * const indent = "                ";
 
 	once = 0;
@@ -326,12 +321,7 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (util_cerr(cursor, "get_value", ret));
 
-		if ((ret = __wt_session_create_strip(
-		    session, value, NULL, &stripped)) != 0)
-			return (util_err(session, ret, NULL));
-		ret = dup_json_string(stripped, &jsonconfig);
-		free(stripped);
-		if (ret != 0)
+		if ((ret = dup_json_string(value, &jsonconfig)) != 0)
 			return (util_cerr(cursor, "config dup", ret));
 		ret = printf("%s\n"
 		    "%s{\n"
@@ -362,67 +352,42 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	WT_EXTENSION_API *wtext;
 	int tret;
 	char *value;
 
 	/* Dump the config. */
-	if (WT_PREFIX_MATCH(uri, "table:")) {
-		/* Open a metadata cursor. */
-		if ((ret = session->open_cursor(
-		    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
-			fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-			    progname, WT_METADATA_URI,
-			    session->strerror(session, ret));
-			return (1);
-		}
+	/* Open a metadata cursor. */
+	if ((ret = session->open_cursor(
+	    session, "metadata:create", NULL, NULL, &cursor)) != 0) {
+		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
+		    progname, "metadata:create",
+		    session->strerror(session, ret));
+		return (1);
+	}
 
-		/*
-		 * Search for the object itself, to make sure it
-		 * exists, and get its config string. This where we
-		 * find out a table object doesn't exist, use a simple
-		 * error message.
-		 */
-		cursor->set_key(cursor, uri);
-		if ((ret = cursor->search(cursor)) == 0) {
-			if ((ret = cursor->get_value(cursor, &value)) != 0)
-				ret = util_cerr(cursor, "get_value", ret);
-			else if (dump_json_table_begin(
-			    session, cursor, uri, value) != 0)
-				ret = 1;
-		} else if (ret == WT_NOTFOUND)
-			ret = util_err(
-			    session, 0, "%s: No such object exists", uri);
-		else
-			ret = util_err(session, ret, "%s", uri);
+	/*
+	 * Search for the object itself, to make sure it
+	 * exists, and get its config string. This where we
+	 * find out a table object doesn't exist, use a simple
+	 * error message.
+	 */
+	cursor->set_key(cursor, uri);
+	if ((ret = cursor->search(cursor)) == 0) {
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			ret = util_cerr(cursor, "get_value", ret);
+		else if (dump_json_table_begin(
+		    session, cursor, uri, value) != 0)
+			ret = 1;
+	} else if (ret == WT_NOTFOUND)
+		ret = util_err(
+		    session, 0, "%s: No such object exists", uri);
+	else
+		ret = util_err(session, ret, "%s", uri);
 
-		if ((tret = cursor->close(cursor)) != 0) {
-			tret = util_cerr(cursor, "close", tret);
-			if (ret == 0)
-				ret = tret;
-		}
-	} else {
-		/*
-		 * We want to be able to dump the metadata file itself, but the
-		 * configuration for that file lives in the turtle file.  Reach
-		 * down into the library and ask for the file's configuration,
-		 * that will work in all cases.
-		 *
-		 * This where we find out a file object doesn't exist, use a
-		 * simple error message.
-		 */
-		wtext = session->
-		    connection->get_extension_api(session->connection);
-		if ((ret =
-		    wtext->metadata_search(wtext, session, uri, &value)) == 0) {
-			if (dump_json_table_begin(
-			    session, NULL, uri, value) != 0)
-				ret = 1;
-		} else if (ret == WT_NOTFOUND)
-			ret = util_err(
-			    session, 0, "%s: No such object exists", uri);
-		else
-			ret = util_err(session, ret, "%s", uri);
+	if ((tret = cursor->close(cursor)) != 0) {
+		tret = util_cerr(cursor, "close", tret);
+		if (ret == 0)
+			ret = tret;
 	}
 
 	return (ret);
@@ -687,17 +652,19 @@ print_config(WT_SESSION *session,
 {
 	WT_DECL_RET;
 	char *value_ret;
+	const char *cfg[] = { v1, v2, NULL };
 
 	/*
-	 * The underlying call will ignore v2 if v1 is NULL -- check here and
-	 * swap in that case.
+	 * The underlying call will stop if the first string is NULL -- check
+	 * here and swap in that case.
 	 */
-	if (v1 == NULL) {
-		v1 = v2;
-		v2 = NULL;
+	if (cfg[0] == NULL) {
+		cfg[0] = cfg[1];
+		cfg[1] = NULL;
 	}
 
-	if ((ret = __wt_session_create_strip(session, v1, v2, &value_ret)) != 0)
+	if ((ret = __wt_config_collapse(
+	    (WT_SESSION_IMPL *)session, cfg, &value_ret)) != 0)
 		return (util_err(session, ret, NULL));
 	ret = printf("%s\n%s\n", key, value_ret);
 	free((char *)value_ret);

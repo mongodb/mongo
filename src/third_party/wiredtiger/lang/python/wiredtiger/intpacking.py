@@ -89,6 +89,11 @@ def pack_int(x):
     elif x <= POS_2BYTE_MAX:
         x -= (POS_1BYTE_MAX + 1)
         return chr(POS_2BYTE_MARKER | getbits(x, 13, 8)) + chr(getbits(x, 8))
+    elif x == POS_2BYTE_MAX + 1:
+        # This is a special case where we could store the value with
+        # just a single byte, but we append a zero byte so that the
+        # encoding doesn't get shorter for this one value.
+        return chr(POS_MULTI_MARKER | 0x1) + chr(0)
     else:
         packed = struct.pack('>Q', x - (POS_2BYTE_MAX + 1))
         while packed and packed[0] == '\x00':

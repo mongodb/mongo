@@ -100,11 +100,10 @@ __wt_block_manager_create(
 	WT_TRET(__wt_close(session, &fh));
 
 	/*
-	 * If checkpoint syncing is enabled, some filesystems require that we
-	 * sync the directory to be confident that the file will appear.
+	 * Some filesystems require that we sync the directory to be confident
+	 * that the file will appear.
 	 */
-	if (ret == 0 && F_ISSET(S2C(session), WT_CONN_CKPT_SYNC) &&
-	    (ret = __wt_filename(session, filename, &path)) == 0) {
+	if (ret == 0 && (ret = __wt_filename(session, filename, &path)) == 0) {
 		ret = __wt_directory_sync(session, path);
 		__wt_free(session, path);
 	}
@@ -180,10 +179,10 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint64_t bucket, hash;
 
-	WT_TRET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
+	WT_RET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
 
 	conn = S2C(session);
-	*blockp = NULL;
+	*blockp = block = NULL;
 	hash = __wt_hash_city64(filename, strlen(filename));
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 	__wt_spin_lock(session, &conn->block_lock);
@@ -264,7 +263,8 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	__wt_spin_unlock(session, &conn->block_lock);
 	return (0);
 
-err:	WT_TRET(__block_destroy(session, block));
+err:	if (block != NULL)
+		WT_TRET(__block_destroy(session, block));
 	__wt_spin_unlock(session, &conn->block_lock);
 	return (ret);
 }

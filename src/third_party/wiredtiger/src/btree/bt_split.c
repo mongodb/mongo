@@ -753,7 +753,7 @@ __split_multi_inmem(
 
 	/*
 	 * We modified the page above, which will have set the first dirty
-	 * transaction to the last transaction current running.  However, the
+	 * transaction to the last transaction currently running.  However, the
 	 * updates we installed may be older than that.  Set the first dirty
 	 * transaction to an impossibly old value so this page is never skipped
 	 * in a checkpoint.

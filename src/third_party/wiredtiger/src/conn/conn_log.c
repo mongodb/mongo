@@ -139,7 +139,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 * We can only archive files if a hot backup is not in progress or
 	 * if we are the backup.
 	 */
-	__wt_spin_lock(session, &conn->hot_backup_lock);
+	WT_RET(__wt_readlock(session, conn->hot_backup_lock));
 	locked = 1;
 	if (conn->hot_backup == 0 || backup_file != 0) {
 		for (i = 0; i < logcount; i++) {
@@ -151,7 +151,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 			}
 		}
 	}
-	__wt_spin_unlock(session, &conn->hot_backup_lock);
+	WT_ERR(__wt_readunlock(session, conn->hot_backup_lock));
 	locked = 0;
 	__wt_log_files_free(session, logfiles, logcount);
 	logfiles = NULL;
@@ -167,7 +167,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	if (0)
 err:		__wt_err(session, ret, "log archive server error");
 	if (locked)
-		__wt_spin_unlock(session, &conn->hot_backup_lock);
+		WT_TRET(__wt_readunlock(session, conn->hot_backup_lock));
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	return (ret);
@@ -207,9 +207,8 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 	if (log->prep_missed > 0) {
 		conn->log_prealloc += log->prep_missed;
 		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-		    "Now pre-allocating up to %" PRIu32,
-		    conn->log_prealloc));
-		log->prep_missed = 0;
+		    "Missed %" PRIu32 ". Now pre-allocating up to %" PRIu32,
+		    log->prep_missed, conn->log_prealloc));
 	}
 	WT_STAT_FAST_CONN_SET(session,
 	    log_prealloc_max, conn->log_prealloc);
@@ -221,6 +220,13 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 		    session, ++log->prep_fileid, WT_LOG_PREPNAME, 1));
 		WT_STAT_FAST_CONN_INCR(session, log_prealloc_files);
 	}
+	/*
+	 * Reset the missed count now.  If we missed during pre-allocating
+	 * the log files, it means the allocation is not keeping up, not that
+	 * we didn't allocate enough.  So we don't just want to keep adding
+	 * in more.
+	 */
+	log->prep_missed = 0;
 
 	if (0)
 err:		__wt_err(session, ret, "log pre-alloc server error");

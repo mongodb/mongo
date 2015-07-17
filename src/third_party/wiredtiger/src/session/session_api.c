@@ -314,8 +314,10 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	 * copied.
 	 */
 	if ((*cursorp)->uri == NULL &&
-	    (ret = __wt_strdup(session, uri, &(*cursorp)->uri)) != 0)
+	    (ret = __wt_strdup(session, uri, &(*cursorp)->uri)) != 0) {
 		WT_TRET((*cursorp)->close(*cursorp));
+		*cursorp = NULL;
+	}
 
 	return (ret);
 }
@@ -378,23 +380,6 @@ err:		if (cursor != NULL)
 		ret = WT_NOTFOUND;
 
 	API_END_RET_NOTFOUND_MAP(session, ret);
-}
-
-/*
- * __wt_session_create_strip --
- *	Discard any configuration information from a schema entry that is not
- * applicable to an session.create call, here for the wt dump command utility,
- * which only wants to dump the schema information needed for load.
- */
-int
-__wt_session_create_strip(WT_SESSION *wt_session,
-    const char *v1, const char *v2, char **value_ret)
-{
-	WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)wt_session;
-	const char *cfg[] =
-	    { WT_CONFIG_BASE(session, WT_SESSION_create), v1, v2, NULL };
-
-	return (__wt_config_collapse(session, cfg, value_ret));
 }
 
 /*

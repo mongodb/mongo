@@ -54,13 +54,18 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	 * Allocate memory for buffers now that the arrays are setup. Split
 	 * this out to make error handling simpler.
 	 */
+	/*
+	 * Cap the slot buffer to the log file size.
+	 */
+	log->slot_buf_size = (uint32_t)WT_MIN(
+	    conn->log_file_max, WT_LOG_SLOT_BUF_SIZE);
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		WT_ERR(__wt_buf_init(session,
-		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_INIT_SIZE));
+		    &log->slot_pool[i].slot_buf, (size_t)log->slot_buf_size));
 		F_SET(&log->slot_pool[i], WT_SLOT_INIT_FLAGS);
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
-	    log_buffer_size, WT_LOG_SLOT_BUF_INIT_SIZE * WT_SLOT_POOL);
+	    log_buffer_size, log->slot_buf_size * WT_SLOT_POOL);
 	if (0) {
 err:		while (--i >= 0)
 			__wt_buf_free(session, &log->slot_pool[i].slot_buf);
@@ -101,12 +106,16 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
 	int64_t new_state, old_state;
-	uint32_t allocated_slot, slot_grow_attempts;
+	uint32_t allocated_slot, slot_attempts;
 
 	conn = S2C(session);
 	log = conn->log;
-	slot_grow_attempts = 0;
+	slot_attempts = 0;
 
+	if (mysize >= (uint64_t)log->slot_buf_size) {
+		WT_STAT_FAST_CONN_INCR(session, log_slot_toobig);
+		return (ENOMEM);
+	}
 find_slot:
 #if WT_SLOT_ACTIVE == 1
 	allocated_slot = 0;
@@ -146,12 +155,11 @@ join_slot:
 		goto find_slot;
 	}
 	/*
-	 * If the slot buffer isn't big enough to hold this update, mark
-	 * the slot for a buffer size increase and find another slot.
+	 * If the slot buffer isn't big enough to hold this update, try
+	 * to find another slot.
 	 */
 	if (new_state > (int64_t)slot->slot_buf.memsize) {
-		F_SET(slot, WT_SLOT_BUF_GROW);
-		if (++slot_grow_attempts > 5) {
+		if (++slot_attempts > 5) {
 			WT_STAT_FAST_CONN_INCR(session, log_slot_toosmall);
 			return (ENOMEM);
 		}
@@ -310,24 +318,8 @@ __wt_log_slot_release(WT_LOGSLOT *slot, uint64_t size)
 int
 __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
-	WT_DECL_RET;
 
-	ret = 0;
-	/*
-	 * Grow the buffer if needed before returning it to the pool.
-	 */
-	if (F_ISSET(slot, WT_SLOT_BUF_GROW)) {
-		WT_STAT_FAST_CONN_INCR(session, log_buffer_grow);
-		WT_STAT_FAST_CONN_INCRV(session,
-		    log_buffer_size, slot->slot_buf.memsize);
-		WT_ERR(__wt_buf_grow(session,
-		    &slot->slot_buf, slot->slot_buf.memsize * 2));
-	}
-err:
-	/*
-	 * No matter if there is an error, we always want to free
-	 * the slot back to the pool.
-	 */
+	WT_UNUSED(session);
 	/*
 	 * Make sure flags don't get retained between uses.
 	 * We have to reset them them here because multiple threads may
@@ -335,62 +327,5 @@ err:
 	 */
 	slot->flags = WT_SLOT_INIT_FLAGS;
 	slot->slot_state = WT_LOG_SLOT_FREE;
-	return (ret);
-}
-
-/*
- * __wt_log_slot_grow_buffers --
- *	Increase the buffer size of all available slots in the buffer pool.
- *	Go to some lengths to include active (but unused) slots to handle
- *	the case where all log write record sizes exceed the size of the
- *	active buffer.
- */
-int
-__wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, size_t newsize)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	WT_LOG *log;
-	WT_LOGSLOT *slot;
-	int64_t orig_state;
-	uint64_t old_size, total_growth;
-	int i;
-
-	conn = S2C(session);
-	log = conn->log;
-	total_growth = 0;
-	WT_STAT_FAST_CONN_INCR(session, log_buffer_grow);
-	/*
-	 * Take the log slot lock to prevent other threads growing buffers
-	 * at the same time. Could tighten the scope of this lock, or have
-	 * a separate lock if there is contention.
-	 */
-	__wt_spin_lock(session, &log->log_slot_lock);
-	for (i = 0; i < WT_SLOT_POOL; i++) {
-		slot = &log->slot_pool[i];
-
-		/* Don't keep growing unrelated buffers. */
-		if (slot->slot_buf.memsize > (10 * newsize) &&
-		    !F_ISSET(slot, WT_SLOT_BUF_GROW))
-			continue;
-
-		/* Avoid atomic operations if they won't succeed. */
-		orig_state = slot->slot_state;
-		if ((orig_state != WT_LOG_SLOT_FREE &&
-		    orig_state != WT_LOG_SLOT_READY) ||
-		    !WT_ATOMIC_CAS8(
-		    slot->slot_state, orig_state, WT_LOG_SLOT_PENDING))
-			continue;
-
-		/* We have a slot - now go ahead and grow the buffer. */
-		old_size = slot->slot_buf.memsize;
-		F_CLR(slot, WT_SLOT_BUF_GROW);
-		WT_ERR(__wt_buf_grow(session, &slot->slot_buf,
-		    WT_MAX(slot->slot_buf.memsize * 2, newsize)));
-		slot->slot_state = orig_state;
-		total_growth += slot->slot_buf.memsize - old_size;
-	}
-err:	__wt_spin_unlock(session, &log->log_slot_lock);
-	WT_STAT_FAST_CONN_INCRV(session, log_buffer_size, total_growth);
-	return (ret);
+	return (0);
 }

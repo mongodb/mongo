@@ -12,7 +12,7 @@
 
 /* Logging subsystem declarations. */
 #define	WT_LOG_ALIGN			128
-#define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
+#define	WT_LOG_SLOT_BUF_SIZE		256 * 1024
 
 #define	WT_INIT_LSN(l)	do {						\
 	(l)->file = 1;							\
@@ -91,11 +91,10 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	WT_ITEM slot_buf;		/* Buffer for grouped writes */
 	int32_t	slot_churn;		/* Active slots are scarce. */
 
-#define	WT_SLOT_BUF_GROW	0x01		/* Grow buffer on release */
-#define	WT_SLOT_BUFFERED	0x02		/* Buffer writes */
-#define	WT_SLOT_CLOSEFH		0x04		/* Close old fh on release */
-#define	WT_SLOT_SYNC		0x08		/* Needs sync on release */
-#define	WT_SLOT_SYNC_DIR	0x10		/* Directory sync on release */
+#define	WT_SLOT_BUFFERED	0x01		/* Buffer writes */
+#define	WT_SLOT_CLOSEFH		0x02		/* Close old fh on release */
+#define	WT_SLOT_SYNC		0x04		/* Needs sync on release */
+#define	WT_SLOT_SYNC_DIR	0x08		/* Directory sync on release */
 	uint32_t flags;			/* Flags */
 } WT_LOGSLOT;
 
@@ -117,6 +116,7 @@ typedef struct {
 	 */
 	uint32_t	 fileid;	/* Current log file number */
 	uint32_t	 prep_fileid;	/* Pre-allocated file number */
+	uint32_t	 tmp_fileid;	/* Temporary file number */
 	uint32_t	 prep_missed;	/* Pre-allocated file misses */
 	WT_FH           *log_fh;	/* Logging file handle */
 	WT_FH           *log_close_fh;	/* Logging file handle to close */
@@ -157,10 +157,11 @@ typedef struct {
 	 * slot count of one.
 	 */
 #define	WT_SLOT_ACTIVE	1
-#define	WT_SLOT_POOL	16
+#define	WT_SLOT_POOL	128
 	uint32_t	 pool_index;		/* Global pool index */
 	WT_LOGSLOT	*slot_array[WT_SLOT_ACTIVE];	/* Active slots */
 	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
+	uint32_t	 slot_buf_size;		/* Buffer size for slots */
 
 #define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
 	uint32_t	 flags;

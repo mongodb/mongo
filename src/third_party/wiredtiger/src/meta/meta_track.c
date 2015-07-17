@@ -15,7 +15,7 @@
  */
 typedef struct __wt_meta_track {
 	enum {
-		WT_ST_EMPTY,		/* Unused slot */
+		WT_ST_EMPTY = 0,	/* Unused slot */
 		WT_ST_CHECKPOINT,	/* Complete a checkpoint */
 		WT_ST_DROP_COMMIT,	/* Drop post commit */
 		WT_ST_FILEOP,		/* File operation */
@@ -64,6 +64,35 @@ __meta_track_next(WT_SESSION_IMPL *session, WT_META_TRACK **trkp)
 	}
 
 	return (0);
+}
+
+/*
+ * __meta_track_clear --
+ *	Clear the structure.
+ */
+static void
+__meta_track_clear(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
+{
+	__wt_free(session, trk->a);
+	__wt_free(session, trk->b);
+	memset(trk, 0, sizeof(WT_META_TRACK));
+}
+
+/*
+ * __meta_track_err --
+ *	Drop the last operation off the end of the list, something went wrong
+ * during initialization.
+ */
+static void
+__meta_track_err(WT_SESSION_IMPL *session)
+{
+	WT_META_TRACK *trk;
+
+	trk = session->meta_track_next;
+	--trk;
+	__meta_track_clear(session, trk);
+
+	session->meta_track_next = trk;
 }
 
 /*
@@ -185,10 +214,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-free:	trk->op = WT_ST_EMPTY;
-	__wt_free(session, trk->a);
-	__wt_free(session, trk->b);
-	trk->dhandle = NULL;
+free:	__meta_track_clear(session, trk);
 
 	return (ret);
 }
@@ -346,14 +372,17 @@ __wt_meta_track_checkpoint(WT_SESSION_IMPL *session)
 int
 __wt_meta_track_insert(WT_SESSION_IMPL *session, const char *key)
 {
+	WT_DECL_RET;
 	WT_META_TRACK *trk;
 
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_REMOVE;
-	WT_RET(__wt_strdup(session, key, &trk->a));
-
+	WT_ERR(__wt_strdup(session, key, &trk->a));
 	return (0);
+
+err:	__meta_track_err(session);
+	return (ret);
 }
 
 /*
@@ -369,7 +398,7 @@ __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_SET;
-	WT_RET(__wt_strdup(session, key, &trk->a));
+	WT_ERR(__wt_strdup(session, key, &trk->a));
 
 	/*
 	 * If there was a previous value, keep it around -- if not, then this
@@ -380,6 +409,10 @@ __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
 		trk->op = WT_ST_REMOVE;
 		ret = 0;
 	}
+	WT_ERR(ret);
+	return (0);
+
+err:	__meta_track_err(session);
 	return (ret);
 }
 
@@ -391,14 +424,18 @@ int
 __wt_meta_track_fileop(
     WT_SESSION_IMPL *session, const char *olduri, const char *newuri)
 {
+	WT_DECL_RET;
 	WT_META_TRACK *trk;
 
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_FILEOP;
-	WT_RET(__wt_strdup(session, olduri, &trk->a));
-	WT_RET(__wt_strdup(session, newuri, &trk->b));
+	WT_ERR(__wt_strdup(session, olduri, &trk->a));
+	WT_ERR(__wt_strdup(session, newuri, &trk->b));
 	return (0);
+
+err:	__meta_track_err(session);
+	return (ret);
 }
 
 /*
@@ -409,13 +446,17 @@ int
 __wt_meta_track_drop(
     WT_SESSION_IMPL *session, const char *filename)
 {
+	WT_DECL_RET;
 	WT_META_TRACK *trk;
 
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_DROP_COMMIT;
-	WT_RET(__wt_strdup(session, filename, &trk->a));
+	WT_ERR(__wt_strdup(session, filename, &trk->a));
 	return (0);
+
+err:	__meta_track_err(session);
+	return (ret);
 }
 
 /*

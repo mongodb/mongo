@@ -334,6 +334,8 @@ __wt_debug_disk(
 
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
 		__dmsg(ds, ", compressed");
+	if (F_ISSET(dsk, WT_PAGE_ENCRYPTED))
+		__dmsg(ds, ", encrypted");
 	if (F_ISSET(dsk, WT_PAGE_EMPTY_V_ALL))
 		__dmsg(ds, ", empty-all");
 	if (F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE))
