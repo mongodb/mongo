@@ -35,6 +35,16 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	wt_off_t size;
 
+	/* Configuration: strict behavior on any error. */
+	WT_RET(__wt_config_gets(session, cfg, "strict", &cval));
+	block->verify_strict = cval.val ? 1 : 0;
+
+	/*
+	 * Set this before reading any extent lists: don't panic if we see
+	 * corruption.
+	 */
+	block->verify = 1;
+
 	/*
 	 * Find the last checkpoint in the list: if there are none, or the only
 	 * checkpoint we have is fake, there's no work to do.  Don't complain,
@@ -98,12 +108,6 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 	 * get it now and initialize the list of file fragments.
 	 */
 	WT_RET(__verify_last_avail(session, block, ckpt));
-
-	/* Configuration: strict behavior on any error. */
-	WT_RET(__wt_config_gets(session, cfg, "strict", &cval));
-	block->verify_strict = cval.val ? 1 : 0;
-
-	block->verify = 1;
 	return (0);
 }
 
@@ -228,7 +232,7 @@ __wt_verify_ckpt_load(
 		WT_RET(__wt_block_extlist_read(
 		    session, block, el, ci->file_size));
 		WT_RET(__wt_block_extlist_merge(
-		    session, el, &block->verify_alloc));
+		    session, block, el, &block->verify_alloc));
 		__wt_block_extlist_free(session, el);
 	}
 	el = &ci->discard;
@@ -236,7 +240,7 @@ __wt_verify_ckpt_load(
 		WT_RET(__wt_block_extlist_read(
 		    session, block, el, ci->file_size));
 		WT_EXT_FOREACH(ext, el->off)
-			WT_RET(__wt_block_off_remove_overlap(session,
+			WT_RET(__wt_block_off_remove_overlap(session, block,
 			    &block->verify_alloc, ext->off, ext->size));
 		__wt_block_extlist_free(session, el);
 	}
@@ -265,7 +269,7 @@ __wt_verify_ckpt_load(
 	 * checkpoints.
 	 */
 	if (ci->root_offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_off_remove_overlap(session,
+		WT_RET(__wt_block_off_remove_overlap(session, block,
 		    &block->verify_alloc, ci->root_offset, ci->root_size));
 
 	/*
