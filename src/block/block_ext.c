@@ -1213,14 +1213,14 @@ __wt_block_extlist_read(WT_SESSION_IMPL *session,
 		if (off < block->allocsize ||
 		    off % block->allocsize != 0 ||
 		    size % block->allocsize != 0 ||
-		    off + size > ckpt_size)
-corrupted:
-			__wt_scr_free(session, &tmp);
+		    off + size > ckpt_size) {
+corrupted:		__wt_scr_free(session, &tmp);
 			WT_BLOCK_ERROR(session, block, WT_ERROR,
 			    "file contains a corrupted %s extent list, range %"
 			    PRIdMAX "-%" PRIdMAX " past end-of-file",
 			    el->name,
 			    (intmax_t)off, (intmax_t)(off + size));
+		}
 
 		WT_ERR(func(session, block, el, off, size));
 	}
