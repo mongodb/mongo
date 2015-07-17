@@ -49,7 +49,7 @@ using mongo::Polygon;  // "windows.h" has another Polygon for Windows GDI.
 std::default_random_engine generator;
 
 MONGO_INITIALIZER(R2CellUnion_Test)(InitializerContext* context) {
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    unsigned seed = stdx::chrono::system_clock::now().time_since_epoch().count();
     for (size_t i = 2; i < context->args().size(); ++i) {
         if (context->args()[i - 1] == "--seed") {
             seed = std::stoul(context->args()[i]);
