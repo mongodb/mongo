@@ -186,11 +186,11 @@ tasks:
 buildvariants:
 - name: linux-wt-standalone
   display_name: Linux WT Standalone
-  batchtime: 180 # 3 hours
+  batchtime: 90 # 1.5 hours
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
-    mongod_exec_wrapper: "numactl --physcpubind=4,5,6,7 -i 1"
-    perf_exec_wrapper: "numactl --physcpubind=1,2,3 -i 0"
+    compile_flags: &compile_flags -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
+    perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
     mongod_flags: "--storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16"
 
   run_on:
@@ -208,11 +208,11 @@ buildvariants:
 
 - name: linux-mmap-standalone
   display_name: Linux MMAPv1 Standalone
-  batchtime: 180 # 3 hours
+  batchtime: 90 # 1.5 hours
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
-    mongod_exec_wrapper: "numactl --physcpubind=4,5,6,7 -i 1"
-    perf_exec_wrapper: "numactl --physcpubind=1,2,3 -i 0"
+    compile_flags: *compile_flags
+    mongod_exec_wrapper: *exec_wrapper
+    perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false"
 
   run_on:
@@ -230,12 +230,32 @@ buildvariants:
 
 - name: linux-wt-repl
   display_name: Linux WT 1-Node ReplSet
-  batchtime: 4320 # 3 day
+  batchtime: 360 # 6 hours
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
-    mongod_exec_wrapper: "numactl --physcpubind=4,5,6,7 -i 1"
-    perf_exec_wrapper: "numactl --physcpubind=1,2,3 -i 0"
+    compile_flags: *compile_flags 
+    mongod_exec_wrapper: *exec_wrapper
+    perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--replSet=test --storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --oplogSize 100000"
+
+  run_on:
+  - "centos6-perf"
+  tasks:
+  - name: compile
+    distros:
+    - rhel55
+  - name: update
+  - name: insert
+  - name: misc
+  - name: singleThreaded
+
+- name: linux-mmap-repl
+  display_name: Linux MMapv1 1-Node ReplSet
+  batchtime: 360 # 6 hours
+  expansions:
+    compile_flags: *compile_flags 
+    mongod_exec_wrapper: *exec_wrapper
+    perf_exec_wrapper: *perf_wrapper
+    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000"
 
   run_on:
   - "centos6-perf"
