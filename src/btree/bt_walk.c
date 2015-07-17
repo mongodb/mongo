@@ -39,7 +39,13 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	 * the first retrieval (which sets the hint for subsequent retrievals),
 	 * is slower.
 	 */
-	for (i = ref->pindex_hint; i < pindex->entries; ++i)
+	i = ref->pindex_hint;
+	if (pindex->index[i]->page == ref->page) {
+		*pindexp = pindex;
+		*slotp = i;
+		return;
+	}
+	while (++i < pindex->entries)
 		if (pindex->index[i]->page == ref->page) {
 			*pindexp = pindex;
 			*slotp = ref->pindex_hint = i;
