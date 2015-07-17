@@ -201,12 +201,6 @@ ascend:	/*
 					    session, couple, flags));
 					WT_ERR(ret);
 				}
-
-				/*
-				 * Set the reference hint (used when we continue
-				 * the walk).
-				 */
-				ref->pindex_hint = slot;
 			}
 
 			*refp = ref;
@@ -222,13 +216,15 @@ ascend:	/*
 			++*walkcntp;
 
 		for (;;) {
-			ref = pindex->index[slot];
-
 			/*
-			 * Set the reference hint (used when we continue the
-			 * walk).
+			 * Move to the next slot, and set the reference hint if
+			 * it's wrong (used when we continue the walk). We don't
+			 * update those hints when splitting, so it's common for
+			 * them to be incorrect in some workloads.
 			 */
-			ref->pindex_hint = slot;
+			ref = pindex->index[slot];
+			if (ref->pindex_hint != slot)
+				ref->pindex_hint = slot;
 
 			if (LF_ISSET(WT_READ_CACHE)) {
 				/*
