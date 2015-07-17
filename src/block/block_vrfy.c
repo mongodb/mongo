@@ -35,16 +35,6 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	wt_off_t size;
 
-	/* Configuration: strict behavior on any error. */
-	WT_RET(__wt_config_gets(session, cfg, "strict", &cval));
-	block->verify_strict = cval.val ? 1 : 0;
-
-	/*
-	 * Set this before reading any extent lists: don't panic if we see
-	 * corruption.
-	 */
-	block->verify = 1;
-
 	/*
 	 * Find the last checkpoint in the list: if there are none, or the only
 	 * checkpoint we have is fake, there's no work to do.  Don't complain,
@@ -97,6 +87,12 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 	WT_RET(__bit_alloc(session, block->frags, &block->fragfile));
 
 	/*
+	 * Set this before reading any extent lists: don't panic if we see
+	 * corruption.
+	 */
+	block->verify = 1;
+
+	/*
 	 * We maintain an allocation list that is rolled forward through the
 	 * set of checkpoints.
 	 */
@@ -108,6 +104,10 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 	 * get it now and initialize the list of file fragments.
 	 */
 	WT_RET(__verify_last_avail(session, block, ckpt));
+
+	/* Configuration: strict behavior on any error. */
+	WT_RET(__wt_config_gets(session, cfg, "strict", &cval));
+	block->verify_strict = cval.val ? 1 : 0;
 	return (0);
 }
 
