@@ -432,6 +432,111 @@ public:
 };
 }  // namespace Document
 
+namespace MetaFields {
+using mongo::Document;
+TEST(MetaFields, TextScoreBasics) {
+    // Documents should not have a text score until it is set.
+    ASSERT_FALSE(Document().hasTextScore());
+
+    // Setting the text score should work as expected.
+    MutableDocument docBuilder;
+    docBuilder.setTextScore(1.0);
+    Document doc = docBuilder.freeze();
+    ASSERT_TRUE(doc.hasTextScore());
+    ASSERT_EQ(1.0, doc.getTextScore());
+}
+
+TEST(MetaFields, RandValBasics) {
+    // Documents should not have a random value until it is set.
+    ASSERT_FALSE(Document().hasRandMetaField());
+
+    // Setting the random value field should work as expected.
+    MutableDocument docBuilder;
+    docBuilder.setRandMetaField(1);
+    Document doc = docBuilder.freeze();
+    ASSERT_TRUE(doc.hasRandMetaField());
+    ASSERT_EQ(1, doc.getRandMetaField());
+
+    // Setting the random value twice should keep the second value.
+    MutableDocument docBuilder2;
+    docBuilder2.setRandMetaField(1);
+    docBuilder2.setRandMetaField(2);
+    Document doc2 = docBuilder2.freeze();
+    ASSERT_TRUE(doc2.hasRandMetaField());
+    ASSERT_EQ(2, doc2.getRandMetaField());
+}
+
+class SerializationTest : public unittest::Test {
+protected:
+    Document roundTrip(const Document& input) {
+        BufBuilder bb;
+        input.serializeForSorter(bb);
+        BufReader reader(bb.buf(), bb.len());
+        return Document::deserializeForSorter(reader, Document::SorterDeserializeSettings());
+    }
+
+    void assertRoundTrips(const Document& input) {
+        // Round trip to/from a buffer.
+        auto output = roundTrip(input);
+        ASSERT_EQ(output, input);
+        ASSERT_EQ(output.hasTextScore(), input.hasTextScore());
+        ASSERT_EQ(output.hasRandMetaField(), input.hasRandMetaField());
+        if (input.hasTextScore())
+            ASSERT_EQ(output.getTextScore(), input.getTextScore());
+        if (input.hasRandMetaField())
+            ASSERT_EQ(output.getRandMetaField(), input.getRandMetaField());
+
+        ASSERT(output.toBson().binaryEqual(input.toBson()));
+    }
+};
+
+TEST_F(SerializationTest, MetaSerializationNoVals) {
+    MutableDocument docBuilder;
+    docBuilder.setTextScore(10.0);
+    docBuilder.setRandMetaField(20);
+    assertRoundTrips(docBuilder.freeze());
+}
+
+TEST_F(SerializationTest, MetaSerializationWithVals) {
+    // Same as above test, but add a non-meta field as well.
+    MutableDocument docBuilder(DOC("foo" << 10));
+    docBuilder.setTextScore(10.0);
+    docBuilder.setRandMetaField(20);
+    assertRoundTrips(docBuilder.freeze());
+}
+
+TEST(MetaFields, ToAndFromBson) {
+    MutableDocument docBuilder;
+    docBuilder.setTextScore(10.0);
+    docBuilder.setRandMetaField(20);
+    Document doc = docBuilder.freeze();
+    BSONObj obj = doc.toBsonWithMetaData();
+    ASSERT_EQ(10.0, obj[Document::metaFieldTextScore].Double());
+    ASSERT_EQ(20, obj[Document::metaFieldRandVal].numberLong());
+    Document fromBson = Document::fromBsonWithMetaData(obj);
+    ASSERT_TRUE(fromBson.hasTextScore());
+    ASSERT_TRUE(fromBson.hasRandMetaField());
+    ASSERT_EQ(10.0, fromBson.getTextScore());
+    ASSERT_EQ(20, fromBson.getRandMetaField());
+}
+
+TEST(MetaFields, BadSerialization) {
+    // Write an unrecognized option to the buffer.
+    BufBuilder bb;
+    // Signal there are 0 fields.
+    bb.appendNum(0);
+    // This would specify a meta field with an invalid type.
+    bb.appendNum(char(DocumentStorage::MetaType::NUM_FIELDS) + 1);
+    // Signals end of input.
+    bb.appendNum(char(0));
+    BufReader reader(bb.buf(), bb.len());
+    ASSERT_THROWS_CODE(
+        Document::deserializeForSorter(reader, Document::SorterDeserializeSettings()),
+        UserException,
+        28744);
+}
+}  // namespace MetaFields
+
 namespace Value {
 
 using mongo::Value;

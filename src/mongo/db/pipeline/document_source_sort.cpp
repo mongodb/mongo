@@ -45,6 +45,9 @@ using std::make_pair;
 using std::string;
 using std::vector;
 
+DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx)
+    : DocumentSource(pExpCtx), populated(false), _mergingPresorted(false) {}
+
 REGISTER_DOCUMENT_SOURCE(sort, DocumentSourceSort::createFromBson);
 
 const char* DocumentSourceSort::getSourceName() const {
@@ -86,9 +89,6 @@ void DocumentSourceSort::dispose() {
     _output.reset();
     pSource->dispose();
 }
-
-DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), populated(false), _mergingPresorted(false) {}
 
 long long DocumentSourceSort::getLimit() const {
     return limitSrc ? limitSrc->getLimit() : -1;
@@ -162,14 +162,19 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
         }
 
         if (keyField.type() == Object) {
+            BSONObj metaDoc = keyField.Obj();
             // this restriction is due to needing to figure out sort direction
             uassert(17312,
-                    "the only expression supported by $sort right now is {$meta: 'textScore'}",
-                    keyField.Obj() == BSON("$meta"
-                                           << "textScore"));
+                    "$meta is the only expression supported by $sort right now",
+                    metaDoc.firstElement().fieldNameStringData() == "$meta");
 
-            pSort->vSortKey.push_back(new ExpressionMeta());
-            pSort->vAscending.push_back(false);  // best scoring documents first
+            VariablesIdGenerator idGen;
+            VariablesParseState vps(&idGen);
+            pSort->vSortKey.push_back(ExpressionMeta::parse(metaDoc.firstElement(), vps));
+
+            // If sorting by textScore, sort highest scores first. If sorting by randVal, order
+            // doesn't matter, so just always use descending.
+            pSort->vAscending.push_back(false);
             continue;
         }
 
@@ -223,12 +228,27 @@ void DocumentSourceSort::populate() {
             msgasserted(17196, "can only mergePresorted from MergeCursors");
         }
     } else {
-        unique_ptr<MySorter> sorter(MySorter::make(makeSortOptions(), Comparator(*this)));
         while (boost::optional<Document> next = pSource->getNext()) {
-            sorter->add(extractKey(*next), *next);
+            loadDocument(std::move(*next));
         }
-        _output.reset(sorter->done());
+        loadingDone();
     }
+}
+
+void DocumentSourceSort::loadDocument(const Document& doc) {
+    invariant(!populated);
+    if (!_sorter) {
+        _sorter.reset(MySorter::make(makeSortOptions(), Comparator(*this)));
+    }
+    _sorter->add(extractKey(doc), doc);
+}
+
+void DocumentSourceSort::loadingDone() {
+    if (!_sorter) {
+        _sorter.reset(MySorter::make(makeSortOptions(), Comparator(*this)));
+    }
+    _output.reset(_sorter->done());
+    _sorter.reset();
     populated = true;
 }
 
@@ -257,6 +277,7 @@ void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& curs
     }
 
     _output.reset(MySorter::Iterator::merge(iterators, makeSortOptions(), Comparator(*this)));
+    populated = true;
 }
 
 Value DocumentSourceSort::extractKey(const Document& d) const {
