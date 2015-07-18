@@ -188,6 +188,13 @@ Status runDownconvertedGetMoreCommand(DBClientConnection* conn,
 
     std::unique_ptr<DBClientCursor> cursor =
         conn->getMore(ns, req.cursorid, req.batchSize.value_or(0));
+
+    if (!cursor) {
+        return {ErrorCodes::HostUnreachable,
+                str::stream() << "cursor initialization failed due to connection problems with "
+                              << conn->getServerAddress()};
+    }
+
     cursor->decouple();
 
     Status status = getStatusFromCursorResult(*cursor);
