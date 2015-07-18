@@ -818,6 +818,29 @@ public:
     /// returns -1 for no limit
     long long getLimit() const;
 
+    /**
+     * Loads a document to be sorted. This can be used to sort a stream of documents that are not
+     * coming from another DocumentSource. Once all documents have been added, the caller must call
+     * loadingDone() before using getNext() to receive the documents in sorted order.
+     */
+    void loadDocument(const Document& doc);
+
+    /**
+     * Signals to the sort stage that there will be no more input documents. It is an error to call
+     * loadDocument() once this method returns.
+     */
+    void loadingDone();
+
+    /**
+     * Instructs the sort stage to use the given set of cursors as inputs, to merge documents that
+     * have already been sorted.
+     */
+    void populateFromCursors(const std::vector<DBClientCursor*>& cursors);
+
+    bool isPopulated() {
+        return populated;
+    };
+
     boost::intrusive_ptr<DocumentSourceLimit> getLimitSrc() const {
         return limitSrc;
     }
@@ -842,7 +865,6 @@ private:
 
     // This is used to merge pre-sorted results from a DocumentSourceMergeCursors.
     class IteratorFromCursor;
-    void populateFromCursors(const std::vector<DBClientCursor*>& cursors);
 
     /* these two parallel each other */
     typedef std::vector<boost::intrusive_ptr<Expression>> SortKey;
@@ -873,7 +895,29 @@ private:
 
     bool _done;
     bool _mergingPresorted;
+    std::unique_ptr<MySorter> _sorter;
     std::unique_ptr<MySorter::Iterator> _output;
+};
+
+class DocumentSourceSample final : public DocumentSource, public SplittableDocumentSource {
+public:
+    boost::optional<Document> getNext() final;
+    const char* getSourceName() const final;
+    Value serialize(bool explain = false) const final;
+
+    boost::intrusive_ptr<DocumentSource> getShardSource() final;
+    boost::intrusive_ptr<DocumentSource> getMergeSource() final;
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+private:
+    explicit DocumentSourceSample(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    long long _size;
+
+    // When no storage engine optimizations are available, $sample uses a $sort stage to randomly
+    // sort the documents.
+    boost::intrusive_ptr<DocumentSourceSort> _sortStage;
 };
 
 class DocumentSourceLimit final : public DocumentSource, public SplittableDocumentSource {
