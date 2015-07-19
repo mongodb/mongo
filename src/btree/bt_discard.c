@@ -412,12 +412,6 @@ __free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	WT_UPDATE *next;
 
 	for (; upd != NULL; upd = next) {
-		/* Everything we free should be visible to everyone. */
-		WT_ASSERT(session,
-		    F_ISSET(session, WT_SESSION_DISCARD_FORCE) ||
-		    upd->txnid == WT_TXN_ABORTED ||
-		    __wt_txn_visible_all(session, upd->txnid));
-
 		next = upd->next;
 		__wt_free(session, upd);
 	}

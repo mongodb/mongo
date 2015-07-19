@@ -60,6 +60,7 @@ src/conn/conn_cache_pool.c
 src/conn/conn_ckpt.c
 src/conn/conn_dhandle.c
 src/conn/conn_handle.c
+src/conn/conn_las.c
 src/conn/conn_log.c
 src/conn/conn_open.c
 src/conn/conn_stat.c

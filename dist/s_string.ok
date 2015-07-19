@@ -156,6 +156,7 @@ KVS
 Kanowski's
 Kounavis
 LANGID
+LAS
 LF
 LLLLLL
 LLLLLLL
@@ -176,6 +177,7 @@ Levyx
 Llqr
 Llqrt
 LockFile
+Lookaside
 Lookup
 MALLOC
 MEM
@@ -319,6 +321,7 @@ WiredTiger's
 WiredTigerCheckpoint
 WiredTigerException
 WiredTigerInit
+WiredTigerLAS
 WiredTigerLog
 WiredTigerPreplog
 WiredTigerTmplog
@@ -645,6 +648,7 @@ kvraw
 kvs
 kvsbdb
 lang
+las
 latencies
 lbrace
 lbracket
@@ -671,6 +675,7 @@ logread
 logrec
 logsize
 logtest
+lookaside
 lookup
 lookups
 lossy

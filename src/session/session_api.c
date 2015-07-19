@@ -383,6 +383,22 @@ err:		if (cursor != NULL)
 }
 
 /*
+ * __wt_session_create --
+ *	Internal version of WT_SESSION::create.
+ */
+int
+__wt_session_create(
+    WT_SESSION_IMPL *session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+
+	WT_WITH_SCHEMA_LOCK(session,
+	    WT_WITH_TABLE_LOCK(session,
+		ret = __wt_schema_create(session, uri, config)));
+	return (ret);
+}
+
+/*
  * __session_create --
  *	WT_SESSION->create method.
  */
@@ -423,9 +439,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 		WT_ERR_NOTFOUND_OK(ret);
 	}
 
-	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_TABLE_LOCK(session,
-		ret = __wt_schema_create(session, uri, config)));
+	ret = __wt_session_create(session, uri, config);
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -529,6 +543,21 @@ __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 }
 
 /*
+ * __wt_session_drop --
+ *	Internal version of WT_SESSION::drop.
+ */
+int
+__wt_session_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+{
+	WT_DECL_RET;
+
+	WT_WITH_SCHEMA_LOCK(session,
+	    WT_WITH_TABLE_LOCK(session,
+		ret = __wt_schema_drop(session, uri, cfg)));
+	return (ret);
+}
+
+/*
  * __session_drop --
  *	WT_SESSION->drop method.
  */
@@ -544,9 +573,7 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_str_name_check(session, uri));
 
-	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_TABLE_LOCK(session,
-		ret = __wt_schema_drop(session, uri, cfg)));
+	ret = __wt_session_drop(session, uri, cfg);
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
 	API_END_RET_NOTFOUND_MAP(session, ret);

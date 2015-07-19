@@ -43,6 +43,7 @@ struct __wt_page_header {
 #define	WT_PAGE_EMPTY_V_ALL	0x02	/* Page has all zero-length values */
 #define	WT_PAGE_EMPTY_V_NONE	0x04	/* Page has no zero-length values */
 #define	WT_PAGE_ENCRYPTED	0x08	/* Page is encrypted on disk */
+#define	WT_PAGE_LAS_UPDATE	0x10	/* Page updates in lookaside store */
 	uint8_t flags;			/* 25: flags */
 
 	/*
@@ -168,6 +169,23 @@ struct __wt_ovfl_txnc {
 };
 
 /*
+ * Lookaside table support: when a page is being reconciled for eviction and has
+ * updates that might be required by earlier readers in the system, the updates
+ * are written into a lookaside table, and restored as necessary if the page is
+ * read. The key is relatively complex: a flag byte (so we can use the lookaside
+ * table for other purposes in the future) a unique marker for the page (a file
+ * ID plus an address), the on-page item's transaction ID (so we can discard any
+ * update records from the lookaside table once the on-page item's transaction
+ * is globally visible), a counter (used to ensure the update records remain in
+ * the original order, and the key (either a byte-string or a record number).
+ * The value is simpler: the WT_UPDATE structures transaction ID and value.
+ *
+ * K: '1', file ID, address-len, address, on-page txn ID, counter, key/recno
+ * V: transaction ID, value
+ */
+#define	WT_LAS_RECONCILE_UPDATE	'1'
+
+/*
  * WT_PAGE_MODIFY --
  *	When a page is modified, there's additional information to maintain.
  */
@@ -188,9 +206,6 @@ struct __wt_page_modify {
 
 	/* Avoid checking for obsolete updates during checkpoints. */
 	uint64_t obsolete_check_txn;
-
-	/* The largest transaction ID seen on the page by reconciliation. */
-	uint64_t rec_max_txn;
 
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
@@ -239,11 +254,14 @@ struct __wt_page_modify {
 		 * associated disk image.
 		 *
 		 * Skipped updates are either a WT_INSERT, or a row-store leaf
-		 * page entry.
+		 * page entry; in the case of creating lookaside records, there
+		 * is an additional value, the committed item's transaction ID.
 		 */
+#define	WT_LAS_RECONCILE_UPDATE	'1'
 		struct __wt_upd_skipped {
 			WT_INSERT *ins;
 			WT_ROW	  *rip;
+			uint64_t   onpage_txn;
 		} *skip;
 		uint32_t skip_entries;
 		void	*skip_dsk;
@@ -873,6 +891,7 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 	 */
 #define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
 #define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
+#define	WT_UPDATE_DELETED_VALUE		UINT32_MAX
 	uint32_t size;			/* update length */
 
 	/* The untyped value immediately follows the WT_UPDATE structure. */

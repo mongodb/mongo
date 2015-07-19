@@ -91,8 +91,6 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 	flags = dsk->flags;
 	if (LF_ISSET(WT_PAGE_COMPRESSED))
 		LF_CLR(WT_PAGE_COMPRESSED);
-	if (LF_ISSET(WT_PAGE_ENCRYPTED))
-		LF_CLR(WT_PAGE_ENCRYPTED);
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
 		if (LF_ISSET(WT_PAGE_EMPTY_V_ALL) &&
 		    LF_ISSET(WT_PAGE_EMPTY_V_NONE))
@@ -105,6 +103,10 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 		if (LF_ISSET(WT_PAGE_EMPTY_V_NONE))
 			LF_CLR(WT_PAGE_EMPTY_V_NONE);
 	}
+	if (LF_ISSET(WT_PAGE_ENCRYPTED))
+		LF_CLR(WT_PAGE_ENCRYPTED);
+	if (LF_ISSET(WT_PAGE_LAS_UPDATE))
+		LF_CLR(WT_PAGE_LAS_UPDATE);
 	if (flags != 0)
 		WT_RET_VRFY(session,
 		    "page at %s has invalid flags set: 0x%" PRIx8,

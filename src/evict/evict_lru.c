@@ -663,44 +663,6 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_evict_page --
- *	Evict a given page.
- */
-int
-__wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	WT_DECL_RET;
-	WT_TXN *txn;
-	WT_TXN_ISOLATION saved_iso;
-
-	/*
-	 * We have to take care when evicting pages not to write a change that:
-	 *  (a) is not yet committed; or
-	 *  (b) is committed more recently than an in-progress checkpoint.
-	 *
-	 * We handle both of these cases by setting up the transaction context
-	 * before evicting, using a special "eviction" isolation level, where
-	 * only globally visible updates can be evicted.
-	 */
-	__wt_txn_update_oldest(session, 1);
-	txn = &session->txn;
-	saved_iso = txn->isolation;
-	txn->isolation = WT_ISO_EVICTION;
-
-	/*
-	 * Sanity check: if a transaction has updates, its updates should not
-	 * be visible to eviction.
-	 */
-	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_HAS_ID) ||
-	    !__wt_txn_visible(session, txn->id));
-
-	ret = __wt_evict(session, ref, 0);
-	txn->isolation = saved_iso;
-
-	return (ret);
-}
-
-/*
  * __wt_evict_file_exclusive_on --
  *	Get exclusive eviction access to a file and discard any of the file's
  *	blocks queued for eviction.
@@ -1139,6 +1101,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
@@ -1148,8 +1111,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	uint32_t walk_flags;
 	int enough, internal_pages, modified, restarts;
 
+	conn = S2C(session);
 	btree = S2BT(session);
-	cache = S2C(session)->cache;
+	cache = conn->cache;
 	start = cache->evict + *slotp;
 	end = WT_MIN(start + WT_EVICT_WALK_PER_FILE,
 	    cache->evict + cache->evict_slots);
@@ -1232,35 +1196,25 @@ fast:		/* If the page can't be evicted, give up. */
 			continue;
 
 		/*
-		 * If the page is clean but has modifications that appear too
-		 * new to evict, skip it.
+		 * If the oldest transaction hasn't changed since the last time
+		 * this page was written, it's unlikely we can make progress (an
+		 * heuristic to avoid repeated attempts to evict the same page).
+		 * Similarly, if the most recent update on the page is not yet
+		 * committed, eviction will fail.
+		 *
+		 * If eviction is stuck, or we are helping with forced eviction,
+		 * try anyway: maybe a transaction that was running last time we
+		 * wrote the page has since rolled back, or we can help get the
+		 * checkpoint completed sooner.
 		 *
 		 * Note: take care with ordering: if we detected that the page
 		 * is modified above, we expect mod != NULL.
 		 */
 		mod = page->modify;
-		if (!modified && mod != NULL && !LF_ISSET(
-		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK) &&
-		    !__wt_txn_visible_all(session, mod->rec_max_txn))
-			continue;
-
-		/*
-		 * If the oldest transaction hasn't changed since the last time
-		 * this page was written, it's unlikely that we can make
-		 * progress.  Similarly, if the most recent update on the page
-		 * is not yet globally visible, eviction will fail.  These
-		 * heuristics attempt to avoid repeated attempts to evict the
-		 * same page.
-		 *
-		 * That said, if eviction is stuck, or we are helping with
-		 * forced eviction, try anyway: maybe a transaction that was
-		 * running last time we wrote the page has since rolled back,
-		 * or we can help get the checkpoint completed sooner.
-		 */
 		if (modified && !LF_ISSET(
 		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK) &&
-		    (mod->disk_snap_min == S2C(session)->txn_global.oldest_id ||
-		    !__wt_txn_visible_all(session, mod->update_txn)))
+		    (!__wt_txn_committed(session, mod->update_txn) ||
+		    mod->disk_snap_min == conn->txn_global.oldest_id))
 			continue;
 
 		WT_ASSERT(session, evict->ref == NULL);
@@ -1433,7 +1387,7 @@ __evict_page(WT_SESSION_IMPL *session, int is_server)
 		__wt_cache_dirty_decr(session, page);
 	}
 
-	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, ref));
+	WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, 0));
 
 	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
 
@@ -1569,27 +1523,30 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, int pct_full)
  *	NOTE: this function is not called anywhere, it is intended to be called
  *	from a debugger.
  */
-void
-__wt_cache_dump(WT_SESSION_IMPL *session)
+int
+__wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 {
-	WT_BTREE *btree;
+	FILE *fp;
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle;
-	WT_REF *next_walk;
+	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_PAGE *page;
+	WT_REF *next_walk;
 	uint64_t file_intl_pages, file_leaf_pages;
 	uint64_t file_bytes, file_dirty, total_bytes;
 
 	conn = S2C(session);
 	total_bytes = 0;
 
+	if (ofile == NULL)
+		fp = stdout;
+	else
+		WT_RET(
+		    __wt_fopen(session, ofile, WT_FHANDLE_WRITE, 0, &fp));
+
+	saved_dhandle = session->dhandle;
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
-			continue;
-
-		btree = dhandle->handle;
-		if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
 			continue;
 
 		file_bytes = file_dirty = file_intl_pages = file_leaf_pages = 0;
@@ -1606,24 +1563,30 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 			file_bytes += page->memory_footprint;
 			if (__wt_page_is_modified(page))
 				file_dirty += page->memory_footprint;
+			(void)__wt_fprintf(fp,
+			    "%" WT_SIZET_FMT ", ", page->memory_footprint);
 		}
 		session->dhandle = NULL;
 
-		printf("cache dump: %s%s%s%s:"
+		(void)__wt_fprintf(fp, "\n" "cache dump: %s%s%s%s:"
 		    " %" PRIu64 " intl pages, %" PRIu64 " leaf pages,"
 		    " %" PRIu64 "MB, %" PRIu64 "MB dirty\n",
 		    dhandle->name,
 		    dhandle->checkpoint == NULL ? "" : " [",
 		    dhandle->checkpoint == NULL ? "" : dhandle->checkpoint,
-		    dhandle->checkpoint == NULL ? "" : "]",
+		    dhandle->checkpoint == NULL ? "" : "]\n\n",
 		    file_intl_pages, file_leaf_pages,
 		    file_bytes >> 20, file_dirty >> 20);
 
 		total_bytes += file_bytes;
 	}
-	printf("cache dump: total found = %" PRIu64 "MB"
+	session->dhandle = saved_dhandle;
+
+	(void)__wt_fprintf(fp, "cache dump: total found = %" PRIu64 "MB"
 	    " vs tracked inuse %" PRIu64 "MB\n",
 	    total_bytes >> 20, __wt_cache_bytes_inuse(conn->cache) >> 20);
-	fflush(stdout);
+	if (fp != stdout)
+		WT_RET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
+	return (0);
 }
 #endif

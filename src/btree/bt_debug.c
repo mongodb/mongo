@@ -340,6 +340,8 @@ __wt_debug_disk(
 		__dmsg(ds, ", empty-all");
 	if (F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE))
 		__dmsg(ds, ", empty-none");
+	if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE))
+		__dmsg(ds, ", LAS-update");
 
 	__dmsg(ds, ", generation %" PRIu64 "\n", dsk->write_gen);
 

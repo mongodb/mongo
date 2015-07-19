@@ -684,9 +684,7 @@ __split_multi_inmem(
 	uint64_t recno;
 	uint32_t i, slot;
 
-	WT_CLEAR(cbt);
-	cbt.iface.session = &session->iface;
-	cbt.btree = S2BT(session);
+	__wt_btcur_init(session, &cbt);
 	__wt_btcur_open(&cbt);
 
 	/*

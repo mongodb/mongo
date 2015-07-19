@@ -33,7 +33,6 @@ static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
 static int   col_update(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   nextprev(WT_CURSOR *, int, int *);
 static void *ops(void *);
-static int   read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
 static int   row_insert(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
 static int   row_update(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
@@ -597,7 +596,7 @@ wts_read_scan(void)
  * read_row --
  *	Read and verify a single element in a row- or column-store file.
  */
-static int
+int
 read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 {
 	static int sn = 0;
@@ -639,9 +638,8 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 			ret = cursor->get_value(cursor, &bitfield);
 			value.data = &bitfield;
 			value.size = 1;
-		} else {
+		} else
 			ret = cursor->get_value(cursor, &value);
-		}
 	}
 	if (ret == WT_ROLLBACK)
 		return (WT_ROLLBACK);

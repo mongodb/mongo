@@ -301,17 +301,19 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * Flush the file before checkpointing: this is the expensive part in
 	 * terms of I/O.
 	 *
-	 * Use the special eviction isolation level to avoid interfering with
-	 * an application checkpoint: we have already checked that all of the
-	 * updates in this chunk are globally visible.
-	 *
-	 * !!! We can wait here for checkpoints and fsyncs to complete, which
-	 * can be a long time.
+	 * !!!
+	 * We can wait here for checkpoints and fsyncs to complete, which can
+	 * take a long time.
 	 */
 	if ((ret = __wt_session_get_btree(
 	    session, chunk->uri, NULL, NULL, 0)) == 0) {
+		/*
+		 * Set read-uncommitted: we have already checked that all of the
+		 * updates in this chunk are globally visible, use the cheapest
+		 * possible check in reconciliation.
+		 */
 		saved_isolation = session->txn.isolation;
-		session->txn.isolation = WT_ISO_EVICTION;
+		session->txn.isolation = WT_ISO_READ_UNCOMMITTED;
 		ret = __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES);
 		session->txn.isolation = saved_isolation;
 		WT_TRET(__wt_session_release_btree(session));

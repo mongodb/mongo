@@ -309,7 +309,6 @@ __evict_review(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_PAGE_MODIFY *mod;
 	uint32_t reconcile_flags;
 
 	/*
@@ -331,7 +330,6 @@ __evict_review(
 
 	/* Now that we have exclusive access, review the page. */
 	page = ref->page;
-	mod = page->modify;
 
 	/*
 	 * Fail if an internal has active children, the children must be evicted
@@ -380,8 +378,8 @@ __evict_review(
 	 * Don't set the update-restore flag for internal pages, they don't have
 	 * updates that can be saved and restored.
 	 */
-	reconcile_flags = WT_EVICTING;
 	if (__wt_page_is_modified(page)) {
+		reconcile_flags = WT_EVICTING;
 		if (closing)
 			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_ERR);
 		else if (!WT_PAGE_IS_INTERNAL(page) &&
@@ -392,15 +390,6 @@ __evict_review(
 		    !__wt_page_is_modified(page) ||
 		    FLD_ISSET(reconcile_flags, WT_SKIP_UPDATE_RESTORE));
 	}
-
-	/*
-	 * If the page was ever modified, make sure all of the updates
-	 * on the page are old enough they can be discarded from cache.
-	 */
-	if (!closing && mod != NULL &&
-	    !__wt_txn_visible_all(session, mod->rec_max_txn) &&
-	    !FLD_ISSET(reconcile_flags, WT_SKIP_UPDATE_RESTORE))
-		return (EBUSY);
 
 	return (0);
 }

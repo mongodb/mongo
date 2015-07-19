@@ -23,6 +23,8 @@
 #define	WT_METADATA_URI		"metadata:"		/* Metadata alias */
 #define	WT_METAFILE_URI		"file:WiredTiger.wt"	/* Metadata file URI */
 
+#define	WT_LASFILE_URI		"file:WiredTigerLAS.wt"	/* Lookaside file URI */
+
 /*
  * Pre computed hash for the metadata file. Used to optimize comparisons
  * against the metafile URI. The validity is checked on connection open

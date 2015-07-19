@@ -95,10 +95,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 				page->modify->write_gen = 0;
 				__wt_cache_dirty_decr(session, page);
 			}
-
-			F_SET(session, WT_SESSION_DISCARD_FORCE);
 			__wt_evict_page_clean_update(session, ref, 1);
-			F_CLR(session, WT_SESSION_DISCARD_FORCE);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}

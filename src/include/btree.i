@@ -375,9 +375,13 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * have committed in the meantime, and the last_running field
 		 * been updated past it.  That is all very unlikely, but not
 		 * impossible, so we take care to read the global state before
-		 * the atomic increment.  If we raced with reconciliation, just
-		 * leave the previous value here: at worst, we will write a
-		 * page in a checkpoint when not absolutely necessary.
+		 * the atomic increment.
+		 *
+		 * If the page was dirty on entry, then last_running == 0. The
+		 * page could have become clean since then, if reconciliation
+		 * completed. In that case, we leave the previous value for
+		 * first_dirty_txn rather than potentially racing to update it,
+		 * at worst, we'll unnecessarily write a page in a checkpoint.
 		 */
 		if (last_running != 0)
 			page->modify->first_dirty_txn = last_running;
@@ -1097,11 +1101,9 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * for existing hazard pointers, the checkpoint thread reconciling an
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
+	 *
+	 * KEITH: this comment should move to somewhere else.
 	 */
-	if (page->read_gen != WT_READGEN_OLDEST &&
-	    !__wt_txn_visible_all(session, __wt_page_is_modified(page) ?
-	    mod->update_txn : mod->rec_max_txn))
-		return (0);
 
 	/*
 	 * If the page was recently split in-memory, don't force it out: we
@@ -1146,7 +1148,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
 
 	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
-	if ((ret = __wt_evict_page(session, ref)) == 0) {
+	if ((ret = __wt_evict(session, ref, 0)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else

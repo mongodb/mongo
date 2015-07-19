@@ -107,11 +107,6 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			upd_size = __wt_update_list_memsize(upd);
 
 			/*
-			 * We are restoring updates that couldn't be evicted,
-			 * there should only be one update list per key.
-			 */
-			WT_ASSERT(session, *upd_entry == NULL);
-			/*
 			 * Set the "old" entry to the second update in the list
 			 * so that the serialization function succeeds in
 			 * swapping the first update into place.

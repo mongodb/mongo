@@ -1132,6 +1132,19 @@ err:	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
 }
 
 /*
+ * __wt_btcur_init --
+ *	Initialize an cursor used for internal purposes.
+ */
+void
+__wt_btcur_init(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+{
+	memset(cbt, 0, sizeof(WT_CURSOR_BTREE));
+
+	cbt->iface.session = &session->iface;
+	cbt->btree = S2BT(session);
+}
+
+/*
  * __wt_btcur_open --
  *	Open a btree cursor.
  */

@@ -140,6 +140,16 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_committed --
+ *	Return if a transaction has been committed.
+ */
+static inline int
+__wt_txn_committed(WT_SESSION_IMPL *session, uint64_t id)
+{
+	return (WT_TXNID_LT(id, S2C(session)->txn_global.last_running) ? 1 : 0);
+}
+
+/*
  * __wt_txn_visible_all --
  *	Check if a given transaction ID is "globally visible".	This is, if
  *	all sessions in the system will see the transaction ID including the
@@ -174,13 +184,6 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	/* Nobody sees the results of aborted transactions. */
 	if (id == WT_TXN_ABORTED)
 		return (0);
-
-	/*
-	 * Eviction only sees globally visible updates, or if there is a
-	 * checkpoint transaction running, use its transaction.
-	 */
-	if (txn->isolation == WT_ISO_EVICTION)
-		return (__wt_txn_visible_all(session, id));
 
 	/*
 	 * Read-uncommitted transactions see all other changes.

@@ -246,6 +246,10 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 	WT_ASSERT(session, WT_PREFIX_MATCH(session->dhandle->name, "file:"));
 
+	/* Skip files that are never involved in a checkpoint. */
+	if (F_ISSET(S2BT(session), WT_BTREE_NO_CHECKPOINT))
+		return (0);
+
 	/* Make sure there is space for the next entry. */
 	WT_RET(__wt_realloc_def(session, &session->ckpt_handle_allocated,
 	    session->ckpt_handle_next + 1, &session->ckpt_handle));
