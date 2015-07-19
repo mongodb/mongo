@@ -1540,8 +1540,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 	if (ofile == NULL)
 		fp = stdout;
 	else
-		WT_RET(
-		    __wt_fopen(session, ofile, WT_FHANDLE_WRITE, 0, &fp));
+		WT_RET(__wt_fopen(session, ofile, WT_FHANDLE_WRITE, 0, &fp));
 
 	saved_dhandle = session->dhandle;
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
