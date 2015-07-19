@@ -72,7 +72,6 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	    WT_BTREE_LAS_FILE | WT_BTREE_NO_CHECKPOINT | WT_BTREE_NO_LOGGING);
 
 err:	__wt_spin_unlock(session, &conn->las_lock);
-
 	return (ret);
 }
 
@@ -136,7 +135,6 @@ __wt_las_insert(WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value)
 
 	/* Reset the cursor. */
 	WT_TRET(cursor->reset(cursor));
-
 	__wt_spin_unlock(session, &conn->las_lock);
 	return (ret);
 }
@@ -224,15 +222,6 @@ __wt_las_remove_block(
 	 */
 	if (conn->las_cursor == NULL)
 		return (0);
-
-	/*
-	 * KEITH
-	 * THERE'S A RACE HERE I CAN'T FIND.
-	 * THERE'S A RACE HERE I CAN'T FIND.
-	 * THERE'S A RACE HERE I CAN'T FIND.
-	 * THERE'S A RACE HERE I CAN'T FIND.
-	 */
-	return (0);
 
 	/*
 	 * Build the page's unique key prefix we'll search for in the lookaside

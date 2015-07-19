@@ -842,10 +842,13 @@ __rec_block_free(
     WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
 	WT_BM *bm;
+	WT_BTREE *btree;
 
-	bm = S2BT(session)->bm;
+	btree= S2BT(session);
+	bm = btree->bm;
 
-	WT_RET(__wt_las_remove_block(session, addr, addr_size));
+	if (!F_ISSET(btree, WT_BTREE_LAS_FILE))
+		WT_RET(__wt_las_remove_block(session, addr, addr_size));
 
 	WT_RET(bm->free(bm, session, addr, addr_size));
 
