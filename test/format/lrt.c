@@ -81,7 +81,7 @@ lrt(void *arg)
 			} else
 				ret = cursor->get_value(cursor, &value);
 			if (ret != 0)
-				die(ret, "cursor.get_value%" PRIu64, keyno);
+				die(ret, "cursor.get_value: %" PRIu64, keyno);
 
 			if (buf_size != value.size ||
 			    memcmp(buf, value.data, value.size) != 0)
@@ -110,7 +110,7 @@ lrt(void *arg)
 			} else
 				ret = cursor->get_value(cursor, &value);
 			if (ret != 0)
-				die(ret, "cursor.get_value%" PRIu64, keyno);
+				die(ret, "cursor.get_value: %" PRIu64, keyno);
 			if (buf_len < value.size &&
 			    (buf = realloc(buf, buf_len = value.size)) == NULL)
 				die(errno, "malloc");
