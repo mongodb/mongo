@@ -92,8 +92,11 @@ lrt(void *arg)
 				die(ret, "cursor.reset");
 			pinned = 0;
 		} else {
-			/* Read a record, creating a snapshot. */
-			keyno = mmrand(NULL, 1, g.key_cnt);
+			/*
+			 * Read a record at the end of the table, creating a
+			 * snapshot.
+			 */
+			keyno = g.key_cnt - 10;
 			while (read_row(cursor, &key, keyno) == WT_ROLLBACK)
 				;
 			if (ret != 0)
@@ -138,6 +141,8 @@ lrt(void *arg)
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
+
+	free(buf);
 
 	return (NULL);
 }

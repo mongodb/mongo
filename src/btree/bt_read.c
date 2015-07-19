@@ -27,8 +27,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	uint32_t key_len;
 	uint64_t recno, txnid;
 	uint8_t prefix_key[100];
-	void *p, *saved_data;
-	const void *t;
+	void *p;
+	const void *saved_data, *t;
 
 	btree = S2BT(session);
 	page = ref->page;
