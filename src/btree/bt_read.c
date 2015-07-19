@@ -34,6 +34,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	page = ref->page;
 	upd = NULL;
 	total_incr = 0;
+	recno = 0;			/* [-Werror=maybe-uninitialized] */
 
 	__wt_btcur_init(session, &cbt);
 	__wt_btcur_open(&cbt);

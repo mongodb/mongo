@@ -3103,6 +3103,7 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 	btree = S2BT(session);
 	page = r->page;
 	counter = 0;
+	counterp = NULL;		/* [-Werror=maybe-uninitialized] */
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_scr_alloc(session, 0, &klas));
