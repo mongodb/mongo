@@ -2170,60 +2170,6 @@ TEST_F(ReplCoordTest, ReadAfterEqualOpTime) {
     ASSERT_OK(result.getStatus());
 }
 
-TEST_F(ReplCoordTest, ReadAfterDeferredGreaterOpTime) {
-    OperationContextNoop txn;
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
-                                                                              << "node1:12345"
-                                                                              << "_id" << 0))),
-                       HostAndPort("node1", 12345));
-
-    getReplCoord()->setMyLastOptime(OpTimeWithTermZero(0, 0));
-
-    auto pseudoLogOp = stdx::async(stdx::launch::async,
-                                   [this]() {
-                                       // Not guaranteed to be scheduled after waitUntil blocks...
-                                       getReplCoord()->setMyLastOptime(OpTimeWithTermZero(200, 0));
-                                   });
-
-    auto result = getReplCoord()->waitUntilOpTime(
-        &txn,
-        ReadConcernArgs(OpTimeWithTermZero(100, 0),
-                        ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
-    pseudoLogOp.get();
-
-    ASSERT_TRUE(result.didWait());
-    ASSERT_OK(result.getStatus());
-}
-
-TEST_F(ReplCoordTest, ReadAfterDeferredEqualOpTime) {
-    OperationContextNoop txn;
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
-                                                                              << "node1:12345"
-                                                                              << "_id" << 0))),
-                       HostAndPort("node1", 12345));
-
-    getReplCoord()->setMyLastOptime(OpTimeWithTermZero(0, 0));
-
-    OpTimeWithTermZero opTimeToWait(100, 0);
-
-    auto pseudoLogOp = stdx::async(stdx::launch::async,
-                                   [this, &opTimeToWait]() {
-                                       // Not guaranteed to be scheduled after waitUntil blocks...
-                                       getReplCoord()->setMyLastOptime(opTimeToWait);
-                                   });
-
-    auto result = getReplCoord()->waitUntilOpTime(
-        &txn, ReadConcernArgs(opTimeToWait, ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
-    pseudoLogOp.get();
-
-    ASSERT_TRUE(result.didWait());
-    ASSERT_OK(result.getStatus());
-}
-
 TEST_F(ReplCoordTest, CantUseReadAfterCommittedIfNotReplSet) {
     init(ReplSettings());
     OperationContextNoop txn;
