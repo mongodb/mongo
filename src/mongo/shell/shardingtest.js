@@ -616,7 +616,7 @@ ShardingTest.prototype.adminCommand = function(cmd){
     if ( res && res.ok == 1 )
         return true;
 
-    throw Error( "command " + tojson( cmd ) + " failed: " + tojson( res ) );
+    throw _getErrorWithCode(res, "command " + tojson(cmd) + " failed: " + tojson(res));
 }
 
 ShardingTest.prototype._rangeToString = function(r){

@@ -265,8 +265,9 @@ DBQuery.prototype.next = function(){
         throw Error( "error hasNext: " + o );
     
     var ret = this._cursor.next();
-    if ( ret.$err )
-        throw Error( "error: " + tojson( ret ) );
+    if ( ret.$err ) {
+        throw _getErrorWithCode(ret, "error: " + tojson( ret ));
+    }
 
     this._numReturned++;
     return ret;
@@ -277,7 +278,7 @@ DBQuery.prototype.objsLeftInBatch = function(){
 
     var ret = this._cursor.objsLeftInBatch();
     if ( ret.$err )
-        throw Error( "error: " + tojson( ret ) );
+        throw _getErrorWithCode(ret,  "error: " + tojson( ret ));
 
     return ret;
 }
@@ -333,7 +334,7 @@ DBQuery.prototype.count = function( applySkipLimit ) {
 
     var res = this._db.runCommand( cmd );
     if( res && res.n != null ) return res.n;
-    throw Error( "count failed: " + tojson( res ) );
+    throw _getErrorWithCode(res, "count failed: " + tojson( res ));
 }
 
 DBQuery.prototype.size = function(){
@@ -618,7 +619,7 @@ DBCommandCursor.prototype.next = function() {
 
         var ret = this._cursor.next();
         if ( ret.$err )
-            throw Error( "error: " + tojson( ret ) );
+            throw _getErrorWithCode(ret, "error: " + tojson(ret));
         return ret;
     }
 }

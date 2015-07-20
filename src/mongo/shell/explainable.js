@@ -31,7 +31,7 @@ var Explainable = (function() {
 
     var throwOrReturn = function(explainResult) {
         if (("ok" in explainResult && !explainResult.ok) || explainResult.$err) {
-            throw Error("explain failed: " + tojson(explainResult));
+            throw _getErrorWithCode(explainResult, "explain failed: " + tojson(explainResult));
         }
 
         return explainResult;

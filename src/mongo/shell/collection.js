@@ -204,7 +204,7 @@ DBCollection.prototype.findOne = function( query , fields, options ){
     var ret = cursor.next();
     if ( cursor.hasNext() ) throw Error( "findOne has more than 1 result!" );
     if ( ret.$err )
-        throw Error( "error " + tojson( ret ) );
+        throw _getErrorWithCode(ret, "error " + tojson(ret));
     return ret;
 }
 
@@ -621,7 +621,7 @@ DBCollection.prototype.dropIndexes = function(){
     if ( res.errmsg.match( /not found/ ) )
         return res;
 
-    throw Error( "error dropping indexes : " + tojson( res ) );
+    throw _getErrorWithCode(res, "error dropping indexes : " + tojson(res));
 }
 
 
@@ -632,7 +632,7 @@ DBCollection.prototype.drop = function(){
     if ( ! ret.ok ){
         if ( ret.errmsg == "ns not found" )
             return false;
-        throw Error( "drop failed: " + tojson( ret ) );
+        throw _getErrorWithCode(ret, "drop failed: " + tojson(ret));
     }
     return true;
 }
@@ -648,7 +648,7 @@ DBCollection.prototype.findAndModify = function(args){
         if (ret.errmsg == "No matching object found"){
             return null;
         }
-        throw Error( "findAndModifyFailed failed: " + tojson( ret ) );
+        throw _getErrorWithCode(ret, "findAndModifyFailed failed: " + tojson(ret));
     }
     return ret.value;
 }
@@ -1031,7 +1031,7 @@ DBCollection.prototype._getIndexesCommand = function(filter){
             return null;
         }
 
-        throw Error( "listIndexes failed: " + tojson( res ) );
+        throw _getErrorWithCode(ret, "listIndexes failed: " + tojson(res));
     }
 
     return new DBCommandCursor(this._mongo, res).toArray();
@@ -1228,7 +1228,7 @@ DBCollection.prototype.exists = function(){
         return this._db.system.namespaces.findOne( { name : this._fullName } );
     }
 
-    throw Error( "listCollections failed: " + tojson( res ) );
+    throw _getErrorWithCode(res, "listCollections failed: " + tojson(res));
 }
 
 DBCollection.prototype.isCapped = function(){
@@ -1249,7 +1249,7 @@ DBCollection.prototype.distinct = function( keyString , query ){
         throw Error("The query argument to the distinct command must be a document but was a " + queryType);
     var res = this._distinct( keyString , query );
     if ( ! res.ok )
-        throw Error("distinct failed: " + tojson( res ));
+        throw _getErrorWithCode(res, "distinct failed: " + tojson(res));
     return res.values;
 }
 
@@ -1386,7 +1386,7 @@ DBCollection.prototype.mapReduce = function( map , reduce , optionsOrOutString )
 
     if ( ! raw.ok ){
         __mrerror__ = raw;
-        throw Error( "map reduce failed:" + tojson(raw) );
+        throw _getErrorWithCode(raw, "map reduce failed:" + tojson(raw));
     }
     return new MapReduceResult( this._db , raw );
 

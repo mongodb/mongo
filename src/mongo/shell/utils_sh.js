@@ -333,9 +333,9 @@ sh._lastMigration = function( ns ){
 }
 
 sh._checkLastError = function( mydb ) {
-    var err = mydb.getLastError();
-    if ( err )
-        throw Error( "error: " + err );
+    var errObj = mydb.getLastErrorObj();
+    if (errObj.err)
+        throw _getErrorWithCode(errObj, "error: " + errObj.err);
 }
 
 sh.addShardTag = function( shard, tag ) {

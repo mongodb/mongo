@@ -50,7 +50,7 @@ Mongo.prototype.getDB = function( name ){
 Mongo.prototype.getDBs = function(){
     var res = this.getDB( "admin" ).runCommand( { "listDatabases" : 1 } );
     if ( ! res.ok )
-        throw Error( "listDatabases failed:" + tojson( res ) );
+        throw _getErrorWithCode(res, "listDatabases failed:" + tojson(res));
     return res;
 }
 
@@ -64,7 +64,7 @@ Mongo.prototype.adminCommand = function( cmd ){
 Mongo.prototype.getLogComponents = function() {
     var res = this.adminCommand({ getParameter:1, logComponentVerbosity:1 });
     if (!res.ok)
-        throw Error( "getLogComponents failed:" + tojson(res));
+        throw _getErrorWithCode(res, "getLogComponents failed:" + tojson(res));
     return res.logComponentVerbosity;
 }
 
@@ -91,7 +91,7 @@ Mongo.prototype.setLogLevel = function(logLevel, component) {
     }
     var res = this.adminCommand({ setParameter : 1, logComponentVerbosity : vDoc });
     if (!res.ok)
-        throw Error( "setLogLevel failed:" + tojson(res));
+        throw _getErrorWithCode(res, "setLogLevel failed:" + tojson(res));
     return res;
 }
 

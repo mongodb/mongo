@@ -19,6 +19,22 @@ function reconnect(db) {
                 });
 };
 
+function _getErrorWithCode(codeOrObj, message) {
+    var e = new Error(message);
+    if (codeOrObj != undefined) {
+        if (codeOrObj.writeError) {
+            e.code = codeOrObj.writeError.code;
+        } else if (codeOrObj.code) {
+            e.code = codeOrObj.code;
+        } else {
+            // At this point assume codeOrObj is a number type
+            e.code = codeOrObj;
+        }
+    }
+
+    return e;
+}
+
 // Please consider using bsonWoCompare instead of this as much as possible.
 friendlyEqual = function( a , b ){
     if ( a == b )
@@ -316,7 +332,7 @@ replSetMemberStatePrompt = function() {
          if ( info && info.length < 20 ) {
              state = info; // "mongos", "configsvr"
          } else {
-             throw Error("Failed:" + info);
+             throw _getErrorWithCode(stateInfo, "Failed:" + info);
          }
     }
     return state + '> ';
@@ -346,7 +362,7 @@ isMasterStatePrompt = function() {
         }
         state = state + role;
     } else {
-        throw Error("Failed: " + tojson(isMaster));
+        throw _getErrorWithCode(isMaster, "Failed: " + tojson(isMaster));
     }
     return state + '> ';
 }
