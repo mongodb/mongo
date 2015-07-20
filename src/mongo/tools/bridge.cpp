@@ -105,8 +105,11 @@ public:
                     dest.port().call(m, response);
 
                     // nothing to reply with?
-                    if (response.empty())
-                        cleanup(0);
+                    if (response.empty()) {
+                        cout << "end connection " << dest.toString() << endl;
+                        mp_.shutdown();
+                        break;
+                    }
 
                     mp_.reply(m, response, oldId);
                     while (exhaust) {
