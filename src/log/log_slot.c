@@ -207,10 +207,10 @@ __log_slot_find_free(WT_SESSION_IMPL *session, WT_LOGSLOT **slot)
 	 * work and let it give us the index of a free slot along
 	 * the way.
 	 */
-	WT_RET(__wt_log_wrlsn(session, &pool_i));
+	WT_RET(__wt_log_wrlsn(session, &pool_i, NULL));
 	while (pool_i == WT_SLOT_POOL) {
 		__wt_yield();
-		WT_RET(__wt_log_wrlsn(session, &pool_i));
+		WT_RET(__wt_log_wrlsn(session, &pool_i, NULL));
 	}
 	*slot = &log->slot_pool[pool_i];
 	WT_ASSERT(session, (*slot)->slot_state == WT_LOG_SLOT_FREE);

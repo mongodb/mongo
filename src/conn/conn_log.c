@@ -398,7 +398,7 @@ typedef struct {
  *	freed in the progress arg.  Must be called with the log slot lock held.
  */
 int
-__wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i)
+__wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i, int *yield)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -435,6 +435,12 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i)
 	 * based on the release LSN, and then look for them in order.
 	 */
 	if (written_i > 0) {
+		/*
+		 * If wanted, reset the yield variable to indicate that we
+		 * have found written slots.
+		 */
+		if (yield != NULL)
+			*yield = 0;
 		WT_INSERTION_SORT(written, written_i,
 		    WT_LOG_WRLSN_ENTRY, WT_WRLSN_ENTRY_CMP_LT);
 
@@ -511,20 +517,23 @@ __log_wrlsn_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	int locked;
+	int locked, yield;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	locked = 0;
+	locked = yield = 0;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		__wt_spin_lock(session, &log->log_slot_lock);
 		locked = 1;
-		WT_ERR(__wt_log_wrlsn(session, NULL));
+		WT_ERR(__wt_log_wrlsn(session, NULL, &yield));
 		locked = 0;
 		__wt_spin_unlock(session, &log->log_slot_lock);
-		WT_ERR(__wt_cond_wait(session,
-		    conn->log_wrlsn_cond, 1000));
+		if (++yield < 1000)
+			__wt_yield();
+		else
+			WT_ERR(__wt_cond_wait(session,
+			    conn->log_wrlsn_cond, 100000));
 	}
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");
