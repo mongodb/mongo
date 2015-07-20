@@ -153,6 +153,8 @@ namespace mongo {
         boost::scoped_ptr<WiredTigerSizeStorer> _sizeStorer;
         std::string _sizeStorerUri;
         mutable ElapsedTracker _sizeStorerSyncTracker;
+
+        mutable int64_t _previousCheckedDropsQueued;
     };
 
 }
