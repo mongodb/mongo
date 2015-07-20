@@ -33,7 +33,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/getmore_response.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/repl/replication_executor_test_fixture.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/memory.h"
@@ -46,7 +46,7 @@ namespace {
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
-class AsyncResultsMergerTest : public repl::ReplicationExecutorTest {
+class AsyncResultsMergerTest : public executor::ThreadPoolExecutorTest {
 public:
     AsyncResultsMergerTest()
         : _nss("testdb.testcoll"),
@@ -55,7 +55,7 @@ public:
                     HostAndPort("localhost", -3)}) {}
 
     void setUp() final {
-        ReplicationExecutorTest::setUp();
+        ThreadPoolExecutorTest::setUp();
         launchExecutorThread();
         executor = &getExecutor();
     }

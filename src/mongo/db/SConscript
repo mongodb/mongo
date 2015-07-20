@@ -646,8 +646,6 @@ serveronlyLibdeps = [
     "repl/repl_coordinator_global",
     "repl/repl_coordinator_impl",
     "repl/repl_settings",
-    "repl/replication_executor",
-    "repl/replication_executor",
     "repl/replset_commands",
     "repl/rs_rollback",
     "repl/rslog",

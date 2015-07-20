@@ -32,24 +32,41 @@
 
 #include "mongo/s/sharding_initialization.h"
 
+#include "mongo/base/status.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
+
+namespace {
+
+using executor::NetworkInterface;
+using executor::ThreadPoolTaskExecutor;
+
+std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
+    ThreadPool::Options tpOptions;
+    tpOptions.poolName = "ShardWork";
+    return stdx::make_unique<ThreadPoolTaskExecutor>(stdx::make_unique<ThreadPool>(tpOptions),
+                                                     std::move(net));
+}
+
+}  // namespace
 
 Status initializeGlobalShardingState(const ConnectionString& configCS) {
     auto network = executor::makeNetworkInterface();
     auto networkPtr = network.get();
-    auto shardRegistry(stdx::make_unique<ShardRegistry>(
-        stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
-        stdx::make_unique<repl::ReplicationExecutor>(network.release(), nullptr, 0),
-        networkPtr));
+    auto shardRegistry(
+        stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
+                                         makeTaskExecutor(std::move(network)),
+                                         networkPtr));
 
     auto catalogManager = stdx::make_unique<CatalogManagerLegacy>();
     Status status = catalogManager->init(configCS);

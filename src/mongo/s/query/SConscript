@@ -62,9 +62,8 @@ env.CppUnitTest(
         "async_results_merger_test.cpp",
     ],
     LIBDEPS=[
-        "async_results_merger",
-        # TODO dependencies shouldn't have repl
-        "$BUILD_DIR/mongo/db/repl/replication_executor_test_fixture",
         "$BUILD_DIR/mongo/db/query/lite_parsed_query",
+        "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
+        "async_results_merger",
     ],
 )

@@ -65,8 +65,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/coredb',
-        '$BUILD_DIR/mongo/db/repl/replication_executor',
         '$BUILD_DIR/third_party/shim_asio',
+        'task_executor_interface',
     ])
 
 env.Library(

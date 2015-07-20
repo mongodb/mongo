@@ -222,7 +222,7 @@ void NetworkInterfaceASIO::_networkErrorCallback(AsyncOp* op, const std::error_c
 }
 
 // NOTE: This method may only be called by ASIO threads
-// (do not call from methods entered by ReplicationExecutor threads)
+// (do not call from methods entered by TaskExecutor threads)
 void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus& resp) {
     op->finish(resp);
 

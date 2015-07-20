@@ -28,10 +28,10 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/client/connection_string.h"
-
 namespace mongo {
+
+class ConnectionString;
+class Status;
 
 /**
  * Takes in the connection string for reaching the config servers and initializes the global
