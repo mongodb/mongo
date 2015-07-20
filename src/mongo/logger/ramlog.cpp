@@ -73,7 +73,7 @@ void RamLog::write(const std::string& str) {
             memcpy(p, str.c_str(), sz - 1);
             p[sz - 1] = 0;
         } else
-            strcpy(p, str.c_str());
+            memcpy(p, str.c_str(), sz);
     } else {
         memcpy(p, str.c_str(), C - 1);
     }

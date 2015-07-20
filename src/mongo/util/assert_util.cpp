@@ -309,21 +309,4 @@ string ExceptionInfo::toString() const {
     ss << "exception: " << code << " " << msg;
     return ss.str();
 }
-
-NOINLINE_DECL ErrorMsg::ErrorMsg(const char* msg, char ch) {
-    int l = strlen(msg);
-    verify(l < 128);
-    memcpy(buf, msg, l);
-    char* p = buf + l;
-    p[0] = ch;
-    p[1] = 0;
-}
-
-NOINLINE_DECL ErrorMsg::ErrorMsg(const char* msg, unsigned val) {
-    int l = strlen(msg);
-    verify(l < 128);
-    memcpy(buf, msg, l);
-    char* p = buf + l;
-    sprintf(p, "%u", val);
-}
 }

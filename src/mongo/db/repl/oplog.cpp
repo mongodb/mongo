@@ -748,8 +748,8 @@ Status applyOperation_inlock(OperationContext* txn,
     } else if (*opType == 'n') {
         // no op
     } else {
-        throw MsgAssertionException(14825,
-                                    ErrorMsg("error in applyOperation : unknown opType ", *opType));
+        throw MsgAssertionException(
+            14825, str::stream() << "error in applyOperation : unknown opType " << *opType);
     }
 
     // AuthorizationManager's logOp method registers a RecoveryUnit::Change
