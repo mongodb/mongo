@@ -49,7 +49,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/s/d_state.h"
 
 namespace mongo {
 
@@ -211,8 +210,6 @@ Status WriteCmd::explain(OperationContext* txn,
         AutoGetDb autoDb(txn, request.getNS().db(), MODE_IX);
         Lock::CollectionLock colLock(txn->lockState(), request.getNS().ns(), MODE_IX);
 
-        ensureShardVersionOKOrThrow(txn->getClient(), request.getNS().ns());
-
         // Get a pointer to the (possibly NULL) collection.
         Collection* collection = NULL;
         if (autoDb.getDb()) {
@@ -248,8 +245,6 @@ Status WriteCmd::explain(OperationContext* txn,
         // info is more accurate.
         AutoGetDb autoDb(txn, request.getNS().db(), MODE_IX);
         Lock::CollectionLock colLock(txn->lockState(), request.getNS().ns(), MODE_IX);
-
-        ensureShardVersionOKOrThrow(txn->getClient(), request.getNS().ns());
 
         // Get a pointer to the (possibly NULL) collection.
         Collection* collection = NULL;
