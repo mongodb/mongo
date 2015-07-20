@@ -31,7 +31,6 @@
 #include <third_party/murmurhash3/MurmurHash3.h>
 
 #include <boost/intrusive_ptr.hpp>
-#include <bitset>
 
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/db/pipeline/value.h"
@@ -189,16 +188,9 @@ public:
           _usedBytes(0),
           _numFields(0),
           _hashTabMask(0),
-          _metaFields(),
+          _hasTextScore(false),
           _textScore(0) {}
     ~DocumentStorage();
-
-    enum MetaType : char {
-        TEXT_SCORE,
-        RAND_VAL,
-
-        NUM_FIELDS
-    };
 
     static const DocumentStorage& emptyDoc() {
         static const char emptyBytes[sizeof(DocumentStorage)] = {0};
@@ -278,31 +270,17 @@ public:
         if (source.hasTextScore()) {
             setTextScore(source.getTextScore());
         }
-        if (source.hasRandMetaField()) {
-            setRandMetaField(source.getRandMetaField());
-        }
     }
 
     bool hasTextScore() const {
-        return _metaFields.test(MetaType::TEXT_SCORE);
+        return _hasTextScore;
     }
     double getTextScore() const {
         return _textScore;
     }
     void setTextScore(double score) {
-        _metaFields.set(MetaType::TEXT_SCORE);
+        _hasTextScore = true;
         _textScore = score;
-    }
-
-    bool hasRandMetaField() const {
-        return _metaFields.test(MetaType::RAND_VAL);
-    }
-    int64_t getRandMetaField() const {
-        return _randVal;
-    }
-    void setRandMetaField(int64_t val) {
-        _metaFields.set(MetaType::RAND_VAL);
-        _randVal = val;
     }
 
 private:
@@ -383,9 +361,8 @@ private:
     unsigned _numFields;    // this includes removed fields
     unsigned _hashTabMask;  // equal to hashTabBuckets()-1 but used more often
 
-    std::bitset<MetaType::NUM_FIELDS> _metaFields;
+    bool _hasTextScore;  // When adding more metadata fields, this should become a bitvector
     double _textScore;
-    int64_t _randVal;
     // When adding a field, make sure to update clone() method
 };
 }

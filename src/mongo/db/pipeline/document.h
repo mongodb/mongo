@@ -201,14 +201,6 @@ public:
         return storage().getTextScore();
     }
 
-    static const StringData metaFieldRandVal;  // "$randVal"
-    bool hasRandMetaField() const {
-        return storage().hasRandMetaField();
-    }
-    int64_t getRandMetaField() const {
-        return storage().getRandMetaField();
-    }
-
     /// members for Sorter
     struct SorterDeserializeSettings {};  // unused
     void serializeForSorter(BufBuilder& buf) const;
@@ -427,10 +419,6 @@ public:
 
     void setTextScore(double score) {
         storage().setTextScore(score);
-    }
-
-    void setRandMetaField(int64_t val) {
-        storage().setRandMetaField(val);
     }
 
     /** Convert to a read-only document and release reference.

@@ -1851,45 +1851,23 @@ REGISTER_EXPRESSION(meta, ExpressionMeta::parse);
 intrusive_ptr<Expression> ExpressionMeta::parse(BSONElement expr,
                                                 const VariablesParseState& vpsIn) {
     uassert(17307, "$meta only supports String arguments", expr.type() == String);
-    if (expr.valueStringData() == "textScore") {
-        return new ExpressionMeta(MetaType::TEXT_SCORE);
-    } else if (expr.valueStringData() == "randVal") {
-        return new ExpressionMeta(MetaType::RAND_VAL);
-    } else {
-        uasserted(17308, "Unsupported argument to $meta: " + expr.String());
-    }
+    uassert(17308, "Unsupported argument to $meta: " + expr.String(), expr.String() == "textScore");
+
+    return new ExpressionMeta();
 }
 
-ExpressionMeta::ExpressionMeta(MetaType metaType) : _metaType(metaType) {}
-
 Value ExpressionMeta::serialize(bool explain) const {
-    switch (_metaType) {
-        case MetaType::TEXT_SCORE:
-            return Value(DOC("$meta"
-                             << "textScore"));
-        case MetaType::RAND_VAL:
-            return Value(DOC("$meta"
-                             << "randVal"));
-    }
-    MONGO_UNREACHABLE;
+    return Value(DOC("$meta"
+                     << "textScore"));
 }
 
 Value ExpressionMeta::evaluateInternal(Variables* vars) const {
     const Document& root = vars->getRoot();
-    switch (_metaType) {
-        case MetaType::TEXT_SCORE:
-            return root.hasTextScore() ? Value(root.getTextScore()) : Value();
-        case MetaType::RAND_VAL:
-            return root.hasRandMetaField() ? Value(static_cast<long long>(root.getRandMetaField()))
-                                           : Value();
-    }
-    MONGO_UNREACHABLE;
+    return root.hasTextScore() ? Value(root.getTextScore()) : Value();
 }
 
 void ExpressionMeta::addDependencies(DepsTracker* deps, vector<string>* path) const {
-    if (_metaType == MetaType::TEXT_SCORE) {
-        deps->needTextScore = true;
-    }
+    deps->needTextScore = true;
 }
 
 /* ------------------------- ExpressionMillisecond ----------------------------- */

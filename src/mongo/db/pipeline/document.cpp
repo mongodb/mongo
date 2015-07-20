@@ -193,9 +193,8 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
     out->_usedBytes = _usedBytes;
     out->_numFields = _numFields;
     out->_hashTabMask = _hashTabMask;
-    out->_metaFields = _metaFields;
+    out->_hasTextScore = _hasTextScore;
     out->_textScore = _textScore;
-    out->_randVal = _randVal;
 
     // Tell values that they have been memcpyed (updates ref counts)
     for (DocumentStorageIterator it = out->iteratorAll(); !it.atEnd(); it.advance()) {
@@ -245,15 +244,12 @@ BSONObj Document::toBson() const {
 }
 
 const StringData Document::metaFieldTextScore("$textScore", StringData::LiteralTag());
-const StringData Document::metaFieldRandVal("$randVal", StringData::LiteralTag());
 
 BSONObj Document::toBsonWithMetaData() const {
     BSONObjBuilder bb;
     toBson(&bb);
     if (hasTextScore())
         bb.append(metaFieldTextScore, getTextScore());
-    if (hasRandMetaField())
-        bb.append(metaFieldRandVal, static_cast<long long>(getRandMetaField()));
     return bb.obj();
 }
 
@@ -263,19 +259,15 @@ Document Document::fromBsonWithMetaData(const BSONObj& bson) {
     BSONObjIterator it(bson);
     while (it.more()) {
         BSONElement elem(it.next());
-        auto fieldName = elem.fieldNameStringData();
-        if (fieldName[0] == '$') {
-            if (fieldName == metaFieldTextScore) {
+        if (elem.fieldName()[0] == '$') {
+            if (elem.fieldNameStringData() == metaFieldTextScore) {
                 md.setTextScore(elem.Double());
-                continue;
-            } else if (fieldName == metaFieldRandVal) {
-                md.setRandMetaField(static_cast<int64_t>(elem.numberLong()));
                 continue;
             }
         }
 
         // Note: this will not parse out metadata in embedded documents.
-        md.addField(fieldName, Value(elem));
+        md.addField(elem.fieldNameStringData(), Value(elem));
     }
 
     return md.freeze();
@@ -433,14 +425,11 @@ void Document::serializeForSorter(BufBuilder& buf) const {
     }
 
     if (hasTextScore()) {
-        buf.appendNum(char(DocumentStorage::MetaType::TEXT_SCORE + 1));
+        buf.appendNum(char(1));
         buf.appendNum(getTextScore());
+    } else {
+        buf.appendNum(char(0));
     }
-    if (hasRandMetaField()) {
-        buf.appendNum(char(DocumentStorage::MetaType::RAND_VAL + 1));
-        buf.appendNum(static_cast<long long>(getRandMetaField()));
-    }
-    buf.appendNum(char(0));
 }
 
 Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
@@ -451,15 +440,8 @@ Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeS
         doc.addField(name, Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
     }
 
-    while (char marker = buf.read<char>()) {
-        if (marker == char(DocumentStorage::MetaType::TEXT_SCORE) + 1) {
-            doc.setTextScore(buf.read<double>());
-        } else if (marker == char(DocumentStorage::MetaType::RAND_VAL) + 1) {
-            doc.setRandMetaField(buf.read<int64_t>());
-        } else {
-            uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
-        }
-    }
+    if (buf.read<char>())  // hasTextScore
+        doc.setTextScore(buf.read<double>());
 
     return doc.freeze();
 }

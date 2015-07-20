@@ -795,16 +795,6 @@ public:
     void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
-
-private:
-    enum MetaType {
-        TEXT_SCORE,
-        RAND_VAL,
-    };
-
-    ExpressionMeta(MetaType metaType);
-
-    MetaType _metaType;
 };
 
 class ExpressionMillisecond final : public ExpressionFixedArity<ExpressionMillisecond, 1> {
