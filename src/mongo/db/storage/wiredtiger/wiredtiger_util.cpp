@@ -99,7 +99,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
 
 StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, StringData uri) {
     invariant(opCtx);
-    WiredTigerCursor curwrap("metadata:", WiredTigerSession::kMetadataTableId, false, opCtx);
+    WiredTigerCursor curwrap("metadata:create", WiredTigerSession::kMetadataTableId, false, opCtx);
     WT_CURSOR* cursor = curwrap.get();
     invariant(cursor);
     std::string strUri = uri.toString();
