@@ -102,6 +102,7 @@ namespace mongo {
         _freeList = INVALID_ID;
 
         _flagged.clear();
+        _idxIds.clear();
     }
 
     void WorkingSet::flagNewIdxId(const WorkingSetID& id) {
