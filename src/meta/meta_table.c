@@ -45,7 +45,7 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 	session->meta_dhandle = session->dhandle;
 	WT_ASSERT(session, session->meta_dhandle != NULL);
 
-	/* The meta_dhandle doesn't need to stay locked -- release it. */
+	/* The metadata handle doesn't need to stay locked -- release it. */
 	return (__wt_session_release_btree(session));
 }
 
@@ -59,9 +59,9 @@ __wt_metadata_cursor(
 {
 	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
+	int is_dead;
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_open_cursor), config, NULL };
-	int is_dead;
 
 	saved_dhandle = session->dhandle;
 	WT_ERR(__wt_metadata_open(session));
