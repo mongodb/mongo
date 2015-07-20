@@ -133,7 +133,7 @@ void ExpressionParams::parse2dsphereParams(const BSONObj& infoObj, S2IndexingPar
     static const std::string kFinestIndexedLevel("finestIndexedLevel");
     static const std::string kCoarsestIndexedLevel("coarsestIndexedLevel");
 
-    long long finestIndexedLevel, coarsestIndexedLevel, maxCellsInCovering, indexVersion;
+    long long indexVersion;
 
     // Determine which version of this index we're using.  If none was set in the descriptor,
     // assume S2_INDEX_VERSION_1 (alas, the first version predates the existence of the version
@@ -142,7 +142,6 @@ void ExpressionParams::parse2dsphereParams(const BSONObj& infoObj, S2IndexingPar
         infoObj, kIndexVersionFieldName, S2_INDEX_VERSION_1, &indexVersion);
 
     out->indexVersion = static_cast<S2IndexVersion>(indexVersion);
-
 
     // Note: In version > 2, these levels are for non-points.
     // Points are always indexed to the finest level.
@@ -157,6 +156,8 @@ void ExpressionParams::parse2dsphereParams(const BSONObj& infoObj, S2IndexingPar
         defaultCoarsestIndexedLevel = S2::kAvgEdge.GetClosestLevel(100.0 * 1000 / out->radius);
         defaultMaxCellsInCovering = 50;
     }
+
+    long long finestIndexedLevel, coarsestIndexedLevel, maxCellsInCovering;
 
     bsonExtractIntegerFieldWithDefault(
         infoObj, "finestIndexedLevel", defaultFinestIndexedLevel, &finestIndexedLevel);
