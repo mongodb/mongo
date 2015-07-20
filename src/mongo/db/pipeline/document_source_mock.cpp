@@ -1,5 +1,5 @@
 /**
- * Copyright 2011 (c) 10gen Inc.
+ * Copyright 2015 (c) MongoDB, Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -31,38 +31,64 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 
-
 namespace mongo {
 
 using boost::intrusive_ptr;
 
-boost::optional<Document> DocumentSourceBsonArray::getNext() {
-    pExpCtx->checkForInterrupt();
+DocumentSourceMock::DocumentSourceMock(std::deque<Document> docs)
+    : DocumentSource(NULL), queue(std::move(docs)) {}
 
-    if (!arrayIterator.more())
-        return boost::none;
-
-    return Document(arrayIterator.next().Obj());
+const char* DocumentSourceMock::getSourceName() const {
+    return "mock";
 }
 
-void DocumentSourceBsonArray::setSource(DocumentSource* pSource) {
-    /* this doesn't take a source */
-    verify(false);
+void DocumentSourceMock::setSource(DocumentSource* pSource) {
+    invariant(false);
 }
 
-DocumentSourceBsonArray::DocumentSourceBsonArray(const BSONObj& array,
-                                                 const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), embeddedObject(array), arrayIterator(embeddedObject) {}
-
-intrusive_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
-    const BSONObj& array, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    return new DocumentSourceBsonArray(array, pExpCtx);
+Value DocumentSourceMock::serialize(bool explain) const {
+    return Value(DOC(getSourceName() << Document()));
 }
 
-Value DocumentSourceBsonArray::serialize(bool explain) const {
-    if (explain) {
-        return Value(DOC("bsonArray" << Document()));
+void DocumentSourceMock::dispose() {
+    disposed = true;
+}
+
+intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(std::deque<Document> docs) {
+    return new DocumentSourceMock(std::move(docs));
+}
+
+intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create() {
+    return new DocumentSourceMock(std::deque<Document>());
+}
+
+intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(const Document& doc) {
+    std::deque<Document> docs = {doc};
+    return new DocumentSourceMock(std::move(docs));
+}
+
+intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(const char* json) {
+    return create(Document(fromjson(json)));
+}
+
+intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(
+    const std::initializer_list<const char*>& jsons) {
+    std::deque<Document> docs;
+    for (auto&& json : jsons) {
+        docs.push_back(Document(fromjson(json)));
     }
-    return Value();
+    return new DocumentSourceMock(std::move(docs));
+}
+
+boost::optional<Document> DocumentSourceMock::getNext() {
+    invariant(!disposed);
+
+    if (queue.empty()) {
+        return {};
+    }
+
+    Document doc = std::move(queue.front());
+    queue.pop_front();
+    return {std::move(doc)};
 }
 }

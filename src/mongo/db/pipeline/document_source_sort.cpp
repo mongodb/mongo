@@ -217,13 +217,10 @@ SortOptions DocumentSourceSort::makeSortOptions() const {
 void DocumentSourceSort::populate() {
     if (_mergingPresorted) {
         typedef DocumentSourceMergeCursors DSCursors;
-        typedef DocumentSourceCommandShards DSCommands;
         if (DSCursors* castedSource = dynamic_cast<DSCursors*>(pSource)) {
             populateFromCursors(castedSource->getCursors());
-        } else if (DSCommands* castedSource = dynamic_cast<DSCommands*>(pSource)) {
-            populateFromBsonArrays(castedSource->getArrays());
         } else {
-            msgasserted(17196, "can only mergePresorted from MergeCursors and CommandShards");
+            msgasserted(17196, "can only mergePresorted from MergeCursors");
         }
     } else {
         unique_ptr<MySorter> sorter(MySorter::make(makeSortOptions(), Comparator(*this)));
@@ -257,33 +254,6 @@ void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& curs
     vector<std::shared_ptr<MySorter::Iterator>> iterators;
     for (size_t i = 0; i < cursors.size(); i++) {
         iterators.push_back(std::make_shared<IteratorFromCursor>(this, cursors[i]));
-    }
-
-    _output.reset(MySorter::Iterator::merge(iterators, makeSortOptions(), Comparator(*this)));
-}
-
-class DocumentSourceSort::IteratorFromBsonArray : public MySorter::Iterator {
-public:
-    IteratorFromBsonArray(DocumentSourceSort* sorter, const BSONArray& array)
-        : _sorter(sorter), _iterator(array) {}
-
-    bool more() {
-        return _iterator.more();
-    }
-    Data next() {
-        Document doc(_iterator.next().Obj());
-        return make_pair(_sorter->extractKey(doc), doc);
-    }
-
-private:
-    DocumentSourceSort* _sorter;
-    BSONObjIterator _iterator;
-};
-
-void DocumentSourceSort::populateFromBsonArrays(const vector<BSONArray>& arrays) {
-    vector<std::shared_ptr<MySorter::Iterator>> iterators;
-    for (size_t i = 0; i < arrays.size(); i++) {
-        iterators.push_back(std::make_shared<IteratorFromBsonArray>(this, arrays[i]));
     }
 
     _output.reset(MySorter::Iterator::merge(iterators, makeSortOptions(), Comparator(*this)));
