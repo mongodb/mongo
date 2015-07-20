@@ -49,14 +49,11 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/chunk_manager_targeter.h"
-#include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
-#include "mongo/s/dbclient_shard_resolver.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
 #include "mongo/s/stale_exception.h"
@@ -397,85 +394,6 @@ void Strategy::commandOp(const string& db,
         result.result = cursor.getShardCursor(shardId)->peekFirst().getOwned();
         results->push_back(result);
     }
-}
-
-Status Strategy::commandOpWrite(const std::string& dbName,
-                                const BSONObj& command,
-                                BatchItemRef targetingBatchItem,
-                                std::vector<CommandResult>* results) {
-    // Note that this implementation will not handle targeting retries and does not completely
-    // emulate write behavior
-
-    ChunkManagerTargeter targeter(
-        NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()));
-    Status status = targeter.init();
-    if (!status.isOK())
-        return status;
-
-    OwnedPointerVector<ShardEndpoint> endpointsOwned;
-    vector<ShardEndpoint*>& endpoints = endpointsOwned.mutableVector();
-
-    if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
-        ShardEndpoint* endpoint;
-        Status status = targeter.targetInsert(targetingBatchItem.getDocument(), &endpoint);
-        if (!status.isOK())
-            return status;
-        endpoints.push_back(endpoint);
-    } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-        Status status = targeter.targetUpdate(*targetingBatchItem.getUpdate(), &endpoints);
-        if (!status.isOK())
-            return status;
-    } else {
-        invariant(targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete);
-        Status status = targeter.targetDelete(*targetingBatchItem.getDelete(), &endpoints);
-        if (!status.isOK())
-            return status;
-    }
-
-    DBClientShardResolver resolver;
-    DBClientMultiCommand dispatcher;
-
-    // Assemble requests
-    for (vector<ShardEndpoint*>::const_iterator it = endpoints.begin(); it != endpoints.end();
-         ++it) {
-        const ShardEndpoint* endpoint = *it;
-
-        ConnectionString host;
-        Status status = resolver.chooseWriteHost(endpoint->shardName, &host);
-        if (!status.isOK())
-            return status;
-
-        dispatcher.addCommand(host, dbName, command);
-    }
-
-    // Errors reported when recv'ing responses
-    dispatcher.sendAll();
-    Status dispatchStatus = Status::OK();
-
-    // Recv responses
-    while (dispatcher.numPending() > 0) {
-        ConnectionString host;
-        RawBSONSerializable response;
-
-        Status status = dispatcher.recvAny(&host, &response);
-        if (!status.isOK()) {
-            // We always need to recv() all the sent operations
-            dispatchStatus = status;
-            continue;
-        }
-
-        CommandResult result;
-        result.target = host;
-        {
-            const auto shard = grid.shardRegistry()->getShard(host.toString());
-            result.shardTargetId = shard->getId();
-        }
-        result.result = response.toBSON();
-
-        results->push_back(result);
-    }
-
-    return dispatchStatus;
 }
 
 Status Strategy::commandOpUnsharded(const std::string& db,

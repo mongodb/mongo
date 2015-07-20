@@ -1177,7 +1177,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
         unique_ptr<PlanStage> root =
             make_unique<CountStage>(txn, collection, request, ws.get(), nullptr);
         return PlanExecutor::make(
-            txn, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
+            txn, std::move(ws), std::move(root), request.getNs().ns(), yieldPolicy);
     }
 
     unique_ptr<CanonicalQuery> cq;
@@ -1185,7 +1185,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
         // If query or hint is not empty, canonicalize the query before working with collection.
         typedef MatchExpressionParser::WhereCallback WhereCallback;
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            request.getNs(),
+            request.getNs().ns(),
             request.getQuery(),
             BSONObj(),  // sort
             BSONObj(),  // projection
@@ -1212,7 +1212,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
         unique_ptr<PlanStage> root =
             make_unique<CountStage>(txn, collection, request, ws.get(), new EOFStage());
         return PlanExecutor::make(
-            txn, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
+            txn, std::move(ws), std::move(root), request.getNs().ns(), yieldPolicy);
     }
 
     invariant(cq.get());

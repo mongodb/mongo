@@ -30,7 +30,6 @@
 
 #include "mongo/db/query/count_request.h"
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -45,7 +44,7 @@ const char kHintField[] = "hint";
 }  // namespace
 
 CountRequest::CountRequest(const std::string& fullNs, BSONObj query)
-    : _fullNs(fullNs), _query(query.getOwned()) {}
+    : _nss(fullNs), _query(query.getOwned()) {}
 
 void CountRequest::setHint(BSONObj hint) {
     _hint = hint.getOwned();
@@ -54,7 +53,7 @@ void CountRequest::setHint(BSONObj hint) {
 BSONObj CountRequest::toBSON() const {
     BSONObjBuilder builder;
 
-    builder.append(kCmdName, _fullNs);
+    builder.append(kCmdName, _nss.ns());
     builder.append(kQueryField, _query);
 
     if (_limit) {

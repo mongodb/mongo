@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -49,9 +50,10 @@ public:
      */
     CountRequest(const std::string& fullNs, BSONObj query);
 
-    const std::string& getNs() const {
-        return _fullNs;
+    const NamespaceString& getNs() const {
+        return _nss;
     }
+
     const BSONObj getQuery() const {
         return _query;
     }
@@ -59,6 +61,7 @@ public:
     long long getLimit() const {
         return _limit.value_or(0);
     }
+
     void setLimit(long long limit) {
         _limit = limit;
     }
@@ -66,6 +69,7 @@ public:
     long long getSkip() const {
         return _skip.value_or(0);
     }
+
     void setSkip(long long skip) {
         _skip = skip;
     }
@@ -73,6 +77,7 @@ public:
     const BSONObj getHint() const {
         return _hint.value_or(BSONObj());
     }
+
     void setHint(BSONObj hint);
 
     /**
@@ -88,7 +93,7 @@ public:
 
 private:
     // Namespace to operate on (e.g. "foo.bar").
-    const std::string _fullNs;
+    const NamespaceString _nss;
 
     // A predicate describing the set of documents to count.
     const BSONObj _query;

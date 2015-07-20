@@ -71,20 +71,6 @@ public:
                           std::vector<CommandResult>* results);
 
     /**
-     * Executes a write command against a particular database, and targets the command based on
-     * a write operation.
-     *
-     * Does *not* retry or retarget if the metadata is stale.
-     *
-     * Similar to commandOp() above, but the targeting rules are different for writes than for
-     * reads.
-     */
-    static Status commandOpWrite(const std::string& db,
-                                 const BSONObj& command,
-                                 BatchItemRef targetingBatchItem,
-                                 std::vector<CommandResult>* results);
-
-    /**
      * Some commands can only be run in a sharded configuration against a namespace that has
      * not been sharded. Use this method to execute such commands.
      *

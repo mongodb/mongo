@@ -32,6 +32,7 @@
 #include "mongo/db/query/explain.h"
 
 namespace mongo {
+namespace {
 
 /**
  * Implements the explain command on mongos.
@@ -136,4 +137,5 @@ public:
 
 } cmdExplainCluster;
 
+}  // namespace
 }  // namespace mongo

@@ -47,7 +47,7 @@ TEST(CountRequest, ParseDefaults) {
 
     const CountRequest& countRequest = countRequestStatus.getValue();
 
-    ASSERT_EQUALS(countRequest.getNs(), "TestDB.TestColl");
+    ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
     ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
 
     // Defaults
@@ -68,7 +68,7 @@ TEST(CountRequest, ParseComplete) {
 
     const CountRequest& countRequest = countRequestStatus.getValue();
 
-    ASSERT_EQUALS(countRequest.getNs(), "TestDB.TestColl");
+    ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
     ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
     ASSERT_EQUALS(countRequest.getLimit(), 100);
     ASSERT_EQUALS(countRequest.getSkip(), 1000);
@@ -87,7 +87,7 @@ TEST(CountRequest, ParseNegativeLimit) {
 
     const CountRequest& countRequest = countRequestStatus.getValue();
 
-    ASSERT_EQUALS(countRequest.getNs(), "TestDB.TestColl");
+    ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
     ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
     ASSERT_EQUALS(countRequest.getLimit(), 100);
     ASSERT_EQUALS(countRequest.getSkip(), 1000);
