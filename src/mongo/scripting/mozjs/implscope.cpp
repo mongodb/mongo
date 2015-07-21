@@ -157,7 +157,10 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     auto scope = getScope(cx);
 
     if (scope->_pendingGC.load()) {
+        scope->_pendingGC.store(false);
         JS_GC(scope->_runtime);
+    } else {
+        JS_MaybeGC(cx);
     }
 
     bool kill = scope->isKillPending();

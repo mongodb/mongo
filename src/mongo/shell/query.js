@@ -360,6 +360,15 @@ DBQuery.prototype.itcount = function(){
     while ( this.hasNext() ){
         num++;
         this.next();
+
+        // This function can be called with some very large cursors.
+        // SpiderMonkey appears happy to allow these objects to accumulate, so
+        // regular gc() avoids an overly large memory footprint.
+        //
+        // TODO: migrate this function into c++
+        if (num % 10000 == 0) {
+            gc();
+        }
     }
     return num;
 }
