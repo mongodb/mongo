@@ -53,12 +53,11 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	/*
 	 * Allocate memory for buffers now that the arrays are setup. Split
 	 * this out to make error handling simpler.
-	 */
-	/*
+	 *
 	 * Cap the slot buffer to the log file size.
 	 */
-	log->slot_buf_size = (uint32_t)WT_MIN(
-	    conn->log_file_max, WT_LOG_SLOT_BUF_SIZE);
+	log->slot_buf_size =
+	    WT_MIN((size_t)conn->log_file_max, WT_LOG_SLOT_BUF_SIZE);
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		WT_ERR(__wt_buf_init(session,
 		    &log->slot_pool[i].slot_buf, log->slot_buf_size));
