@@ -317,7 +317,7 @@ void	 key_gen_setup(uint8_t **);
 void	 key_len_setup(void);
 void	*lrt(void *);
 void	 path_setup(const char *);
-int	 read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
+int	 read_row(WT_CURSOR *, WT_ITEM *, uint64_t, int);
 uint32_t rng(uint64_t *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen(uint64_t *, uint8_t *, size_t *, uint64_t);

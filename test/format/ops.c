@@ -474,7 +474,7 @@ skip_insert:			if (col_update(tinfo,
 			}
 		} else {
 			++tinfo->search;
-			if (read_row(cursor, &key, keyno))
+			if (read_row(cursor, &key, keyno, 0))
 				if (intxn)
 					goto deadlock;
 			continue;
@@ -497,7 +497,7 @@ skip_insert:			if (col_update(tinfo,
 
 		/* Read to confirm the operation. */
 		++tinfo->search;
-		if (read_row(cursor, &key, keyno))
+		if (read_row(cursor, &key, keyno, 0))
 			goto deadlock;
 
 		/* Reset the cursor: there is no reason to keep pages pinned. */
@@ -582,7 +582,7 @@ wts_read_scan(void)
 		}
 
 		key.data = keybuf;
-		if ((ret = read_row(cursor, &key, cnt)) != 0)
+		if ((ret = read_row(cursor, &key, cnt, 0)) != 0)
 			die(ret, "read_scan");
 	}
 
@@ -597,7 +597,7 @@ wts_read_scan(void)
  *	Read and verify a single element in a row- or column-store file.
  */
 int
-read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
+read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
 {
 	static int sn = 0;
 	WT_ITEM value;
@@ -633,18 +633,25 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		ret = cursor->search(cursor);
 		sn = 1;
 	}
-	if (ret == 0) {
+	switch (ret) {
+	case 0:
 		if (g.type == FIX) {
 			ret = cursor->get_value(cursor, &bitfield);
 			value.data = &bitfield;
 			value.size = 1;
 		} else
 			ret = cursor->get_value(cursor, &value);
-	}
-	if (ret == WT_ROLLBACK)
+		break;
+	case WT_ROLLBACK:
 		return (WT_ROLLBACK);
-	if (ret != 0 && ret != WT_NOTFOUND)
+	case WT_NOTFOUND:
+		if (notfound_err)
+			return (WT_NOTFOUND);
+		ret = 0;
+		break;
+	default:
 		die(ret, "read_row: read row %" PRIu64, keyno);
+	}
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)

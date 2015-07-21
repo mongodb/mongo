@@ -68,7 +68,8 @@ lrt(void *arg)
 	for (pinned = 0;;) {
 		if (pinned) {
 			/* Confirm the returned value hasn't changed. */
-			while (read_row(cursor, &key, keyno) == WT_ROLLBACK)
+			while ((ret = read_row(cursor,
+			    &key, keyno, 1)) == WT_ROLLBACK)
 				;
 			if (ret != 0)
 				die(ret, "read_row %" PRIu64, keyno);
@@ -97,7 +98,10 @@ lrt(void *arg)
 			 * snapshot.
 			 */
 			keyno = g.key_cnt - 10;
-			while (read_row(cursor, &key, keyno) == WT_ROLLBACK)
+			if (keyno > 1000)
+				keyno -= mmrand(NULL, 1, 200);
+			while ((ret = read_row(
+			    cursor, &key, keyno, 1)) == WT_ROLLBACK)
 				;
 			if (ret != 0)
 				die(ret, "read_row %" PRIu64, keyno);
@@ -121,7 +125,10 @@ lrt(void *arg)
 			 * hopefully allowing the page with the record just
 			 * retrieved to be evicted from memory.
 			 */
-			if (read_row(cursor, &key, (uint64_t)1))
+			while ((ret = read_row(
+			    cursor, &key, (uint64_t)1, 1)) == WT_ROLLBACK)
+				;
+			if (ret != 0)
 				die(ret, "cursor.search 1");
 
 			pinned = 1;
