@@ -37,6 +37,8 @@ __metadata_turtle(const char *key)
 int
 __wt_metadata_open(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
+
 	if (session->meta_dhandle != NULL)
 		return (0);
 
@@ -44,6 +46,15 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 
 	session->meta_dhandle = session->dhandle;
 	WT_ASSERT(session, session->meta_dhandle != NULL);
+
+	/* 
+	 * Set special flags for the metadata file.
+	 * Eviction; the metadata file is never evicted.
+	 * Logging; the metadata file is always logged if possible.
+	 */
+	btree = S2BT(session);
+	F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
+	F_CLR(btree, WT_BTREE_NO_LOGGING);
 
 	/* The metadata handle doesn't need to stay locked -- release it. */
 	return (__wt_session_release_btree(session));
