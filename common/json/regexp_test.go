@@ -228,5 +228,16 @@ func TestRegexpLiteral(t *testing.T) {
 			err := Unmarshal([]byte(data), &jsonMap)
 			So(err, ShouldNotBeNil)
 		})
+
+		Convey("cannot contain invalid escape sequences", func() {
+			var jsonMap map[string]interface{}
+
+			key := "key"
+			value := `/f\o\o/`
+			data := fmt.Sprintf(`{"%v":%v}`, key, value)
+
+			err := Unmarshal([]byte(data), &jsonMap)
+			So(err, ShouldNotBeNil)
+		})
 	})
 }
