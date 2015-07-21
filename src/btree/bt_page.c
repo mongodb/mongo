@@ -272,7 +272,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
 				size += sizeof(WT_REF);
 			}
 		if (0) {
-err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
+err:			if ((pindex = WT_INTL_INDEX_GET_SAFE(page)) != NULL) {
 				for (i = 0; i < pindex->entries; ++i)
 					__wt_free(session, pindex->index[i]);
 				__wt_free(session, pindex);
@@ -459,7 +459,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Walk the page, building references: the page contains value items.
 	 * The value items are on-page items (WT_CELL_VALUE).
 	 */
-	pindex = WT_INTL_INDEX_COPY(page);
+	pindex = WT_INTL_INDEX_GET_SAFE(page);
 	refp = pindex->index;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		ref = *refp++;
@@ -594,7 +594,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 * location cookie pairs.  Keys are on-page/overflow items and location
 	 * cookies are WT_CELL_ADDR_XXX items.
 	 */
-	pindex = WT_INTL_INDEX_COPY(page);
+	pindex = WT_INTL_INDEX_GET_SAFE(page);
 	refp = pindex->index;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		ref = *refp;

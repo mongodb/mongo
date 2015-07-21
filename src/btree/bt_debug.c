@@ -600,7 +600,7 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		__dmsg(ds, " recno %" PRIu64, page->pg_intl_recno);
-		pindex = WT_INTL_INDEX_COPY(page);
+		pindex = WT_INTL_INDEX_GET_SAFE(page);
 		entries = pindex->entries;
 		break;
 	case WT_PAGE_COL_FIX:
@@ -612,7 +612,7 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		entries = page->pg_var_entries;
 		break;
 	case WT_PAGE_ROW_INT:
-		pindex = WT_INTL_INDEX_COPY(page);
+		pindex = WT_INTL_INDEX_GET_SAFE(page);
 		entries = pindex->entries;
 		break;
 	case WT_PAGE_ROW_LEAF:

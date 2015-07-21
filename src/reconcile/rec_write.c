@@ -523,7 +523,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	}
 
 	WT_ASSERT(session, session->split_gen != 0);
-	pindex = WT_INTL_INDEX_COPY(next);
+	WT_INTL_INDEX_GET(session, next, pindex);
 	for (i = 0; i < mod->mod_multi_entries; ++i) {
 		WT_ERR(__wt_multi_to_ref(session,
 		    next, &mod->mod_multi[i], &pindex->index[i], NULL));
@@ -2961,7 +2961,7 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 		    "bulk-load is only possible for newly created trees");
 
 	/* Get a reference to the empty leaf page. */
-	pindex = WT_INTL_INDEX_COPY(btree->root.page);
+	pindex = WT_INTL_INDEX_GET_SAFE(btree->root.page);
 	cbulk->ref = pindex->index[0];
 	cbulk->leaf = cbulk->ref->page;
 

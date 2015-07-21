@@ -422,7 +422,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		    __wt_page_alloc(session, WT_PAGE_COL_INT, 1, 1, 1, &root));
 		root->pg_intl_parent_ref = &btree->root;
 
-		pindex = WT_INTL_INDEX_COPY(root);
+		pindex = WT_INTL_INDEX_GET_SAFE(root);
 		ref = pindex->index[0];
 		ref->home = root;
 		ref->page = NULL;
@@ -435,7 +435,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		    __wt_page_alloc(session, WT_PAGE_ROW_INT, 0, 1, 1, &root));
 		root->pg_intl_parent_ref = &btree->root;
 
-		pindex = WT_INTL_INDEX_COPY(root);
+		pindex = WT_INTL_INDEX_GET_SAFE(root);
 		ref = pindex->index[0];
 		ref->home = root;
 		ref->page = NULL;

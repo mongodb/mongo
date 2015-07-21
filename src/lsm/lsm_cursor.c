@@ -132,10 +132,11 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	hard_limit = F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH) ? 1 : 0;
 
 	if (have_primary) {
+		WT_ENTER_PAGE_INDEX(session);
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
-		    ovfl = __wt_btree_size_overflow(
-		    session, hard_limit ?
+		    ovfl = __wt_btree_lsm_size(session, hard_limit ?
 		    2 * lsm_tree->chunk_size : lsm_tree->chunk_size));
+		WT_LEAVE_PAGE_INDEX(session);
 
 		/* If there was no overflow, we're done. */
 		if (!ovfl)
