@@ -1114,6 +1114,11 @@ static void shutdownServer() {
     stdx::thread close_socket_thread(stdx::bind(MessagingPort::closeAllSockets, 0));
     close_socket_thread.detach();
 
+    // We drop the scope cache because leak sanitizer can't see across the
+    // thread we use for proxying MozJS requests. Dropping the cache cleans up
+    // the memory and makes leak sanitizer happy.
+    ScriptEngine::dropScopeCache();
+
     getGlobalServiceContext()->shutdownGlobalStorageEngineCleanly();
 }
 

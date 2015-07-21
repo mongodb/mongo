@@ -345,6 +345,12 @@ public:
         return std::shared_ptr<Scope>();
     }
 
+    void clear() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+        _pools.clear();
+    }
+
 private:
     struct ScopeAndPool {
         std::shared_ptr<Scope> scope;
@@ -362,6 +368,10 @@ private:
 
 ScopeCache scopeCache;
 }  // anonymous namespace
+
+void ScriptEngine::dropScopeCache() {
+    scopeCache.clear();
+}
 
 class PooledScope : public Scope {
 public:

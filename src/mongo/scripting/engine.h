@@ -239,6 +239,7 @@ public:
     virtual bool utf8Ok() const = 0;
 
     static void setup();
+    static void dropScopeCache();
 
     /** gets a scope from the pool or a new one if pool is empty
      * @param db The db name
