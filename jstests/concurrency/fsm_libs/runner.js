@@ -348,6 +348,17 @@ var runner = (function() {
 
         try {
             var schedule = scheduleWorkloads(workloads, executionMode, executionOptions);
+
+            // Print out the entire schedule of workloads to make it easier to run the same
+            // schedule when debugging test failures.
+            jsTest.log('The entire schedule of FSM workloads:');
+
+            // Note: We use printjsononeline (instead of just plain printjson) to make it
+            // easier to reuse the output in variable assignments.
+            printjsononeline(schedule);
+
+            jsTest.log('End of schedule');
+
             schedule.forEach(function(workloads) {
                 var cleanup = [];
                 var errors = [];
