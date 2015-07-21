@@ -172,7 +172,7 @@ extern int __wt_row_ikey_alloc(WT_SESSION_IMPL *session, uint32_t cell_offset, c
 extern int __wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t cell_offset, const void *key, size_t size, WT_REF *ref);
 extern int __wt_row_ikey(WT_SESSION_IMPL *session, uint32_t cell_offset, const void *key, size_t size, WT_REF *ref);
 extern int __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, WT_ITEM *value, WT_UPDATE *upd, int is_remove);
+extern int __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, WT_ITEM *value, WT_UPDATE *upd_arg, int is_remove);
 extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session, WT_ITEM *key, u_int skipdepth, WT_INSERT **insp, size_t *ins_sizep);
 extern int __wt_update_alloc( WT_SESSION_IMPL *session, WT_ITEM *value, WT_UPDATE **updp, size_t *sizep);
 extern WT_UPDATE *__wt_update_obsolete_check( WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd);
@@ -244,6 +244,7 @@ extern int __wt_las_search(WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *valu
 extern int __wt_las_remove(WT_SESSION_IMPL *session, WT_ITEM *key);
 extern int __wt_las_remove_block( WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size);
 extern int __wt_log_truncate_files( WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[]);
+extern int __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i, int *yield);
 extern int __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_logmgr_open(WT_SESSION_IMPL *session);
 extern int __wt_logmgr_destroy(WT_SESSION_IMPL *session);

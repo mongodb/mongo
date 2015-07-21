@@ -221,6 +221,7 @@ struct __wt_connection_stats {
 	WT_STATS log_scan_rereads;
 	WT_STATS log_scans;
 	WT_STATS log_slot_closes;
+	WT_STATS log_slot_coalesced;
 	WT_STATS log_slot_consolidated;
 	WT_STATS log_slot_joins;
 	WT_STATS log_slot_races;
