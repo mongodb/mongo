@@ -1022,16 +1022,37 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * Evicting, there are still two ways to continue forward: if we skipped
 	 * updates we can save/restore them, that is, evict most of the page and
 	 * then create a new, smaller page where we re-instantiate the skipped
-	 * updates. If we didn't skip updates, but there were updates that were
-	 * not yet visible to all readers in the system, we write those updates
-	 * into the lookaside store, restoring them as necessary if the page is
-	 * read back into cache. The simple case is when there were no skipped
-	 * items: we must copy the update list, but there are no special cases
-	 * or additional work to do.
+	 * updates.
+	 *
+	 * If we didn't skip updates, but there were updates not yet visible to
+	 * all readers in the system, we write those updates into the lookaside
+	 * store, restoring them if the page is read back into cache.
 	 */
 	if (!skipped) {
+		/*
+		 * The lookaside file is a special case, it can't store records
+		 * for itself.
+		 */
 		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
 			return (EBUSY);
+
+		/*
+		 * If no update is globally visible, saving the update list is
+		 * not enough, we have to save the existing entry on the page.
+		 * If there's no existing entry on the page, fail because we
+		 * can't write anything at all, this entry doesn't exist for
+		 * some reader of the system.
+		 */
+		if (!__wt_txn_visible_all(session, min_txn)) {
+			*updp = NULL;
+			if (ins != NULL)
+				return (EBUSY);
+		}
+
+		/*
+		 * There were no skipped items: we must copy the update list,
+		 * but there are no special cases or additional work to do.
+		 */
 		goto save_update_list;
 	}
 
