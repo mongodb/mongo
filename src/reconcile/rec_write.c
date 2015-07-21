@@ -3096,6 +3096,7 @@ static int
 __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 {
 	WT_BTREE *btree;
+	WT_CURSOR *cursor;
 	WT_DECL_ITEM(key);
 	WT_DECL_ITEM(klas);
 	WT_DECL_ITEM(vlas);
@@ -3107,12 +3108,16 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 	uint64_t recno;
 	uint32_t counter, i, keylen, slot;
 	uint8_t *counterp;
+	int clear;
 	void *p;
 
 	btree = S2BT(session);
+	cursor = NULL;
 	page = r->page;
 	counter = 0;
 	counterp = NULL;		/* [-Werror=maybe-uninitialized] */
+
+	WT_ERR(__wt_las_cursor(session, &cursor, &clear));
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_scr_alloc(session, 0, &klas));
@@ -3238,11 +3243,15 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 			WT_ASSERT(session, WT_PTRDIFF(p, vlas->mem) == len);
 
 			/* Insert into the lookaside store. */
-			WT_ERR(__wt_las_insert(session, klas, vlas));
+			cursor->set_key(cursor, klas);
+			cursor->set_value(cursor, vlas);
+			WT_ERR(cursor->insert(cursor));
 		} while ((upd = upd->next) != NULL);
 	}
 
-err:	__wt_scr_free(session, &key);
+err:	WT_TRET(__wt_las_cursor_close(session, &cursor, clear));
+
+	__wt_scr_free(session, &key);
 	__wt_scr_free(session, &klas);
 	__wt_scr_free(session, &vlas);
 
