@@ -1058,21 +1058,19 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
 }
 
 /**
- * Returns true if indices contains an index that can be
- * used with DistinctNode. Sets indexOut to the array index
- * of PlannerParams::indices.
- * Look for the index for the fewest fields.
- * Criteria for suitable index is that the index cannot be special
- * (geo, hashed, text, ...).
+ * Returns true if indices contains an index that can be used with DistinctNode (the "fast distinct
+ * hack" node, which can be used only if there is an empty query predicate).  Sets indexOut to the
+ * array index of PlannerParams::indices.  Look for the index for the fewest fields.  Criteria for
+ * suitable index is that the index cannot be special (geo, hashed, text, ...), and the index cannot
+ * be a partial index.
  *
- * Multikey indices are not suitable for DistinctNode when the projection
- * is on an array element. Arrays are flattened in a multikey index which
- * makes it impossible for the distinct scan stage (plan stage generated from
- * DistinctNode) to select the requested element by array index.
+ * Multikey indices are not suitable for DistinctNode when the projection is on an array element.
+ * Arrays are flattened in a multikey index which makes it impossible for the distinct scan stage
+ * (plan stage generated from DistinctNode) to select the requested element by array index.
  *
- * Multikey indices cannot be used for the fast distinct hack if the field is dotted.
- * Currently the solution generated for the distinct hack includes a projection stage and
- * the projection stage cannot be covered with a dotted field.
+ * Multikey indices cannot be used for the fast distinct hack if the field is dotted.  Currently the
+ * solution generated for the distinct hack includes a projection stage and the projection stage
+ * cannot be covered with a dotted field.
  */
 bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
                           const std::string& field,
@@ -1083,6 +1081,10 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
     for (size_t i = 0; i < indices.size(); ++i) {
         // Skip special indices.
         if (!IndexNames::findPluginName(indices[i].keyPattern).empty()) {
+            continue;
+        }
+        // Skip partial indices.
+        if (indices[i].filterExpr) {
             continue;
         }
         // Skip multikey indices if we are projecting on a dotted field.
@@ -1330,10 +1332,10 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     QueryPlannerParams plannerParams;
     plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
 
-    // TODO Need to check if query is compatible with any partial indexes.  SERVER-17854.
     IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(txn, false);
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
+        IndexCatalogEntry* ice = ii.catalogEntry(desc);
         // The distinct hack can work if any field is in the index but it's not always clear
         // if it's a win unless it's the first field.
         if (desc->keyPattern().firstElement().fieldName() == field) {
@@ -1343,7 +1345,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
                                                        desc->isSparse(),
                                                        desc->unique(),
                                                        desc->indexName(),
-                                                       NULL,
+                                                       ice->getFilterExpression(),
                                                        desc->infoObj()));
         }
     }
