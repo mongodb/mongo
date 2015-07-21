@@ -84,7 +84,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     // Check if testName is an object, if so, pull params from there
     var keyFile = undefined
-    var numConfigs = 1;
+    var numConfigs = 2;
     otherParams = Object.merge( otherParams || {}, {} )
 
     if( isObject( testName ) ){
@@ -98,7 +98,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         numShards = otherParams.shards || 2
         verboseLevel = otherParams.verbose || 0
         numMongos = otherParams.mongos || 1
-        numConfigs = otherParams.config || 1;
+        numConfigs = otherParams.config || numConfigs;
 
         var tempCount = 0;
         
@@ -312,7 +312,6 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     }
     else {
         // Using replica set for config servers
-        assert.eq(1, numConfigs);
 
         var rstOptions = { useHostName : otherParams.useHostname,
                            startPort : 29000,

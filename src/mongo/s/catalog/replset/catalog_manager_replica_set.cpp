@@ -85,7 +85,7 @@ namespace {
 // Until read committed is supported always write to the primary with majority write and read
 // from the secondary. That way we ensure that reads will see a consistent data.
 const ReadPreferenceSetting kConfigWriteSelector(ReadPreference::PrimaryOnly, TagSet{});
-const ReadPreferenceSetting kConfigReadSelector(ReadPreference::PrimaryOnly, TagSet{});
+const ReadPreferenceSetting kConfigReadSelector(ReadPreference::SecondaryPreferred, TagSet{});
 
 const int kNotMasterNumRetries = 3;
 const int kInitialSSVRetries = 3;

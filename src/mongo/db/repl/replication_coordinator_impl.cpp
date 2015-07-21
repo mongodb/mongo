@@ -1044,7 +1044,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
     const OpTime& opTime,
     const WriteConcernOptions& writeConcern) {
     const Mode replMode = getReplicationMode();
-    if (replMode == modeNone || serverGlobalParams.configsvr) {
+    if (replMode == modeNone) {
         // no replication check needed (validated above)
         return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
     }
