@@ -552,6 +552,7 @@ bool MozJSImplScope::exec(StringData code,
 
     JS::CompileOptions co(_context);
     setCompileOptions(&co);
+    co.setFile(name.c_str());
     JS::RootedScript script(_context);
 
     bool success = JS::Compile(_context, _global, co, code.rawData(), code.size(), &script);
