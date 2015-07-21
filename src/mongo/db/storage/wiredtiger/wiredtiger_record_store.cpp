@@ -1190,6 +1190,8 @@ void WiredTigerRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
     while (auto record = cursor.next()) {
         RecordId loc = record->id;
         if (end < loc || (inclusive && end == loc)) {
+            if (_cappedDeleteCallback)
+                uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, loc, record->data));
             deleteRecord(txn, loc);
         }
     }
