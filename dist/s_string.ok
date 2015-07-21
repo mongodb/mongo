@@ -509,6 +509,7 @@ dmsg
 doxgen
 doxygen
 ds
+dsb
 dsk
 dsrc
 dst
@@ -652,6 +653,7 @@ las
 latencies
 lbrace
 lbracket
+ld
 len
 lenp
 level's
@@ -902,6 +904,7 @@ subtree
 sunique
 superset
 sw
+sy
 sys
 t's
 tV
