@@ -217,7 +217,7 @@ add_option('wiredtiger',
 js_engine_choices = ['v8-3.12', 'v8-3.25', 'mozjs', 'none']
 add_option('js-engine',
     choices=js_engine_choices,
-    default=js_engine_choices[0],
+    default=js_engine_choices[2],
     help='JavaScript scripting engine implementation',
     type='choice',
 )
