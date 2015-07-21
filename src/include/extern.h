@@ -242,7 +242,6 @@ extern int __wt_las_create(WT_SESSION_IMPL *session);
 extern int __wt_las_destroy(WT_SESSION_IMPL *session);
 extern int __wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *clearp);
 extern int __wt_las_cursor_close(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int clear);
-extern int __wt_las_insert(WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value);
 extern int __wt_log_truncate_files( WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[]);
 extern int __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i, int *yield);
 extern int __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[]);
