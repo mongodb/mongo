@@ -653,6 +653,9 @@ __rec_write_init(WT_SESSION_IMPL *session,
 		F_SET(&r->dsk, WT_ITEM_ALIGNED);
 	}
 
+	/* Reconciliation is not re-entrant, make sure that doesn't happen. */
+	WT_ASSERT(session, r->ref == NULL);
+
 	/* Remember the configuration. */
 	r->ref = ref;
 	r->page = page;
@@ -791,6 +794,9 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 
 	if (r->bnd == NULL)
 		return;
+
+	/* Reconciliation is not re-entrant, make sure that doesn't happen. */
+	r->ref = NULL;
 
 	/*
 	 * Free the boundary structures' memory.  In the case of normal cleanup,
