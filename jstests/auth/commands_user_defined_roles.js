@@ -178,7 +178,6 @@ function createUsers(conn) {
 
 var opts = {
     auth:"",
-    enableExperimentalIndexStatsCmd: "",
     enableExperimentalStorageDetailsCmd: ""
 }
 var impls = {

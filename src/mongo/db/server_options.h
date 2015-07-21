@@ -117,8 +117,7 @@ struct ServerGlobalParams {
      * Switches to enable experimental (unsupported) features.
      */
     struct ExperimentalFeatures {
-        ExperimentalFeatures() : indexStatsCmdEnabled(false), storageDetailsCmdEnabled(false) {}
-        bool indexStatsCmdEnabled;      // -- enableExperimentalIndexStatsCmd
+        ExperimentalFeatures() : storageDetailsCmdEnabled(false) {}
         bool storageDetailsCmdEnabled;  // -- enableExperimentalStorageDetailsCmd
     } experimental;
 

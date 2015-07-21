@@ -56,7 +56,6 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".getPlanCache() get query plan cache associated with collection");
     print("\tdb." + shortName + ".getIndexes()");
     print("\tdb." + shortName + ".group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
-    // print("\tdb." + shortName + ".indexStats({expandNodes: [<expanded child numbers>}, <detailed: t/f>) - output aggregate/per-depth btree bucket stats");
     print("\tdb." + shortName + ".insert(obj)");
     print("\tdb." + shortName + ".mapReduce( mapFunction , reduceFunction , <optional params> )");
     print("\tdb." + shortName + ".aggregate( [pipeline], <optional params> ) - performs an aggregation on a collection; returns a cursor");
@@ -73,7 +72,6 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
     print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool]) - instead of two flags, you can pass an object with fields: upsert, multi");
     print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
-    // print("\tdb." + shortName + ".getIndexStats({expandNodes: [<expanded child numbers>}, <detailed: t/f>) - same as .indexStats but prints a human readable summary of the output");
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
     print("\tdb." + shortName + ".getSplitKeysForChunks( <maxChunkSize> ) - calculates split points over all chunks and returns splitter function");
@@ -876,131 +874,6 @@ DBCollection.prototype.getPagesInRAM = function(params) {
         }
     } else {
         printExtent(stats, "range " + stats.range);
-    }
-}
-
-DBCollection.prototype.indexStats = function(params) {
-    var cmd = { indexStats: this.getName() };
-
-    if (typeof(params) == 'object') // support arbitrary options here
-        Object.extend(cmd, params);
-
-    var res = this._db.runCommand(cmd);
-    if (!res.ok && res.errmsg.match(/no such cmd/)) {
-        print("this command requires starting mongod with --enableExperimentalIndexStatsCmd");
-    }
-    return res;
-}
-
-DBCollection.prototype.getIndexStats = function(params, detailed) {
-    var stats = this.indexStats(params);
-    if (!stats.ok) {
-        print("error executing indexStats command: " + tojson(stats));
-        return;
-    }
-
-    print("-- index \"" + stats.index + "\" --");
-    print("  version " + stats.version + " | key pattern " +
-          tojsononeline(stats.keyPattern) + (stats.isIdIndex ? " [id index]" : "") +
-          " | storage namespace \"" + stats.storageNs + "\"");
-    print("  " + stats.depth + " deep, bucket body is " + stats.bucketBodyBytes + " bytes");
-    print();
-    if (detailed) {
-        print("  **  min |-- .02 quant --- 1st quartile [=== median ===] 3rd quartile --- " +
-              ".98 quant --| max  **  ");
-        print();
-    }
-
-    // format a number rounding to three decimal figures
-    var fnum = function(n) {
-        return n.toFixed(3);
-    }
-
-    var formatBoxPlot = function(st) {
-        var out = "";
-        if (st.count == 0) return "no samples";
-        out += "avg. " + fnum(st.mean);
-        if (st.count == 1) return out;
-        out += " | stdev. " + fnum(st.stddev);
-
-        var quant = function(st, prob) {
-            return st.quantiles["" + prob].toFixed(3);
-        }
-        if (st.quantiles) {
-            out += "\t" + fnum(st.min) + " |-- " + quant(st, 0.02) + " --- " + quant(st, 0.25) +
-                   " [=== " + quant(st, 0.5) + " ===] " + quant(st, 0.75) + " --- " +
-                   quant(st, 0.98) + " --| " + fnum(st.max) + " ";
-        }
-        return out;
-    }
-
-    var formatStats = function(indent, nd) {
-        var out = "";
-        out += indent + "bucket count\t" + nd.numBuckets
-                      + "\ton average " + fnum(nd.fillRatio.mean * 100) + " %"
-                      + " (±" + fnum((nd.fillRatio.stddev) * 100) + " %) full"
-                      + "\t" + fnum(nd.bsonRatio.mean * 100) + " %"
-                      + " (±" + fnum((nd.bsonRatio.stddev) * 100) + " %) bson keys, "
-                      + fnum(nd.keyNodeRatio.mean * 100) + " %"
-                      + " (±" + fnum((nd.keyNodeRatio.stddev) * 100) + " %) key nodes\n";
-        if (detailed) {
-            out += indent + "\n";
-            out += indent + "key count\t" + formatBoxPlot(nd.keyCount) + "\n";
-            out += indent + "used keys\t" + formatBoxPlot(nd.usedKeyCount) + "\n";
-            out += indent + "space occupied by (ratio of bucket)\n";
-            out += indent + "  key nodes\t" + formatBoxPlot(nd.keyNodeRatio) + "\n";
-            out += indent + "  key objs \t" + formatBoxPlot(nd.bsonRatio) + "\n";
-            out += indent + "  used     \t" + formatBoxPlot(nd.fillRatio) + "\n";
-        }
-        return out;
-    }
-
-    print(formatStats("  ", stats.overall));
-    print();
-
-    for (var d = 0; d <= stats.depth; ++d) {
-        print("  -- depth " + d + " --");
-        print(formatStats("    ", stats.perLevel[d]));
-    }
-
-    if (stats.expandedNodes) {
-        print("\n-- expanded nodes --\n");
-        for (var d = 0; d < stats.expandedNodes.length - 1; ++d) {
-            var node;
-            if (d == 0) {
-                node = stats.expandedNodes[0][0];
-                print("  -- root -- ");
-            } else {
-                node = stats.expandedNodes[d][params.expandNodes[d]];
-                print("  -- node # " + params.expandNodes[d] + " at depth " +
-                      node.nodeInfo.depth + " -- ");
-            }
-            print("    " + (node.nodeInfo.firstKey ? tojsononeline(node.nodeInfo.firstKey) : "") + " -> " +
-                  (node.nodeInfo.lastKey ? tojsononeline(node.nodeInfo.lastKey) : ""));
-            print("    " + node.nodeInfo.keyCount + " keys (" + node.nodeInfo.keyCount + " used)" +
-                  "\tat diskloc " + tojsononeline(node.nodeInfo.diskLoc));
-            print("    ");
-            print("    subtree stats, excluding node");
-            print(formatStats("      ", node));
-
-            if (detailed) {
-                print("    children (: % full, subtree % full)");
-                var children = "      ";
-                for (var k = 0; k < stats.expandedNodes[d + 1].length; ++k) {
-                    var node = stats.expandedNodes[d + 1][k];
-                    if (node.nodeInfo != undefined) {
-                        children += node.nodeInfo.childNum + ": " +
-                                    (node.nodeInfo.fillRatio * 100).toFixed(1) + ", " +
-                                    (node.fillRatio.mean * 100).toFixed(1) + " | ";
-                    } else {
-                        children += k + ": - | ";
-                    }
-                    if (k != 0 && k % 5 == 0) children += "\n      ";
-                }
-                print(children);
-                print(" ");
-            }
-        }
     }
 }
 

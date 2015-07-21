@@ -130,7 +130,6 @@ var db;
                                                     'mr_replaceIntoDB|' +
                                                     'mr_auth|' +
                                                     'queryoptimizera|' +
-                                                    'indexStatsCommand|' +
                                                     'storageDetailsCommand|' +
                                                     'reversecursor|' +
                                                     'stages.*|' +

@@ -1440,34 +1440,6 @@ var authCommandsLib = {
                 }
             ]
         },
-/*      temporarily removed see SERVER-13555 
-        {
-            testname: "indexStats",
-            command: {indexStats: "x", index: "a_1"},
-            skipSharded: true, 
-            setup: function (db) {
-                db.x.save({a: 10});
-                db.x.ensureIndex({a: 1});
-            },
-            teardown: function (db) { db.x.drop(); },
-            testcases: [
-                {
-                    runOnDb: firstDbName,
-                    roles: roles_dbAdmin,
-                    privileges: [
-                        { resource: {db: firstDbName, collection: "x"}, actions: ["indexStats"] }
-                    ]
-                },
-                {
-                    runOnDb: secondDbName,
-                    roles: roles_dbAdminAny,
-                    privileges: [
-                        { resource: {db: secondDbName, collection: "x"}, actions: ["indexStats"] }
-                    ]
-                }
-            ]
-        },
-*/
         {
             testname: "isMaster",
             command: {isMaster: 1},

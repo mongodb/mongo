@@ -146,7 +146,6 @@ function checkForNonExistentRoles() {
 
 var opts = {
     auth:"",
-    enableExperimentalIndexStatsCmd: "",
     enableExperimentalStorageDetailsCmd: ""
 }
 var impls = {

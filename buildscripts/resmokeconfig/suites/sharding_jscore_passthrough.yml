@@ -39,7 +39,6 @@ selector:
     - jstests/core/bench_test*.js
     - jstests/core/mr_replaceIntoDB.js
     - jstests/core/queryoptimizera.js
-    - jstests/core/indexStatsCommand.js
     - jstests/core/storageDetailsCommand.js
     - jstests/core/stages*.js
     - jstests/core/top.js

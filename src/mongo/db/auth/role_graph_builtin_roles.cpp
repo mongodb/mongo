@@ -140,8 +140,8 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::dropCollection
         << ActionType::dropDatabase  // clusterAdmin gets this also TODO(spencer): should
                                      // readWriteAnyDatabase?
-        << ActionType::dropIndex << ActionType::createIndex << ActionType::indexStats
-        << ActionType::enableProfiler << ActionType::listCollections << ActionType::listIndexes
+        << ActionType::dropIndex << ActionType::createIndex << ActionType::enableProfiler
+        << ActionType::listCollections << ActionType::listIndexes
         << ActionType::planCacheIndexFilter << ActionType::planCacheRead
         << ActionType::planCacheWrite << ActionType::reIndex
         << ActionType::renameCollectionSameDB  // read_write gets this also

@@ -363,14 +363,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                                moe::Switch,
                                "log stack traces for every exception").hidden();
 
-    options->addOptionChaining("enableExperimentalIndexStatsCmd",
-                               "enableExperimentalIndexStatsCmd",
-                               moe::Switch,
-                               "EXPERIMENTAL (UNSUPPORTED). "
-                               "Enable command computing aggregate statistics on indexes.")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
-
     options->addOptionChaining("enableExperimentalStorageDetailsCmd",
                                "enableExperimentalStorageDetailsCmd",
                                moe::Switch,
@@ -755,10 +747,6 @@ Status storeServerOptions(const moe::Environment& params, const std::vector<std:
         }
     }
 
-    if (params.count("enableExperimentalIndexStatsCmd")) {
-        serverGlobalParams.experimental.indexStatsCmdEnabled =
-            params["enableExperimentalIndexStatsCmd"].as<bool>();
-    }
     if (params.count("enableExperimentalStorageDetailsCmd")) {
         serverGlobalParams.experimental.storageDetailsCmdEnabled =
             params["enableExperimentalStorageDetailsCmd"].as<bool>();
