@@ -150,12 +150,11 @@ setup_truncate(CONFIG *cfg,
 	size_t i;
 	uint64_t end_point_val, final_milestone_gap, start_point_val;
 
-	ret = 0;
 	end_point_val = final_milestone_gap = start_point_val = 0;
 
 	/* We are limited to only one table when running truncate */
-	ret = session->open_cursor(session, cfg->uris[0], NULL, NULL, &cursor);
-	if (ret != 0)
+	if ((ret = session->open_cursor(
+	    session, cfg->uris[0], NULL, NULL, &cursor)) != 0)
 		goto err;
 
 	/* Truncation percentage value. eg 10% is 0.1 */
@@ -178,35 +177,29 @@ setup_truncate(CONFIG *cfg,
 	 * data available, then we need to setup some initial truncation
 	 * milestones.
 	 */
-	ret = cursor->next(cursor);
-	if (ret == 0)
-		ret = cursor->get_key(cursor, &key);
-
-	/* We have data */
-	if (ret == 0) {
-		start_point_val = decode_key(key);
-		cursor->reset(cursor);
-		if ((ret = cursor->prev(cursor)) != 0) {
-			lprintf(cfg, ret, 0, "truncate setup end: prev failed");
-			goto err;
-		}
-		if ((ret = cursor->get_key(cursor, &key)) != 0) {
-			lprintf(cfg, ret, 0,
-			    "truncate setup end: get_key failed");
-			goto err;
-		}
-		end_point_val = decode_key(key);
-		/* Not enough documents? */
-		if (start_point_val + trunc->needed_milestones > end_point_val)
-			trunc->truncate_milestone_gap = 0;
-		else
-			trunc->truncate_milestone_gap =
-			    (end_point_val - start_point_val)
-			    / trunc->needed_milestones;
-	} else if (ret != WT_NOTFOUND) {
-		lprintf(cfg, ret, 0, "truncate setup start: get_key failed");
+	if ((ret = cursor->next(cursor)) != 0 ||
+	    (ret = cursor->get_key(cursor, &key)) != 0) {
+		lprintf(cfg, ret, 0, "truncate setup start: failed");
 		goto err;
 	}
+
+	/* We have data */
+	start_point_val = decode_key(key);
+	cursor->reset(cursor);
+	if ((ret = cursor->prev(cursor)) != 0 ||
+	    (ret = cursor->get_key(cursor, &key)) != 0) {
+		lprintf(cfg, ret, 0, "truncate setup end: failed");
+		goto err;
+	}
+	end_point_val = decode_key(key);
+
+	/* Not enough documents? */
+	if (start_point_val + trunc->needed_milestones > end_point_val)
+		trunc->truncate_milestone_gap = 0;
+	else
+		trunc->truncate_milestone_gap =
+		    (end_point_val - start_point_val) /
+		    trunc->needed_milestones;
 
 	/* If we have enough data allocate some milestones */
 	if (trunc->truncate_milestone_gap != 0) {
@@ -231,8 +224,8 @@ setup_truncate(CONFIG *cfg,
 		}
 	}
 	trunc->truncate_milestone_gap = final_milestone_gap;
-err:
-	cursor->close(cursor);
+
+err:	cursor->close(cursor);
 	return (ret);
 }
 
