@@ -87,8 +87,6 @@ namespace {
 
     const std::string kWiredTigerEngineName = "wiredTiger";
 
-    const long long WiredTigerRecordStore::kCollectionScanOnCreationThreshold = 10000;
-
     StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj options) {
         StringBuilder ss;
         BSONForEach(elem, options) {
@@ -232,9 +230,8 @@ namespace {
                 _dataSize.store( dataSize );
                 _sizeStorer->onCreate( this, numRecords, dataSize );
             }
-
-            if (_sizeStorer == NULL || _numRecords.load() < kCollectionScanOnCreationThreshold) {
-                LOG(1) << "doing scan of collection " << ns << " to get info";
+            else {
+                LOG(1) << "Doing scan of collection " << ns << " to get size and count info"
 
                 _numRecords.store(0);
                 _dataSize.store(0);
