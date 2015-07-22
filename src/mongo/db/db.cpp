@@ -731,7 +731,12 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 #endif
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
+MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
+#if MONGO_CONFIG_SSL
+                                     ("SetGlobalEnvironment", "SSLManager"))
+#else
+                                     ("SetGlobalEnvironment"))
+#endif
 (InitializerContext* context) {
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         getGlobalReplSettings(),

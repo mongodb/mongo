@@ -32,7 +32,6 @@
 
 #include "mongo/executor/network_interface_asio.h"
 
-#include <type_traits>
 #include <utility>
 
 #include "mongo/db/dbmessage.h"
@@ -54,43 +53,25 @@ namespace executor {
 namespace {
 
 using asio::ip::tcp;
+using NetworkOpHandler = stdx::function<void(std::error_code, size_t)>;
 
-// A type conforms to the NetworkHandler concept if it is a callable type that takes a
-// std::error_code and std::size_t and returns void. The std::error_code parameter is used
-// to inform the handler if the asynchronous operation it was waiting on succeeded, and the size_t
-// parameter conveys how many bytes were read or written.
-template <typename FunctionLike>
-using IsNetworkHandler =
-    std::is_convertible<FunctionLike, stdx::function<void(std::error_code, std::size_t)>>;
-
-template <typename Handler>
-void asyncSendMessage(AsyncStreamInterface& stream, Message* m, Handler&& handler) {
-    static_assert(IsNetworkHandler<Handler>::value,
-                  "Handler passed to asyncSendMessage does not conform to NetworkHandler concept");
+// TODO: Consider templatizing on handler here to avoid using stdx::functions.
+void asyncSendMessage(tcp::socket& sock, Message* m, NetworkOpHandler handler) {
     // TODO: Some day we may need to support vector messages.
     fassert(28708, m->buf() != 0);
-    stream.write(asio::buffer(m->buf(), m->size()), std::forward<Handler>(handler));
+    asio::const_buffer buf(m->buf(), m->size());
+    asio::async_write(sock, asio::buffer(buf), handler);
 }
 
-template <typename Handler>
-void asyncRecvMessageHeader(AsyncStreamInterface& stream,
-                            MSGHEADER::Value* header,
-                            Handler&& handler) {
-    static_assert(
-        IsNetworkHandler<Handler>::value,
-        "Handler passed to asyncRecvMessageHeader does not conform to NetworkHandler concept");
-    stream.read(asio::buffer(header->view().view2ptr(), sizeof(decltype(*header))),
-                std::forward<Handler>(handler));
+void asyncRecvMessageHeader(tcp::socket& sock, MSGHEADER::Value* header, NetworkOpHandler handler) {
+    asio::async_read(
+        sock, asio::buffer(header->view().view2ptr(), sizeof(MSGHEADER::Value)), handler);
 }
 
-template <typename Handler>
-void asyncRecvMessageBody(AsyncStreamInterface& stream,
+void asyncRecvMessageBody(tcp::socket& sock,
                           MSGHEADER::Value* header,
                           Message* m,
-                          Handler&& handler) {
-    static_assert(
-        IsNetworkHandler<Handler>::value,
-        "Handler passed to asyncRecvMessageBody does not conform to NetworkHandler concept");
+                          NetworkOpHandler handler) {
     // TODO: This error code should be more meaningful.
     std::error_code ec;
 
@@ -118,7 +99,7 @@ void asyncRecvMessageBody(AsyncStreamInterface& stream,
     invariant(bodyLength >= 0);
 
     // receive remaining data into md->data
-    stream.read(asio::buffer(mdView.data(), bodyLength), std::forward<Handler>(handler));
+    asio::async_read(sock, asio::buffer(mdView.data(), bodyLength), handler);
 }
 
 }  // namespace
@@ -183,7 +164,7 @@ std::unique_ptr<Message> NetworkInterfaceASIO::_messageFromRequest(
 
 void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
     auto negotiatedProtocol =
-        rpc::negotiate(op->connection().serverProtocols(), op->connection().clientProtocols());
+        rpc::negotiate(op->connection()->serverProtocols(), op->connection()->clientProtocols());
 
     if (!negotiatedProtocol.isOK()) {
         return _completeOperation(op, negotiatedProtocol.getStatus());
@@ -283,7 +264,7 @@ void NetworkInterfaceASIO::_asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler 
         }
 
         asyncRecvMessageBody(
-            cmd->conn().stream(), &cmd->header(), &cmd->toRecv(), std::move(recvMessageCallback));
+            cmd->conn().sock(), &cmd->header(), &cmd->toRecv(), std::move(recvMessageCallback));
     };
 
     // Step 2
@@ -292,11 +273,11 @@ void NetworkInterfaceASIO::_asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler 
         if (ec)
             return handler(ec, bytes);
 
-        asyncRecvMessageHeader(cmd->conn().stream(), &cmd->header(), std::move(recvHeaderCallback));
+        asyncRecvMessageHeader(cmd->conn().sock(), &cmd->header(), std::move(recvHeaderCallback));
     };
 
     // Step 1
-    asyncSendMessage(cmd->conn().stream(), &cmd->toSend(), std::move(sendMessageCallback));
+    asyncSendMessage(cmd->conn().sock(), &cmd->toSend(), std::move(sendMessageCallback));
 }
 
 }  // namespace executor

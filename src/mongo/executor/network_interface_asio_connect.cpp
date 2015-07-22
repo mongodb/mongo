@@ -34,59 +34,23 @@
 
 #include <utility>
 
-#include "mongo/config.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
-
-#ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
-#endif
 
 namespace mongo {
 namespace executor {
 
 using asio::ip::tcp;
 
-class NetworkInterfaceASIO::AsyncStream final : public AsyncStreamInterface {
-public:
-    // TODO: after we get rid of the bootstrap connection path, change this constructor
-    // to take the io_service instead to more closely match AsyncSecureStream
-    AsyncStream(tcp::socket&& stream) : _stream(std::move(stream)) {}
-
-    void connect(const tcp::resolver::iterator iter, ConnectHandler&& connectHandler) override {
-        asio::async_connect(
-            _stream,
-            std::move(iter),
-            // We need to wrap this with a lambda of the right signature so it compiles, even
-            // if we don't actually use the resolver iterator.
-            [this, connectHandler](std::error_code ec, tcp::resolver::iterator) {
-                return connectHandler(ec);
-            });
-    }
-
-    void write(asio::const_buffer buffer, StreamHandler&& streamHandler) override {
-        asio::async_write(_stream, asio::buffer(buffer), std::move(streamHandler));
-    }
-
-    void read(asio::mutable_buffer buffer, StreamHandler&& streamHandler) override {
-        asio::async_read(_stream, asio::buffer(buffer), std::move(streamHandler));
-    }
-
-private:
-    tcp::socket _stream;
-};
-
-NetworkInterfaceASIO::AsyncConnection::AsyncConnection(std::unique_ptr<AsyncStreamInterface> stream,
+NetworkInterfaceASIO::AsyncConnection::AsyncConnection(asio::ip::tcp::socket&& sock,
                                                        rpc::ProtocolSet protocols)
-    : AsyncConnection(std::move(stream), protocols, boost::none) {}
+    : AsyncConnection(std::move(sock), protocols, boost::none) {}
 
 NetworkInterfaceASIO::AsyncConnection::AsyncConnection(
-    std::unique_ptr<AsyncStreamInterface> stream,
+    asio::ip::tcp::socket&& sock,
     rpc::ProtocolSet protocols,
     boost::optional<ConnectionPool::ConnectionPtr>&& bootstrapConn)
-    : _stream(std::move(stream)),
+    : _sock(std::move(sock)),
       _serverProtocols(protocols),
       _bootstrapConn(std::move(bootstrapConn)) {}
 
@@ -105,8 +69,8 @@ NetworkInterfaceASIO::AsyncConnection& NetworkInterfaceASIO::AsyncConnection::op
 }
 #endif
 
-AsyncStreamInterface& NetworkInterfaceASIO::AsyncConnection::stream() {
-    return *_stream;
+asio::ip::tcp::socket& NetworkInterfaceASIO::AsyncConnection::sock() {
+    return _sock;
 }
 
 rpc::ProtocolSet NetworkInterfaceASIO::AsyncConnection::serverProtocols() const {
@@ -125,24 +89,11 @@ void NetworkInterfaceASIO::_connectASIO(AsyncOp* op) {
     tcp::resolver::query query(op->request().target.host(),
                                std::to_string(op->request().target.port()));
     // TODO: Investigate how we might hint or use shortcuts to resolve when possible.
-    const auto thenConnect = [this, op](std::error_code ec, tcp::resolver::iterator endpoints) {
-        _validateAndRun(op,
-                        ec,
-                        [this, op, endpoints]() {
-
-#ifdef MONGO_CONFIG_SSL
-            int sslModeVal = getSSLGlobalParams().sslMode.load();
-            if (sslModeVal == SSLParams::SSLMode_preferSSL ||
-                sslModeVal == SSLParams::SSLMode_requireSSL) {
-                invariant(_sslContext.is_initialized());
-                return _setupSecureSocket(op, std::move(endpoints));
-            }
-#endif
-            _setupSocket(op, std::move(endpoints));
-
-                        });
-    };
-    _resolver.async_resolve(query, std::move(thenConnect));
+    _resolver.async_resolve(
+        query,
+        [this, op](std::error_code ec, asio::ip::basic_resolver_iterator<tcp> endpoints) {
+            _validateAndRun(op, ec, [this, op, endpoints]() { _setupSocket(op, endpoints); });
+        });
 }
 
 void NetworkInterfaceASIO::_connectWithDBClientConnection(AsyncOp* op) {
@@ -153,24 +104,7 @@ void NetworkInterfaceASIO::_connectWithDBClientConnection(AsyncOp* op) {
             // - we cannot get a new connection from the pool
             // - we get a connection from the pool, but cannot use it
             // - we fail to transfer the connection's socket to an ASIO wrapper
-            // TODO(amidvidy): why is this hardcoded to 1 second? That seems too low.
-            ConnectionPool::ConnectionPtr conn(
-                _connPool.get(), op->request().target, now(), Milliseconds(1000));
-
-            // TODO: Add a case here for unix domain sockets.
-            int protocol = conn.get()->port().localAddr().getType();
-            if (protocol != AF_INET && protocol != AF_INET6) {
-                throw SocketException(SocketException::CONNECT_ERROR, "Unsupported family");
-            }
-
-            tcp::socket sock{_io_service,
-                             protocol == AF_INET ? tcp::v4() : tcp::v6(),
-                             conn.get()->port().psock->rawFD()};
-
-            op->setConnection(AsyncConnection(stdx::make_unique<AsyncStream>(std::move(sock)),
-                                              conn.get()->getServerRPCProtocols(),
-                                              std::move(conn)));
-
+            op->connect(_connPool.get(), &_io_service, now());
         } catch (...) {
             LOG(3) << "failed to connect, posting mock completion";
 
@@ -192,17 +126,18 @@ void NetworkInterfaceASIO::_connectWithDBClientConnection(AsyncOp* op) {
     t.detach();
 }
 
-void NetworkInterfaceASIO::_setupSocket(AsyncOp* op, const tcp::resolver::iterator endpoints) {
+void NetworkInterfaceASIO::_setupSocket(AsyncOp* op, const tcp::resolver::iterator& endpoints) {
+    tcp::socket sock(_io_service);
+    AsyncConnection conn(std::move(sock), rpc::supports::kOpQueryOnly);
+
     // TODO: Consider moving this call to post-auth so we only assign completed connections.
-    op->setConnection(AsyncConnection(stdx::make_unique<AsyncStream>(tcp::socket{_io_service}),
-                                      rpc::supports::kOpQueryOnly));
+    op->setConnection(std::move(conn));
 
-    auto& stream = op->connection().stream();
-
-    stream.connect(std::move(endpoints),
-                   [this, op](std::error_code ec) {
-                       _validateAndRun(op, ec, [this, op]() { _authenticate(op); });
-                   });
+    asio::async_connect(op->connection()->sock(),
+                        std::move(endpoints),
+                        [this, op](std::error_code ec, tcp::resolver::iterator iter) {
+                            _validateAndRun(op, ec, [this, op]() { _sslHandshake(op); });
+                        });
 }
 
 }  // namespace executor

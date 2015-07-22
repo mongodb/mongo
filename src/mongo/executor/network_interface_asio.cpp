@@ -34,13 +34,10 @@
 
 #include <utility>
 
-#include "mongo/config.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
-
-#include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
 namespace executor {
@@ -48,18 +45,6 @@ namespace executor {
 NetworkInterfaceASIO::NetworkInterfaceASIO()
     : _io_service(), _resolver(_io_service), _state(State::kReady), _isExecutorRunnable(false) {
     _connPool = stdx::make_unique<ConnectionPool>(kMessagingPortKeepOpen);
-
-#if MONGO_CONFIG_SSL
-    if (getSSLManager()) {
-        // We use sslv23, which corresponds to OpenSSLs SSLv23_method, for compatibility with older
-        // versions of OpenSSL. This mirrors the call to SSL_CTX_new in ssl_manager.cpp. In
-        // initAsyncSSLContext we explicitly disable all protocols other than TLSv1, TLSv1.1,
-        // and TLSv1.2.
-        _sslContext.emplace(asio::ssl::context::sslv23);
-        uassertStatusOK(
-            getSSLManager()->initSSLContext(_sslContext->native_handle(), getSSLGlobalParams()));
-    }
-#endif
 }
 
 std::string NetworkInterfaceASIO::getDiagnosticString() {
