@@ -63,11 +63,11 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	    session, WT_LASFILE_URI, NULL, open_cursor_cfg, &conn->las_cursor));
 
 	/*
-	 * No cache checks.
+	 * No eviction.
 	 * No lookaside records during reconciliation.
 	 * No checkpoints or logging.
 	 */
-	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
+	F_SET(session, WT_SESSION_NO_EVICTION);
 	F_SET(S2BT(session),
 	    WT_BTREE_LAS_FILE | WT_BTREE_NO_CHECKPOINT | WT_BTREE_NO_LOGGING);
 
@@ -112,12 +112,13 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
  *	Return a lookaside cursor.
  */
 int
-__wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *clearp)
+__wt_las_cursor(
+    WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *saved_flagsp)
 {
 	WT_CONNECTION_IMPL *conn;
 
 	*cursorp = NULL;
-	*clearp = 0;
+	*saved_flagsp = session->flags;
 
 	conn = S2C(session);
 
@@ -127,8 +128,7 @@ __wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *clearp)
 
 	__wt_spin_lock(session, &conn->las_lock);
 
-	*clearp = F_ISSET(session, WT_SESSION_NO_CACHE_CHECK) ? 0 : 1;
-	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
+	F_SET(session, WT_SESSION_NO_EVICTION);
 
 	*cursorp = conn->las_cursor;
 
@@ -140,7 +140,8 @@ __wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *clearp)
  *	Discard a lookaside cursor.
  */
 int
-__wt_las_cursor_close(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int clear)
+__wt_las_cursor_close(
+	WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t saved_flags)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
@@ -151,9 +152,7 @@ __wt_las_cursor_close(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int clear)
 	if ((cursor = *cursorp) == NULL)
 		return (0);
 	*cursorp = NULL;
-
-	if (clear)
-		F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
+	session->flags = saved_flags;
 
 	/* Reset the cursor. */
 	ret = cursor->reset(cursor);

@@ -3127,9 +3127,8 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 	WT_UPD_SKIPPED *list;
 	size_t len;
 	uint64_t recno;
-	uint32_t counter, i, keylen, slot;
+	uint32_t counter, i, keylen, saved_flags, slot;
 	uint8_t *counterp;
-	int clear;
 	void *p;
 
 	btree = S2BT(session);
@@ -3138,7 +3137,7 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 	counter = 0;
 	counterp = NULL;		/* [-Werror=maybe-uninitialized] */
 
-	WT_ERR(__wt_las_cursor(session, &cursor, &clear));
+	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_scr_alloc(session, 0, &klas));
@@ -3260,7 +3259,7 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 		} while ((upd = upd->next) != NULL);
 	}
 
-err:	WT_TRET(__wt_las_cursor_close(session, &cursor, clear));
+err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
 
 	__wt_scr_free(session, &key);
 	__wt_scr_free(session, &klas);

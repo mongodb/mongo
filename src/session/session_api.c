@@ -1028,7 +1028,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * operations, but checkpoint does enough I/O it may be called upon to
 	 * perform slow operations for the block manager.
 	 */
-	F_SET(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
+	F_SET(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
 
 	/*
 	 * Only one checkpoint can be active at a time, and checkpoints must run
@@ -1043,7 +1043,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
 
-err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
+err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
 
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }

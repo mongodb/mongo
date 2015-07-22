@@ -414,7 +414,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	 * ourselves to get stuck creating bloom filters, the entire tree
 	 * can stall since there may be no worker threads available to flush.
 	 */
-	F_SET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
+	F_SET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		WT_ERR(src->get_key(src, &key));
 		WT_ERR(__wt_bloom_insert(bloom, &key));
@@ -448,7 +448,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 err:	if (bloom != NULL)
 		WT_TRET(__wt_bloom_close(bloom));
-	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
+	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 	return (ret);
 }
 
