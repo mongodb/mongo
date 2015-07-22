@@ -56,13 +56,13 @@ NetworkInterfaceASIO::AsyncConnection::AsyncConnection(
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
 NetworkInterfaceASIO::AsyncConnection::AsyncConnection(AsyncConnection&& other)
-    : _sock(std::move(other._sock)),
+    : _stream(std::move(other._stream)),
       _serverProtocols(other._serverProtocols),
       _clientProtocols(other._clientProtocols) {}
 
 NetworkInterfaceASIO::AsyncConnection& NetworkInterfaceASIO::AsyncConnection::operator=(
     AsyncConnection&& other) {
-    _sock = std::move(other._sock);
+    _stream = std::move(other._stream);
     _serverProtocols = other._serverProtocols;
     _clientProtocols = other._clientProtocols;
     return *this;
