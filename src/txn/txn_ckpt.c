@@ -1191,19 +1191,23 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 	}
 
 	/*
-	 * If closing a modified file, checkpoint the file and optionally flush
-	 * the writes (the checkpoint call will discard the blocks, there's no
-	 * additional step needed).
-	 *
 	 * We should already have the schema lock unless we're finishing a bulk
 	 * load -- the only other paths to closing files (sweep and LSM) have
 	 * already checked for read-only trees.
 	 */
-	if (!final)
-		WT_ASSERT(session,
-		    bulk || F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
+	WT_ASSERT(session,
+	    final || bulk || F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 
-	need_tracking = !bulk && !final && !WT_META_TRACKING(session);
+	/*
+	 * Turn on metadata tracking if:
+	 * * The session isn't already doing metadata tracking
+	 * * The file isn't bulk loadable
+	 * * The close isn't during connection close or the update is for the
+	 *   metadata file itself (when we need to track to ensure durability).
+	 */
+	need_tracking = !WT_META_TRACKING(session) && !bulk &&
+	   (!final || WT_IS_METADATA(session->dhandle));
+
 	if (need_tracking)
 		WT_RET(__wt_meta_track_on(session));
 
