@@ -1274,9 +1274,6 @@ namespace {
         while( !iter->isEOF() ) {
             RecordId loc = iter->getNext();
             if ( end < loc || ( inclusive && end == loc ) ) {
-                if (_cappedDeleteCallback)
-                    uassertStatusOK(
-                        _cappedDeleteCallback->aboutToDeleteCapped(txn, loc, dataFor(txn, loc)));
                 deleteRecord( txn, loc );
             }
         }
