@@ -230,7 +230,7 @@ namespace {
                 _dataSize.store( dataSize );
                 _sizeStorer->onCreate( this, numRecords, dataSize );
             } else {
-                LOG(1) << "Doing scan of collection " << ns << " to get size and count info"
+                LOG(1) << "Doing scan of collection " << ns << " to get size and count info";
 
                 _numRecords.store(0);
                 _dataSize.store(0);
