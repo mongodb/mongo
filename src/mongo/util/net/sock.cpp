@@ -516,7 +516,7 @@ bool Socket::secure(SSLManagerInterface* mgr, const std::string& remoteHost) {
     }
     _sslManager = mgr;
     _sslConnection.reset(_sslManager->connect(this));
-    mgr->parseAndValidatePeerCertificate(_sslConnection.get(), remoteHost);
+    mgr->parseAndValidatePeerCertificateDeprecated(_sslConnection.get(), remoteHost);
     return true;
 }
 
@@ -534,7 +534,7 @@ std::string Socket::doSSLHandshake(const char* firstBytes, int len) {
                                   remoteString());
     }
     _sslConnection.reset(_sslManager->accept(this, firstBytes, len));
-    return _sslManager->parseAndValidatePeerCertificate(_sslConnection.get(), "");
+    return _sslManager->parseAndValidatePeerCertificateDeprecated(_sslConnection.get(), "");
 }
 #endif
 
