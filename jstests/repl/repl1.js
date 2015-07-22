@@ -6,7 +6,7 @@ soonCount = function( count ) {
     assert.soon( function() { 
 //                print( "check count" );
 //                print( "count: " + s.getDB( baseName ).z.find().count() );
-                return s.getDB( baseName ).a.find().count() == count; 
+                return s.getDB( baseName ).a.find().itcount() == count; 
                 } );    
 }
 
@@ -45,7 +45,7 @@ doTest = function( signal ) {
     for( i = 1010; i < 1020; ++i )
         am.save( { _id: new ObjectId(), i: i } );
 
-    assert.soon( function() { return as.find().count() == 1020; } );
+    assert.soon( function() { return as.find().itcount() == 1020; } );
     assert.eq( 1, as.find( { i: 1019 } ).count() );
 
     assert.automsg( "m.getDB( 'local' ).getCollection( 'oplog.$main' ).stats().size > 0" );
