@@ -68,7 +68,8 @@ namespace {
 void addJournalSyncForWMajority(WriteConcernOptions* writeConcern) {
     if (repl::getGlobalReplicationCoordinator()->isV1ElectionProtocol() &&
         writeConcern->wMode == WriteConcernOptions::kMajority &&
-        writeConcern->syncMode == WriteConcernOptions::NONE) {
+        writeConcern->syncMode == WriteConcernOptions::NONE &&
+        getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()) {
         writeConcern->syncMode = WriteConcernOptions::JOURNAL;
     }
 }

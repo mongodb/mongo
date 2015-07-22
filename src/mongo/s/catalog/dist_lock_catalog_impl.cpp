@@ -142,7 +142,10 @@ DistLockCatalogImpl::DistLockCatalogImpl(ShardRegistry* shardRegistry,
                                          Milliseconds writeConcernTimeout)
     : _client(shardRegistry),
       _writeConcern(WriteConcernOptions(WriteConcernOptions::kMajority,
-                                        WriteConcernOptions::JOURNAL,
+                                        // Note: Even though we're setting NONE here,
+                                        // kMajority implies JOURNAL, if journaling is supported
+                                        // by this mongod.
+                                        WriteConcernOptions::NONE,
                                         writeConcernTimeout.count())),
       _lockPingNS(LockpingsType::ConfigNS),
       _locksNS(LocksType::ConfigNS) {}
