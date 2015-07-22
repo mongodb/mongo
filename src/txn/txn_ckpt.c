@@ -538,7 +538,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * this isn't a full checkpoint since checkpointing the metadata
 	 * updates the start LSN for recovery.
 	 */
-	if (full || !logging) { 
+	if (full || !logging) {
 		/*
 		 * If any tree was dirty, we will have updated the metadata
 		 * with the new checkpoint information.  If the metadata is
