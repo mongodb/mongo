@@ -105,19 +105,20 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t checkpoint_snap_min, oldest_id;
-	uint32_t checkpoint_id;
+	uint64_t checkpoint_gen, checkpoint_pinned, oldest_id;
 
 	txn_global = &S2C(session)->txn_global;
 	btree = S2BT_SAFE(session);
 
 	/*
 	 * Take a local copy of these IDs in case they are updated while we are
-	 * checking visibility.
+	 * checking visibility.  Only the generation needs to be carefully
+	 * ordered: if a checkpoint is starting and the generation is bumped,
+	 * we take the minimum of the other two IDs, which is what we want.
 	 */
-	checkpoint_id = txn_global->checkpoint_id;
-	checkpoint_snap_min = txn_global->checkpoint_snap_min;
 	oldest_id = txn_global->oldest_id;
+	WT_ORDERED_READ(checkpoint_gen, txn_global->checkpoint_gen);
+	checkpoint_pinned = txn_global->checkpoint_pinned;
 
 	/*
 	 * Checkpoint transactions often fall behind ordinary application
@@ -129,17 +130,13 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 * checkpoint, or this handle is up to date with the active checkpoint
 	 * then it's safe to ignore the checkpoint ID in the visibility check.
 	 */
-	if (checkpoint_snap_min != WT_TXN_NONE &&
-	    checkpoint_id != session->id && (btree == NULL ||
-	    btree->checkpoint_gen != txn_global->checkpoint_gen) &&
-	    WT_TXNID_LT(checkpoint_snap_min, oldest_id))
-		/*
-		 * Use the checkpoint ID for the visibility check if it is the
-		 * oldest ID in the system.
-		 */
-		oldest_id = checkpoint_snap_min;
+	if (checkpoint_pinned == WT_TXN_NONE ||
+	    WT_TXNID_LT(oldest_id, checkpoint_pinned) ||
+	    WT_SESSION_IS_CHECKPOINT(session) ||
+	    (btree != NULL && btree->checkpoint_gen == checkpoint_gen))
+		return (oldest_id);
 
-	return (oldest_id);
+	return (checkpoint_pinned);
 }
 
 /*
@@ -355,7 +352,7 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 	if (!F_ISSET(txn, WT_TXN_HAS_ID)) {
 		conn = S2C(session);
 		txn_global = &conn->txn_global;
-		txn_state = &txn_global->states[session->id];
+		txn_state = WT_SESSION_TXN_STATE(session);
 
 		WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 
@@ -447,7 +444,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 	txn_global = &S2C(session)->txn_global;
-	txn_state = &txn_global->states[session->id];
+	txn_state = WT_SESSION_TXN_STATE(session);
 
 	/*
 	 * If there is no transaction running (so we don't have an ID), and no

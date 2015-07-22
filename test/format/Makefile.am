@@ -8,7 +8,7 @@ endif
 noinst_PROGRAMS = t
 noinst_SCRIPTS = s_dumpcmp
 t_SOURCES =\
-	config.h format.h backup.c bulk.c compact.c config.c ops.c \
+	config.h format.h backup.c bulk.c compact.c config.c lrt.c ops.c \
 	salvage.c t.c util.c wts.c
 
 if HAVE_BERKELEY_DB

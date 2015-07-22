@@ -506,6 +506,7 @@ dmsg
 doxgen
 doxygen
 ds
+dsb
 dsk
 dsrc
 dst
@@ -648,6 +649,7 @@ lang
 latencies
 lbrace
 lbracket
+ld
 len
 lenp
 level's
@@ -674,6 +676,7 @@ logtest
 lookup
 lookups
 lossy
+lrt
 lru
 lseek
 lsm
@@ -844,6 +847,7 @@ sd
 secretkey
 sed
 sessionp
+setkv
 setstr
 setv
 sfence
@@ -895,6 +899,7 @@ subtree
 sunique
 superset
 sw
+sy
 sys
 t's
 tV

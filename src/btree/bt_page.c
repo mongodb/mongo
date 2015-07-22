@@ -21,7 +21,7 @@ static int  __inmem_row_leaf_entries(
  *	Check if a page matches the criteria for forced eviction.
  */
 static int
-__evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+__evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 
@@ -33,10 +33,6 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	/* Leaf pages only. */
 	if (WT_PAGE_IS_INTERNAL(page))
-		return (0);
-
-	/* Eviction may be turned off. */
-	if (LF_ISSET(WT_READ_NO_EVICT) || F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		return (0);
 
 	/*
@@ -68,10 +64,13 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 #endif
     )
 {
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	u_int sleep_cnt, wait_cnt;
 	int busy, cache_work, force_attempts, oldgen;
+
+	btree = S2BT(session);
 
 	for (force_attempts = oldgen = 0, wait_cnt = 0;;) {
 		switch (ref->state) {
@@ -115,7 +114,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * be evicting if no hazard pointer is required, we're
 			 * done.
 			 */
-			if (F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY))
+			if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
 				goto skip_evict;
 
 			/*
@@ -140,7 +139,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * the page's generation number. If eviction isn't being
 			 * done on this file, we're done.
 			 */
-			if (F_ISSET(S2BT(session), WT_BTREE_NO_EVICTION))
+			if (LF_ISSET(WT_READ_NO_EVICT) ||
+			    F_ISSET(btree, WT_BTREE_NO_EVICTION))
 				goto skip_evict;
 
 			/*
@@ -148,7 +148,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 */
 			page = ref->page;
 			if (force_attempts < 10 &&
-			    __evict_force_check(session, page, flags)) {
+			    __evict_force_check(session, page)) {
 				++force_attempts;
 				ret = __wt_page_release_evict(session, ref);
 				/* If forced eviction fails, stall. */

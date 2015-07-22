@@ -73,7 +73,13 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 
 		ip = etmp;
 		dsk = ip->data;
-	}
+	} else if (btree->kencryptor != NULL &&
+	    !F_ISSET(btree, WT_BTREE_VERIFY) &&
+	    !F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK))
+		WT_ERR_MSG(session, WT_ERROR,
+		    "encryption configured, and existing file is not "
+		    "encrypted");
+
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED)) {
 		if (btree->compressor == NULL ||
 		    btree->compressor->decompress == NULL)

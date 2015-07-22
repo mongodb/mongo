@@ -25,25 +25,62 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package com.wiredtiger.test;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+#include "format.h"
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses( {
-    AsyncTest.class,
-    AutoCloseTest.class,
-    BackupCursorTest.class,
-    CursorTest.class,
-    CursorTest02.class,
-    ExceptionTest.class,
-    PackTest.class,
-    PackTest02.class,
-    PackTest03.class
-})
+/*
+ * lrt --
+ *	Start a long-running transaction.
+ */
+void *
+lrt(void *arg)
+{
+	WT_CONNECTION *conn;
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
+	u_int period;
+	int pinned, ret;
 
-public class WiredTigerSuite {
-    // the class remains empty,
-    // used only as a holder for the above annotations
+	(void)(arg);
+
+	/* Open a session and cursor. */
+	conn = g.wts_conn;
+	if ((ret = conn->open_session(
+	    conn, NULL, "isolation=snapshot", &session)) != 0)
+		die(ret, "connection.open_session");
+	if ((ret = session->open_cursor(
+	    session, g.uri, NULL, NULL, &cursor)) != 0)
+		die(ret, "session.open_cursor");
+
+	for (pinned = 0;;) {
+		/*
+		 * If we have an open cursor, reset it, releasing our pin, else
+		 * position the cursor, creating a snapshot.
+		 */
+		if (pinned) {
+			if ((ret = cursor->reset(cursor)) != 0)
+				die(ret, "cursor.reset");
+			pinned = 0;
+		} else {
+			if ((ret = cursor->next(cursor)) != 0)
+				die(ret, "cursor.reset");
+			pinned = 1;
+		}
+
+		/* Sleep for some number of seconds. */
+		period = mmrand(NULL, 1, 10);
+
+		/* Sleep for short periods so we don't make the run wait. */
+		while (period > 0 && !g.workers_finished) {
+			--period;
+			sleep(1);
+		}
+		if (g.workers_finished)
+			break;
+	}
+
+	if ((ret = session->close(session, NULL)) != 0)
+		die(ret, "session.close");
+
+	return (NULL);
 }

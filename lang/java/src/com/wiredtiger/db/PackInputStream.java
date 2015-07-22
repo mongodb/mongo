@@ -119,7 +119,6 @@ public class PackInputStream {
     throws WiredTigerPackingException {
         format.checkType('U', false);
         getByteArrayInternal(getByteArrayLength(), dest, off, len);
-
     }
 
     /**
@@ -128,6 +127,7 @@ public class PackInputStream {
      */
     public byte[] getByteArray()
     throws WiredTigerPackingException {
+        format.checkType('U', false);
         int itemLen = getByteArrayLength();
         byte[] unpacked = new byte[itemLen];
         getByteArrayInternal(itemLen, unpacked, 0, itemLen);
@@ -141,8 +141,17 @@ public class PackInputStream {
     private int getByteArrayLength()
     throws WiredTigerPackingException {
         int itemLen = 0;
-        /* The rest of the buffer is a byte array. */
-        if (format.available() == 1) {
+
+        if (format.hasLength()) {
+            // If the format has a length, it's always used.
+            itemLen = format.getLengthFromFormat(true);
+        } else if (format.getType() == 'U') {
+            // The 'U' format is used internally, and may be exposed to us.
+            // It indicates that the size is always stored unless there
+            // is a size in the format.
+            itemLen = unpackInt(false);
+        } else if (format.available() == 1) {
+            // The rest of the buffer is a byte array.
             itemLen = valueLen - valueOff;
         } else {
             itemLen = unpackInt(false);
@@ -156,7 +165,6 @@ public class PackInputStream {
     private void getByteArrayInternal(
         int itemLen, byte[] dest, int off, int destLen)
     throws WiredTigerPackingException {
-        /* TODO: padding. */
         int copyLen = itemLen;
         if (itemLen > destLen) {
             copyLen = destLen;
@@ -171,11 +179,11 @@ public class PackInputStream {
      */
     public int getInt()
     throws WiredTigerPackingException {
-        boolean signed = false;
+        boolean signed = true;
         format.checkType('i', false);
         if (format.getType() == 'I' ||
                 format.getType() == 'L') {
-            signed = true;
+            signed = false;
         }
         format.consume();
         return unpackInt(signed);
@@ -186,10 +194,10 @@ public class PackInputStream {
      */
     public long getLong()
     throws WiredTigerPackingException {
-        boolean signed = false;
+        boolean signed = true;
         format.checkType('q', false);
         if (format.getType() == 'Q') {
-            signed = true;
+            signed = false;
         }
         format.consume();
         return unpackLong(signed);
@@ -210,10 +218,10 @@ public class PackInputStream {
      */
     public short getShort()
     throws WiredTigerPackingException {
-        boolean signed = false;
+        boolean signed = true;
         format.checkType('h', false);
         if (format.getType() == 'H') {
-            signed = true;
+            signed = false;
         }
         format.consume();
         return unpackShort(signed);

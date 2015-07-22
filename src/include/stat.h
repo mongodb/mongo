@@ -203,7 +203,6 @@ struct __wt_connection_stats {
 	WT_STATS dh_session_handles;
 	WT_STATS dh_session_sweeps;
 	WT_STATS file_open;
-	WT_STATS log_buffer_grow;
 	WT_STATS log_buffer_size;
 	WT_STATS log_bytes_payload;
 	WT_STATS log_bytes_written;
@@ -222,10 +221,10 @@ struct __wt_connection_stats {
 	WT_STATS log_scan_rereads;
 	WT_STATS log_scans;
 	WT_STATS log_slot_closes;
+	WT_STATS log_slot_coalesced;
 	WT_STATS log_slot_consolidated;
 	WT_STATS log_slot_joins;
 	WT_STATS log_slot_races;
-	WT_STATS log_slot_switch_fails;
 	WT_STATS log_slot_toobig;
 	WT_STATS log_slot_toosmall;
 	WT_STATS log_slot_transitions;

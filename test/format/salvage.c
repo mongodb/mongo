@@ -149,6 +149,9 @@ wts_salvage(void)
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
+	if (g.c_salvage == 0)
+		return;
+
 	/*
 	 * Save a copy of the interesting files so we can replay the salvage
 	 * step as necessary.

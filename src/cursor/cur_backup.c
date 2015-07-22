@@ -217,9 +217,9 @@ __backup_start(
 	 * could start a hot backup that would race with an already-started
 	 * checkpoint.
 	 */
-	__wt_spin_lock(session, &conn->hot_backup_lock);
+	WT_RET(__wt_writelock(session, conn->hot_backup_lock));
 	conn->hot_backup = 1;
-	__wt_spin_unlock(session, &conn->hot_backup_lock);
+	WT_ERR(__wt_writeunlock(session, conn->hot_backup_lock));
 
 	/* Create the hot backup file. */
 	WT_ERR(__backup_file_create(session, cb, 0));
@@ -318,9 +318,9 @@ __backup_stop(WT_SESSION_IMPL *session)
 	ret = __wt_backup_file_remove(session);
 
 	/* Checkpoint deletion can proceed, as can the next hot backup. */
-	__wt_spin_lock(session, &conn->hot_backup_lock);
+	WT_TRET(__wt_writelock(session, conn->hot_backup_lock));
 	conn->hot_backup = 0;
-	__wt_spin_unlock(session, &conn->hot_backup_lock);
+	WT_TRET(__wt_writeunlock(session, conn->hot_backup_lock));
 
 	return (ret);
 }

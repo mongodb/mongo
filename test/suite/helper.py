@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import glob, os, string
+import glob, os, shutil, string, subprocess
 import wiredtiger
 
 # python has a filecmp.cmp function, but different versions of python approach
@@ -95,6 +95,29 @@ def confirm_empty(self, uri):
     else:
         self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
+
+# copy a WT home directory
+def copy_wiredtiger_home(olddir, newdir, aligned=True):
+    # unaligned copy requires 'dd', which may not be available on Windows
+    if not aligned and os.name == "nt":
+        raise AssertionError(
+            'copy_wiredtiger_home: unaligned copy impossible on Windows')
+    shutil.rmtree(newdir, ignore_errors=True)
+    os.mkdir(newdir)
+    for fname in os.listdir(olddir):
+        fullname = os.path.join(olddir, fname)
+        # Skip lock file, on Windows it is locked.
+        if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname:
+            # Use a dd command that does not align on a block boundary.
+            if aligned:
+                shutil.copy(fullname, newdir)
+            else:
+                fullname = os.path.join(olddir, fname)
+                inpf = 'if=' + fullname
+                outf = 'of=' + newdir + '/' + fullname
+                cmd_list = ['dd', inpf, outf, 'bs=300']
+                a = subprocess.Popen(cmd_list)
+                a.wait()
 
 # create a simple_populate or complex_populate key
 def key_populate(cursor, i):
