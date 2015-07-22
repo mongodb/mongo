@@ -212,37 +212,37 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 			last_upd = upd;
 		}
 	}
-	if (first_upd == NULL)
-		goto done;
-
-	/* Search the page and insert the update structure. */
-	switch (page->type) {
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
-		/* Search the page. */
-		WT_ERR(__wt_col_search(session, recno, ref, &cbt));
-
-		/* Apply the modification. */
-		WT_ERR(__wt_col_modify(
-		    session, &cbt, recno, NULL, first_upd, 0));
-		break;
-	case WT_PAGE_ROW_LEAF:
-		/* Search the page. */
-		WT_ERR(__wt_row_search(session, klas, ref, &cbt, 1));
-
-		/* Apply the modification. */
-		WT_ERR(
-		    __wt_row_modify(session, &cbt, klas, NULL, first_upd, 0));
-		break;
-	WT_ILLEGAL_VALUE_ERR(session);
-	}
-
-	/* Don't discard any appended structures on error. */
-	first_upd = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
 
+	/* Search the page and insert the updates. */
+	if (first_upd != NULL) {
+		switch (page->type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_VAR:
+			/* Search the page. */
+			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
+
+			/* Apply the modification. */
+			WT_ERR(__wt_col_modify(
+			    session, &cbt, recno, NULL, first_upd, 0));
+			break;
+		case WT_PAGE_ROW_LEAF:
+			/* Search the page. */
+			WT_ERR(__wt_row_search(session, klas, ref, &cbt, 1));
+
+			/* Apply the modification. */
+			WT_ERR(__wt_row_modify(
+			    session, &cbt, klas, NULL, first_upd, 0));
+			break;
+		WT_ILLEGAL_VALUE_ERR(session);
+		}
+
+		/* Don't discard any appended structures on error. */
+		first_upd = NULL;
+	}
+
 	/* Discard the cursor. */
-	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
+	WT_ERR(__wt_las_cursor_close(session, &cursor, saved_flags));
 
 	/* Remove this block's entries from the lookaside table. */
 	WT_ERR(__wt_las_remove_block(session, addr, addr_size));
