@@ -40,7 +40,7 @@ lrt(void *arg)
 	WT_ITEM key, value;
 	WT_SESSION *session;
 	size_t buf_len, buf_size;
-	uint64_t keyno;
+	uint64_t keyno, saved_keyno;
 	u_int period;
 	int pinned, ret;
 	uint8_t bitfield, *keybuf;
@@ -69,10 +69,10 @@ lrt(void *arg)
 		if (pinned) {
 			/* Confirm the returned value hasn't changed. */
 			while ((ret = read_row(cursor,
-			    &key, keyno, 1)) == WT_ROLLBACK)
+			    &key, saved_keyno, 1)) == WT_ROLLBACK)
 				;
 			if (ret != 0)
-				die(ret, "read_row %" PRIu64, keyno);
+				die(ret, "read_row %" PRIu64, saved_keyno);
 
 			/* Compare the previous value with the current one. */
 			if (g.type == FIX) {
@@ -82,7 +82,8 @@ lrt(void *arg)
 			} else
 				ret = cursor->get_value(cursor, &value);
 			if (ret != 0)
-				die(ret, "cursor.get_value: %" PRIu64, keyno);
+				die(ret,
+				    "cursor.get_value: %" PRIu64, saved_keyno);
 
 			if (buf_size != value.size ||
 			    memcmp(buf, value.data, value.size) != 0)
@@ -97,14 +98,16 @@ lrt(void *arg)
 			 * Read a record at the end of the table, creating a
 			 * snapshot.
 			 */
-			keyno = g.key_cnt - 10;
-			if (keyno > 1000)
-				keyno -= mmrand(NULL, 1, 200);
-			while ((ret = read_row(
-			    cursor, &key, keyno, 1)) == WT_ROLLBACK)
-				;
+			do {
+				saved_keyno = mmrand(NULL,
+				    (u_int)(g.key_cnt - g.key_cnt / 10),
+				    (u_int)g.key_cnt);
+				while ((ret = read_row(cursor,
+				    &key, saved_keyno, 1)) == WT_ROLLBACK)
+					;
+			} while (ret == WT_NOTFOUND);
 			if (ret != 0)
-				die(ret, "read_row %" PRIu64, keyno);
+				die(ret, "read_row %" PRIu64, saved_keyno);
 
 			/* Take a copy of the cursor's value. */
 			if (g.type == FIX) {
@@ -114,22 +117,26 @@ lrt(void *arg)
 			} else
 				ret = cursor->get_value(cursor, &value);
 			if (ret != 0)
-				die(ret, "cursor.get_value: %" PRIu64, keyno);
+				die(ret,
+				    "cursor.get_value: %" PRIu64, saved_keyno);
 			if (buf_len < value.size &&
 			    (buf = realloc(buf, buf_len = value.size)) == NULL)
 				die(errno, "malloc");
 			memcpy(buf, value.data, buf_size = value.size);
 
 			/*
-			 * Move the cursor to the first record in the table,
+			 * Move the cursor to an early record in the table,
 			 * hopefully allowing the page with the record just
 			 * retrieved to be evicted from memory.
 			 */
-			while ((ret = read_row(
-			    cursor, &key, (uint64_t)1, 1)) == WT_ROLLBACK)
-				;
+			do {
+				keyno = mmrand(NULL, 1, (u_int)g.key_cnt / 5);
+				while ((ret = read_row(cursor,
+				    &key, keyno, 1)) == WT_ROLLBACK)
+					;
+			} while (ret == WT_NOTFOUND);
 			if (ret != 0)
-				die(ret, "cursor.search 1");
+				die(ret, "read_row %" PRIu64, keyno);
 
 			pinned = 1;
 		}
