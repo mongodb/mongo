@@ -229,8 +229,7 @@ namespace {
                 _numRecords.store( numRecords );
                 _dataSize.store( dataSize );
                 _sizeStorer->onCreate( this, numRecords, dataSize );
-            }
-            else {
+            } else {
                 LOG(1) << "Doing scan of collection " << ns << " to get size and count info"
 
                 _numRecords.store(0);
@@ -241,10 +240,6 @@ namespace {
                     RecordData data = iterator->dataFor( loc );
                     _numRecords.fetchAndAdd(1);
                     _dataSize.fetchAndAdd(data.size());
-                }
-
-                if ( _sizeStorer ) {
-                    _sizeStorer->storeToCache( _uri, _numRecords.load(), _dataSize.load() );
                 }
             }
 
