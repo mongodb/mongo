@@ -113,10 +113,9 @@ generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 }
 
 static inline uint64_t
-decode_key(CONFIG *cfg, char *key_buf)
+decode_key(char *key_buf)
 {
-	char *endPtr;
-	return (strtoull (key_buf, &endPtr, 10));
+	return (strtoull(key_buf, NULL, 10));
 }
 
 static void
@@ -185,7 +184,7 @@ setup_truncate(CONFIG *cfg,
 
 	/* We have data */
 	if (ret == 0) {
-		start_point_val = decode_key(cfg, key);
+		start_point_val = decode_key(key);
 		cursor->reset(cursor);
 		if ((ret = cursor->prev(cursor)) != 0) {
 			lprintf(cfg, ret, 0, "truncate setup end: prev failed");
@@ -196,7 +195,7 @@ setup_truncate(CONFIG *cfg,
 			    "truncate setup end: get_key failed");
 			goto err;
 		}
-		end_point_val = decode_key(cfg, key);
+		end_point_val = decode_key(key);
 		/* Not enough documents? */
 		if (start_point_val + trunc->needed_milestones > end_point_val)
 			trunc->truncate_milestone_gap = 0;
