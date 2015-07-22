@@ -538,7 +538,11 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
     else if ( typeof ( options ) == "boolean" )
         ret.unique = true;
     else if ( typeof ( options ) == "object" ){
-        if ( options.length ){
+        if ( Array.isArray(options) ){
+            if (options.length > 3) {
+                throw new Error("Index options that are supplied in array form may only specify" +
+                                " three values: name, unique, dropDups");
+            }
             var nb = 0;
             for ( var i=0; i<options.length; i++ ){
                 if ( typeof ( options[i] ) == "string" )
