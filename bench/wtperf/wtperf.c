@@ -244,13 +244,9 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	char *truncate_key;
 	int ret;
-	size_t i;
 
 	/* Update the total inserts */
-	trunc->total_gross_inserts = 0;
-	for (i=0; i < thread->cfg->workers_cnt; i++)
-		trunc->total_gross_inserts +=
-		    thread->cfg->workers[i].total_inserts;
+	trunc->total_gross_inserts = sum_insert_ops(cfg);
 
 	trunc->expected_total +=
 	    (trunc->total_gross_inserts - trunc->last_total_inserts);
@@ -735,7 +731,6 @@ worker(void *arg)
 				randomize_value(thread, value_buf);
 			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) == 0) {
-				thread->total_inserts++;
 				break;
 			}
 			goto op_err;
@@ -2494,7 +2489,6 @@ start_threads(CONFIG *cfg,
 		thread->update.min_latency = UINT32_MAX;
 		thread->ckpt.max_latency = thread->insert.max_latency =
 		thread->read.max_latency = thread->update.max_latency = 0;
-		thread->total_inserts = 0;
 	}
 
 	/* Start the threads. */
