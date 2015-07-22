@@ -118,7 +118,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ITEM(vlas);
 	WT_PAGE *page;
-	WT_UPDATE *upd;
+	WT_UPDATE *first_upd, *last_upd, *upd;
 	size_t incr, prefix_len, total_incr;
 	uint32_t key_len, saved_flags, upd_size;
 	uint64_t recno, txnid;
@@ -128,7 +128,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 
 	cursor = NULL;
 	page = ref->page;
-	upd = NULL;
+	first_upd = last_upd = upd = NULL;
 	total_incr = 0;
 	recno = 0;			/* [-Werror=maybe-uninitialized] */
 	saved_flags = 0;		/* [-Werror=maybe-uninitialized] */
@@ -205,31 +205,40 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		total_incr += incr;
 		upd->txnid = txnid;
 
-		/* Search the page and insert the update structure. */
-		switch (page->type) {
-		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_VAR:
-			/* Search the page. */
-			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
-
-			/* Apply the modification. */
-			WT_ERR(__wt_col_modify(
-			    session, &cbt, recno, NULL, upd, 0));
-			break;
-		case WT_PAGE_ROW_LEAF:
-			/* Search the page. */
-			WT_ERR(__wt_row_search(session, klas, ref, &cbt, 1));
-
-			/* Apply the modification. */
-			WT_ERR(
-			    __wt_row_modify(session, &cbt, klas, NULL, upd, 0));
-			break;
-		WT_ILLEGAL_VALUE_ERR(session);
+		if (first_upd == NULL)
+			first_upd = last_upd = upd;
+		else {
+			last_upd->next = upd;
+			last_upd = upd;
 		}
-
-		/* Don't discard any appended structures on error. */
-		upd = NULL;
 	}
+	if (first_upd == NULL)
+		goto done;
+
+	/* Search the page and insert the update structure. */
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+		/* Search the page. */
+		WT_ERR(__wt_col_search(session, recno, ref, &cbt));
+
+		/* Apply the modification. */
+		WT_ERR(__wt_col_modify(
+		    session, &cbt, recno, NULL, first_upd, 0));
+		break;
+	case WT_PAGE_ROW_LEAF:
+		/* Search the page. */
+		WT_ERR(__wt_row_search(session, klas, ref, &cbt, 1));
+
+		/* Apply the modification. */
+		WT_ERR(
+		    __wt_row_modify(session, &cbt, klas, NULL, first_upd, 0));
+		break;
+	WT_ILLEGAL_VALUE_ERR(session);
+	}
+
+	/* Don't discard any appended structures on error. */
+	first_upd = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Discard the cursor. */
@@ -265,8 +274,8 @@ done: err:
 	cbt.ref = NULL;
 	WT_TRET(__wt_btcur_close(&cbt));
 
-	if (upd != NULL)
-		__wt_free(session, upd);
+	if (first_upd != NULL)
+		__wt_free_update_list(session, first_upd);
 
 	__wt_scr_free(session, &klas);
 

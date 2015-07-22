@@ -122,6 +122,7 @@ extern void __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_free_ref( WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int free_pages);
 extern void __wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pindex, int free_pages);
+extern void __wt_free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd);
 extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[]);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern void __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, int is_recno);
