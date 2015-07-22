@@ -2117,58 +2117,14 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
-  - name: aggregation
-  - name: auth
   - name: dbtest
   - name: disk
-  - name: durability
-  - name: failpoints
   - name: jsCore
   - name: jsCore_compatibility
   - name: mmap
-  - name: mongosTest
-  - name: replicasets
-  - name: replication
-  - name: sharding
-  - name: tool
   - name: push
     distros:
     - rhel55-test
-
-- name: linux-32-debug
-  display_name: Linux 32-bit DEBUG
-  modules: ~
-  run_on:
-  - rhel55-32
-  expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go32 PATH=/opt/go32/bin:$PATH
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux-debug
-    push_arch: i686
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
-    compile_flags: --dbg=on --distarch=i686 --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
-  tasks:
-  - name: compile
-    distros:
-    - rhel55
-  - name: aggregation
-  - name: auth
-  - name: dbtest
-  - name: disk
-  - name: durability
-  - name: failpoints
-  - name: jsCore
-  - name: jsCore_compatibility
-  - name: mmap
-  - name: mongosTest
-  - name: replicasets
-  - name: replication
-  - name: sharding
-  - name: tool
 
 ###########################################
 #         Windows buildvariants           #
@@ -2545,20 +2501,11 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2013-compile
-  - name: aggregation
-  - name: auth
   - name: dbtest
   - name: disk
-  - name: durability
-  - name: failpoints
   - name: jsCore
   - name: jsCore_compatibility
   - name: mmap
-  - name: mongosTest
-  - name: replicasets
-  - name: replication
-  - name: sharding
-  - name: tool
   - name: push
     distros:
     - rhel55-test
