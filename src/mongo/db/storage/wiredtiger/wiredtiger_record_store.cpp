@@ -998,7 +998,7 @@ namespace {
 
     private:
         WiredTigerRecordStore* _rs;
-        bool _amount;
+        int _amount;
     };
 
     void WiredTigerRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
