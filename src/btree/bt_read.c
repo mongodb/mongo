@@ -145,11 +145,17 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	memcpy(klas->mem, prefix, prefix_len);
 	klas->size = prefix_len;
 
-	/* Open a lookaside table cursor. */
+	/*
+	 * Open a lookaside table cursor and search for the matching prefix.
+	 * If we don't find any records, we're done.
+	 */
 	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
 	cursor->set_key(cursor, klas);
-	if ((ret = cursor->search_near(cursor, &exact)) != 0)
+	if ((ret = cursor->search_near(cursor, &exact)) != 0 || exact < 0) {
+		if (ret == WT_NOTFOUND)
+			ret = 0;
 		goto done;
+	}
 
 	/* Step through the lookaside records. */
 	for (; ret == 0; ret = cursor->next(cursor)) {
