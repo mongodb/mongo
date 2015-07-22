@@ -741,10 +741,8 @@ private:
   // The underlying native implementation.
   native_handle_type handle_;
 
-  // MONGO HACK - prevent ASIO from initializing OpenSSL
   // Ensure openssl is initialised.
-  // asio::ssl::detail::openssl_init<> init_;
-
+  asio::ssl::detail::openssl_init<> init_;
 };
 
 } // namespace ssl
