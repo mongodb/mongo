@@ -1081,7 +1081,7 @@ static void singleInsert(OperationContext* txn,
                          Collection* collection,
                          WriteOpResult* result) {
     const string& insertNS = collection->ns().ns();
-    invariant(txn->lockState()->isCollectionLockedForMode(insertNS, MODE_IX));
+    dassert(txn->lockState()->isCollectionLockedForMode(insertNS, MODE_IX));
 
     WriteUnitOfWork wunit(txn);
     StatusWith<RecordId> status = collection->insertDocument(txn, docToInsert, true);
