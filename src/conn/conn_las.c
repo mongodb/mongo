@@ -53,7 +53,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 
 	/* Re-create the file. */
 	WT_ERR(__wt_session_create(
-	    session, WT_LASFILE_URI, "key_format=u,value_format=u"));
+	    session, WT_LASFILE_URI, "key_format=u,value_format=QIu"));
 
 	/*
 	 * Open the cursor. (Note the "overwrite=false" configuration, we want

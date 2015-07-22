@@ -3120,8 +3120,8 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(key);
 	WT_DECL_ITEM(klas);
-	WT_DECL_ITEM(vlas);
 	WT_DECL_RET;
+	WT_ITEM vlas;
 	WT_PAGE *page;
 	WT_UPDATE *upd;
 	WT_UPD_SKIPPED *list;
@@ -3142,7 +3142,6 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_scr_alloc(session, 0, &klas));
-	WT_ERR(__wt_scr_alloc(session, 0, &vlas));
 
 	/*
 	 * Enter each update in the boundary list into the lookaside store.
@@ -3208,7 +3207,7 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 			counterp = p = (uint8_t *)p + sizeof(uint64_t);
 			memcpy(p, &counter, sizeof(uint32_t));
 			p = (uint8_t *)p + sizeof(uint32_t);
-			keylen = key->size;
+			keylen = WT_STORE_SIZE(key->size);
 			memcpy(p, &keylen, sizeof(uint32_t));
 			p = (uint8_t *)p + sizeof(uint32_t);
 			memcpy(p, key->data, key->size);
@@ -3247,25 +3246,16 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 			counterp[2] = ((uint8_t *)&counter)[1];
 			counterp[3] = ((uint8_t *)&counter)[0];
 #endif
-			/* Build the value. */
-			len = sizeof(uint64_t) + sizeof(uint32_t) +
-			    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : upd->size);
-			WT_ERR(__wt_buf_init(session, vlas, len));
-			p = vlas->mem;
-			memcpy(p, &upd->txnid, sizeof(uint64_t));
-			p = (uint8_t *)p + sizeof(uint64_t);
-			memcpy(p, &upd->size, sizeof(uint32_t));
-			p = (uint8_t *)p + sizeof(uint32_t);
-			if (!WT_UPDATE_DELETED_ISSET(upd)) {
-				memcpy(p, WT_UPDATE_DATA(upd), upd->size);
-				p = (uint8_t *)p + upd->size;
+			if (WT_UPDATE_DELETED_ISSET(upd))
+				vlas.size = 0;
+			else {
+				vlas.data = WT_UPDATE_DATA(upd);
+				vlas.size = upd->size;
 			}
-			vlas->size = len;
-			WT_ASSERT(session, WT_PTRDIFF(p, vlas->mem) == len);
 
 			/* Insert into the lookaside store. */
 			cursor->set_key(cursor, klas);
-			cursor->set_value(cursor, vlas);
+			cursor->set_value(cursor, upd->txnid, upd->size, &vlas);
 			WT_ERR(cursor->insert(cursor));
 		} while ((upd = upd->next) != NULL);
 	}
@@ -3274,7 +3264,6 @@ err:	WT_TRET(__wt_las_cursor_close(session, &cursor, clear));
 
 	__wt_scr_free(session, &key);
 	__wt_scr_free(session, &klas);
-	__wt_scr_free(session, &vlas);
 
 	return (ret);
 }
