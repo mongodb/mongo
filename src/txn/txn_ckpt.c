@@ -560,7 +560,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 		WT_ERR(__checkpoint_verbose_track(session,
 		    "metadata sync completed", &verb_timer));
-	} else if (logging)
+	} else
 		/*
 		 * Ensure the log file is synced so that recovery finds the
 		 * correct checkpoint in the metadata for the files in which we
