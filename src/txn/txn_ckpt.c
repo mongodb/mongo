@@ -1202,11 +1202,9 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 	 * Turn on metadata tracking if:
 	 * * The session isn't already doing metadata tracking
 	 * * The file isn't bulk loadable
-	 * * The close isn't during connection close or the update is for the
-	 *   metadata file itself (when we need to track to ensure durability).
+	 * * The close isn't during connection close
 	 */
-	need_tracking = !WT_META_TRACKING(session) && !bulk &&
-	   (!final || WT_IS_METADATA(session->dhandle));
+	need_tracking = !WT_META_TRACKING(session) && !bulk && !final;
 
 	if (need_tracking)
 		WT_RET(__wt_meta_track_on(session));
