@@ -216,7 +216,7 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	++copy.s.writers;
 	++copy.s.readers;
 
-	l->us = copy.us;
+	l->i.us = copy.i.us;
 	return (0);
 }
 

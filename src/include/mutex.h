@@ -32,7 +32,9 @@ typedef union {			/* Read/write lock */
 	WiredTiger read/write locks require modification for big-endian systems.
 #else
 	uint64_t u;
-	uint32_t us;
+	struct {
+		uint32_t us;
+	} i;
 	struct {
 		uint16_t writers;
 		uint16_t readers;
