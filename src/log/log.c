@@ -360,12 +360,12 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
 }
 
 /*
- * __log_acquire --
- *	Called with the log slot lock held.  Can be called recursively
+ * __wt_log_acquire --
+ *	Called serially when switching slots.  Can be called recursively
  *	from __wt_log_newfile when we change log files.
  */
-static int
-__log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
+int
+__wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -375,12 +375,14 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	log = conn->log;
 	created_log = 1;
 	/*
-	 * Called locked.  Add recsize to alloc_lsn.  Save our starting LSN
+	 * Add recsize to alloc_lsn.  Save our starting LSN
 	 * where the previous allocation finished for the release LSN.
 	 * That way when log files switch, we're waiting for the correct LSN
 	 * from outstanding writes.
 	 */
 	slot->slot_release_lsn = log->alloc_lsn;
+	__wt_errx(session, "LOG_ACQUIRE: Release slot. LSN %lu/%lu",
+	    slot->slot_release_lsn.file,slot->slot_release_lsn.offset);
 	if (!__log_size_fit(session, &log->alloc_lsn, recsize)) {
 		WT_RET(__wt_log_newfile(session, 0, &created_log));
 		if (log->log_close_fh != NULL)
@@ -388,23 +390,10 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	}
 
 	/*
-	 * Checkpoints can be configured based on amount of log written.
-	 * Add in this log record to the sum and if needed, signal the
-	 * checkpoint condition.  The logging subsystem manages the
-	 * accumulated field.  There is a bit of layering violation
-	 * here checking the connection ckpt field and using its
-	 * condition.
-	 */
-	if (WT_CKPT_LOGSIZE(conn)) {
-		log->log_written += (wt_off_t)recsize;
-		WT_RET(__wt_checkpoint_signal(session, log->log_written));
-	}
-
-	/*
 	 * Need to minimally fill in slot info here.  Our slot start LSN
 	 * comes after any potential new log file creations.
 	 */
-	slot->slot_start_lsn = log->alloc_lsn;
+	slot->slot_start_lsn = slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_start_offset = log->alloc_lsn.offset;
 	/*
 	 * Pre-allocate on the first real write into the log file, if it
@@ -413,10 +402,10 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	if (log->alloc_lsn.offset == WT_LOG_FIRST_RECORD && created_log)
 		WT_RET(__log_prealloc(session, log->log_fh));
 
-	log->alloc_lsn.offset += (wt_off_t)recsize;
-	slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_error = 0;
 	slot->slot_fh = log->log_fh;
+	__wt_errx(session, "LOG_ACQUIRE: Set up slot. LSN %lu/%lu",
+	    slot->slot_end_lsn.file,slot->slot_end_lsn.offset);
 	return (0);
 }
 
@@ -492,22 +481,36 @@ static int
 __log_fill(WT_SESSION_IMPL *session,
     WT_MYSLOT *myslot, int direct, WT_ITEM *record, WT_LSN *lsnp)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 
+	/*
+	 * The WT_LOG_SLOT_BUF_MAX macro uses log.
+	 */
+	conn = S2C(session);
+	log = conn->log;
 	logrec = (WT_LOG_RECORD *)record->mem;
 	/*
-	 * Call __wt_write.  For now the offset is the real byte offset.  If the
-	 * offset becomes a unit of WT_LOG_ALIGN this is where we would multiply
-	 * by WT_LOG_ALIGN to get the real file byte offset for write().
+	 * Call __wt_write or copy into the buffer.  For now the offset is the
+	 * real byte offset.  If the offset becomes a unit of WT_LOG_ALIGN this
+	 * is where we would multiply by WT_LOG_ALIGN to get the real file byte
+	 * offset for write().
 	 */
-	if (direct)
+	if (!direct && logrec->len < WT_LOG_SLOT_BUF_MAX)
+		memcpy((char *)myslot->slot->slot_buf.mem + myslot->offset,
+		    logrec, logrec->len);
+	else {
+		/*
+		 * If this is a direct write or a slot unbuffered write,
+		 * write it now.
+		 */
 		WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 		    myslot->offset + myslot->slot->slot_start_offset,
 		    (size_t)logrec->len, (void *)logrec));
-	else
-		memcpy((char *)myslot->slot->slot_buf.mem + myslot->offset,
-		    logrec, logrec->len);
+		myslot->slot->slot_unbuffered = logrec->len;
+	}
 
 	WT_STAT_FAST_CONN_INCRV(session, log_bytes_written, logrec->len);
 	if (lsnp != NULL) {
@@ -567,9 +570,9 @@ __log_file_header(
 	myslot.offset = 0;
 
 	/*
-	 * We may recursively call __log_acquire to allocate log space for the
-	 * log descriptor record.  Call __log_fill to write it, but we
-	 * do not need to call __log_release because we're not waiting for
+	 * We may recursively call __wt_log_acquire to allocate log space for
+	 * the log descriptor record.  Call __log_fill to write it, but we
+	 * do not need to call __wt_log_release because we're not waiting for
 	 * any earlier operations to complete.
 	 */
 	if (prealloc) {
@@ -577,7 +580,7 @@ __log_file_header(
 		tmp.slot_fh = fh;
 	} else {
 		WT_ASSERT(session, fh == NULL);
-		WT_ERR(__log_acquire(session, logrec->len, &tmp));
+		WT_ERR(__wt_log_acquire(session, logrec->len, &tmp));
 	}
 	WT_ERR(__log_fill(session, &myslot, 1, buf, NULL));
 	/*
@@ -1055,11 +1058,11 @@ err:
 }
 
 /*
- * __log_release --
+ * __wt_log_release --
  *	Release a log slot.
  */
-static int
-__log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
+int
+__wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -1067,18 +1070,36 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	WT_LSN sync_lsn;
 	size_t write_size;
 	int locked, yield_count;
+	int64_t release_bytes;
 
 	conn = S2C(session);
 	log = conn->log;
 	locked = yield_count = 0;
 	*freep = 1;
+	release_bytes = WT_LOG_SLOT_RELEASED(slot->slot_state);
 
 	/* Write the buffered records */
+	/*
+	 * Checkpoints can be configured based on amount of log written.
+	 * Add in this log record to the sum and if needed, signal the
+	 * checkpoint condition.  The logging subsystem manages the
+	 * accumulated field.  There is a bit of layering violation
+	 * here checking the connection ckpt field and using its
+	 * condition.
+	 */
+	if (WT_CKPT_LOGSIZE(conn)) {
+		log->log_written += (wt_off_t)release_bytes;
+		WT_RET(__wt_checkpoint_signal(session, log->log_written));
+	}
+
 	if (F_ISSET(slot, WT_SLOT_BUFFERED)) {
-		write_size = (size_t)
-		    (slot->slot_end_lsn.offset - slot->slot_start_offset);
-		WT_ERR(__wt_write(session, slot->slot_fh,
-		    slot->slot_start_offset, write_size, slot->slot_buf.mem));
+		write_size = (size_t)release_bytes - slot->slot_unbuffered;
+		if (write_size != 0) {
+			__wt_errx(session, "log_release: BUFFERED call wt_write %lu off %lu",
+			    write_size, slot->slot_start_offset);
+			WT_ERR(__wt_write(session, slot->slot_fh,
+			    slot->slot_start_offset, write_size, slot->slot_buf.mem));
+		}
 	}
 
 	/*
@@ -1092,11 +1113,14 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	    !F_ISSET(slot, WT_SLOT_SYNC | WT_SLOT_SYNC_DIR)) {
 		*freep = 0;
 		slot->slot_state = WT_LOG_SLOT_WRITTEN;
+		__wt_errx(session, "log_release: slot WRITTEN");
 		/*
 		 * After this point the worker thread owns the slot.  There
 		 * is nothing more to do but return.
 		 */
+#if 0
 		WT_ERR(__wt_cond_signal(session, conn->log_wrlsn_cond));
+#endif
 		goto done;
 	}
 
@@ -1114,6 +1138,8 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	}
 	log->write_start_lsn = slot->slot_start_lsn;
 	log->write_lsn = slot->slot_end_lsn;
+	__wt_errx(session, "log_release: write_lsn %lu/%lu",
+	    log->write_lsn.file, log->write_lsn.offset);
 	WT_ERR(__wt_cond_signal(session, log->log_write_cond));
 
 	/*
@@ -1251,7 +1277,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	if (create_log) {
 		log->prep_missed++;
 		if ((ret = __wt_log_allocfile(
-		    session, log->fileid, WT_LOG_FILENAME, 0)) != 0)
+		    session, log->fileid, WT_LOG_FILENAME, 1)) != 0)
 			return (ret);
 	}
 	WT_RET(__log_openfile(session,
@@ -1263,6 +1289,8 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	log->alloc_lsn.file = log->fileid;
 	log->alloc_lsn.offset = WT_LOG_FIRST_RECORD;
 	end_lsn = log->alloc_lsn;
+	__wt_errx(session, "NEWFILE: alloc LSN %lu/%lu",
+	    log->fileid, WT_LOG_FIRST_RECORD);
 
 	/*
 	 * If we're called from connection creation code, we need to update
@@ -1587,11 +1615,11 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		F_SET(&tmp, WT_SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(&tmp, WT_SLOT_SYNC);
-	WT_ERR(__log_acquire(session, record->size, &tmp));
+	WT_ERR(__wt_log_acquire(session, record->size, &tmp));
 	__wt_spin_unlock(session, &log->log_slot_lock);
 	locked = 0;
 	WT_ERR(__log_fill(session, &myslot, 1, record, lsnp));
-	WT_ERR(__log_release(session, &tmp, &dummy));
+	WT_ERR(__wt_log_release(session, &tmp, &dummy));
 
 err:	if (locked)
 		__wt_spin_unlock(session, &log->log_slot_lock);
@@ -1741,6 +1769,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LOG_RECORD *logrec;
 	WT_LSN lsn;
 	WT_MYSLOT myslot;
+	int64_t release_size;
 	uint32_t rdup_len;
 	int free_slot, locked;
 
@@ -1778,7 +1807,10 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	WT_STAT_FAST_CONN_INCR(session, log_writes);
 
-	if (!F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE)) {
+F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
+	/* XXX */
+	if (!F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE) ||
+	    rdup_len > WT_LOG_SLOT_MAXIMUM) {
 		ret = __log_direct_write(session, record, &lsn, flags);
 		if (ret == 0 && lsnp != NULL)
 			*lsnp = lsn;
@@ -1811,7 +1843,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	    session, rdup_len, flags, &myslot)) == ENOMEM) {
 		/*
 		 * If we couldn't find a consolidated slot for this record
-		 * write the record directly.
+		 * write the record directly. XXX
 		 */
 		while ((ret = __log_direct_write(
 		    session, record, lsnp, flags)) == EAGAIN)
@@ -1820,34 +1852,49 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		return (0);
 	}
 	WT_ERR(ret);
-	if (myslot.offset == 0) {
-		__wt_spin_lock(session, &log->log_slot_lock);
-		locked = 1;
-		WT_ERR(__wt_log_slot_close(session, myslot.slot));
-		WT_ERR(__log_acquire(
-		    session, myslot.slot->slot_group_size, myslot.slot));
-		__wt_spin_unlock(session, &log->log_slot_lock);
-		locked = 0;
-		WT_ERR(__wt_log_slot_notify(session, myslot.slot));
-	} else
-		WT_ERR(__wt_log_slot_wait(session, myslot.slot));
+	/*
+	 * If the addition of this record crosses the buffer boundary,
+	 * switch in a new slot.
+	 */
+	__wt_errx(session, "LOG_WRITE: myslot off %lu end %lu, len %lu flags 0x%lx",
+	    myslot.offset, myslot.end_offset, rdup_len, flags);
+	if (myslot.end_offset >= WT_LOG_SLOT_BUF_MAX) {
+		__wt_errx(session, "LOG_WRITE: force switch");
+		WT_ERR(__wt_log_slot_switch(
+		    session, (wt_off_t)myslot.end_offset));
+	}
 	WT_ERR(__log_fill(session, &myslot, 0, record, &lsn));
-	if (__wt_log_slot_release(myslot.slot, rdup_len) == WT_LOG_SLOT_DONE) {
-		WT_ERR(__log_release(session, myslot.slot, &free_slot));
+	__wt_errx(session, "LOG_WRITE: slot_release %lu", rdup_len);
+	release_size = __wt_log_slot_release(myslot.slot, (int64_t)rdup_len);
+	if (WT_LOG_SLOT_DONE(release_size)) {
+		__wt_errx(session, "LOG_WRITE: log_release %lu relsize %lu",
+		    rdup_len, release_size);
+		WT_ERR(__wt_log_release(session, myslot.slot, &free_slot));
 		if (free_slot)
 			WT_ERR(__wt_log_slot_free(session, myslot.slot));
+	} else if (LF_ISSET(WT_LOG_FLUSH | WT_LOG_FSYNC)) {
+		/*
+		 * If we are going to wait for this slot to get written,
+		 * signal the wrlsn thread.
+		 */
+		if (conn->log_wrlsn_cond != NULL) {
+			WT_ERR(__wt_cond_signal(session, conn->log_wrlsn_cond));
+			__wt_yield();
+		} else
+			WT_ERR(__wt_log_force_write(session));
+	}
+	if (LF_ISSET(WT_LOG_FLUSH)) {
+		/* Wait for our writes to reach the OS */
+		while (WT_LOG_CMP(&log->write_lsn, &lsn) <= 0 &&
+		    myslot.slot->slot_error == 0)
+			(void)__wt_cond_wait(
+			    session, log->log_write_cond, 10000);
 	} else if (LF_ISSET(WT_LOG_FSYNC)) {
 		/* Wait for our writes to reach disk */
 		while (WT_LOG_CMP(&log->sync_lsn, &lsn) <= 0 &&
 		    myslot.slot->slot_error == 0)
 			(void)__wt_cond_wait(
 			    session, log->log_sync_cond, 10000);
-	} else if (LF_ISSET(WT_LOG_FLUSH)) {
-		/* Wait for our writes to reach the OS */
-		while (WT_LOG_CMP(&log->write_lsn, &lsn) <= 0 &&
-		    myslot.slot->slot_error == 0)
-			(void)__wt_cond_wait(
-			    session, log->log_write_cond, 10000);
 	}
 
 	/*

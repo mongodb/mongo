@@ -507,6 +507,43 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i, int *yield)
 }
 
 /*
+ * __wt_log_force_write --
+ *	Force a switch and release and write of the current slot.
+ */
+int
+__wt_log_force_write(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	WT_MYSLOT myslot;
+	int64_t len, release_size;
+	int free_slot;
+
+	conn = S2C(session);
+	log = conn->log;
+	len = WT_LOG_SLOT_BUF_MAX;
+	__wt_errx(session, "force_write: Close current slot");
+	/*
+	 * This is not a great way to force the write as it may confuse
+	 * the maintenance of alloc_lsn.
+	 */
+	WT_RET(__wt_log_slot_join(session, len, 0, &myslot));
+	/*
+	 * We don't want this len accounted for, adjust the end offset.
+	 */
+	myslot.end_offset -= len;
+	WT_RET(__wt_log_slot_switch(session, (wt_off_t)myslot.end_offset));
+	myslot.slot->slot_unbuffered = len;
+	release_size = __wt_log_slot_release(myslot.slot, len);
+	if (WT_LOG_SLOT_DONE(release_size)) {
+		WT_RET(__wt_log_release(session, myslot.slot, &free_slot));
+		if (free_slot)
+			WT_RET(__wt_log_slot_free(session, myslot.slot));
+	}
+	return (0);
+}
+
+/*
  * __log_wrlsn_server --
  *	The log wrlsn server thread.
  */
@@ -524,16 +561,22 @@ __log_wrlsn_server(void *arg)
 	log = conn->log;
 	locked = yield = 0;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
+		/*
+		 * Force a slot switch.
+		 */
+		WT_ERR(__wt_log_force_write(session));
 		__wt_spin_lock(session, &log->log_slot_lock);
 		locked = 1;
 		WT_ERR(__wt_log_wrlsn(session, NULL, &yield));
 		locked = 0;
 		__wt_spin_unlock(session, &log->log_slot_lock);
+#if 0
 		if (++yield < 1000)
 			__wt_yield();
 		else
+#endif
 			WT_ERR(__wt_cond_wait(session,
-			    conn->log_wrlsn_cond, 100000));
+			    conn->log_wrlsn_cond, 1000000));
 	}
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");

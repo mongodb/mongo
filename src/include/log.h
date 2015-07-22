@@ -12,7 +12,6 @@
 
 /* Logging subsystem declarations. */
 #define	WT_LOG_ALIGN			128
-#define	WT_LOG_SLOT_BUF_SIZE		256 * 1024
 
 #define	WT_INIT_LSN(l)	do {						\
 	(l)->file = 1;							\
@@ -59,30 +58,54 @@
 
 /*
  * Possible values for the consolidation array slot states:
- * (NOTE: Any new states must be > WT_LOG_SLOT_DONE and < WT_LOG_SLOT_READY.)
  *
- * < WT_LOG_SLOT_DONE - threads are actively writing to the log.
- * WT_LOG_SLOT_DONE - all activity on this slot is complete.
  * WT_LOG_SLOT_FREE - slot is available for allocation.
- * WT_LOG_SLOT_PENDING - slot is transitioning from ready to active.
  * WT_LOG_SLOT_WRITTEN - slot is written and should be processed by worker.
- * WT_LOG_SLOT_READY - slot is ready for threads to join.
- * > WT_LOG_SLOT_READY - threads are actively consolidating on this slot.
  *
  * The slot state must be volatile: threads loop checking the state and can't
  * cache the first value they see.
+ *
+ * The slot state is divided into two 32 bit sizes.  One half is the
+ * amount joined and the other is the amount released.  Since we use
+ * negative values for other states, that leaves 31 bits, 2 GB for
+ * accounting.
  */
-#define	WT_LOG_SLOT_DONE	0
-#define	WT_LOG_SLOT_FREE	1
-#define	WT_LOG_SLOT_PENDING	2
-#define	WT_LOG_SLOT_WRITTEN	3
-#define	WT_LOG_SLOT_READY	4
+#define	WT_LOG_SLOT_BUF_SIZE		(256 * 1024)
+#define	WT_LOG_SLOT_BUF_MAX		((uint32_t)log->slot_buf_size / 2)
+#define	WT_LOG_SLOT_MAXIMUM		(uint32_t)			\
+    ((2 ^ 31) - WT_LOG_SLOT_BUF_SIZE)
+
+#define	WT_LOG_SLOT_JOINED(state)	((state) >> 32)
+#define	WT_LOG_SLOT_JOIN_REL(j, r)	(((j) << 32) + (r))
+#define	WT_LOG_SLOT_RELEASED(state)	((int64_t)(int32_t)(state))
+
+#define	WT_LOG_SLOT_FREE	-1	/* Not in use */
+#define	WT_LOG_SLOT_WRITTEN	-2	/* Slot data written, not processed */
+
+/* Slot is in use */
+#define	WT_LOG_SLOT_ACTIVE(state)	(WT_LOG_SLOT_JOINED(state) >= 0)
+/* Slot is in use, no longer able to be joined */
+#define	WT_LOG_SLOT_CLOSED(state)					\
+    (WT_LOG_SLOT_ACTIVE(state) &&					\
+     WT_LOG_SLOT_JOINED(state) >= WT_LOG_SLOT_BUF_MAX)
+/* Slot is in use, all data copied into buffer */
+#define	WT_LOG_SLOT_DONE(state)						\
+    (WT_LOG_SLOT_CLOSED(state) &&					\
+     WT_LOG_SLOT_RELEASED(state) == WT_LOG_SLOT_JOINED(state))
+/* Slot is in use, copying into the buffer */
+#define	WT_LOG_SLOT_FILLING(state)					\
+    (WT_LOG_SLOT_CLOSED(state) &&					\
+     WT_LOG_SLOT_RELEASED(state) < WT_LOG_SLOT_JOINED(state))
+/* Slot is in use, more threads may join this slot */
+#define	WT_LOG_SLOT_OPEN(state)						\
+    (WT_LOG_SLOT_ACTIVE(state) &&					\
+     WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_BUF_MAX)
+
 typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	volatile int64_t slot_state;	/* Slot state */
+	int64_t	 slot_unbuffered;	/* Unbuffered data in this slot */
 	uint64_t slot_group_size;	/* Group size */
 	int32_t	 slot_error;		/* Error value */
-#define	WT_SLOT_INVALID_INDEX	0xffffffff
-	uint32_t slot_index;		/* Active slot index */
 	wt_off_t slot_start_offset;	/* Starting file offset */
 	WT_LSN	slot_release_lsn;	/* Slot release LSN */
 	WT_LSN	slot_start_lsn;		/* Slot starting LSN */
@@ -102,6 +125,7 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 
 typedef struct {
 	WT_LOGSLOT	*slot;
+	wt_off_t	 end_offset;
 	wt_off_t	 offset;
 } WT_MYSLOT;
 
@@ -151,14 +175,12 @@ typedef struct {
 
 	/*
 	 * Consolidation array information
-	 * WT_SLOT_ACTIVE must be less than WT_SLOT_POOL.
 	 * Our testing shows that the more consolidation we generate the
 	 * better the performance we see which equates to an active slot
 	 * slot count of one.
 	 */
-#define	WT_SLOT_ACTIVE	1
 #define	WT_SLOT_POOL	128
-	WT_LOGSLOT	*slot_array[WT_SLOT_ACTIVE];	/* Active slots */
+	WT_LOGSLOT	*active_slot;			/* Active slot */
 	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
 	size_t		 slot_buf_size;		/* Buffer size for slots */
 
