@@ -47,6 +47,7 @@ var doTest = function() {
     mongod = startMongodNoReset( '--port', port, '--dbpath', dbpath );
     sleep(50);
     testDB = new Mongo('localhost:' + port).getDB(baseName);
+    func(testDB);
     var firstPass = time(func, testDB);
     var secondPass = time(func, testDB);
     stopMongod(port, 15);
