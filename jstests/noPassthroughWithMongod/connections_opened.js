@@ -1,6 +1,6 @@
 // Tests serverStatus tracking of connections opened
 
-var numPerTypeToCreate = 100;
+var numPerTypeToCreate = 50;
 
 // We need to create a new mongod to ensure no one else is talking to us in the background, and
 // will screw up our stats.
