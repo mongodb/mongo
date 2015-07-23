@@ -128,7 +128,7 @@ PlanStage::StageState CountStage::work(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     } else if (PlanStage::DEAD == state) {
         return state;
-    } else if (PlanStage::FAILURE == state || PlanStage::DEAD == state) {
+    } else if (PlanStage::FAILURE == state) {
         *out = id;
         // If a stage fails, it may create a status WSM to indicate why it failed, in which
         // case 'id' is valid. If ID is invalid, we create our own error message.
