@@ -92,17 +92,24 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 	if (conn->las_session == NULL)
 		return (0);
 
-	/* Close open cursors. */
-	if ((cursor = conn->las_cursor) != NULL)
-		WT_TRET(cursor->close(cursor));
+	/* Close the session, closing the open cursor. */
+	wt_session = &conn->las_session->iface;
+	WT_TRET(wt_session->close(wt_session, NULL));
+
+	/*
+	 * Clear the references (this isn't just for clarity, the underlying
+	 * code uses the non-NULL cursor to determine if information in the
+	 * lookaside table needs to be updated as blocks are freed).
+	 *
+	 * KEITH:
+	 * This isn't right; we should be setting WT_SYNC_DISCARD_FORCE and
+	 * simply discarding the dirty blocks before dropping the file.
+	 */
+	conn->las_cursor = NULL;
+	conn->las_session = NULL;
 
 	/* Discard any incarnation of the file. */
 	WT_TRET(__las_drop(conn->las_session));
-
-	/* Close the session. */
-	wt_session = &conn->las_session->iface;
-	WT_TRET(wt_session->close(wt_session, NULL));
-	conn->las_session = NULL;
 
 	return (ret);
 }
