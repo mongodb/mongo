@@ -158,7 +158,6 @@ __evict_server(void *arg)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_EVICT_WORKER *worker;
 	WT_SESSION_IMPL *session;
 
 	session = arg;
