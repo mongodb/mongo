@@ -577,19 +577,36 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                     {
                         BenchRunEventTrace _bret(&stats.insertCounter);
 
-                        BSONObj insertDoc = fixQuery(e["doc"].Obj(), bsonTemplateEvaluator);
-
+                        BSONObj insertDoc;
                         if (useWriteCmd) {
                             BSONObjBuilder builder;
                             builder.append("insert", nsToCollectionSubstring(ns));
                             BSONArrayBuilder docBuilder(builder.subarrayStart("documents"));
-                            docBuilder.append(insertDoc);
+                            if (e["doc"].type() == Array) {
+                                for (auto& element : e["doc"].Array()) {
+                                    insertDoc = fixQuery(element.Obj(), bsonTemplateEvaluator);
+                                    docBuilder.append(insertDoc);
+                                }
+                            } else {
+                                insertDoc = fixQuery(e["doc"].Obj(), bsonTemplateEvaluator);
+                                docBuilder.append(insertDoc);
+                            }
                             docBuilder.done();
                             // TODO: Replace after SERVER-11774.
                             conn->runCommand(
                                 nsToDatabaseSubstring(ns).toString(), builder.done(), result);
                         } else {
-                            conn->insert(ns, insertDoc);
+                            if (e["doc"].type() == Array) {
+                                std::vector<BSONObj> insertArray;
+                                for (auto& element : e["doc"].Array()) {
+                                    BSONObj e = fixQuery(element.Obj(), bsonTemplateEvaluator);
+                                    insertArray.push_back(e);
+                                }
+                                conn->insert(ns, insertArray);
+                            } else {
+                                insertDoc = fixQuery(e["doc"].Obj(), bsonTemplateEvaluator);
+                                conn->insert(ns, insertDoc);
+                            }
                             if (safe)
                                 result = conn->getLastErrorDetailed();
                         }
