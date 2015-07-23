@@ -484,12 +484,11 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_prealloc_used.desc = "log: pre-allocated log files used";
 	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
 	stats->log_scan_records.desc = "log: records processed by log scan";
-	stats->log_slot_switch_fails.desc =
-	    "log: slots selected for switching that were unavailable";
 	stats->log_compress_mem.desc =
 	    "log: total in-memory size of compressed records";
 	stats->log_buffer_size.desc = "log: total log buffer size";
 	stats->log_compress_len.desc = "log: total size of compressed records";
+	stats->log_slot_coalesced.desc = "log: written slots coalesced";
 	stats->log_close_yields.desc =
 	    "log: yields waiting for previous log file close";
 	stats->lsm_work_queue_app.desc =
@@ -647,9 +646,9 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_prealloc_used.v = 0;
 	stats->log_slot_toobig.v = 0;
 	stats->log_scan_records.v = 0;
-	stats->log_slot_switch_fails.v = 0;
 	stats->log_compress_mem.v = 0;
 	stats->log_compress_len.v = 0;
+	stats->log_slot_coalesced.v = 0;
 	stats->log_close_yields.v = 0;
 	stats->lsm_rows_merged.v = 0;
 	stats->lsm_checkpoint_throttle.v = 0;

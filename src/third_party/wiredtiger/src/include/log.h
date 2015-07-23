@@ -158,10 +158,9 @@ typedef struct {
 	 */
 #define	WT_SLOT_ACTIVE	1
 #define	WT_SLOT_POOL	128
-	uint32_t	 pool_index;		/* Global pool index */
 	WT_LOGSLOT	*slot_array[WT_SLOT_ACTIVE];	/* Active slots */
 	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
-	uint32_t	 slot_buf_size;		/* Buffer size for slots */
+	size_t		 slot_buf_size;		/* Buffer size for slots */
 
 #define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
 	uint32_t	 flags;

@@ -5108,7 +5108,7 @@ err:			__wt_scr_free(session, &tkey);
 		 */
 		mod->rec_max_txn = r->max_txn;
 		if (!F_ISSET(r, WT_EVICTING) &&
-		    !WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
+		    WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
 			btree->rec_max_txn = r->max_txn;
 
 		/*

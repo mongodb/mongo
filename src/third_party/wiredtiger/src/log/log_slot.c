@@ -53,15 +53,14 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	/*
 	 * Allocate memory for buffers now that the arrays are setup. Split
 	 * this out to make error handling simpler.
-	 */
-	/*
+	 *
 	 * Cap the slot buffer to the log file size.
 	 */
-	log->slot_buf_size = (uint32_t)WT_MIN(
-	    conn->log_file_max, WT_LOG_SLOT_BUF_SIZE);
+	log->slot_buf_size =
+	    WT_MIN((size_t)conn->log_file_max, WT_LOG_SLOT_BUF_SIZE);
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		WT_ERR(__wt_buf_init(session,
-		    &log->slot_pool[i].slot_buf, (size_t)log->slot_buf_size));
+		    &log->slot_pool[i].slot_buf, log->slot_buf_size));
 		F_SET(&log->slot_pool[i], WT_SLOT_INIT_FLAGS);
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
@@ -189,6 +188,36 @@ join_slot:
 }
 
 /*
+ * __log_slot_find_free --
+ * 	Find and return a free log slot.
+ */
+static int
+__log_slot_find_free(WT_SESSION_IMPL *session, WT_LOGSLOT **slot)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	uint32_t pool_i;
+
+	conn = S2C(session);
+	log = conn->log;
+	WT_ASSERT(session, slot != NULL);
+	/*
+	 * Encourage processing and moving the write LSN forward.
+	 * That process has to walk the slots anyway, so do that
+	 * work and let it give us the index of a free slot along
+	 * the way.
+	 */
+	WT_RET(__wt_log_wrlsn(session, &pool_i, NULL));
+	while (pool_i == WT_SLOT_POOL) {
+		__wt_yield();
+		WT_RET(__wt_log_wrlsn(session, &pool_i, NULL));
+	}
+	*slot = &log->slot_pool[pool_i];
+	WT_ASSERT(session, (*slot)->slot_state == WT_LOG_SLOT_FREE);
+	return (0);
+}
+
+/*
  * __wt_log_slot_close --
  *	Close a slot and do not allow any other threads to join this slot.
  *	Remove this from the active slot array and move a new slot from
@@ -202,40 +231,13 @@ __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_LOG *log;
 	WT_LOGSLOT *newslot;
 	int64_t old_state;
-	int32_t yields;
-	uint32_t pool_i, switch_fails;
 
 	conn = S2C(session);
 	log = conn->log;
-	switch_fails = 0;
-retry:
 	/*
 	 * Find an unused slot in the pool.
 	 */
-	pool_i = log->pool_index;
-	newslot = &log->slot_pool[pool_i];
-	if (++log->pool_index >= WT_SLOT_POOL)
-		log->pool_index = 0;
-	if (newslot->slot_state != WT_LOG_SLOT_FREE) {
-		WT_STAT_FAST_CONN_INCR(session, log_slot_switch_fails);
-		/*
-		 * If it takes a number of attempts to find an available slot
-		 * it's likely all slots are waiting to be released. This
-		 * churn is used to change how long we pause before closing
-		 * the slot - which leads to more consolidation and less churn.
-		 */
-		if (++switch_fails % WT_SLOT_POOL == 0 && slot->slot_churn < 5)
-			++slot->slot_churn;
-		__wt_yield();
-		goto retry;
-	} else if (slot->slot_churn > 0) {
-		--slot->slot_churn;
-		WT_ASSERT(session, slot->slot_churn >= 0);
-	}
-
-	/* Pause to allow other threads a chance to consolidate. */
-	for (yields = slot->slot_churn; yields >= 0; yields--)
-		__wt_yield();
+	WT_RET(__log_slot_find_free(session, &newslot));
 
 	/*
 	 * Swap out the slot we're going to use and put a free one in the
@@ -244,7 +246,7 @@ retry:
 	WT_STAT_FAST_CONN_INCR(session, log_slot_closes);
 	newslot->slot_state = WT_LOG_SLOT_READY;
 	newslot->slot_index = slot->slot_index;
-	log->slot_array[newslot->slot_index] = &log->slot_pool[pool_i];
+	log->slot_array[newslot->slot_index] = newslot;
 	old_state = WT_ATOMIC_STORE8(slot->slot_state, WT_LOG_SLOT_PENDING);
 	slot->slot_group_size = (uint64_t)(old_state - WT_LOG_SLOT_READY);
 	/*

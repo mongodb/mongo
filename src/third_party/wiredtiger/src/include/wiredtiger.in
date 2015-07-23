@@ -3720,14 +3720,14 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_SCANS				1087
 /*! log: consolidated slot closures */
 #define	WT_STAT_CONN_LOG_SLOT_CLOSES			1088
+/*! log: written slots coalesced */
+#define	WT_STAT_CONN_LOG_SLOT_COALESCED			1089
 /*! log: logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1089
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1090
 /*! log: consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			1090
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			1091
 /*! log: consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			1091
-/*! log: slots selected for switching that were unavailable */
-#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1092
+#define	WT_STAT_CONN_LOG_SLOT_RACES			1092
 /*! log: record size exceeded maximum */
 #define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1093
 /*! log: failed to find a slot large enough for record */

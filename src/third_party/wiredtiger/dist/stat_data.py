@@ -241,12 +241,11 @@ connection_stats = [
     LogStat('log_writes', 'log write operations'),
     LogStat('log_write_lsn', 'log server thread advances write LSN'),
 
+    LogStat('log_slot_coalesced', 'written slots coalesced'),
     LogStat('log_slot_consolidated', 'logging bytes consolidated'),
     LogStat('log_slot_closes', 'consolidated slot closures'),
     LogStat('log_slot_joins', 'consolidated slot joins'),
     LogStat('log_slot_races', 'consolidated slot join races'),
-    LogStat('log_slot_switch_fails',
-        'slots selected for switching that were unavailable'),
     LogStat('log_slot_toobig', 'record size exceeded maximum'),
     LogStat('log_slot_toosmall',
         'failed to find a slot large enough for record'),
