@@ -2419,6 +2419,10 @@ wtperf_rand(CONFIG_THREAD *thread)
 	 * Wrap the key to within the expected range and avoid zero: we never
 	 * insert that key.
 	 */
-	rval = (rval % wtperf_value_range(cfg)) + 1;
+	rval = wtperf_value_range(cfg);
+	if (rval)
+		rval = (rval % wtperf_value_range(cfg)) + 1;
+	else
+		rval = 1;
 	return (rval);
 }
