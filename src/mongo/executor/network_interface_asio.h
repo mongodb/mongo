@@ -95,6 +95,7 @@ public:
     void shutdown() override;
     void waitForWork() override;
     void waitForWorkUntil(Date_t when) override;
+    void setConnectionHook(std::unique_ptr<ConnectionHook> hook) override;
     void signalWorkAvailable() override;
     Date_t now() override;
     void startCommand(const TaskExecutor::CallbackHandle& cbHandle,

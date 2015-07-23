@@ -131,6 +131,10 @@ void NetworkInterfaceImpl::waitForWorkUntil(Date_t when) {
     _isExecutorRunnable = false;
 }
 
+void NetworkInterfaceImpl::setConnectionHook(std::unique_ptr<ConnectionHook> hook) {
+    MONGO_UNREACHABLE;
+}
+
 void NetworkInterfaceImpl::_runOneCommand() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_pending.empty()) {

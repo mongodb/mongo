@@ -82,6 +82,7 @@ public:
     virtual void shutdown();
     virtual void waitForWork();
     virtual void waitForWorkUntil(Date_t when);
+    virtual void setConnectionHook(std::unique_ptr<ConnectionHook> hook);
     virtual void signalWorkAvailable();
     virtual Date_t now();
     virtual std::string getHostName();

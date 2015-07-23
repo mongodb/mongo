@@ -290,6 +290,10 @@ void NetworkInterfaceMock::waitForWorkUntil(Date_t when) {
     _waitForWork_inlock(&lk);
 }
 
+void NetworkInterfaceMock::setConnectionHook(std::unique_ptr<ConnectionHook> hook) {
+    MONGO_UNREACHABLE;
+}
+
 void NetworkInterfaceMock::signalWorkAvailable() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _waitingToRunMask |= kExecutorThread;
