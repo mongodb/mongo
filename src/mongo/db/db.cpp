@@ -830,6 +830,9 @@ static int mongoDbMain(int argc, char* argv[], char** envp) {
 
     setupSignalHandlers(false);
 
+    // Mongod shouldn't lazily kill cursors. It doesn't mix well with connection pooling.
+    DBClientConnection::setLazyKillCursor(false);
+
     dbExecCommand = argv[0];
 
     srand(curTimeMicros());
