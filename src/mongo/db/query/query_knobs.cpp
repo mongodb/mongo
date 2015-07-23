@@ -44,8 +44,6 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheFeedbacksStored, int, 20);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheStdDeviations, double, 2.0);
 
-MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheWriteOpsBetweenFlush, int, 1000);
-
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheReplanningEnabled, bool, true);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheEvictionRatio, double, 10.0);

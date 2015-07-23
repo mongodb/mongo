@@ -386,12 +386,6 @@ public:
      */
     size_t size() const;
 
-    /**
-     *  You must notify the cache if you are doing writes, as query plan utility will change.
-     *  Cache is flushed after every 1000 notifications.
-     */
-    void notifyOfWriteOp();
-
 private:
     /**
      * Releases resources associated with each cache entry

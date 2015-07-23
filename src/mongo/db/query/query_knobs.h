@@ -69,9 +69,6 @@ extern int internalQueryCacheFeedbacksStored;
 // entry from the cache?
 extern double internalQueryCacheStdDeviations;
 
-// How many write ops should we allow in a collection before tossing all cache entries?
-extern int internalQueryCacheWriteOpsBetweenFlush;
-
 // Whether or not CachedPlanStage replanning is enabled.
 extern bool internalQueryCacheReplanningEnabled;
 

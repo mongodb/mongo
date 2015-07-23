@@ -499,16 +499,4 @@ size_t PlanCache::size() const {
     return _cache.size();
 }
 
-void PlanCache::notifyOfWriteOp() {
-    // It's fine to clear the cache multiple times if multiple threads
-    // increment the counter to kPlanCacheMaxWriteOperations or greater.
-    if (_writeOperations.addAndFetch(1) < internalQueryCacheWriteOpsBetweenFlush) {
-        return;
-    }
-
-    LOG(1) << _ns << ": clearing collection plan cache - " << internalQueryCacheWriteOpsBetweenFlush
-           << " write operations detected since last refresh.";
-    clear();
-}
-
 }  // namespace mongo

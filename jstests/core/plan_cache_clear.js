@@ -52,25 +52,12 @@ assert.eq(0, getShapes().length, 'plan cache should be empty after successful pl
 // http://docs.mongodb.org/manual/core/query-plans/#query-plan-revision
 // As collections change over time, the query optimizer deletes the query plan and re-evaluates
 // after any of the following events:
-// - The collection receives 1,000 write operations.
 // - The reIndex rebuilds the index.
 // - You add or drop an index.
 // - The mongod process restarts.
 //
 
-// Case 1: The collection receives 1,000 write operations.
-// Steps:
-//     Populate cache. Cache should contain 1 key after running query.
-//     Insert 1000 documents.
-//     Cache should be cleared.
-assert.eq(1, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
-assert.eq(1, getShapes().length, 'plan cache should not be empty after query');
-for (var i = 0; i < 1000; i++) {
-    t.save({b: i});
-}
-assert.eq(0, getShapes().length, 'plan cache should be empty after adding 1000 documents.');
-
-// Case 2: The reIndex rebuilds the index.
+// Case 1: The reIndex rebuilds the index.
 // Steps:
 //     Populate the cache with 1 entry.
 //     Run reIndex on the collection.
@@ -81,7 +68,7 @@ res = t.reIndex();
 print('reIndex result = ' + tojson(res));
 assert.eq(0, getShapes().length, 'plan cache should be empty after reIndex operation');
 
-// Case 3: You add or drop an index.
+// Case 2: You add or drop an index.
 // Steps:
 //     Populate the cache with 1 entry.
 //     Add an index.
@@ -91,5 +78,5 @@ assert.eq(1, getShapes().length, 'plan cache should not be empty after query');
 t.ensureIndex({b: 1});
 assert.eq(0, getShapes().length, 'plan cache should be empty after adding index');
 
-// Case 4: The mongod process restarts
+// Case 3: The mongod process restarts
 // Not applicable.
