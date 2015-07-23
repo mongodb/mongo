@@ -102,21 +102,22 @@ bool matchExpressionLessThan(const MatchExpression* lhs, const MatchExpression* 
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    const std::string& ns,
+    NamespaceString nss,
     const BSONObj& query,
     const MatchExpressionParser::WhereCallback& whereCallback) {
     const BSONObj emptyObj;
-    return CanonicalQuery::canonicalize(ns, query, emptyObj, emptyObj, 0, 0, whereCallback);
+    return CanonicalQuery::canonicalize(
+        std::move(nss), query, emptyObj, emptyObj, 0, 0, whereCallback);
 }
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    const std::string& ns,
+    NamespaceString nss,
     const BSONObj& query,
     bool explain,
     const MatchExpressionParser::WhereCallback& whereCallback) {
     const BSONObj emptyObj;
-    return CanonicalQuery::canonicalize(ns,
+    return CanonicalQuery::canonicalize(std::move(nss),
                                         query,
                                         emptyObj,  // sort
                                         emptyObj,  // projection
@@ -132,28 +133,29 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    const std::string& ns,
+    NamespaceString nss,
     const BSONObj& query,
     long long skip,
     long long limit,
     const MatchExpressionParser::WhereCallback& whereCallback) {
     const BSONObj emptyObj;
-    return CanonicalQuery::canonicalize(ns, query, emptyObj, emptyObj, skip, limit, whereCallback);
+    return CanonicalQuery::canonicalize(
+        std::move(nss), query, emptyObj, emptyObj, skip, limit, whereCallback);
 }
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    const std::string& ns,
+    NamespaceString nss,
     const BSONObj& query,
     const BSONObj& sort,
     const BSONObj& proj,
     const MatchExpressionParser::WhereCallback& whereCallback) {
-    return CanonicalQuery::canonicalize(ns, query, sort, proj, 0, 0, whereCallback);
+    return CanonicalQuery::canonicalize(std::move(nss), query, sort, proj, 0, 0, whereCallback);
 }
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    const std::string& ns,
+    NamespaceString nss,
     const BSONObj& query,
     const BSONObj& sort,
     const BSONObj& proj,
@@ -162,12 +164,12 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     const MatchExpressionParser::WhereCallback& whereCallback) {
     const BSONObj emptyObj;
     return CanonicalQuery::canonicalize(
-        ns, query, sort, proj, skip, limit, emptyObj, whereCallback);
+        std::move(nss), query, sort, proj, skip, limit, emptyObj, whereCallback);
 }
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    const std::string& ns,
+    NamespaceString nss,
     const BSONObj& query,
     const BSONObj& sort,
     const BSONObj& proj,
@@ -176,7 +178,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     const BSONObj& hint,
     const MatchExpressionParser::WhereCallback& whereCallback) {
     const BSONObj emptyObj;
-    return CanonicalQuery::canonicalize(ns,
+    return CanonicalQuery::canonicalize(std::move(nss),
                                         query,
                                         sort,
                                         proj,
@@ -267,7 +269,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    const std::string& ns,
+    NamespaceString nss,
     const BSONObj& query,
     const BSONObj& sort,
     const BSONObj& proj,
@@ -282,18 +284,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Pass empty sort and projection.
     BSONObj emptyObj;
 
-    auto lpqStatus = LiteParsedQuery::makeAsOpQuery(NamespaceString(ns),
-                                                    skip,
-                                                    limit,
-                                                    0,
-                                                    query,
-                                                    proj,
-                                                    sort,
-                                                    hint,
-                                                    minObj,
-                                                    maxObj,
-                                                    snapshot,
-                                                    explain);
+    auto lpqStatus = LiteParsedQuery::makeAsOpQuery(
+        std::move(nss), skip, limit, 0, query, proj, sort, hint, minObj, maxObj, snapshot, explain);
     if (!lpqStatus.isOK()) {
         return lpqStatus.getStatus();
     }

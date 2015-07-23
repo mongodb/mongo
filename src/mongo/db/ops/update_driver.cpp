@@ -172,7 +172,8 @@ Status UpdateDriver::populateDocumentWithQueryFields(const BSONObj& query,
     // We canonicalize the query to collapse $and/$or, and the first arg (ns) is not needed
     // Also, because this is for the upsert case, where we insert a new document if one was
     // not found, the $where clause does not make sense, hence empty WhereCallback.
-    auto statusWithCQ = CanonicalQuery::canonicalize("", query, WhereCallbackNoop());
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(NamespaceString(""), query, WhereCallbackNoop());
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

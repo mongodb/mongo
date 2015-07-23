@@ -54,13 +54,13 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-static const char* ns = "somebogusns";
+static const NamespaceString nss("test.collection");
 
 /**
  * Utility functions to create a CanonicalQuery
  */
 unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj) {
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj);
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj);
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -76,7 +76,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj);
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj, sortObj, projObj);
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -95,7 +95,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     BSONObj hintObj = fromjson(hintStr);
     BSONObj minObj = fromjson(minStr);
     BSONObj maxObj = fromjson(maxStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns,
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss,
                                                      queryObj,
                                                      sortObj,
                                                      projObj,
@@ -127,7 +127,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     BSONObj minObj = fromjson(minStr);
     BSONObj maxObj = fromjson(maxStr);
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        ns, queryObj, sortObj, projObj, skip, limit, hintObj, minObj, maxObj, snapshot, explain);
+        nss, queryObj, sortObj, projObj, skip, limit, hintObj, minObj, maxObj, snapshot, explain);
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -507,7 +507,7 @@ protected:
         solns.clear();
 
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns,
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss,
                                                          query,
                                                          sort,
                                                          proj,
@@ -588,7 +588,7 @@ protected:
                                       const BSONObj& sort,
                                       const BSONObj& proj,
                                       const QuerySolution& soln) const {
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns, query, sort, proj);
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, query, sort, proj);
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 

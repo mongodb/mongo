@@ -86,7 +86,7 @@ Status ParsedUpdate::parseQueryToCQ() {
     // The projection needs to be applied after the update operation, so we specify an empty
     // BSONObj as the projection during canonicalization.
     const BSONObj emptyObj;
-    auto statusWithCQ = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
+    auto statusWithCQ = CanonicalQuery::canonicalize(_request->getNamespaceString(),
                                                      _request->getQuery(),
                                                      _request->getSort(),
                                                      emptyObj,  // projection

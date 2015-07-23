@@ -44,25 +44,23 @@
 
 namespace QueryStageSubplan {
 
+static const NamespaceString nss("unittests.QueryStageSubplan");
+
 class QueryStageSubplanBase {
 public:
     QueryStageSubplanBase() : _client(&_txn) {}
 
     virtual ~QueryStageSubplanBase() {
-        OldClientWriteContext ctx(&_txn, ns());
-        _client.dropCollection(ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
+        _client.dropCollection(nss.ns());
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_txn, nss.ns(), obj));
     }
 
     void insert(const BSONObj& doc) {
-        _client.insert(ns(), doc);
-    }
-
-    static const char* ns() {
-        return "unittests.QueryStageSubplan";
+        _client.insert(nss.ns(), doc);
     }
 
 protected:
@@ -72,7 +70,6 @@ protected:
     std::unique_ptr<CanonicalQuery> cqFromFindCommand(const std::string& findCmd) {
         BSONObj cmdObj = fromjson(findCmd);
 
-        const NamespaceString nss("testns.testcoll");
         bool isExplain = false;
         auto lpq =
             unittest::assertGet(LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain));
@@ -96,7 +93,7 @@ private:
 class QueryStageSubplanGeo2dOr : public QueryStageSubplanBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
         addIndex(BSON("a"
                       << "2d"
                       << "b" << 1));
@@ -107,7 +104,7 @@ public:
             "{$or: [{a: {$geoWithin: {$centerSphere: [[0,0],10]}}},"
             "{a: {$geoWithin: {$centerSphere: [[1,1],10]}}}]}");
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), query);
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, query);
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -133,7 +130,7 @@ public:
 class QueryStageSubplanPlanFromCache : public QueryStageSubplanBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
 
         addIndex(BSON("a" << 1));
         addIndex(BSON("a" << 1 << "b" << 1));
@@ -150,7 +147,7 @@ public:
 
         Collection* collection = ctx.getCollection();
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), query);
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, query);
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -380,7 +377,7 @@ public:
 class QueryStageSubplanPlanContainedOr : public QueryStageSubplanBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
         addIndex(BSON("b" << 1 << "a" << 1));
         addIndex(BSON("c" << 1 << "a" << 1));
 
@@ -392,7 +389,7 @@ public:
         insert(BSON("_id" << 3 << "a" << 1 << "c" << 3));
         insert(BSON("_id" << 4 << "a" << 1 << "c" << 4));
 
-        auto cq = unittest::assertGet(CanonicalQuery::canonicalize(ns(), query));
+        auto cq = unittest::assertGet(CanonicalQuery::canonicalize(nss, query));
 
         Collection* collection = ctx.getCollection();
 
@@ -438,7 +435,7 @@ public:
 class QueryStageSubplanPlanRootedOrNE : public QueryStageSubplanBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
         addIndex(BSON("a" << 1 << "b" << 1));
         addIndex(BSON("a" << 1 << "c" << 1));
 
@@ -451,7 +448,7 @@ public:
         BSONObj query = fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}");
         BSONObj sort = BSON("d" << 1);
         BSONObj projection;
-        auto cq = unittest::assertGet(CanonicalQuery::canonicalize(ns(), query, sort, projection));
+        auto cq = unittest::assertGet(CanonicalQuery::canonicalize(nss, query, sort, projection));
 
         Collection* collection = ctx.getCollection();
 

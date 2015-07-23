@@ -43,7 +43,7 @@ namespace mongo {
 
 using unittest::assertGet;
 
-const char* QueryPlannerTest::ns = "somebogus.ns";
+const NamespaceString QueryPlannerTest::nss("test.collection");
 
 void QueryPlannerTest::setUp() {
     internalQueryPlannerEnableHashIntersection = true;
@@ -165,7 +165,7 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
     // Clean up any previous state from a call to runQueryFull
     solns.clear();
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns,
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss,
                                                      query,
                                                      sort,
                                                      proj,
@@ -230,7 +230,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                            bool snapshot) {
     solns.clear();
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns,
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss,
                                                      query,
                                                      sort,
                                                      proj,
@@ -250,7 +250,6 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
 void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     solns.clear();
 
-    const NamespaceString nss(ns);
     invariant(nss.isValid());
 
     const bool isExplain = false;

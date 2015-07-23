@@ -265,7 +265,8 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(const BSONObj& bas
         return StatusWith<BSONObj>(BSONObj());
 
     // Extract equalities from query
-    auto statusWithCQ = CanonicalQuery::canonicalize("", basicQuery, WhereCallbackNoop());
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(NamespaceString(""), basicQuery, WhereCallbackNoop());
     if (!statusWithCQ.isOK()) {
         return StatusWith<BSONObj>(statusWithCQ.getStatus());
     }

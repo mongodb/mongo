@@ -44,7 +44,7 @@ using boost::intrusive_ptr;
 using std::unique_ptr;
 using std::vector;
 
-static const char* const ns = "unittests.documentsourcetests";
+static const NamespaceString nss("unittests.documentsourcetests");
 static const BSONObj metaTextScore = BSON("$meta"
                                           << "textScore");
 
@@ -60,7 +60,7 @@ public:
     CollectionBase() : client(&_opCtx) {}
 
     ~CollectionBase() {
-        client.dropCollection(ns);
+        client.dropCollection(nss.ns());
     }
 
 protected:
@@ -74,7 +74,7 @@ using mongo::DocumentSourceCursor;
 
 class Base : public CollectionBase {
 public:
-    Base() : _ctx(new ExpressionContext(&_opCtx, NamespaceString(ns))) {
+    Base() : _ctx(new ExpressionContext(&_opCtx, nss)) {
         _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     }
 
@@ -84,15 +84,15 @@ protected:
         _source.reset();
         _exec.reset();
 
-        OldClientWriteContext ctx(&_opCtx, ns);
-        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj()));
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(nss, /*query=*/BSONObj()));
         _exec = uassertStatusOK(
             getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::YIELD_MANUAL));
 
         _exec->saveState();
         _exec->registerExec();
 
-        _source = DocumentSourceCursor::create(ns, _exec, _ctx);
+        _source = DocumentSourceCursor::create(nss.ns(), _exec, _ctx);
     }
     intrusive_ptr<ExpressionContext> ctx() {
         return _ctx;
@@ -126,7 +126,7 @@ public:
 class Iterate : public Base {
 public:
     void run() {
-        client.insert(ns, BSON("a" << 1));
+        client.insert(nss.ns(), BSON("a" << 1));
         createSource();
         // The DocumentSourceCursor doesn't hold a read lock.
         ASSERT(!_opCtx.lockState()->isReadLocked());
@@ -160,9 +160,9 @@ public:
 class IterateDispose : public Base {
 public:
     void run() {
-        client.insert(ns, BSON("a" << 1));
-        client.insert(ns, BSON("a" << 2));
-        client.insert(ns, BSON("a" << 3));
+        client.insert(nss.ns(), BSON("a" << 1));
+        client.insert(nss.ns(), BSON("a" << 2));
+        client.insert(nss.ns(), BSON("a" << 3));
         createSource();
         // The result is as expected.
         boost::optional<Document> next = source()->getNext();
@@ -212,9 +212,9 @@ public:
         return DocumentSourceLimit::create(ctx(), limit);
     }
     void run() {
-        client.insert(ns, BSON("a" << 1));
-        client.insert(ns, BSON("a" << 2));
-        client.insert(ns, BSON("a" << 3));
+        client.insert(nss.ns(), BSON("a" << 1));
+        client.insert(nss.ns(), BSON("a" << 2));
+        client.insert(nss.ns(), BSON("a" << 3));
         createSource();
 
         // initial limit becomes limit of cursor

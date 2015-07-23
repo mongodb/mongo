@@ -186,7 +186,7 @@ public:
 
         const WhereCallbackReal whereCallback(txn, nss.db());
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            nss.ns(), rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), whereCallback);
+            nss, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), whereCallback);
         if (!statusWithCQ.isOK()) {
             errmsg = "Can't parse filter / create query";
             return false;

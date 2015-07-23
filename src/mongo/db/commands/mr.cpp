@@ -1006,7 +1006,7 @@ void State::finalReduce(CurOp* op, ProgressMeterHolder& pm) {
     const WhereCallbackReal whereCallback(_txn, nss.db());
 
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(_config.incLong, BSONObj(), sortKey, BSONObj(), whereCallback);
+        CanonicalQuery::canonicalize(nss, BSONObj(), sortKey, BSONObj(), whereCallback);
     verify(statusWithCQ.isOK());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -1367,7 +1367,7 @@ public:
                 const WhereCallbackReal whereCallback(txn, nss.db());
 
                 auto statusWithCQ = CanonicalQuery::canonicalize(
-                    config.ns, config.filter, config.sort, BSONObj(), whereCallback);
+                    nss, config.filter, config.sort, BSONObj(), whereCallback);
                 if (!statusWithCQ.isOK()) {
                     uasserted(17238, "Can't canonicalize query " + config.filter.toString());
                     return 0;

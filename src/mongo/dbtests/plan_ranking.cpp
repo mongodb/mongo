@@ -63,7 +63,7 @@ namespace PlanRankingTests {
 using std::unique_ptr;
 using std::vector;
 
-static const char* ns = "unittests.PlanRankingTests";
+static const NamespaceString nss("unittests.PlanRankingTests");
 
 class PlanRankingTestBase {
 public:
@@ -74,8 +74,8 @@ public:
         // Run all tests with hash-based intersection enabled.
         internalQueryPlannerEnableHashIntersection = true;
 
-        OldClientWriteContext ctx(&_txn, ns);
-        _client.dropCollection(ns);
+        OldClientWriteContext ctx(&_txn, nss.ns());
+        _client.dropCollection(nss.ns());
     }
 
     virtual ~PlanRankingTestBase() {
@@ -85,12 +85,12 @@ public:
     }
 
     void insert(const BSONObj& obj) {
-        OldClientWriteContext ctx(&_txn, ns);
-        _client.insert(ns, obj);
+        OldClientWriteContext ctx(&_txn, nss.ns());
+        _client.insert(nss.ns(), obj);
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, ns, obj));
+        ASSERT_OK(dbtests::createIndex(&_txn, nss.ns(), obj));
     }
 
     /**
@@ -100,7 +100,7 @@ public:
      * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
     QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-        AutoGetCollectionForRead ctx(&_txn, ns);
+        AutoGetCollectionForRead ctx(&_txn, nss.ns());
         Collection* collection = ctx.getCollection();
 
         QueryPlannerParams plannerParams;
@@ -189,7 +189,7 @@ public:
 
         // Run the query {a:4, b:1}.
         {
-            auto statusWithCQ = CanonicalQuery::canonicalize(ns, BSON("a" << 100 << "b" << 1));
+            auto statusWithCQ = CanonicalQuery::canonicalize(nss, BSON("a" << 100 << "b" << 1));
             verify(statusWithCQ.isOK());
             cq = std::move(statusWithCQ.getValue());
             ASSERT(cq.get());
@@ -206,7 +206,7 @@ public:
 
         // And run the same query again.
         {
-            auto statusWithCQ = CanonicalQuery::canonicalize(ns, BSON("a" << 100 << "b" << 1));
+            auto statusWithCQ = CanonicalQuery::canonicalize(nss, BSON("a" << 100 << "b" << 1));
             verify(statusWithCQ.isOK());
             cq = std::move(statusWithCQ.getValue());
         }
@@ -240,7 +240,7 @@ public:
 
         // Run the query {a:1, b:{$gt:1}.
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(ns, BSON("a" << 1 << "b" << BSON("$gt" << 1)));
+            CanonicalQuery::canonicalize(nss, BSON("a" << 1 << "b" << BSON("$gt" << 1)));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -279,7 +279,7 @@ public:
 
         // Query for a==27 with projection that wants 'a' and 'b'.  BSONObj() is for sort.
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            ns, BSON("a" << 27), BSONObj(), BSON("_id" << 0 << "a" << 1 << "b" << 1));
+            nss, BSON("a" << 27), BSONObj(), BSON("_id" << 0 << "a" << 1 << "b" << 1));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -312,7 +312,7 @@ public:
 
         // There is no data that matches this query but we don't know that until EOF.
         BSONObj queryObj = BSON("a" << 1 << "b" << 1 << "c" << 99);
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj);
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj);
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -349,7 +349,7 @@ public:
         // returning any data.
 
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            ns, BSON("a" << 2), BSONObj(), BSON("_id" << 0 << "a" << 1 << "b" << 1));
+            nss, BSON("a" << 2), BSONObj(), BSON("_id" << 0 << "a" << 1 << "b" << 1));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -380,7 +380,7 @@ public:
         addIndex(BSON("b" << 1));
 
         // Run the query {a:N+1, b:1}.  (No such document.)
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns, BSON("a" << N + 1 << "b" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, BSON("a" << N + 1 << "b" << 1));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -415,7 +415,7 @@ public:
 
         // Run the query {a:N+1, b:1}.  (No such document.)
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(ns, BSON("a" << BSON("$gte" << N + 1) << "b" << 1));
+            CanonicalQuery::canonicalize(nss, BSON("a" << BSON("$gte" << N + 1) << "b" << 1));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -445,7 +445,7 @@ public:
         BSONObj queryObj = BSON("_id" << BSON("$gte" << 20 << "$lte" << 200));
         BSONObj sortObj = BSON("c" << 1);
         BSONObj projObj = BSONObj();
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj);
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj, sortObj, projObj);
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -472,7 +472,7 @@ public:
         }
 
         // Look for A Space Odyssey.
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns, BSON("foo" << 2001));
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, BSON("foo" << 2001));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -503,7 +503,7 @@ public:
         addIndex(BSON("d" << 1 << "e" << 1));
 
         // Query: find({a: 1}).sort({d: 1})
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns,
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss,
                                                          BSON("a" << 1),
                                                          BSON("d" << 1),  // sort
                                                          BSONObj());      // projection
@@ -542,7 +542,7 @@ public:
         // results. However, an index scan on 'b' will start producing results sooner
         // than an index scan on 'a'.
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(ns, fromjson("{a: 1, b: 1, c: {$gte: 5000}}"));
+            CanonicalQuery::canonicalize(nss, fromjson("{a: 1, b: 1, c: {$gte: 5000}}"));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -573,7 +573,7 @@ public:
         addIndex(BSON("a" << 1));
 
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(ns, fromjson("{a: 9, b: {$ne: 10}, c: 9}"));
+            CanonicalQuery::canonicalize(nss, fromjson("{a: 9, b: {$ne: 10}, c: 9}"));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());

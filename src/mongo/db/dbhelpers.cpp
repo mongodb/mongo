@@ -130,7 +130,7 @@ RecordId Helpers::findOne(OperationContext* txn,
 
     const WhereCallbackReal whereCallback(txn, collection->ns().db());
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns().ns(), query, whereCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, whereCallback);
     massert(17244, "Could not canonicalize " + query.toString(), statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

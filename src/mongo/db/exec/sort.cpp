@@ -229,7 +229,7 @@ void SortStageKeyGenerator::getBoundsForSort(const BSONObj& queryObj, const BSON
     params.indices.push_back(sortOrder);
 
     auto statusWithQueryForSort =
-        CanonicalQuery::canonicalize("fake_ns", queryObj, WhereCallbackNoop());
+        CanonicalQuery::canonicalize(NamespaceString("fake.ns"), queryObj, WhereCallbackNoop());
     verify(statusWithQueryForSort.isOK());
     unique_ptr<CanonicalQuery> queryForSort = std::move(statusWithQueryForSort.getValue());
 

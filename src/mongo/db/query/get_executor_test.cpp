@@ -43,7 +43,7 @@ namespace {
 
 using std::unique_ptr;
 
-static const char* ns = "somebogusns";
+static const NamespaceString nss("test.collection");
 
 /**
  * Utility functions to create a CanonicalQuery
@@ -54,7 +54,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj);
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj, sortObj, projObj);
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }

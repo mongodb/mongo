@@ -209,7 +209,8 @@ StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationC
     const NamespaceString nss(ns);
     const WhereCallbackReal whereCallback(txn, nss.db());
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, whereCallback);
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(std::move(nss), queryObj, sortObj, projObj, whereCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

@@ -82,20 +82,20 @@ public:
             MatchExpressionParser::WhereCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
+        NamespaceString nss,
         const BSONObj& query,
         const MatchExpressionParser::WhereCallback& whereCallback =
             MatchExpressionParser::WhereCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
+        NamespaceString nss,
         const BSONObj& query,
         bool explain,
         const MatchExpressionParser::WhereCallback& whereCallback =
             MatchExpressionParser::WhereCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
+        NamespaceString nss,
         const BSONObj& query,
         long long skip,
         long long limit,
@@ -103,7 +103,7 @@ public:
             MatchExpressionParser::WhereCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
+        NamespaceString nss,
         const BSONObj& query,
         const BSONObj& sort,
         const BSONObj& proj,
@@ -111,7 +111,7 @@ public:
             MatchExpressionParser::WhereCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
+        NamespaceString nss,
         const BSONObj& query,
         const BSONObj& sort,
         const BSONObj& proj,
@@ -121,7 +121,7 @@ public:
             MatchExpressionParser::WhereCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
+        NamespaceString nss,
         const BSONObj& query,
         const BSONObj& sort,
         const BSONObj& proj,
@@ -132,7 +132,7 @@ public:
             MatchExpressionParser::WhereCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const std::string& ns,
+        NamespaceString nss,
         const BSONObj& query,
         const BSONObj& sort,
         const BSONObj& proj,

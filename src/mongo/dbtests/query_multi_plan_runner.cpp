@@ -61,6 +61,8 @@ using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
 
+static const NamespaceString nss("unittests.QueryStageMultiPlanRunner");
+
 /**
  * Create query solution.
  */
@@ -75,31 +77,27 @@ QuerySolution* createQuerySolution() {
 class MultiPlanRunnerBase {
 public:
     MultiPlanRunnerBase() : _client(&_txn) {
-        OldClientWriteContext ctx(&_txn, ns());
-        _client.dropCollection(ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
+        _client.dropCollection(nss.ns());
     }
 
     virtual ~MultiPlanRunnerBase() {
-        OldClientWriteContext ctx(&_txn, ns());
-        _client.dropCollection(ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
+        _client.dropCollection(nss.ns());
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_txn, nss.ns(), obj));
     }
 
     void insert(const BSONObj& obj) {
-        OldClientWriteContext ctx(&_txn, ns());
-        _client.insert(ns(), obj);
+        OldClientWriteContext ctx(&_txn, nss.ns());
+        _client.insert(nss.ns(), obj);
     }
 
     void remove(const BSONObj& obj) {
-        OldClientWriteContext ctx(&_txn, ns());
-        _client.remove(ns(), obj);
-    }
-
-    static const char* ns() {
-        return "unittests.QueryStageMultiPlanRunner";
+        OldClientWriteContext ctx(&_txn, nss.ns());
+        _client.remove(nss.ns(), obj);
     }
 
 protected:
@@ -120,7 +118,7 @@ public:
 
         addIndex(BSON("foo" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForRead ctx(&_txn, nss.ns());
         const Collection* coll = ctx.getCollection();
 
         // Plan 0: IXScan over foo == 7
@@ -154,7 +152,7 @@ public:
             new CollectionScan(&_txn, csparams, sharedWs.get(), filter.get()));
 
         // Hand the plans off to the runner.
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), BSON("foo" << 7));
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, BSON("foo" << 7));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());
@@ -204,11 +202,11 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForRead ctx(&_txn, nss.ns());
         Collection* collection = ctx.getCollection();
 
         // Query for both 'a' and 'b' and sort on 'b'.
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns(),
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss,
                                                          BSON("a" << 1 << "b" << 1),  // query
                                                          BSON("b" << 1),              // sort
                                                          BSONObj());                  // proj

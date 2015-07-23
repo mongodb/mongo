@@ -189,7 +189,7 @@ protected:
     // Data members.
     //
 
-    static const char* ns;
+    static const NamespaceString nss;
 
     BSONObj queryObj;
     std::unique_ptr<CanonicalQuery> cq;

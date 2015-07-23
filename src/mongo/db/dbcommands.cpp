@@ -577,7 +577,8 @@ public:
         BSONObj sort = BSON("files_id" << 1 << "n" << 1);
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            auto statusWithCQ = CanonicalQuery::canonicalize(ns, query, sort, BSONObj());
+            auto statusWithCQ =
+                CanonicalQuery::canonicalize(NamespaceString(ns), query, sort, BSONObj());
             if (!statusWithCQ.isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return 0;

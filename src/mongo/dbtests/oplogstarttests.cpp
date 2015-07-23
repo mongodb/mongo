@@ -39,43 +39,35 @@ namespace OplogStartTests {
 using std::unique_ptr;
 using std::string;
 
+static const NamespaceString nss("unittests.oplogstarttests");
+
 class Base {
 public:
     Base()
         : _txn(),
           _scopedXact(&_txn, MODE_X),
           _lk(_txn.lockState()),
-          _context(&_txn, ns()),
+          _context(&_txn, nss.ns()),
           _client(&_txn) {
-        Collection* c = _context.db()->getCollection(ns());
+        Collection* c = _context.db()->getCollection(nss.ns());
         if (!c) {
             WriteUnitOfWork wuow(&_txn);
-            c = _context.db()->createCollection(&_txn, ns());
+            c = _context.db()->createCollection(&_txn, nss.ns());
             wuow.commit();
         }
         ASSERT(c->getIndexCatalog()->haveIdIndex(&_txn));
     }
 
     ~Base() {
-        client()->dropCollection(ns());
+        client()->dropCollection(nss.ns());
 
         // The OplogStart stage is not allowed to outlive it's RecoveryUnit.
         _stage.reset();
     }
 
 protected:
-    static const char* ns() {
-        return "unittests.oplogstarttests";
-    }
-    static const char* dbname() {
-        return "unittests";
-    }
-    static const char* collname() {
-        return "oplogstarttests";
-    }
-
     Collection* collection() {
-        return _context.db()->getCollection(ns());
+        return _context.db()->getCollection(nss.ns());
     }
 
     DBDirectClient* client() {
@@ -83,7 +75,7 @@ protected:
     }
 
     void setupFromQuery(const BSONObj& query) {
-        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), query);
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, query);
         ASSERT_OK(statusWithCQ.getStatus());
         _cq = std::move(statusWithCQ.getValue());
         _oplogws.reset(new WorkingSet());
@@ -122,7 +114,7 @@ class OplogStartIsOldest : public Base {
 public:
     void run() {
         for (int i = 0; i < 10; ++i) {
-            client()->insert(ns(), BSON("_id" << i << "ts" << i));
+            client()->insert(nss.ns(), BSON("_id" << i << "ts" << i));
         }
 
         setupFromQuery(BSON("ts" << BSON("$gte" << 10)));
@@ -146,7 +138,7 @@ class OplogStartIsNewest : public Base {
 public:
     void run() {
         for (int i = 0; i < 10; ++i) {
-            client()->insert(ns(), BSON("_id" << i << "ts" << i));
+            client()->insert(nss.ns(), BSON("_id" << i << "ts" << i));
         }
 
         setupFromQuery(BSON("ts" << BSON("$gte" << 1)));
@@ -173,7 +165,7 @@ class OplogStartIsNewestExtentHop : public Base {
 public:
     void run() {
         for (int i = 0; i < 10; ++i) {
-            client()->insert(ns(), BSON("_id" << i << "ts" << i));
+            client()->insert(nss.ns(), BSON("_id" << i << "ts" << i));
         }
 
         setupFromQuery(BSON("ts" << BSON("$gte" << 1)));
@@ -194,10 +186,10 @@ public:
 class SizedExtentHopBase : public Base {
 public:
     SizedExtentHopBase() {
-        client()->dropCollection(ns());
+        client()->dropCollection(nss.ns());
     }
     virtual ~SizedExtentHopBase() {
-        client()->dropCollection(ns());
+        client()->dropCollection(nss.ns());
     }
 
     void run() {
@@ -227,13 +219,13 @@ protected:
     void buildCollection() {
         BSONObj info;
         // Create a collection with specified extent sizes
-        BSONObj command = BSON("create" << collname() << "capped" << true << "$nExtents"
+        BSONObj command = BSON("create" << nss.coll() << "capped" << true << "$nExtents"
                                         << extentSizes() << "autoIndexId" << false);
-        ASSERT(client()->runCommand(dbname(), command, info));
+        ASSERT(client()->runCommand(nss.db().toString(), command, info));
 
         // Populate documents.
         for (int i = 0; i < numDocs(); ++i) {
-            client()->insert(ns(), BSON("_id" << i << "ts" << i << "payload" << payload8k()));
+            client()->insert(nss.ns(), BSON("_id" << i << "ts" << i << "payload" << payload8k()));
         }
     }
 
