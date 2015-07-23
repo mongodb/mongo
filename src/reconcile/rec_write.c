@@ -5046,6 +5046,9 @@ err:			__wt_scr_free(session, &tkey);
 		WT_FULL_BARRIER();
 	} else {
 		mod->rec_max_txn = r->max_txn;
+		if (!F_ISSET(r, WT_EVICTING) &&
+		    TXNID_LT(btree->rec_max_txn, r->max_txn))
+			btree->rec_max_txn = r->max_txn;
 
 		if (WT_ATOMIC_CAS4(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
