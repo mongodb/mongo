@@ -75,8 +75,8 @@ assert.eq( { _id: 1 }, t.find( { _id: 1 }, { "foo.bar": 1 } ).next() );
 assert.eq( { _id: 1, b: [ { c: 4 } ] },
            t.find( { _id: 1 }, { b: { $elemMatch: { c: 4 } } } ).next() );
 
-// Non-simple: $returnKey.
-assert.eq( { _id: 1 }, t.find( { _id: 1 } )._addSpecial( "$returnKey", true ).next() );
+// Non-simple: .returnKey().
+assert.eq( { _id: 1 }, t.find( { _id: 1 } ).returnKey().next() );
 
-// Non-simple: $returnKey overrides other projections.
-assert.eq( { _id: 1 }, t.find( { _id: 1 }, { a: 1 } )._addSpecial( "$returnKey", true ).next() );
+// Non-simple: .returnKey() overrides other projections.
+assert.eq( { _id: 1 }, t.find( { _id: 1 }, { a: 1 } ).returnKey().next() );

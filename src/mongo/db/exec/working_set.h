@@ -195,7 +195,7 @@ enum WorkingSetComputedDataType {
     // What's the distance from a geoNear query point to the document?
     WSM_COMPUTED_GEO_DISTANCE = 1,
 
-    // The index key used to retrieve the document, for $returnKey query option.
+    // The index key used to retrieve the document, for returnKey query option.
     WSM_INDEX_KEY = 2,
 
     // What point (of several possible points) was used to compute the distance to the document

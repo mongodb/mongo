@@ -1188,7 +1188,7 @@ TEST_F(QueryPlannerTest, MaxMinBadHintSelectsReverseIndex) {
 
 
 //
-// $snapshot
+// snapshot
 //
 
 TEST_F(QueryPlannerTest, Snapshot) {

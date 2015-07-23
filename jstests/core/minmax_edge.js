@@ -1,5 +1,5 @@
 /*
- * Test that $min and $max queries properly handle the edge cases with NaN and Infinity.
+ * Test that .min() and .max() queries properly handle the edge cases with NaN and Infinity.
  * Other edge cases are covered by C++ unit tests.
  */
 

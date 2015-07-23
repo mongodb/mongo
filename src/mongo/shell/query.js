@@ -41,6 +41,8 @@ DBQuery.prototype.help = function () {
     print("\t.max(idxDoc)")
     print("\t.comment(comment)")
     print("\t.snapshot()")
+    print("\t.returnKey()")
+    print("\t.maxScan(n)")
     print("\t.readPref(mode, tagset)")
     
     print("\nCursor methods");
@@ -463,6 +465,14 @@ DBQuery.prototype.explain = function (verbose) {
 
 DBQuery.prototype.snapshot = function(){
     return this._addSpecial( "$snapshot" , true );
+}
+
+DBQuery.prototype.returnKey = function(){
+    return this._addSpecial( "$returnKey" , true );
+}
+
+DBQuery.prototype.maxScan = function(n){
+    return this._addSpecial( "$maxScan" , n );
 }
 
 DBQuery.prototype.pretty = function(){

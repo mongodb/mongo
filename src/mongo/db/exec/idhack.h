@@ -104,7 +104,7 @@ private:
     // Have we returned our one document?
     bool _done;
 
-    // Do we need to add index key metadata for $returnKey?
+    // Do we need to add index key metadata for returnKey?
     bool _addKeyMetadata;
 
     // If we want to return a RecordId and it points to something that's not in memory,

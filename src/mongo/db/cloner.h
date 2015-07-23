@@ -97,7 +97,7 @@ private:
 /**
  *  slaveOk     - if true it is ok if the source of the data is !ismaster.
  *  useReplAuth - use the credentials we normally use as a replication slave for the cloning
- *  snapshot    - use $snapshot mode for copying collections.  note this should not be used
+ *  snapshot    - use snapshot mode for copying collections.  note this should not be used
  *                when it isn't required, as it will be slower.  for example,
  *                repairDatabase need not use it.
  */

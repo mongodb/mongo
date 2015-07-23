@@ -570,10 +570,10 @@ Status LiteParsedQuery::validate() const {
 
     if (_snapshot) {
         if (!_sort.isEmpty()) {
-            return Status(ErrorCodes::BadValue, "E12001 can't use sort with $snapshot");
+            return Status(ErrorCodes::BadValue, "E12001 can't use sort with snapshot");
         }
         if (!_hint.isEmpty()) {
-            return Status(ErrorCodes::BadValue, "E12002 can't use hint with $snapshot");
+            return Status(ErrorCodes::BadValue, "E12002 can't use hint with snapshot");
         }
     }
 

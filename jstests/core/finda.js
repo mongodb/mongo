@@ -41,7 +41,7 @@ function makeCursor( query, projection, sort, batchSize, returnKey ) {
         print("bs: " + batchSize);
     }
     if ( returnKey ) {
-        cursor._addSpecial( "$returnKey", true );
+        cursor.returnKey();
     }
     return cursor;
 }

@@ -21,13 +21,12 @@ if ( lookAtDocumentMetrics ) {
 t.save( { a : 1 , b : "hi" } );
 t.save( { a : 2 , b : "hi" } );
 
-/* very basic test of $snapshot just that we get some result */
-// we are assumign here that snapshot uses the id index; maybe one day it doesn't if so this would need to change then
-assert( t.find({$query:{},$snapshot:1})[0].a == 1 , "$snapshot simple test 1" );
+// Basic test of .snapshot().
+assert( t.find().snapshot()[0].a == 1 , ".snapshot() simple test 1" );
 var q = t.findOne();
 q.c = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
 t.save(q); // will move a:1 object to after a:2 in the file 
-assert( t.find({$query:{},$snapshot:1})[0].a == 1 , "$snapshot simple test 2" );
+assert( t.find().snapshot()[0].a == 1 , ".snapshot() simple test 2" );
 
 assert( t.findOne( { a : 1 } ).b != null , "A" );
 assert( t.findOne( { a : 1 } , { a : 1 } ).b == null , "B");
