@@ -320,6 +320,24 @@ quick_exit_env.Library(
     ]
 )
 
+env.Library(
+    target="secure_zero_memory",
+    source=[
+        'secure_zero_memory.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
+env.CppUnitTest(
+    target='secure_zero_memory_test',
+    source=['secure_zero_memory_test.cpp'],
+    LIBDEPS=[
+        'secure_zero_memory'
+    ],
+)
+
 if not env.TargetOSIs('windows'):
     env.CppUnitTest(
         target='signal_handlers_synchronous_test',

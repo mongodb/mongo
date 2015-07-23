@@ -1718,6 +1718,29 @@ def doConfigure(myenv):
 
     conf.Finish()
 
+    def CheckMemset_s(context):
+        test_body = """
+        #define __STDC_WANT_LIB_EXT1__ 1
+        #include <cstring>
+        int main(int argc, char* argv[]) {
+            void* data = nullptr;
+            return memset_s(data, 0, 0, 0);
+        }
+        """
+
+        context.Message('Checking for memset_s... ')
+        ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
+        context.Result(ret)
+        return ret
+
+    conf = Configure(env, custom_tests = {
+        'CheckMemset_s' : CheckMemset_s,
+    })
+    if conf.CheckMemset_s():
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_MEMSET_S")
+
+    conf.Finish()
+
     # If we are using libstdc++, check to see if we are using a libstdc++ that is older than
     # our GCC minimum of 4.8.2. This is primarly to help people using clang on OS X but
     # forgetting to use --libc++ (or set the target OS X version high enough to get it as the
