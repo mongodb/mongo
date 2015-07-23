@@ -100,7 +100,7 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
 
 /*
  * __wt_wiredtiger_error --
- *\tReturn a constant string for WiredTiger POSIX-standard and errors.
+ *\tReturn a constant string for POSIX-standard and WiredTiger errors.
  */
 const char *
 __wt_wiredtiger_error(int error)
@@ -119,8 +119,8 @@ for err in errors:
 tfile.write('''\t}
 
 \t/*
-\t * POSIX errors are non-negative integers; check for 0 explicitly
-\t * in-case the underlying strerror doesn't handle 0, some don't.
+\t * POSIX errors are non-negative integers; check for 0 explicitly incase
+\t * the underlying strerror doesn't handle 0, some historically didn't.
 \t */
 \tif (error == 0)
 \t\treturn ("Successful return: 0");
