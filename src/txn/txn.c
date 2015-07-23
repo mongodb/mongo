@@ -59,7 +59,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 
 	WT_ASSERT(session,
 	    txn_state->snap_min == WT_TXN_NONE ||
-	    session->txn.isolation == TXN_ISO_READ_UNCOMMITTED ||
+	    session->txn.isolation == WT_ISO_READ_UNCOMMITTED ||
 	    !__wt_txn_visible_all(session, txn_state->snap_min));
 
 	txn_state->snap_min = WT_TXN_NONE;
@@ -299,9 +299,9 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.len != 0)
 		txn->isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
-		    TXN_ISO_SNAPSHOT :
+		    WT_ISO_SNAPSHOT :
 		    WT_STRING_MATCH("read-committed", cval.str, cval.len) ?
-		    TXN_ISO_READ_COMMITTED : TXN_ISO_READ_UNCOMMITTED;
+		    WT_ISO_READ_COMMITTED : WT_ISO_READ_UNCOMMITTED;
 
 	/*
 	 * The default sync setting is inherited from the connection, but can

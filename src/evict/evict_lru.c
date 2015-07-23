@@ -692,7 +692,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_txn_update_oldest(session, 1);
 	txn = &session->txn;
 	saved_iso = txn->isolation;
-	txn->isolation = TXN_ISO_EVICTION;
+	txn->isolation = WT_ISO_EVICTION;
 
 	/*
 	 * Sanity check: if a transaction has updates, its updates should not
