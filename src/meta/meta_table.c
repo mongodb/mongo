@@ -48,13 +48,21 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, session->meta_dhandle != NULL);
 
 	/* 
-	 * Set special flags for the metadata file.
-	 * Eviction; the metadata file is never evicted.
-	 * Logging; the metadata file is always logged if possible.
+	 * Set special flags for the metadata file: eviction (the metadata file
+	 * is in-memory and never evicted), logging (the metadata file is always
+	 * logged if possible).
+	 *
+	 * Test flags before setting them so updates can't race in subsequent
+	 * opens (the first update is safe because it's single-threaded from
+	 * wiredtiger_open).
 	 */
 	btree = S2BT(session);
-	F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
-	F_CLR(btree, WT_BTREE_NO_LOGGING);
+	if (!F_ISSET(btree, WT_BTREE_IN_MEMORY))
+		F_SET(btree, WT_BTREE_IN_MEMORY);
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		F_SET(btree, WT_BTREE_NO_EVICTION);
+	if (F_ISSET(btree, WT_BTREE_NO_LOGGING))
+		F_CLR(btree, WT_BTREE_NO_LOGGING);
 
 	/* The metadata handle doesn't need to stay locked -- release it. */
 	return (__wt_session_release_btree(session));
