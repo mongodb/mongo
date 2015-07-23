@@ -83,7 +83,6 @@ int
 __wt_las_destroy(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 
