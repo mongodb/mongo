@@ -399,8 +399,6 @@ StatusWith<RecordId> Collection::_insertDocument(OperationContext* txn,
     invariant(RecordId::min() < loc.getValue());
     invariant(loc.getValue() < RecordId::max());
 
-    _infoCache.notifyOfWriteOp();
-
     Status s = _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
     if (!s.isOK())
         return StatusWith<RecordId>(s);
@@ -445,8 +443,6 @@ void Collection::deleteDocument(
     _indexCatalog.unindexRecord(txn, doc.value(), loc, noWarn);
 
     _recordStore->deleteRecord(txn, loc);
-
-    _infoCache.notifyOfWriteOp();
 
     if (!id.isEmpty()) {
         getGlobalServiceContext()->getOpObserver()->onDelete(txn, ns().ns(), id);
@@ -531,11 +527,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
     }
 
     // At this point, the old object may or may not still be indexed, depending on if it was
-    // moved.
-
-    _infoCache.notifyOfWriteOp();
-
-    // If the object did move, we need to add the new location to all indexes.
+    // moved. If the object did move, we need to add the new location to all indexes.
     if (newLocation.getValue() != oldLocation) {
         if (debug) {
             if (debug->nmoved == -1)  // default of -1 rather than 0

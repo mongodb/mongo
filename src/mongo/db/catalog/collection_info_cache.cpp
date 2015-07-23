@@ -123,12 +123,6 @@ void CollectionInfoCache::computeIndexKeys(OperationContext* txn) {
     _keysComputed = true;
 }
 
-void CollectionInfoCache::notifyOfWriteOp() {
-    if (NULL != _planCache.get()) {
-        _planCache->notifyOfWriteOp();
-    }
-}
-
 void CollectionInfoCache::clearQueryCache() {
     if (NULL != _planCache.get()) {
         _planCache->clear();

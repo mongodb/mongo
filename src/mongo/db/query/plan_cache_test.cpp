@@ -388,46 +388,6 @@ TEST(PlanCacheTest, AddValidSolution) {
     ASSERT_EQUALS(planCache.size(), 1U);
 }
 
-TEST(PlanCacheTest, NotifyOfWriteOp) {
-    PlanCache planCache;
-    unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
-    QuerySolution qs;
-    qs.cacheData.reset(new SolutionCacheData());
-    qs.cacheData->tree.reset(new PlanCacheIndexTree());
-    std::vector<QuerySolution*> solns;
-    solns.push_back(&qs);
-    ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
-    ASSERT_EQUALS(planCache.size(), 1U);
-
-    // First (N - 1) write ops should have no effect on cache contents.
-    for (int i = 0; i < (internalQueryCacheWriteOpsBetweenFlush - 1); ++i) {
-        planCache.notifyOfWriteOp();
-    }
-    ASSERT_EQUALS(planCache.size(), 1U);
-
-    // N-th notification will cause cache to be cleared.
-    planCache.notifyOfWriteOp();
-    ASSERT_EQUALS(planCache.size(), 0U);
-
-    // Clearing the cache should reset the internal write
-    // operation counter.
-    // Repopulate cache. Write (N - 1) times.
-    // Clear cache.
-    // Add cache entry again.
-    // After clearing and adding a new entry, the next write operation should not
-    // clear the cache.
-    ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
-    for (int i = 0; i < (internalQueryCacheWriteOpsBetweenFlush - 1); ++i) {
-        planCache.notifyOfWriteOp();
-    }
-    ASSERT_EQUALS(planCache.size(), 1U);
-    planCache.clear();
-    ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
-    // Notification after clearing will not flush cache.
-    planCache.notifyOfWriteOp();
-    ASSERT_EQUALS(planCache.size(), 1U);
-}
-
 /**
  * Each test in the CachePlanSelectionTest suite goes through
  * the following flow:

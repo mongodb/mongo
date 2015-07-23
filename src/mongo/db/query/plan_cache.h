@@ -381,12 +381,6 @@ public:
     size_t size() const;
 
     /**
-     *  You must notify the cache if you are doing writes, as query plan utility will change.
-     *  Cache is flushed after every 1000 notifications.
-     */
-    void notifyOfWriteOp();
-
-    /**
      * Updates internal state kept about the collection's indexes.  Must be called when the set
      * of indexes on the associated collection have changed.
      *

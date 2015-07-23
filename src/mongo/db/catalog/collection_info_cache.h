@@ -84,9 +84,6 @@ public:
 
     void clearQueryCache();
 
-    /* you must notify the cache if you are doing writes, as query plan utility will change */
-    void notifyOfWriteOp();
-
 private:
     Collection* _collection;  // not owned
 

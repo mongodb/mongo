@@ -69,9 +69,6 @@ extern int internalQueryCacheFeedbacksStored;
 // and replanning?
 extern double internalQueryCacheEvictionRatio;
 
-// How many write ops should we allow in a collection before tossing all cache entries?
-extern int internalQueryCacheWriteOpsBetweenFlush;
-
 //
 // Planning and enumeration.
 //
