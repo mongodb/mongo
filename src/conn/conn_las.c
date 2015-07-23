@@ -36,7 +36,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	/* Lock the lookaside table and check if we won the race. */
+	/* Lock the lookaside file and check if we won the race. */
 	__wt_spin_lock(session, &conn->las_lock);
 	if (conn->las_cursor != NULL) {
 		__wt_spin_unlock(session, &conn->las_lock);
@@ -45,7 +45,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 
 	/* Open an internal session, used for lookaside cursors. */
 	WT_ERR(__wt_open_internal_session(
-	    conn, "lookaside table", 1, 1, &conn->las_session));
+	    conn, "lookaside file", 1, 1, &conn->las_session));
 	session = conn->las_session;
 
 	/* Discard any previous incarnation of the file. */
@@ -64,10 +64,12 @@ __wt_las_create(WT_SESSION_IMPL *session)
 
 	/*
 	 * No eviction.
-	 * No lookaside records during reconciliation.
+	 * Forced discard on release.
+	 * No lookaside records for the lookaside file during reconciliation.
 	 * No checkpoints or logging.
 	 */
 	F_SET(session, WT_SESSION_NO_EVICTION);
+	F_SET(session->dhandle, WT_DHANDLE_DISCARD_FORCE);
 	F_SET(S2BT(session),
 	    WT_BTREE_LAS_FILE | WT_BTREE_NO_CHECKPOINT | WT_BTREE_NO_LOGGING);
 
@@ -98,17 +100,20 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 	/*
 	 * Clear the references (this isn't just for clarity, the underlying
 	 * code uses the non-NULL cursor to determine if information in the
-	 * lookaside table needs to be updated as blocks are freed).
-	 *
-	 * KEITH:
-	 * This isn't right; we should be setting WT_SYNC_DISCARD_FORCE and
-	 * simply discarding the dirty blocks before dropping the file.
+	 * lookaside file needs to be updated as blocks are freed).
 	 */
 	conn->las_cursor = NULL;
 	conn->las_session = NULL;
 
-	/* Discard any incarnation of the file. */
-	WT_TRET(__las_drop(conn->las_session));
+	/*
+	 * Discard any incarnation of the file.
+	 *
+	 * KEITH: I'm not sure about this: if WT_DHANDLE_DISCARD_FORCE isn't set
+	 * on the lookaside data handle, we drop core removing the Btree handle
+	 * from the connection session's hash list. We want to forcibly discard
+	 * the file, but I'm concerned I'm using sessions in some illegal way.
+	 */
+	WT_TRET(__las_drop(session));
 
 	return (ret);
 }
