@@ -185,8 +185,7 @@ setup_truncate(CONFIG *cfg,
 
 	/* We have data */
 	start_point_val = decode_key(key);
-	cursor->reset(cursor);
-	if ((ret = cursor->prev(cursor)) != 0 ||
+	if ((cursor->reset(cursor)) != 0 || (ret = cursor->prev(cursor)) != 0 ||
 	    (ret = cursor->get_key(cursor, &key)) != 0) {
 		lprintf(cfg, ret, 0, "truncate setup end: failed");
 		goto err;
@@ -293,6 +292,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
 		(void)usleep(1000);
 		*trk = &thread->truncate_sleep;
 	}
+	/* We don't close the cursor here as it does not belong to us */
 err:	return (ret);
 }
 

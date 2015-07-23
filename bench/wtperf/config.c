@@ -244,9 +244,9 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				continue;
 			}
 			if (STRING_MATCH("truncate", k.str, k.len)) {
-				workp->truncate = v.val;
-				if (workp->truncate > 0)
-					cfg->has_truncate = 1;
+				if ((workp->truncate = v.val) != 1)
+					goto err;
+				cfg->has_truncate = 1;
 				continue;
 			}
 			if (STRING_MATCH("truncate_pct", k.str, k.len)) {
