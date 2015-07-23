@@ -173,30 +173,6 @@ __evict_server(void *arg)
 			break;
 
 		/*
-		 * If we have caught up and there are more than the minimum
-		 * number of eviction workers running, shut one down.
-		 */
-		if (conn->evict_workers > conn->evict_workers_min) {
-			WT_TRET(__wt_verbose(session, WT_VERB_EVICTSERVER,
-			    "Stopping evict worker: %"PRIu32"\n",
-			    conn->evict_workers));
-			worker = &conn->evict_workctx[--conn->evict_workers];
-			F_CLR(worker, WT_EVICT_WORKER_RUN);
-			WT_TRET(__wt_cond_signal(
-			    session, cache->evict_waiter_cond));
-			WT_TRET(__wt_thread_join(session, worker->tid));
-			/*
-			 * Flag errors here with a message, but don't shut down
-			 * the eviction server - that's fatal.
-			 */
-			WT_ASSERT(session, ret == 0);
-			if (ret != 0) {
-				(void)__wt_msg(session,
-				    "Error stopping eviction worker: %d", ret);
-				ret = 0;
-			}
-		}
-		/*
 		 * Clear the walks so we don't pin pages while asleep,
 		 * otherwise we can block applications evicting large pages.
 		 */
