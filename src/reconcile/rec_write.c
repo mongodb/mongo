@@ -5430,7 +5430,7 @@ err:			__wt_scr_free(session, &tkey);
 		 * tree, and checkpoint visits every dirty page in the tree.
 		 */
 		if (!F_ISSET(r, WT_EVICTING) &&
-		    !WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
+		    WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
 			btree->rec_max_txn = r->max_txn;
 
 		/*
