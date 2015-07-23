@@ -128,7 +128,6 @@ public:
               bool assertOk = true,
               std::string* actualServer = 0);
     void say(mongo::Message& toSend, bool isRetry = false, std::string* actualServer = 0);
-    void sayPiggyBack(mongo::Message& toSend);
     bool lazySupported() const;
 
 private:

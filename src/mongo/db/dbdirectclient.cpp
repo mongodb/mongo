@@ -89,11 +89,6 @@ std::string DBDirectClient::getServerAddress() const {
     return "localhost";  // TODO: should this have the port?
 }
 
-void DBDirectClient::sayPiggyBack(Message& toSend) {
-    // don't need to piggy back when connected locally
-    return say(toSend);
-}
-
 bool DBDirectClient::callRead(Message& toSend, Message& response) {
     return call(toSend, response);
 }
@@ -153,12 +148,6 @@ unique_ptr<DBClientCursor> DBDirectClient::query(const string& ns,
                                                  int batchSize) {
     return DBClientBase::query(
         ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
-}
-
-void DBDirectClient::killCursor(long long id) {
-    // The killCursor command on the DB client is only used by sharding,
-    // so no need to have it for MongoD.
-    verify(!"killCursor should not be used in MongoD");
 }
 
 const HostAndPort DBDirectClient::dummyHost("0.0.0.0", 0);

@@ -107,7 +107,6 @@ public:
 
     virtual bool call(Message& toSend, Message& response, bool assertOk, std::string* actualServer);
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
-    virtual void sayPiggyBack(Message& toSend);
 
     virtual void killCursor(long long cursorID);
 

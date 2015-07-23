@@ -70,46 +70,6 @@ void AbstractMessagingPort::setConnectionId(long long connectionId) {
 
 /* messagingport -------------------------------------------------------------- */
 
-class PiggyBackData {
-public:
-    PiggyBackData(MessagingPort* port) {
-        _port = port;
-        _buf = new char[1300];
-        _cur = _buf;
-    }
-
-    ~PiggyBackData() {
-        DESTRUCTOR_GUARD(flush(); delete[](_cur););
-    }
-
-    void append(Message& m) {
-        verify(m.header().getLen() <= 1300);
-
-        if (len() + m.header().getLen() > 1300)
-            flush();
-
-        memcpy(_cur, m.singleData().view2ptr(), m.header().getLen());
-        _cur += m.header().getLen();
-    }
-
-    void flush() {
-        if (_buf == _cur)
-            return;
-
-        _port->send(_buf, len(), "flush");
-        _cur = _buf;
-    }
-
-    int len() const {
-        return _cur - _buf;
-    }
-
-private:
-    MessagingPort* _port;
-    char* _buf;
-    char* _cur;
-};
-
 class Ports {
     std::set<MessagingPort*> ports;
     stdx::mutex m;
@@ -142,18 +102,16 @@ void MessagingPort::closeAllSockets(unsigned mask) {
     ports.closeAll(mask);
 }
 
-MessagingPort::MessagingPort(int fd, const SockAddr& remote)
-    : psock(new Socket(fd, remote)), piggyBackData(0) {
+MessagingPort::MessagingPort(int fd, const SockAddr& remote) : psock(new Socket(fd, remote)) {
     ports.insert(this);
 }
 
 MessagingPort::MessagingPort(double timeout, logger::LogSeverity ll)
     : psock(new Socket(timeout, ll)) {
     ports.insert(this);
-    piggyBackData = 0;
 }
 
-MessagingPort::MessagingPort(std::shared_ptr<Socket> sock) : psock(sock), piggyBackData(0) {
+MessagingPort::MessagingPort(std::shared_ptr<Socket> sock) : psock(sock) {
     ports.insert(this);
 }
 
@@ -166,8 +124,6 @@ void MessagingPort::shutdown() {
 }
 
 MessagingPort::~MessagingPort() {
-    if (piggyBackData)
-        delete (piggyBackData);
     shutdown();
     ports.erase(this);
 }
@@ -294,38 +250,7 @@ void MessagingPort::say(Message& toSend, int responseTo) {
     mmm(log() << "*  say()  thr:" << GetCurrentThreadId() << endl;)
         toSend.header().setId(nextMessageId());
     toSend.header().setResponseTo(responseTo);
-
-    if (piggyBackData && piggyBackData->len()) {
-        mmm(log() << "*     have piggy back"
-                  << endl;) if ((piggyBackData->len() + toSend.header().getLen()) > 1300) {
-            // won't fit in a packet - so just send it off
-            piggyBackData->flush();
-        }
-        else {
-            piggyBackData->append(toSend);
-            piggyBackData->flush();
-            return;
-        }
-    }
-
     toSend.send(*this, "say");
-}
-
-void MessagingPort::piggyBack(Message& toSend, int responseTo) {
-    if (toSend.header().getLen() > 1300) {
-        // not worth saving because its almost an entire packet
-        say(toSend);
-        return;
-    }
-
-    // we're going to be storing this, so need to set it up
-    toSend.header().setId(nextMessageId());
-    toSend.header().setResponseTo(responseTo);
-
-    if (!piggyBackData)
-        piggyBackData = new PiggyBackData(this);
-
-    piggyBackData->append(toSend);
 }
 
 HostAndPort MessagingPort::remote() const {

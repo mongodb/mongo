@@ -230,10 +230,6 @@ protected:
     */
     virtual void _auth(const BSONObj& params);
 
-    virtual void sayPiggyBack(Message& toSend) {
-        checkMaster()->say(toSend);
-    }
-
 private:
     /**
      * Used to simplify slave-handling logic on errors

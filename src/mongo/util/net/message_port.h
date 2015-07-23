@@ -39,7 +39,6 @@
 namespace mongo {
 
 class MessagingPort;
-class PiggyBackData;
 
 class MessagingPort : public AbstractMessagingPort {
 public:
@@ -78,8 +77,6 @@ public:
      *       horrible things will happen
      */
     bool recv(const Message& sent, Message& response);
-
-    void piggyBack(Message& toSend, int responseTo = 0);
 
     unsigned remotePort() const {
         return psock->remotePort();
@@ -121,16 +118,12 @@ public:
     }
 
 private:
-    PiggyBackData* piggyBackData;
-
     // this is the parsed version of remote
     // mutable because its initialized only on call to remote()
     mutable HostAndPort _remoteParsed;
 
 public:
     static void closeAllSockets(unsigned tagMask = 0xffffffff);
-
-    friend class PiggyBackData;
 };
 
 

@@ -220,9 +220,6 @@ static ExitCode runMongosServer(bool doUpgrade) {
     globalConnPool.addHook(new ShardingConnectionHook(false));
     shardConnectionPool.addHook(new ShardingConnectionHook(true));
 
-    // Mongos shouldn't lazily kill cursors, otherwise we can end up with extras from migration
-    DBClientConnection::setLazyKillCursor(false);
-
     ReplicaSetMonitor::setConfigChangeHook(&ConfigServer::replicaSetChange);
 
     // Mongos connection pools already takes care of authenticating new connections so the

@@ -580,10 +580,6 @@ void SyncClusterConnection::say(Message& toSend, bool isRetry, string* actualSer
     _checkLast();
 }
 
-void SyncClusterConnection::sayPiggyBack(Message& toSend) {
-    verify(0);
-}
-
 int SyncClusterConnection::_lockType(const string& name) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);

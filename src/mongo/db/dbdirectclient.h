@@ -81,10 +81,6 @@ public:
 
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
 
-    virtual void sayPiggyBack(Message& toSend);
-
-    virtual void killCursor(long long cursorID);
-
     virtual bool callRead(Message& toSend, Message& response);
 
     virtual unsigned long long count(const std::string& ns,

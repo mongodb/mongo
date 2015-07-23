@@ -402,7 +402,6 @@ public:
                       bool assertOk = true,
                       std::string* actualServer = 0) = 0;
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0) = 0;
-    virtual void sayPiggyBack(Message& toSend) = 0;
     /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
     virtual bool recv(Message& m) {
         verify(false);
@@ -1085,7 +1084,7 @@ public:
      */
     virtual bool isStillConnected() = 0;
 
-    virtual void killCursor(long long cursorID) = 0;
+    virtual void killCursor(long long cursorID);
 
     virtual bool callRead(Message& toSend, Message& response) = 0;
 
@@ -1230,7 +1229,6 @@ public:
         return _serverAddress;
     }
 
-    virtual void killCursor(long long cursorID);
     virtual bool callRead(Message& toSend, Message& response) {
         return call(toSend, response);
     }
@@ -1266,19 +1264,11 @@ public:
      */
     void setParentReplSetName(const std::string& replSetName);
 
-    static void setLazyKillCursor(bool lazy) {
-        _lazyKillCursor = lazy;
-    }
-    static bool getLazyKillCursor() {
-        return _lazyKillCursor;
-    }
-
     uint64_t getSockCreationMicroSec() const;
 
 protected:
     friend class SyncClusterConnection;
     virtual void _auth(const BSONObj& params);
-    virtual void sayPiggyBack(Message& toSend);
 
     std::unique_ptr<MessagingPort> _port;
 
@@ -1301,7 +1291,6 @@ protected:
     double _so_timeout;
 
     static AtomicInt32 _numConnections;
-    static bool _lazyKillCursor;  // lazy means we piggy back kill cursors on next op
 
 private:
     /**

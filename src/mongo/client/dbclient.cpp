@@ -1318,6 +1318,17 @@ void DBClientBase::update(const string& ns, Query query, BSONObj obj, int flags)
     say(toSend);
 }
 
+void DBClientBase::killCursor(long long cursorId) {
+    StackBufBuilder b;
+    b.appendNum((int)0);  // reserved
+    b.appendNum((int)1);  // number
+    b.appendNum(cursorId);
+
+    Message m;
+    m.setData(dbKillCursors, b.buf(), b.len());
+    say(m);
+}
+
 list<BSONObj> DBClientWithCommands::getIndexSpecs(const string& ns, int options) {
     list<BSONObj> specs;
 
@@ -1504,10 +1515,6 @@ void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer
     }
 }
 
-void DBClientConnection::sayPiggyBack(Message& toSend) {
-    port().piggyBack(toSend);
-}
-
 bool DBClientConnection::recv(Message& m) {
     if (port().recv(m)) {
         return true;
@@ -1580,21 +1587,6 @@ void DBClientConnection::checkResponse(const char* data, int nReturned, bool* re
     }
 }
 
-void DBClientConnection::killCursor(long long cursorId) {
-    StackBufBuilder b;
-    b.appendNum((int)0);  // reserved
-    b.appendNum((int)1);  // number
-    b.appendNum(cursorId);
-
-    Message m;
-    m.setData(dbKillCursors, b.buf(), b.len());
-
-    if (_lazyKillCursor)
-        sayPiggyBack(m);
-    else
-        say(m);
-}
-
 void DBClientConnection::setParentReplSetName(const string& replSetName) {
     _parentReplSetName = replSetName;
 }
@@ -1616,8 +1608,6 @@ void DBClientConnection::handleNotMasterResponse(const BSONElement& elemToCheck)
 }
 
 AtomicInt32 DBClientConnection::_numConnections;
-bool DBClientConnection::_lazyKillCursor = true;
-
 
 /** @return the database name portion of an ns string */
 string nsGetDB(const string& ns) {

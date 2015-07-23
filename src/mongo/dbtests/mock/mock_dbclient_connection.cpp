@@ -198,10 +198,6 @@ void MockDBClientConnection::say(mongo::Message& toSend, bool isRetry, string* a
     verify(false);  // unimplemented
 }
 
-void MockDBClientConnection::sayPiggyBack(mongo::Message& toSend) {
-    verify(false);  // unimplemented
-}
-
 bool MockDBClientConnection::lazySupported() const {
     verify(false);  // unimplemented
     return false;

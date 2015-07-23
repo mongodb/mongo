@@ -52,7 +52,6 @@ const size_t MaxMessageSizeBytes = 48 * 1000 * 1000;
 
 class Message;
 class MessagingPort;
-class PiggyBackData;
 
 typedef uint32_t MSGID;
 
