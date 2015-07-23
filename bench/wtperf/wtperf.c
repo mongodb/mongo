@@ -237,6 +237,8 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
 	char *truncate_key;
 	int ret;
 
+	ret = 0;
+
 	/* Update the total inserts */
 	trunc->total_gross_inserts = sum_insert_ops(cfg);
 
@@ -247,6 +249,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
 	/* We have enough data, so we can setup milestones and truncate */
 	if (trunc->expected_total > trunc->needed_milestones) {
 		while (trunc->num_milestones < trunc->needed_milestones) {
+			trunc->last_key += trunc->truncate_milestone_gap;
 			truncate_key = calloc(cfg->key_sz, 1);
 			truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 			if (truncate_item == NULL) {
@@ -260,7 +263,6 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
 			STAILQ_INSERT_TAIL(
 			    &cfg->truncate_stone_head, truncate_item, q);
 			trunc->num_milestones++;
-			trunc->last_key += trunc->truncate_milestone_gap;
 		}
 
 		/* We have too much data, we need to truncate */
@@ -270,14 +272,16 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
 			trunc->num_milestones--;
 			STAILQ_REMOVE_HEAD(&cfg->truncate_stone_head, q);
 			cursor->set_key(cursor,truncate_item->key);
-			cursor->search(cursor);
-			ret = session->truncate(session,
-			    NULL, NULL, cursor, NULL);
-			trunc->expected_total -= truncate_item->diff;
-			if (ret != 0) {
-				lprintf(cfg, ret, 0, "Truncate failed");
-				return (ret);
+			if ((ret = cursor->search(cursor)) != 0) {
+				lprintf(cfg, ret, 0, "Truncate search: failed");
+				goto err;
 			}
+			if ((ret = session->truncate(session,
+			    NULL, NULL, cursor, NULL)) != 0) {
+				lprintf(cfg, ret, 0, "Truncate: failed");
+				goto err;
+			}
+			trunc->expected_total -= truncate_item->diff;
 			free(truncate_item->key);
 			free(truncate_item);
 			truncate_item = NULL;
@@ -289,7 +293,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread, TRACK **trk,
 		(void)usleep(1000);
 		*trk = &thread->truncate_sleep;
 	}
-	return (0);
+err:	return (ret);
 }
 
 static int
@@ -624,11 +628,10 @@ worker(void *arg)
 	}
 
 	/* Setup for truncate */
-	if (thread->workload->truncate != 0) {
+	if (thread->workload->truncate != 0)
 		if ((ret = setup_truncate(cfg,
 		    thread, &truncate_config, session)) != 0)
 			goto err;
-	}
 
 	while (!cfg->stop) {
 		/*
@@ -661,6 +664,7 @@ worker(void *arg)
 				continue;
 			break;
 		case WORKER_TRUNCATE:
+			trk = &thread->truncate;
 			next_val = wtperf_rand(thread);
 			break;
 		default:
@@ -722,16 +726,14 @@ worker(void *arg)
 			if (cfg->random_value)
 				randomize_value(thread, value_buf);
 			cursor->set_value(cursor, value_buf);
-			if ((ret = cursor->insert(cursor)) == 0) {
+			if ((ret = cursor->insert(cursor)) == 0)
 				break;
-			}
 			goto op_err;
 		case WORKER_TRUNCATE:
-			trk = &thread->truncate;
 			if ((ret = run_truncate(cfg, thread,
-			    &trk, &truncate_config, cursor, session)) != 0)
-				goto err;
-			break;
+			    &trk, &truncate_config, cursor, session)) == 0)
+				break;
+			goto op_err;
 		case WORKER_UPDATE:
 			if ((ret = cursor->search(cursor)) == 0) {
 				if ((ret = cursor->get_value(
@@ -841,14 +843,13 @@ op_err:			lprintf(cfg, ret, 0,
 err:		cfg->error = cfg->stop = 1;
 	}
 	/* Empty the truncate queue before close */
-	if (thread->workload->truncate != 0) {
+	if (thread->workload->truncate != 0)
 		while (!STAILQ_EMPTY(&cfg->truncate_stone_head)) {
 			truncate_item = STAILQ_FIRST(&cfg->truncate_stone_head);
 			STAILQ_REMOVE_HEAD(&cfg->truncate_stone_head, q);
 			free(truncate_item->key);
 			free(truncate_item);
 		}
-	}
 	free(cursors);
 
 	return (NULL);
@@ -2118,6 +2119,7 @@ start_run(CONFIG *cfg)
 		/* One final summation of the operations we've completed. */
 		cfg->read_ops = sum_read_ops(cfg);
 		cfg->insert_ops = sum_insert_ops(cfg);
+		cfg->truncate_ops = sum_truncate_ops(cfg);
 		cfg->update_ops = sum_update_ops(cfg);
 		cfg->ckpt_ops = sum_ckpt_ops(cfg);
 		total_ops = cfg->read_ops + cfg->insert_ops + cfg->update_ops;
@@ -2132,6 +2134,11 @@ start_run(CONFIG *cfg)
 		    "%%) %" PRIu64 " ops/sec",
 		    cfg->insert_ops, (cfg->insert_ops * 100) / total_ops,
 		    cfg->insert_ops / cfg->run_time);
+		lprintf(cfg, 0, 1,
+		    "Executed %" PRIu64 " truncate operations (%" PRIu64
+		    "%%) %" PRIu64 " ops/sec",
+		    cfg->truncate_ops, (cfg->truncate_ops * 100) / total_ops,
+		    cfg->truncate_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " update operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
@@ -2286,7 +2293,7 @@ main(int argc, char *argv[])
 	 */
 	if (cfg->async_threads > 0) {
 		if (cfg->has_truncate > 0) {
-			lprintf(cfg, 0, 0, "Cannot run truncate and async\n");
+			lprintf(cfg, 1, 0, "Cannot run truncate and async\n");
 			goto err;
 		}
 		cfg->use_asyncops = 1;
@@ -2314,13 +2321,13 @@ main(int argc, char *argv[])
 
 	/* You can't have truncate on a random collection */
 	if (cfg->has_truncate && cfg->random_range) {
-		lprintf(cfg, 0, 0, "Cannot run truncate and random_range\n");
+		lprintf(cfg, 1, 0, "Cannot run truncate and random_range\n");
 		goto err;
 	}
 
 	/* We can't run truncate with more than one table */
 	if (cfg->has_truncate && cfg->table_count > 1) {
-		lprintf(cfg, 0, 0, "Cannot run truncate when > 1 table\n");
+		lprintf(cfg, 1, 0, "Cannot truncate more than 1 table\n");
 		goto err;
 	}
 
