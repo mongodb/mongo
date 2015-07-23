@@ -501,6 +501,10 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       wasError(false) {}
 
 DBClientCursor::~DBClientCursor() {
+    kill();
+}
+
+void DBClientCursor::kill() {
     DESTRUCTOR_GUARD(
 
         if (cursorId && _ownCursor && !inShutdown()) {
@@ -533,6 +537,9 @@ DBClientCursor::~DBClientCursor() {
         }
 
         );
+
+    // Mark this cursor as dead since we can't do any getMores.
+    cursorId = 0;
 }
 
 
