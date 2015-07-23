@@ -44,8 +44,6 @@
 namespace mongo {
 namespace {
 
-const BSONArray tagsMatchesAll = BSON_ARRAY(BSONObj());
-
 const char kModeFieldName[] = "mode";
 const char kTagsFieldName[] = "tags";
 
@@ -107,7 +105,7 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
 
 }  // namespace
 
-TagSet::TagSet() : _tags(tagsMatchesAll) {}
+TagSet::TagSet() : _tags(BSON_ARRAY(BSONObj())) {}
 
 TagSet TagSet::primaryOnly() {
     return TagSet{BSONArray()};
