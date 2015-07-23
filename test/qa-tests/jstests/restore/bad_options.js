@@ -35,6 +35,11 @@
             concat(getRestoreTarget('jstests/restore/testdata/blankcoll/blank.bson')));
     assert.neq(0, ret);
 
+    // run restore with an invalid verbosity value
+    ret = toolTest.runTool.apply(toolTest,['restore', '-v', 'torvalds'].
+            concat(getRestoreTarget('restore/testdata/dump_empty')));
+    assert.neq(0, ret);
+
     // success
     toolTest.stop();
 

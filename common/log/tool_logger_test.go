@@ -19,8 +19,9 @@ func TestBasicToolLoggerFunctionality(t *testing.T) {
 
 	Convey("With a new ToolLogger", t, func() {
 		v1 := &options.Verbosity{
-			Quiet:   false,
-			Verbose: []bool{true, true, true},
+			Quiet:        false,
+			SetVerbosity: nil,
+			VLevel:       3,
 		}
 		tl = NewToolLogger(v1)
 		So(tl, ShouldNotBeNil)
@@ -67,8 +68,9 @@ func TestGlobalToolLoggerFunctionality(t *testing.T) {
 
 	Convey("With an initialized global ToolLogger", t, func() {
 		globalToolLogger = NewToolLogger(&options.Verbosity{
-			Quiet:   false,
-			Verbose: []bool{true, true, true},
+			Quiet:        false,
+			SetVerbosity: nil,
+			VLevel:       3,
 		})
 		So(globalToolLogger, ShouldNotBeNil)
 
@@ -85,8 +87,9 @@ func TestToolLoggerWriter(t *testing.T) {
 	Convey("With a tool logger that writes to a buffer", t, func() {
 		buff := bytes.NewBuffer(make([]byte, 1024))
 		v1 := &options.Verbosity{
-			Quiet:   false,
-			Verbose: []bool{true, true, true},
+			Quiet:        false,
+			SetVerbosity: nil,
+			VLevel:       3,
 		}
 		tl := NewToolLogger(v1)
 		tl.SetWriter(buff)
