@@ -60,8 +60,13 @@ boost::optional<Document> DocumentSourceSort::getNext() {
     if (!populated)
         populate();
 
-    if (!_output || !_output->more())
+    if (!_output || !_output->more()) {
+        // Need to be sure connections are marked as done so they can be returned to the connection
+        // pool. This only needs to happen in the _mergingPresorted case, but it doesn't hurt to
+        // always do it.
+        dispose();
         return boost::none;
+    }
 
     return _output->next().second;
 }
@@ -87,7 +92,9 @@ void DocumentSourceSort::serializeToArray(vector<Value>& array, bool explain) co
 
 void DocumentSourceSort::dispose() {
     _output.reset();
-    pSource->dispose();
+    if (pSource) {
+        pSource->dispose();
+    }
 }
 
 long long DocumentSourceSort::getLimit() const {

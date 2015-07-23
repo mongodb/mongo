@@ -163,6 +163,13 @@ boost::optional<Document> DocumentSourceMergeCursors::getNext() {
 }
 
 void DocumentSourceMergeCursors::dispose() {
+    // Note it is an error to call done() on a connection before consuming the response from a
+    // request. Therefore it is an error to call dispose() if there are any outstanding connections
+    // which have not received a reply.
+    for (auto&& cursorAndConn : _cursors) {
+        cursorAndConn->cursor.kill();
+        cursorAndConn->connection.done();
+    }
     _cursors.clear();
     _currentCursor = _cursors.end();
 }
