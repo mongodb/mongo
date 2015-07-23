@@ -404,16 +404,19 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i, int *yield)
 	WT_LOG *log;
 	WT_LOG_WRLSN_ENTRY written[WT_SLOT_POOL];
 	WT_LOGSLOT *coalescing, *slot;
+	WT_LSN save_lsn;
 	size_t written_i;
 	uint32_t i, save_i;
 
 	conn = S2C(session);
 	log = conn->log;
-	coalescing = NULL;
-	written_i = 0;
-	i = 0;
 	if (free_i != NULL)
 		*free_i = WT_SLOT_POOL;
+restart:
+	coalescing = NULL;
+	WT_INIT_LSN(&save_lsn);
+	written_i = 0;
+	i = 0;
 
 	/*
 	 * Walk the array once saving any slots that are in the
@@ -451,7 +454,27 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i, int *yield)
 		 */
 		for (i = 0; i < written_i; i++) {
 			slot = &log->slot_pool[written[i].slot_index];
+			/*
+			 * The log server thread pushes out slots periodically.
+			 * Sometimes they are empty slots.  If we find an
+			 * empty slot, where empty means the start and end LSN
+			 * are the same, free it and continue.
+			 */
+			if (WT_LOG_CMP(&slot->slot_start_lsn,
+			    &slot->slot_end_lsn) == 0) {
+				WT_RET(__wt_log_slot_free(session, slot));
+				if (free_i != NULL && *free_i == WT_SLOT_POOL &&
+				    slot->slot_state == WT_LOG_SLOT_FREE)
+					*free_i = save_i;
+				continue;
+			}
 			if (coalescing != NULL) {
+				/*
+				 * If the write_lsn changed, we may be able to
+				 * process slots.  Try again.
+				 */
+				if (WT_LOG_CMP(&log->write_lsn, &save_lsn) != 0)
+					goto restart;
 				if (WT_LOG_CMP(&coalescing->slot_end_lsn,
 				    &written[i].lsn) != 0) {
 					coalescing = slot;
@@ -473,7 +496,11 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i, int *yield)
 				/*
 				 * If this written slot is not the next LSN,
 				 * try to start coalescing with later slots.
+				 * A synchronous write may update write_lsn
+				 * so save the last one we saw to check when
+				 * coalescing slots.
 				 */
+				save_lsn = log->write_lsn;
 				if (WT_LOG_CMP(
 				    &log->write_lsn, &written[i].lsn) != 0) {
 					coalescing = slot;
@@ -522,7 +549,6 @@ __wt_log_force_write(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	log = conn->log;
 	len = WT_LOG_SLOT_BUF_MAX;
-	__wt_errx(session, "force_write: Close current slot");
 	/*
 	 * This is not a great way to force the write as it may confuse
 	 * the maintenance of alloc_lsn.
@@ -564,7 +590,6 @@ __log_wrlsn_server(void *arg)
 		/*
 		 * Force a slot switch.
 		 */
-		WT_ERR(__wt_log_force_write(session));
 		__wt_spin_lock(session, &log->log_slot_lock);
 		locked = 1;
 		WT_ERR(__wt_log_wrlsn(session, NULL, &yield));
@@ -604,6 +629,14 @@ __log_server(void *arg)
 	log = conn->log;
 	locked = 0;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
+		/*
+		 * Slots depend on future activity.  Force out buffered
+		 * writes in case we are idle.  This cannot be part of the
+		 * wrlsn thread because of interaction advancing the write_lsn
+		 * and a buffer may need to wait for the write_lsn to advance
+		 * in the case of a synchronous buffer.  We end up with a hang.
+		 */
+		WT_ERR(__wt_log_force_write(session));
 		/*
 		 * Perform log pre-allocation.
 		 */

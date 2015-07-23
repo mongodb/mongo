@@ -54,9 +54,6 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset)
 				current->slot_end_lsn = current->slot_start_lsn;
 				current->slot_end_lsn.offset += new_offset;
 				log->alloc_lsn = current->slot_end_lsn;
-				__wt_errx(session, "Switch: current slot 0x%llx start %lu/%lu end %lu/%lu",
-				    current, current->slot_start_lsn.file, current->slot_start_lsn.offset,
-				    current->slot_end_lsn.file, current->slot_end_lsn.offset);
 				WT_RET(__wt_log_acquire(session,
 				    WT_LOG_SLOT_BUF_SIZE, slot));
 				/*
@@ -64,8 +61,6 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset)
 				 */
 				slot->slot_state = 0;
 				slot->slot_unbuffered = 0;
-				__wt_errx(session, "Switch: active slot %d 0x%llu start_lsn %lu/%lu",
-				    i, slot, slot->slot_start_lsn.file, slot->slot_start_lsn.offset);
 				log->active_slot = slot;
 				return (0);
 			}
@@ -124,8 +119,6 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	slot->slot_release_lsn = log->alloc_lsn;
 	slot->slot_fh = log->log_fh;
 	log->active_slot = slot;
-	__wt_errx(session, "SLOT_INIT: Set active LSN %lu/%lu",
-	    log->alloc_lsn.file, log->alloc_lsn.offset);
 
 	if (0) {
 err:		while (--i >= 0)
@@ -183,7 +176,6 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	/*
 	 * There should almost always be a slot open.
 	 */
-	__wt_errx(session, "Join: mysize %lu", mysize);
 	for (;;) {
 		WT_BARRIER();
 		slot = log->active_slot;
@@ -199,9 +191,6 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		 */
 		if (WT_LOG_SLOT_OPEN(old_state) &&
 		    WT_ATOMIC_CAS8(slot->slot_state, old_state, new_state))
-			/*
-			 * XXX we got the state.
-			 */
 			break;
 		else
 			/*
@@ -222,38 +211,6 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	myslotp->slot = slot;
 	myslotp->offset = join_offset;
 	myslotp->end_offset = join_offset + mysize;
-	__wt_errx(session, "Join: slot 0x%llx new_state 0x%llx off %lu end %lu",
-	    slot, new_state, join_offset, myslotp->end_offset);
-	return (0);
-}
-
-/*
- * __log_slot_find_free --
- * 	Find and return a free log slot.
- */
-static int
-__log_slot_find_free(WT_SESSION_IMPL *session, WT_LOGSLOT **slot)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_LOG *log;
-	uint32_t pool_i;
-
-	conn = S2C(session);
-	log = conn->log;
-	WT_ASSERT(session, slot != NULL);
-	/*
-	 * Encourage processing and moving the write LSN forward.
-	 * That process has to walk the slots anyway, so do that
-	 * work and let it give us the index of a free slot along
-	 * the way.
-	 */
-	WT_RET(__wt_log_wrlsn(session, &pool_i, NULL));
-	while (pool_i == WT_SLOT_POOL) {
-		__wt_yield();
-		WT_RET(__wt_log_wrlsn(session, &pool_i, NULL));
-	}
-	*slot = &log->slot_pool[pool_i];
-	WT_ASSERT(session, (*slot)->slot_state == WT_LOG_SLOT_FREE);
 	return (0);
 }
 
