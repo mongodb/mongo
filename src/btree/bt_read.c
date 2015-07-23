@@ -182,7 +182,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		 * globally visible, we no longer need this record, the on-page
 		 * record is just as good.
 		 */
-		p = (uint8_t *)klas->mem + prefix_len;
+		p = (uint8_t *)klas->data + prefix_len;
 		memcpy(&txnid, p, sizeof(uint64_t));
 		p = (uint8_t *)p + sizeof(uint64_t);
 		if (__wt_txn_visible_all(session, txnid))
@@ -222,11 +222,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		case WT_PAGE_ROW_LEAF:
 			memcpy(&key_len, p, sizeof(uint32_t));
 			p = (uint8_t *)p + sizeof(uint32_t);
-			klas->data = p;
-			klas->size = key_len;
-			if (current_key->size != klas->size ||
-			    memcmp(current_key->data,
-			    klas->data, current_key->size) != 0) {
+			if (current_key->size != key_len || memcmp(
+			    current_key->data, p, current_key->size) != 0) {
 				if (first_upd != NULL) {
 					/* Search the page and add updates. */
 					WT_ERR(__wt_row_search(session,
@@ -236,8 +233,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 					    current_key, NULL, first_upd, 0));
 					first_upd = NULL;
 				}
-				WT_ERR(__wt_buf_set(session,
-				    current_key, klas->data, klas->size));
+				WT_ERR(__wt_buf_set(
+				    session, current_key, p, key_len));
 			}
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
