@@ -46,7 +46,8 @@ lrt(void *arg)
 	uint8_t bitfield, *keybuf;
 	void *buf;
 
-	(void)(arg);
+	(void)(arg);			/* Unused parameter */
+	saved_keyno = 0;		/* [-Werror=maybe-uninitialized] */
 
 	key_gen_setup(&keybuf);
 	memset(&key, 0, sizeof(key));
