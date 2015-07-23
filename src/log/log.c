@@ -1217,6 +1217,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 */
 	while (log->log_close_fh != NULL) {
 		WT_STAT_FAST_CONN_INCR(session, log_close_yields);
+		WT_RET(__wt_log_wrlsn(session, NULL, NULL));
 		__wt_yield();
 	}
 	log->log_close_fh = log->log_fh;

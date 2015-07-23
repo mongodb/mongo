@@ -169,6 +169,18 @@
 #define	WT_READ_BARRIER()	WT_FULL_BARRIER()
 #define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
 
+#elif defined(__aarch64__)
+#define	WT_PAUSE()	__asm__ volatile("yield" ::: "memory")
+#define	WT_FULL_BARRIER() do {						\
+	  __asm__ volatile ("dsb sy" ::: "memory");			\
+} while (0)
+#define	WT_READ_BARRIER() do {						\
+	  __asm__ volatile ("dsb ld" ::: "memory");			\
+} while (0)
+#define	WT_WRITE_BARRIER() do {						\
+	  __asm__ volatile ("dsb st" ::: "memory");			\
+} while (0)
+
 #else
 #error "No write barrier implementation for this hardware"
 #endif

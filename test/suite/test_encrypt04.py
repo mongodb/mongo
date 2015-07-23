@@ -50,13 +50,17 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         ('none', dict( name1='none', keyid1='', secretkey1='')),
         ('rotn17abc', dict( name1='rotn', keyid1='17', secretkey1='ABC')),
         ('rotn11abc', dict( name1='rotn', keyid1='11', secretkey1='ABC')),
-        ('rotn11xyz', dict( name1='rotn', keyid1='11', secretkey1='XYZ'))
+        ('rotn11xyz', dict( name1='rotn', keyid1='11', secretkey1='XYZ')),
+        ('rotn11xyz_and_clear', dict( name1='rotn', keyid1='11',
+                                      secretkey1='XYZ', fileinclear1=True))
     ]
     encrypt_scen_2 = [
         ('none', dict( name2='none', keyid2='', secretkey2='')),
         ('rotn17abc', dict( name2='rotn', keyid2='17', secretkey2='ABC')),
         ('rotn11abc', dict( name2='rotn', keyid2='11', secretkey2='ABC')),
-        ('rotn11xyz', dict( name2='rotn', keyid2='11', secretkey2='XYZ'))
+        ('rotn11xyz', dict( name2='rotn', keyid2='11', secretkey2='XYZ')),
+        ('rotn11xyz_and_clear', dict( name2='rotn', keyid2='11',
+                                      secretkey2='XYZ', fileinclear2=True))
     ]
     scenarios = number_scenarios(multiply_scenarios \
                                  ('.', encrypt_scen_1, encrypt_scen_2))
@@ -73,10 +77,14 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
             self.name = self.name1
             self.keyid = self.keyid1
             self.secretkey = self.secretkey1
+            self.fileinclear = self.fileinclear1 if \
+                               hasattr(self, 'fileinclear1') else False
         else:
             self.name = self.name2
             self.keyid = self.keyid2
             self.secretkey = self.secretkey2
+            self.fileinclear = self.fileinclear2 if \
+                               hasattr(self, 'fileinclear2') else False
 
         encarg = 'encryption=(name={0},keyid={1},secretkey={2}),'.format(
             self.name, self.keyid, self.secretkey)
@@ -126,10 +134,30 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         else:
             return ',extensions=["' + '","'.join(extfiles) + '"]'
 
+    # Evaluate expression, which either must succeed (if expect_okay)
+    # or must fail (if !expect_okay).
+    def check_okay(self, expect_okay, expr):
+        completed = False
+        if expect_okay:
+            expr()
+        else:
+            # expect an error, and maybe error messages,
+            # so turn off stderr checking.
+            with self.expectedStderrPattern(''):
+                try:
+                    expr()
+                    completed = True
+                except:
+                    pass
+                self.assertEqual(False, completed)
+        return expect_okay
+
     # Create a table with encryption values that are in error.
     def test_encrypt(self):
         params = 'key_format=S,value_format=S'
-        if self.name != None:
+        if self.name == 'none' or self.fileinclear:
+            params += ',encryption=(name=none)'
+        else:
             params += ',encryption=(name=' + self.name + \
                       ',keyid=' + self.keyid + ')'
 
@@ -144,31 +172,19 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         self.part = 2
         self.name = self.name2
         self.keyid = self.keyid2
-        self.secretkey = self.secretkey
+        self.secretkey = self.secretkey2
 
         is_same = (self.name1 == self.name2 and
                    self.keyid1 == self.keyid2 and
                    self.secretkey1 == self.secretkey2)
 
         # We expect an error if we specified different
-        # encryption from one open to the next.  The exception
-        # is when we started out with no encryption,
-        # we can still enable encryption and read existing files.
-        expect_error = not is_same and self.name1 != 'none'
+        # encryption from one open to the next.
+        expect_okay = is_same
 
-        if expect_error:
-            completed = False
-            with self.expectedStderrPattern(''):   # effectively ignore stderr
-                try:
-                    self.reopen_conn()
-                    completed = True
-                except:
-                    pass
-                self.assertEqual(False, completed)
-        else:
-            # Force the cache to disk, so we read
-            # compressed/encrypted pages from disk.
-            self.reopen_conn()
+        # Force the cache to disk, so we read
+        # compressed/encrypted pages from disk.
+        if self.check_okay(expect_okay, lambda: self.reopen_conn()):
             cursor = self.session.open_cursor(self.uri, None)
             r.seed(0)
             self.check_records(cursor, r, 0, self.nrecords)

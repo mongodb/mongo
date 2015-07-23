@@ -9,6 +9,66 @@
 #include "wt_internal.h"
 
 /*
+ * __page_refp --
+ *      Return the page's index and slot for a reference.
+ */
+static inline void
+__page_refp(WT_SESSION_IMPL *session,
+    WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
+{
+	WT_PAGE_INDEX *pindex;
+	uint32_t i;
+
+	/*
+	 * Copy the parent page's index value: the page can split at any time,
+	 * but the index's value is always valid, even if it's not up-to-date.
+	 */
+retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
+
+	/*
+	 * Use the page's reference hint: it should be correct unless the page
+	 * split before our slot.  If the page splits after our slot, the hint
+	 * will point earlier in the array than our actual slot, so the first
+	 * loop is from the hint to the end of the list, and the second loop
+	 * is from the start of the list to the end of the list.  (The second
+	 * loop overlaps the first, but that only happen in cases where we've
+	 * deepened the tree and aren't going to find our slot at all, that's
+	 * not worth optimizing.)
+	 *
+	 * It's not an error for the reference hint to be wrong, it just means
+	 * the first retrieval (which sets the hint for subsequent retrievals),
+	 * is slower.
+	 */
+	i = ref->pindex_hint;
+	if (i < pindex->entries && pindex->index[i]->page == ref->page) {
+		*pindexp = pindex;
+		*slotp = i;
+		return;
+	}
+	while (++i < pindex->entries)
+		if (pindex->index[i]->page == ref->page) {
+			*pindexp = pindex;
+			*slotp = ref->pindex_hint = i;
+			return;
+		}
+	for (i = 0; i < pindex->entries; ++i)
+		if (pindex->index[i]->page == ref->page) {
+			*pindexp = pindex;
+			*slotp = ref->pindex_hint = i;
+			return;
+		}
+
+	/*
+	 * If we don't find our reference, the page split into a new level and
+	 * our home pointer references the wrong page.  After internal pages
+	 * deepen, their reference structure home value are updated; yield and
+	 * wait for that to happen.
+	 */
+	__wt_yield();
+	goto retry;
+}
+
+/*
  * __wt_tree_walk --
  *	Move to the next/previous page in the tree.
  */
@@ -99,7 +159,7 @@ ascend:	/*
 	}
 
 	/* Figure out the current slot in the WT_REF array. */
-	__wt_page_refp(session, ref, &pindex, &slot);
+	__page_refp(session, ref, &pindex, &slot);
 
 	for (;;) {
 		/*
@@ -134,19 +194,13 @@ ascend:	/*
 				 * parent of the current child page, our parent
 				 * reference can't have split or been evicted.
 				 */
-				__wt_page_refp(session, ref, &pindex, &slot);
+				__page_refp(session, ref, &pindex, &slot);
 				if ((ret = __wt_page_swap(
 				    session, couple, ref, flags)) != 0) {
 					WT_TRET(__wt_page_release(
 					    session, couple, flags));
 					WT_ERR(ret);
 				}
-
-				/*
-				 * Set the reference hint (used when we continue
-				 * the walk).
-				 */
-				ref->pindex_hint = slot;
 			}
 
 			*refp = ref;
@@ -162,13 +216,15 @@ ascend:	/*
 			++*walkcntp;
 
 		for (;;) {
-			ref = pindex->index[slot];
-
 			/*
-			 * Set the reference hint (used when we continue the
-			 * walk).
+			 * Move to the next slot, and set the reference hint if
+			 * it's wrong (used when we continue the walk). We don't
+			 * update those hints when splitting, so it's common for
+			 * them to be incorrect in some workloads.
 			 */
-			ref->pindex_hint = slot;
+			ref = pindex->index[slot];
+			if (ref->pindex_hint != slot)
+				ref->pindex_hint = slot;
 
 			if (LF_ISSET(WT_READ_CACHE)) {
 				/*
@@ -270,7 +326,7 @@ ascend:	/*
 				    couple == couple_orig ||
 				    WT_PAGE_IS_INTERNAL(couple->page));
 				ref = couple;
-				__wt_page_refp(session, ref, &pindex, &slot);
+				__page_refp(session, ref, &pindex, &slot);
 				if (couple == couple_orig)
 					break;
 			}
