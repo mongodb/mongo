@@ -24,14 +24,3 @@ x = runMongoProgram( "mongodump",
                      "-h", "127.0.0.1:"+m.port,
                      "--collection", colName);
 assert.eq(x, 0, "mongodump should succeed with authentication");
-
-// SERVER-5233: mongodump with authentication breaks when using "--out -"
-x = runMongoProgram( "mongodump",
-                     "--db", dbName,
-                     "--authenticationDatabase=admin",
-                     "-u", "testuser",
-                     "-p", "testuser",
-                     "-h", "127.0.0.1:"+m.port,
-                     "--collection", colName,
-                     "--out", "-" );
-assert.eq(x, 0, "mongodump should succeed with authentication while using '--out'");
