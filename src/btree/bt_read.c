@@ -169,11 +169,6 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		    memcmp(klas->data, prefix, prefix_len) != 0)
 			break;
 
-		/* Make sure we have a local copy of the record. */
-		if (!WT_DATA_IN_ITEM(klas))
-			WT_ERR(__wt_buf_set(
-			    session, klas, klas->data, klas->size));
-
 		/*
 		 * Skip to the on-page transaction ID stored in the key; if it's
 		 * globally visible, we no longer need this record, the on-page
@@ -197,7 +192,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 			break;
 		case WT_PAGE_ROW_LEAF:
 			memcpy(&key_len, p, sizeof(uint32_t));
-			klas->data = (uint8_t *)p + sizeof(uint32_t);
+			p = (uint8_t *)p + sizeof(uint32_t);
+			klas->data = p;
 			klas->size = key_len;
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
