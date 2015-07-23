@@ -2380,7 +2380,8 @@ wtperf_value_range(CONFIG *cfg)
 {
 	if (cfg->random_range)
 		return (cfg->icount + cfg->random_range);
-
+	if (cfg->icount + cfg->insert_key == 0)
+		return (0);
 	return (cfg->icount + cfg->insert_key - (u_int)(cfg->workers_cnt + 1));
 }
 
