@@ -167,6 +167,13 @@ namespace mongo {
     }
 
     void DocumentSourceMergeCursors::dispose() {
+        // Note it is an error to call done() on a connection before consuming the response from a
+        // request. Therefore it is an error to call dispose() if there are any outstanding
+        // connections which have not received a reply.
+        for (_currentCursor = _cursors.begin(); _currentCursor != _cursors.end(); ++_currentCursor) {
+            (*_currentCursor)->cursor.kill();
+            (*_currentCursor)->connection.done();
+        }
         _cursors.clear();
         _currentCursor = _cursors.end();
     }

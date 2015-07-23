@@ -49,8 +49,13 @@ namespace mongo {
         if (!populated)
             populate();
 
-        if (!_output || !_output->more())
+        if (!_output || !_output->more()) {
+            // Need to be sure connections are marked as done so they can be returned to the
+            // connection pool. This only needs to happen in the _mergingPresorted case, but it
+            // doesn't hurt to always do it.
+            dispose();
             return boost::none;
+        }
 
         return _output->next().second;
     }
@@ -76,7 +81,9 @@ namespace mongo {
 
     void DocumentSourceSort::dispose() {
         _output.reset();
-        pSource->dispose();
+        if (pSource) {
+            pSource->dispose();
+        }
     }
 
     DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx)
