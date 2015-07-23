@@ -202,6 +202,18 @@ namespace mongo {
         void initLazy( bool isRetry = false );
         bool initLazyFinish( bool& retry );
 
+        /**
+         * Marks this object as dead and sends the KillCursors message to the server.
+         *
+         * Any errors that result from this are swallowed since this is typically performed as part
+         * of cleanup and a failure to kill the cursor should not result in a failure of the
+         * operation using the cursor.
+         *
+         * Killing an already killed or exhausted cursor does nothing, so it is safe to always call
+         * this if you want to ensure that a cursor is killed.
+         */
+        void kill();
+
         class Batch : boost::noncopyable {
             friend class DBClientCursor;
             auto_ptr<Message> m;

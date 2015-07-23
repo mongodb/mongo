@@ -325,6 +325,10 @@ namespace mongo {
     }
 
     DBClientCursor::~DBClientCursor() {
+        kill();
+    }
+
+    void DBClientCursor::kill() {
         if (!this)
             return;
 
@@ -362,6 +366,9 @@ namespace mongo {
         }
 
         );
+
+        // Mark this cursor as dead since we can't do any getMores.
+        cursorId = 0;
     }
 
 
