@@ -142,6 +142,15 @@ var Explainable = (function() {
             return throwOrReturn(explainResult);
         }
 
+        this.distinct = function(keyString, query) {
+            var distinctCmd = {distinct: this._collection.getName(),
+                               key: keyString,
+                               query: query || {}};
+            var explainCmd = {explain: distinctCmd, verbosity: this._verbosity};
+            var explainResult = this._collection.runCommand(explainCmd);
+            return throwOrReturn(explainResult);
+        }
+
         this.remove = function() {
             var parsed = this._collection._parseRemove.apply(this._collection, arguments);
             var query = parsed.query;

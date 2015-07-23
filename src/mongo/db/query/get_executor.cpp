@@ -1296,11 +1296,16 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
 
 StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
                                                          Collection* collection,
+                                                         const std::string& ns,
                                                          const BSONObj& query,
                                                          const std::string& field,
+                                                         bool isExplain,
                                                          PlanExecutor::YieldPolicy yieldPolicy) {
-    // This should'a been checked by the distinct command.
-    invariant(collection);
+    if (!collection) {
+        // Treat collections that do not exist as empty collections.
+        return PlanExecutor::make(
+            txn, make_unique<WorkingSet>(), make_unique<EOFStage>(), ns, yieldPolicy);
+    }
 
     // TODO: check for idhack here?
 
@@ -1339,14 +1344,13 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.
     if (plannerParams.indices.empty()) {
-        auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, whereCallback);
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(collection->ns(), query, isExplain, whereCallback);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        // Takes ownership of 'cq'.
-        return getExecutor(txn, collection, std::move(cq), yieldPolicy);
+        return getExecutor(txn, collection, std::move(statusWithCQ.getValue()), yieldPolicy);
     }
 
     //
@@ -1359,8 +1363,18 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     BSONObj projection = getDistinctProjection(field);
 
     // Apply a projection of the key.  Empty BSONObj() is for the sort.
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(collection->ns(), query, BSONObj(), projection, whereCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns(),
+                                                     query,
+                                                     BSONObj(),  // sort
+                                                     projection,
+                                                     0,          // skip
+                                                     0,          // limit
+                                                     BSONObj(),  // hint
+                                                     BSONObj(),  // min
+                                                     BSONObj(),  // max
+                                                     isExplain,
+                                                     false,  // snapshot
+                                                     whereCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -1392,7 +1406,6 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
         LOG(2) << "Using fast distinct: " << cq->toStringShort()
                << ", planSummary: " << Explain::getPlanSummary(root.get());
 
-        // Takes ownership of its arguments (except for 'collection').
         return PlanExecutor::make(txn,
                                   std::move(ws),
                                   std::move(root),
@@ -1447,15 +1460,12 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     }
 
     // We drop the projection from the 'cq'.  Unfortunately this is not trivial.
-    statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, whereCallback);
+    statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, isExplain, whereCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
 
-    cq = std::move(statusWithCQ.getValue());
-
-    // Takes ownership of 'cq'.
-    return getExecutor(txn, collection, std::move(cq), yieldPolicy);
+    return getExecutor(txn, collection, std::move(statusWithCQ.getValue()), yieldPolicy);
 }
 
 }  // namespace mongo

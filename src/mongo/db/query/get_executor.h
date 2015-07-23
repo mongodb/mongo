@@ -130,8 +130,10 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const std::string& field)
 StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDistinct(
     OperationContext* txn,
     Collection* collection,
+    const std::string& ns,
     const BSONObj& query,
     const std::string& field,
+    bool isExplain,
     PlanExecutor::YieldPolicy yieldPolicy);
 
 /*

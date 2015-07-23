@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -50,6 +51,13 @@ namespace mongo {
 using std::unique_ptr;
 using std::string;
 using std::stringstream;
+
+namespace {
+
+const char kKeyField[] = "key";
+const char kQueryField[] = "query";
+
+}  // namespace
 
 class DistinctCommand : public Command {
 public:
@@ -80,6 +88,61 @@ public:
         help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
     }
 
+    /**
+     * Used by explain() and run() to get the PlanExecutor for the query.
+     */
+    StatusWith<unique_ptr<PlanExecutor>> getPlanExecutor(OperationContext* txn,
+                                                         Collection* collection,
+                                                         const string& ns,
+                                                         const BSONObj& cmdObj,
+                                                         bool isExplain) const {
+        // Extract the key field.
+        BSONElement keyElt;
+        auto statusKey = bsonExtractTypedField(cmdObj, kKeyField, BSONType::String, &keyElt);
+        if (!statusKey.isOK()) {
+            return {statusKey};
+        }
+        string key = keyElt.valuestrsafe();
+
+        // Extract the query field. If the query field is nonexistent, an empty query is used.
+        BSONObj query;
+        BSONElement queryElt;
+        auto statusQuery = bsonExtractTypedField(cmdObj, kQueryField, BSONType::Object, &queryElt);
+        if (statusQuery.isOK()) {
+            query = queryElt.embeddedObject();
+        } else if (statusQuery != ErrorCodes::NoSuchKey) {
+            return {statusQuery};
+        }
+
+        auto executor = getExecutorDistinct(
+            txn, collection, ns, query, key, isExplain, PlanExecutor::YIELD_AUTO);
+        if (!executor.isOK()) {
+            return executor.getStatus();
+        }
+
+        return std::move(executor.getValue());
+    }
+
+    virtual Status explain(OperationContext* txn,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           ExplainCommon::Verbosity verbosity,
+                           BSONObjBuilder* out) const {
+        const string ns = parseNs(dbname, cmdObj);
+        AutoGetCollectionForRead ctx(txn, ns);
+
+        Collection* collection = ctx.getCollection();
+
+        StatusWith<unique_ptr<PlanExecutor>> executor =
+            getPlanExecutor(txn, collection, ns, cmdObj, true);
+        if (!executor.isOK()) {
+            return executor.getStatus();
+        }
+
+        Explain::explainStages(executor.getValue().get(), verbosity, out);
+        return Status::OK();
+    }
+
     bool run(OperationContext* txn,
              const string& dbname,
              BSONObj& cmdObj,
@@ -88,26 +151,17 @@ public:
              BSONObjBuilder& result) {
         Timer t;
 
-        // ensure that the key is a string
-        uassert(18510,
-                mongoutils::str::stream() << "The first argument to the distinct command "
-                                          << "must be a string but was a "
-                                          << typeName(cmdObj["key"].type()),
-                cmdObj["key"].type() == mongo::String);
+        const string ns = parseNs(dbname, cmdObj);
+        AutoGetCollectionForRead ctx(txn, ns);
 
-        // ensure that the where clause is a document
-        if (cmdObj["query"].isNull() == false && cmdObj["query"].eoo() == false) {
-            uassert(18511,
-                    mongoutils::str::stream() << "The query for the distinct command must be a "
-                                              << "document but was a "
-                                              << typeName(cmdObj["query"].type()),
-                    cmdObj["query"].type() == mongo::Object);
+        Collection* collection = ctx.getCollection();
+
+        auto executor = getPlanExecutor(txn, collection, ns, cmdObj, false);
+        if (!executor.isOK()) {
+            return appendCommandStatus(result, executor.getStatus());
         }
 
-        string key = cmdObj["key"].valuestrsafe();
-        BSONObj keyPattern = BSON(key << 1);
-
-        BSONObj query = getQuery(cmdObj);
+        string key = cmdObj[kKeyField].valuestrsafe();
 
         int bufSize = BSONObjMaxUserSize - 4096;
         BufBuilder bb(bufSize);
@@ -116,30 +170,9 @@ public:
         BSONArrayBuilder arr(bb);
         BSONElementSet values;
 
-        const string ns = parseNs(dbname, cmdObj);
-        AutoGetCollectionForRead ctx(txn, ns);
-
-        Collection* collection = ctx.getCollection();
-        if (!collection) {
-            result.appendArray("values", BSONObj());
-            result.append("stats", BSON("n" << 0 << "nscanned" << 0 << "nscannedObjects" << 0));
-            return true;
-        }
-
-        auto statusWithPlanExecutor =
-            getExecutorDistinct(txn, collection, query, key, PlanExecutor::YIELD_AUTO);
-        if (!statusWithPlanExecutor.isOK()) {
-            uasserted(17216,
-                      mongoutils::str::stream() << "Can't get executor for query " << query << ": "
-                                                << statusWithPlanExecutor.getStatus().toString());
-            return 0;
-        }
-
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
-
         BSONObj obj;
         PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+        while (PlanExecutor::ADVANCED == (state = executor.getValue()->getNext(&obj, NULL))) {
             // Distinct expands arrays.
             //
             // If our query is covered, each value of the key should be in the index key and
@@ -167,7 +200,7 @@ public:
 
         // Get summary information about the plan.
         PlanSummaryStats stats;
-        Explain::getSummaryStats(*exec, &stats);
+        Explain::getSummaryStats(*executor.getValue(), &stats);
 
         verify(start == bb.buf());
 
@@ -179,7 +212,7 @@ public:
             b.appendNumber("nscanned", stats.totalKeysExamined);
             b.appendNumber("nscannedObjects", stats.totalDocsExamined);
             b.appendNumber("timems", t.millis());
-            b.append("planSummary", Explain::getPlanSummary(exec.get()));
+            b.append("planSummary", Explain::getPlanSummary(executor.getValue().get()));
             result.append("stats", b.obj());
         }
 

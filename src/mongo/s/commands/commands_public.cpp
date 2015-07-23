@@ -32,6 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -892,7 +893,6 @@ public:
 
 } splitVectorCmd;
 
-
 class DistinctCmd : public PublicGridCommand {
 public:
     DistinctCmd() : PublicGridCommand("distinct") {}
@@ -971,6 +971,40 @@ public:
 
         result.appendArray("values", b.obj());
         return true;
+    }
+
+    Status explain(OperationContext* txn,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   ExplainCommon::Verbosity verbosity,
+                   BSONObjBuilder* out) const {
+        const string fullns = parseNs(dbname, cmdObj);
+
+        // Extract the targeting query.
+        BSONObj targetingQuery;
+        BSONElement queryElt;
+        auto statusQuery = bsonExtractTypedField(cmdObj, "query", BSONType::Object, &queryElt);
+        if (statusQuery.isOK()) {
+            targetingQuery = queryElt.embeddedObject();
+        } else if (statusQuery != ErrorCodes::NoSuchKey) {
+            return {statusQuery};
+        }
+
+        BSONObjBuilder explainCmdBob;
+        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+
+        // We will time how long it takes to run the commands on the shards.
+        Timer timer;
+
+        vector<Strategy::CommandResult> shardResults;
+        Strategy::commandOp(dbname, explainCmdBob.obj(), 0, fullns, targetingQuery, &shardResults);
+
+        long long millisElapsed = timer.millis();
+
+        const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
+
+        return ClusterExplain::buildExplainResult(
+            shardResults, mongosStageName, millisElapsed, out);
     }
 } disinctCmd;
 

@@ -18,7 +18,8 @@
     assert.throws( t.distinct, [{a:1}] );
 
     // from command interface
-    assert.commandFailedWithCode( t.runCommand( "distinct", { "key" : { a : 1 } } ), 18510 );
+    assert.commandFailedWithCode(t.runCommand("distinct", {"key": {a: 1}}),
+                                 14); // ErrorCodes::TypeMismatch
 
 
     //second argument should be a document or error
@@ -27,7 +28,8 @@
     assert.throws( t.distinct, ['a', '1'] );
 
     // from command interface
-    assert.commandFailedWithCode( t.runCommand( "distinct", { "key" : "a", "query" : "a" } ), 18511 );
+    assert.commandFailedWithCode(t.runCommand("distinct", {"key": "a", "query": "a"}),
+                                 14); // ErrorCodes::TypeMismatch
 
 
 
