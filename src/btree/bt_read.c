@@ -114,6 +114,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 {
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE cbt;
+	WT_DECL_ITEM(current_key);
 	WT_DECL_ITEM(klas);
 	WT_DECL_RET;
 	WT_ITEM(vlas);
@@ -121,7 +122,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	WT_UPDATE *first_upd, *last_upd, *upd;
 	size_t incr, prefix_len, total_incr;
 	uint32_t key_len, saved_flags, upd_size;
-	uint64_t recno, txnid;
+	uint64_t current_recno, recno, txnid;
 	uint8_t prefix[100];
 	int exact;
 	void *p;
@@ -130,12 +131,13 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	page = ref->page;
 	first_upd = last_upd = upd = NULL;
 	total_incr = 0;
-	recno = 0;			/* [-Werror=maybe-uninitialized] */
+	current_recno = recno = WT_RECNO_OOB;
 	saved_flags = 0;		/* [-Werror=maybe-uninitialized] */
 
 	__wt_btcur_init(session, &cbt);
 	__wt_btcur_open(&cbt);
 
+	WT_ERR(__wt_scr_alloc(session, 0, &current_key));
 	WT_ERR(__wt_scr_alloc(session, addr_size + 100, &klas));
 
 	/* Build the unique file/address prefix. */
@@ -157,7 +159,13 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		goto done;
 	}
 
-	/* Step through the lookaside records. */
+	/*
+	 * Step through the lookaside records. The lookaside records are in key
+	 * and update order, that is, there will be a set of in-order updates
+	 * for a key, then another set of in-order updates for a subsequent key.
+	 * We process all of the updates for a key and then insert those updates
+	 * into the page, then all the updates for the next key, and so on.
+	 */
 	for (; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor, klas));
 
@@ -182,22 +190,10 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 
 		/*
 		 * Skip past the counter (it's only needed to ensure records are
-		 * read in their original, listed order), then crack the key.
+		 * read in their original, listed order), leaving p referencing
+		 * the first byte of the key.
 		 */
 		p = (uint8_t *)p + sizeof(uint32_t);
-		switch (page->type) {
-		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_VAR:
-			memcpy(&recno, p, sizeof(uint64_t));
-			break;
-		case WT_PAGE_ROW_LEAF:
-			memcpy(&key_len, p, sizeof(uint32_t));
-			p = (uint8_t *)p + sizeof(uint32_t);
-			klas->data = p;
-			klas->size = key_len;
-			break;
-		WT_ILLEGAL_VALUE_ERR(session);
-		}
 
 		/* Allocate the WT_UPDATE structure. */
 		WT_ERR(cursor->get_value(cursor, &txnid, &upd_size, &vlas));
@@ -207,6 +203,47 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		total_incr += incr;
 		upd->txnid = txnid;
 
+		switch (page->type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_VAR:
+			memcpy(&recno, p, sizeof(uint64_t));
+			if (current_recno != recno) {
+				if (first_upd != NULL) {
+					/* Search the page and add updates. */
+					WT_ERR(__wt_col_search(
+					    session, current_recno, ref, &cbt));
+					WT_ERR(__wt_col_modify(session, &cbt,
+					    current_recno, NULL, first_upd, 0));
+					first_upd = NULL;
+				}
+				current_recno = recno;
+			}
+			break;
+		case WT_PAGE_ROW_LEAF:
+			memcpy(&key_len, p, sizeof(uint32_t));
+			p = (uint8_t *)p + sizeof(uint32_t);
+			klas->data = p;
+			klas->size = key_len;
+			if (current_key->size != klas->size ||
+			    memcmp(current_key->data,
+			    klas->data, current_key->size) != 0) {
+				if (first_upd != NULL) {
+					/* Search the page and add updates. */
+					WT_ERR(__wt_row_search(session,
+					    current_key, ref, &cbt, 1));
+					WT_ERR(
+					    __wt_row_modify(session, &cbt,
+					    current_key, NULL, first_upd, 0));
+					first_upd = NULL;
+				}
+				WT_ERR(__wt_buf_set(session,
+				    current_key, klas->data, klas->size));
+			}
+			break;
+		WT_ILLEGAL_VALUE_ERR(session);
+		}
+
+		/* Append the latest update to the list. */
 		if (first_upd == NULL)
 			first_upd = last_upd = upd;
 		else {
@@ -216,32 +253,29 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-	/* Search the page and insert the updates. */
-	if (first_upd != NULL) {
+	/* Insert the last set of updates, if any. */
+	if (first_upd != NULL)
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			/* Search the page. */
-			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
-
-			/* Apply the modification. */
-			WT_ERR(__wt_col_modify(
-			    session, &cbt, recno, NULL, first_upd, 0));
+			/* Search the page and add updates. */
+			WT_ERR(__wt_col_search(
+			    session, current_recno, ref, &cbt));
+			WT_ERR(__wt_col_modify(session, &cbt,
+			    current_recno, NULL, first_upd, 0));
+			first_upd = NULL;
 			break;
 		case WT_PAGE_ROW_LEAF:
-			/* Search the page. */
-			WT_ERR(__wt_row_search(session, klas, ref, &cbt, 1));
-
-			/* Apply the modification. */
-			WT_ERR(__wt_row_modify(
-			    session, &cbt, klas, NULL, first_upd, 0));
+			/* Search the page and add updates. */
+			WT_ERR(__wt_row_search(session,
+			    current_key, ref, &cbt, 1));
+			WT_ERR(
+			    __wt_row_modify(session, &cbt,
+			    current_key, NULL, first_upd, 0));
+			first_upd = NULL;
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
-
-		/* Don't discard any appended structures on error. */
-		first_upd = NULL;
-	}
 
 	/* Discard the cursor. */
 	WT_ERR(__wt_las_cursor_close(session, &cursor, saved_flags));
@@ -279,6 +313,7 @@ done: err:
 	if (first_upd != NULL)
 		__wt_free_update_list(session, first_upd);
 
+	__wt_scr_free(session, &current_key);
 	__wt_scr_free(session, &klas);
 
 	return (ret);
