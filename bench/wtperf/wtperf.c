@@ -2381,7 +2381,7 @@ wtperf_value_range(CONFIG *cfg)
 	if (cfg->random_range)
 		return (cfg->icount + cfg->random_range);
 	if (cfg->icount + cfg->insert_key == 0)
-		return (0);
+		return (1);
 	return (cfg->icount + cfg->insert_key - (u_int)(cfg->workers_cnt + 1));
 }
 
@@ -2420,10 +2420,6 @@ wtperf_rand(CONFIG_THREAD *thread)
 	 * Wrap the key to within the expected range and avoid zero: we never
 	 * insert that key.
 	 */
-	rval = wtperf_value_range(cfg);
-	if (rval)
-		rval = (rval % wtperf_value_range(cfg)) + 1;
-	else
-		rval = 1;
+	rval = (rval % wtperf_value_range(cfg)) + 1;
 	return (rval);
 }
