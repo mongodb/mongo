@@ -531,26 +531,16 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_txn_commit(session, NULL));
 
 	/*
-	 * Checkpoint the metadata file if this is a system wide checkpoint or
-	 * logging is disabled. Otherwise ensure that the log file has been
-	 * flushed so that the checkpoint is stable on disk.
-	 * It is not OK to checkpoint the metadata if logging is enabled and
-	 * this isn't a full checkpoint since checkpointing the metadata
-	 * updates the start LSN for recovery.
+	 * Ensure that the metadata changes are durable before the checkpoint
+	 * is resolved. Do this by either checkpointing the metadata or syncing
+	 * the log file.
+	 * Recovery relies on the checkpoint LSN in the metadata only being
+	 * updated by full checkpoints so only checkpoint the metadata for
+	 * full or non-logged checkpoints.
 	 */
 	if (full || !logging) {
-		/*
-		 * If any tree was dirty, we will have updated the metadata
-		 * with the new checkpoint information.  If the metadata is
-		 * clean, all other trees must have been clean.
-		 *
-		 * Disable metadata tracking during the metadata checkpoint.
-		 *
-		 * We don't lock old checkpoints in the metadata file: there is
-		 * no way to open one.  We are holding other handle locks, it
-		 * is not safe to lock conn->spinlock.
-		 */
 		session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
+		/* Disable metadata tracking during the metadata checkpoint. */
 		saved_meta_next = session->meta_track_next;
 		session->meta_track_next = NULL;
 		WT_WITH_DHANDLE(session,
@@ -561,11 +551,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__checkpoint_verbose_track(session,
 		    "metadata sync completed", &verb_timer));
 	} else
-		/*
-		 * Ensure the log file is synced so that recovery finds the
-		 * correct checkpoint in the metadata for the files in which we
-		 * just created checkpoints.
-		 */
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_txn_checkpoint_log(session,
 		    0, WT_TXN_LOG_CKPT_SYNC, NULL));
@@ -1200,9 +1185,9 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 
 	/*
 	 * Turn on metadata tracking if:
-	 * * The session isn't already doing metadata tracking
-	 * * The file isn't bulk loadable
-	 * * The close isn't during connection close
+	 * - The session is not already doing metadata tracking.
+	 * - The file is not empty or being bulk loaded.
+	 * - The close is not during connection close.
 	 */
 	need_tracking = !WT_META_TRACKING(session) && !bulk && !final;
 
