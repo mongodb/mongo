@@ -276,6 +276,14 @@ String.prototype.endsWith = function(str){
     return this.indexOf(str, this.length - str.length) !== -1
 }
 
+// Polyfill taken from
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/includes
+if (!String.prototype.includes) {
+    String.prototype.includes = function() {'use strict';
+        return String.prototype.indexOf.apply(this, arguments) !== -1;
+    };
+}
+
 // Returns a copy padded with the provided character _chr_ so it becomes (at least) _length_
 // characters long.
 // No truncation is performed if the string is already longer than _length_.

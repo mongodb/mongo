@@ -20,13 +20,6 @@ print.captureAllOutput = function (fn, args) {
     return res;
 }
 
-// SERVER-19369 to move this into types.js next to startsWith() and endsWith()
-// Polyfill a default implementation of String.includes() (defined in ES6)
-if (typeof String.prototype.includes === 'undefined') {
-    String.prototype.includes = function(it) { return this.indexOf(it) >= 0; };
-}
-
-
 var st = new ShardingTest({ shards: 1, mongos: 1, config: 1, other: { smallfiles: true } });
 
 var mongos = st.s0;
