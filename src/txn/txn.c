@@ -307,6 +307,12 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 			    WT_TXNID_LT(id, oldest_id))
 				oldest_id = id;
 		}
+
+		/* The oldest ID can't move past any named snapshots. */
+		if ((id = txn_global->nsnap_oldest_id) != WT_TXN_NONE &&
+		    WT_TXNID_LT(id, oldest_id))
+			oldest_id = id;
+
 		if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
 			txn_global->oldest_id = oldest_id;
 		txn_global->scan_count = 0;
