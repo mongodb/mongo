@@ -388,6 +388,22 @@ tasks:
 
           npm install || true
           npm start -- --jsTestsDir ../jstests || true
+    - command: archive.targz_pack
+      params:
+        target: "jstests.tgz"
+        source_dir: "src/jstestfuzz"
+        include:
+          - "out/*.js"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: jstests.tgz
+        remote_file: mongodb-mongo-master/${build_variant}/${revision}/jstestfuzz/jstestfuzz-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: Generated Tests
     - func: "run tests"
       vars:
         resmoke_args: --suites=jstestfuzz
