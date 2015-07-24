@@ -87,20 +87,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	txn_global = &conn->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
 
-	current_id = snap_min = txn_global->current;
-	prev_oldest_id = txn_global->oldest_id;
-
-	/* For pure read-only workloads, avoid scanning. */
-	if (prev_oldest_id == current_id) {
-		txn_state->snap_min = current_id;
-		__txn_sort_snapshot(session, 0, current_id);
-
-		/* Check that the oldest ID has not moved in the meantime. */
-		if (prev_oldest_id == txn_global->oldest_id &&
-		    txn_global->scan_count == 0)
-			return;
-	}
-
 	/*
 	 * We're going to scan.  Increment the count of scanners to prevent the
 	 * oldest ID from moving forwards.  Spin if the count is negative,
@@ -112,9 +98,21 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	} while (count < 0 ||
 	    !WT_ATOMIC_CAS4(txn_global->scan_count, count, count + 1));
 
-	/* The oldest ID cannot change until the scan count goes to zero. */
-	prev_oldest_id = txn_global->oldest_id;
 	current_id = snap_min = txn_global->current;
+	prev_oldest_id = txn_global->oldest_id;
+
+	/* For pure read-only workloads, avoid scanning. */
+	if (prev_oldest_id == current_id) {
+		txn_state->snap_min = current_id;
+		__txn_sort_snapshot(session, 0, current_id);
+
+		/* Check that the oldest ID has not moved in the meantime. */
+		if (prev_oldest_id == txn_global->oldest_id) {
+			WT_ASSERT(session, txn_global->scan_count > 0);
+			(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
+			return;
+		}
+	}
 
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
