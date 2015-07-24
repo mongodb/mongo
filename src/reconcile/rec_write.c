@@ -2793,9 +2793,8 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	dsk->mem_size = r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
 
 	/* If this is a checkpoint, we're done, otherwise write the page. */
-	return (
-	    __rec_is_checkpoint(session, r, bnd) ? 0 :
-	    __rec_split_write(session, r, bnd, &r->dsk, 1));
+	return (__rec_is_checkpoint(session, r, bnd) ?
+	    0 : __rec_split_write(session, r, bnd, &r->dsk, 1));
 }
 
 /*
