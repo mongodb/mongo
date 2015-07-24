@@ -109,7 +109,7 @@ typedef struct {
 typedef struct __truncate_struct TRUNCATE_CONFIG;
 struct __truncate_struct {
 	double truncation_percentage;
-	uint64_t truncate_stone_gap;
+	uint64_t stone_gap;
 	uint64_t needed_stones;
 	uint64_t final_stone_gap;
 	uint64_t expected_total;
@@ -179,7 +179,7 @@ struct __config {			/* Configuration structure */
 	u_int		 has_truncate;  /* if there is a truncate workload */
 
 	/* Queue head for use with the Truncate Logic */
-	STAILQ_HEAD(__truncate_qh, __truncate_queue_entry) truncate_stone_head;
+	STAILQ_HEAD(__truncate_qh, __truncate_queue_entry) stone_head;
 
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT

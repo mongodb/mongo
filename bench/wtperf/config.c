@@ -96,7 +96,7 @@ config_assign(CONFIG *dest, const CONFIG *src)
 			}
 		}
 
-	STAILQ_INIT(&dest->truncate_stone_head);
+	STAILQ_INIT(&dest->stone_head);
 	return (0);
 }
 

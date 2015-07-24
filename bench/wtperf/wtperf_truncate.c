@@ -52,16 +52,16 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	/* Truncation percentage value. eg 10% is 0.1. */
 	trunc_cfg->truncation_percentage = (double)workload->truncate_pct / 100;
 	/* How many entries between each stone. */
-	trunc_cfg->truncate_stone_gap =
+	trunc_cfg->stone_gap =
 	    workload->truncate_count * trunc_cfg->truncation_percentage;
 	/* How many stones we need. */
 	trunc_cfg->needed_stones =
-	    workload->truncate_count / trunc_cfg->truncate_stone_gap;
+	    workload->truncate_count / trunc_cfg->stone_gap;
 
-	final_stone_gap = trunc_cfg->truncate_stone_gap;
+	final_stone_gap = trunc_cfg->stone_gap;
 
 	/* Reset this value for use again. */
-	trunc_cfg->truncate_stone_gap = 0;
+	trunc_cfg->stone_gap = 0;
 
 	/*
 	 * Here we check if there is data in the collection. If there is
@@ -84,35 +84,32 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 
 	/* Assign stones if there are enough documents. */
 	if (start_point + trunc_cfg->needed_stones > end_point)
-		trunc_cfg->truncate_stone_gap = 0;
+		trunc_cfg->stone_gap = 0;
 	else
-		trunc_cfg->truncate_stone_gap =
+		trunc_cfg->stone_gap =
 		    (end_point - start_point) / trunc_cfg->needed_stones;
 
 	/* If we have enough data allocate some stones. */
-	if (trunc_cfg->truncate_stone_gap != 0) {
+	if (trunc_cfg->stone_gap != 0) {
 		trunc_cfg->expected_total = (end_point - start_point);
-		for (i = 0; i < trunc_cfg->needed_stones; i++) {
+		for (i = 1; i <= trunc_cfg->needed_stones; i++) {
 			truncate_key = calloc(cfg->key_sz, 1);
 			truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 			if (truncate_item == NULL) {
 				ret = enomem(cfg);
 				goto err;
 			}
-			generate_key(cfg, truncate_key,
-			    trunc_cfg->truncate_stone_gap * (i+1));
+			generate_key(
+			    cfg, truncate_key, trunc_cfg->stone_gap * i);
 			truncate_item->key = truncate_key;
 			truncate_item->diff =
-			    (trunc_cfg->truncate_stone_gap * (i+1)) -
-			    trunc_cfg->last_key;
-			STAILQ_INSERT_TAIL( &cfg->truncate_stone_head,
-			    truncate_item, q);
-			trunc_cfg->last_key =
-			    trunc_cfg->truncate_stone_gap * (i+1);
+			    (trunc_cfg->stone_gap * i) - trunc_cfg->last_key;
+			STAILQ_INSERT_TAIL( &cfg->stone_head, truncate_item, q);
+			trunc_cfg->last_key = trunc_cfg->stone_gap * i;
 			trunc_cfg->num_stones++;
 		}
 	}
-	trunc_cfg->truncate_stone_gap = final_stone_gap;
+	trunc_cfg->stone_gap = final_stone_gap;
 
 err:	cursor->close(cursor);
 	return (ret);
@@ -144,7 +141,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	}
 
 	while (trunc_cfg->num_stones < trunc_cfg->needed_stones) {
-		trunc_cfg->last_key += trunc_cfg->truncate_stone_gap;
+		trunc_cfg->last_key += trunc_cfg->stone_gap;
 		truncate_key = calloc(cfg->key_sz, 1);
 		truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 		if (truncate_item == NULL) {
@@ -154,8 +151,8 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 		}
 		generate_key(cfg, truncate_key, trunc_cfg->last_key);
 		truncate_item->key = truncate_key;
-		truncate_item->diff = trunc_cfg->truncate_stone_gap;
-		STAILQ_INSERT_TAIL(&cfg->truncate_stone_head, truncate_item, q);
+		truncate_item->diff = trunc_cfg->stone_gap;
+		STAILQ_INSERT_TAIL(&cfg->stone_head, truncate_item, q);
 		trunc_cfg->num_stones++;
 	}
 
@@ -167,9 +164,9 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 		return (0);
 	}
 
-	truncate_item = STAILQ_FIRST(&cfg->truncate_stone_head);
+	truncate_item = STAILQ_FIRST(&cfg->stone_head);
 	trunc_cfg->num_stones--;
-	STAILQ_REMOVE_HEAD(&cfg->truncate_stone_head, q);
+	STAILQ_REMOVE_HEAD(&cfg->stone_head, q);
 	cursor->set_key(cursor,truncate_item->key);
 	if ((ret = cursor->search(cursor)) != 0) {
 		lprintf(cfg, ret, 0, "Truncate search: failed");
@@ -192,9 +189,9 @@ void
 cleanup_truncate_config(CONFIG *cfg) {
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 
-	while (!STAILQ_EMPTY(&cfg->truncate_stone_head)) {
-		truncate_item = STAILQ_FIRST(&cfg->truncate_stone_head);
-		STAILQ_REMOVE_HEAD(&cfg->truncate_stone_head, q);
+	while (!STAILQ_EMPTY(&cfg->stone_head)) {
+		truncate_item = STAILQ_FIRST(&cfg->stone_head);
+		STAILQ_REMOVE_HEAD(&cfg->stone_head, q);
 		free(truncate_item->key);
 		free(truncate_item);
 	}
