@@ -74,11 +74,11 @@ bool BasicFTSTokenizer::moveNext() {
 
         // Stop words are case-sensitive so we need them to be lower cased to check
         // against the stop word list
-        if ((_options & FTSTokenizer::FilterStopWords) && _stopWords->isStopWord(word)) {
+        if ((_options & FTSTokenizer::kFilterStopWords) && _stopWords->isStopWord(word)) {
             continue;
         }
 
-        if (_options & FTSTokenizer::GenerateCaseSensitiveTokens) {
+        if (_options & FTSTokenizer::kGenerateCaseSensitiveTokens) {
             word = token.data.toString();
         }
 

@@ -62,6 +62,11 @@ public:
     explicit String(StringData utf8_src);
 
     /**
+     * Reset the String with the new UTF-8 source data, reusing the underlying buffer when possible.
+     */
+    void resetData(const StringData utf8_src);
+
+    /**
      * Return a lowercased version of the String instance using the Unicode data in u_data.h.
      */
     String toLower(CaseFoldMode mode = CaseFoldMode::kNormal) const;
@@ -128,6 +133,11 @@ private:
      * UTF-32 data.
      */
     String(std::u32string&& src);
+
+    /**
+     * Helper method for converting a UTF-8 string to a UTF-32 string.
+     */
+    void setData(const StringData utf8_src);
 
     /**
      * The underlying UTF-32 data.

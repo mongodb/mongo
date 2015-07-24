@@ -42,6 +42,8 @@ baseEnv.Library('base', [
         'fts_language.cpp',
         'fts_basic_phrase_matcher.cpp',
         'fts_basic_tokenizer.cpp',
+        'fts_unicode_phrase_matcher.cpp',
+        'fts_unicode_tokenizer.cpp',
         'fts_util.cpp',
         'fts_element_iterator.cpp',
         'stemmer.cpp',
@@ -72,25 +74,16 @@ env.Library('ftsmongos', [
         ], LIBDEPS=["server_common"])
 
 
-env.CppUnitTest( "fts_index_format_test", "fts_index_format_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_stop_words_test", "stop_words_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_stemmer_test", "stemmer_test.cpp",
+env.CppUnitTest( "fts_basic_phrase_matcher_test", "fts_basic_phrase_matcher_test.cpp",
                  LIBDEPS=["base"] )
 
 env.CppUnitTest( "fts_basic_tokenizer_test", "fts_basic_tokenizer_test.cpp",
                  LIBDEPS=["base"] )
 
-env.CppUnitTest( "fts_tokenizer_test", "tokenizer_test.cpp",
+env.CppUnitTest( "fts_element_iterator_test", "fts_element_iterator_test.cpp",
                  LIBDEPS=["base"] )
 
-env.CppUnitTest( "fts_query_test", "fts_query_test.cpp",
-                 LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_spec_test", "fts_spec_test.cpp",
+env.CppUnitTest( "fts_index_format_test", "fts_index_format_test.cpp",
                  LIBDEPS=["base"] )
 
 env.CppUnitTest( "fts_language_test", "fts_language_test.cpp",
@@ -99,8 +92,23 @@ env.CppUnitTest( "fts_language_test", "fts_language_test.cpp",
 env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",
                  LIBDEPS=["base"] )
 
-env.CppUnitTest( "fts_element_iterator_test", "fts_element_iterator_test.cpp",
+env.CppUnitTest( "fts_query_test", "fts_query_test.cpp",
                  LIBDEPS=["base"] )
 
-env.CppUnitTest( "fts_basic_phrase_matcher_test", "fts_basic_phrase_matcher_test.cpp",
+env.CppUnitTest( "fts_spec_test", "fts_spec_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_stemmer_test", "stemmer_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_stop_words_test", "stop_words_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_tokenizer_test", "tokenizer_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_unicode_phrase_matcher_test", "fts_unicode_phrase_matcher_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_unicode_tokenizer_test", "fts_unicode_tokenizer_test.cpp",
                  LIBDEPS=["base"] )

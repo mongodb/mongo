@@ -26,58 +26,39 @@
  *    it in the license file.
  */
 
-#include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/fts/fts_tokenizer.h"
-#include "mongo/unittest/unittest.h"
+#pragma once
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/fts/fts_phrase_matcher.h"
+#include "mongo/db/fts/unicode/codepoints.h"
 
 namespace mongo {
 namespace fts {
 
-std::vector<std::string> tokenizeString(const char* str, const char* language) {
-    StatusWithFTSLanguage swl = FTSLanguage::make(language, TEXT_INDEX_VERSION_2);
-    ASSERT_OK(swl);
+class FTSLanguage;
 
-    std::unique_ptr<FTSTokenizer> tokenizer(swl.getValue()->createTokenizer());
+/**
+ * UnicodeFTSPhraseMatcher
+ *
+ * A phrase matcher that looks for exact substring matches that ignore diacritics, and with UTF-8
+ * aware case folding if the phrase match is not specified as case sensitive. Optionally, the phrase
+ * matching can be diacritic sensitive if a parameter is passed to the constructor. Additionally, if
+ * the language string passed to the phrase matcher's constructor is Turkish (uses the special I
+ * case fold mapping), the phrase matcher will take that into account.
+ */
+class UnicodeFTSPhraseMatcher final : public FTSPhraseMatcher {
+    MONGO_DISALLOW_COPYING(UnicodeFTSPhraseMatcher);
 
-    tokenizer->reset(str, FTSTokenizer::kNone);
+public:
+    UnicodeFTSPhraseMatcher(const std::string& language);
 
-    std::vector<std::string> terms;
+    bool phraseMatches(const std::string& phrase,
+                       const std::string& haystack,
+                       Options options) const override;
 
-    while (tokenizer->moveNext()) {
-        terms.push_back(tokenizer->get().toString());
-    }
-
-    return terms;
-}
-
-// Ensure punctuation is filtered out of the indexed document
-// and the 's is not separated
-TEST(FtsBasicTokenizer, English) {
-    std::vector<std::string> terms = tokenizeString("Do you see Mark's dog running?", "english");
-
-    ASSERT_EQUALS(6U, terms.size());
-    ASSERT_EQUALS("do", terms[0]);
-    ASSERT_EQUALS("you", terms[1]);
-    ASSERT_EQUALS("see", terms[2]);
-    ASSERT_EQUALS("mark", terms[3]);
-    ASSERT_EQUALS("dog", terms[4]);
-    ASSERT_EQUALS("run", terms[5]);
-}
-
-// Ensure punctuation is filtered out of the indexed document
-// and the 's is separated
-TEST(FtsBasicTokenizer, French) {
-    std::vector<std::string> terms = tokenizeString("Do you see Mark's dog running?", "french");
-
-    ASSERT_EQUALS(7U, terms.size());
-    ASSERT_EQUALS("do", terms[0]);
-    ASSERT_EQUALS("you", terms[1]);
-    ASSERT_EQUALS("se", terms[2]);
-    ASSERT_EQUALS("mark", terms[3]);
-    ASSERT_EQUALS("s", terms[4]);
-    ASSERT_EQUALS("dog", terms[5]);
-    ASSERT_EQUALS("running", terms[6]);
-}
+private:
+    unicode::CaseFoldMode _caseFoldMode;
+};
 
 }  // namespace fts
 }  // namespace mongo

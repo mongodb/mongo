@@ -82,8 +82,8 @@ bool FTSMatcher::_hasPositiveTerm_string(const FTSLanguage* language, const stri
     std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
 
     tokenizer->reset(raw.c_str(),
-                     _query.getCaseSensitive() ? FTSTokenizer::GenerateCaseSensitiveTokens
-                                               : FTSTokenizer::None);
+                     _query.getCaseSensitive() ? FTSTokenizer::kGenerateCaseSensitiveTokens
+                                               : FTSTokenizer::kNone);
 
     while (tokenizer->moveNext()) {
         string word = tokenizer->get().toString();
@@ -115,8 +115,8 @@ bool FTSMatcher::_hasNegativeTerm_string(const FTSLanguage* language, const stri
     std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
 
     tokenizer->reset(raw.c_str(),
-                     _query.getCaseSensitive() ? FTSTokenizer::GenerateCaseSensitiveTokens
-                                               : FTSTokenizer::None);
+                     _query.getCaseSensitive() ? FTSTokenizer::kGenerateCaseSensitiveTokens
+                                               : FTSTokenizer::kNone);
 
     while (tokenizer->moveNext()) {
         string word = tokenizer->get().toString();

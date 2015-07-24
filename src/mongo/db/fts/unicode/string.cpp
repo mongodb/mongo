@@ -42,6 +42,14 @@ using linenoise_utf8::copyString8to32;
 using std::u32string;
 
 String::String(const StringData utf8_src) {
+    setData(utf8_src);
+}
+
+void String::resetData(const StringData utf8_src) {
+    setData(utf8_src);
+}
+
+void String::setData(const StringData utf8_src) {
     // _data is the target, resize it so that it's guaranteed to fit all of the input characters,
     // plus a null character if there isn't one.
     _data.resize(utf8_src.size() + 1);

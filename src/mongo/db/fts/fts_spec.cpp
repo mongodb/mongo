@@ -182,7 +182,7 @@ void FTSSpec::_scoreStringV2(FTSTokenizer* tokenizer,
 
     unsigned numTokens = 0;
 
-    tokenizer->reset(raw.rawData(), FTSTokenizer::FilterStopWords);
+    tokenizer->reset(raw.rawData(), FTSTokenizer::kFilterStopWords);
 
     while (tokenizer->moveNext()) {
         string term = tokenizer->get().toString();

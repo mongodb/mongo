@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 
@@ -49,24 +51,29 @@ public:
     virtual ~FTSTokenizer() = default;
 
     /**
-     * Options for generating tokens
+     * Options for generating tokens.
      */
-    enum Options {
-        /**
-         * Default means lower cased, and stop words are not filtered.
-         */
-        None = 0,
+    using Options = uint8_t;
 
-        /**
-         * Do not lower case terms.
-         */
-        GenerateCaseSensitiveTokens = 1 << 0,
+    /**
+     * Default means lower cased, diacritics removed, and stop words are not filtered.
+     */
+    static const Options kNone = 0;
 
-        /**
-         * Filter out stop words from return tokens.
-         */
-        FilterStopWords = 1 << 1,
-    };
+    /**
+     * Do not lower case terms.
+     */
+    static const Options kGenerateCaseSensitiveTokens = 1 << 0;
+
+    /**
+     * Filter out stop words from return tokens.
+     */
+    static const Options kFilterStopWords = 1 << 1;
+
+    /**
+     * Do not remove diacritics from terms.
+     */
+    static const Options kGenerateDiacriticSensitiveTokens = 1 << 2;
 
     /**
      * Process a new document, and discards any previous results.

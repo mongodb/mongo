@@ -44,7 +44,7 @@ TEST(FtsBasicPhraseMatcher, CaseInsensitive) {
     std::string nofind2 = "dolor velit";
 
     BasicFTSPhraseMatcher phraseMatcher;
-    FTSPhraseMatcher::PhraseMatcherOptions options = FTSPhraseMatcher::kNone;
+    FTSPhraseMatcher::Options options = FTSPhraseMatcher::kNone;
 
     ASSERT(phraseMatcher.phraseMatches(find1, str1, options));
     ASSERT(phraseMatcher.phraseMatches(find2, str2, options));
@@ -64,7 +64,7 @@ TEST(FtsBasicPhraseMatcher, CaseSensitive) {
     std::string nofind2 = "Irure dolor";
 
     BasicFTSPhraseMatcher phraseMatcher;
-    FTSPhraseMatcher::PhraseMatcherOptions options = FTSPhraseMatcher::kCaseSensitive;
+    FTSPhraseMatcher::Options options = FTSPhraseMatcher::kCaseSensitive;
 
     ASSERT(phraseMatcher.phraseMatches(find1, str1, options));
     ASSERT(phraseMatcher.phraseMatches(find2, str2, options));
