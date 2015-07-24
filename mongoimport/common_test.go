@@ -15,7 +15,7 @@ import (
 
 func init() {
 	log.SetVerbosity(&options.Verbosity{
-		Verbose: []bool{true, true, true, true},
+		VLevel: 4,
 	})
 }
 
