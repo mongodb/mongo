@@ -273,7 +273,7 @@ String.prototype.startsWith = function(str){
 }
 
 String.prototype.endsWith = function(str){
-    return new RegExp(RegExp.escape(str) + "$").test(this)
+    return this.indexOf(str, this.length - str.length) !== -1
 }
 
 // Returns a copy padded with the provided character _chr_ so it becomes (at least) _length_
