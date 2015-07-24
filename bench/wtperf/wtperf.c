@@ -1453,8 +1453,9 @@ execute_populate(CONFIG *cfg)
 	CONFIG_THREAD *popth;
 	WT_ASYNC_OP *asyncop;
 	size_t i;
-	uint64_t last_ops, msecs;
+	uint64_t last_ops, msecs, print_ops_sec;
 	uint32_t interval, tables;
+	double print_secs;
 	int elapsed, ret;
 	void *(*pfunc)(void *);
 
@@ -1532,10 +1533,22 @@ execute_populate(CONFIG *cfg)
 
 	lprintf(cfg, 0, 1, "Finished load of %" PRIu32 " items", cfg->icount);
 	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
+
+	/*
+	 * This is needed as the divisions will fail if the insert takes no time
+	 * which will only be the case when there is no data to insert.
+	 */
+	if (msecs == 0) {
+		print_secs = 0;
+		print_ops_sec = 0;
+	} else {
+		print_secs = (double)msecs / (double)MSEC_PER_SEC;
+		print_ops_sec =
+		    (uint64_t)((cfg->icount / msecs) / MSEC_PER_SEC);
+	}
 	lprintf(cfg, 0, 1,
 	    "Load time: %.2f\n" "load ops/sec: %" PRIu64,
-	    (double)msecs / (double)MSEC_PER_SEC,
-	    (uint64_t)((cfg->icount / msecs) / MSEC_PER_SEC));
+	    print_secs, print_ops_sec);
 
 	/*
 	 * If configured, compact to allow LSM merging to complete.  We
@@ -2285,6 +2298,12 @@ main(int argc, char *argv[])
 			break;
 		}
 
+	if (cfg->populate_threads == 0 && cfg->icount != 0) {
+		lprintf(cfg, 1, 0,
+		    "Cannot have 0 populate threads when icount is set\n");
+		goto err;
+	}
+
 	cfg->async_config = NULL;
 	/*
 	 * If the user specified async_threads we use async for all ops.
@@ -2601,7 +2620,12 @@ wtperf_value_range(CONFIG *cfg)
 {
 	if (cfg->random_range)
 		return (cfg->icount + cfg->random_range);
-
+	/*
+	 * It is legal to configure a zero size populate phase, hide that
+	 * from other code by pretending the range is 1 in that case.
+	 */
+	if (cfg->icount + cfg->insert_key == 0)
+		return (1);
 	return (cfg->icount + cfg->insert_key - (u_int)(cfg->workers_cnt + 1));
 }
 
