@@ -1151,8 +1151,11 @@ ShardingTest.prototype.stopMongod = function(n) {
  * Warning: Overwrites the old s (if n = 0) and sn member variables.
  */
 ShardingTest.prototype.restartMongos = function(n) {
-    this.stopMongos(n);
-    var newConn = MongoRunner.runMongos(this['s' + n].commandLine);
+    var mongos = this['s' + n];
+    MongoRunner.stopMongos(mongos);
+    mongos.restart = true;
+
+    var newConn = MongoRunner.runMongos(mongos);
 
     this['s' + n] = newConn;
     if (n == 0) {
@@ -1166,12 +1169,11 @@ ShardingTest.prototype.restartMongos = function(n) {
  * Warning: Overwrites the old dn member variables.
  */
 ShardingTest.prototype.restartMongod = function(n) {
-    this.stopMongod(n);
+    var mongod = this['d' + n];
+    MongoRunner.stopMongod(mongod);
+    mongod.restart = true;
 
-    var cmdLine = this['d' + n].commandLine;
-    cmdLine['restart'] = true;
-
-    var newConn = MongoRunner.runMongod(cmdLine);
+    var newConn = MongoRunner.runMongod(mongod);
 
     this['d' + n] = newConn;
 };
