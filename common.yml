@@ -467,7 +467,25 @@ functions:
         rm -rf mongodb/${db_files_dir|db_files} mongodb/${logfile|run.log};
         mkdir mongodb/${db_files_dir|db_files};
         echo "Starting mongod...";
-        ./mongodb/mongod${extension} ${mongodb_args} --dbpath mongodb/db_files --port 33333 --setParameter=enableTestCommands=1 &
+        ./mongodb/mongod${extension} ${mongodb_args} --dbpath mongodb/db_files --port 33333 --setParameter=enableTestCommands=1
+
+  "wait for mongod to be ready":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        SECONDS=0
+        while ! ./mongodb/mongo${extension} --port 33333 </dev/null 2>/dev/null >/dev/null ; do
+            SECONDS=`expr $SECONDS + 1`
+            if [ $SECONDS -gt 20 ]; then
+                echo "mongod not ready after 20 seconds"
+                exit 1
+            fi
+            echo "waiting for mongod to be ready..." ;
+            sleep 1 ;
+        done
+        echo "mongod ready";
 
   "upload tool":
     command: s3.put
@@ -554,6 +572,7 @@ tasks:
       vars:
         mongo_url: "${mongo30_url}"
     - func: "start mongod"
+    - func: "wait for mongod to be ready"
     - func: "setup integration test"
     - func: "run unit test"
 
@@ -653,12 +672,7 @@ tasks:
       vars:
         mongo_url: "${mongo30_url}"
     - func: "start mongod"
-    - command: shell.exec
-      params:
-        directory: src
-        script: |
-          # Give mongod a chance to start
-          sleep 2s
+    - func: "wait for mongod to be ready"
     - func: "run tool integration tests"
 
 - name: integration-auth
@@ -687,12 +701,7 @@ tasks:
       vars:
         mongo_url: "${mongo30_url}"
     - func: "start mongod"
-    - command: shell.exec
-      params:
-        directory: src
-        script: |
-          # Give mongod a chance to start
-          sleep 2s
+    - func: "wait for mongod to be ready"
     - func: "run tool integration tests"
 
 - name: json
