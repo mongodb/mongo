@@ -40,9 +40,14 @@ namespace mozjs {
 
 namespace {
 
-JSErrorFormatString kFormatString = {"{0}", 1, JSEXN_ERR};
+JSErrorFormatString kErrorFormatString = {"{0}", 1, JSEXN_ERR};
 const JSErrorFormatString* errorCallback(void* data, const unsigned code) {
-    return &kFormatString;
+    return &kErrorFormatString;
+}
+
+JSErrorFormatString kUncatchableErrorFormatString = {"{0}", 1, JSEXN_NONE};
+const JSErrorFormatString* uncatchableErrorCallback(void* data, const unsigned code) {
+    return &kUncatchableErrorFormatString;
 }
 
 }  // namespace
@@ -50,11 +55,17 @@ const JSErrorFormatString* errorCallback(void* data, const unsigned code) {
 void mongoToJSException(JSContext* cx) {
     auto status = exceptionToStatus();
 
-    JS_ReportErrorNumber(cx, errorCallback, nullptr, status.code(), status.reason().c_str());
+    auto callback =
+        status.code() == ErrorCodes::JSUncatchableError ? uncatchableErrorCallback : errorCallback;
+
+    JS_ReportErrorNumber(cx, callback, nullptr, status.code(), status.reason().c_str());
 }
 
 void setJSException(JSContext* cx, ErrorCodes::Error code, StringData sd) {
-    JS_ReportErrorNumber(cx, errorCallback, nullptr, code, sd.rawData());
+    auto callback =
+        code == ErrorCodes::JSUncatchableError ? uncatchableErrorCallback : errorCallback;
+
+    JS_ReportErrorNumber(cx, callback, nullptr, code, sd.rawData());
 }
 
 Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {

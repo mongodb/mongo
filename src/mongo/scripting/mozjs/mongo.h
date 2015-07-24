@@ -79,9 +79,10 @@ struct MongoExternalInfo : public MongoBase {
 
     struct Functions {
         MONGO_DEFINE_JS_FUNCTION(load);
+        MONGO_DEFINE_JS_FUNCTION(quit);
     };
 
-    static const JSFunctionSpec freeFunctions[2];
+    static const JSFunctionSpec freeFunctions[3];
 };
 
 }  // namespace mozjs

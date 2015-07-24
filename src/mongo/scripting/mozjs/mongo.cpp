@@ -63,8 +63,8 @@ const JSFunctionSpec MongoBase::methods[13] = {
 
 const char* const MongoBase::className = "Mongo";
 
-const JSFunctionSpec MongoExternalInfo::freeFunctions[2] = {
-    MONGO_ATTACH_JS_FUNCTION(load), JS_FS_END,
+const JSFunctionSpec MongoExternalInfo::freeFunctions[3] = {
+    MONGO_ATTACH_JS_FUNCTION(load), MONGO_ATTACH_JS_FUNCTION(quit), JS_FS_END,
 };
 
 namespace {
@@ -559,6 +559,14 @@ void MongoExternalInfo::Functions::load(JSContext* cx, JS::CallArgs args) {
     }
 
     args.rval().setBoolean(true);
+}
+
+void MongoExternalInfo::Functions::quit(JSContext* cx, JS::CallArgs args) {
+    auto scope = getScope(cx);
+
+    scope->setQuickExit(args.get(0).isNumber() ? args.get(0).toNumber() : 0);
+
+    uasserted(ErrorCodes::JSUncatchableError, "Calling Quit");
 }
 
 }  // namespace mozjs

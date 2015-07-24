@@ -227,6 +227,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _pendingGC(false),
       _connectState(ConnectState::Not),
       _status(Status::OK()),
+      _quickExit(false),
       _binDataProto(_context),
       _bsonProto(_context),
       _countDownLatchProto(_context),
@@ -707,6 +708,9 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     if (success)
         return false;
 
+    if (_quickExit)
+        return false;
+
     if (_status.isOK()) {
         _status = Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
     }
@@ -734,6 +738,19 @@ void MozJSImplScope::setCompileOptions(JS::CompileOptions* co) {
 
 MozJSImplScope* MozJSImplScope::getThreadScope() {
     return kCurrentScope;
+}
+
+void MozJSImplScope::setQuickExit(int exitCode) {
+    _quickExit = true;
+    _exitCode = exitCode;
+}
+
+bool MozJSImplScope::getQuickExit(int* exitCode) {
+    if (_quickExit) {
+        *exitCode = _exitCode;
+    }
+
+    return _quickExit;
 }
 
 void MozJSImplScope::setOOM() {

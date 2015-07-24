@@ -226,6 +226,9 @@ public:
         return _timestampProto;
     }
 
+    void setQuickExit(int exitCode);
+    bool getQuickExit(int* exitCode);
+
     static const char* const kExecResult;
     static const char* const kInvokeResult;
 
@@ -291,6 +294,8 @@ private:
     std::atomic<bool> _pendingGC;
     ConnectState _connectState;
     Status _status;
+    int _exitCode;
+    bool _quickExit;
 
     WrapType<BinDataInfo> _binDataProto;
     WrapType<BSONInfo> _bsonProto;

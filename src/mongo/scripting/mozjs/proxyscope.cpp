@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/util/quick_exit.h"
 
 namespace mongo {
 namespace mozjs {
@@ -306,6 +307,12 @@ void MozJSProxyScope::implThread() {
             _function();
         } catch (...) {
             _status = exceptionToStatus();
+        }
+
+        int exitCode;
+        if (_implScope && _implScope->getQuickExit(&exitCode)) {
+            scope.reset();
+            quickExit(exitCode);
         }
 
         _state = State::ImplResponse;
