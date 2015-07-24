@@ -564,6 +564,9 @@ env_vars = Variables(
     args=ARGUMENTS
 )
 
+env_vars.Add('ABIDW',
+    help="Configures the path to the 'abidw' (a libabigail) utility")
+
 env_vars.Add('ARFLAGS',
     help='Sets flags for the archiver',
     converter=variable_shlex_converter)
@@ -1027,6 +1030,13 @@ if env.TargetOSIs('windows') and link_model != 'object':
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS' if link_model == "object" else '$_LIBDEPS_LIBS'
 
 if link_model.startswith("dynamic"):
+
+    # Add in the abi linking tool if the user requested and it is
+    # supported on this platform.
+    if env.get('ABIDW'):
+        abilink = Tool('abilink')
+        if abilink.exists(env):
+            abilink(env)
 
     # Redirect the 'Library' target, which we always use instead of 'StaticLibrary' for things
     # that can be built in either mode, to point to SharedLibrary.

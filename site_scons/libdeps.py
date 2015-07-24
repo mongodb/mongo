@@ -235,7 +235,9 @@ def libdeps_emitter(target, source, env):
             file_name = '${LIBPREFIX}' + file_name
         if not file_name.endswith(lib_suffix):
             file_name += '${LIBSUFFIX}'
-        libdep_files.append(env.File(os.path.join(dir_name, file_name)))
+
+        node_factory = env['BUILDERS']['StaticLibrary'].target_factory or env.File
+        libdep_files.append(node_factory(os.path.join(dir_name, file_name)))
 
     for t in target:
         # target[0] must be a Node and not a string, or else libdeps will fail to
@@ -276,7 +278,9 @@ def shlibdeps_emitter(target, source, env):
             file_name = '${SHLIBPREFIX}' + file_name
         if not file_name.endswith(lib_suffix):
             file_name += '${SHLIBSUFFIX}'
-        libdep_files.append(env.File(os.path.join(dir_name, file_name)))
+
+        node_factory = env['BUILDERS']['SharedLibrary'].target_factory or env.File
+        libdep_files.append(node_factory(os.path.join(dir_name, file_name)))
 
     for t in target:
         # target[0] must be a Node and not a string, or else libdeps will fail to
