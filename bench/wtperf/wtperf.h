@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HAVE_WTPERF_H
+#ifndef	HAVE_WTPERF_H
 #define	HAVE_WTPERF_H
 
 #ifndef _WIN32
