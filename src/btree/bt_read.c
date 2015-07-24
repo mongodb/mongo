@@ -9,8 +9,8 @@
 #include "wt_internal.h"
 
 #define	WT_MAX_PREFIX_SIZE						\
-    sizeof(char) +							\
-    sizeof(uint32_t) + sizeof(uint8_t) + WT_BTREE_MAX_ADDR_COOKIE
+    (sizeof(char) +							\
+    sizeof(uint32_t) + sizeof(uint8_t) + WT_BTREE_MAX_ADDR_COOKIE)
 
 /*
  * __las_build_prefix --
