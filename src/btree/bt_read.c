@@ -8,6 +8,10 @@
 
 #include "wt_internal.h"
 
+#define	WT_MAX_PREFIX_SIZE						\
+    sizeof(char) +							\
+    sizeof(uint32_t) + sizeof(uint8_t) + WT_BTREE_MAX_ADDR_COOKIE
+
 /*
  * __las_build_prefix --
  *	Build the unique file/address prefix.
@@ -53,9 +57,9 @@ __wt_las_remove_block(
 	WT_DECL_ITEM(klas);
 	WT_DECL_RET;
 	size_t prefix_len;
-	int exact;
 	uint32_t saved_flags;
-	uint8_t prefix[100];
+	int exact;
+	uint8_t prefix[WT_MAX_PREFIX_SIZE];
 
 	cursor = NULL;
 
@@ -70,14 +74,24 @@ __wt_las_remove_block(
 	__las_build_prefix(session, addr, addr_size, prefix, &prefix_len);
 
 	/* Copy the unique prefix into the key. */
-	WT_RET(__wt_scr_alloc(session, addr_size + 100, &klas));
+	WT_RET(__wt_scr_alloc(session, WT_MAX_PREFIX_SIZE, &klas));
 	memcpy(klas->mem, prefix, prefix_len);
 	klas->size = prefix_len;
 
-	WT_RET(__wt_las_cursor(session, &cursor, &saved_flags));
-
+	/*
+	 * Open a lookaside table cursor and search for the matching prefix.
+	 * If we don't find any records, we're done.
+	 */
+	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
 	cursor->set_key(cursor, klas);
-	while ((ret = cursor->search_near(cursor, &exact)) == 0) {
+	if ((ret = cursor->search_near(cursor, &exact)) != 0 || exact < 0) {
+		if (ret == WT_NOTFOUND)
+			ret = 0;
+		goto done;
+	}
+
+	/* Step through the lookaside records. */
+	for (; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor, klas));
 
 		/*
@@ -88,17 +102,21 @@ __wt_las_remove_block(
 		    memcmp(klas->data, prefix, prefix_len) != 0)
 			break;
 
-		/* Make sure we have a local copy of the record. */
+		/*
+		 * Make sure we have a local copy of the record.
+		 *
+		 * KEITH: Why is this necessary?
+		 */
 		if (!WT_DATA_IN_ITEM(klas))
 			WT_ERR(__wt_buf_set(
 			    session, klas, klas->data, klas->size));
 
 		WT_ERR(cursor->remove(cursor));
-		klas->size = prefix_len;
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
+done: err:
+	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
 
 	__wt_scr_free(session, &klas);
 	return (ret);
@@ -123,7 +141,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	size_t incr, prefix_len, total_incr;
 	uint32_t key_len, saved_flags, upd_size;
 	uint64_t current_recno, recno, txnid;
-	uint8_t prefix[100];
+	uint8_t prefix[WT_MAX_PREFIX_SIZE];
 	int exact;
 	void *p;
 
@@ -138,7 +156,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	__wt_btcur_open(&cbt);
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current_key));
-	WT_ERR(__wt_scr_alloc(session, addr_size + 100, &klas));
+	WT_ERR(__wt_scr_alloc(session, WT_MAX_PREFIX_SIZE, &klas));
 
 	/* Build the unique file/address prefix. */
 	__las_build_prefix(session, addr, addr_size, prefix, &prefix_len);
