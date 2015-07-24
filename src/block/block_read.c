@@ -204,15 +204,17 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			__wt_errx(session,
 			    "read checksum error for %" PRIu32 "B block at "
 			    "offset %" PRIuMAX ": calculated block checksum "
-			    "of %" PRIu32 " doesn't match expected cksum of %"
-			    PRIu32, size, (uintmax_t)offset, page_cksum, cksum);
+			    "of %" PRIu32 " doesn't match expected checksum "
+			    "of %" PRIu32,
+			    size, (uintmax_t)offset, page_cksum, cksum);
 	} else
 		if (!F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK))
 			__wt_errx(session,
 			    "read checksum error for %" PRIu32 "B block at "
 			    "offset %" PRIuMAX ": block header checksum "
-			    "of %" PRIu32 " doesn't match expected cksum of %"
-			    PRIu32, size, (uintmax_t)offset, blk->cksum, cksum);
+			    "of %" PRIu32 " doesn't match expected checksum "
+			    "of %" PRIu32,
+			    size, (uintmax_t)offset, blk->cksum, cksum);
 
 	/* Panic if a checksum fails during an ordinary read. */
 	return (block->verify ||
