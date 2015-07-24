@@ -246,8 +246,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 					/* Search the page and add updates. */
 					WT_ERR(__wt_row_search(session,
 					    current_key, ref, &cbt, 1));
-					WT_ERR(
-					    __wt_row_modify(session, &cbt,
+					WT_ERR(__wt_row_modify(session, &cbt,
 					    current_key, NULL, first_upd, 0));
 					first_upd = NULL;
 				}
@@ -284,8 +283,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 			/* Search the page and add updates. */
 			WT_ERR(__wt_row_search(session,
 			    current_key, ref, &cbt, 1));
-			WT_ERR(
-			    __wt_row_modify(session, &cbt,
+			WT_ERR(__wt_row_modify(session, &cbt,
 			    current_key, NULL, first_upd, 0));
 			first_upd = NULL;
 			break;
