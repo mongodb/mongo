@@ -61,6 +61,9 @@ bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
     invariant(_planYielding);
     invariant(allowedToYield());
 
+    // Reset the yield timer in order to prevent from yielding again right away.
+    resetTimer();
+
     _forceYield = false;
 
     OperationContext* opCtx = _planYielding->getOpCtx();

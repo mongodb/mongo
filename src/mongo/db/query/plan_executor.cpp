@@ -283,9 +283,6 @@ bool PlanExecutor::restoreState() {
 
 bool PlanExecutor::restoreStateWithoutRetrying() {
     invariant(_currentState == kSaved);
-    // We're restoring after a yield or getMore now. If we're a yielding plan executor, reset
-    // the yield timer in order to prevent from yielding again right away.
-    _yieldPolicy->resetTimer();
 
     if (!killed()) {
         _root->restoreState();
@@ -305,6 +302,11 @@ void PlanExecutor::detachFromOperationContext() {
 
 void PlanExecutor::reattachToOperationContext(OperationContext* txn) {
     invariant(_currentState == kDetached);
+
+    // We're reattaching for a getMore now.  Reset the yield timer in order to prevent from
+    // yielding again right away.
+    _yieldPolicy->resetTimer();
+
     _opCtx = txn;
     _root->reattachToOperationContext(txn);
     _currentState = kSaved;
