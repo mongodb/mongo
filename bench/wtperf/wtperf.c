@@ -2380,6 +2380,10 @@ wtperf_value_range(CONFIG *cfg)
 {
 	if (cfg->random_range)
 		return (cfg->icount + cfg->random_range);
+	/*
+	 * It is legal to configure a zero size populate phase, hide that
+	 * from other code by pretending the range is 1 in that case.
+	 */
 	if (cfg->icount + cfg->insert_key == 0)
 		return (1);
 	return (cfg->icount + cfg->insert_key - (u_int)(cfg->workers_cnt + 1));
