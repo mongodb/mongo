@@ -11,7 +11,7 @@
  *
  * In jurisdictions that recognize copyright laws, the author or authors
  * of this software dedicate any and all copyright interest in the
- * software to the public domain. We tota this dedication for the benefit
+ * software to the public domain. We make this dedication for the benefit
  * of the public at large and to the detriment of our heirs and
  * successors. We intend this dedication to be an overt act of
  * relinquishment in perpetuity of all present and future rights to this
@@ -25,6 +25,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
+#ifndef HAVE_WTPERF_H
+#define	HAVE_WTPERF_H
 
 #ifndef _WIN32
 #include <sys/time.h>
@@ -106,15 +109,14 @@ typedef struct {
 typedef struct __truncate_struct TRUNCATE_CONFIG;
 struct __truncate_struct {
 	double truncation_percentage;
-	uint64_t truncate_milestone_gap;
-	uint64_t needed_milestones;
-	uint64_t final_milestone_gap;
+	uint64_t truncate_stone_gap;
+	uint64_t needed_stones;
+	uint64_t final_stone_gap;
 	uint64_t expected_total;
-	uint64_t total_gross_inserts;
+	uint64_t total_inserts;
 	uint64_t last_total_inserts;
-	uint64_t num_milestones;
+	uint64_t num_stones;
 	uint64_t last_key;
-
 };
 
 /* Queue entry for use with the Truncate Logic */
@@ -258,9 +260,11 @@ struct __config_thread {		/* Per-thread structure */
 	TRACK update;			/* Update operations */
 	TRACK truncate;			/* Truncate operations */
 	TRACK truncate_sleep;		/* Truncate sleep operations */
+	TRUNCATE_CONFIG trunc_cfg;	/* Truncate configuration */
 
 };
 
+void	 cleanup_truncate_config(CONFIG *);
 int	 config_assign(CONFIG *, const CONFIG *);
 int	 config_compress(CONFIG *);
 void	 config_free(CONFIG *);
@@ -269,12 +273,16 @@ int	 config_opt_line(CONFIG *, const char *);
 int	 config_opt_str(CONFIG *, const char *, const char *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
+uint64_t decode_key(char *);
 void	 latency_insert(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_print(CONFIG *);
 int	 enomem(const CONFIG *);
+int	 run_truncate(
+    CONFIG *, CONFIG_THREAD *, TRACK **, WT_CURSOR *, WT_SESSION *);
 int	 setup_log_file(CONFIG *);
+int	 setup_truncate(CONFIG *, CONFIG_THREAD *, WT_SESSION *);
 uint64_t sum_ckpt_ops(CONFIG *);
 uint64_t sum_insert_ops(CONFIG *);
 uint64_t sum_pop_ops(CONFIG *);
@@ -288,3 +296,14 @@ void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 __attribute__((format (printf, 4, 5)))
 #endif
 ;
+
+static inline void
+generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
+{
+	/*
+	 * Don't change to snprintf, sprintf is faster in some tests.
+	 */
+	sprintf(key_buf, "%0*" PRIu64, cfg->key_sz - 1, keyno);
+}
+
+#endif

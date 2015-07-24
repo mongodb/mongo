@@ -95,6 +95,8 @@ config_assign(CONFIG *dest, const CONFIG *src)
 				*pstr = newstr;
 			}
 		}
+
+	STAILQ_INIT(&dest->truncate_stone_head);
 	return (0);
 }
 
@@ -122,6 +124,7 @@ config_free(CONFIG *cfg)
 		free(cfg->uris);
 	}
 
+	cleanup_truncate_config(cfg);
 	free(cfg->ckptthreads);
 	free(cfg->popthreads);
 	free(cfg->base_uri);
