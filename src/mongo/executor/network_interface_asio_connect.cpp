@@ -55,7 +55,7 @@ public:
     // to take the io_service instead to more closely match AsyncSecureStream
     AsyncStream(tcp::socket&& stream) : _stream(std::move(stream)) {}
 
-    void connect(const tcp::resolver::iterator iter, ConnectHandler&& connectHandler) override {
+    void connect(tcp::resolver::iterator iter, ConnectHandler&& connectHandler) override {
         asio::async_connect(
             _stream,
             std::move(iter),
@@ -80,15 +80,7 @@ private:
 
 NetworkInterfaceASIO::AsyncConnection::AsyncConnection(std::unique_ptr<AsyncStreamInterface> stream,
                                                        rpc::ProtocolSet protocols)
-    : AsyncConnection(std::move(stream), protocols, boost::none) {}
-
-NetworkInterfaceASIO::AsyncConnection::AsyncConnection(
-    std::unique_ptr<AsyncStreamInterface> stream,
-    rpc::ProtocolSet protocols,
-    boost::optional<ConnectionPool::ConnectionPtr>&& bootstrapConn)
-    : _stream(std::move(stream)),
-      _serverProtocols(protocols),
-      _bootstrapConn(std::move(bootstrapConn)) {}
+    : _stream(std::move(stream)), _serverProtocols(protocols) {}
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
 NetworkInterfaceASIO::AsyncConnection::AsyncConnection(AsyncConnection&& other)
@@ -121,7 +113,7 @@ void NetworkInterfaceASIO::AsyncConnection::setServerProtocols(rpc::ProtocolSet 
     _serverProtocols = protocols;
 }
 
-void NetworkInterfaceASIO::_connectASIO(AsyncOp* op) {
+void NetworkInterfaceASIO::_connect(AsyncOp* op) {
     tcp::resolver::query query(op->request().target.host(),
                                std::to_string(op->request().target.port()));
     // TODO: Investigate how we might hint or use shortcuts to resolve when possible.
@@ -145,54 +137,7 @@ void NetworkInterfaceASIO::_connectASIO(AsyncOp* op) {
     _resolver.async_resolve(query, std::move(thenConnect));
 }
 
-void NetworkInterfaceASIO::_connectWithDBClientConnection(AsyncOp* op) {
-    // connect in a separate thread to avoid blocking the rest of the system
-    stdx::thread t([this, op]() {
-        try {
-            // The call to connect() will throw if:
-            // - we cannot get a new connection from the pool
-            // - we get a connection from the pool, but cannot use it
-            // - we fail to transfer the connection's socket to an ASIO wrapper
-            // TODO(amidvidy): why is this hardcoded to 1 second? That seems too low.
-            ConnectionPool::ConnectionPtr conn(
-                _connPool.get(), op->request().target, now(), Milliseconds(1000));
-
-            // TODO: Add a case here for unix domain sockets.
-            int protocol = conn.get()->port().localAddr().getType();
-            if (protocol != AF_INET && protocol != AF_INET6) {
-                throw SocketException(SocketException::CONNECT_ERROR, "Unsupported family");
-            }
-
-            tcp::socket sock{_io_service,
-                             protocol == AF_INET ? tcp::v4() : tcp::v6(),
-                             conn.get()->port().psock->rawFD()};
-
-            op->setConnection(AsyncConnection(stdx::make_unique<AsyncStream>(std::move(sock)),
-                                              conn.get()->getServerRPCProtocols(),
-                                              std::move(conn)));
-
-        } catch (...) {
-            LOG(3) << "failed to connect, posting mock completion";
-
-            if (inShutdown()) {
-                return;
-            }
-
-            auto status = exceptionToStatus();
-
-            asio::post(_io_service,
-                       [this, op, status]() { return _completeOperation(op, status); });
-            return;
-        }
-
-        // send control back to main thread(pool)
-        asio::post(_io_service, [this, op]() { _beginCommunication(op); });
-    });
-
-    t.detach();
-}
-
-void NetworkInterfaceASIO::_setupSocket(AsyncOp* op, const tcp::resolver::iterator endpoints) {
+void NetworkInterfaceASIO::_setupSocket(AsyncOp* op, tcp::resolver::iterator endpoints) {
     // TODO: Consider moving this call to post-auth so we only assign completed connections.
     op->setConnection(AsyncConnection(stdx::make_unique<AsyncStream>(tcp::socket{_io_service}),
                                       rpc::supports::kOpQueryOnly));

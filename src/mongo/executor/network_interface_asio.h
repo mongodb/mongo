@@ -43,7 +43,6 @@
 #endif
 
 #include "mongo/base/status.h"
-#include "mongo/client/connection_pool.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -73,7 +72,7 @@ public:
 
     using StreamHandler = stdx::function<void(std::error_code, std::size_t)>;
 
-    virtual void connect(const asio::ip::tcp::resolver::iterator endpoints,
+    virtual void connect(asio::ip::tcp::resolver::iterator endpoints,
                          ConnectHandler&& connectHandler) = 0;
 
     virtual void write(asio::const_buffer buf, StreamHandler&& writeHandler) = 0;
@@ -124,10 +123,6 @@ private:
     public:
         AsyncConnection(std::unique_ptr<AsyncStreamInterface>, rpc::ProtocolSet serverProtocols);
 
-        AsyncConnection(std::unique_ptr<AsyncStreamInterface>,
-                        rpc::ProtocolSet serverProtocols,
-                        boost::optional<ConnectionPool::ConnectionPtr>&& bootstrapConn);
-
         AsyncStreamInterface& stream();
 
         rpc::ProtocolSet serverProtocols() const;
@@ -148,13 +143,6 @@ private:
 
         rpc::ProtocolSet _serverProtocols;
         rpc::ProtocolSet _clientProtocols{rpc::supports::kAll};
-
-        /**
-         * The bootstrap connection we use to run auth. This will eventually go away when we finish
-         * implementing async auth, but for now we need to keep it alive so that the socket it
-         * creates stays open.
-         */
-        boost::optional<ConnectionPool::ConnectionPtr> _bootstrapConn;
     };
 
     /**
@@ -277,11 +265,10 @@ private:
                                                  rpc::Protocol protocol);
 
     // Connection
-    void _connectASIO(AsyncOp* op);
-    void _connectWithDBClientConnection(AsyncOp* op);
+    void _connect(AsyncOp* op);
 
     // setup plaintext TCP socket
-    void _setupSocket(AsyncOp* op, const asio::ip::tcp::resolver::iterator endpoints);
+    void _setupSocket(AsyncOp* op, asio::ip::tcp::resolver::iterator endpoints);
 
 #ifdef MONGO_CONFIG_SSL
     // setup SSL socket
@@ -314,8 +301,6 @@ private:
     stdx::mutex _executorMutex;
     bool _isExecutorRunnable;
     stdx::condition_variable _isExecutorRunnableCondition;
-
-    std::unique_ptr<ConnectionPool> _connPool;
 
 #ifdef MONGO_CONFIG_SSL
     // The SSL context. This declaration is wrapped in an ifdef because the asio::ssl::context

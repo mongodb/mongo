@@ -47,8 +47,6 @@ namespace executor {
 
 NetworkInterfaceASIO::NetworkInterfaceASIO()
     : _io_service(), _resolver(_io_service), _state(State::kReady), _isExecutorRunnable(false) {
-    _connPool = stdx::make_unique<ConnectionPool>(kMessagingPortKeepOpen);
-
 #ifdef MONGO_CONFIG_SSL
     if (getSSLManager()) {
         // We use sslv23, which corresponds to OpenSSLs SSLv23_method, for compatibility with older

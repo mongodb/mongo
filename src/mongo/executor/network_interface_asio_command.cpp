@@ -38,9 +38,10 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/request_builder_interface.h"
-#include "mongo/util/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -158,8 +159,8 @@ void NetworkInterfaceASIO::_startCommand(AsyncOp* op) {
         return;
     }
 
-    // _connect...() will continue the state machine.
-    _connectWithDBClientConnection(op);
+    // _connect() will continue the state machine.
+    _connect(op);
 }
 
 std::unique_ptr<Message> NetworkInterfaceASIO::_messageFromRequest(

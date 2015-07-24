@@ -49,7 +49,7 @@ public:
     AsyncSecureStream(asio::io_service* io_service, asio::ssl::context* sslContext)
         : _stream(*io_service, *sslContext) {}
 
-    void connect(const asio::ip::tcp::resolver::iterator endpoints,
+    void connect(asio::ip::tcp::resolver::iterator endpoints,
                  ConnectHandler&& connectHandler) override {
         // Stash the connectHandler as we won't be able to call it until we re-enter the state
         // machine.

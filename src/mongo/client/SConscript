@@ -67,7 +67,6 @@ env.Library(
         'sasl_plain_client_conversation.cpp',
         'sasl_scramsha1_client_conversation.cpp',
         'syncclusterconnection.cpp',
-        '$BUILD_DIR/mongo/db/dbmessage.cpp',
     ],
     LIBDEPS=[
         'connection_string',

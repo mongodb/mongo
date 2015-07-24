@@ -32,6 +32,7 @@
 
 #include "mongo/executor/network_interface_asio.h"
 
+#include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/legacy_request_builder.h"
 

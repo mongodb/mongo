@@ -91,14 +91,23 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target="dbmessage",
+    source=[
+        "dbmessage.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/net/network',
+    ]
+)
+
 env.CppUnitTest(
     target="dbmessage_test",
     source=[
         "dbmessage_test.cpp"
     ],
     LIBDEPS=[
-        "common",
-        "$BUILD_DIR/mongo/client/clientdriver",
+        "dbmessage",
     ],
 )
 env.CppUnitTest('record_id_test', 'record_id_test.cpp', LIBDEPS=[])
