@@ -109,7 +109,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 */
 	F_CLR(conn, WT_CONN_SERVER_RUN);
 	WT_TRET(__wt_async_destroy(session));
-	WT_TRET(__wt_las_destroy(session));
 	WT_TRET(__wt_lsm_manager_destroy(session));
 
 	F_SET(conn, WT_CONN_CLOSING);
@@ -118,6 +117,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_statlog_destroy(session, 1));
 	WT_TRET(__wt_sweep_destroy(session));
 	WT_TRET(__wt_evict_destroy(session));
+
+	/* Close the lookaside file cursors, after all eviction is complete. */
+	WT_TRET(__wt_las_destroy(session));
 
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(session));
