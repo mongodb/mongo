@@ -130,6 +130,9 @@ int32_t ValueWriter::toInt32() {
 
 int64_t ValueWriter::toInt64() {
     int64_t out;
+    if (getScope(_context)->getNumberLongProto().instanceOf(_value))
+        return NumberLongInfo::ToNumberLong(_context, _value);
+
     if (JS::ToInt64(_context, _value, &out))
         return out;
 

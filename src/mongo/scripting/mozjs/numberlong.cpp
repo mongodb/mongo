@@ -30,6 +30,8 @@
 
 #include "mongo/scripting/mozjs/numberlong.h"
 
+#include <js/Conversions.h>
+
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
@@ -121,16 +123,22 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
     if (args.length() == 0) {
         o.setNumber(kFloatApprox, 0);
     } else if (args.length() == 1) {
-        if (args.get(0).isNumber()) {
-            o.setValue(kFloatApprox, args.get(0));
+        auto arg = args.get(0);
+        if (arg.isNumber()) {
+            o.setValue(kFloatApprox, arg);
         } else {
-            std::string str = ValueWriter(cx, args.get(0)).toString();
-
-            unsigned long long val = parseLL(str.c_str());
+            std::string str = ValueWriter(cx, arg).toString();
+            long long val;
+            // For string values we call strtoll because we expect non-number string
+            // values to fail rather than return 0 (which is the behavior of ToInt64.
+            if (arg.isString())
+                val = parseLL(str.c_str());
+            // Otherwise we call the toNumber on the js value to get the long long value.
+            else
+                val = ValueWriter(cx, arg).toInt64();
 
             // values above 2^53 are not accurately represented in JS
-            if ((long long)val == (long long)(double)(long long)(val) &&
-                val < 9007199254740992ULL) {
+            if ((long long)val == (long long)(double)(long long)(val) && val < 9007199254740992LL) {
                 o.setNumber(kFloatApprox, val);
             } else {
                 o.setNumber(kFloatApprox, val);

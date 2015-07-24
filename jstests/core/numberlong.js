@@ -53,3 +53,11 @@ assert.eq.automsg( "'{ \"a\" : NumberLong(\"-11111111111111111\") }'", "p" );
 assert.throws.automsg( function() { new NumberLong( "" ); } );
 assert.throws.automsg( function() { new NumberLong( "y" ); } );
 assert.throws.automsg( function() { new NumberLong( "11111111111111111111" ); } );
+
+// create NumberLong from NumberInt (SERVER-9973)
+assert.doesNotThrow.automsg( function() { new NumberLong(NumberInt(1)); } );
+
+// check that creating a NumberLong from a NumberLong bigger than a double doesn't
+// get a truncated value (SERVER-9973)
+n = new NumberLong(NumberLong( "11111111111111111" ));
+assert.eq.automsg("n.toString()", "'NumberLong(\"11111111111111111\")'");
