@@ -31,6 +31,7 @@
 #include "mongo/scripting/mozjs/bindata.h"
 
 #include <iomanip>
+#include <cctype>
 
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -61,17 +62,26 @@ const char* const BinDataInfo::className = "BinData";
 
 namespace {
 
-void hexToBinData(JSContext* cx, int type, StringData hexstr, JS::MutableHandleValue out) {
+void hexToBinData(JSContext* cx,
+                  int type,
+                  const JS::Handle<JS::Value> hexdata,
+                  JS::MutableHandleValue out) {
     auto scope = getScope(cx);
+    uassert(ErrorCodes::BadValue, "BinData data must be a String", hexdata.isString());
 
-    // SERVER-9686: This function does not correctly check to make sure hexstr is actually made
-    // up of valid hex digits, and fails in the hex utility functions
+    auto hexstr = ValueWriter(cx, hexdata).toString();
 
-    int len = hexstr.size() / 2;
+    uassert(
+        ErrorCodes::BadValue, "BinData hex string must be an even length", hexstr.size() % 2 == 0);
+    auto len = hexstr.size() / 2;
+
     std::unique_ptr<char[]> data(new char[len]);
-    const char* src = hexstr.rawData();
-    for (int i = 0; i < len; i++) {
-        data[i] = fromHex(src + i * 2);
+    const char* src = hexstr.c_str();
+    for (size_t i = 0; i < len; i++) {
+        int src_index = i * 2;
+        if (!std::isxdigit(src[src_index]) || !std::isxdigit(src[src_index + 1]))
+            uasserted(ErrorCodes::BadValue, "Invalid hex character in string");
+        data[i] = fromHex(src + src_index);
     }
 
     std::string encoded = base64::encode(data.get(), len);
@@ -104,24 +114,26 @@ void BinDataInfo::Functions::UUID(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
         uasserted(ErrorCodes::BadValue, "UUID needs 1 argument");
 
-    auto str = ValueWriter(cx, args.get(0)).toString();
+    auto arg = args.get(0);
+    auto str = ValueWriter(cx, arg).toString();
 
     if (str.length() != 32)
         uasserted(ErrorCodes::BadValue, "UUID string must have 32 characters");
 
-    hexToBinData(cx, bdtUUID, str, args.rval());
+    hexToBinData(cx, bdtUUID, arg, args.rval());
 }
 
 void BinDataInfo::Functions::MD5(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
         uasserted(ErrorCodes::BadValue, "MD5 needs 1 argument");
 
-    auto str = ValueWriter(cx, args.get(0)).toString();
+    auto arg = args.get(0);
+    auto str = ValueWriter(cx, arg).toString();
 
     if (str.length() != 32)
         uasserted(ErrorCodes::BadValue, "MD5 string must have 32 characters");
 
-    hexToBinData(cx, MD5Type, str, args.rval());
+    hexToBinData(cx, MD5Type, arg, args.rval());
 }
 
 void BinDataInfo::Functions::HexData(JSContext* cx, JS::CallArgs args) {
@@ -134,9 +146,7 @@ void BinDataInfo::Functions::HexData(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue,
                   "HexData subtype must be a Number between 0 and 255 inclusive");
 
-    auto str = ValueWriter(cx, args.get(1)).toString();
-
-    hexToBinData(cx, type.toInt32(), str, args.rval());
+    hexToBinData(cx, type.toInt32(), args.get(1), args.rval());
 }
 
 void BinDataInfo::Functions::toString(JSContext* cx, JS::CallArgs args) {
@@ -181,8 +191,8 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
     }
 
     auto type = args.get(0);
-
-    if (!type.isNumber() || type.toInt32() < 0 || type.toInt32() > 255) {
+    auto typeNumber = ValueWriter(cx, type).toInt32();
+    if (!type.isNumber() || typeNumber < 0 || typeNumber > 255) {
         uasserted(ErrorCodes::BadValue,
                   "BinData subtype must be a Number between 0 and 255 inclusive");
     }

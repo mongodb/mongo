@@ -179,13 +179,12 @@ var bindataConstructors = {
         'BinData(-1, "")',
         'BinData(256, "")',
         'BinData("string","aaaa")',
-        // SERVER-10152
-        //'BinData(0, true)',
-        //'BinData(0, null)',
-        //'BinData(0, undefined)',
-        //'BinData(0, {})',
-        //'BinData(0, [])',
-        //'BinData(0, function () {})',
+        'BinData(0, true)',
+        'BinData(0, null)',
+        'BinData(0, undefined)',
+        'BinData(0, {})',
+        'BinData(0, [])',
+        'BinData(0, function () {})',
         ]
 }
 
@@ -198,8 +197,7 @@ var uuidConstructors = {
         'UUID()',
         'UUID("aa")',
         'UUID("invalidhex")',
-        // SERVER-9686
-        //'UUID("invalidhexbutstilltherequiredlen")',
+        'UUID("invalidhexbutstilltherequiredlen")',
         'UUID(true)',
         'UUID(null)',
         'UUID(undefined)',
@@ -218,8 +216,7 @@ var md5Constructors = {
         'MD5()',
         'MD5("aa")',
         'MD5("invalidhex")',
-        // SERVER-9686
-        //'MD5("invalidhexbutstilltherequiredlen")',
+        'MD5("invalidhexbutstilltherequiredlen")',
         'MD5(true)',
         'MD5(null)',
         'MD5(undefined)',
@@ -232,29 +229,26 @@ var md5Constructors = {
 var hexdataConstructors = {
     "valid" : [
         'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
-        // Numbers as the payload are converted to strings, so HexData(0, 100) == HexData(0, "100")
-        'HexData(0, 100)',
         'HexData(0, "")',
-        'HexData(0, "aaa")',
-        'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
         'HexData(0, "000000000000000000000005")', // SERVER-9605
         ],
     "invalid" : [
         'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
         'HexData()',
         'HexData(0)',
+        'HexData(0, 100)',
         'HexData(-1, "")',
         'HexData(256, "")',
+        'HexData(0, "aaa")',
         'HexData("string","aaaa")',
-        // SERVER-10152
-        //'HexData(0, true)',
-        //'HexData(0, null)',
-        //'HexData(0, undefined)',
-        //'HexData(0, {})',
-        //'HexData(0, [])',
-        //'HexData(0, function () {})',
-        // SERVER-9686
-        //'HexData(0, "invalidhex")',
+        'HexData(0, true)',
+        'HexData(0, null)',
+        'HexData(0, undefined)',
+        'HexData(0, {})',
+        'HexData(0, [])',
+        'HexData(0, function () {})',
+        'HexData(0, "invalidhex")',
         ]
 }
 
