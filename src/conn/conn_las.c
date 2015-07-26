@@ -172,3 +172,99 @@ __wt_las_cursor_close(
 
 	return (ret);
 }
+
+/*
+ * __las_sweep_reconcile --
+ *	Return if reconciliation records in the lookaside file can be deleted.
+ */
+static int
+__las_sweep_reconcile(WT_SESSION_IMPL *session, WT_ITEM *key)
+{
+	uint64_t txnid;
+	uint8_t addr_size;
+	void *p;
+
+	/*
+	 * Skip to the on-page transaction ID stored in the key; if it's
+	 * globally visible, we no longer need this record, the on-page
+	 * record is just as good.
+	 */
+	p = (uint8_t *)key->data;
+	p = (uint8_t *)p + sizeof(char);		/* '1' */
+	p = (uint8_t *)p + sizeof(uint32_t);		/* file ID */
+	addr_size = *(uint8_t *)p;
+	p = (uint8_t *)p + sizeof(uint8_t);		/* addr_size */
+	p = (uint8_t *)p + addr_size;			/* addr */
+	memcpy(&txnid, p, sizeof(uint64_t));
+
+	return (__wt_txn_visible_all(session, txnid));
+}
+
+/*
+ * __wt_las_sweep --
+ *	Sweep the lookaside file.
+ */
+int
+__wt_las_sweep(WT_SESSION_IMPL *session)
+{
+	WT_CURSOR *cursor;
+	WT_DECL_ITEM(klas);
+	WT_DECL_RET;
+	uint32_t saved_flags;
+
+	cursor = NULL;
+	saved_flags = 0;		/* [-Werror=maybe-uninitialized] */
+
+	/*
+	 * If the lookaside store isn't yet open, there's no work to do.
+	 */
+	if (S2C(session)->las_cursor == 0)
+		return (0);
+
+	/*
+	 * KEITH
+	 * Currently called from the sweep thread (just as a place-holder until
+	 * we decide if the lookaside sweeper gets its own thread or not). It
+	 * could also be called by an eviction-worker thread, more reasonably,
+	 * given how tightly the lookaside file is tied to eviction.
+	 *
+	 * There's also some tuning questions: we should track the total number
+	 * of records in the lookaside file, and only sweep if there are enough
+	 * records to make sweeping worthwhile, and only sweep part of the file
+	 * if there are too many to sweep at once. We might also want to sweep
+	 * the records in the cache more frequently, and out-of-cache records
+	 * less frequently.
+	 */
+	WT_ERR(__wt_scr_alloc(session, 0, &klas));
+
+	/* Open a lookaside table cursor and walk the file. */
+	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
+	while ((ret = cursor->next(cursor)) == 0) {
+		WT_ERR(cursor->get_key(cursor, klas));
+
+		switch (((uint8_t *)klas->data)[0]) {
+		case WT_LAS_RECONCILE_UPDATE:
+			if (!__las_sweep_reconcile(session, klas))
+				continue;
+			break;
+		WT_ILLEGAL_VALUE_ERR(session);
+		}
+
+		/*
+		 * Make sure we have a local copy of the record.
+		 *
+		 * KEITH: Why is this necessary?
+		 */
+		if (!WT_DATA_IN_ITEM(klas))
+			WT_ERR(__wt_buf_set(
+			    session, klas, klas->data, klas->size));
+
+		WT_ERR(cursor->remove(cursor));
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
+
+	__wt_scr_free(session, &klas);
+	return (ret);
+}

@@ -265,6 +265,11 @@ __sweep_server(void *arg)
 		    (uint64_t)conn->sweep_interval * WT_MILLION));
 
 		/*
+		 * Sweep the lookaside file.
+		 */
+		WT_ERR(__wt_las_sweep(session));
+
+		/*
 		 * Mark handles with a time of death, and report whether any
 		 * handles are marked dead.
 		 */
