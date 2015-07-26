@@ -134,8 +134,8 @@ Status collMod(OperationContext* txn,
             auto status = coll->setValidationLevel(txn, e.String());
             if (!status.isOK())
                 errorStatus = std::move(status);
-        } else if (str::equals("validationState", e.fieldName())) {
-            auto status = coll->setValidationState(txn, e.String());
+        } else if (str::equals("validationAction", e.fieldName())) {
+            auto status = coll->setValidationAction(txn, e.String());
             if (!status.isOK())
                 errorStatus = std::move(status);
         } else {

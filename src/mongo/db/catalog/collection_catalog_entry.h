@@ -105,7 +105,7 @@ public:
     virtual void updateValidator(OperationContext* txn,
                                  const BSONObj& validator,
                                  StringData validationLevel,
-                                 StringData validationState) = 0;
+                                 StringData validationAction) = 0;
 
 private:
     NamespaceString _ns;

@@ -95,7 +95,7 @@ public:
     void updateValidator(OperationContext* txn,
                          const BSONObj& validator,
                          StringData validationLevel,
-                         StringData validationState) final;
+                         StringData validationAction) final;
 
     // not part of interface, but available to my storage engine
 

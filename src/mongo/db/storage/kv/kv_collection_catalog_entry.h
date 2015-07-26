@@ -71,7 +71,7 @@ public:
     void updateValidator(OperationContext* txn,
                          const BSONObj& validator,
                          StringData validationLevel,
-                         StringData validationState) final;
+                         StringData validationAction) final;
 
     RecordStore* getRecordStore() {
         return _recordStore.get();
