@@ -1038,16 +1038,15 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 		/*
 		 * If no update is globally visible, saving the update list is
-		 * not enough, we have to save the existing entry on the page.
-		 * If there's no existing entry on the page, fail because we
-		 * can't write anything at all, this entry doesn't exist for
-		 * some reader of the system.
+		 * not enough, we have to save the existing entry on the page,
+		 * there are readers that still require it. That currently fails
+		 * the eviction attempt -- an alternative might be to store the
+		 * existing page entry in the lookaside file with a transaction
+		 * ID of 0. That would work even if there is no existing page
+		 * entry, we could stored a removed entry in the lookaside file.
 		 */
-		if (!__wt_txn_visible_all(session, min_txn)) {
-			*updp = NULL;
-			if (ins != NULL)
-				return (EBUSY);
-		}
+		if (!__wt_txn_visible_all(session, min_txn))
+			return (EBUSY);
 
 		/*
 		 * There were no skipped items: we must copy the update list,
