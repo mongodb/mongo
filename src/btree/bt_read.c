@@ -253,6 +253,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 			last_upd->next = upd;
 			last_upd = upd;
 		}
+		upd = NULL;
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -308,6 +309,12 @@ err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
 	cbt.ref = NULL;
 	WT_TRET(__wt_btcur_close(&cbt));
 
+	/*
+	 * On error, upd points to a single unlinked WT_UPDATE structure,
+	 * first_upd points to a list.
+	 */
+	if (upd != NULL)
+		__wt_free(session, upd);
 	if (first_upd != NULL)
 		__wt_free_update_list(session, first_upd);
 
