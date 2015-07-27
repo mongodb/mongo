@@ -38,6 +38,7 @@
 #include "mongo/client/remote_command_targeter_factory.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
@@ -59,6 +60,8 @@ using RemoteCommandCallbackArgs = TaskExecutor::RemoteCommandCallbackArgs;
 
 namespace {
 const Seconds kConfigCommandTimeout{30};
+const int kNotMasterNumRetries = 3;
+const Milliseconds kNotMasterRetryInterval{500};
 }  // unnamed namespace
 
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
@@ -335,6 +338,47 @@ StatusWith<BSONObj> ShardRegistry::runCommand(const HostAndPort& host,
     }
 
     return responseStatus.getValue().data;
+}
+
+StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(const ShardId& shardId,
+                                                                  const std::string& dbname,
+                                                                  const BSONObj& cmdObj) {
+    auto targeter = getShard(shardId)->getTargeter();
+    const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet{});
+
+    for (int i = 0; i < kNotMasterNumRetries; ++i) {
+        auto target = targeter->findHost(readPref);
+        if (!target.isOK()) {
+            if (ErrorCodes::NotMaster == target.getStatus()) {
+                if (i == kNotMasterNumRetries - 1) {
+                    // If we're out of retries don't bother sleeping, just return.
+                    return target.getStatus();
+                }
+                sleepmillis(kNotMasterRetryInterval.count());
+                continue;
+            }
+            return target.getStatus();
+        }
+
+        auto response = runCommand(target.getValue(), dbname, cmdObj);
+        if (!response.isOK()) {
+            return response.getStatus();
+        }
+
+        Status commandStatus = getStatusFromCommandResult(response.getValue());
+        if (ErrorCodes::NotMaster == commandStatus) {
+            if (i == kNotMasterNumRetries - 1) {
+                // If we're out of retries don't bother sleeping, just return.
+                return commandStatus;
+            }
+            sleepmillis(kNotMasterRetryInterval.count());
+            continue;
+        }
+
+        return response.getValue();
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

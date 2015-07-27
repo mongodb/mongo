@@ -127,20 +127,6 @@ private:
     StatusWith<std::string> _generateNewShardName() const override;
 
     /**
-     * Helper for running commands against the config server with logic for retargeting and
-     * retrying the command in the event of a NotMaster response.
-     * Returns ErrorCodes::NotMaster if after the max number of retries we still haven't
-     * successfully delivered the command to a primary.  Can also return a non-ok status in the
-     * event of a network error communicating with the config servers.  If we are able to get
-     * a valid response from running the command then we will return it, even if the command
-     * response indicates failure.  Thus the caller is responsible for checking the command
-     * response object for any kind of command-specific failure.  The only exception is
-     * NotMaster errors, which we intercept and follow the rules described above for handling.
-     */
-    StatusWith<BSONObj> _runConfigServerCommandWithNotMasterRetries(const std::string& dbName,
-                                                                    const BSONObj& cmdObj);
-
-    /**
      * Helper method for running a count command against a given target server with appropriate
      * error handling.
      */

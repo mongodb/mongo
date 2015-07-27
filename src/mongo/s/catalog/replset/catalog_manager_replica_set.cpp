@@ -84,12 +84,9 @@ namespace {
 
 // Until read committed is supported always write to the primary with majority write and read
 // from the secondary. That way we ensure that reads will see a consistent data.
-const ReadPreferenceSetting kConfigWriteSelector(ReadPreference::PrimaryOnly, TagSet{});
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::SecondaryPreferred, TagSet{});
 
-const int kNotMasterNumRetries = 3;
 const int kInitialSSVRetries = 3;
-const Milliseconds kNotMasterRetryInterval{500};
 const int kActionLogCollectionSize = 1024 * 1024 * 2;
 const int kChangeLogCollectionSize = 1024 * 1024 * 10;
 
@@ -438,7 +435,8 @@ void CatalogManagerReplicaSet::logAction(const ActionLogType& actionLog) {
     if (_actionLogCollectionCreated.load() == 0) {
         BSONObj createCmd = BSON("create" << ActionLogType::ConfigNS << "capped" << true << "size"
                                           << kActionLogCollectionSize);
-        auto result = _runConfigServerCommandWithNotMasterRetries("config", createCmd);
+        auto result =
+            grid.shardRegistry()->runCommandWithNotMasterRetries("config", "config", createCmd);
         if (!result.isOK()) {
             LOG(1) << "couldn't create actionlog collection: " << causedBy(result.getStatus());
             return;
@@ -466,7 +464,8 @@ void CatalogManagerReplicaSet::logChange(const string& clientAddress,
     if (_changeLogCollectionCreated.load() == 0) {
         BSONObj createCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true << "size"
                                           << kChangeLogCollectionSize);
-        auto result = _runConfigServerCommandWithNotMasterRetries("config", createCmd);
+        auto result =
+            grid.shardRegistry()->runCommandWithNotMasterRetries("config", "config", createCmd);
         if (!result.isOK()) {
             LOG(1) << "couldn't create changelog collection: " << causedBy(result.getStatus());
             return;
@@ -719,7 +718,7 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(const std::string& 
         return Command::appendCommandStatus(*result, scopedDistLock.getStatus());
     }
 
-    auto response = _runConfigServerCommandWithNotMasterRetries(dbname, cmdObj);
+    auto response = grid.shardRegistry()->runCommandWithNotMasterRetries("config", dbname, cmdObj);
     if (!response.isOK()) {
         return Command::appendCommandStatus(*result, response.getStatus());
     }
@@ -749,7 +748,7 @@ bool CatalogManagerReplicaSet::runReadCommand(const std::string& dbname,
 Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(const BSONArray& updateOps,
                                                          const BSONArray& preCondition) {
     BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition);
-    auto response = _runConfigServerCommandWithNotMasterRetries("config", cmd);
+    auto response = grid.shardRegistry()->runCommandWithNotMasterRetries("config", "config", cmd);
 
     if (!response.isOK()) {
         return response.getStatus();
@@ -776,7 +775,7 @@ void CatalogManagerReplicaSet::writeConfigServerDirect(const BatchedCommandReque
     invariant(dbname == "config" || dbname == "admin");
     const BSONObj cmdObj = batchRequest.toBSON();
 
-    auto response = _runConfigServerCommandWithNotMasterRetries(dbname, cmdObj);
+    auto response = grid.shardRegistry()->runCommandWithNotMasterRetries("config", dbname, cmdObj);
     if (!response.isOK()) {
         _toBatchError(response.getStatus(), batchResponse);
         return;
@@ -788,45 +787,6 @@ void CatalogManagerReplicaSet::writeConfigServerDirect(const BatchedCommandReque
                              str::stream() << "Failed to parse config server response: " << errmsg),
                       batchResponse);
     }
-}
-
-StatusWith<BSONObj> CatalogManagerReplicaSet::_runConfigServerCommandWithNotMasterRetries(
-    const std::string& dbname, const BSONObj& cmdObj) {
-    auto targeter = grid.shardRegistry()->getShard("config")->getTargeter();
-
-    for (int i = 0; i < kNotMasterNumRetries; ++i) {
-        auto target = targeter->findHost(kConfigWriteSelector);
-        if (!target.isOK()) {
-            if (ErrorCodes::NotMaster == target.getStatus()) {
-                if (i == kNotMasterNumRetries - 1) {
-                    // If we're out of retries don't bother sleeping, just return.
-                    return target.getStatus();
-                }
-                sleepmillis(kNotMasterRetryInterval.count());
-                continue;
-            }
-            return target.getStatus();
-        }
-
-        auto response = grid.shardRegistry()->runCommand(target.getValue(), dbname, cmdObj);
-        if (!response.isOK()) {
-            return response.getStatus();
-        }
-
-        Status commandStatus = Command::getStatusFromCommandResult(response.getValue());
-        if (ErrorCodes::NotMaster == commandStatus) {
-            if (i == kNotMasterNumRetries - 1) {
-                // If we're out of retries don't bother sleeping, just return.
-                return commandStatus;
-            }
-            sleepmillis(kNotMasterRetryInterval.count());
-            continue;
-        }
-
-        return response.getValue();
-    }
-
-    MONGO_UNREACHABLE;
 }
 
 Status CatalogManagerReplicaSet::_checkDbDoesNotExist(const string& dbName,

@@ -150,11 +150,27 @@ public:
                                                     boost::optional<long long> limit);
 
     /**
-     * Runs a command against the specified host and returns the result.
+     * Runs a command against the specified host and returns the result.  It is the responsibility
+     * of the caller to check the returned BSON for command-specific failures.
      */
     StatusWith<BSONObj> runCommand(const HostAndPort& host,
                                    const std::string& dbName,
                                    const BSONObj& cmdObj);
+
+    /**
+     * Helper for running commands against a given shard with logic for retargeting and
+     * retrying the command in the event of a NotMaster response.
+     * Returns ErrorCodes::NotMaster if after the max number of retries we still haven't
+     * successfully delivered the command to a primary.  Can also return a non-ok status in the
+     * event of a network error communicating with the shard.  If we are able to get
+     * a valid response from running the command then we will return it, even if the command
+     * response indicates failure.  Thus the caller is responsible for checking the command
+     * response object for any kind of command-specific failure.  The only exception is
+     * NotMaster errors, which we intercept and follow the rules described above for handling.
+     */
+    StatusWith<BSONObj> runCommandWithNotMasterRetries(const ShardId& shard,
+                                                       const std::string& dbname,
+                                                       const BSONObj& cmdObj);
 
 private:
     typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;
