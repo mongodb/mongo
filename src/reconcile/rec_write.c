@@ -867,13 +867,13 @@ __rec_block_free(
  */
 static int
 __rec_skip_update_save(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_UPDATE *upd, WT_INSERT *ins, WT_ROW *rip)
+    WT_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip, uint64_t txnid)
 {
 	WT_RET(__wt_realloc_def(
 	    session, &r->skip_allocated, r->skip_next + 1, &r->skip));
 	r->skip[r->skip_next].ins = ins;
 	r->skip[r->skip_next].rip = rip;
-	r->skip[r->skip_next].onpage_txn = upd == NULL ? 0 : upd->txnid;
+	r->skip[r->skip_next].onpage_txn = txnid;
 	++r->skip_next;
 	return (0);
 }
@@ -902,18 +902,18 @@ __rec_skip_update_move(
  *	Return the update in a list that should be written (or NULL if none can
  * be written).
  */
-static inline int
+static int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_INSERT *ins, WT_ROW *rip, WT_CELL_UNPACK *vpack, WT_UPDATE **updp)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_ITEM ovfl;
+	WT_DECL_ITEM(tmp);
 	WT_PAGE *page;
-	WT_UPDATE *upd, *upd_list, *upd_ovfl;
+	WT_UPDATE *append, *upd, *upd_list;
 	size_t notused;
 	uint64_t max_txn, min_txn, txnid;
-	int skipped;
+	int append_value, skipped;
 
 	*updp = NULL;
 
@@ -931,15 +931,15 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	} else
 		upd_list = ins->upd;
 
-	skipped = 0;
-	for (max_txn = WT_TXN_NONE, min_txn = UINT64_MAX, upd = upd_list;
-	    upd != NULL; upd = upd->next) {
+	for (skipped = 0,
+	    max_txn = WT_TXN_NONE, min_txn = UINT64_MAX,
+	    upd = upd_list; upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
 
 		/*
 		 * Track the largest/smallest transaction IDs on the list and
-		 * the first unwritten transaction on the page.
+		 * the smallest not-globally-visible transaction on the page.
 		 */
 		if (WT_TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
@@ -956,13 +956,10 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * KEITH: I think this is wrong, we're ignoring we can't write
 		 * updates committed more recently than in-progress checkpoints.
 		 *
-		 * Record whether any updates were skipped on the way to finding
-		 * the first visible update.
-		 *
-		 * If updates were skipped, future reads without intervening
-		 * modifications to the page could see a different value; if
-		 * no updates were skipped, the page can safely be marked clean
-		 * and does not need to be reconciled until modified again.
+		 * Track whether any updates were skipped on the way to finding
+		 * the first visible update; if no updates are skipped, the page
+		 * can safely be marked clean and does not need to be reconciled
+		 * again until it's modified again.
 		 */
 		if (*updp == NULL) {
 			if (F_ISSET(r, WT_EVICTING) ?
@@ -986,32 +983,44 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	/*
 	 * If no updates were skipped and all updates are globally visible, the
 	 * page can be marked clean and we're done, regardless of whether we're
-	 * evicting or checkpointing or the mode we're in.
+	 * evicting or checkpointing.
 	 *
 	 * We have to check both: the oldest transaction ID may have moved while
 	 * we were scanning the update list, so it is possible to skip an update
 	 * but then find that by the end of the scan, all updates are stable.
-	 *
-	 * This doesn't apply to the lookaside file, there are no older readers
-	 * of that file.
 	 */
-	if (!skipped &&
-	    (F_ISSET(btree, WT_BTREE_LAS_FILE) ||
-	    __wt_txn_visible_all(session, max_txn)))
-		return (0);
+	if (!skipped) {
+		/*
+		 * The lookaside file is treated specially: first, having any
+		 * pages at all in the lookaside file indicates some eviction
+		 * pressure, so we'd like to evict the lookaside file's pages
+		 * to reduce that pressure. As a special-case, we know there
+		 * are no older readers of the lookaside file, we can skip the
+		 * check. Second, when evicting pages where we didn't skip any
+		 * updates, the way forward after the visibility check fails is
+		 * to store the update list in the lookaside file, and storing
+		 * lookaside file updates in the lookaside file isn't a plan.
+		 */
+		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
+			return (0);
+
+		if (__wt_txn_visible_all(session, max_txn))
+			return (0);
+	}
 
 	/*
 	 * In some cases, there had better not be skipped updates or updates not
 	 * yet globally visible.
 	 */
-	if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
+	if (F_ISSET(r, WT_VISIBILITY_ERR))
 		WT_PANIC_RET(session, EINVAL,
-		    "reconciliation illegally skipped an update");
+		    "reconciliation error, uncommitted update or update not "
+		    "visible");
 
 	/*
-	 * If not evicting, we know what we'll write and we're done. Because
-	 * some updates were skipped or are not globally visible, the page can't
-	 * be marked clean.
+	 * If not evicting the page, we know what we'll write and we're done.
+	 * Because some updates were skipped or are not globally visible, the
+	 * page can't be marked clean.
 	 */
 	if (!F_ISSET(r, WT_EVICTING)) {
 		r->leave_dirty = 1;
@@ -1019,128 +1028,156 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	}
 
 	/*
-	 * Evicting, there are still two ways to continue forward: if we skipped
-	 * updates we can save/restore them, that is, evict most of the page and
-	 * then create a new, smaller page where we re-instantiate the skipped
-	 * updates.
+	 * Evicting and either there are skipped updates (uncommitted changes),
+	 * or updates not yet globally visible (committed changes some readers
+	 * in the system cannot see).
 	 *
-	 * If we didn't skip updates, but there were updates not yet visible to
-	 * all readers in the system, we write those updates into the lookaside
-	 * store, restoring them if the page is read back into cache.
-	 */
-	if (!skipped) {
-		/*
-		 * The lookaside file is a special case, it can't store records
-		 * for itself.
-		 */
-		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
-			return (EBUSY);
-
-		/*
-		 * If no update is globally visible, saving the update list is
-		 * not enough, we have to save the existing entry on the page,
-		 * there are readers that still require it. That currently fails
-		 * the eviction attempt -- an alternative might be to store the
-		 * existing page entry in the lookaside file with a transaction
-		 * ID of 0. That would work even if there is no existing page
-		 * entry, we could stored a removed entry in the lookaside file.
-		 */
-		if (!__wt_txn_visible_all(session, min_txn))
-			return (EBUSY);
-
-		/*
-		 * There were no skipped items: we must copy the update list,
-		 * but there are no special cases or additional work to do.
-		 */
-		goto save_update_list;
-	}
-
-	/*
-	 * If there are skipped updates we can't save/restore, eviction fails,
-	 * we can't evict this page.
+	 * There are two ways to continue forward with the eviction, based on
+	 * whether or not we skipped an update (there are uncommitted changes
+	 * on the page).
 	 *
-	 * KEITH
-	 * Theoretically, this could have a finer granularity -- we could have
-	 * some blocks with skipped updates and are being saved/restored, and
-	 * other blocks with not-yet-visible updates in the lookaside store.
-	 * For now, I'm doing all-or-nothing at the page-level.
+	 *
+	 * First, if we skipped updates, can evict most of the page and create
+	 * a new, smaller page with just the skipped updates.
 	 */
-	if (!r->evict_skipped_updates) {
+	append_value = 0;
+	if (skipped) {
+		/*
+		 * Currently, the save/restore eviction path is only configured
+		 * when forcibly evicting pages (it's intended for large pages
+		 * that will split into many smaller pages).
+		 *
+		 * If there are skipped updates we can't save/restore, eviction
+		 * fails.
+		 */
 		if (!F_ISSET(r, WT_SKIP_UPDATE_RESTORE))
 			return (EBUSY);
 		r->evict_skipped_updates = 1;
-	}
-
-	/*
-	 * Handling skipped updates: clear the returned update so our caller
-	 * ignores the key/value pair in the case of an insert/append entry
-	 * (everything we need is in the update list), and otherwise writes the
-	 * original on-page key/value pair to which the update list applies.
-	 */
-	*updp = NULL;
-
-	/*
-	 * Handling skipped updates: the page isn't evicted and stays dirty.
-	 */
-	r->leave_dirty = 1;
-
-	/*
-	 * Handling skipped updates: we don't want to write an original on-page
-	 * value item to disk because it's been updated or removed.
-	 *
-	 * Here's the deal: an overflow value was updated or removed and its
-	 * backing blocks freed.  If any transaction in the system might still
-	 * read the value, a copy was cached in page reconciliation tracking
-	 * memory, and the page cell set to WT_CELL_VALUE_OVFL_RM.  Eviction
-	 * then chose the page and we're splitting it up in order to push parts
-	 * of it out of memory.
-	 *
-	 * We could write the original on-page value item to disk... if we had
-	 * a copy.  The cache may not have a copy (a globally visible update
-	 * would have kept a value from ever being cached), or an update that
-	 * subsequent became globally visible could cause a cached value to be
-	 * discarded.  Either way, once there's a globally visible update, we
-	 * may not have the value.
-	 *
-	 * Fortunately, if there's a globally visible update we don't care about
-	 * the original version, so we simply ignore it, no transaction can ever
-	 * try and read it.  If there isn't a globally visible update, there had
-	 * better be a cached value.
-	 *
-	 * In the latter case, we could write the value out to disk, but (1) we
-	 * are planning on re-instantiating this page in memory, it isn't going
-	 * to disk, and (2) the value item is eventually going to be discarded,
-	 * that seems like a waste of a write.  Instead, find the cached value
-	 * and append it to the update list we're saving for later restoration.
-	 */
-	if (vpack != NULL && vpack->raw == WT_CELL_VALUE_OVFL_RM &&
-	    !__wt_txn_visible_all(session, min_txn)) {
-		if ((ret = __wt_ovfl_txnc_search(
-		    page, vpack->data, vpack->size, &ovfl)) != 0)
-			WT_PANIC_RET(session, ret,
-			    "cached overflow item discarded early");
 
 		/*
-		 * Create an update structure with an impossibly low transaction
-		 * ID and append it to the update list we're about to save.
-		 * Restoring that update list when this page is re-instantiated
-		 * creates an update for the key/value pair visible to every
-		 * running transaction in the system, ensuring the on-page value
-		 * will be ignored.
+		 * Clear the returned update so our caller ignores the key/value
+		 * pair in the case of an insert/append list entry (everything
+		 * we need is in the update list), and otherwise writes the
+		 * original on-page key/value pair to which the update list
+		 * applies.
 		 */
-		WT_RET(__wt_update_alloc(session, &ovfl, &upd_ovfl, &notused));
-		upd_ovfl->txnid = WT_TXN_NONE;
-		for (upd = upd_list; upd->next != NULL; upd = upd->next)
-			;
-		upd->next = upd_ovfl;
+		*updp = NULL;
+
+		/* The page can't be marked clean. */
+		r->leave_dirty = 1;
+
+		/*
+		 * A special-case for overflow values, where we can't write the
+		 * original on-page value item to disk because it's been updated
+		 * or removed.
+		 *
+		 * What happens is that an overflow value is updated or removed
+		 * and its backing blocks freed.  If any reader in the system
+		 * might still want the value, a copy was cached in the page
+		 * reconciliation tracking memory, and the page cell set to
+		 * WT_CELL_VALUE_OVFL_RM.  Eviction then chose the page and
+		 * we're splitting it up in order to push parts of it out of
+		 * memory.
+		 *
+		 * We could write the original on-page value item to disk... if
+		 * we had a copy.  The cache may not have a copy (a globally
+		 * visible update would have kept a value from being cached), or
+		 * an update that subsequently became globally visible could
+		 * cause a cached value to be discarded.  Either way, once there
+		 * is a globally visible update, we may not have the original
+		 * value.
+		 *
+		 * Fortunately, if there's a globally visible update we don't
+		 * care about the original version, so we simply ignore it, no
+		 * transaction can ever try and read it.  If there isn't a
+		 * globally visible update, there had better be a cached value.
+		 *
+		 * In the latter case, we could write the value out to disk, but
+		 * (1) we are planning on re-instantiating this page in memory,
+		 * it isn't going to disk, and (2) the value item is eventually
+		 * going to be discarded, that seems like a waste of a write.
+		 * Instead, find the cached value and append it to the update
+		 * list we're saving for later restoration.
+		 */
+		if (vpack != NULL &&
+		    vpack->raw == WT_CELL_VALUE_OVFL_RM &&
+		    !__wt_txn_visible_all(session, min_txn))
+			append_value = 1;
 	}
 
-save_update_list:
 	/*
-	 * The order of the updates on the list matters so we can't move only
-	 * the unresolved updates, we have to move the entire update list.
+	 * Second, if we did NOT skip updates, we can save a copy of the update
+	 * list in the lookaside table and proceed with eviction. If/when the
+	 * page is read back into the cache, we'll re-apply the update list (if
+	 * any of the old readers are still around).
+	 *
+	 * If at least one update is globally visible, we copy the update list,
+	 * but can ignore the current on-page value. If no updates is globally
+	 * visible, readers may require the page's original value.
 	 */
-	return (__rec_skip_update_save(session, r, *updp, ins, rip));
+	if (!skipped)
+		if (!__wt_txn_visible_all(session, min_txn))
+			append_value = 1;
+
+	/*
+	 * We need the original on-page value for some reason: get a copy and
+	 * append it to the end of the update list with a transaction ID that
+	 * guarantees its visibility.
+	 */
+	if (append_value) {
+		/*
+		 * If we don't have a value cell, it's an insert/append list
+		 * key/value pair which simply doesn't exist for some reader;
+		 * place a deleted record at the end of the update list.
+		 *
+		 * KEITH:
+		 * I'm pretty sure this is wrong for fixed-width column store,
+		 * vpack is NULL. Can we fake one?
+		 */
+		if (vpack == NULL)
+			WT_RET(__wt_update_alloc(
+			    session, NULL, &append, &notused));
+		else {
+			append = NULL;
+			__wt_scr_alloc(session, 0, &tmp);
+			if ((ret = __wt_page_cell_data_ref(
+			    session, page, vpack, tmp)) == 0)
+				ret = __wt_update_alloc(
+				    session, tmp, &append, &notused);
+			__wt_scr_free(session, &tmp);
+			if (ret != 0 && append != NULL)
+				__wt_free(session, append);
+			WT_RET(ret);
+		}
+
+		/*
+		 * Give the entry an impossibly low transaction ID to ensure its
+		 * global visibility, append it to the update list.
+		 *
+		 * Note the change to the actual reader-accessible update list:
+		 * from now on, the original on-page value appears at the end
+		 * of the update list, even if this reconciliation subsequently
+		 * fails.
+		 */
+		append->txnid = WT_TXN_NONE;
+		for (upd = upd_list; upd->next != NULL; upd = upd->next)
+			;
+		upd->next = append;
+	}
+
+	/*
+	 * The order of the updates on the list matters, we can't move only the
+	 * unresolved updates, move the entire update list.
+	 *
+	 * If we skipped updates, the transaction value is never used.  If we
+	 * didn't skip updates, the list of updates are eventually written to
+	 * the lookaside table, and associated with each update record is the
+	 * transaction ID of the update we wrote in the reconciled page; once
+	 * that transaction ID is globally visible, we know we no longer need
+	 * the lookaside file records, allowing them to be discarded.
+	 */
+	return (__rec_skip_update_save(
+	    session, r, ins, rip, skipped ? WT_TXN_NONE : (*updp)->txnid));
 }
 
 /*
@@ -1362,7 +1399,7 @@ __rec_child_deleted(
 		 * In some cases, there had better not be any updates we can't
 		 * write.
 		 */
-		if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
+		if (F_ISSET(r, WT_VISIBILITY_ERR))
 			WT_PANIC_RET(session, EINVAL,
 			    "reconciliation illegally skipped an update");
 	}

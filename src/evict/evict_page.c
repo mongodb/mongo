@@ -381,7 +381,7 @@ __evict_review(
 	if (__wt_page_is_modified(page)) {
 		reconcile_flags = WT_EVICTING;
 		if (closing)
-			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_ERR);
+			FLD_SET(reconcile_flags, WT_VISIBILITY_ERR);
 		else if (!WT_PAGE_IS_INTERNAL(page) &&
 		    page->read_gen == WT_READGEN_OLDEST)
 			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_RESTORE);

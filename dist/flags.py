@@ -47,8 +47,8 @@ flags = {
     ],
     'rec_write' : [
         'EVICTING',
-        'SKIP_UPDATE_ERR',
         'SKIP_UPDATE_RESTORE',
+        'VISIBILITY_ERR',
     ],
     'txn_log_checkpoint' : [
         'TXN_LOG_CKPT_CLEANUP',
