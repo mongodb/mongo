@@ -71,6 +71,10 @@ if not use_system_version_of_library('asio'):
     thirdPartyIncludePathList.append(
         ('asio', '#/src/third_party/asio-asio-1-11-0/asio/include'))
 
+if not use_system_version_of_library('intel_decimal128'):
+    thirdPartyIncludePathList.append(
+        ('intel_decimal128', '#/src/third_party/IntelRDFPMathLib20U1/LIBRARY'))
+
 def injectAllThirdPartyIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
 
@@ -347,4 +351,24 @@ asioEnv.Library(
     target="shim_asio",
     source=[
         'shim_asio.cpp'
+    ])
+
+if use_system_version_of_library("intel_decimal128"):
+    intelDecimal128Env = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_INTEL_DECIMAL128_SYSLIBDEP'],
+        ])
+else:
+    intelDecimal128Env = env.Clone()
+    intelDecimal128Env.InjectThirdPartyIncludePaths(libraries=['intel_decimal128'])
+    intelDecimal128Env.SConscript('IntelRDFPMathLib20U1/SConscript', exports={ 'env' : intelDecimal128Env })
+    intelDecimal128Env = intelDecimal128Env.Clone(
+        LIBDEPS=[
+            'IntelRDFPMathLib20U1/intel_decimal128',
+        ])
+
+intelDecimal128Env.Library(
+    target="shim_intel_decimal128",
+    source=[
+        'shim_intel_decimal128.cpp'
     ])

@@ -1,0 +1,662 @@
+# ##############################################################################
+# ==============================================================================
+#  Copyright (c) 2007-2011, Intel Corp.
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without 
+#  modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright notice, 
+#      this list of conditions and the following disclaimer.
+#    * Redistributions in binary form must reproduce the above copyright 
+#      notice, this list of conditions and the following disclaimer in the 
+#      documentation and/or other materials provided with the distribution.
+#    * Neither the name of Intel Corporation nor the names of its contributors 
+#      may be used to endorse or promote products derived from this software 
+#      without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+#  THE POSSIBILITY OF SUCH DAMAGE.
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+
+
+ifeq ($(origin MAKEFILE_IML_HEAD),undefined)	# Guard against multiple inclusions
+
+MAKEFILE_IML_HEAD := already_seen
+# ==============================================================================
+# Performance Note: Recursively expanded assignments (i.e. assignments using the
+# "=" operator) can significantly degrad performance because the right-hand side
+# of the assignment is evaluated every time the macro is referenced. On the
+# other hand, for simple assignments (using the ":=" operator) the right-hand
+# side is only evaluated once, which can improve performance. Conditional
+# assignments ("?=") are recursively expanded assignments and therefore have
+# performance implications. We can avoid recursive expansion of conditional
+# assignments by immediately forcing an evaluation. For example:
+#
+#	FOOBAR ?= whatever
+#	FOOBAR := $(FOOBAR)
+#
+# Alternatively, we can use the 'Cset' macro defined below. 'Cset' is identical
+# to '?=', but can be used as part of a simple assignment. Using the 'Cset'
+# operator, the above example looks like:
+#
+#	FOOBAR := $(call Cset,FOOBAR,whatever)
+# ==============================================================================
+
+__Cset = $(strip $(if $(subst $3,,$(origin $1)),$($1),$2))
+  Cset = $(call __Cset,$(strip $1),$(strip $2),undefined)
+
+
+# ==============================================================================
+# Pull in any local definitions
+# ==============================================================================
+
+ifneq ($(origin IML_MAKEFILE_PRE),undefined)
+include $(IML_MAKEFILE_PRE)
+endif
+
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+# Platform independent Macros
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+
+# ==============================================================================
+# The following set of macros are used to split the name of a target into fields
+# and use those field values to create -D command line switches. The macros
+# assume that the "fields" of a name are separted by an underscore character.
+# The macro Wn gets the n-th "field" of a file base name and Dn macros prepend
+# the string _FLAG_ to the field name and get the value associated with that
+# string.
+#
+# Example: Suppose the target name has the form sin_f_la.<ext>, where f and la
+# indicate single precision floating point and low accuracy respectively. Then
+# W1, W2 and W3 would evaluate to sin, f and la repecitively. Further, if the
+# following symbols were defined:
+#
+#		_FLAG_sin := -DSIN
+#		_FLAG_f   := -DSINGLE
+#		_FLAG_la  := -DLOW_ACCURACY
+#
+# Then the target/rule:
+#
+#	$(OBJ_DIR)/sin_f_la.$O:
+#		$(CC) sincos.c $(D1) $(D2) $(D3)
+#
+# Would expand to
+#
+#	$(OBJ_DIR)/sin_f_la.$O:
+#		$(CC) sincos.c -DSIN -DSINGLE -DLOW_ACCURACY
+#
+# ==============================================================================
+
+BASENAME = $(basename $(notdir $@))
+
+W1 = $(word 1,$(subst _, ,$(BASENAME)))
+W2 = $(word 2,$(subst _, ,$(BASENAME)))
+W3 = $(word 3,$(subst _, ,$(BASENAME)))
+W4 = $(word 4,$(subst _, ,$(BASENAME)))
+W5 = $(word 5,$(subst _, ,$(BASENAME)))
+
+D1 = $(_FLAG_$(W1))
+D2 = $(_FLAG_$(W2))
+D3 = $(_FLAG_$(W3))
+D4 = $(_FLAG_$(W4))
+D5 = $(_FLAG_$(W5))
+
+# ==============================================================================
+# The opposite of breaking a name into it's fields is to construct a name from
+# it constituent fields. The CrossCat macros produce the cross product of
+# multiple lists and concatenate the elements of the cross product to produce
+# a single name.
+#
+# For example, the CrossCat of the of the three lists "a b", "_" and "1 2 3" is 
+# the list "a_1 a_2 a_3 b_1 b_2_b3"
+# ==============================================================================
+
+_CrossCat  = $(foreach a,$1,$(foreach b,$2,$(strip $a)$(strip $b)))
+CrossCat  = $(if $1,$(if $2,$(call _CrossCat,$1,$2),$1),$2)
+
+CrossCat2 = $(call CrossCat,$1,$2)
+CrossCat3 = $(call CrossCat,$1,$(call CrossCat2,$2,$3))
+CrossCat4 = $(call CrossCat,$1,$(call CrossCat3,$2,$3,$4))
+CrossCat5 = $(call CrossCat,$1,$(call CrossCat4,$2,$3,$4,$5))
+CrossCat6 = $(call CrossCat,$1,$(call CrossCat5,$2,$3,$4,$5,$6))
+CrossCat7 = $(call CrossCat,$1,$(call CrossCat6,$2,$3,$4,$5,$6,$7))
+CrossCat8 = $(call CrossCat,$1,$(call CrossCat7,$2,$3,$4,$5,$6,$7,$8))
+CrossCat9 = $(call CrossCat,$1,$(call CrossCat8,$2,$3,$4,$5,$6,$7,$8,$9))
+
+# ==============================================================================
+# The GenList macro is a variant of the CrossCat macro that creates lists of
+# the from:
+# 
+#       <prefix><field_1>_<field_2>_<field_3><suffix>
+# 
+# Where fields 1, 2 and 3 are iteratively taken from lists specified as the
+# 2nd, 3rd or 4th arguments to the macro. If the 3rd or 4th argument is null, it
+# defaults to $(IML_TYPES) and $(IML_VARIANTS) respectively. If the second
+# argument is null, then a null list is returned.
+#
+# GenPreList and GenObjList are variants of GenList implicitly supply the
+# directory and file extension for preprocessed and object files respectively
+# ==============================================================================
+
+GenList = $(if $2,$(call CrossCat7,$1,$2, \
+                 _,$(if $3,$3,$(IML_TYPES)), \
+                 _,$(if $4,$4,$(IML_VARIANTS)),$5),)
+
+GenList9 = $(if $2,$(call CrossCat9,$1,$2, \
+                 _,$(if $3,$3,$(IML_TYPES)), \
+                 _,$(if $4,$4,$(IML_VARIANTS)),$5,$6,$7),)
+
+PrefixSuffix   = $(addprefix $(strip $1),$(addsuffix $(strip $3),$(strip $2)))
+GenTypeList    = $(call PrefixSuffix,$1,$(if $2, \
+                     $(call CrossCat3,$2, \
+                         _,$(if $3,$3,$(IML_TYPES))),),$4)
+GenTypeVarList = $(call PrefixSuffix,$1,$(if $2, \
+                     $(call CrossCat5,$2, \
+                         _,$(if $3,$3,$(IML_TYPES)), \
+                         _,$(if $4,$4,$(IML_VARIANTS))),),$5)
+
+# ==============================================================================
+# GetIndex scans a list looking for a string. If the string is found, the index
+# of the string in the list (starting from 1) is returned. Otherwise a null is
+# returned
+# ==============================================================================
+
+__INDICES__ = 1 2 3 4 5 6 7 8 9 10 11
+
+GetIndex = $(strip $(word 1,$(if $(word $(words $(__INDICES__)),$2), \
+               $(error "List too large. Adjust __INDICES__"), \
+               $(foreach n,$(__INDICES__), \
+                   $(if $(word $n,$2), \
+                       $(if $(subst $1,,$(word $n,$2)),,$n),\
+                       )))))
+
+IsListItem = $(if $(call GetIndex,$1,$2),true,false)
+
+# ==============================================================================
+# ToUpper and ToLower convert to upper and lower case respectively by invoking
+# the underlying shell.
+# ==============================================================================
+
+ToUpper = $(shell echo "$1" | tr [:lower:] [:upper:])
+ToLower = $(shell echo "$1" | tr [:upper:] [:lower:])
+
+# ==============================================================================
+# The macro AorBorC(sym, undefVal, target, trueVal, falseVal) a selects one of
+# three values depending on the state of a named symbol 'sym'. If 'sym' is
+# undefined, it returns returns 'undefVal'. Otherwise, 'trueVal' or 'falseVal'
+# is returned depending on whether the symbol value equal 'target' or not.
+# 
+# The remaining macros in this section select between two values via the AorBorC
+# macro by making undefVal equal to one of trueVal or falseVal
+# ==============================================================================
+
+AorBorC   = $(if $(filter undefined,$(origin $1)),$2,$(if $(filter $3,$($1)),$4,$5))
+
+ZeroOne   = $(call AorBorC,$1,0,0,0,1)		# 0 if undef or 0, 1 otherwise
+OneZero   = $(call AorBorC,$1,1,0,0,1)		# 1 if undef or 1, 0 otherwise
+DefUndef  = $(call AorBorC,$1,-U,1,-D$1,-U$1)	# -U if undef or 0, -D otherwise
+OneSelect = $(call AorBorC,$1,$3,1,$2,$3)	# $3 if undef or 0, $2 otherwise
+
+# ==============================================================================
+# CleanList eliminates extra blanks between list elements
+# ==============================================================================
+
+CleanList = $(foreach e,$1,$(strip $e))
+
+# ==============================================================================
+# GetListName is a "up level" version of the filter command. GetListName
+# searches a list of lists for a particular element. If the element is found,
+# it returns a the set of lists that contained the element. Otherwise it returns
+# null. For example if:
+#
+#	FF_F_FUNCS  := hypot atan2 pow
+#	F_FF_FUNCS  := sincos
+#	II_I_FUNCS  := div rem
+#	II_II_FUNCS := divrem
+#	CC_C_FUNCS  := cpow
+#
+#	LISTS       := FF_F_FUNCS F_FF_FUNCS II_I_FUNCS II_II_FUNCS CC_C_FUNCS
+#
+# Then
+#
+#	$(call GetListName, divrem,$(LISTS))
+#
+# will return II_II_FUNCS
+#
+# ==============================================================================
+
+GetListName = $(call CleanList,$(foreach n,$2,$(if $(filter $1,$($n)),$n,)))
+
+# ==============================================================================
+# NumCompare allows the comparison of two numbers by escaping to the shell
+# and using perl to perform an evaluation. It returns one of the strings
+# less, equal or greater
+# ==============================================================================
+
+NumCompare = $(shell $(PERL) -e \
+                'print eval ($1 < $2) ? "less" : ($1 > $2) ? "greater" : "equal"')
+
+# ==============================================================================
+# EchoLongFileList is a partial work around to the shell command line limits on
+# the echo command. The basic assumption is that the file list has the form:
+#
+#	<rootDir>/<subDir>/fileName<suffix>
+#
+# The command creates a shorter list by stripping off the <rootDir> and
+# .<suffix> parts and then echoing each name in the resulting list with the
+# <rootDir> and .<suffix> fields added back it.
+#
+# The calling sequence is 
+#
+#	$(call EchoLongFileList,<rootDir>,<suffix>,<fileList>)
+
+# NOTE: This approach is only effective if <rootDir> is relatively long compared
+# to <subDir>/fileName. (Which is currently the case for all IML builds)
+#
+# LongFileListToFile is a wrapper around EchoLongFileList that writes the
+# results to a (new) file - one file per line
+# ==============================================================================
+
+EchoLongFileList = for f in $(patsubst $(strip $1)%$(strip $2),%,$3); \
+                      do echo $(strip $1$)$$f$(strip $2); done
+
+LongFileListToFile = rm -f $4; $(call EchoLongFileList,$1,$2,$3) > $4
+
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+# Symbol default values
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+
+# ==============================================================================
+# Determine host operating system
+# ==============================================================================
+
+Warning = $(warning $1 = $($1))
+Error = $(warning $1 = $($1))
+       
+OS_ALIAS     := Linux FreeBSD  Darwin SunOS HP-UX Windows_NT CYGWIN_NT-5.1 CYGWIN_NT-5.2-WOW64 CYGWIN_NT-6.1-WOW64
+OS_MAP_LIST  := LINUX FREEBSD  MACH   LINUX LINUX WINNT      WINNT         WINNT               WINNT
+OS_LIST      := LINUX FREEBSD  MACH   WINNT
+OS_TYPE      := LINUX LINUX    LINUX  WINNT
+OS_TYPES := LINUX WINNT
+
+_HOST_OS       := $(shell uname)
+_HOST_OS_ALIAS_INDEX := $(call GetIndex,$(_HOST_OS),$(OS_ALIAS))
+ifeq (,$(_HOST_OS_ALIAS_INDEX))
+    $(error Unknown host OS $(_HOST_OS))
+endif
+
+IML_HOST_OS   ?= $(word $(_HOST_OS_ALIAS_INDEX),$(OS_MAP_LIST))
+IML_HOST_OS   := $(IML_HOST_OS)
+HOST_OS_LIST_INDEX := $(call GetIndex,$(IML_HOST_OS),$(OS_LIST))
+ifeq (,$(HOST_OS_LIST_INDEX))
+    $(error Invalid host OS $(IML_HOST_OS))
+endif
+
+IML_HOST_OS_TYPE   ?= $(word $(HOST_OS_LIST_INDEX),$(OS_TYPE))
+IML_HOST_OS_TYPE   := $(IML_HOST_OS_TYPE)
+HOST_OS_TYPE_INDEX := $(call GetIndex,$(IML_HOST_OS_TYPE),$(OS_TYPES))
+
+# ==============================================================================
+# Determine host architecture.
+# ==============================================================================
+
+ifeq ($(IML_HOST_OS_TYPE),LINUX)
+    ifneq ($(IML_HOST_OS),MACH)
+        _HOST_ARCH := $(shell uname -m)
+    else
+        # ======================================================================
+        # MACH may report "i386" for uname -m command in both 32 and 64 cases
+        # Therefore we use the following command sequence found in ICS scripts
+        # ======================================================================
+        __RUN_SYSCTL := $(word 2,\
+                            $(shell sysctl -a hw | grep hw.optional.x86_64:\ 1))
+        ifeq ($(__RUN_SYSCTL),1)
+            _HOST_ARCH := x86_64
+        else
+            _HOST_ARCH := x86
+        endif
+    endif
+else
+    ifeq ($(IML_HOST_OS_TYPE),WINNT)
+        _HOST_ARCH := $(word 1,$(PROCESSOR_IDENTIFIER))
+    else
+        $(error Don't know how to determine architecture for $(IML_HOST_OS))
+    endif
+endif
+
+ARCH_ALIAS := x86  ia64 EM64T x86_64 i686 amd64 Intel64 sun4u
+ARCH_LIST  := IA32 IA64 EFI2  EFI2   IA32 EFI2  EFI2    EFI2
+ARCH_TYPE  := IA32 IA64 EFI2  EFI2   IA32 EFI2  EFI2    EFI2
+ARCH_TYPES := IA32 IA64 EFI2
+
+UARCH_LIST := SSE GSSE LRB LRB2
+
+_HOST_ARCH_INDEX = $(call GetIndex,$(_HOST_ARCH),$(ARCH_ALIAS))
+ifeq (,$(_HOST_ARCH_INDEX))
+    $(error Unknown host architecture $(_HOST_ARCH))
+endif
+
+IML_HOST_ARCH   ?= $(word $(_HOST_ARCH_INDEX),$(ARCH_LIST))
+IML_HOST_ARCH   := $(IML_HOST_ARCH)
+HOST_ARCH_LIST_INDEX  := $(call GetIndex,$(IML_HOST_ARCH),$(ARCH_LIST))
+ifeq (,$(HOST_ARCH_LIST_INDEX))
+    $(error Invalid host architecture $(IML_HOST_ARCH))
+endif
+
+IML_HOST_ARCH_TYPE   ?= $(word $(HOST_ARCH_LIST_INDEX),$(ARCH_TYPE))
+IML_HOST_ARCH_TYPE   := $(IML_HOST_ARCH_TYPE)
+HOST_ARCH_TYPE_INDEX := $(call GetIndex,$(IML_HOST_ARCH_TYPE),$(ARCH_TYPES))
+
+# ==============================================================================
+# Set up default values of target OS and architecture
+# ==============================================================================
+
+IML_TARGET_OS      := $(call Cset,IML_TARGET_OS,   $(IML_HOST_OS))
+IML_TARGET_ARCH    := $(call Cset,IML_TARGET_ARCH, $(IML_HOST_ARCH))
+IML_TARGET_UARCH   := $(call Cset,IML_TARGET_UARCH,SSE)
+
+TARGET_OS_LIST_INDEX := $(call GetIndex,$(IML_TARGET_OS),$(OS_LIST))
+ifeq (,$(TARGET_OS_LIST_INDEX))
+    $(error Invalid target OS $(IML_TARGET_OS))
+endif
+
+TARGET_ARCH_INDEX := $(call GetIndex,$(IML_TARGET_ARCH),$(ARCH_TYPES))
+ifeq (,$(TARGET_ARCH_INDEX))
+    $(error Invalid target architecture $(IML_TARGET_ARCH))
+endif
+
+TARGET_UARCH_INDEX := $(call GetIndex,$(IML_TARGET_UARCH),$(UARCH_LIST))
+ifeq (,$(TARGET_UARCH_INDEX))
+    $(error Invalid target micro architecture $(IML_TARGET_UARCH))
+endif
+
+IML_TARGET_OS_TYPE   ?= $(word $(TARGET_OS_LIST_INDEX),$(OS_TYPE))
+IML_TARGET_OS_TYPE      := $(IML_TARGET_OS_TYPE)
+TARGET_OS_TYPE_INDEX := $(call GetIndex,$(IML_TARGET_OS_TYPE),$(OS_TYPES))
+
+TARGET_ARCH_TYPE_INDEX  := $(call GetIndex,$(IML_TARGET_ARCH),$(ARCH_TYPES))
+IML_TARGET_ARCH_TYPE    ?= $(word $(TARGET_ARCH_TYPE_INDEX),$(ARCH_TYPES))
+IML_TARGET_ARCH_TYPE    := $(IML_TARGET_ARCH_TYPE)
+
+TARGET_UARCH_TYPE_INDEX := $(TARGET_UARCH_INDEX)
+
+# ==============================================================================
+# Some possibly useful flag macros that can be used with the Dn macros defined
+# above
+# ==============================================================================
+
+_FLAG_s   := -D_SINGLE_
+_FLAG_d   := -D_DOUBLE_
+_FLAG_e   := -D_EXTENDED_
+
+_FLAG_lat := -D_LATENCY_
+_FLAG_tp  := -D_THROUGHPUT_
+_FLAG_rf  := -D_REDUCED_FUNCTIONALITY_
+
+# ==============================================================================
+# Miscellaneous macros
+# ==============================================================================
+
+_EMPTY_ :=
+_SP     := $(_EMPTY_) $(_EMPTY_)
+
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+# Platform dependent macros
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+
+# ==============================================================================
+# Windows systems can't find the "executable" sometimes if it doesn't begin with
+# a directory path. The macro ForceExeName check for a directory path and if it
+# doesn't exist prepends "./"
+# ==============================================================================
+
+ForceExeName = $(if $(subst $1,,$(notdir $1)),$1,./$1)
+
+# ==============================================================================
+# Define macros to choose values depending on the OS and architecture setting.
+# ==============================================================================
+
+HostOsSelect          = $(strip $($(HOST_OS_LIST_INDEX)))
+HostOsTypeSelect      = $(strip $($(HOST_OS_TYPE_INDEX)))
+HostArchSelect        = $(strip $($(HOST_ARCH_LIST_INDEX)))
+HostArchTypeSelect    = $(strip $($(HOST_ARCH_TYPE_INDEX)))
+
+TargetOsSelect        = $(strip $($(TARGET_OS_LIST_INDEX)))
+TargetOsTypeSelect    = $(strip $($(TARGET_OS_TYPE_INDEX)))
+TargetArchSelect      = $(strip $($(TARGET_ARCH_INDEX)))
+TargetArchTypeSelect  = $(strip $($(TARGET_ARCH_TYPE_INDEX)))
+TargetUarchTypeSelect = $(strip $($(TARGET_UARCH_TYPE_INDEX)))
+
+# ==============================================================================
+# Define standard OS and ARCH dependent symbols
+#
+# CselOs is a combination of Cset and a named 'OsTypeSelect' routine. The value
+# of OS_CHOICE allows selection based on either the host or target OS. The 
+# default value of OS_CHOICE is 'Target'
+#
+# CselArch is a combination of Cset and a named 'ArchTypeSelect' routine. 
+# The value of ARCH_CHOICE allows selection based on either the host or target 
+# ARCH. The default value of ARCH_CHOICE is OS_CHOICE
+#
+# CselOsName is a combination of Cset and a named 'OsSelect' routine. 
+# of OS_CHOICE allows selection based on either the host or target OS.
+# This one is used for distinguishing MacOS (MACH) from other LINUX-type OSes
+# ==============================================================================
+
+CselOs     = $(call Cset,$1,$(call $(strip $2OsTypeSelect),$3,$4))
+CselArch   = $(call Cset,$1,$(call $(strip $2ArchTypeSelect),$3,$4,$5))
+CselOsName = $(call Cset,$1,$(call $(strip $2OsSelect),$3,$4,$5,$6))
+
+O          := $(call CselOs, O,        Target,  o,  obj)
+A          := $(call CselOs, A,        Target,  a,  lib)
+SHR        := $(call CselOsName, SHR,  Target, so, so, dylib, dll)
+EXE        := $(call CselOs, EXE,      Target,   , .exe)
+IEXT       := $(call CselOs, IEXT,     Target, il,   iw)
+ASMEXT     := $(call CselOs, ASMEXT,   Target,  s,  asm)
+RECOGN     := $(call CselOs, RECOGN,   Target,-xc,  -Tc)
+
+ OS_CHOICE ?= TARGET
+_OS_CHOICE := $(if $(subst host,,$(call ToLower,$(OS_CHOICE))),Target,Host)
+
+ ARCH_CHOICE ?= OS_CHOICE
+_ARCH_CHOICE := $(if $(subst host,,$(call ToLower,$(ARCH_CHOICE))),Target,Host)
+
+__empty:=
+MACH__space:=$(__empty) $(__empty)
+
+FLS        := $(call CselOs,FLS,       $(_OS_CHOICE),       :,           ;)
+RM         := $(call CselOs, RM,       $(_OS_CHOICE),   rm -f, del        )
+AR_CMD     := $(call CselOsName,AR_CMD,$(_OS_CHOICE),   ar rv, ar rv, libtool, lib -nologo)
+AR_OUT     := $(call CselOsName,AR_OUT,$(_OS_CHOICE),        ,      ,      -o, /out:)$($(IML_TARGET_OS)__space)
+LD_CMD     := $(call CselOsName,LD_CMD,$(_OS_CHOICE),icc,icc,libtool,link /nologo)
+LD_OUT     := $(call CselOs, LD_OUT,   $(_OS_CHOICE),      -o,       /out:)$($(IML_TARGET_OS)__space)
+LD_FLAGS   := $(call CselOs, LD_FLAGS, $(_OS_CHOICE),   -shared -nostdlib,)
+RC         := $(call CselOs, RC,       $(_OS_CHOICE), RC_not_to_be_used_with_linux,rc)
+RC_FLAGS   := $(call CselOs, RC_FLAGS, $(_OS_CHOICE), RC_FLAGS_not_to_be_used_with_linux,)
+RC_OUT     := $(call CselOs, RC_OUT,   $(_OS_CHOICE), RC_OUT_not_to_be_used_with_linux,-Fo)
+
+PERL       := $(call Cset, PERL, perl)
+
+# ==============================================================================
+# If the user hasn't set up the CC value, use an internal default value. In
+# either case verify the compiler choice; set up standard compiler switches;
+# and determine if this is an Intel compiler.
+#
+# CselCc is similar to CselOs except that selection is made based on the
+# compiler type rather than the OS type.
+#
+# QoptOpt return "Q options" for turning remark messages off. I.e. QoptOpt(a,b)
+# returns either "-a b" or "-Qa:b"
+# ==============================================================================
+
+ifeq ($(origin CC_NAME),undefined)
+    ifeq ($(origin CC),default)
+        CC_NAME := $(call $(_OS_CHOICE)OsTypeSelect, icc, icl)
+    else
+        __TMP   := $(strip $(subst /, ,$(firstword $(CC))))
+        CC_NAME := $(word $(words $(__TMP)), $(__TMP))
+    endif
+endif
+
+CC_NAME_LIST  := icc icl gcc cl cc
+CC_TYPE_LIST  := gcc cl  gcc cl gcc
+CC_TYPES      := gcc cl
+INTEL_CC_LIST := icc icl
+
+CC_NAME_INDEX := $(call GetIndex,$(CC_NAME),$(CC_NAME_LIST))
+ifeq ($(CC_NAME_INDEX),)
+    $(error "Unknown CC_NAME ($(CC_NAME)). Must be one of $(CC_NAME_LIST))
+endif
+
+CC_INDEX      := $(call GetIndex,$(CC_NAME),$(CC_NAME_LIST))
+CC_TYPE       := $(word $(CC_INDEX),$(CC_TYPE_LIST))
+CC_TYPE_INDEX := $(call GetIndex,$(CC_TYPE),$(CC_TYPES))
+
+CcSelect       = $(strip $($(CC_INDEX)))
+CcTypeSelect   = $(strip $($(CC_TYPE_INDEX)))
+CcNameSelect   = $(strip $($(CC_NAME_INDEX)))
+
+_CPP := $(CC_NAME) $(call CcNameSelect,-EP,-EP,-E -P,-EP)
+_CC  := $(CC_NAME) $(call CcNameSelect,, -nologo,, -nologo)
+
+ifeq ($(origin CC),default)
+    CC := $(_CC)
+endif
+ifeq ($(origin CPP),default)
+    CPP := $(_CPP)
+endif
+
+CselCc         = $(call Cset,$1,$(call CcTypeSelect,$2,$3))
+
+QOPT           := $(call CselCc, QOPT,        -, /Q      )
+FO             := $(call CselCc, FO,   -o$(_SP), /Fo     )
+FE             := $(call CselCc, FE,   -o$(_SP), /Fe     )
+FA             := $(call CselCc, FA,   -o$(_SP), /Fa     )
+DBG            := $(call CselCc, DBG,    -O0 -g, /Od /Zi )
+CC_LDFLAGS     := $(call CcNameSelect,,,-lm, bufferoverflowU.lib )
+
+QoptOpt         = $(call CcTypeSelect,-$1 $2,-Q$1:$2)
+_NOVECMSG      := $(call Cset, _NOVECMSG, $(call QoptOpt,diag-disable,vec))
+
+IS_INTEL_CC     = $(call IsListItem,$(CC_NAME),$(INTEL_CC_LIST))
+
+ifeq ($(IS_INTEL_CC),true)
+    ifneq ($(IML_HOST_ARCH_TYPE),IA64)
+        NOVECMSG ?= $(_NOVECMSG)
+    endif
+endif
+
+# ==============================================================================
+# RmLeadingDotSlash removes the leading ./ charaters at the beginning of
+# relative path names. This can be useful when trying to pattern match files
+# names in automatic variables (like $?, $^, $<, etc.) because make removes the
+# leading ./ charachters from the file names in those variables. 
+# ==============================================================================
+
+ifeq ($(IML_HOST_OS),MACH)
+    RmLeadingDotSlash = $(shell echo "$(strip $1)" | sed -E -e "s%^(\./+)+%%g")
+else
+    RmLeadingDotSlash = $(shell echo "$(strip $1)" | sed -e "s%^\\(\\./\\+\\)\\+%%g")
+endif
+
+# ==============================================================================
+# Determine number of CPU's on this processor
+# ==============================================================================
+
+ifeq ($(IML_HOST_OS_TYPE),LINUX)
+    ifeq ($(IML_HOST_OS),MACH)
+        _NUM_CPUS := $(shell /usr/sbin/system_profiler SPHardwareDataType | \
+                       egrep Processors | sed -e "s/^.* //")
+    else
+        _NUM_CPUS := $(shell egrep processor /proc/cpuinfo | wc -l)
+    endif
+else
+    ifeq ($(IML_HOST_OS_TYPE),WINNT)
+        _HUM_CPUS := $(NUMBER_OF_PROCESSORS)
+    else
+        $(error Don't know how to determine architecture for $(IML_HOST_OS))
+    endif
+endif
+
+IML_NUM_CPUS ?= $(_NUM_CPUS)
+
+# ==============================================================================
+# Directory structure macros.
+#
+# NOTE: These are included at the end of the file so that any definitions
+# supplied by IML_MAKEFILE_PRE can use the use previously defined symbols to
+# create their values.
+# ==============================================================================
+
+OBJ_DIR  := $(call Cset,OBJ_DIR,  ./obj      )
+SRC_DIR  := $(call Cset,SRC_DIR,  .          )
+INC_DIR  := $(call Cset,INC_DIR,  .          )
+PRE_DIR  := $(call Cset,PRE_DIR,  ./pre      )
+GEN_DIR  := $(call Cset,GEN_DIR,  $(PRE_DIR) )
+EXE_DIR  := $(call Cset,EXE_DIR,  $(OBJ_DIR) )
+WRK_DIR  := $(call Cset,WRK_DIR,  ./wrk      )
+RES_DIR  := $(call Cset,RES_DIR,  $(WRK_DIR) )
+LIB_DIR  := $(call Cset,LIB_DIR,  $(OBJ_DIR) )
+DEST_DIR := $(call Cset,DEST_DIR, $(LIB_DIR) )
+LIBM_DIR := $(call Cset,LIBM_DIR, $(OBJ_DIR) )
+TSRC_DIR := $(call Cset,TSRC_DIR, .          )
+TOBJ_DIR := $(call Cset,TOBJ_DIR, $(OBJ_DIR) )
+
+IML_COMMON_DIR  := $(call Cset,IML_COMMON_DIR,$(LIBDEV)/mathlibs/common)
+IML_TOOLS_DIR   := $(call Cset,IML_TOOLS_DIR,$(IML_COMMON_DIR))
+
+DIR_EXISTS      := $(call Cset,DIR_EXISTS,.directory_exists)
+
+OBJ_DIR_EXISTS  := $(call Cset,OBJ_DIR_EXISTS,  $(OBJ_DIR)/$(DIR_EXISTS)  )
+PRE_DIR_EXISTS  := $(call Cset,PRE_DIR_EXISTS,  $(PRE_DIR)/$(DIR_EXISTS)  )
+EXE_DIR_EXISTS  := $(call Cset,EXE_DIR_EXISTS,  $(EXE_DIR)/$(DIR_EXISTS)  )
+WRK_DIR_EXISTS  := $(call Cset,WRK_DIR_EXISTS,  $(WRK_DIR)/$(DIR_EXISTS)  )
+RES_DIR_EXISTS  := $(call Cset,RES_DIR_EXISTS,  $(RES_DIR)/$(DIR_EXISTS)  )
+LIB_DIR_EXISTS  := $(call Cset,LIB_DIR_EXISTS,  $(LIB_DIR)/$(DIR_EXISTS)  )
+DEST_DIR_EXISTS := $(call Cset,DEST_DIR_EXISTS, $(DEST_DIR)/$(DIR_EXISTS) )
+LIBM_DIR_EXISTS := $(call Cset,LIBM_DIR_EXISTS, $(LIBM_DIR)/$(DIR_EXISTS) )
+TOBJ_DIR_EXISTS := $(call Cset,TOBJ_DIR_EXISTS, $(TOBJ_DIR)/$(DIR_EXISTS) )
+
+MKLIB      := $(PERL) $(IML_TOOLS_DIR)/mklib.pl
+
+# ==============================================================================
+# Export interesting symbols
+# ==============================================================================
+
+ifndef NO_PERL5LIB_EXPORT
+    export PERL5LIB := $(IML_TOOLS_DIR)$(FLS)$(PERL5LIB)
+endif
+
+endif # ifeq ($(origin MAKEFILE_IML_HEAD),undefined)
+
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+# End makefile.iml_head
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================

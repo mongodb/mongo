@@ -1,0 +1,7 @@
+echo "BEGIN TESTS IN SOLARIS..."
+rm readtest linuxout ../LIBRARY/libbid.a
+./solarisbuild > linuxout
+./check linuxout
+rm readtest linuxout ../LIBRARY/libbid.a
+echo "END TESTS IN SOLARIS..."
+echo "THE TESTS PASSED IF NO FAILURES WERE REPORTED ABOVE"

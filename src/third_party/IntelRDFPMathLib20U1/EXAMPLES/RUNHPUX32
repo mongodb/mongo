@@ -1,0 +1,8 @@
+echo "BEGIN BUILDING AND RUNNING EXAMPLES IN HPUX (32-BIT DATA MODE)..."
+rm -f a.out hpuxout32
+./hpuxbuild32 > hpuxout32
+# grep PASS hpuxout32
+cat hpuxout32
+grep FAIL hpuxout32
+echo "END BUILDING AND RUNNING EXAMPLES IN HPUX (32-BIT DATA MODE)..."
+echo "THE TESTS PASSED IF THE WORD 'FAIL' WAS NOT PRINTED ABOVE"

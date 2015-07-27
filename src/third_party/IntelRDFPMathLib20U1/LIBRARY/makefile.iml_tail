@@ -1,0 +1,171 @@
+# file: makefile.iml_tail
+# ##############################################################################
+# ==============================================================================
+#  Copyright (c) 2007-2011, Intel Corp.
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without 
+#  modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright notice, 
+#      this list of conditions and the following disclaimer.
+#    * Redistributions in binary form must reproduce the above copyright 
+#      notice, this list of conditions and the following disclaimer in the 
+#      documentation and/or other materials provided with the distribution.
+#    * Neither the name of Intel Corporation nor the names of its contributors 
+#      may be used to endorse or promote products derived from this software 
+#      without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+#  THE POSSIBILITY OF SUCH DAMAGE.
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+
+ifeq ($(origin MAKEFILE_IML_TAIL),undefined)    # Guard against multiple inclusions
+MAKEFILE_IML_TAIL := already_seen
+
+# ==============================================================================
+# On windows systems, LIB is an environment variable, so don't define it locally
+# ==============================================================================
+
+ENABLE_LIB_ORIGIN_CHECK ?= yes
+
+ifneq ($(ENABLE_LIB_ORIGIN_CHECK),no)
+    _LIB_origin = $(origin LIB)
+    ifneq ($(_LIB_origin), undefined)
+        ifneq ($(_LIB_origin),environment)
+            $(warning LIB is reserved as a windows environment variable.")
+        endif
+    endif
+endif
+
+# ==============================================================================
+# Targets for creating "directory exists" files
+# ==============================================================================
+
+$(DIR_EXISTS):
+	touch $@
+
+%/$(DIR_EXISTS):
+	mkdir -p $*
+	touch $@
+
+# ==============================================================================
+# Standard clean, realClean and clobber commands. Note that these targets use
+# the double colon (::) form so that they can be overridden in the "users"
+# makefile. However, that means that in the user makefile the corresponding
+# targets must also use the :: form.
+# ==============================================================================
+
+INCLUDE_CLEAN_TARGETS ?= yes
+
+ifeq ($(INCLUDE_CLEAN_TARGETS),yes)
+
+CleanIt = $(if $1,rm -f $1,)
+
+.PHONY: clean realClean clobber
+
+clean::
+	$(call CleanIt,$(CLEAN_LIST))
+
+realClean:: clean
+	$(call CleanIt,$(REAL_CLEAN_LIST))
+
+clobber:: realClean
+	$(call CleanIt,$(CLOBBER_LIST))
+
+endif
+
+# ==============================================================================
+# Target for dumping symbol values:
+#
+# The folloing invokation:
+#
+#	make -f ... Info INFO="A B C"
+#
+# will print out the values of the symbols A, B and C along with the origin of
+# those symbols. If INFO is not defined on the command line it defaults to the
+# (rather long) list of symbols defined below.
+# ==============================================================================
+
+.PHONY: Info
+
+INFO      ?= \
+	IML_HOST_OS \
+	IML_HOST_OS_TYPE \
+	IML_HOST_ARCH \
+	IML_HOST_ARCH_TYPE \
+	IML_TARGET_OS \
+	IML_TARGET_OS_TYPE \
+	IML_TARGET_ARCH \
+	IML_TARGET_ARCH_TYPE \
+	OBJ_DIR \
+	SRC_DIR \
+	INC_DIR \
+	PRE_DIR \
+	EXE_DIR \
+	WRK_DIR \
+	LIB_DIR \
+	LIBM_DIR \
+	TSRC_DIR \
+	TOBJ_DIR \
+	OS_CHOICE \
+	O \
+	A \
+	SHR \
+	EXE \
+	IEXT \
+	FO \
+	RECOGN \
+	QOPT \
+	CC_NAME \
+	CC \
+	FO \
+	RM \
+	AR_CMD \
+	AR_OUT \
+	LD_CMD \
+	LD_OUT \
+	LD_FLAGS \
+	CPP \
+	PERL \
+	DIR_EXISTS \
+	CLEAN_LIST \
+	REAL_CLEAN_LIST \
+	CLOBBER_LIST \
+
+
+INFO := $(call CleanList,$(INFO))
+
+Info :
+	@$(foreach v,$(INFO),echo "	$v($(origin $v)) = $($v)";)
+
+# ==============================================================================
+# Pull in any local targets
+# ==============================================================================
+
+ifneq ($(origin IML_MAKEFILE_POST),undefined)
+include $(IML_MAKEFILE_POST)
+endif
+
+
+endif # MAKEFILE_IML_TAIL already seen
+
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+# End makefile.iml_tail
+# ==============================================================================
+# ##############################################################################
+# ==============================================================================
+       

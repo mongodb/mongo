@@ -377,6 +377,11 @@ add_option('use-system-asio',
     nargs=0,
 )
 
+add_option('use-system-intel_decimal128',
+    help='use system version of intel decimal128',
+    nargs=0,
+)
+
 add_option('use-system-all',
     help='use all system libraries',
     nargs=0,
@@ -1049,6 +1054,8 @@ if link_model.startswith("dynamic"):
     # Redirect the 'Library' target, which we always use instead of 'StaticLibrary' for things
     # that can be built in either mode, to point to SharedLibrary.
     env['BUILDERS']['Library'] = env['BUILDERS']['SharedLibrary']
+    # Do the same for SharedObject
+    env['BUILDERS']['Object'] = env['BUILDERS']['SharedObject']
 
     # TODO: Ideally, the conditions below should be based on a detection of what linker we are
     # using, not the local OS, but I doubt very much that we will see the mach-o linker on
@@ -2147,6 +2154,9 @@ def doConfigure(myenv):
 
     if use_system_version_of_library("yaml"):
         conf.FindSysLibDep("yaml", ["yaml-cpp"])
+
+    if use_system_version_of_library("intel_decimal128"):
+        conf.FindSysLibDep("intel_decimal128", ["bid"])
 
     if wiredtiger and use_system_version_of_library("wiredtiger"):
         if not conf.CheckCXXHeader( "wiredtiger.h" ):

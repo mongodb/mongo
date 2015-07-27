@@ -1,0 +1,106 @@
+/******************************************************************************
+  Copyright (c) 2011, Intel Corp.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without 
+  modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright 
+      notice, this list of conditions and the following disclaimer in the 
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Intel Corporation nor the names of its contributors 
+      may be used to endorse or promote products derived from this software 
+      without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  THE POSSIBILITY OF SUCH DAMAGE.
+******************************************************************************/
+
+// 000:
+// 0 arguments passed by value (except fpsf)
+// 0 rounding mode passed as argument
+// 0 pointer to status flags passed as argument 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include "decimal.h"
+
+int
+main () {
+  Decimal128 x, y, z;
+  _IDEC_round my_rnd_mode = _IDEC_dflround;
+  _IDEC_flags my_fpsf = _IDEC_allflagsclear;
+
+  printf ("Begin Decimal Floating-Point Sanity Check\n");
+
+  // 2 * 3 = 6
+  my_rnd_mode = _IDEC_nearesteven; my_fpsf = _IDEC_allflagsclear; 
+  z.w[HIGH_128W] = 0xbaddbaddbaddbaddull; z.w[LOW_128W] = 0xbaddbaddbaddbaddull;
+  x.w[HIGH_128W] = 0x3040000000000000ull; x.w[LOW_128W] = 0x0000000000000002ull; // x = 2
+  y.w[HIGH_128W] = 0x3040000000000000ull; y.w[LOW_128W] = 0x0000000000000003ull; // y = 3
+  z = __bid128_mul (x, y, my_rnd_mode, &my_fpsf);
+  if (z.w[HIGH_128W] != 0x3040000000000000ull || z.w[LOW_128W] != 0x0000000000000006ull ||
+      my_fpsf != _IDEC_allflagsclear) {
+    printf ("RECEIVED z="LX" "LX" my_fpsf=%x\n", z.w[HIGH_128W], z.w[LOW_128W], my_fpsf);
+    printf ("EXPECTED z=3040000000000000 0000000000000006 my_fpsf=00000000\n");
+    printf ("ERROR: TEST CASE 1 FOR __bid128_mul 000 () FAILED\n\n");
+    exit (1);
+  } else {
+    printf ("TEST CASE 1 FOR __bid128_mul 000 () PASSED\n");
+  }
+
+  // (x * y)RN is inexact and > MidPoint
+  my_rnd_mode = _IDEC_nearesteven; my_fpsf = _IDEC_allflagsclear;
+  z.w[HIGH_128W] = 0xbaddbaddbaddbaddull; z.w[LOW_128W] = 0xbaddbaddbaddbaddull;
+  x.w[HIGH_128W] = 0x310800000000021eull; x.w[LOW_128W] = 0x19e0c9bab235ede1ull;
+    // x = 9999999999999999340001 * 10^100; q1 = 22 <- 128 bits
+  y.w[HIGH_128W] = 0x310800000000d3c2ull; y.w[LOW_128W] = 0x1bcecced9c69132full;
+    // y = 999999999999999923000111 * 10^100; q2 = 24 <- 128 bits
+  z = __bid128_mul (x, y, my_rnd_mode, &my_fpsf);
+    // 9999999999999999340001 * 10^100 * 999999999999999923000111 * 10^100 =(RN)
+    //  9999999999999998570002110000000051 * 10^200
+  if (z.w[HIGH_128W] != 0x31e9ed09bead87c0ull || z.w[LOW_128W] != 0x23b52ee2d8fdec33ull ||
+      my_fpsf != _IDEC_inexact) { 
+    // 9999999999999998570002110000000051 * 10^212, inexact
+    printf ("RECEIVED z="LX" "LX" my_fpsf=%x\n", z.w[HIGH_128W], z.w[LOW_128W], my_fpsf);
+    printf ("EXPECTED z=31e9ed09bead87c0 23b52ee2d8fdec33 my_fpsf=00000020\n");
+    printf ("ERROR: TEST CASE 2 FOR __bid128_mul 000 () FAILED\n\n");
+    exit (1);
+  } else {
+    printf ("TEST CASE 2 FOR __bid128_mul 000 () PASSED\n");
+  }
+
+  // (x * y)RN is inexact and > MidPoint
+  my_rnd_mode = _IDEC_towardzero; my_fpsf = _IDEC_allflagsclear;
+  z.w[HIGH_128W] = 0xbaddbaddbaddbaddull; z.w[LOW_128W] = 0xbaddbaddbaddbaddull;
+  x.w[HIGH_128W] = 0x310800000000021eull; x.w[LOW_128W] = 0x19e0c9bab235ede1ull;
+    // x = 9999999999999999340001 * 10^100; q1 = 22 <- 128 bits
+  y.w[HIGH_128W] = 0x310800000000d3c2ull; y.w[LOW_128W] = 0x1bcecced9c69132full;
+    // y = 999999999999999923000111 * 10^100; q2 = 24 <- 128 bits
+  z = __bid128_mul (x, y, my_rnd_mode, &my_fpsf);
+    // 9999999999999999340001 * 10^100 * 999999999999999923000111 * 10^100 =(RN)
+    //  9999999999999998570002110000000050 * 10^200
+  if (z.w[HIGH_128W] != 0x31e9ed09bead87c0ull || z.w[LOW_128W] != 0x23b52ee2d8fdec32ull ||
+      my_fpsf != _IDEC_inexact) { 
+    // 9999999999999998570002110000000050 * 10^212, inexact
+    printf ("RECEIVED z="LX" "LX" my_fpsf=%x\n", z.w[HIGH_128W], z.w[LOW_128W], my_fpsf);
+    printf ("EXPECTED z=31e9ed09bead87c0 23b52ee2d8fdec32 my_fpsf=00000020\n");
+    printf ("ERROR: TEST CASE 3 FOR __bid128_mul 000 () FAILED\n\n");
+    exit (1);
+  } else {
+    printf ("TEST CASE 3 FOR __bid128_mul 000 () PASSED\n");
+  }
+
+  printf ("End Decimal Floating-Point Sanity Check\n");
+}

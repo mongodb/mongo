@@ -1,0 +1,6 @@
+echo "BEGIN TESTS IN HPUX (64-BIT DATA MODE)..."
+./hpuxbuild64 > hpuxout64
+./check hpuxout64
+rm readtest hpuxout64 ../LIBRARY/libbid.a
+echo "END TESTS IN HPUX (64-BIT DATA MODE)..."
+echo "THE TESTS PASSED IF NO FAILURES WERE REPORTED ABOVE"
