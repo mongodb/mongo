@@ -6,6 +6,7 @@ var dir = 'jstests/concurrency/fsm_workloads';
 
 var blacklist = [
     // Disabled due to known bugs
+    'reindex_background.js', // SERVER-19128 Fatal assertion during secondary index build
     'yield_sort.js', // SERVER-17011 Cursor can return objects out of order if updated during query
 
     // Disabled due to MongoDB restrictions and/or workload restrictions
