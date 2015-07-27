@@ -24,7 +24,7 @@
         printjson(res)
 
         assert.gt(t.count(), 0)
-        assert.eq(db.repro.findOne({}, {_id:0}), docs[0])
+        assert.eq(t.findOne({}, {_id:0}), docs[0])
     }
 
     var docs = []
