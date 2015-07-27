@@ -79,18 +79,13 @@ __wt_las_remove_block(
 	klas->size = prefix_len;
 
 	/*
-	 * Open a lookaside table cursor and search for the matching prefix.
-	 * If we don't find any records, we're done.
+	 * Open a lookaside table cursor and search for the matching prefix,
+	 * stepping through any matching records.
 	 */
 	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
 	cursor->set_key(cursor, klas);
-	if ((ret = cursor->search_near(cursor, &exact)) != 0 || exact < 0) {
-		if (ret == WT_NOTFOUND)
-			ret = 0;
-		goto done;
-	}
-
-	/* Step through the lookaside records. */
+	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
+		ret = cursor->next(cursor);
 	for (; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor, klas));
 
@@ -115,8 +110,7 @@ __wt_las_remove_block(
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-done: err:
-	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
+err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
 
 	__wt_scr_free(session, &klas);
 	return (ret);
@@ -166,24 +160,19 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	klas->size = prefix_len;
 
 	/*
-	 * Open a lookaside table cursor and search for the matching prefix.
-	 * If we don't find any records, we're done.
+	 * Open a lookaside table cursor and search for the matching prefix,
+	 * stepping through any matching records.
+	 *
+	 * The lookaside records are in key and update order, that is, there
+	 * will be a set of in-order updates for a key, then another set of
+	 * in-order updates for a subsequent key. We process all of the updates
+	 * for a key and then insert those updates into the page, then all the
+	 * updates for the next key, and so on.
 	 */
 	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
 	cursor->set_key(cursor, klas);
-	if ((ret = cursor->search_near(cursor, &exact)) != 0 || exact < 0) {
-		if (ret == WT_NOTFOUND)
-			ret = 0;
-		goto done;
-	}
-
-	/*
-	 * Step through the lookaside records. The lookaside records are in key
-	 * and update order, that is, there will be a set of in-order updates
-	 * for a key, then another set of in-order updates for a subsequent key.
-	 * We process all of the updates for a key and then insert those updates
-	 * into the page, then all the updates for the next key, and so on.
-	 */
+	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
+		ret = cursor->next(cursor);
 	for (; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor, klas));
 
@@ -309,8 +298,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		page->modify->first_dirty_txn = WT_TXN_FIRST;
 	}
 
-done: err:
-	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
+err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
 
 	/*
 	 * KEITH: don't release the page, we don't have a hazard pointer on it;
