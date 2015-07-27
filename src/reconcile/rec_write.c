@@ -1138,15 +1138,12 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			WT_RET(__wt_update_alloc(
 			    session, NULL, &append, &notused));
 		else {
-			append = NULL;
 			__wt_scr_alloc(session, 0, &tmp);
 			if ((ret = __wt_page_cell_data_ref(
 			    session, page, vpack, tmp)) == 0)
 				ret = __wt_update_alloc(
 				    session, tmp, &append, &notused);
 			__wt_scr_free(session, &tmp);
-			if (ret != 0 && append != NULL)
-				__wt_free(session, append);
 			WT_RET(ret);
 		}
 
