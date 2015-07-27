@@ -409,10 +409,15 @@ var runner = (function() {
 
                     startTime = new Date();
                     threadMgr.init(workloads, context, maxAllowedConnections);
-                    threadMgr.spawnAll(cluster, executionOptions);
-                    threadMgr.checkFailed(0.2);
 
-                    errors = threadMgr.joinAll();
+                    try {
+                        threadMgr.spawnAll(cluster, executionOptions);
+                        threadMgr.checkFailed(0.2);
+                    } finally {
+                        // Threads must be joined before destruction, so do this
+                        // even in the presence of exceptions.
+                        errors = threadMgr.joinAll();
+                    }
                 } finally {
                     endTime = new Date();
                     cleanup.forEach(function(workload) {
