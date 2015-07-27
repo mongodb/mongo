@@ -249,6 +249,10 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 			if (STRING_MATCH("truncate", k.str, k.len)) {
 				if ((workp->truncate = v.val) != 1)
 					goto err;
+				/* There can only be one Truncate thread. */
+				if (cfg->has_truncate != 0) {
+					goto err;
+				}
 				cfg->has_truncate = 1;
 				continue;
 			}
@@ -275,12 +279,18 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		if (workp->insert == 0 && workp->read == 0 &&
 		    workp->update == 0 && workp->truncate == 0)
 			goto err;
-		/* Why run with truncate if we don't want any truncation */
+		/* Why run with truncate if we don't want any truncation. */
 		if (workp->truncate != 0 &&
 		    workp->truncate_pct == 0 && workp->truncate_count == 0)
 			goto err;
 		if (workp->truncate != 0 &&
 		    (workp->truncate_pct < 1 || workp->truncate_pct > 99))
+			goto err;
+		/* Truncate should have its own exclusive thread. */
+		if (workp->truncate != 0 && workp->threads > 1)
+			goto err;
+		if (workp->truncate != 0 &&
+		    (workp->insert > 0 || workp->read > 0 || workp->update > 0))
 			goto err;
 		cfg->workers_cnt += (u_int)workp->threads;
 	}

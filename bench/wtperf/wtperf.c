@@ -734,7 +734,7 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 {
 	int64_t pct;
 
-	/* Confirm reads, inserts and updates cannot all be zero. */
+	/* Confirm reads, inserts, truncates and updates cannot all be zero. */
 	if (workp->insert == 0 && workp->read == 0 &&
 	    workp->truncate == 0 && workp->update == 0) {
 		lprintf(cfg, EINVAL, 0, "no operations scheduled");

@@ -172,6 +172,11 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 		lprintf(cfg, ret, 0, "Truncate: failed");
 		return (ret);
 	}
+
+	if ((ret = cursor->reset(cursor)) != 0) {
+		lprintf(cfg, ret, 0, "Cursor reset failed");
+		return (ret);
+	}
 	*truncatedp = 1;
 	trunc_cfg->expected_total -= truncate_item->diff;
 	free(truncate_item->key);
