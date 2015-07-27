@@ -128,8 +128,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	WT_CURSOR_BTREE cbt;
 	WT_DECL_ITEM(current_key);
 	WT_DECL_ITEM(klas);
+	WT_DECL_ITEM(vlas);
 	WT_DECL_RET;
-	WT_ITEM(vlas);
 	WT_PAGE *page;
 	WT_UPDATE *first_upd, *last_upd, *upd;
 	size_t incr, prefix_len, total_incr;
@@ -151,6 +151,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current_key));
 	WT_ERR(__wt_scr_alloc(session, WT_MAX_PREFIX_SIZE, &klas));
+	WT_ERR(__wt_scr_alloc(session, 0, &vlas));
 
 	/* Build the unique file/address prefix. */
 	__las_build_prefix(session, addr, addr_size, prefix, &prefix_len);
@@ -203,9 +204,9 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		p = (uint8_t *)p + sizeof(uint32_t);
 
 		/* Allocate the WT_UPDATE structure. */
-		WT_ERR(cursor->get_value(cursor, &txnid, &upd_size, &vlas));
+		WT_ERR(cursor->get_value(cursor, &txnid, &upd_size, vlas));
 		WT_ERR(__wt_update_alloc(session,
-		    (upd_size == WT_UPDATE_DELETED_VALUE) ? NULL : &vlas,
+		    (upd_size == WT_UPDATE_DELETED_VALUE) ? NULL : vlas,
 		    &upd, &incr));
 		total_incr += incr;
 		upd->txnid = txnid;
@@ -320,6 +321,7 @@ err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
 
 	__wt_scr_free(session, &current_key);
 	__wt_scr_free(session, &klas);
+	__wt_scr_free(session, &vlas);
 
 	return (ret);
 }
