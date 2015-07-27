@@ -30,7 +30,9 @@ if(db.isMaster().msg != "isdbgrid") {
   // ensure that slow query is logged in detail
   assert( contains(resp.log, function(v) {
    print(v);
-   return v.indexOf(" query ") != -1 && v.indexOf("query:") != -1 &&
+   var opString = db.getMongo().useReadCommands() ? " find " : " query ";
+   var filterString = db.getMongo().useReadCommands() ? "filter:" : "query:";
+   return v.indexOf(opString) != -1 && v.indexOf(filterString) != -1 &&
           v.indexOf("nscanned:") != -1 &&
           v.indexOf("nscannedObjects:") != -1 &&
           v.indexOf("SENTINEL") != -1;

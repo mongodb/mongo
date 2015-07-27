@@ -71,7 +71,7 @@ assert.eq.automsg( "4", "t.find( {$or:[{a:2},{b:3}]} ).batchSize( 2 ).toArray().
 assert.eq.automsg( "4", "t.find( {$or:[{a:2},{b:3}]} ).snapshot().toArray().length" );
 
 t.save( {a:1,b:3} );
-assert.eq.automsg( "4", "t.find( {$or:[{a:2},{b:3}]} ).batchSize(-4).toArray().length" );
+assert.eq.automsg( "4", "t.find( {$or:[{a:2},{b:3}]} ).limit(4).toArray().length" );
 
 assert.eq.automsg( "[1,2]", "Array.sort( t.distinct( 'a', {$or:[{a:2},{b:3}]} ) )" );
 

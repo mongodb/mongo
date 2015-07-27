@@ -1,4 +1,3 @@
-
 t = db.sort3;
 t.drop();
 
@@ -10,7 +9,3 @@ assert.eq( "1,5,3" , t.find().toArray().map( function(z){ return z.a; } ) );
 
 assert.eq( "1,3,5" , t.find().sort( { a : 1 } ).toArray().map( function(z){ return z.a; } ) );
 assert.eq( "5,3,1" , t.find().sort( { a : -1 } ).toArray().map( function(z){ return z.a; } ) );
-
-assert.eq( "1,3,5" , t.find( { query : {} , orderby : { a : 1 } } ).toArray().map( function(z){ return z.a; } ) );
-assert.eq( "5,3,1" , t.find( { query : {} , orderby : { a : -1 } } ).toArray().map( function(z){ return z.a; } ) );
-
