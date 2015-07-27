@@ -446,6 +446,11 @@ worker(void *arg)
 		goto err;
 	}
 
+	/* Setup for truncate */
+	if (thread->workload->truncate != 0)
+		if ((ret = setup_truncate(cfg, thread, session)) != 0)
+			goto err;
+
 	key_buf = thread->key_buf;
 	value_buf = thread->value_buf;
 
@@ -457,11 +462,6 @@ worker(void *arg)
 		lprintf(cfg, ret, 0, "First transaction begin failed");
 		goto err;
 	}
-
-	/* Setup for truncate */
-	if (thread->workload->truncate != 0)
-		if ((ret = setup_truncate(cfg, thread, session)) != 0)
-			goto err;
 
 	while (!cfg->stop) {
 		/*
