@@ -366,7 +366,9 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(const ShardId&
         }
 
         Status commandStatus = getStatusFromCommandResult(response.getValue());
-        if (ErrorCodes::NotMaster == commandStatus) {
+        if (ErrorCodes::NotMaster == commandStatus ||
+            ErrorCodes::NotMasterNoSlaveOkCode == commandStatus) {
+            targeter->markHostNotMaster(target.getValue());
             if (i == kNotMasterNumRetries - 1) {
                 // If we're out of retries don't bother sleeping, just return.
                 return commandStatus;

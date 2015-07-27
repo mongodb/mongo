@@ -47,4 +47,8 @@ StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
     return _hostAndPort;
 }
 
+void RemoteCommandTargeterStandalone::markHostNotMaster(const HostAndPort& host) {
+    dassert(host == _hostAndPort);
+}
+
 }  // namespace mongo

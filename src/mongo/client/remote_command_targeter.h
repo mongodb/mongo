@@ -66,6 +66,13 @@ public:
      */
     virtual StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) = 0;
 
+    /**
+     * Reports to the targeter that a NotMaster response was received when communicating with
+     * "host', and so it should update its bookkeeping to avoid giving out the host again on a
+     * subsequent request for the primary.
+     */
+    virtual void markHostNotMaster(const HostAndPort& host) = 0;
+
 protected:
     RemoteCommandTargeter() = default;
 };

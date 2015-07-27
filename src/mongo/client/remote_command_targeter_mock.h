@@ -56,6 +56,11 @@ public:
     StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
 
     /**
+     * No-op for the mock.
+     */
+    void markHostNotMaster(const HostAndPort& host) override;
+
+    /**
      * Sets the return value for the next call to connectionString.
      */
     void setConnectionStringReturnValue(const ConnectionString returnValue);

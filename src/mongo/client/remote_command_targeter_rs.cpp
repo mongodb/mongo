@@ -78,4 +78,10 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(const ReadPreferenceSe
     return hostAndPort;
 }
 
+void RemoteCommandTargeterRS::markHostNotMaster(const HostAndPort& host) {
+    invariant(_rsMonitor);
+
+    _rsMonitor->failedHost(host);
+}
+
 }  // namespace mongo

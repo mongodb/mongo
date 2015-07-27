@@ -51,6 +51,10 @@ public:
         return _mock->findHost(readPref);
     }
 
+    void markHostNotMaster(const HostAndPort& host) override {
+        _mock->markHostNotMaster(host);
+    }
+
 private:
     const std::shared_ptr<RemoteCommandTargeter> _mock;
 };

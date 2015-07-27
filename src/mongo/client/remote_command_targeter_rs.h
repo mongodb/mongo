@@ -54,6 +54,8 @@ public:
 
     StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
 
+    void markHostNotMaster(const HostAndPort& host) override;
+
 private:
     // Name of the replica set which this targeter maintains
     const std::string _rsName;
