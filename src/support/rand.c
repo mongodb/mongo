@@ -41,9 +41,9 @@
  * of the values to avoid that, and read/write in atomic, 8B chunks.
  */
 #undef	M_W
-#define	M_W(r)	r.u.w
+#define	M_W(r)	r.x.w
 #undef	M_Z
-#define	M_Z(r)	r.u.z
+#define	M_Z(r)	r.x.z
 
 /*
  * __wt_random_init --

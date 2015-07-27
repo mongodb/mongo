@@ -259,7 +259,7 @@
 /* Random number generator state. */
 union __wt_rand_state {
 	uint64_t v;
-	union {
+	struct {
 		uint32_t w, z;
-	} u;
+	} x;
 };
