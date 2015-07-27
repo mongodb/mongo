@@ -39,16 +39,17 @@ try {
     db.setProfilingLevel(2);
 
     t.find().itcount();
-    checkLastOp( [ [ "op", "query" ],
+    checkLastOp( [// TODO re-enable when SERVER-19566 is implemented.
+                  // [ "op", "query" ],
+                  // [ "query", {} ],
+                  // [ "responseLength", 20 ],
                   [ "ns", "profile4.profile4" ],
-                  [ "query", {} ],
                   [ "ntoreturn", 0 ],
                   [ "ntoskip", 0 ],
                   [ "nscanned", 0 ],
                   [ "keyUpdates", 0 ],
                   [ "nreturned", 0 ],
-                  [ "cursorExhausted", true],
-                  [ "responseLength", 20 ] ] );
+                  [ "cursorExhausted", true] ] );
     
     // check write lock stats are set
     t.save( {} );
@@ -60,14 +61,16 @@ try {
     // check read lock stats are set
     t.find();
     o = lastOp();
-    assert.eq('query', o.op);
+    // TODO re-enable when SERVER-19566 is implemented.
+    // assert.eq('query', o.op);
     printjson(o.locks);
     assert.lt( 0, Object.keys(o.locks).length );
 
     t.save( {} );
     t.save( {} );
     t.find().skip( 1 ).limit( 4 ).itcount();
-    checkLastOp( [ [ "ntoreturn", 4 ],
+    checkLastOp( [// TODO re-enable when SERVER-19566 is implemented.
+                  // [ "ntoreturn", 4 ],
                   [ "ntoskip", 1 ],
                   [ "nscannedObjects", 3 ],
                   [ "nreturned", 2 ] ] );
@@ -77,7 +80,8 @@ try {
     assert.lt( 0, o.cursorid );
     
     t.find( {a:1} ).itcount();
-    checkLastOp( [ [ "query", {a:1} ] ] );
+    // TODO re-enable when SERVER-19566 is implemented.
+    // checkLastOp( [ [ "query", {a:1} ] ] );
     
     t.find( {_id:0} ).itcount();
     checkLastOp( [ [ "idhack", true ] ] );
@@ -110,7 +114,8 @@ try {
     t.insert([{_id:0},{_id:1},{_id:2},{_id:3},{_id:4}]);
     t.find().batchSize(2).next(); // Query performed leaving open cursor
     var operation = lastOp();
-    assert.eq("query", operation.op);
+    // TODO re-enable when SERVER-19566 is implemented.
+    // assert.eq("query", operation.op);
     assert(!("cursorExhausted" in operation));
 
     var cursor = t.find().batchSize(2);
@@ -118,7 +123,8 @@ try {
     cursor.next(); // Consume second of 2 docs from initial query.
     cursor.next(); // getMore performed, leaving open cursor.
     operation = lastOp();
-    assert.eq("getmore", operation.op);
+    // TODO re-enable when SERVER-19566 is implemented.
+    // assert.eq("getmore", operation.op);
     assert(!("cursorExhausted" in operation));
 
     // Exhaust cursor and confirm getMore has "cursorExhausted:true".
