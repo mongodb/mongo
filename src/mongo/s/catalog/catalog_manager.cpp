@@ -649,16 +649,8 @@ Status CatalogManager::dropCollection(OperationContext* txn, const NamespaceStri
     auto* shardRegistry = grid.shardRegistry();
 
     for (const auto& shardEntry : allShards) {
-        const auto shard = shardRegistry->getShard(shardEntry.getName());
-
-        auto shardTargetStatus =
-            shard->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
-        if (!shardTargetStatus.isOK()) {
-            return shardTargetStatus.getStatus();
-        }
-
-        auto dropResult = shardRegistry->runCommand(
-            shardTargetStatus.getValue(), ns.db().toString(), BSON("drop" << ns.coll()));
+        auto dropResult = shardRegistry->runCommandWithNotMasterRetries(
+            shardEntry.getName(), ns.db().toString(), BSON("drop" << ns.coll()));
 
         if (!dropResult.isOK()) {
             return dropResult.getStatus();
@@ -670,7 +662,7 @@ Status CatalogManager::dropCollection(OperationContext* txn, const NamespaceStri
                 continue;
             }
 
-            errors.emplace(shard->getConnString().toString(), dropResult.getValue());
+            errors.emplace(shardEntry.getHost(), dropResult.getValue());
         }
     }
 
@@ -700,26 +692,18 @@ Status CatalogManager::dropCollection(OperationContext* txn, const NamespaceStri
     LOG(1) << "dropCollection " << ns << " chunk data deleted";
 
     for (const auto& shardEntry : allShards) {
-        const auto shard = grid.shardRegistry()->getShard(shardEntry.getName());
-
-        auto shardTargetStatus =
-            shard->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
-        if (!shardTargetStatus.isOK()) {
-            return shardTargetStatus.getStatus();
-        }
-
         BSONObjBuilder cmdBuilder;
         cmdBuilder.append("setShardVersion", ns.ns());
         cmdBuilder.append("configdb", connectionString().toString());
         cmdBuilder.append("shard", shardEntry.getName());
-        cmdBuilder.append("shardHost", shard->getConnString().toString());
+        cmdBuilder.append("shardHost", shardEntry.getHost());
 
         ChunkVersion::DROPPED().addToBSON(cmdBuilder);
 
         cmdBuilder.append("authoritative", true);
 
-        auto ssvResult =
-            shardRegistry->runCommand(shardTargetStatus.getValue(), "admin", cmdBuilder.obj());
+        auto ssvResult = shardRegistry->runCommandWithNotMasterRetries(
+            shardEntry.getName(), "admin", cmdBuilder.obj());
 
         if (!ssvResult.isOK()) {
             return ssvResult.getStatus();
@@ -730,8 +714,8 @@ Status CatalogManager::dropCollection(OperationContext* txn, const NamespaceStri
             return ssvStatus;
         }
 
-        auto unsetShardingStatus = shardRegistry->runCommand(
-            shardTargetStatus.getValue(), "admin", BSON("unsetSharding" << 1));
+        auto unsetShardingStatus = shardRegistry->runCommandWithNotMasterRetries(
+            shardEntry.getName(), "admin", BSON("unsetSharding" << 1));
 
         if (!unsetShardingStatus.isOK()) {
             return unsetShardingStatus.getStatus();

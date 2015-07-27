@@ -192,12 +192,6 @@ StatusWith<LockpingsType> DistLockCatalogImpl::getPing(StringData processID) {
 }
 
 Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
-    auto targetStatus = _targeter()->findHost(kReadPref);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
-    }
-
     auto request =
         FindAndModifyRequest::makeUpdate(_lockPingNS,
                                          BSON(LockpingsType::process() << processID),
@@ -205,8 +199,8 @@ Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
     request.setUpsert(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus =
-        _client->runCommand(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON());
+    auto resultStatus = _client->runCommandWithNotMasterRetries(
+        "config", _locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -230,12 +224,6 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
                                                     StringData processId,
                                                     Date_t time,
                                                     StringData why) {
-    auto targetStatus = _targeter()->findHost(kReadPref);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
-    }
-
     BSONObj newLockDetails(BSON(LocksType::lockID(lockSessionID)
                                 << LocksType::state(LocksType::LOCKED) << LocksType::who() << who
                                 << LocksType::process() << processId << LocksType::when(time)
@@ -249,8 +237,8 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
     request.setShouldReturnNew(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus =
-        _client->runCommand(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON());
+    auto resultStatus = _client->runCommandWithNotMasterRetries(
+        "config", _locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -287,12 +275,6 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
                                                         StringData processId,
                                                         Date_t time,
                                                         StringData why) {
-    auto targetStatus = _targeter()->findHost(kReadPref);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
-    }
-
     BSONArrayBuilder orQueryBuilder;
     orQueryBuilder.append(
         BSON(LocksType::name() << lockID << LocksType::state(LocksType::UNLOCKED)));
@@ -308,8 +290,8 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
     request.setShouldReturnNew(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus =
-        _client->runCommand(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON());
+    auto resultStatus = _client->runCommandWithNotMasterRetries(
+        "config", _locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -334,20 +316,14 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
 }
 
 Status DistLockCatalogImpl::unlock(const OID& lockSessionID) {
-    auto targetStatus = _targeter()->findHost(kReadPref);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
-    }
-
     auto request = FindAndModifyRequest::makeUpdate(
         _locksNS,
         BSON(LocksType::lockID(lockSessionID)),
         BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus =
-        _client->runCommand(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON());
+    auto resultStatus = _client->runCommandWithNotMasterRetries(
+        "config", _locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -471,18 +447,12 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByName(StringData name) {
 }
 
 Status DistLockCatalogImpl::stopPing(StringData processId) {
-    auto targetStatus = _targeter()->findHost(kReadPref);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
-    }
-
     auto request =
         FindAndModifyRequest::makeRemove(_lockPingNS, BSON(LockpingsType::process() << processId));
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus =
-        _client->runCommand(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON());
+    auto resultStatus = _client->runCommandWithNotMasterRetries(
+        "config", _locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
