@@ -753,6 +753,19 @@ namespace mongo {
     }
 
     template< class V >
+    void BtreeBucket<V>::assertIfKeyTooLongAndNotIgnored(const IndexCatalogEntry* btreeState,
+                                                         const Key& key) const {
+        if ( key.dataSize() <= getKeyMax() )
+            return;
+
+        string msg = str::stream() << "Btree::insert: key too large to index, failing "
+            << btreeState->descriptor()->indexNamespace() << ' '
+            << key.dataSize() << ' ' << key.toString();
+        problem() << msg << endl;
+        keyTooLongAssert( 17280, msg );
+    }
+
+    template< class V >
     string BtreeBucket<V>::dupKeyError( const IndexDescriptor* idx , const Key& key ) {
         stringstream ss;
         ss << "E11000 duplicate key error ";
@@ -1901,11 +1914,7 @@ namespace mongo {
         dassert(toplevel);
         if ( toplevel ) {
             if ( key.dataSize() > getKeyMax() ) {
-                string msg = str::stream() << "Btree::insert: key too large to index, failing "
-                                           << btreeState->descriptor()->indexNamespace() << ' '
-                                           << key.dataSize() << ' ' << key.toString();
-                problem() << msg << endl;
-                keyTooLongAssert( 17280, msg );
+                assertIfKeyTooLongAndNotIgnored(btreeState, key);
                 return 3;
             }
         }

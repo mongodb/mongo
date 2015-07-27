@@ -1177,9 +1177,11 @@ namespace mongo {
     Status IndexCatalog::_indexRecord( IndexCatalogEntry* index,
                                        const BSONObj& obj,
                                        const DiskLoc &loc,
-                                       const PregeneratedKeysOnIndex* prep ) {
+                                       const PregeneratedKeysOnIndex* prep,
+                                       bool ignoreKeyTooLong ) {
         InsertDeleteOptions options;
         options.logIfError = false;
+        options.ignoreKeyTooLong = ignoreKeyTooLong;
 
         bool isUnique =
             index->descriptor()->isIdIndex() ||
@@ -1188,7 +1190,7 @@ namespace mongo {
         options.dupsAllowed = ignoreUniqueIndex( index->descriptor() ) || !isUnique;
 
         int64_t inserted;
-        return index->accessMethod()->insert(obj, loc, options, &inserted, prep );
+        return index->accessMethod()->insert(obj, loc, options, &inserted, prep);
     }
 
     Status IndexCatalog::_unindexRecord( IndexCatalogEntry* index,
@@ -1233,7 +1235,8 @@ namespace mongo {
 
     void IndexCatalog::indexRecord( const BSONObj& obj,
                                     const DiskLoc &loc,
-                                    const PregeneratedKeys* preGen ) {
+                                    const PregeneratedKeys* preGen,
+                                    bool ignoreKeyTooLong ) {
 
         for ( IndexCatalogEntryContainer::const_iterator i = _entries.begin();
               i != _entries.end();
@@ -1246,7 +1249,7 @@ namespace mongo {
                 perIndex = preGen->get( entry );
 
             try {
-                Status s = _indexRecord( entry, obj, loc, perIndex );
+                Status s = _indexRecord( entry, obj, loc, perIndex, ignoreKeyTooLong );
                 uassert(s.location(), s.reason(), s.isOK() );
             }
             catch ( AssertionException& ae ) {

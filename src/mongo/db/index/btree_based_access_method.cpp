@@ -87,10 +87,16 @@ namespace mongo {
                 ++*numInserted;
             }
             catch (AssertionException& e) {
-                if (10287 == e.getCode() && !_btreeState->isReady()) {
+                const int code = e.getCode();
+                if (10287 == code && !_btreeState->isReady()) {
                     // This is the duplicate key exception.  We ignore it for some reason in BG
                     // indexing.
                     DEV log() << "info: key already in index during bg indexing (ok)\n";
+                }
+                else if (options.ignoreKeyTooLong && (code == 17280 || code == 17281)) {
+                    // Behave as-if failIndexKeyTooLong was false and bt_insert silently didn't
+                    // insert the record.
+                    continue;
                 }
                 else if (!options.dupsAllowed) {
                     // Assuming it's a duplicate key exception.  Clean up any inserted keys.
@@ -270,8 +276,8 @@ namespace mongo {
             && (KeyPattern::isIdKeyPattern(_descriptor->keyPattern()) || _descriptor->unique())
             && !options.dupsAllowed;
 
-        if (checkForDups) {
-            for (vector<BSONObj*>::iterator i = data->added.begin(); i != data->added.end(); i++) {
+        for (vector<BSONObj*>::iterator i = data->added.begin(); i != data->added.end(); i++) {
+            if (checkForDups) {
                 if (_interface->wouldCreateDup(_btreeState,
                                                _btreeState->head(),
                                                **i, record)) {
@@ -282,6 +288,8 @@ namespace mongo {
                                                           **i));
                 }
             }
+
+            _interface->assertIfKeyTooLongAndNotIgnored(_btreeState, _btreeState->head(), **i);
         }
 
         status->_isValid = true;

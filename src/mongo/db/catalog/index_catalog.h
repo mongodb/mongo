@@ -252,7 +252,7 @@ namespace mongo {
 
         // this throws for now
         void indexRecord( const BSONObj& obj, const DiskLoc &loc,
-                          const PregeneratedKeys* preGen = NULL );
+                          const PregeneratedKeys* preGen, bool ignoreKeyTooLong );
 
         void unindexRecord( const BSONObj& obj, const DiskLoc& loc, bool noWarn );
 
@@ -303,7 +303,7 @@ namespace mongo {
 
         Status _indexRecord( IndexCatalogEntry* index,
                              const BSONObj& obj, const DiskLoc &loc,
-                             const PregeneratedKeysOnIndex* pregen );
+                             const PregeneratedKeysOnIndex* pregen, bool ignoreKeyTooLong );
 
         Status _unindexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc,
                                bool logIfError );

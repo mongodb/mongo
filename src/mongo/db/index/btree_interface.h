@@ -76,6 +76,10 @@ namespace mongo {
                                     const BSONObj& key,
                                     const DiskLoc& self) const = 0;
 
+        virtual void assertIfKeyTooLongAndNotIgnored(const IndexCatalogEntry* btreeState,
+                                                     const DiskLoc& thisLoc,
+                                                     const BSONObj& key) const = 0;
+
         virtual void customLocate(const IndexCatalogEntry* btreeState,
                                   DiskLoc& locInOut,
                                   int& keyOfs,

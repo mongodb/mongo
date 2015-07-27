@@ -688,6 +688,9 @@ namespace mongo {
                             const Key& key,
                             const DiskLoc& self) const;
 
+        void assertIfKeyTooLongAndNotIgnored(const IndexCatalogEntry* btreeState,
+                                             const Key& key) const;
+
         /**
          * Preconditions: none
          * Postconditions: @return a new bucket allocated from pdfile storage

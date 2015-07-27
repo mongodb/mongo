@@ -223,13 +223,16 @@ namespace mongo {
      * Flags we can set for inserts and deletes (and updates, which are kind of both).
      */
     struct InsertDeleteOptions {
-        InsertDeleteOptions() : logIfError(false), dupsAllowed(false) { }
+        InsertDeleteOptions() : logIfError(false), dupsAllowed(false), ignoreKeyTooLong(false) { }
 
         // If there's an error, log() it.
         bool logIfError;
 
         // Are duplicate keys allowed in the index?
         bool dupsAllowed;
+
+        // Ignore key too long failures.
+        bool ignoreKeyTooLong;
     };
 
 }  // namespace mongo

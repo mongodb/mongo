@@ -186,7 +186,7 @@ namespace mongo {
                 return StatusWith<DiskLoc>( ret );
         }
 
-        StatusWith<DiskLoc> status = _insertDocument( docToInsert, enforceQuota, preGen );
+        StatusWith<DiskLoc> status = _insertDocument( docToInsert, enforceQuota, preGen, false );
         if ( status.isOK() ) {
             _details->paddingFits();
         }
@@ -217,7 +217,8 @@ namespace mongo {
 
     StatusWith<DiskLoc> Collection::_insertDocument( const BSONObj& docToInsert,
                                                      bool enforceQuota,
-                                                     const PregeneratedKeys* preGen ) {
+                                                     const PregeneratedKeys* preGen,
+                                                     bool ignoreKeyTooLong ) {
 
         // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
         //       under the RecordStore, this feels broken since that should be a
@@ -236,7 +237,7 @@ namespace mongo {
         _infoCache.notifyOfWriteOp();
 
         try {
-            _indexCatalog.indexRecord( docToInsert, loc.getValue(), preGen );
+            _indexCatalog.indexRecord( docToInsert, loc.getValue(), preGen, ignoreKeyTooLong );
         }
         catch ( AssertionException& e ) {
             if ( _details->isCapped() ) {
@@ -347,7 +348,7 @@ namespace mongo {
                     debug->nmoved += 1;
             }
 
-            StatusWith<DiskLoc> loc = _insertDocument( objNew, enforceQuota, NULL );
+            StatusWith<DiskLoc> loc = _insertDocument( objNew, enforceQuota, NULL, true );
 
             if ( loc.isOK() ) {
                 // insert successful, now lets deallocate the old location
@@ -356,7 +357,7 @@ namespace mongo {
             }
             else {
                 // new doc insert failed, so lets re-index the old document and location
-                _indexCatalog.indexRecord( objOld, oldLocation );
+                _indexCatalog.indexRecord( objOld, oldLocation, NULL, true );
             }
 
             return loc;

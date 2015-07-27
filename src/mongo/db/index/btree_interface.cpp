@@ -104,6 +104,14 @@ namespace mongo {
                                                                            self);
         }
 
+        virtual void assertIfKeyTooLongAndNotIgnored(const IndexCatalogEntry* btreeState,
+                                                     const DiskLoc& thisLoc,
+                                                     const BSONObj& key) const {
+            typename Version::KeyOwned ownedVersion(key);
+            getBucket( btreeState, thisLoc )->assertIfKeyTooLongAndNotIgnored(btreeState,
+                                                                              ownedVersion);
+        }
+
         virtual void customLocate(const IndexCatalogEntry* btreeState,
                                   DiskLoc& locInOut,
                                   int& keyOfs,

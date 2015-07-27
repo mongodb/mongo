@@ -215,7 +215,8 @@ namespace mongo {
          */
         StatusWith<DiskLoc> _insertDocument( const BSONObj& doc,
                                              bool enforceQuota,
-                                             const PregeneratedKeys* preGen );
+                                             const PregeneratedKeys* preGen,
+                                             bool ignoreUniqueIndex );
 
         void _compactExtent(const DiskLoc diskloc, int extentNumber,
                             MultiIndexBlock& indexesToInsertTo,
