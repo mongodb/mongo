@@ -706,8 +706,9 @@ int _main(int argc, char* argv[], char** envp) {
 
     if (!shellGlobalParams.script.empty()) {
         mongo::shell_utils::MongoProgramScope s;
-        if (!scope->exec(shellGlobalParams.script, "(shell eval)", true, true, false))
+        if (!scope->exec(shellGlobalParams.script, "(shell eval)", false, true, false))
             return -4;
+        scope->exec("shellPrintHelper( __lastres__ );", "(shell2 eval)", true, true, false);
     }
 
     for (size_t i = 0; i < shellGlobalParams.files.size(); ++i) {
