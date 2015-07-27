@@ -264,8 +264,8 @@ ScriptingFunction Scope::createFunction(const char* code) {
     //     lookup the source on an exception, but SpiderMonkey uses the value
     //     returned by JS_CompileFunction.
     ScriptingFunction defaultFunctionNumber = getFunctionCache().size() + 1;
-    ScriptingFunction& actualFunctionNumber = _cachedFunctions[code];
-    actualFunctionNumber = _createFunction(code, defaultFunctionNumber);
+    ScriptingFunction actualFunctionNumber = _createFunction(code, defaultFunctionNumber);
+    _cachedFunctions[code] = actualFunctionNumber;
     return actualFunctionNumber;
 }
 
