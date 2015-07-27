@@ -94,7 +94,7 @@ BSONObj ValueWriter::toBSON() {
 
         std::tie(originalBSON, altered) = BSONInfo::originalBSON(_context, obj);
 
-        if (!altered)
+        if (originalBSON && !altered)
             return *originalBSON;
     }
 

@@ -340,7 +340,7 @@ void ObjectWrapper::writeThis(BSONObjBuilder* b) {
 
         std::tie(originalBSON, altered) = BSONInfo::originalBSON(_context, _object);
 
-        if (!altered) {
+        if (originalBSON && !altered) {
             b->appendElements(*originalBSON);
             return;
         }
