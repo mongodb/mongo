@@ -89,14 +89,16 @@ function runOneTest(conn, t) {
 
     for (var i = 0; i < t.testcases.length; i++) {
         var testcase = t.testcases[i];
-        var privileges = testcase.privileges;
-
         if (!("privileges" in testcase)) {
             continue;
         }
+        // Make a copy of the priviliges array since it will be modified.
+        var privileges = testcase.privileges.map(function(p) {
+            return Object.extend({}, p, true);
+        });
 
         if (testcase.expectAuthzFailure) {
-            msg = testInsufficientPrivileges(conn, t, testcase, testcase.privileges);
+            msg = testInsufficientPrivileges(conn, t, testcase, privileges);
             if (msg) {
                 failures.push(t.testname + ": " + msg);
             }
@@ -124,9 +126,8 @@ function runOneTest(conn, t) {
         if (msg) {
             failures.push(t.testname + ": " + msg);
         }
-
         // test resource pattern where collection is ""
-        testcase.privileges.forEach(function(j) {
+        privileges.forEach(function(j) {
             if (j.resource.collection && !j.resource.collection.startsWith('system.')) {
                 j.resource.collection = "";
             }
@@ -135,9 +136,8 @@ function runOneTest(conn, t) {
         if (msg) {
             failures.push(t.testname + ": " + msg);
         }
-
         // test resource pattern where database is ""
-        testcase.privileges.forEach(function(j) {
+        privileges.forEach(function(j) {
             if (j.resource.db) {
                 j.resource.db = "";
             }
