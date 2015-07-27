@@ -37,10 +37,12 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
@@ -141,7 +143,8 @@ public:
 
         // Don't need to split pipeline if the first $match is an exact match on shard key, unless
         // there is a stage that needs to be run on the primary shard.
-        bool needSplit = shardKeyMatches.isEmpty() || pipeline->needsPrimaryShardMerger();
+        const bool needPrimaryShardMerger = pipeline->needsPrimaryShardMerger();
+        const bool needSplit = shardKeyMatches.isEmpty() || needPrimaryShardMerger;
 
         // Split the pipeline into pieces for mongod(s) and this mongos. If needSplit is true,
         // 'pipeline' will become the merger side.
@@ -177,7 +180,7 @@ public:
             uassertAllShardsSupportExplain(shardResults);
 
             if (needSplit) {
-                result << "splitPipeline"
+                result << "needsPrimaryShardMerger" << needPrimaryShardMerger << "splitPipeline"
                        << DOC("shardsPart" << shardPipeline->writeExplainOps() << "mergerPart"
                                            << pipeline->writeExplainOps());
             } else {
@@ -224,10 +227,14 @@ public:
             outputNsOrEmpty = out->getOutputNs().ns();
         }
 
-        // Run merging command on primary shard of database. Need to use ShardConnection so
-        // that the merging mongod is sent the config servers on connection init.
-        const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
-        ShardConnection conn(shard->getConnString(), outputNsOrEmpty);
+        // Run merging command on random shard, unless a stage needs the primary shard. Need to use
+        // ShardConnection so that the merging mongod is sent the config servers on connection init.
+        auto& prng = txn->getClient()->getPrng();
+        const auto& mergingShardId = needPrimaryShardMerger
+            ? conf->getPrimaryId()
+            : shardResults[prng.nextInt32(shardResults.size())].shardTargetId;
+        const auto mergingShard = grid.shardRegistry()->getShard(mergingShardId);
+        ShardConnection conn(mergingShard->getConnString(), outputNsOrEmpty);
         BSONObj mergedResults =
             aggRunCommand(conn.get(), dbname, mergeCmd.freeze().toBson(), options);
         conn.done();

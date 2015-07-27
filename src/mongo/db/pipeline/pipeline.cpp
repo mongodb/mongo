@@ -455,6 +455,7 @@ bool Pipeline::needsPrimaryShardMerger() const {
     }
     return false;
 }
+
 std::vector<NamespaceString> Pipeline::getInvolvedCollections() const {
     std::vector<NamespaceString> collections;
     for (auto&& source : sources) {
