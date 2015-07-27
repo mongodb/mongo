@@ -2,16 +2,26 @@
 
 Import("env")
 
-env.Library('platform', [
-        'posix_fadvise.cpp',
-        'process_id.cpp',
-        "shared_library.cpp",
-        "shared_library_${TARGET_OS_FAMILY}.cpp",
-        'strcasestr.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-        ]
+lib_deps = [
+    '$BUILD_DIR/mongo/base',
+]
+source_files = [
+    'posix_fadvise.cpp',
+    'process_id.cpp',
+    'shared_library.cpp',
+    'shared_library_${TARGET_OS_FAMILY}.cpp',
+    'strcasestr.cpp',
+]
+
+if GetOption('experimental-decimal-support') == 'on':
+    lib_deps.append('$BUILD_DIR/third_party/shim_intel_decimal128')
+    source_files.append('decimal128.cpp')
+else:
+    source_files.append('decimal128_dummy.cpp')
+
+env.Library(target='platform',
+            source=source_files,
+            LIBDEPS=lib_deps
 )
 
 env.CppUnitTest('atomic_word_test', 'atomic_word_test.cpp')
@@ -19,3 +29,6 @@ env.CppUnitTest('bits_test', 'bits_test.cpp')
 env.CppUnitTest('endian_test', 'endian_test.cpp')
 env.CppUnitTest('process_id_test', 'process_id_test.cpp', LIBDEPS=['platform'])
 env.CppUnitTest('random_test', 'random_test.cpp', LIBDEPS=['$BUILD_DIR/mongo/base'])
+
+if GetOption('experimental-decimal-support') == 'on':
+    env.CppUnitTest('decimal128_test', 'decimal128_test.cpp', LIBDEPS=['platform'])
