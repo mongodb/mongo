@@ -293,9 +293,6 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	/* Discard the cursor. */
 	WT_ERR(__wt_las_cursor_close(session, &cursor, saved_flags));
 
-	/* Remove this block's entries from the lookaside table. */
-	WT_ERR(__wt_las_remove_block(session, addr, addr_size));
-
 	if (total_incr != 0) {
 		__wt_cache_page_inmem_incr(session, page, total_incr);
 
@@ -395,11 +392,17 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 		if (previous_state == WT_REF_DELETED)
 			WT_ERR(__wt_delete_page_instantiate(session, ref));
 
-		/* Instantiate entries from the database's look-aside buffer. */
+		/*
+		 * Instantiate entries from the database's lookaside file; if
+		 * successful, we know this page will be instantiated, remove
+		 * the entries from the lookaside file.
+		 */
 		dsk = tmp.data;
-		if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE))
+		if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE)) {
 			WT_ERR(__las_page_instantiate(
 			    session, ref, addr, addr_size));
+			WT_ERR(__wt_las_remove_block(session, addr, addr_size));
+		}
 	}
 
 	WT_ERR(__wt_verbose(session, WT_VERB_READ,
