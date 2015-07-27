@@ -58,9 +58,10 @@ public:
     virtual const std::vector<FieldRef*>* getImmutableFields() const;
 
 private:
-    Collection* _collection;
     const NamespaceString& _nsString;
-    ChunkVersion _shardVersion;
+    const ChunkVersion _shardVersion;
+
+    Collection* _collection;
 };
 
 } /* namespace mongo */

@@ -48,7 +48,6 @@
 
 namespace mongo {
 
-using std::endl;
 using std::string;
 
 Request::Request(Message& m, AbstractMessagingPort* p)
@@ -90,7 +89,7 @@ void Request::process(int attempt) {
 
     Timer t;
     LOG(3) << "Request::process begin ns: " << getns() << " msg id: " << msgId << " op: " << op
-           << " attempt: " << attempt << endl;
+           << " attempt: " << attempt;
 
     _d.markSet();
 
@@ -122,7 +121,7 @@ void Request::process(int attempt) {
     }
 
     LOG(3) << "Request::process end ns: " << getns() << " msg id: " << msgId << " op: " << op
-           << " attempt: " << attempt << " " << t.millis() << "ms" << endl;
+           << " attempt: " << attempt << " " << t.millis() << "ms";
 }
 
 void Request::reply(Message& response, const string& fromServer) {

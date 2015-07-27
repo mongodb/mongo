@@ -75,6 +75,7 @@
 namespace mongo {
 
 using std::set;
+using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -201,7 +202,7 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
                   collectionDetail.obj());
     }
 
-    ChunkManagerPtr manager(new ChunkManager(ns, fieldsAndOrder, unique));
+    shared_ptr<ChunkManager> manager(new ChunkManager(ns, fieldsAndOrder, unique));
     manager->createFirstChunks(dbPrimaryShardId, &initPoints, &initShardIds);
     manager->loadExistingRanges(nullptr);
 

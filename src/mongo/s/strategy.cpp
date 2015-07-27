@@ -32,7 +32,6 @@
 
 #include "mongo/s/strategy.h"
 
-
 #include "mongo/base/status.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/util/builder.h"

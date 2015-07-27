@@ -28,8 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/chunk_diff.h"
-
 #include <string>
 #include <map>
 #include <utility>
@@ -37,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/chunk_diff.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

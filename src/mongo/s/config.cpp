@@ -141,6 +141,8 @@ DBConfig::DBConfig(std::string name, const DatabaseType& dbt) : _name(name) {
     _shardingEnabled = dbt.getSharded();
 }
 
+DBConfig::~DBConfig() = default;
+
 bool DBConfig::isSharded(const string& ns) {
     if (!_shardingEnabled)
         return false;

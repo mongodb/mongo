@@ -48,8 +48,8 @@
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/config.h"
-#include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
@@ -542,6 +542,7 @@ bool Chunk::splitIfShould(long dataWritten) const {
             LOG(1) << "won't auto split because not enough tickets: " << getManager()->getns();
             return false;
         }
+
         TicketHolderReleaser releaser(&(getManager()->_splitHeuristics._splitTickets));
 
         // this is a bit ugly

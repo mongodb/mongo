@@ -1,5 +1,4 @@
-// cursors.h
-/*
+/**
  *    Copyright (C) 2010 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -27,7 +26,6 @@
  *    then also delete it in the license file.
  */
 
-
 #pragma once
 
 #include <string>
@@ -39,7 +37,6 @@
 namespace mongo {
 
 class QueryMessage;
-
 
 class ShardedClientCursor {
     MONGO_DISALLOW_COPYING(ShardedClientCursor);
@@ -154,4 +151,5 @@ private:
 };
 
 extern CursorCache cursorCache;
-}
+
+}  // namespace mongo

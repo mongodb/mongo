@@ -98,6 +98,7 @@ private:
 class DBConfig {
 public:
     DBConfig(std::string name, const DatabaseType& dbt);
+    ~DBConfig();
 
     /**
      * The name of the database which this entry caches.

@@ -36,7 +36,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
@@ -74,7 +73,7 @@ const UpdateIndexData* UpdateLifecycleImpl::getIndexKeys(OperationContext* opCtx
 }
 
 const std::vector<FieldRef*>* UpdateLifecycleImpl::getImmutableFields() const {
-    CollectionMetadataPtr metadata = getMetadata(_nsString);
+    std::shared_ptr<CollectionMetadata> metadata = getMetadata(_nsString);
     if (metadata) {
         const std::vector<FieldRef*>& fields = metadata->getKeyPatternFields();
         // Return shard-keys as immutable for the update system.

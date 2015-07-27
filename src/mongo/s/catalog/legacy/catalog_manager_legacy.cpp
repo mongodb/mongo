@@ -32,7 +32,6 @@
 
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 
-#include <map>
 #include <pcrecpp.h>
 
 #include "mongo/base/status.h"
@@ -80,11 +79,10 @@
 
 namespace mongo {
 
-using std::map;
-using std::pair;
 using std::set;
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 using str::stream;
 
@@ -333,7 +331,7 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
     logChange(
         txn->getClient()->clientAddress(true), "shardCollection.start", ns, collectionDetail.obj());
 
-    ChunkManagerPtr manager(new ChunkManager(ns, fieldsAndOrder, unique));
+    shared_ptr<ChunkManager> manager(new ChunkManager(ns, fieldsAndOrder, unique));
     manager->createFirstChunks(dbPrimaryShardId, &initPoints, &initShardIds);
     manager->loadExistingRanges(nullptr);
 
