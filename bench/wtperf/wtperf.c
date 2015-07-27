@@ -391,7 +391,7 @@ worker(void *arg)
 	size_t i;
 	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
-	int measure_latency, ret;
+	int measure_latency, ret, truncated;
 	char *value_buf, *key_buf, *value;
 	char buf[512];
 
@@ -494,7 +494,6 @@ worker(void *arg)
 				continue;
 			break;
 		case WORKER_TRUNCATE:
-			trk = &thread->truncate;
 			/* Required but not used. */
 			next_val = wtperf_rand(thread);
 			break;
@@ -562,8 +561,15 @@ worker(void *arg)
 			goto op_err;
 		case WORKER_TRUNCATE:
 			if ((ret = run_truncate(
-			    cfg, thread, &trk, cursor, session)) == 0)
+			    cfg, thread, cursor, session, &truncated)) == 0) {
+				if (truncated)
+					trk = &thread->truncate;
+				else
+					trk = &thread->truncate_sleep;
+				/* Pause between truncate attempts */
+				(void)usleep(1000);
 				break;
+			}
 			goto op_err;
 		case WORKER_UPDATE:
 			if ((ret = cursor->search(cursor)) == 0) {

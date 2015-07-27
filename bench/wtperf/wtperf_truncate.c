@@ -117,7 +117,7 @@ err:	cursor->close(cursor);
 
 int
 run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
-    TRACK **trk, WT_CURSOR *cursor, WT_SESSION *session) {
+    WT_CURSOR *cursor, WT_SESSION *session, int *truncatedp) {
 
 	TRUNCATE_CONFIG *trunc_cfg;
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
@@ -127,6 +127,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	ret = 0;
 	trunc_cfg = &thread->trunc_cfg;
 
+	*truncatedp = 0;
 	/* Update the total inserts */
 	trunc_cfg->total_inserts = sum_insert_ops(cfg);
 	trunc_cfg->expected_total +=
@@ -134,11 +135,8 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	trunc_cfg->last_total_inserts = trunc_cfg->total_inserts;
 
 	/* We are done if there isn't enough data to trigger a new milestone. */
-	if (trunc_cfg->expected_total <= trunc_cfg->needed_stones) {
-		(void)usleep(1000);
-		*trk = &thread->truncate_sleep;
+	if (trunc_cfg->expected_total <= trunc_cfg->needed_stones)
 		return (0);
-	}
 
 	while (trunc_cfg->num_stones < trunc_cfg->needed_stones) {
 		trunc_cfg->last_key += trunc_cfg->stone_gap;
@@ -158,11 +156,8 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 
 	/* We are done if there isn't enough data to trigger a truncate. */
 	if (trunc_cfg->num_stones == 0 ||
-	    trunc_cfg->expected_total <= thread->workload->truncate_count) {
-		(void)usleep(1000);
-		*trk = &thread->truncate_sleep;
+	    trunc_cfg->expected_total <= thread->workload->truncate_count)
 		return (0);
-	}
 
 	truncate_item = STAILQ_FIRST(&cfg->stone_head);
 	trunc_cfg->num_stones--;
@@ -177,6 +172,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 		lprintf(cfg, ret, 0, "Truncate: failed");
 		return (ret);
 	}
+	*truncatedp = 1;
 	trunc_cfg->expected_total -= truncate_item->diff;
 	free(truncate_item->key);
 	free(truncate_item);

@@ -280,7 +280,7 @@ void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_print(CONFIG *);
 int	 enomem(const CONFIG *);
 int	 run_truncate(
-    CONFIG *, CONFIG_THREAD *, TRACK **, WT_CURSOR *, WT_SESSION *);
+    CONFIG *, CONFIG_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
 int	 setup_log_file(CONFIG *);
 int	 setup_truncate(CONFIG *, CONFIG_THREAD *, WT_SESSION *);
 uint64_t sum_ckpt_ops(CONFIG *);
