@@ -42,6 +42,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/config.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/platform/strnlen.h"
 
 namespace mongo {
 class BSONObj;

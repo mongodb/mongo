@@ -1841,6 +1841,9 @@ def doConfigure(myenv):
     if conf.CheckMemset_s():
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_MEMSET_S")
 
+    if conf.CheckFunc('strnlen'):
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_STRNLEN")
+
     conf.Finish()
 
     # If we are using libstdc++, check to see if we are using a libstdc++ that is older than

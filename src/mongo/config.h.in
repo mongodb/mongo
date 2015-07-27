@@ -67,6 +67,9 @@
 // Defined if std::make_unique is available
 @mongo_config_have_std_make_unique@
 
+// Defined if strnlen is available
+@mongo_config_have_strnlen@
+
 // Defined if building an optimized build
 @mongo_config_optimized_build@
 

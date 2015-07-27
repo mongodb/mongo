@@ -38,6 +38,7 @@
 
 #include "mongo/base/data_view.h"
 #include "mongo/platform/bits.h"
+#include "mongo/platform/strnlen.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 

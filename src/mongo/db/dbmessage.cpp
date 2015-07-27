@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/dbmessage.h"
+#include "mongo/platform/strnlen.h"
 
 namespace mongo {
 

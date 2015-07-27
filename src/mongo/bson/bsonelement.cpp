@@ -37,6 +37,7 @@
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_cursor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/strnlen.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
