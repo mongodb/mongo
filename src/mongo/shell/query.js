@@ -149,7 +149,7 @@ DBQuery.prototype._convertToCommand = function() {
         }
     }
 
-    if (this._query.orderby) {
+    if ("orderby" in this._query) {
         cmd["sort"] = this._query.orderby;
     }
 
@@ -157,43 +157,43 @@ DBQuery.prototype._convertToCommand = function() {
         cmd["projection"] = this._fields;
     }
 
-    if (this._query.$hint) {
+    if ("$hint" in this._query) {
         cmd["hint"] = this._query.$hint;
     }
 
-    if (this._query.$readPreference) {
+    if ("$readPreference" in this._query) {
        cmd["$readPreference"] = this._query.$readPreference;
     }
 
-    if (this._query.$comment) {
+    if ("$comment" in this._query) {
         cmd["comment"] = this._query.$comment;
     }
 
-    if (this._query.$maxScan) {
+    if ("$maxScan" in this._query) {
         cmd["maxScan"] = this._query.$maxScan;
     }
 
-    if (this._query.$maxTimeMS) {
+    if ("$maxTimeMS" in this._query) {
         cmd["maxTimeMS"] = this._query.$maxTimeMS;
     }
 
-    if (this._query.$max) {
+    if ("$max" in this._query) {
         cmd["max"] = this._query.$max;
     }
 
-    if (this._query.$min) {
+    if ("$min" in this._query) {
         cmd["min"] = this._query.$min;
     }
 
-    if (this._query.$returnKey) {
+    if ("$returnKey" in this._query) {
         cmd["returnKey"] = this._query.$returnKey;
     }
 
-    if (this._query.$showDiskLoc) {
+    if ("$showDiskLoc" in this._query) {
         cmd["showRecordId"] = this._query.$showDiskLoc;
     }
 
-    if (this._query.$snapshot) {
+    if ("$snapshot" in this._query) {
         cmd["snapshot"] = this._query.$snapshot;
     }
 
