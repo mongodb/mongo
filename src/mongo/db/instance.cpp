@@ -1009,6 +1009,25 @@ static void insertSystemIndexes(OperationContext* txn, DbMessage& d, CurOp& curO
     }
 }
 
+bool _receivedInsert(OperationContext* txn,
+                     const NamespaceString& nsString,
+                     const char* ns,
+                     vector<BSONObj>& docs,
+                     bool keepGoing,
+                     CurOp& op,
+                     bool checkCollection) {
+    // CONCURRENCY TODO: is being read locked in big log sufficient here?
+    // writelock is used to synchronize stepdowns w/ writes
+    uassert(
+        10058, "not master", repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString));
+
+    OldClientContext ctx(txn, ns);
+    if (checkCollection && !ctx.db()->getCollection(nsString))
+        return false;
+    insertMulti(txn, ctx, keepGoing, ns, docs, op);
+    return true;
+}
+
 void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Message& m, CurOp& op) {
     DbMessage d(m);
     const char* ns = d.getns();
@@ -1041,32 +1060,16 @@ void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Mess
         uassertStatusOK(status);
     }
 
-    const int notMasterCodeForInsert = 10058;  // This is different from ErrorCodes::NotMaster
+    const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
     {
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
         Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-        // CONCURRENCY TODO: is being read locked in big log sufficient here?
-        // writelock is used to synchronize stepdowns w/ writes
-        uassert(notMasterCodeForInsert,
-                "not master",
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString));
-
         // OldClientContext may implicitly create a database, so check existence
         if (dbHolder().get(txn, nsString.db()) != NULL) {
-            OldClientContext ctx(txn, ns);
-            if (ctx.db()->getCollection(nsString)) {
-                if (multi.size() > 1) {
-                    const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-                    insertMulti(txn, ctx, keepGoing, ns, multi, op);
-                } else {
-                    checkAndInsert(txn, ctx, ns, multi[0]);
-                    globalOpCounters.incInsertInWriteLock(1);
-                    op.debug().ninserted = 1;
-                }
+            if (_receivedInsert(txn, nsString, ns, multi, keepGoing, op, true))
                 return;
-            }
         }
     }
 
@@ -1074,22 +1077,7 @@ void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Mess
     ScopedTransaction transaction(txn, MODE_IX);
     Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_X);
 
-    // CONCURRENCY TODO: is being read locked in big log sufficient here?
-    // writelock is used to synchronize stepdowns w/ writes
-    uassert(notMasterCodeForInsert,
-            "not master",
-            repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString));
-
-    OldClientContext ctx(txn, ns);
-
-    if (multi.size() > 1) {
-        const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-        insertMulti(txn, ctx, keepGoing, ns, multi, op);
-    } else {
-        checkAndInsert(txn, ctx, ns, multi[0]);
-        globalOpCounters.incInsertInWriteLock(1);
-        op.debug().ninserted = 1;
-    }
+    _receivedInsert(txn, nsString, ns, multi, keepGoing, op, false);
 }
 
 static AtomicUInt32 shutdownInProgress(0);
