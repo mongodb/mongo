@@ -99,8 +99,8 @@ public:
                 continue;
             }
 
-            const auto shardHost = uassertStatusOK(
-                s->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
+            const auto shardHost = uassertStatusOK(s->getTargeter()->findHost(
+                {ReadPreference::PrimaryPreferred, TagSet::primaryOnly()}));
 
             BSONObj x = uassertStatusOK(
                 grid.shardRegistry()->runCommand(shardHost, "admin", BSON("listDatabases" << 1)));

@@ -46,7 +46,7 @@ StatusWith<long long> retrieveTotalShardSize(ShardId shardId, ShardRegistry* sha
     }
 
     auto shardHostStatus =
-        shard->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
+        shard->getTargeter()->findHost({ReadPreference::PrimaryPreferred, TagSet::primaryOnly()});
     if (!shardHostStatus.isOK()) {
         return shardHostStatus.getStatus();
     }
