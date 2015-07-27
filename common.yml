@@ -193,13 +193,17 @@ mongo_tools_variables:
 
 
 ## Common mongodb arguments
-  mongodb_arguments:
-    default: &mongodb_default_startup_args
-      mongodb_args: &default_startup_args_string " "
-    ssl: &mongodb_ssl_startup_args
-      mongodb_args: "--sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca.pem --sslPEMKeyFile common/db/openssl/testdata/server.pem "
-    auth: &mongodb_auth_startup_args
-      mongodb_args: &auth_startup_args_string "--auth "
+  mongod_arguments:
+    default: &mongod_default_startup_args
+      mongod_args: &mongod_default_startup_args_string "--port 33333"
+    ssl: &mongod_ssl_startup_args
+      mongod_args: "--port 33333 --sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca.pem --sslPEMKeyFile common/db/openssl/testdata/server.pem"
+
+  mongo_arguments:
+    default: &mongo_default_startup_args
+      mongo_args: &mongo_default_startup_args_string "--port 33333"
+    ssl: &mongo_ssl_startup_args
+      mongo_args: "--port 33333 --ssl --sslCAFile ./common/db/openssl/testdata/ca.pem --sslPEMKeyFile ./common/db/openssl/testdata/server.pem --sslAllowInvalidCertificates"
 
 functions:
 
@@ -376,12 +380,7 @@ functions:
         if [ "${create_mongod_users_command}" != "" ]; then
           export AUTH_USERNAME=${auth_username}
           export AUTH_PASSWORD=${auth_password}
-          if [ "${ssl_bv}" != "" ]
-          then
-            echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} --port 33333 --ssl --sslCAFile ./common/db/openssl/testdata/ca.pem --sslPEMKeyFile ./common/db/openssl/testdata/server.pem --sslAllowInvalidCertificates admin
-          else
-            echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} admin --port 33333
-          fi
+          echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} ${mongo_args} admin
         fi;
 
         for i in mongoimport mongoexport mongostat mongooplog mongorestore mongodump mongofiles; do
@@ -467,7 +466,7 @@ functions:
         rm -rf mongodb/${db_files_dir|db_files} mongodb/${logfile|run.log};
         mkdir mongodb/${db_files_dir|db_files};
         echo "Starting mongod...";
-        ./mongodb/mongod${extension} ${mongodb_args} --dbpath mongodb/db_files --port 33333 --setParameter=enableTestCommands=1
+        ./mongodb/mongod${extension} ${mongod_args} --dbpath mongodb/db_files --setParameter=enableTestCommands=1
 
   "wait for mongod to be ready":
     command: shell.exec
@@ -476,16 +475,21 @@ functions:
       script: |
         set -o verbose
         SECONDS=0
-        while ! ./mongodb/mongo${extension} --port 33333 </dev/null 2>/dev/null >/dev/null ; do
-            SECONDS=`expr $SECONDS + 1`
-            if [ $SECONDS -gt 20 ]; then
-                echo "mongod not ready after 20 seconds"
-                exit 1
+        while true ; do
+            ./mongodb/mongo${extension} ${mongo_args} </dev/null 2>/dev/null >/dev/null
+            if [ "$?" = "0" ]; then
+                echo "mongod ready";
+                exit 0
+            else
+                SECONDS=`expr $SECONDS + 1`
+                if [ $SECONDS -gt 20 ]; then
+                    echo "mongod not ready after 20 seconds"
+                    exit 1
+                fi
+                echo "waiting for mongod to be ready..." ;
+                sleep 1 ;
             fi
-            echo "waiting for mongod to be ready..." ;
-            sleep 1 ;
         done
-        echo "mongod ready";
 
   "upload tool":
     command: s3.put
@@ -566,8 +570,10 @@ tasks:
             value: "common/db"
           - key: "args"
             value: "-test.types=db"
-          - key: "mongodb_args"
-            value: *default_startup_args_string
+          - key: "mongod_args"
+            value: *mongod_default_startup_args_string
+          - key: "mongo_args"
+            value: *mongo_default_startup_args_string
     - func: "download mongod"
       vars:
         mongo_url: "${mongo30_url}"
@@ -689,8 +695,8 @@ tasks:
         updates:
           - key: "args"
             value: "-test.types=${integration_test_args},auth"
-          - key: "mongodb_args"
-            concat: *auth_startup_args_string
+          - key: "mongod_args"
+            concat: " --auth"
           - key: "auth_username"
             value: "passwordIsTaco"
           - key: "auth_password"
@@ -1234,7 +1240,8 @@ buildvariants:
   - osx-108
   expansions:
     <<: *mongo_url_osx108
-    <<: *mongodb_default_startup_args
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
     arch: "osx/x86_64"
     build_tags: -tags "ssl"
   tasks: *osx_108_tasks
@@ -1245,7 +1252,8 @@ buildvariants:
   - osx-108
   expansions:
     <<: *mongo_url_osx108
-    <<: *mongodb_ssl_startup_args
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
     arch: "osx/x86_64"
     build_tags: -tags "ssl"
     edition: ssl
@@ -1261,7 +1269,8 @@ buildvariants:
   - ubuntu1204-test
   expansions:
     <<: *mongo_url_ubuntu1204
-    <<: *mongodb_default_startup_args
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
     build_tags: -tags "ssl"
     arch: "linux/x86_64"
     integration_test_args: integration
@@ -1273,10 +1282,10 @@ buildvariants:
   - ubuntu1204-test
   expansions:
     <<: *mongo_url_ubuntu1204_enterprise
-    <<: *mongodb_ssl_startup_args
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
     build_tags: -tags "ssl"
     edition: ssl
-    ssl_bv: true
     arch: "linux/x86_64"
     smoke_use_ssl: --use-ssl
     integration_test_args: "integration,ssl"
@@ -1288,7 +1297,8 @@ buildvariants:
   - ubuntu1204-test
   expansions:
     <<: *mongo_url_ubuntu1204_enterprise
-    <<: *mongodb_default_startup_args
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
     build_tags: -tags "ssl sasl"
     smoke_use_ssl: --use-ssl
     arch: "linux/x86_64"
@@ -1306,7 +1316,8 @@ buildvariants:
   - solaris
   expansions:
     <<: *mongo_url_solaris
-    <<: *mongodb_default_startup_args
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
   tasks: *solaris_tasks
 
 #######################################
@@ -1318,7 +1329,8 @@ buildvariants:
   - windows-32
   expansions:
     <<: *mongo_url_windows32
-    <<: *mongodb_default_startup_args
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     integration_test_args: "integration"
@@ -1330,7 +1342,8 @@ buildvariants:
   - windows-64-vs2013-test
   expansions:
     <<: *mongo_url_windows64
-    <<: *mongodb_default_startup_args
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
     extension: .exe
     arch: "win32/x86_64"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
@@ -1343,11 +1356,11 @@ buildvariants:
   - windows-64-vs2013-compile
   expansions:
     <<: *mongo_url_windows64_enterprise
-    <<: *mongodb_ssl_startup_args
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
     build_tags: -tags "ssl"
     edition: ssl
     smoke_use_ssl: --use-ssl
-    ssl_bv: true
     extension: .exe
     arch: "win32/x86_64"
     library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
@@ -1361,6 +1374,8 @@ buildvariants:
   - windows-64-vs2013-compile
   expansions:
     <<: *mongo_url_windows64_enterprise
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
     build_tags: -tags "sasl ssl"
     smoke_use_ssl: --use-ssl
     edition: enterprise
@@ -1383,7 +1398,8 @@ buildvariants:
   - ubuntu1204-test
   expansions:
     <<: *mongo_url_ubuntu1204
-    <<: *mongodb_default_startup_args
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
     build_tags: -tags "ssl"
     arch: "linux/x86_64"
     args: "-race"
