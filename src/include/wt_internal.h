@@ -266,6 +266,8 @@ struct __wt_upd_skipped;
     typedef struct __wt_upd_skipped WT_UPD_SKIPPED;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
+union __wt_rand_state;
+    typedef union __wt_rand_state WT_RAND_STATE;
 /*
  * Forward type declarations for internal types: END
  * DO NOT EDIT: automatically built by dist/s_typedef.
