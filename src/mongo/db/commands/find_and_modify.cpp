@@ -344,6 +344,7 @@ public:
             maybeDisableValidation.emplace(txn);
 
         auto client = txn->getClient();
+        auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
 
         // We may encounter a WriteConflictException when creating a collection during an
         // upsert, even when holding the exclusive lock on the database (due to other load on
@@ -464,6 +465,11 @@ public:
             }
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "findAndModify", nsString.ns());
+
+        // No-ops need to reset lastOp in the client, for write concern.
+        if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
+            repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+        }
 
         WriteConcernResult res;
         auto waitForWCStatus = waitForWriteConcern(

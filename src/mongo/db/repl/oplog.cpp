@@ -167,7 +167,6 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
     }
 
     OpTime opTime(ts, term);
-    replCoord->setMyLastOptime(opTime);
     return std::pair<OpTime, long long>(opTime, hashNew);
 }
 
@@ -315,8 +314,11 @@ void _logOp(OperationContext* txn,
     BSONObj partial = b.done();
 
     OplogDocWriter writer(partial, obj);
+    // This transaction might roll back.
     checkOplogInsert(_localOplogCollection->insertDocument(txn, &writer, false));
 
+    // Set this only after we're sure the insert didn't abort and roll back.
+    replCoord->setMyLastOptime(slot.first);
     ReplClientInfo::forClient(txn->getClient()).setLastOp(slot.first);
 }
 

@@ -33,6 +33,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/decorable.h"
 
@@ -47,6 +48,13 @@ long long ReplClientInfo::getTerm() {
         _cachedTerm = getGlobalReplicationCoordinator()->getTerm();
     }
     return _cachedTerm;
+}
+
+void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* txn) {
+    ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(txn->getServiceContext());
+    if (replCoord->isReplEnabled()) {
+        setLastOp(replCoord->getMyLastOptime());
+    }
 }
 
 }  // namespace repl

@@ -46,6 +46,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
@@ -187,6 +188,8 @@ public:
         if (specs.size() == 0) {
             result.append("numIndexesAfter", numIndexesBefore);
             result.append("note", "all indexes already exist");
+            // No-ops need to reset lastOp in the client, for write concern.
+            repl::ReplClientInfo::forClient(txn->getClient()).setLastOpToSystemLastOpTime(txn);
             return true;
         }
 
@@ -309,6 +312,5 @@ private:
 
         return Status::OK();
     }
-
 } cmdCreateIndex;
 }

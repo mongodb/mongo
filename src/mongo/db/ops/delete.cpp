@@ -67,6 +67,10 @@ long long deleteObjects(OperationContext* txn,
     ParsedDelete parsedDelete(txn, &request);
     uassertStatusOK(parsedDelete.parseRequest());
 
+    // Replicated writes are disallowed with deleteObjects, as we are not properly setting
+    // lastOp for no-op deletes.
+    fassert(22001, !txn->writesAreReplicated());
+
     std::unique_ptr<PlanExecutor> exec =
         uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete));
 

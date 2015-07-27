@@ -76,6 +76,7 @@
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/service_context.h"
@@ -634,6 +635,8 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
     uassertStatusOK(userAllowedWriteNS(nsString));
     int flags = d.pullInt();
     BSONObj query = d.nextJsObj();
+    auto client = txn->getClient();
+    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
 
     verify(d.moreJSObjs());
     verify(query.objsize() < m.header().dataLen());
@@ -647,15 +650,14 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
 
     op.debug().query = query;
     {
-        stdx::lock_guard<Client> lk(*txn->getClient());
+        stdx::lock_guard<Client> lk(*client);
         op.setNS_inlock(nsString.ns());
         op.setQuery_inlock(query);
     }
 
-    Status status = AuthorizationSession::get(txn->getClient())
-                        ->checkAuthForUpdate(nsString, query, toupdate, upsert);
-    audit::logUpdateAuthzCheck(
-        txn->getClient(), nsString, query, toupdate, upsert, multi, status.code());
+    Status status =
+        AuthorizationSession::get(client)->checkAuthForUpdate(nsString, query, toupdate, upsert);
+    audit::logUpdateAuthzCheck(client, nsString, query, toupdate, upsert, multi, status.code());
     uassertStatusOK(status);
 
     UpdateRequest request(nsString);
@@ -695,8 +697,13 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
                 UpdateResult res = UpdateStage::makeUpdateResult(*exec, &op.debug());
 
                 // for getlasterror
-                LastError::get(txn->getClient())
-                    .recordUpdate(res.existing, res.numMatched, res.upserted);
+                LastError::get(client).recordUpdate(res.existing, res.numMatched, res.upserted);
+
+                // No-ops need to reset lastOp in the client, for write concern.
+                if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
+                    repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+                }
+
                 return;
             }
             break;
@@ -741,7 +748,12 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
         uassertStatusOK(exec->executePlan());
         UpdateResult res = UpdateStage::makeUpdateResult(*exec, &op.debug());
 
-        LastError::get(txn->getClient()).recordUpdate(res.existing, res.numMatched, res.upserted);
+        LastError::get(client).recordUpdate(res.existing, res.numMatched, res.upserted);
+
+        // No-ops need to reset lastOp in the client, for write concern.
+        if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
+            repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+        }
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "update", nsString.ns());
 }
@@ -755,16 +767,18 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
     verify(d.moreJSObjs());
     BSONObj pattern = d.nextJsObj();
 
+    auto client = txn->getClient();
+    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+
     op.debug().query = pattern;
     {
-        stdx::lock_guard<Client> lk(*txn->getClient());
+        stdx::lock_guard<Client> lk(*client);
         op.setQuery_inlock(pattern);
         op.setNS_inlock(nsString.ns());
     }
 
-    Status status =
-        AuthorizationSession::get(txn->getClient())->checkAuthForDelete(nsString, pattern);
-    audit::logDeleteAuthzCheck(txn->getClient(), nsString, pattern, status.code());
+    Status status = AuthorizationSession::get(client)->checkAuthForDelete(nsString, pattern);
+    audit::logDeleteAuthzCheck(client, nsString, pattern, status.code());
     uassertStatusOK(status);
 
     DeleteRequest request(nsString);
@@ -795,8 +809,13 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
             // Run the plan and get the number of docs deleted.
             uassertStatusOK(exec->executePlan());
             long long n = DeleteStage::getNumDeleted(*exec);
-            LastError::get(txn->getClient()).recordDelete(n);
+            LastError::get(client).recordDelete(n);
             op.debug().ndeleted = n;
+
+            // No-ops need to reset lastOp in the client, for write concern.
+            if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
+                repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+            }
 
             break;
         } catch (const WriteConflictException& dle) {

@@ -1144,6 +1144,9 @@ static void multiUpdate(OperationContext* txn,
     // Updates from the write commands path can yield.
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
+    auto client = txn->getClient();
+    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+
     int attempt = 0;
     bool createCollection = false;
     for (int fakeLoop = 0; fakeLoop < 1; fakeLoop++) {
@@ -1257,6 +1260,12 @@ static void multiUpdate(OperationContext* txn,
             result->getStats().nModified = didInsert ? 0 : numDocsModified;
             result->getStats().n = didInsert ? 1 : numMatched;
             result->getStats().upsertedID = resUpsertedID;
+
+            // No-ops need to reset lastOp in the client, for write concern.
+            if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
+                repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+            }
+
         } catch (const WriteConflictException& dle) {
             debug->writeConflicts++;
             if (isMulti) {
@@ -1303,6 +1312,9 @@ static void multiRemove(OperationContext* txn,
     // Deletes running through the write commands path can yield.
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
+    auto client = txn->getClient();
+    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+
     int attempt = 1;
     while (1) {
         try {
@@ -1340,6 +1352,11 @@ static void multiRemove(OperationContext* txn,
             // Execute the delete and retrieve the number deleted.
             uassertStatusOK(exec->executePlan());
             result->getStats().n = DeleteStage::getNumDeleted(*exec);
+
+            // No-ops need to reset lastOp in the client, for write concern.
+            if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
+                repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+            }
 
             break;
         } catch (const WriteConflictException& dle) {

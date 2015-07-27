@@ -36,6 +36,7 @@ namespace mongo {
 
 class BSONObjBuilder;
 class Client;
+class OperationContext;
 
 namespace repl {
 
@@ -67,6 +68,13 @@ public:
     // Stepping down will kill all user operations, so there is no write after stepping down
     // in the case of yielding.
     long long getTerm();
+
+    /**
+     * Use this to set the LastOp to the latest known OpTime in the oplog.
+     * This is necessary when doing no-op writes, as we need to set the client's lastOp to a proper
+     * value for write concern wait to work.
+     */
+    void setLastOpToSystemLastOpTime(OperationContext* txn);
 
 private:
     static const long long kUninitializedTerm = -1;
