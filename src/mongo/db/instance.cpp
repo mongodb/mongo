@@ -1017,9 +1017,8 @@ bool _receivedInsert(OperationContext* txn,
                      CurOp& op) {
     // CONCURRENCY TODO: is being read locked in big log sufficient here?
     // writelock is used to synchronize stepdowns w/ writes
-    uassert(10058,
-            "not master",
-            repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString));
+    uassert(
+        10058, "not master", repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString));
 
     OldClientContext ctx(txn, ns);
     if (!ctx.db()->getCollection(nsString))
