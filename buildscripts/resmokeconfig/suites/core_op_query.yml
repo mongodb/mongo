@@ -8,6 +8,7 @@ executor:
     config:
       shell_options:
         rpcProtocols: opQueryOnly
+        readMode: commands
     hooks:
     - class: CleanEveryN
       n: 20

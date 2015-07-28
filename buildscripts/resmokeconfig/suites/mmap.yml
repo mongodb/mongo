@@ -10,6 +10,7 @@ executor:
         global_vars:
           TestData:
             storageEngine: mmapv1
+        readMode: commands
     hooks:
     - class: CleanEveryN
       n: 20

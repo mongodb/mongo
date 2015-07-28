@@ -136,6 +136,9 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
     args.append("--eval")
     args.append(eval_str)
 
+    if config.SHELL_READ_MODE is not None:
+        kwargs["readMode"] = config.SHELL_READ_MODE
+
     if config.SHELL_WRITE_MODE is not None:
         kwargs["writeMode"] = config.SHELL_WRITE_MODE
 

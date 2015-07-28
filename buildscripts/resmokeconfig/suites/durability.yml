@@ -17,3 +17,4 @@ executor:
           TestData:
             storageEngine: mmapv1
         nodb: ''
+        readMode: commands

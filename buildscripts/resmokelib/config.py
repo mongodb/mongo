@@ -49,6 +49,7 @@ DEFAULTS = {
     "repeat": 1,
     "reportFile": None,
     "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
+    "shellReadMode": None,
     "shellWriteMode": None,
     "shuffle": False,
     "storageEngine": None,
@@ -114,6 +115,9 @@ REPEAT = None
 
 # If set, then resmoke.py will write out a report file with the status of each test that ran.
 REPORT_FILE = None
+
+# If set, then mongo shells started by resmoke.py will use the specified read mode.
+SHELL_READ_MODE = None
 
 # If set, then mongo shells started by resmoke.py will use the specified write mode.
 SHELL_WRITE_MODE = None

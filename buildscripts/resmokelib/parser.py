@@ -33,6 +33,7 @@ DEST_TO_CONFIG = {
     "repeat": "repeat",
     "report_file": "reportFile",
     "seed": "seed",
+    "shell_read_mode": "shellReadMode",
     "shell_write_mode": "shellWriteMode",
     "shuffle": "shuffle",
     "storage_engine": "storageEngine",
@@ -136,6 +137,10 @@ def parse_command_line():
                       help=("Seed for the random number generator. Useful in combination with the"
                             " --shuffle option for producing a consistent test execution order."))
 
+    parser.add_option("--shellReadMode", type="choice", action="store", dest="shell_read_mode",
+                      choices=("commands", "compatibility"), metavar="READ_MODE",
+                      help="The read mode used by the mongo shell.")
+
     parser.add_option("--shellWriteMode", type="choice", action="store", dest="shell_write_mode",
                       choices=("commands", "compatibility", "legacy"), metavar="WRITE_MODE",
                       help="The write mode used by the mongo shell.")
@@ -197,6 +202,7 @@ def update_config_vars(values):
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT = config.pop("repeat")
     _config.REPORT_FILE = config.pop("reportFile")
+    _config.SHELL_READ_MODE = config.pop("shellReadMode")
     _config.SHELL_WRITE_MODE = config.pop("shellWriteMode")
     _config.SHUFFLE = config.pop("shuffle")
     _config.STORAGE_ENGINE = config.pop("storageEngine")
