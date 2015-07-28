@@ -87,6 +87,11 @@ struct QueryPlannerParams {
         // Set this to prevent the planner from generating plans which answer a predicate
         // implicitly via exact index bounds for index intersection solutions.
         CANNOT_TRIM_IXISECT = 1 << 8,
+
+        // Set this if snapshot() should scan the _id index rather than performing a
+        // collection scan. The MMAPv1 storage engine sets this option since it cannot
+        // guarantee that a collection scan won't miss documents or return duplicates.
+        SNAPSHOT_USE_ID = 1 << 9,
     };
 
     // See Options enum above.

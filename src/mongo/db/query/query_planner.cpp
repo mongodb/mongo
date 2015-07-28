@@ -436,15 +436,16 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         LOG(5) << "Index " << i << " is " << params.indices[i].toString() << endl;
     }
 
-    bool canTableScan = !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
+    const bool canTableScan = !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
+    const bool isTailable = query.getParsed().isTailable();
 
     // If the query requests a tailable cursor, the only solution is a collscan + filter with
     // tailable set on the collscan.  TODO: This is a policy departure.  Previously I think you
     // could ask for a tailable cursor and it just tried to give you one.  Now, we fail if we
     // can't provide one.  Is this what we want?
-    if (query.getParsed().isTailable()) {
+    if (isTailable) {
         if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) && canTableScan) {
-            QuerySolution* soln = buildCollscanSoln(query, true, params);
+            QuerySolution* soln = buildCollscanSoln(query, isTailable, params);
             if (NULL != soln) {
                 out->push_back(soln);
             }
@@ -468,7 +469,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             // min/max are incompatible with $natural.
             if (canTableScan && query.getParsed().getMin().isEmpty() &&
                 query.getParsed().getMax().isEmpty()) {
-                QuerySolution* soln = buildCollscanSoln(query, false, params);
+                QuerySolution* soln = buildCollscanSoln(query, isTailable, params);
                 if (NULL != soln) {
                     out->push_back(soln);
                 }
@@ -497,14 +498,30 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         hintIndex = query.getParsed().getHint();
     }
 
-    // Snapshot is a form of a hint.  If snapshot is set, try to use _id index to make a real
-    // plan.  If that fails, just scan the _id index.
-    if (query.getParsed().isSnapshot()) {
-        // Find the ID index in indexKeyPatterns.  It's our hint.
-        for (size_t i = 0; i < params.indices.size(); ++i) {
-            if (isIdIndex(params.indices[i].keyPattern)) {
-                hintIndex = params.indices[i].keyPattern;
-                break;
+    // If snapshot is set, default to collscanning. If the query param SNAPSHOT_USE_ID is set,
+    // snapshot is a form of a hint, so try to use _id index to make a real plan. If that fails,
+    // just scan the _id index.
+    //
+    // Don't do this if the query is a geonear or text as as text search queries must be answered
+    // using full text indices and geoNear queries must be answered using geospatial indices.
+    if (query.getParsed().isSnapshot() &&
+        !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
+        !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
+        const bool useIXScan = params.options & QueryPlannerParams::SNAPSHOT_USE_ID;
+
+        if (!useIXScan) {
+            QuerySolution* soln = buildCollscanSoln(query, isTailable, params);
+            if (soln) {
+                out->push_back(soln);
+            }
+            return Status::OK();
+        } else {
+            // Find the ID index in indexKeyPatterns. It's our hint.
+            for (size_t i = 0; i < params.indices.size(); ++i) {
+                if (isIdIndex(params.indices[i].keyPattern)) {
+                    hintIndex = params.indices[i].keyPattern;
+                    break;
+                }
             }
         }
     }
@@ -893,7 +910,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     bool collscanNeeded = (0 == out->size() && canTableScan);
 
     if (possibleToCollscan && (collscanRequested || collscanNeeded)) {
-        QuerySolution* collscan = buildCollscanSoln(query, false, params);
+        QuerySolution* collscan = buildCollscanSoln(query, isTailable, params);
         if (NULL != collscan) {
             SolutionCacheData* scd = new SolutionCacheData();
             scd->solnType = SolutionCacheData::COLLSCAN_SOLN;

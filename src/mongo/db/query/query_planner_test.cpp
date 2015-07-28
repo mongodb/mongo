@@ -1196,9 +1196,29 @@ TEST_F(QueryPlannerTest, Snapshot) {
     runQuerySnapshot(fromjson("{a: {$gt: 0}}"));
 
     assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {filter: {a: {$gt: 0}}, dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, SnapshotUseId) {
+    params.options = QueryPlannerParams::SNAPSHOT_USE_ID;
+
+    addIndex(BSON("a" << 1));
+    runQuerySnapshot(fromjson("{a: {$gt: 0}}"));
+
+    assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {a:{$gt:0}}, node: "
         "{ixscan: {filter: null, pattern: {_id: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotSnapshotWithGeoNear) {
+    // Snapshot is skipped with geonear queries.
+    addIndex(BSON("a"
+                  << "2d"));
+    runQuerySnapshot(fromjson("{a: {$near: [0,0]}}"));
+
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists("{geoNear2d: {a: '2d'}}");
 }
 
 //

@@ -175,10 +175,8 @@ assert.commandWorked(explain);
 // .snapshot()
 explain = t.explain().find().snapshot().finish();
 assert.commandWorked(explain);
-assert(isIxscan(explain.queryPlanner.winningPlan));
 explain = t.find().snapshot().explain();
 assert.commandWorked(explain);
-assert(isIxscan(explain.queryPlanner.winningPlan));
 
 // .next()
 explain = t.explain().find().next();
