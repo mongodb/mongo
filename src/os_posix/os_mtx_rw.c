@@ -83,8 +83,8 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	nusers = (uint16_t)users + 1;
 	writers = l->s.writers;
 	old = (pad << 48) + (users << 32) + (users << 16) + writers;
-	new = (pad << 48) + ((uint64_t)nusers << 32) +
-	    ((uint64_t)nusers << 16) + writers;
+	/* Intentionally overflow (users + 1) into pad to handle 64K lockers. */
+	new = (pad << 48) + ((users + 1) << 32) + (nusers << 16) + writers;
 	return (WT_ATOMIC_CAS8(l->u, old, new) ? 0 : EBUSY);
 }
 
@@ -155,7 +155,6 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 	uint64_t old, new, pad, readers, users;
-	uint16_t nusers;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: try_writelock %s", rwlock->name));
@@ -165,9 +164,9 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	pad = l->s.pad;
 	readers = l->s.readers;
 	users = l->s.users;
-	nusers = (uint16_t)users + 1;
 	old = (pad << 48) + (users << 32) + (readers << 16) + users;
-	new = (pad << 48) + ((uint64_t)nusers << 32) + (readers << 16) + users;
+	/* Intentionally overflow (users + 1) into pad to handle 64K lockers. */
+	new = (pad << 48) + ((users + 1) << 32) + (readers << 16) + users;
 	return (WT_ATOMIC_CAS8(l->u, old, new) ? 0 : EBUSY);
 }
 
