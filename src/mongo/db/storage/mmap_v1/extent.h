@@ -42,7 +42,8 @@ namespace mongo {
 /* extents are datafile regions where all the records within the region
    belong to the same namespace.
 
-(11:12:35 AM) dm10gen: when the extent is allocated, all its empty space is stuck into one big DeletedRecord
+(11:12:35 AM) dm10gen: when the extent is allocated, all its empty space is stuck into one big
+    DeletedRecord
 (11:12:55 AM) dm10gen: and that is placed on the free list
 */
 #pragma pack(1)

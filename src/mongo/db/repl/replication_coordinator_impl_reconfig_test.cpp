@@ -521,7 +521,7 @@ TEST_F(ReplCoordTest, ReconfigDuringHBReconfigFails) {
 //         net->exitNetwork();
 //         stopCapturingLogMessages();
 //         ASSERT_EQUALS(1,
-//                 countLogLinesContaining("because already in the midst of a configuration process"));
+//             countLogLinesContaining("because already in the midst of a configuration process"));
 //         reconfigThread.join();
 //         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
 //     }

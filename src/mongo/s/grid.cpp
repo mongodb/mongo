@@ -294,8 +294,8 @@ bool Grid::addShard(string* name,
             }
         }
 
-        // if the shard is part of a replica set, make sure all the hosts mentioned in 'servers' are part of
-        // the set. It is fine if not all members of the set are present in 'servers'.
+        // if the shard is part of a replica set, make sure all the hosts mentioned in 'servers' are
+        // part of the set. It is fine if not all members of the set are present in 'servers'.
         bool foundAll = true;
         string offendingHost;
         if (!commandSetName.empty()) {
@@ -343,9 +343,9 @@ bool Grid::addShard(string* name,
         if (name->empty() && !setName.empty())
             *name = setName;
 
-        // In order to be accepted as a new shard, that mongod must not have any database name that exists already
-        // in any other shards. If that test passes, the new shard's databases are going to be entered as
-        // non-sharded db's whose primary is the newly added shard.
+        // In order to be accepted as a new shard, that mongod must not have any database name that
+        // exists already in any other shards. If that test passes, the new shard's databases are
+        // going to be entered as non-sharded db's whose primary is the newly added shard.
 
         BSONObj resListDB;
         ok = newShardConn->runCommand("admin", BSON("listDatabases" << 1), resListDB);
@@ -491,8 +491,8 @@ bool Grid::_getNewShardName(string* name) const {
 }
 
 /*
- * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a particular
- * collection.
+ * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a
+ * particular collection.
  */
 
 bool Grid::shouldBalance(const SettingsType& balancerSettings) const {

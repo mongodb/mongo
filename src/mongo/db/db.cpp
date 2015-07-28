@@ -144,7 +144,8 @@ Timer startupSrandTimer;
 QueryResult::View emptyMoreResult(long long);
 
 
-/* todo: make this a real test.  the stuff in dbtests/ seem to do all dbdirectclient which exhaust doesn't support yet. */
+/* todo: make this a real test.  the stuff in dbtests/ seem to do all
+ * dbdirectclient which exhaust doesn't support yet. */
 // QueryOption_Exhaust
 #define TESTEXHAUST 0
 #if (TESTEXHAUST)

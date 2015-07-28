@@ -58,7 +58,8 @@ public:
     using DBClientBase::update;
     using DBClientBase::remove;
 
-    /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
+    /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet
+     * connections. */
     DBClientReplicaSet(const std::string& name,
                        const std::vector<HostAndPort>& servers,
                        double so_timeout = 0);
@@ -137,7 +138,8 @@ public:
                                bool* retry = NULL,
                                std::string* targetHost = NULL);
 
-    /* this is the callback from our underlying connections to notify us that we got a "not master" error.
+    /* this is the callback from our underlying connections to notify us that we got a "not master"
+     * error.
      */
     void isntMaster();
 

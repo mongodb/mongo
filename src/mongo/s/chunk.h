@@ -157,7 +157,8 @@ public:
     bool splitIfShould(long dataWritten) const;
 
     /**
-     * Splits this chunk at a non-specificed split key to be chosen by the mongod holding this chunk.
+     * Splits this chunk at a non-specificed split key to be chosen by the mongod holding this
+     * chunk.
      *
      * @param mode
      * @param res the object containing details about the split execution
@@ -316,7 +317,8 @@ private:
      */
     void determineSplitPoints(bool atMedian, std::vector<BSONObj>* splitPoints) const;
 
-    /** initializes _dataWritten with a random value so that a mongos restart wouldn't cause delay in splitting */
+    /** initializes _dataWritten with a random value so that a mongos restart wouldn't cause delay
+     * in splitting */
     static int mkDataWritten();
 };
 
@@ -440,7 +442,8 @@ public:
     }
 
     /**
-     * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
+     * this is just an increasing number of how many ChunkManagers we have so we know if something
+     * has been updated
      */
     unsigned long long getSequenceNumber() const {
         return _sequenceNumber;

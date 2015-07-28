@@ -654,7 +654,8 @@ public:
             }
         }
 
-        // result.appendNumber( "collections" , ncollections ); //TODO: need to find a good way to get this
+        // result.appendNumber( "collections" , ncollections ); //TODO: need to find a good way to
+        // get this
         output.appendNumber("objects", objects);
         /* avgObjSize on mongod is not scaled based on the argument to db.stats(), so we use
          * unscaledDataSize here for consistency.  See SERVER-7347. */
@@ -1735,7 +1736,8 @@ public:
             verify(0);
         }
 
-        // We could support arbitrary shard keys by sending commands to all shards but I don't think we should
+        // We could support arbitrary shard keys by sending commands to all shards but I don't think
+        // we should
         errmsg =
             "GridFS fs.chunks collection must be sharded on either {files_id:1} or {files_id:1, "
             "n:1}";
@@ -2037,7 +2039,8 @@ public:
             uassert(15920,
                     "Cannot output to a non-sharded collection, a sharded collection exists",
                     !confOut->isSharded(finalColLong));
-        // should we also prevent going from non-sharded to sharded? during the transition client may see partial data
+        // should we also prevent going from non-sharded to sharded? during the transition client
+        // may see partial data
 
         long long maxChunkSizeBytes = 0;
         if (shardedOutput) {
@@ -2102,14 +2105,15 @@ public:
                         dlk = dist_lock_try( &lockSetup , (string)"mr-parallel" );
                         if ( ! dlk.got() ) {
                             if ( ++tryc % 100 == 0 )
-                                warning() << "the collection metadata could not be locked for mapreduce, already locked by " << dlk.other() << endl;
-                            sleepmillis(100);
+                                warning() << "the collection metadata could not be locked for
+                                mapreduce, already locked by " << dlk.other() << endl;
+                                sleepmillis(100);
                         }
                     }
                 }
                 catch( LockException& e ){
-                    errmsg = str::stream() << "error locking distributed lock for mapreduce " << causedBy( e );
-                    return false;
+                    errmsg = str::stream() << "error locking distributed lock for mapreduce " <<
+                    causedBy( e ); return false;
                 }
             }
             */

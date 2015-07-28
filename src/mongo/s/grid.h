@@ -155,7 +155,8 @@ public:
     /**
      * @param balancerDoc bson that may contain a window of time for the balancer to work
      *        format { ... , activeWindow: { start: "8:30" , stop: "19:00" } , ... }
-     * @return true if there is no window of time specified for the balancer or it we're currently in it
+     * @return true if there is no window of time specified for the balancer or it we're currently
+     * in it
      */
     static bool _inBalancingWindow(const BSONObj& balancerDoc, const boost::posix_time::ptime& now);
 

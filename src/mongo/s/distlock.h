@@ -137,12 +137,13 @@ public:
     static LastPings lastPings;
 
     /**
-     * The constructor does not connect to the configdb yet and constructing does not mean the lock was acquired.
-     * Construction does trigger a lock "pinging" mechanism, though.
+     * The constructor does not connect to the configdb yet and constructing does not mean the lock
+     * was acquired. Construction does trigger a lock "pinging" mechanism, though.
      *
      * @param conn address of config(s) server(s)
      * @param name identifier for the lock
-     * @param lockTimeout how long can the log go "unpinged" before a new attempt to lock steals it (in minutes).
+     * @param lockTimeout how long can the log go "unpinged" before a new attempt to lock steals it
+     *      (in minutes).
      * @param lockPing how long to wait between lock pings
      * @param legacy use legacy logic
      *
@@ -154,13 +155,14 @@ public:
     ~DistributedLock(){};
 
     /**
-     * Attempts to acquire 'this' lock, checking if it could or should be stolen from the previous holder. Please
-     * consider using the dist_lock_try construct to acquire this lock in an exception safe way.
+     * Attempts to acquire 'this' lock, checking if it could or should be stolen from the previous
+     * holder. Please consider using the dist_lock_try construct to acquire this lock in an
+     * exception safe way.
      *
      * @param why human readable description of why the lock is being taken (used to log)
      * @param whether this is a lock re-entry or a new lock
-     * @param other configdb's lock document that is currently holding the lock, if lock is taken, or our own lock
-     * details if not
+     * @param other configdb's lock document that is currently holding the lock, if lock is taken,
+     * or our own lock details if not
      * @return true if it managed to grab the lock
      */
     bool lock_try(const std::string& why,

@@ -758,7 +758,8 @@ void State::init() {
     _scope->invoke(init, 0, 0, 0, true);
 
     // js function to run reduce on all keys
-    // redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key); list = hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
+    // redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key); list =
+    // hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
     _reduceAll = _scope->createFunction(
         "var map = _mrMap;"
         "var list, ret;"
@@ -1570,7 +1571,8 @@ public:
         }
 
         // fetch result from other shards 1 chunk at a time
-        // it would be better to do just one big $or query, but then the sorting would not be efficient
+        // it would be better to do just one big $or query, but then the sorting would not be
+        // efficient
         string shardName = shardingState.getShardName();
         DBConfigPtr confOut = grid.getDBConfig(dbname, false);
 

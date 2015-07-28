@@ -180,9 +180,9 @@ public:
 };
 
 //
-// Tests creating a new chunk manager with random split points.  Creating chunks on multiple shards is not
-// tested here since there are unresolved race conditions there and probably should be avoided if at all
-// possible.
+// Tests creating a new chunk manager with random split points.  Creating chunks on multiple shards
+// is not tested here since there are unresolved race conditions there and probably should be
+// avoided if at all possible.
 //
 class ChunkManagerCreateFullTest : public ChunkManagerTest {
 public:
@@ -224,7 +224,8 @@ public:
         set<int> minorVersions;
         OID epoch;
 
-        // Check that all chunks were created with version 1|x with consistent epoch and unique minor versions
+        // Check that all chunks were created with version 1|x with consistent epoch and unique
+        // minor versions
         while (cursor->more()) {
             BSONObj chunk = cursor->next();
 
@@ -246,8 +247,8 @@ public:
 };
 
 //
-// Tests that chunks are loaded correctly from the db with no a-priori info and also that they can be reloaded
-// on top of an old chunk manager with changes.
+// Tests that chunks are loaded correctly from the db with no a-priori info and also that they can
+// be reloaded on top of an old chunk manager with changes.
 //
 class ChunkManagerLoadBasicTest : public ChunkManagerCreateFullTest {
 public:
@@ -355,7 +356,8 @@ public:
         }
     };
 
-    // Allow validating with and without ranges (b/c our splits won't actually be updated by the diffs)
+    // Allow validating with and without ranges (b/c our splits won't actually be updated by the
+    // diffs)
     void validate(BSONArray chunks, ChunkVersion maxVersion, const VersionMap& maxShardVersions) {
         validate(chunks, NULL, maxVersion, maxShardVersions);
     }
@@ -386,7 +388,8 @@ public:
             chunkCount++;
 
             if (ranges != NULL) {
-                // log() << "Validating chunk " << chunkDoc << " size : " << ranges->size() << " vs " << chunkCount << endl;
+                // log() << "Validating chunk " << chunkDoc << " size : " << ranges->size() << " vs
+                // " << chunkCount << endl;
 
                 RangeMap::iterator chunkRange =
                     ranges->find(_inverse ? chunkDoc["max"].Obj() : chunkDoc["min"].Obj());
@@ -586,7 +589,8 @@ public:
                             chunk[ChunkType::shard()].String())
                             break;
 
-                        // log() << "... appending chunk from diff shard: " << prevShardChunk << endl;
+                        // log() << "... appending chunk from diff shard: " << prevShardChunk <<
+                        // endl;
                         newChunksB.append(prevShardChunk);
 
                         prevShardChunk = BSONObj();
@@ -616,7 +620,8 @@ public:
                         BSONObj newShard = newShardB.obj();
                         BSONObj prevShard = prevShardB.obj();
 
-                        // log() << " ... migrated to " << newShard << " and updated " << prevShard << endl;
+                        // log() << " ... migrated to " << newShard << " and updated " << prevShard
+                        // << endl;
 
                         newChunksB.append(newShard);
                         newChunksB.append(prevShard);

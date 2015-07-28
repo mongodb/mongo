@@ -85,7 +85,8 @@ struct ptr {
         _p = p.get();
         return *this;
     }
-    // template<typename U> ptr& operator= (const std::auto_ptr<U>& p) { _p = p.get(); return *this; }
+    // template<typename U> ptr& operator= (const std::auto_ptr<U>& p) { _p = p.get(); return *this;
+    // }
 
     // use
     T* operator->() const {

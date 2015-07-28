@@ -248,7 +248,8 @@ ChunkManagerPtr DBConfig::shardCollection(const string& ns,
     }
 
     // Tell the primary mongod to refresh it's data
-    // TODO:  Think the real fix here is for mongos to just assume all collections sharded, when we get there
+    // TODO:  Think the real fix here is for mongos to just assume all collections sharded, when we
+    // get there
     for (int i = 0; i < 4; i++) {
         if (i == 3) {
             warning() << "too many tries updating initial version of " << ns << " on shard primary "
@@ -308,8 +309,8 @@ void DBConfig::getChunkManagerOrPrimary(const string& ns,
                                         ChunkManagerPtr& manager,
                                         ShardPtr& primary) {
     // The logic here is basically that at any time, our collection can become sharded or unsharded
-    // via a command.  If we're not sharded, we want to send data to the primary, if sharded, we want
-    // to send data to the correct chunks, and we can't check both w/o the lock.
+    // via a command.  If we're not sharded, we want to send data to the primary, if sharded, we
+    // want to send data to the correct chunks, and we can't check both w/o the lock.
 
     manager.reset();
     primary.reset();
@@ -326,9 +327,10 @@ void DBConfig::getChunkManagerOrPrimary(const string& ns,
         } else {
             CollectionInfo& cInfo = i->second;
 
-            // TODO: we need to be careful about handling shardingEnabled, b/c in some places we seem to use and
-            // some we don't.  If we use this function in combination with just getChunkManager() on a slightly
-            // borked config db, we'll get lots of staleconfig retries
+            // TODO: we need to be careful about handling shardingEnabled, b/c in some places we
+            // seem to use and some we don't.  If we use this function in combination with just
+            // getChunkManager() on a slightly borked config db, we'll get lots of staleconfig
+            // retries
             if (_shardingEnabled && cInfo.isSharded()) {
                 manager = cInfo.getCM();
             } else {
@@ -388,7 +390,8 @@ ChunkManagerPtr DBConfig::getChunkManager(const string& ns, bool shouldReload, b
     verify(!key.isEmpty());
 
     // TODO: We need to keep this first one-chunk check in until we have a more efficient way of
-    // creating/reusing a chunk manager, as doing so requires copying the full set of chunks currently
+    // creating/reusing a chunk manager, as doing so requires copying the full set of chunks
+    // currently
 
     BSONObj newest;
     if (oldVersion.isSet() && !forceReload) {
@@ -470,9 +473,9 @@ ChunkManagerPtr DBConfig::getChunkManager(const string& ns, bool shouldReload, b
 
     //
     // LEGACY BEHAVIOR
-    // It's possible to get into a state when dropping collections when our new version is less than our prev
-    // version.  Behave identically to legacy mongos, for now, and warn to draw attention to the problem.
-    // TODO: Assert in next version, to allow smooth upgrades
+    // It's possible to get into a state when dropping collections when our new version is less than
+    // our prev version.  Behave identically to legacy mongos, for now, and warn to draw attention
+    // to the problem. TODO: Assert in next version, to allow smooth upgrades
     //
 
     if (shouldReset && temp->getVersion() < ci.getCM()->getVersion()) {
@@ -512,9 +515,10 @@ void DBConfig::unserialize(const BSONObj& from) {
     _shardingEnabled = from.getBoolField(DatabaseType::DEPRECATED_partitioned().c_str());
     _primary.reset(from.getStringField(DatabaseType::primary().c_str()));
 
-    // In the 1.5.x series, we used to have collection metadata nested in the database entry. The 1.6.x series
-    // had migration code that ported that info to where it belongs now: the 'collections' collection. We now
-    // just assert that we're not migrating from a 1.5.x directly into a 1.7.x without first converting.
+    // In the 1.5.x series, we used to have collection metadata nested in the database entry. The
+    // 1.6.x series had migration code that ported that info to where it belongs now: the
+    // 'collections' collection. We now just assert that we're not migrating from a 1.5.x directly
+    // into a 1.7.x without first converting.
     BSONObj sharded = from.getObjectField(DatabaseType::DEPRECATED_sharded().c_str());
     if (!sharded.isEmpty())
         uasserted(
@@ -1241,7 +1245,8 @@ void ConfigServer::logChange(const string& what, const string& ns, const BSONObj
     }
 
     catch (std::exception& e) {
-        // if we got here, it means the config change is only in the log; it didn't make it to config.changelog
+        // if we got here, it means the config change is only in the log; it didn't make it to
+        // config.changelog
         log() << "not logging config change: " << changeID << " " << e.what() << endl;
     }
 }

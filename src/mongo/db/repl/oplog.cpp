@@ -510,7 +510,8 @@ void createOplog(OperationContext* txn) {
 // -------------------------------------
 
 /** @param fromRepl false if from ApplyOpsCmd
-    @return true if was and update should have happened and the document DNE.  see replset initial sync code.
+    @return true if was and update should have happened and the document DNE.
+    see replset initial sync code.
  */
 bool applyOperation_inlock(OperationContext* txn,
                            Database* db,
@@ -602,8 +603,8 @@ bool applyOperation_inlock(OperationContext* txn,
                         << "warning, repl doing slow updates (no _id field) for " << ns << endl;
                 }
             } else {
-                /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
-                          then.  very few upserts will not be inserts...
+                /* todo : it may be better to do an insert here, and then catch the dup key
+                 * exception and do update then.  very few upserts will not be inserts...
                           */
                 BSONObjBuilder b;
                 b.append(_id);
@@ -648,8 +649,8 @@ bool applyOperation_inlock(OperationContext* txn,
                     log() << "replication failed to apply update: " << op.toString() << endl;
                 }
                 // need to check to see if it isn't present so we can set failedUpdate correctly.
-                // note that adds some overhead for this extra check in some cases, such as an updateCriteria
-                // of the form
+                // note that adds some overhead for this extra check in some cases, such as an
+                // updateCriteria of the form
                 //   { _id:..., { x : {$size:...} }
                 // thus this is not ideal.
                 else {
@@ -663,8 +664,8 @@ bool applyOperation_inlock(OperationContext* txn,
                         log() << "replication couldn't find doc: " << op.toString() << endl;
                     }
 
-                    // Otherwise, it's present; zero objects were updated because of additional specifiers
-                    // in the query for idempotence
+                    // Otherwise, it's present; zero objects were updated because of additional
+                    // specifiers in the query for idempotence
                 }
             } else {
                 // this could happen benignly on an oplog duplicate replay of an upsert

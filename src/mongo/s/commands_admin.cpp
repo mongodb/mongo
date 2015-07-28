@@ -1311,7 +1311,8 @@ public:
     }
 } listShardsCmd;
 
-/* a shard is a single mongod server or a replica pair.  add it (them) to the cluster as a storage partition. */
+/* a shard is a single mongod server or a replica pair.  add it (them) to the cluster as a storage
+ * partition. */
 class AddShard : public GridAdminCmd {
 public:
     AddShard() : GridAdminCmd("addShard") {}
@@ -1342,7 +1343,8 @@ public:
             return false;
         }
 
-        // using localhost in server names implies every other process must use localhost addresses too
+        // using localhost in server names implies every other process must use localhost addresses
+        // too
         vector<HostAndPort> serverAddrs = servers.getServers();
         for (size_t i = 0; i < serverAddrs.size(); i++) {
             if (serverAddrs[i].isLocalHost() != grid.allowLocalHost()) {

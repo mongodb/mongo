@@ -282,8 +282,9 @@ public:
              BSONObjBuilder& result,
              bool fromRepl) {
         //
-        // 1.a We'll parse the parameters in two steps. First, make sure the we can use the split index to get
-        //     a good approximation of the size of the chunk -- without needing to access the actual data.
+        // 1.a We'll parse the parameters in two steps. First, make sure the we
+        // can use the split index to get a good approximation of the size of
+        // the chunk -- without needing to access the actual data.
         //
 
         const std::string ns = parseNs(dbname, jsobj);
@@ -294,7 +295,8 @@ public:
             return false;
         }
 
-        // If min and max are not provided use the "minKey" and "maxKey" for the sharding key pattern.
+        // If min and max are not provided use the "minKey" and "maxKey" for
+        // the sharding key pattern.
         BSONObj min = jsobj.getObjectField("min");
         BSONObj max = jsobj.getObjectField("max");
         if (min.isEmpty() != max.isEmpty()) {
@@ -350,12 +352,12 @@ public:
             const long long dataSize = collection->dataSize(txn);
 
             //
-            // 1.b Now that we have the size estimate, go over the remaining parameters and apply any maximum size
-            //     restrictions specified there.
+            // 1.b Now that we have the size estimate, go over the remaining parameters and apply
+            // any maximum size restrictions specified there.
             //
 
-            // 'force'-ing a split is equivalent to having maxChunkSize be the size of the current chunk, i.e., the
-            // logic below will split that chunk in half
+            // 'force'-ing a split is equivalent to having maxChunkSize be the size of the current
+            // chunk, i.e., the logic below will split that chunk in half
             long long maxChunkSize = 0;
             bool forceMedianSplit = false;
             {
@@ -377,8 +379,8 @@ public:
                     }
                 }
 
-                // We need a maximum size for the chunk, unless we're not actually capable of finding any
-                // split points.
+                // We need a maximum size for the chunk, unless we're not actually capable of
+                // finding any split points.
                 if (maxChunkSize <= 0 && recCount != 0) {
                     errmsg =
                         "need to specify the desired max chunk size (maxChunkSize or "
@@ -398,9 +400,9 @@ public:
             log() << "request split points lookup for chunk " << ns << " " << min << " -->> " << max
                   << endl;
 
-            // We'll use the average object size and number of object to find approximately how many keys
-            // each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects, if
-            // provided.
+            // We'll use the average object size and number of object to find approximately how many
+            // keys each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects,
+            // if provided.
             const long long avgRecSize = dataSize / recCount;
             long long keyCount = maxChunkSize / (2 * avgRecSize);
             if (maxChunkObjects && (maxChunkObjects < keyCount)) {
@@ -429,9 +431,9 @@ public:
                 return false;
             }
 
-            // Use every 'keyCount'-th key as a split point. We add the initial key as a sentinel, to be removed
-            // at the end. If a key appears more times than entries allowed on a chunk, we issue a warning and
-            // split on the following key.
+            // Use every 'keyCount'-th key as a split point. We add the initial key as a sentinel,
+            // to be removed at the end. If a key appears more times than entries allowed on a
+            // chunk, we issue a warning and split on the following key.
             set<BSONObj> tooFrequentKeys;
             splitKeys.push_back(
                 prettyKey(idx->keyPattern(), currKey.getOwned()).extractFields(keyPattern));
@@ -444,7 +446,8 @@ public:
                     if (currCount > keyCount && !forceMedianSplit) {
                         currKey = prettyKey(idx->keyPattern(), currKey.getOwned())
                                       .extractFields(keyPattern);
-                        // Do not use this split key if it is the same used in the previous split point.
+                        // Do not use this split key if it is the same used in the previous split
+                        // point.
                         if (currKey.woCompare(splitKeys.back()) == 0) {
                             tooFrequentKeys.insert(currKey.getOwned());
                         } else {
@@ -488,8 +491,8 @@ public:
             }
 
             //
-            // 3. Format the result and issue any warnings about the data we gathered while traversing the
-            //    index
+            // 3. Format the result and issue any warnings about the data we gathered while
+            // traversing the index
             //
 
             // Warn for keys that are more numerous than maxChunkSize allows.
@@ -720,7 +723,8 @@ public:
         log() << "splitChunk accepted at version " << shardVersion;
 
         //
-        // 3. create the batch of updates to metadata ( the new chunks ) to be applied via 'applyOps' command
+        // 3. create the batch of updates to metadata ( the new chunks ) to be applied via
+        // 'applyOps' command
         //
 
         BSONObjBuilder logDetail;

@@ -48,8 +48,8 @@ public:
     virtual void reply(
         Message& received,
         Message& response,
-        MSGID
-            responseTo) = 0;  // like the reply below, but doesn't rely on received.data still being available
+        // like the reply below, but doesn't rely on received.data still being available
+        MSGID responseTo) = 0;
     virtual void reply(Message& received, Message& response) = 0;
 
     virtual HostAndPort remote() const = 0;

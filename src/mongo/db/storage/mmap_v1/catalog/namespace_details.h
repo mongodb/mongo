@@ -97,8 +97,8 @@ public:
     DiskLoc capExtent;  // the "current" extent we're writing too for a capped collection
     DiskLoc capFirstNewRecord;
 
-    unsigned short
-        _dataFileVersion;  // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
+    // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
+    unsigned short _dataFileVersion;
     unsigned short _indexFileVersion;
 
     unsigned long long multiKeyIndexBits;

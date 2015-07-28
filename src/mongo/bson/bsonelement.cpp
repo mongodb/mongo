@@ -841,7 +841,8 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
         case Bool:
             return *l.value() - *r.value();
         case Timestamp:
-            // unsigned compare for timestamps - note they are not really dates but (ordinal + time_t)
+            // unsigned compare for timestamps - note they are not really dates
+            // but (ordinal + time_t)
             if (l.date() < r.date())
                 return -1;
             return l.date() == r.date() ? 0 : 1;

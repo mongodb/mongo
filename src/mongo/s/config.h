@@ -215,8 +215,10 @@ protected:
     Shard _primary;     // e.g. localhost , mongo.foo.com:9999
     bool _shardingEnabled;
 
-    // map<std::string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
-    // map<std::string,ChunkManagerPtr> _shards; // this will only have entries for things that have been looked at
+    // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
+    // map<std::string,CollectionInfo> _sharded;
+    // this will only have entries for things that have been looked at
+    // map<std::string,ChunkManagerPtr> _shards;
 
     Collections _collections;
 

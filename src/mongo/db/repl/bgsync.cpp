@@ -405,7 +405,8 @@ bool BackgroundSync::_rollbackIfNeeded(OperationContext* txn, OplogReader& r) {
                 syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
                 return true;
             }
-            /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
+            /* we're not ahead?  maybe our new query got fresher data.  best to come back and try
+             * again */
             log() << "replSet syncTail condition 1";
             sleepsecs(1);
         } catch (DBException& e) {

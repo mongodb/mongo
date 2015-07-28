@@ -124,7 +124,8 @@ public:
     template <class F>
     static void forEach(F fun);
 
-    /** note: you need to be in mmmutex when using this. forEach (above) handles that for you automatically.
+    /** note: you need to be in mmmutex when using this. forEach (above) handles that for you
+     * automatically.
 */
     static std::set<MongoFile*>& getAllFiles();
 

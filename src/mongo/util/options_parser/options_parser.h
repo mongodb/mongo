@@ -108,7 +108,8 @@ private:
                             const std::vector<std::string>& argv,
                             Environment*);
 
-    /** Handles parsing of an INI config std::string and adds the results to the given Environment */
+    /** Handles parsing of an INI config std::string and adds the results to the given Environment
+     * */
     Status parseINIConfigFile(const OptionSection&, const std::string& config, Environment*);
 
     /** Gets defaults from the OptionSection and adds them to the given Environment */

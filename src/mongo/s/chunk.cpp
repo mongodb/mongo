@@ -598,13 +598,15 @@ bool Chunk::splitIfShould(long dataWritten) const {
         Status status = split(Chunk::autoSplitInternal, &splitCount, &res);
         if (!status.isOK()) {
             // split would have issued a message if we got here
-            _dataWritten =
-                0;  // this means there wasn't enough data to split, so don't want to try again until considerable more data
+            // this means there wasn't enough data to split, so don't want to
+            // try again until considerable more data
+            _dataWritten = 0;
             return false;
         }
 
         if (maxIsInf() || minIsInf()) {
-            // we don't want to reset _dataWritten since we kind of want to check the other side right away
+            // we don't want to reset _dataWritten since we kind of want to
+            // check the other side right away
         } else {
             _dataWritten = 0;  // we're splitting, so should wait a bit
         }
@@ -798,9 +800,9 @@ ChunkManager::ChunkManager(const BSONObj& collDoc)
       _unique(collDoc[CollectionType::unique()].trueValue()),
       _chunkRanges(),
       _mutex("ChunkManager"),
-      // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
-      // Increasing this number here will prompt checkShardVersion() to refresh the connection-level versions to
-      // the most up to date value.
+      // The shard versioning mechanism hinges on keeping track of the number of times we reloaded
+      // ChunkManager's. Increasing this number here will prompt checkShardVersion() to refresh the
+      // connection-level versions to the most up to date value.
       _sequenceNumber(NextSequenceNumber.addAndFetch(1)) {
     //
     // Sets up a chunk manager from an existing sharded collection document
@@ -1587,8 +1589,8 @@ int ChunkManager::getCurrentDesiredChunkSize() const {
 }
 
 // NOTE (careful when deprecating)
-//   currently the sharding is enabled because of a write or read (as opposed to a split or migrate), the shard learns
-//   its name and through the 'setShardVersion' command call
+//   currently the sharding is enabled because of a write or read (as opposed to a split or
+//   migrate), the shard learns its name and through the 'setShardVersion' command call
 bool setShardVersion(DBClientBase& conn,
                      const string& ns,
                      ChunkVersion version,

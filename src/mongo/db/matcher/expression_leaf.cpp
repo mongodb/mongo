@@ -277,7 +277,8 @@ Status RegexMatchExpression::init(const StringData& path,
 }
 
 bool RegexMatchExpression::matchesSingleElement(const BSONElement& e) const {
-    // log() << "RegexMatchExpression::matchesSingleElement _regex: " << _regex << " e: " << e << std::endl;
+    // log() << "RegexMatchExpression::matchesSingleElement _regex: " << _regex << " e: " << e <<
+    // std::endl;
     switch (e.type()) {
         case String:
         case Symbol:

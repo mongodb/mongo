@@ -52,12 +52,15 @@ class BtreeBucket;
     (such as adding a virtual function)
  */
 class DiskLoc {
-    int _a;  // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
+    // this will be volume, file #, etc. but is a logical value could be anything depending on
+    // storage engine
+    int _a;
     int ofs;
 
 public:
     enum SentinelValues {
-        /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
+        /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but
+         * outside DiskLoc context so confusing as-is. */
         NullOfs = -1,
 
         // Caps the number of files that may be allocated in a database, allowing about 32TB of
@@ -96,8 +99,9 @@ public:
     }
     DiskLoc& Null() {
         _a = -1;
-        ofs =
-            0; /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
+        /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but
+         * outside DiskLoc context so confusing as-is. */
+        ofs = 0;
         return *this;
     }
     void assertOk() const {

@@ -199,7 +199,8 @@ extern struct ltc_hash_descriptor {
     */
     int (*test)(void);
 
-    /* accelerated hmac callback: if you need to-do multiple packets just use the generic hmac_memory and provide a hash callback */
+    /* accelerated hmac callback: if you need to-do multiple packets just use the generic
+     * hmac_memory and provide a hash callback */
     int (*hmac_block)(const unsigned char* key,
                       unsigned long keylen,
                       const unsigned char* in,

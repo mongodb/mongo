@@ -49,7 +49,8 @@ size_t _getSizeDefault(const T& t) {
  * A custom sizing function can optionally be given.  By default the getSize function
  * returns 1 for each item, resulting in size equaling the number of items queued.
  *
- * Note that use of this class is deprecated.  This class only works with a single consumer and      * a single producer.
+ * Note that use of this class is deprecated.  This class only works with a single consumer and
+ * * a single producer.
  */
 template <typename T>
 class BlockingQueue : boost::noncopyable {

@@ -78,9 +78,10 @@ public:
         connInfo->setTimeout(timeout);
     }
 
-    /* If we were to run a query and not exhaust the cursor, future use of the connection would be problematic.
-       So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes
-       ScopedConn limited in functionality but very safe.  More non-cursor wrappers can be added here if needed.
+    /* If we were to run a query and not exhaust the cursor, future use of the connection would be
+     * problematic. So here what we do is wrapper known safe methods and not allow cursor-style
+     * queries at all. This makes ScopedConn limited in functionality but very safe.  More
+     * non-cursor wrappers can be added here if needed.
        */
     bool runCommand(const std::string& dbname, const BSONObj& cmd, BSONObj& info, int options = 0) {
         return conn()->runCommand(dbname, cmd, info, options);

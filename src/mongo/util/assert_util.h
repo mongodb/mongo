@@ -87,8 +87,10 @@ struct MONGO_CLIENT_API ExceptionInfo {
     int code;
 };
 
-/** helper class that builds error strings.  lighter weight than a StringBuilder, albeit less flexible.
-    NOINLINE_DECL used in the constructor implementations as we are assuming this is a cold code path when used.
+/** helper class that builds error strings.  lighter weight than a StringBuilder, albeit less
+ * flexible.
+    NOINLINE_DECL used in the constructor implementations as we are assuming this is a cold code
+    path when used.
 
     example:
       throw UserException(123, ErrorMsg("blah", num_val));

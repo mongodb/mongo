@@ -639,7 +639,9 @@ public:
         ASSERT_EQUALS(5, out["z"].number());
         ASSERT_EQUALS(NumberDouble, out["a"].embeddedObjectUserCheck()["0"].type());
         // Commenting so that v8 tests will work
-        //            ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["1"].type() ); // TODO: this is technically bad, but here to make sure that i understand the behavior
+        //            ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["1"].type()
+        //            ); // TODO: this is technically bad, but here to make sure that i understand
+        //            the behavior
 
 
         // Eliot says I don't have to worry about this case

@@ -32,7 +32,8 @@
 
 namespace mongo {
 
-/** this is a sort of smart pointer class where we can move where something is and all the pointers will adjust.
+/** this is a sort of smart pointer class where we can move where something is and all the pointers
+ * will adjust.
     not threadsafe.
     */
 struct MoveableBuffer {
@@ -46,7 +47,8 @@ struct MoveableBuffer {
 
 /* implementation (inlines) below */
 
-// this is a temp stub implementation...not really done yet - just having everything compile & such for checkpointing into git
+// this is a temp stub implementation...not really done yet - just having everything compile & such
+// for checkpointing into git
 
 inline MoveableBuffer::MoveableBuffer() : p(0) {}
 

@@ -28,11 +28,13 @@
 
 /* Collections we use:
 
-   local.sources         - indicates what sources we pull from as a "slave", and the last update of each
+   local.sources         - indicates what sources we pull from as a "slave", and the last update of
+                            each
    local.oplog.$main     - our op log as "master"
    local.dbinfo.<dbname> - no longer used???
-   local.pair.startup    - [deprecated] can contain a special value indicating for a pair that we have the master copy.
-                           used when replacing other half of the pair which has permanently failed.
+   local.pair.startup    - [deprecated] can contain a special value indicating for a pair that we
+                           have the master copy. used when replacing other half of the pair which
+                           has permanently failed.
    local.pair.sync       - [deprecated] { initialsynccomplete: 1 }
 */
 
@@ -667,7 +669,8 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
     scoped_ptr<Lock::GlobalWrite> lk(alreadyLocked ? 0 : new Lock::GlobalWrite(txn->lockState()));
 
     if (replAllDead) {
-        // hmmm why is this check here and not at top of this function? does it get set between top and here?
+        // hmmm why is this check here and not at top of this function? does it get set between top
+        // and here?
         log() << "replAllDead, throwing SyncException: " << replAllDead << endl;
         throw SyncException();
     }
@@ -926,7 +929,8 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
             verify(syncedTo < nextOpTime);
             throw SyncException();
         } else {
-            /* t == syncedTo, so the first op was applied previously or it is the first op of initial query and need not be applied. */
+            /* t == syncedTo, so the first op was applied previously or it is the first op of
+             * initial query and need not be applied. */
         }
     }
 
@@ -1048,7 +1052,8 @@ int ReplSource::sync(OperationContext* txn, int& nApplied) {
     }
     nClonedThisPass = 0;
 
-    // FIXME Handle cases where this db isn't on default port, or default port is spec'd in hostName.
+    // FIXME Handle cases where this db isn't on default port, or default port is spec'd in
+    // hostName.
     if ((string("localhost") == hostName || string("127.0.0.1") == hostName) &&
         serverGlobalParams.port == ServerGlobalParams::DefaultDBPort) {
         log() << "repl:   can't sync from self (localhost). sources configuration may be wrong."
@@ -1157,9 +1162,8 @@ static void replMain(OperationContext* txn) {
                     break;
                 }
             }
-            verify(
-                syncing ==
-                0);  // i.e., there is only one sync thread running. we will want to change/fix this.
+            // i.e., there is only one sync thread running. we will want to change/fix this.
+            verify(syncing == 0);
             syncing++;
         }
 
@@ -1337,7 +1341,8 @@ void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
 
 void pretouchOperation(OperationContext* txn, const BSONObj& op) {
     if (txn->lockState()->isWriteLocked()) {
-        return;  // no point pretouching if write locked. not sure if this will ever fire, but just in case.
+        // no point pretouching if write locked. not sure if this will ever fire, but just in case.
+        return;
     }
 
     const char* which = "o";

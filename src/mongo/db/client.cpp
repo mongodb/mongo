@@ -280,7 +280,8 @@ Client::WriteContext::WriteContext(OperationContext* opCtx, const std::string& n
 void Client::Context::checkNotStale() const {
     switch (_client->_curOp->getOp()) {
         case dbGetMore:  // getMore's are special and should be handled else where
-        case dbUpdate:  // update & delete check shard version in instance.cpp, so don't check here as well
+        // update & delete check shard version in instance.cpp, so don't check here as well
+        case dbUpdate:
         case dbDelete:
             break;
         default: { ensureShardVersionOKOrThrow(_ns); }

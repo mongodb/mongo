@@ -663,7 +663,8 @@ inline double BSONElement::numberDouble() const {
     }
 }
 
-/** Retrieve int value for the element safely.  Zero returned if not a number. Converted to int if another numeric type. */
+/** Retrieve int value for the element safely.  Zero returned if not a number.
+ * Converted to int if another numeric type. */
 inline int BSONElement::numberInt() const {
     switch (type()) {
         case NumberDouble:

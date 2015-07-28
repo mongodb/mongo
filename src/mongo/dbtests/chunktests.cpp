@@ -318,8 +318,8 @@ class InMultiShard : public CompoundKeyBase {
         return BSON("a" << BSON("$in" << BSON_ARRAY(0 << 5 << 10)) << "b"
                         << BSON("$in" << BSON_ARRAY(0 << 5 << 25)));
     }
-    // If we were to send this query to just the shards it actually needed to hit, it would only hit shards 0 and 2
-    // Because of the optimization from SERVER-4745, however, we'll also hit shard 1.
+    // If we were to send this query to just the shards it actually needed to hit, it would only hit
+    // shards 0 and 2 Because of the optimization from SERVER-4745, however, we'll also hit shard 1.
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0"
                           << "1"

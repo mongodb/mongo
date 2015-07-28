@@ -1099,7 +1099,8 @@ public:
             if (str::equals("collMod", e.fieldName())) {
                 // no-op
             } else if (str::startsWith(e.fieldName(), "$")) {
-                // no-op: ignore top-level fields prefixed with $. They are for the command processor.
+                // no-op: ignore top-level fields prefixed with $. They are for the command
+                // processor.
             } else if (LiteParsedQuery::cmdOptionMaxTimeMS == e.fieldNameStringData()) {
                 // no-op
             } else if (str::equals("index", e.fieldName())) {
@@ -1359,7 +1360,8 @@ bool _execCommand(OperationContext* txn,
         LOG(1) << "command failed because of stale config, can retry" << causedBy(e) << endl;
         throw;
     } catch (DBException& e) {
-        // TODO: Rethrown errors have issues here, should divorce SendStaleConfigException from the DBException tree
+        // TODO: Rethrown errors have issues here, should divorce SendStaleConfigException from the
+        // DBException tree
 
         stringstream ss;
         ss << "exception: " << e.what();

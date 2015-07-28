@@ -511,8 +511,8 @@ bool Balancer::_init() {
 
         // contact the config server and refresh shard information
         // checks that each shard is indeed a different process (no hostname mixup)
-        // these checks are redundant in that they're redone at every new round but we want to do them initially here
-        // so to catch any problem soon
+        // these checks are redundant in that they're redone at every new round but we want to do
+        // them initially here so to catch any problem soon
         Shard::reloadShardInfo();
         _checkOIDs();
 
@@ -536,7 +536,8 @@ bool Balancer::_init() {
 }
 
 void Balancer::run() {
-    // this is the body of a BackgroundJob so if we throw here we're basically ending the balancer thread prematurely
+    // this is the body of a BackgroundJob so if we throw here we're basically ending the balancer
+    // thread prematurely
     while (!inShutdown()) {
         if (!_init()) {
             log() << "will retry to initialize balancer in one minute" << endl;

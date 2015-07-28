@@ -70,12 +70,14 @@ public:
         return _pos < _theend;
     }
 
-    /** @return true if more elements exist to be enumerated INCLUDING the EOO element which is always at the end. */
+    /** @return true if more elements exist to be enumerated INCLUDING the EOO element which is
+     * always at the end. */
     bool moreWithEOO() {
         return _pos <= _theend;
     }
 
-    /** @return the next element in the object. For the final element, element.eoo() will be true. */
+    /** @return the next element in the object. For the final element, element.eoo() will be true.
+     * */
     BSONElement next(bool checkEnd) {
         verify(_pos <= _theend);
 

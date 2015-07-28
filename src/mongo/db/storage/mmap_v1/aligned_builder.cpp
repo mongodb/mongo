@@ -134,8 +134,8 @@ void AlignedBuilder::_malloc(unsigned sz) {
     _p._allocationAddress = p;
     _p._data = (char*)p;
 #elif defined(__linux__)
-    // in theory #ifdef _POSIX_VERSION should work, but it doesn't on OS X 10.4, and needs to be tested on solaris.
-    // so for now, linux only for this.
+    // in theory #ifdef _POSIX_VERSION should work, but it doesn't on OS X 10.4, and needs to be
+    // tested on solaris. so for now, linux only for this.
     void* p = 0;
     int res = posix_memalign(&p, Alignment, sz);
     massert(13524, "out of memory AlignedBuilder", res == 0);

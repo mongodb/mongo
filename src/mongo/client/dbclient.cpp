@@ -979,8 +979,8 @@ bool DBClientWithCommands::exists(const string& ns) {
 
 void DBClientConnection::_auth(const BSONObj& params) {
     if (autoReconnect) {
-        /* note we remember the auth info before we attempt to auth -- if the connection is broken, we will
-           then have it for the next autoreconnect attempt.
+        /* note we remember the auth info before we attempt to auth -- if the connection is broken,
+         * we will then have it for the next autoreconnect attempt.
         */
         authCache[params[saslCommandUserDBFieldName].str()] = params.getOwned();
     }
@@ -988,7 +988,8 @@ void DBClientConnection::_auth(const BSONObj& params) {
     DBClientBase::_auth(params);
 }
 
-/** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use
+/** query N objects from the database into an array.  makes sense mostly when you want a small
+ * number of results.  if a huge number, use
     query() and iterate the cursor.
  */
 void DBClientInterface::findN(vector<BSONObj>& out,
@@ -1702,9 +1703,9 @@ bool DBClientConnection::_lazyKillCursor = true;
 
 
 bool serverAlive(const string& uri) {
-    DBClientConnection c(
-        false,
-        20);  // potentially the connection to server could fail while we're checking if it's alive - so use timeouts
+    // potentially the connection to server could fail while we're checking if it's alive - so use
+    // timeouts
+    DBClientConnection c(false, 20);
     string err;
     if (!c.connect(HostAndPort(uri), err))
         return false;

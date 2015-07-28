@@ -180,7 +180,8 @@ int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(
                           diffChunkDoc[ChunkType::max()].Obj());
 
         // Figure out which of the new chunks we need to track
-        // Important - we need to actually own this doc, in case the cursor decides to getMore or unbuffer
+        // Important - we need to actually own this doc, in case the cursor decides to getMore or
+        // unbuffer
         if (isTracked(diffChunkDoc))
             newTracked.push_back(diffChunkDoc.getOwned());
     }
