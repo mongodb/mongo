@@ -64,7 +64,7 @@ void CollectionOptions::reset() {
     storageEngine = BSONObj();
     validator = BSONObj();
     validationLevel = "";
-    validationState = "";
+    validationAction = "";
 }
 
 bool CollectionOptions::isValid() const {
@@ -163,12 +163,12 @@ Status CollectionOptions::parse(const BSONObj& options) {
             }
 
             validator = e.Obj().getOwned();
-        } else if (fieldName == "validationState") {
+        } else if (fieldName == "validationAction") {
             if (e.type() != mongo::String) {
-                return Status(ErrorCodes::BadValue, "'validationState' has to be a string.");
+                return Status(ErrorCodes::BadValue, "'validationAction' has to be a string.");
             }
 
-            validationState = e.String();
+            validationAction = e.String();
         } else if (fieldName == "validationLevel") {
             if (e.type() != mongo::String) {
                 return Status(ErrorCodes::BadValue, "'validationLevel' has to be a string.");
@@ -217,8 +217,8 @@ BSONObj CollectionOptions::toBSON() const {
         b.append("validationLevel", validationLevel);
     }
 
-    if (!validationState.empty()) {
-        b.append("validationState", validationState);
+    if (!validationAction.empty()) {
+        b.append("validationAction", validationAction);
     }
 
     return b.obj();
