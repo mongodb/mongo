@@ -413,9 +413,8 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	if (WT_PAGE_IS_INTERNAL(page)) {
 		for (;;) {
 			F_CAS_ATOMIC(page, WT_PAGE_SPLIT_LOCKED, ret);
-			if (ret == 0) {
+			if (ret == 0)
 				break;
-			}
 			__wt_yield();
 		}
 		split_lock = 1;
