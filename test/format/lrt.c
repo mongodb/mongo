@@ -59,8 +59,7 @@ lrt(void *arg)
 
 	/* Open a session and cursor. */
 	conn = g.wts_conn;
-	if ((ret = conn->open_session(
-	    conn, NULL, "isolation=snapshot", &session)) != 0)
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if ((ret = session->open_cursor(
 	    session, g.uri, NULL, NULL, &cursor)) != 0)
@@ -68,7 +67,7 @@ lrt(void *arg)
 
 	for (pinned = 0;;) {
 		if (pinned) {
-			/* Confirm the returned value hasn't changed. */
+			/* Re-read the record at the end of the table. */
 			while ((ret = read_row(cursor,
 			    &key, saved_keyno, 1)) == WT_ROLLBACK)
 				;
@@ -90,15 +89,27 @@ lrt(void *arg)
 			    memcmp(buf, value.data, value.size) != 0)
 				die(0, "mismatched start/stop values");
 
+			/* End the transaction. */
+			if ((ret =
+			    session->commit_transaction(session, NULL)) != 0)
+				die(ret, "session.commit_transaction");
+
 			/* Reset the cursor, releasing our pin. */
 			if ((ret = cursor->reset(cursor)) != 0)
 				die(ret, "cursor.reset");
 			pinned = 0;
 		} else {
 			/*
-			 * Read a record at the end of the table, creating a
-			 * snapshot.
+			 * Begin transaction: without an explicit transaction,
+			 * the snapshot is only kept around while a cursor is
+			 * positioned. As soon as the cursor loses its position
+			 * a new snapshot will be allocated.
 			 */
+			if ((ret = session->begin_transaction(
+			    session, "isolation=snapshot")) != 0)
+				die(ret, "session.begin_transaction");
+
+			/* Read a record at the end of the table. */
 			do {
 				saved_keyno = mmrand(NULL,
 				    (u_int)(g.key_cnt - g.key_cnt / 10),
@@ -110,7 +121,7 @@ lrt(void *arg)
 			if (ret != 0)
 				die(ret, "read_row %" PRIu64, saved_keyno);
 
-			/* Take a copy of the cursor's value. */
+			/* Copy the cursor's value. */
 			if (g.type == FIX) {
 				ret = cursor->get_value(cursor, &bitfield);
 				value.data = &bitfield;
