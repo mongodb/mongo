@@ -403,7 +403,8 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	 */
 	if (block->ckpt_inprogress) {
 		__wt_errx(session,
-		    "%s: checkpointed without the checkpoint being resolved",
+		    "%s: checkpointed without first resolving the previous "
+		    "checkpoint",
 		    block->name);
 
 		WT_RET(__wt_block_checkpoint_resolve(session, block));
