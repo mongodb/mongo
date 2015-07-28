@@ -2,9 +2,11 @@ package mongoexport
 
 import (
 	"bytes"
+	"encoding/csv"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
+	"strings"
 	"testing"
 )
 
@@ -27,7 +29,9 @@ func TestWriteCSV(t *testing.T) {
 			csvExporter.ExportDocument(bson.M{"_id": "12345"})
 			csvExporter.WriteFooter()
 			csvExporter.Flush()
-			So(out.String(), ShouldEqual, `12345,,,`+"\n")
+			rec, err := csv.NewReader(strings.NewReader(out.String())).Read()
+			So(err, ShouldBeNil)
+			So(rec, ShouldResemble, []string{"12345", "", "", ""})
 		})
 
 		Convey("Exported document with index into nested objects should print correctly", func() {
@@ -35,7 +39,9 @@ func TestWriteCSV(t *testing.T) {
 			csvExporter.ExportDocument(bson.M{"z": []interface{}{"x", bson.M{"a": "T", "B": 1}}})
 			csvExporter.WriteFooter()
 			csvExporter.Flush()
-			So(out.String(), ShouldEqual, `,,,T`+"\n")
+			rec, err := csv.NewReader(strings.NewReader(out.String())).Read()
+			So(err, ShouldBeNil)
+			So(rec, ShouldResemble, []string{"", "", "", "T"})
 		})
 
 		Reset(func() {
