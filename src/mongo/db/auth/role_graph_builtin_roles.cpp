@@ -154,8 +154,8 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::listDatabases << ActionType::listShards  // clusterManager gets this also
         << ActionType::netstat << ActionType::replSetGetConfig  // clusterManager gets this also
         << ActionType::replSetGetStatus                         // clusterManager gets this also
-        << ActionType::serverStatus << ActionType::top << ActionType::cursorInfo
-        << ActionType::inprog << ActionType::shardingState;
+        << ActionType::serverStatus << ActionType::top << ActionType::inprog
+        << ActionType::shardingState;
 
     // clusterMonitor role actions that target a database (or collection) resource
     clusterMonitorRoleDatabaseActions << ActionType::collStats  // dbAdmin gets this also

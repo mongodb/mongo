@@ -786,27 +786,7 @@ var authCommandsLib = {
                     ]
                 }
             ]
-        },
-        {
-            testname: "cursorInfo",
-            command: {cursorInfo: 1},
-            testcases: [
-                {
-                    runOnDb: firstDbName,
-                    roles: roles_monitoring,
-                    privileges: [
-                        { resource: {cluster: true}, actions: ["cursorInfo"] }
-                    ]
-                },
-                {
-                    runOnDb: secondDbName,
-                    roles: roles_monitoring,
-                    privileges: [
-                        { resource: {cluster: true}, actions: ["cursorInfo"] }
-                    ]
-                }
-            ]
-        },/* Removed until SERVER-19640 is resolved.
+        }, /* Removed until SERVER-19640 is resolved.
         {
             testname: "dataSize_1",
             command: {dataSize: firstDbName + ".x"},
@@ -2514,7 +2494,7 @@ var authCommandsLib = {
                 }
             ]
         },
-/*      temporarily removed see SERVER-13555 
+/*      temporarily removed see SERVER-13555
          {
             testname: "storageDetails",
             command: {storageDetails: "x", analyze: "diskStorage"},

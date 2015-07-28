@@ -482,36 +482,4 @@ public:
 void CursorCache::startTimeoutThread() {
     task::repeat(new CursorTimeoutTask, 4000);
 }
-
-class CmdCursorInfo : public Command {
-public:
-    CmdCursorInfo() : Command("cursorInfo") {}
-    virtual bool slaveOk() const {
-        return true;
-    }
-    virtual void help(stringstream& help) const {
-        help << " example: { cursorInfo : 1 }";
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::cursorInfo);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
-    bool run(OperationContext* txn,
-             const string&,
-             BSONObj& jsobj,
-             int,
-             string& errmsg,
-             BSONObjBuilder& result) {
-        cursorCache.appendInfo(result);
-        if (jsobj["setTimeout"].isNumber())
-            CursorCache::TIMEOUT = jsobj["setTimeout"].numberLong();
-        return true;
-    }
-} cmdCursorInfo;
-}
+}  // namespace mongo

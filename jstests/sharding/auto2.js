@@ -18,8 +18,8 @@ s.stopBalancer();
 
 var i=0;
 for ( j=0; j<30; j++ ){
-    print( "j:" + j + " : " + 
-           Date.timeFunc( 
+    print( "j:" + j + " : " +
+           Date.timeFunc(
                function(){
                    var bulk = coll.initializeUnorderedBulkOp();
                    for ( var k=0; k<100; k++ ){
@@ -27,9 +27,9 @@ for ( j=0; j<30; j++ ){
                        i++;
                    }
                    assert.writeOK(bulk.execute());
-               } 
+               }
            ) );
-    
+
 }
 
 s.startBalancer();
@@ -44,8 +44,8 @@ print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand(
 s.printChunks();
 
 function doCountsGlobal(){
-    counta = s._connections[0].getDB( "test" ).foo.count(); 
-    countb = s._connections[1].getDB( "test" ).foo.count(); 
+    counta = s._connections[0].getDB( "test" ).foo.count();
+    countb = s._connections[1].getDB( "test" ).foo.count();
     return counta + countb;
 }
 
@@ -54,7 +54,7 @@ assert.soon( function(){
     doCountsGlobal()
 
     print( "Counts: " + counta + countb)
-    
+
     return counta > 0 && countb > 0
 })
 
@@ -72,13 +72,13 @@ for ( i=0; i<j*100; i++ ){
         x = coll.findOne( { num : i } );
         if ( ! x ){
             print( "still can't find: " + i );
-            
+
             for ( var zzz=0; zzz<s._connections.length; zzz++ ){
                 if ( s._connections[zzz].getDB( "test" ).foo.findOne( { num : i } ) ){
                     print( "found on wrong server: " + s._connections[zzz] );
                 }
             }
-            
+
         }
     }
 }
@@ -103,26 +103,26 @@ for ( i=0; i<100; i++ ){
     cursor = coll.find().batchSize(5);
     cursor.next();
     cursor = null;
-    gc(); 
+    gc();
 }
 
 print( "checkpoint D")
 
 // test not-sharded cursors
-db = s.getDB( "test2" ); 
+db = s.getDB( "test2" );
 t = db.foobar;
 for ( i =0; i<100; i++ )
     t.save( { _id : i } );
 for ( i=0; i<100; i++ ){
     t.find().batchSize( 2 ).next();
-    assert.lt( 0 , db.runCommand( "cursorInfo" ).totalOpen , "cursor1" );
+    assert.lt(0 , db.serverStatus().metrics.cursor.open.total, "cursor1");
     gc();
 }
 
 for ( i=0; i<100; i++ ){
     gc();
 }
-assert.eq( 0 , db.runCommand( "cursorInfo" ).totalOpen , "cursor2" );
+assert.eq(0, db.serverStatus().metrics.cursor.open.total, "cursor2");
 
 // Stop the balancer, otherwise it may grab some connections from the pool for itself
 s.stopBalancer()
