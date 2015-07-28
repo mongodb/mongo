@@ -43,6 +43,8 @@
 namespace mongo {
 namespace executor {
 
+class NetworkConnectionHook;
+
 /**
  * Implementation of the network interface for use by classes implementing TaskExecutor
  * inside mongod.
@@ -72,13 +74,13 @@ namespace executor {
 class NetworkInterfaceImpl final : public NetworkInterface {
 public:
     NetworkInterfaceImpl();
+    NetworkInterfaceImpl(std::unique_ptr<NetworkConnectionHook> hook);
     ~NetworkInterfaceImpl();
     std::string getDiagnosticString() override;
     void startup() override;
     void shutdown() override;
     void waitForWork() override;
     void waitForWorkUntil(Date_t when) override;
-    void setConnectionHook(std::unique_ptr<ConnectionHook> hook) override;
     void signalWorkAvailable() override;
     Date_t now() override;
     std::string getHostName() override;
@@ -153,7 +155,7 @@ private:
     bool _inShutdown = false;
 
     // Interface for running remote commands
-    RemoteCommandRunnerImpl _commandRunner{kMessagingPortKeepOpen};
+    RemoteCommandRunnerImpl _commandRunner;
 
     // Number of active network requests
     size_t _numActiveNetworkRequests = 0;

@@ -39,6 +39,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+namespace executor {
+class NetworkConnectionHook;
+}
 
 /**
  * Represents a pool of connections to a MongoDB server. The pool is synchronized internally
@@ -66,7 +69,6 @@ public:
     typedef stdx::list<ConnectionInfo> ConnectionList;
     typedef unordered_map<HostAndPort, ConnectionList> HostConnectionMap;
     typedef std::map<HostAndPort, Date_t> HostLastUsedMap;
-
 
     /**
      * RAII class for connections from the pool.  To use the connection pool, instantiate one of
@@ -119,7 +121,6 @@ public:
         ConnectionList::iterator _connInfo;
     };
 
-
     /**
      * Instantiates a new connection pool with the specified tags to be applied to the
      * messaging ports that it opens.
@@ -127,6 +128,7 @@ public:
      * @param messagingPortTags tags to be applied to the messaging ports for each of the
      *      connections. If no tags are required, use 0.
      */
+    ConnectionPool(int messagingPortTags, std::unique_ptr<executor::NetworkConnectionHook> hook);
     ConnectionPool(int messagingPortTags);
     ~ConnectionPool();
 
@@ -203,6 +205,9 @@ private:
 
     // Time representing when the connections were last cleaned.
     Date_t _lastCleanUpTime;
+
+    // The connection hook for this pool. May be nullptr if there is no hook.
+    const std::unique_ptr<executor::NetworkConnectionHook> _hook;
 };
 
 }  // namespace mongo

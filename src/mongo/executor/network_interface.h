@@ -54,64 +54,6 @@ public:
     virtual ~NetworkInterface();
 
     /**
-     * An interface for augmenting the NetworkInterface with domain-specific host validation and
-     * post-connection logic.
-     */
-    class ConnectionHook {
-    public:
-        virtual ~ConnectionHook() = default;
-
-        /**
-         * Runs optional validation logic on an isMaster reply from a remote host. If a non-OK
-         * Status is returned, it will be propagated up to the completion handler for the command
-         * that initiated the request that caused this connection to be created. This will
-         * be called once for each connection that is created, even if a remote host with the
-         * same HostAndPort has already successfully passed validation on a different connection.
-         *
-         * This method must not throw any exceptions or block on network or disk-IO. However, in the
-         * event that an exception escapes, the NetworkInterface is responsible for calling
-         * std::terminate.
-         */
-        virtual Status validateHost(const HostAndPort& remoteHost,
-                                    const RemoteCommandResponse& isMasterReply) = 0;
-
-        /**
-         * Generates a command to run on the remote host immediately after connecting to it.
-         * If a non-OK StatusWith is returned, it will be propagated up to the completion handler
-         * for the command that initiated the request that caused this connection to be created.
-         *
-         * The command will be run after socket setup, SSL handshake, authentication, and wire
-         * protocol detection, but before any commands submitted to the NetworkInterface via
-         * startCommand are run. In the case that it isn't neccessary to run a command, makeRequest
-         * may return boost::none.
-         *
-         * This method must not throw any exceptions or block on network or disk-IO. However, in the
-         * event that an exception escapes, the NetworkInterface is responsible for calling
-         * std::terminate.
-         */
-        virtual StatusWith<boost::optional<RemoteCommandRequest>> makeRequest(
-            const HostAndPort& remoteHost) = 0;
-
-        /**
-         * Handles a remote server's reply to the command generated with makeRequest. If a
-         * non-OK Status is returned, it will be propagated up to the completion handler for the
-         * command that initiated the request that caused this connection to be created.
-         *
-         * If the corresponding earlier call to makeRequest for this connection returned
-         * boost::none, the NetworkInterface will not call handleReply.
-         *
-         * This method must not throw any exceptions or block on network or disk-IO. However, in the
-         * event that an exception escapes, the NetworkInterface is responsible for calling
-         * std::terminate.
-         */
-        virtual Status handleReply(const HostAndPort& remoteHost,
-                                   RemoteCommandResponse&& response) = 0;
-
-    protected:
-        ConnectionHook() = default;
-    };
-
-    /**
      * Returns diagnostic info.
      */
     virtual std::string getDiagnosticString() = 0;
@@ -145,13 +87,6 @@ public:
      * Similar to waitForWork, but only blocks until "when".
      */
     virtual void waitForWorkUntil(Date_t when) = 0;
-
-    /**
-     * Sets a connection hook for this NetworkInterface. This method can only be
-     * called once, and must be called before startup() or the result
-     * is undefined.
-     */
-    virtual void setConnectionHook(std::unique_ptr<ConnectionHook> hook) = 0;
 
     /**
      * Signals to the network interface that there is new work (such as a signaled event) for

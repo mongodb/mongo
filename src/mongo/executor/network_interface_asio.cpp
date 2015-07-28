@@ -109,10 +109,6 @@ void NetworkInterfaceASIO::waitForWorkUntil(Date_t when) {
     _isExecutorRunnable = false;
 }
 
-void NetworkInterfaceASIO::setConnectionHook(std::unique_ptr<ConnectionHook> hook) {
-    MONGO_UNREACHABLE;
-}
-
 void NetworkInterfaceASIO::signalWorkAvailable() {
     stdx::unique_lock<stdx::mutex> lk(_executorMutex);
     _signalWorkAvailable_inlock();

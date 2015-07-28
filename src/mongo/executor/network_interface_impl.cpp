@@ -35,7 +35,9 @@
 #include <memory>
 
 #include "mongo/client/connection_pool.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -63,7 +65,12 @@ ThreadPool::Options makeOptions() {
 
 }  // namespace
 
-NetworkInterfaceImpl::NetworkInterfaceImpl() : NetworkInterface(), _pool(makeOptions()) {}
+NetworkInterfaceImpl::NetworkInterfaceImpl() : NetworkInterfaceImpl(nullptr){};
+
+NetworkInterfaceImpl::NetworkInterfaceImpl(std::unique_ptr<NetworkConnectionHook> hook)
+    : NetworkInterface(),
+      _pool(makeOptions()),
+      _commandRunner(kMessagingPortKeepOpen, std::move(hook)) {}
 
 NetworkInterfaceImpl::~NetworkInterfaceImpl() {}
 
@@ -129,10 +136,6 @@ void NetworkInterfaceImpl::waitForWorkUntil(Date_t when) {
         _isExecutorRunnableCondition.wait_for(lk, waitTime);
     }
     _isExecutorRunnable = false;
-}
-
-void NetworkInterfaceImpl::setConnectionHook(std::unique_ptr<ConnectionHook> hook) {
-    MONGO_UNREACHABLE;
 }
 
 void NetworkInterfaceImpl::_runOneCommand() {

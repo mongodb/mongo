@@ -34,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/stdx/memory.h"
@@ -44,7 +45,7 @@ namespace executor {
 namespace {
 
 template <typename ValidateFunc, typename RequestFunc, typename ReplyFunc>
-class TestConnectionHook final : public NetworkInterface::ConnectionHook {
+class TestConnectionHook final : public NetworkConnectionHook {
 public:
     TestConnectionHook(ValidateFunc&& validateFunc,
                        RequestFunc&& requestFunc,

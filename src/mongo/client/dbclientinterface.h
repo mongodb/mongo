@@ -45,6 +45,10 @@
 
 namespace mongo {
 
+namespace executor {
+struct RemoteCommandResponse;
+}
+
 /** the query field 'options' can have these bits set: */
 enum QueryOptions {
     /** Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor
@@ -1137,12 +1141,26 @@ public:
     virtual bool connect(const HostAndPort& server, std::string& errmsg);
 
     /**
+
+     * A hook used to validate the reply of an 'isMaster' command during connection. If the hook
+     * returns a non-OK Status, the DBClientConnection object will disconnect from the remote
+     * server. This function must not throw - it can only indicate failure by returning a non-OK
+     * status.
+     */
+    using HandshakeValidationHook =
+        stdx::function<Status(const executor::RemoteCommandResponse& isMasterReply)>;
+
+    /**
      * Semantically equivalent to the previous connect method, but returns a Status
-     * instead of taking an errmsg out parameter.
+     * instead of taking an errmsg out parameter. Also allows optional validation of the reply to
+     * the 'isMaster' command executed during connection.
      *
      * @param server The server to connect to.
+     * @param a hook to validate the 'isMaster' reply received during connection. If the hook
+     * fails, the connection will be terminated and a non-OK status will be returned.
      */
-    Status connect(const HostAndPort& server);
+    Status connect(const HostAndPort& server,
+                   const HandshakeValidationHook& hook = HandshakeValidationHook());
 
     /**
      * This version of connect does not run 'isMaster' after creating a TCP connection to the

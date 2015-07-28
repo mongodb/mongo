@@ -33,6 +33,11 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
 
 namespace mongo {
 namespace {
@@ -45,7 +50,12 @@ const Minutes kMaxConnectionAge(30);
 
 }  // namespace
 
-ConnectionPool::ConnectionPool(int messagingPortTags) : _messagingPortTags(messagingPortTags) {}
+ConnectionPool::ConnectionPool(int messagingPortTags,
+                               std::unique_ptr<executor::NetworkConnectionHook> hook)
+    : _messagingPortTags(messagingPortTags), _hook(std::move(hook)) {}
+
+ConnectionPool::ConnectionPool(int messagingPortTags)
+    : ConnectionPool(messagingPortTags, nullptr) {}
 
 ConnectionPool::~ConnectionPool() {
     cleanUpOlderThan(Date_t::max());
@@ -163,10 +173,34 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     // timeouts.  Thus, we must take count() and divide by 1000.0 to get the number
     // of seconds with a fractional part.
     conn->setSoTimeout(timeout.count() / 1000.0);
-    std::string errmsg;
-    uassert(ErrorCodes::HostUnreachable,
-            str::stream() << "Failed attempt to connect to " << target.toString() << "; " << errmsg,
-            conn->connect(target, errmsg));
+
+    if (_hook) {
+        uassertStatusOK(
+            conn->connect(target,
+                          [this, &target](const executor::RemoteCommandResponse& isMasterReply) {
+                              return _hook->validateHost(target, isMasterReply);
+                          }));
+
+        auto postConnectRequest = uassertStatusOK(_hook->makeRequest(target));
+
+        // We might not have a postConnectRequest
+        if (postConnectRequest != boost::none) {
+            auto start = Date_t::now();
+            auto reply =
+                conn->runCommandWithMetadata(postConnectRequest->dbname,
+                                             postConnectRequest->cmdObj.firstElementFieldName(),
+                                             postConnectRequest->metadata,
+                                             postConnectRequest->cmdObj);
+
+            auto rcr = executor::RemoteCommandResponse(reply->getCommandReply().getOwned(),
+                                                       reply->getMetadata().getOwned(),
+                                                       Date_t::now() - start);
+
+            uassertStatusOK(_hook->handleReply(target, std::move(rcr)));
+        }
+    } else {
+        uassertStatusOK(conn->connect(target));
+    }
 
     conn->port().tag |= _messagingPortTags;
 

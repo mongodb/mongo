@@ -34,12 +34,17 @@
 
 namespace mongo {
 
+namespace executor {
+class NetworkConnectionHook;
+}  // namespace executor
+
 template <typename T>
 class StatusWith;
 
 class RemoteCommandRunnerImpl {
 public:
-    RemoteCommandRunnerImpl(int messagingPortTags);
+    RemoteCommandRunnerImpl(int messagingTags,
+                            std::unique_ptr<executor::NetworkConnectionHook> hook);
     virtual ~RemoteCommandRunnerImpl();
 
     /**

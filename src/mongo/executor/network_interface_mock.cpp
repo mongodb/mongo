@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_connection_hook.h"
 
 #include <algorithm>
 #include <iterator>
@@ -390,7 +391,7 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
     _enqueueOperation_inlock(std::move(postconnectOp));
 }
 
-void NetworkInterfaceMock::setConnectionHook(std::unique_ptr<ConnectionHook> hook) {
+void NetworkInterfaceMock::setConnectionHook(std::unique_ptr<NetworkConnectionHook> hook) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_hasStarted);
     invariant(!_hook);

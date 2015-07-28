@@ -46,6 +46,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
@@ -927,15 +928,17 @@ private:
 /**
 * Initializes the wire version of conn, and returns the isMaster reply.
 */
-StatusWith<BSONObj> initWireVersion(DBClientBase* conn) {
+StatusWith<executor::RemoteCommandResponse> initWireVersion(DBClientBase* conn) {
     try {
         // We need to force the usage of OP_QUERY on this command, even if we have previously
         // detected support for OP_COMMAND on a connection. This is necessary to handle the case
         // where we reconnect to an older version of MongoDB running at the same host/port.
         ScopedForceOpQuery forceOpQuery{conn};
 
+        Date_t start{Date_t::now()};
         auto result = conn->runCommandWithMetadata(
             "admin", "isMaster", rpc::makeEmptyMetadata(), BSON("isMaster" << 1));
+        Date_t finish{Date_t::now()};
 
         BSONObj isMasterObj = result->getCommandReply().getOwned();
 
@@ -945,7 +948,8 @@ StatusWith<BSONObj> initWireVersion(DBClientBase* conn) {
             conn->setWireVersions(minWireVersion, maxWireVersion);
         }
 
-        return isMasterObj;
+        return executor::RemoteCommandResponse{
+            std::move(isMasterObj), result->getMetadata().getOwned(), finish - start};
 
     } catch (...) {
         return exceptionToStatus();
@@ -963,8 +967,8 @@ bool DBClientConnection::connect(const HostAndPort& server, std::string& errmsg)
     return true;
 }
 
-
-Status DBClientConnection::connect(const HostAndPort& serverAddress) {
+Status DBClientConnection::connect(const HostAndPort& serverAddress,
+                                   const HandshakeValidationHook& hook) {
     auto connectStatus = connectSocketOnly(serverAddress);
     if (!connectStatus.isOK()) {
         return connectStatus;
@@ -976,12 +980,22 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress) {
         return swIsMasterReply.getStatus();
     }
 
-    auto swProtocolSet = rpc::parseProtocolSetFromIsMasterReply(swIsMasterReply.getValue());
+    auto swProtocolSet = rpc::parseProtocolSetFromIsMasterReply(swIsMasterReply.getValue().data);
     if (!swProtocolSet.isOK()) {
         return swProtocolSet.getStatus();
     }
 
     _setServerRPCProtocols(swProtocolSet.getValue());
+
+    if (hook) {
+        auto validationStatus = hook(swIsMasterReply.getValue());
+        if (!validationStatus.isOK()) {
+            // Disconnect and mark failed.
+            _failed = true;
+            _port.reset();
+            return validationStatus;
+        }
+    }
 
     return Status::OK();
 }
@@ -1016,7 +1030,7 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     _resolvedAddress = osAddr.getAddr();
 
     if (!_port->connect(osAddr)) {
-        return Status(ErrorCodes::OperationFailed,
+        return Status(ErrorCodes::HostUnreachable,
                       str::stream() << "couldn't connect to server " << _serverAddress.toString()
                                     << ", connection attempt failed");
     }
@@ -1025,7 +1039,7 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     int sslModeVal = sslGlobalParams.sslMode.load();
     if (sslModeVal == SSLParams::SSLMode_preferSSL || sslModeVal == SSLParams::SSLMode_requireSSL) {
         if (!_port->secure(sslManager(), serverAddress.host())) {
-            return Status(ErrorCodes::OperationFailed, "Failed to initialize SSL on connection");
+            return Status(ErrorCodes::SSLHandshakeFailed, "Failed to initialize SSL on connection");
         }
     }
 #endif

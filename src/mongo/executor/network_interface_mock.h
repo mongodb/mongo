@@ -44,6 +44,8 @@
 namespace mongo {
 namespace executor {
 
+class NetworkConnectionHook;
+
 /**
  * Mock network implementation for use in unit tests.
  *
@@ -85,7 +87,7 @@ public:
     virtual void shutdown();
     virtual void waitForWork();
     virtual void waitForWorkUntil(Date_t when);
-    virtual void setConnectionHook(std::unique_ptr<ConnectionHook> hook);
+    virtual void setConnectionHook(std::unique_ptr<NetworkConnectionHook> hook);
     virtual void signalWorkAvailable();
     virtual Date_t now();
     virtual std::string getHostName();
@@ -301,7 +303,7 @@ private:
     std::priority_queue<AlarmInfo, std::vector<AlarmInfo>, std::greater<AlarmInfo>> _alarms;  // (M)
 
     // The connection hook.
-    std::unique_ptr<ConnectionHook> _hook;  // (R)
+    std::unique_ptr<NetworkConnectionHook> _hook;  // (R)
 
     // The set of hosts we have seen so far. If we see a new host, we will execute the
     // ConnectionHook's validation and post-connection logic.
