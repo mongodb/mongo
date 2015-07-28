@@ -37,75 +37,73 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
-    using std::string;
-    using std::vector;
+using std::auto_ptr;
+using std::string;
+using std::vector;
 
-    static ClusterFindCmd cmdFindCluster;
+static ClusterFindCmd cmdFindCluster;
 
-    Status ClusterFindCmd::checkAuthForCommand(ClientBasic* client,
-                                               const std::string& dbname,
-                                               const BSONObj& cmdObj) {
-        AuthorizationSession* authzSession = client->getAuthorizationSession();
-        ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
+Status ClusterFindCmd::checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+    AuthorizationSession* authzSession = client->getAuthorizationSession();
+    ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 
-        if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::find)) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::find)) {
+        return Status::OK();
     }
 
-    Status ClusterFindCmd::explain(OperationContext* txn,
-                                   const std::string& dbname,
-                                   const BSONObj& cmdObj,
-                                   ExplainCommon::Verbosity verbosity,
-                                   BSONObjBuilder* out) const {
-        const string fullns = parseNs(dbname, cmdObj);
+    return Status(ErrorCodes::Unauthorized, "unauthorized");
+}
 
-        // Parse the command BSON to a LiteParsedQuery.
-        LiteParsedQuery* rawLpq;
-        bool isExplain = true;
-        Status lpqStatus = LiteParsedQuery::make(fullns, cmdObj, isExplain, &rawLpq);
-        if (!lpqStatus.isOK()) {
-            return lpqStatus;
-        }
-        auto_ptr<LiteParsedQuery> lpq(rawLpq);
+Status ClusterFindCmd::explain(OperationContext* txn,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               ExplainCommon::Verbosity verbosity,
+                               BSONObjBuilder* out) const {
+    const string fullns = parseNs(dbname, cmdObj);
 
-        BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
-
-        // We will time how long it takes to run the commands on the shards.
-        Timer timer;
-
-        vector<Strategy::CommandResult> shardResults;
-        STRATEGY->commandOp(dbname,
-                            explainCmdBob.obj(),
-                            lpq->getOptions().toInt(),
-                            fullns,
-                            lpq->getFilter(),
-                            &shardResults);
-
-        long long millisElapsed = timer.millis();
-
-        const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
-
-        return ClusterExplain::buildExplainResult(shardResults,
-                                                  mongosStageName,
-                                                  millisElapsed,
-                                                  out);
+    // Parse the command BSON to a LiteParsedQuery.
+    LiteParsedQuery* rawLpq;
+    bool isExplain = true;
+    Status lpqStatus = LiteParsedQuery::make(fullns, cmdObj, isExplain, &rawLpq);
+    if (!lpqStatus.isOK()) {
+        return lpqStatus;
     }
+    auto_ptr<LiteParsedQuery> lpq(rawLpq);
 
-    bool ClusterFindCmd::run(OperationContext* txn, const string& dbName,
-                             BSONObj& cmdObj,
-                             int options,
-                             string& errmsg,
-                             BSONObjBuilder& result,
-                              bool fromRepl) {
-        // Currently only explains of finds run through the find command. Queries that are not
-        // explained use the legacy OP_QUERY path.
-        errmsg = "find command not yet implemented";
-        return false;
-    }
+    BSONObjBuilder explainCmdBob;
+    ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
 
-} // namespace mongo
+    // We will time how long it takes to run the commands on the shards.
+    Timer timer;
+
+    vector<Strategy::CommandResult> shardResults;
+    STRATEGY->commandOp(dbname,
+                        explainCmdBob.obj(),
+                        lpq->getOptions().toInt(),
+                        fullns,
+                        lpq->getFilter(),
+                        &shardResults);
+
+    long long millisElapsed = timer.millis();
+
+    const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
+
+    return ClusterExplain::buildExplainResult(shardResults, mongosStageName, millisElapsed, out);
+}
+
+bool ClusterFindCmd::run(OperationContext* txn,
+                         const string& dbName,
+                         BSONObj& cmdObj,
+                         int options,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+    // Currently only explains of finds run through the find command. Queries that are not
+    // explained use the legacy OP_QUERY path.
+    errmsg = "find command not yet implemented";
+    return false;
+}
+
+}  // namespace mongo

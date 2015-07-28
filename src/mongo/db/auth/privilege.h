@@ -36,47 +36,50 @@
 
 namespace mongo {
 
-    class Privilege;
-    typedef std::vector<Privilege> PrivilegeVector;
+class Privilege;
+typedef std::vector<Privilege> PrivilegeVector;
 
+/**
+ * A representation of the permission to perform a set of actions on a resource.
+ */
+class Privilege {
+public:
     /**
-     * A representation of the permission to perform a set of actions on a resource.
+     * Adds "privilegeToAdd" to "privileges", de-duping "privilegeToAdd" if the vector already
+     * contains a privilege on the same resource.
+     *
+     * This method is the preferred way to add privileges to  privilege vectors.
      */
-    class Privilege {
-    public:
-        /**
-         * Adds "privilegeToAdd" to "privileges", de-duping "privilegeToAdd" if the vector already
-         * contains a privilege on the same resource.
-         *
-         * This method is the preferred way to add privileges to  privilege vectors.
-         */
-        static void addPrivilegeToPrivilegeVector(PrivilegeVector* privileges,
-                                                  const Privilege& privilegeToAdd);
+    static void addPrivilegeToPrivilegeVector(PrivilegeVector* privileges,
+                                              const Privilege& privilegeToAdd);
 
 
-        Privilege() {};
-        Privilege(const ResourcePattern& resource, const ActionType& action);
-        Privilege(const ResourcePattern& resource, const ActionSet& actions);
-        ~Privilege() {}
+    Privilege(){};
+    Privilege(const ResourcePattern& resource, const ActionType& action);
+    Privilege(const ResourcePattern& resource, const ActionSet& actions);
+    ~Privilege() {}
 
-        const ResourcePattern& getResourcePattern() const { return _resource; }
+    const ResourcePattern& getResourcePattern() const {
+        return _resource;
+    }
 
-        const ActionSet& getActions() const { return _actions; }
+    const ActionSet& getActions() const {
+        return _actions;
+    }
 
-        void addActions(const ActionSet& actionsToAdd);
-        void removeActions(const ActionSet& actionsToRemove);
+    void addActions(const ActionSet& actionsToAdd);
+    void removeActions(const ActionSet& actionsToRemove);
 
-        // Checks if the given action is present in the Privilege.
-        bool includesAction(const ActionType& action) const;
-        // Checks if the given actions are present in the Privilege.
-        bool includesActions(const ActionSet& actions) const;
+    // Checks if the given action is present in the Privilege.
+    bool includesAction(const ActionType& action) const;
+    // Checks if the given actions are present in the Privilege.
+    bool includesActions(const ActionSet& actions) const;
 
-        BSONObj toBSON() const;
+    BSONObj toBSON() const;
 
-    private:
+private:
+    ResourcePattern _resource;
+    ActionSet _actions;  // bitmask of actions this privilege grants
+};
 
-        ResourcePattern _resource;
-        ActionSet _actions; // bitmask of actions this privilege grants
-    };
-
-} // namespace mongo
+}  // namespace mongo

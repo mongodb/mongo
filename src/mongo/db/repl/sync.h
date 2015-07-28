@@ -33,25 +33,26 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-    class Database;
-    class OperationContext;
+class Database;
+class OperationContext;
 
 namespace repl {
 
-    class Sync {
-    protected:
-        std::string hn;
-    public:
-        Sync(const std::string& hostname) : hn(hostname) {}
-        virtual ~Sync() {}
-        virtual BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o);
+class Sync {
+protected:
+    std::string hn;
 
-        /**
-         * If applyOperation_inlock should be called again after an update fails.
-         */
-        virtual bool shouldRetry(OperationContext* txn, const BSONObj& o);
-        void setHostname(const std::string& hostname);
-    };
+public:
+    Sync(const std::string& hostname) : hn(hostname) {}
+    virtual ~Sync() {}
+    virtual BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o);
 
-} // namespace repl
-} // namespace mongo
+    /**
+     * If applyOperation_inlock should be called again after an update fails.
+     */
+    virtual bool shouldRetry(OperationContext* txn, const BSONObj& o);
+    void setHostname(const std::string& hostname);
+};
+
+}  // namespace repl
+}  // namespace mongo

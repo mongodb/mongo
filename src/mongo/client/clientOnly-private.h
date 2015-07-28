@@ -30,9 +30,9 @@
 #include "mongo/client/export_macros.h"
 
 namespace mongo {
-    class mutex;
+class mutex;
 
-    namespace shell_utils {
-        extern MONGO_CLIENT_API mongo::mutex &mongoProgramOutputMutex;
-    }
+namespace shell_utils {
+extern MONGO_CLIENT_API mongo::mutex& mongoProgramOutputMutex;
+}
 }

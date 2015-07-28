@@ -34,161 +34,168 @@
 
 namespace mongo {
 
-    using std::vector;
+using std::vector;
 
-    // Does not take ownership.
-    OplogStart::OplogStart(OperationContext* txn,
-                           const Collection* collection,
-                           MatchExpression* filter,
-                           WorkingSet* ws)
-        : _txn(txn),
-          _needInit(true),
-          _backwardsScanning(false),
-          _extentHopping(false),
-          _done(false),
-          _collection(collection),
-          _workingSet(ws),
-          _filter(filter) { }
+// Does not take ownership.
+OplogStart::OplogStart(OperationContext* txn,
+                       const Collection* collection,
+                       MatchExpression* filter,
+                       WorkingSet* ws)
+    : _txn(txn),
+      _needInit(true),
+      _backwardsScanning(false),
+      _extentHopping(false),
+      _done(false),
+      _collection(collection),
+      _workingSet(ws),
+      _filter(filter) {}
 
-    OplogStart::~OplogStart() { }
+OplogStart::~OplogStart() {}
 
-    PlanStage::StageState OplogStart::work(WorkingSetID* out) {
-        // We do our (heavy) init in a work(), where work is expected.
-        if (_needInit) {
-            CollectionScanParams params;
-            params.collection = _collection;
-            params.direction = CollectionScanParams::BACKWARD;
-            _cs.reset(new CollectionScan(_txn, params, _workingSet, NULL));
-            _needInit = false;
-            _backwardsScanning = true;
-            _timer.reset();
-        }
-
-        // If we're still reading backwards, keep trying until timing out.
-        if (_backwardsScanning) {
-            verify(!_extentHopping);
-            // Still have time to succeed with reading backwards.
-            if (_timer.seconds() < _backwardsScanTime) {
-                return workBackwardsScan(out);
-            }
-            switchToExtentHopping();
-        }
-
-        // Don't find it in time?  Swing from extent to extent like tarzan.com.
-        verify(_extentHopping);
-        return workExtentHopping(out);
+PlanStage::StageState OplogStart::work(WorkingSetID* out) {
+    // We do our (heavy) init in a work(), where work is expected.
+    if (_needInit) {
+        CollectionScanParams params;
+        params.collection = _collection;
+        params.direction = CollectionScanParams::BACKWARD;
+        _cs.reset(new CollectionScan(_txn, params, _workingSet, NULL));
+        _needInit = false;
+        _backwardsScanning = true;
+        _timer.reset();
     }
 
-    PlanStage::StageState OplogStart::workExtentHopping(WorkingSetID* out) {
-        if (_done || _subIterators.empty()) {
-            return PlanStage::IS_EOF;
+    // If we're still reading backwards, keep trying until timing out.
+    if (_backwardsScanning) {
+        verify(!_extentHopping);
+        // Still have time to succeed with reading backwards.
+        if (_timer.seconds() < _backwardsScanTime) {
+            return workBackwardsScan(out);
         }
+        switchToExtentHopping();
+    }
 
-        // we work from the back to the front since the back has the newest data.
-        const RecordId loc = _subIterators.back()->getNext();
-        _subIterators.popAndDeleteBack();
+    // Don't find it in time?  Swing from extent to extent like tarzan.com.
+    verify(_extentHopping);
+    return workExtentHopping(out);
+}
 
-        // TODO: should we ever try and return NEED_FETCH here?
-        if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(_txn, loc).value())) {
-            _done = true;
-            WorkingSetID id = _workingSet->allocate();
-            WorkingSetMember* member = _workingSet->get(id);
-            member->loc = loc;
-            member->obj = _collection->docFor(_txn, member->loc);
-            member->state = WorkingSetMember::LOC_AND_OBJ;
-            *out = id;
-            return PlanStage::ADVANCED;
-        }
+PlanStage::StageState OplogStart::workExtentHopping(WorkingSetID* out) {
+    if (_done || _subIterators.empty()) {
+        return PlanStage::IS_EOF;
+    }
 
+    // we work from the back to the front since the back has the newest data.
+    const RecordId loc = _subIterators.back()->getNext();
+    _subIterators.popAndDeleteBack();
+
+    // TODO: should we ever try and return NEED_FETCH here?
+    if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(_txn, loc).value())) {
+        _done = true;
+        WorkingSetID id = _workingSet->allocate();
+        WorkingSetMember* member = _workingSet->get(id);
+        member->loc = loc;
+        member->obj = _collection->docFor(_txn, member->loc);
+        member->state = WorkingSetMember::LOC_AND_OBJ;
+        *out = id;
+        return PlanStage::ADVANCED;
+    }
+
+    return PlanStage::NEED_TIME;
+}
+
+void OplogStart::switchToExtentHopping() {
+    // Transition from backwards scanning to extent hopping.
+    _backwardsScanning = false;
+    _extentHopping = true;
+
+    // Toss the collection scan we were using.
+    _cs.reset();
+
+    // Set up our extent hopping state.
+    _subIterators = _collection->getManyIterators(_txn);
+}
+
+PlanStage::StageState OplogStart::workBackwardsScan(WorkingSetID* out) {
+    PlanStage::StageState state = _cs->work(out);
+
+    // EOF.  Just start from the beginning, which is where we've hit.
+    if (PlanStage::IS_EOF == state) {
+        _done = true;
+        return state;
+    }
+
+    if (PlanStage::ADVANCED != state) {
+        return state;
+    }
+
+    WorkingSetMember* member = _workingSet->get(*out);
+    verify(member->hasObj());
+    verify(member->hasLoc());
+
+    if (!_filter->matchesBSON(member->obj.value())) {
+        _done = true;
+        // RecordId is returned in *out.
+        return PlanStage::ADVANCED;
+    } else {
+        _workingSet->free(*out);
         return PlanStage::NEED_TIME;
     }
+}
 
-    void OplogStart::switchToExtentHopping() {
-        // Transition from backwards scanning to extent hopping.
-        _backwardsScanning = false;
-        _extentHopping = true;
+bool OplogStart::isEOF() {
+    return _done;
+}
 
-        // Toss the collection scan we were using.
-        _cs.reset();
-
-        // Set up our extent hopping state.
-        _subIterators = _collection->getManyIterators(_txn);
+void OplogStart::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    if (_needInit) {
+        return;
     }
 
-    PlanStage::StageState OplogStart::workBackwardsScan(WorkingSetID* out) {
-        PlanStage::StageState state = _cs->work(out);
-
-        // EOF.  Just start from the beginning, which is where we've hit.
-        if (PlanStage::IS_EOF == state) {
-            _done = true;
-            return state;
-        }
-
-        if (PlanStage::ADVANCED != state) { return state; }
-
-        WorkingSetMember* member = _workingSet->get(*out);
-        verify(member->hasObj());
-        verify(member->hasLoc());
-
-        if (!_filter->matchesBSON(member->obj.value())) {
-            _done = true;
-            // RecordId is returned in *out.
-            return PlanStage::ADVANCED;
-        }
-        else {
-            _workingSet->free(*out);
-            return PlanStage::NEED_TIME;
-        }
+    if (INVALIDATION_DELETION != type) {
+        return;
     }
 
-    bool OplogStart::isEOF() { return _done; }
-
-    void OplogStart::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-        if (_needInit) { return; }
-
-        if (INVALIDATION_DELETION != type) { return; }
-
-        if (_cs) {
-            _cs->invalidate(txn, dl, type);
-        }
-
-        for (size_t i = 0; i < _subIterators.size(); i++) {
-            _subIterators[i]->invalidate(dl);
-        }
+    if (_cs) {
+        _cs->invalidate(txn, dl, type);
     }
 
-    void OplogStart::saveState() {
-        _txn = NULL;
-        if (_cs) {
-            _cs->saveState();
-        }
+    for (size_t i = 0; i < _subIterators.size(); i++) {
+        _subIterators[i]->invalidate(dl);
+    }
+}
 
-        for (size_t i = 0; i < _subIterators.size(); i++) {
-            _subIterators[i]->saveState();
-        }
+void OplogStart::saveState() {
+    _txn = NULL;
+    if (_cs) {
+        _cs->saveState();
     }
 
-    void OplogStart::restoreState(OperationContext* opCtx) {
-        invariant(_txn == NULL);
-        _txn = opCtx;
-        if (_cs) {
-            _cs->restoreState(opCtx);
-        }
+    for (size_t i = 0; i < _subIterators.size(); i++) {
+        _subIterators[i]->saveState();
+    }
+}
 
-        for (size_t i = 0; i < _subIterators.size(); i++) {
-            if (!_subIterators[i]->restoreState(opCtx)) {
-                _subIterators.erase(_subIterators.begin() + i);
-                // need to hit same i on next pass through loop
-                i--;
-            }
-        }
+void OplogStart::restoreState(OperationContext* opCtx) {
+    invariant(_txn == NULL);
+    _txn = opCtx;
+    if (_cs) {
+        _cs->restoreState(opCtx);
     }
 
-    vector<PlanStage*> OplogStart::getChildren() const {
-        vector<PlanStage*> empty;
-        return empty;
+    for (size_t i = 0; i < _subIterators.size(); i++) {
+        if (!_subIterators[i]->restoreState(opCtx)) {
+            _subIterators.erase(_subIterators.begin() + i);
+            // need to hit same i on next pass through loop
+            i--;
+        }
     }
+}
 
-    int OplogStart::_backwardsScanTime = 5;
+vector<PlanStage*> OplogStart::getChildren() const {
+    vector<PlanStage*> empty;
+    return empty;
+}
+
+int OplogStart::_backwardsScanTime = 5;
 
 }  // namespace mongo

@@ -36,130 +36,118 @@ using namespace mongo;
 
 namespace {
 
-    TEST(QueryPlannerAnalysis, GetSortPatternBasic) {
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1}")));
-        ASSERT_EQUALS(fromjson("{a: -1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: -1}")));
-        ASSERT_EQUALS(fromjson("{a: 1, b: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 1}")));
-        ASSERT_EQUALS(fromjson("{a: 1, b: -1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: -1}")));
-        ASSERT_EQUALS(fromjson("{a: -1, b: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: -1, b: 1}")));
-        ASSERT_EQUALS(fromjson("{a: -1, b: -1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: -1, b: -1}")));
-    }
+TEST(QueryPlannerAnalysis, GetSortPatternBasic) {
+    ASSERT_EQUALS(fromjson("{a: 1}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1}")));
+    ASSERT_EQUALS(fromjson("{a: -1}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: -1}")));
+    ASSERT_EQUALS(fromjson("{a: 1, b: 1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 1}")));
+    ASSERT_EQUALS(fromjson("{a: 1, b: -1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: -1}")));
+    ASSERT_EQUALS(fromjson("{a: -1, b: 1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: -1, b: 1}")));
+    ASSERT_EQUALS(fromjson("{a: -1, b: -1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: -1, b: -1}")));
+}
 
-    TEST(QueryPlannerAnalysis, GetSortPatternOtherElements) {
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 0}")));
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 100}")));
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: Infinity}")));
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: true}")));
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: false}")));
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: []}")));
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: {}}")));
+TEST(QueryPlannerAnalysis, GetSortPatternOtherElements) {
+    ASSERT_EQUALS(fromjson("{a: 1}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: 0}")));
+    ASSERT_EQUALS(fromjson("{a: 1}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: 100}")));
+    ASSERT_EQUALS(fromjson("{a: 1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: Infinity}")));
+    ASSERT_EQUALS(fromjson("{a: 1}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: true}")));
+    ASSERT_EQUALS(fromjson("{a: 1}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: false}")));
+    ASSERT_EQUALS(fromjson("{a: 1}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: []}")));
+    ASSERT_EQUALS(fromjson("{a: 1}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: {}}")));
 
-        ASSERT_EQUALS(fromjson("{a: -1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: -100}")));
-        ASSERT_EQUALS(fromjson("{a: -1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: -Infinity}")));
+    ASSERT_EQUALS(fromjson("{a: -1}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: -100}")));
+    ASSERT_EQUALS(fromjson("{a: -1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: -Infinity}")));
 
-        ASSERT_EQUALS(fromjson("{}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{}")));
-    }
+    ASSERT_EQUALS(fromjson("{}"), QueryPlannerAnalysis::getSortPattern(fromjson("{}")));
+}
 
-    TEST(QueryPlannerAnalysis, GetSortPatternSpecialIndexTypes) {
-        ASSERT_EQUALS(fromjson("{}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 'hashed'}")));
-        ASSERT_EQUALS(fromjson("{}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 'text'}")));
-        ASSERT_EQUALS(fromjson("{}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: '2dsphere'}")));
-        ASSERT_EQUALS(fromjson("{}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: ''}")));
-        ASSERT_EQUALS(fromjson("{}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 'foo'}")));
+TEST(QueryPlannerAnalysis, GetSortPatternSpecialIndexTypes) {
+    ASSERT_EQUALS(fromjson("{}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: 'hashed'}")));
+    ASSERT_EQUALS(fromjson("{}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: 'text'}")));
+    ASSERT_EQUALS(fromjson("{}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: '2dsphere'}")));
+    ASSERT_EQUALS(fromjson("{}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: ''}")));
+    ASSERT_EQUALS(fromjson("{}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: 'foo'}")));
 
-        ASSERT_EQUALS(fromjson("{a: -1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: -1, b: 'text'}")));
-        ASSERT_EQUALS(fromjson("{a: -1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: -1, b: '2dsphere'}")));
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 'text'}")));
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: '2dsphere'}")));
+    ASSERT_EQUALS(fromjson("{a: -1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: -1, b: 'text'}")));
+    ASSERT_EQUALS(fromjson("{a: -1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: -1, b: '2dsphere'}")));
+    ASSERT_EQUALS(fromjson("{a: 1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 'text'}")));
+    ASSERT_EQUALS(fromjson("{a: 1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: '2dsphere'}")));
 
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 'text', c: 1}")));
-        ASSERT_EQUALS(fromjson("{a: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: '2dsphere',"
-                                                                    " c: 1}")));
+    ASSERT_EQUALS(fromjson("{a: 1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 'text', c: 1}")));
+    ASSERT_EQUALS(fromjson("{a: 1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson(
+                      "{a: 1, b: '2dsphere',"
+                      " c: 1}")));
 
-        ASSERT_EQUALS(fromjson("{a: 1, b: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 1, c: 'text'}")));
-        ASSERT_EQUALS(fromjson("{a: 1, b: 1}"),
-                      QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 1, c: 'text',"
-                                                                    " d: 1}")));
-    }
+    ASSERT_EQUALS(fromjson("{a: 1, b: 1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 1, c: 'text'}")));
+    ASSERT_EQUALS(fromjson("{a: 1, b: 1}"),
+                  QueryPlannerAnalysis::getSortPattern(fromjson(
+                      "{a: 1, b: 1, c: 'text',"
+                      " d: 1}")));
+}
 
-    // Test the generation of sort orders provided by an index scan done by
-    // IndexScanNode::computeProperties().
-    TEST(QueryPlannerAnalysis, IxscanSortOrdersBasic) {
-        IndexScanNode ixscan;
-        ixscan.indexKeyPattern = fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}");
+// Test the generation of sort orders provided by an index scan done by
+// IndexScanNode::computeProperties().
+TEST(QueryPlannerAnalysis, IxscanSortOrdersBasic) {
+    IndexScanNode ixscan;
+    ixscan.indexKeyPattern = fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}");
 
-        // Bounds are {a: [[1,1]], b: [[2,2]], c: [[3,3]], d: [[1,5]], e:[[1,1],[2,2]]},
-        // all inclusive.
-        OrderedIntervalList oil1("a");
-        oil1.intervals.push_back(Interval(fromjson("{'': 1, '': 1}"), true, true));
-        ixscan.bounds.fields.push_back(oil1);
+    // Bounds are {a: [[1,1]], b: [[2,2]], c: [[3,3]], d: [[1,5]], e:[[1,1],[2,2]]},
+    // all inclusive.
+    OrderedIntervalList oil1("a");
+    oil1.intervals.push_back(Interval(fromjson("{'': 1, '': 1}"), true, true));
+    ixscan.bounds.fields.push_back(oil1);
 
-        OrderedIntervalList oil2("b");
-        oil2.intervals.push_back(Interval(fromjson("{'': 2, '': 2}"), true, true));
-        ixscan.bounds.fields.push_back(oil2);
+    OrderedIntervalList oil2("b");
+    oil2.intervals.push_back(Interval(fromjson("{'': 2, '': 2}"), true, true));
+    ixscan.bounds.fields.push_back(oil2);
 
-        OrderedIntervalList oil3("c");
-        oil3.intervals.push_back(Interval(fromjson("{'': 3, '': 3}"), true, true));
-        ixscan.bounds.fields.push_back(oil3);
+    OrderedIntervalList oil3("c");
+    oil3.intervals.push_back(Interval(fromjson("{'': 3, '': 3}"), true, true));
+    ixscan.bounds.fields.push_back(oil3);
 
-        OrderedIntervalList oil4("d");
-        oil4.intervals.push_back(Interval(fromjson("{'': 1, '': 5}"), true, true));
-        ixscan.bounds.fields.push_back(oil4);
+    OrderedIntervalList oil4("d");
+    oil4.intervals.push_back(Interval(fromjson("{'': 1, '': 5}"), true, true));
+    ixscan.bounds.fields.push_back(oil4);
 
-        OrderedIntervalList oil5("e");
-        oil5.intervals.push_back(Interval(fromjson("{'': 1, '': 1}"), true, true));
-        oil5.intervals.push_back(Interval(fromjson("{'': 2, '': 2}"), true, true));
-        ixscan.bounds.fields.push_back(oil5);
+    OrderedIntervalList oil5("e");
+    oil5.intervals.push_back(Interval(fromjson("{'': 1, '': 1}"), true, true));
+    oil5.intervals.push_back(Interval(fromjson("{'': 2, '': 2}"), true, true));
+    ixscan.bounds.fields.push_back(oil5);
 
-        // Compute and retrieve the set of sorts.
-        ixscan.computeProperties();
-        const BSONObjSet& sorts = ixscan.getSort();
+    // Compute and retrieve the set of sorts.
+    ixscan.computeProperties();
+    const BSONObjSet& sorts = ixscan.getSort();
 
-        // One possible sort is the index key pattern.
-        ASSERT(sorts.find(fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}")) != sorts.end());
+    // One possible sort is the index key pattern.
+    ASSERT(sorts.find(fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}")) != sorts.end());
 
-        // All prefixes of the key pattern.
-        ASSERT(sorts.find(fromjson("{a: 1}")) != sorts.end());
-        ASSERT(sorts.find(fromjson("{a: 1, b: 1}")) != sorts.end());
-        ASSERT(sorts.find(fromjson("{a: 1, b: 1, c: 1}")) != sorts.end());
-        ASSERT(sorts.find(fromjson("{a: 1, b: 1, c: 1, d: 1}")) != sorts.end());
+    // All prefixes of the key pattern.
+    ASSERT(sorts.find(fromjson("{a: 1}")) != sorts.end());
+    ASSERT(sorts.find(fromjson("{a: 1, b: 1}")) != sorts.end());
+    ASSERT(sorts.find(fromjson("{a: 1, b: 1, c: 1}")) != sorts.end());
+    ASSERT(sorts.find(fromjson("{a: 1, b: 1, c: 1, d: 1}")) != sorts.end());
 
-        // Additional sorts considered due to point intervals on 'a', 'b', and 'c'.
-        ASSERT(sorts.find(fromjson("{b: 1, c: 1, d: 1, e: 1}")) != sorts.end());
-        ASSERT(sorts.find(fromjson("{c: 1, d: 1, e: 1}")) != sorts.end());
-        ASSERT(sorts.find(fromjson("{d: 1, e: 1}")) != sorts.end());
-        ASSERT(sorts.find(fromjson("{d: 1}")) != sorts.end());
+    // Additional sorts considered due to point intervals on 'a', 'b', and 'c'.
+    ASSERT(sorts.find(fromjson("{b: 1, c: 1, d: 1, e: 1}")) != sorts.end());
+    ASSERT(sorts.find(fromjson("{c: 1, d: 1, e: 1}")) != sorts.end());
+    ASSERT(sorts.find(fromjson("{d: 1, e: 1}")) != sorts.end());
+    ASSERT(sorts.find(fromjson("{d: 1}")) != sorts.end());
 
-        // There should be 9 total sorts: make sure no other ones snuck their way in.
-        ASSERT_EQ(9U, sorts.size());
-    }
+    // There should be 9 total sorts: make sure no other ones snuck their way in.
+    ASSERT_EQ(9U, sorts.size());
+}
 
 }  // namespace

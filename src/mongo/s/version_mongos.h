@@ -27,6 +27,6 @@
 */
 
 namespace mongo {
-    // print mongos version info
-    void printShardingVersionInfo(bool out);
-} // namespace mongo
+// print mongos version info
+void printShardingVersionInfo(bool out);
+}  // namespace mongo

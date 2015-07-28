@@ -38,39 +38,43 @@
 
 namespace mongo {
 
-    namespace task {
+namespace task {
 
-        typedef stdx::function<void()> lam;
+typedef stdx::function<void()> lam;
 
-        /** typical usage is: task::fork( new Server("threadname") ); */
-        class Server : public Task {
-        public:
-            /** send a message to the port */
-            void send(lam);
+/** typical usage is: task::fork( new Server("threadname") ); */
+class Server : public Task {
+public:
+    /** send a message to the port */
+    void send(lam);
 
-            Server(const std::string& name) : m("server"), _name(name), rq(false) { }
-            virtual ~Server() { }
+    Server(const std::string& name) : m("server"), _name(name), rq(false) {}
+    virtual ~Server() {}
 
-            /** send message but block until function completes */
-            void call(const lam&);
+    /** send message but block until function completes */
+    void call(const lam&);
 
-            void requeue() { rq = true; }
-
-        protected:
-            // REMINDER : for use in mongod, you will want to have this call Client::initThread().
-            virtual void starting() { }
-
-        private:
-            virtual bool initClient() { return true; }
-            virtual std::string name() const { return _name; }
-            void doWork();
-            std::deque<lam> d;
-            mongo::mutex m;
-            boost::condition c;
-            std::string _name;
-            bool rq;
-        };
-
+    void requeue() {
+        rq = true;
     }
 
+protected:
+    // REMINDER : for use in mongod, you will want to have this call Client::initThread().
+    virtual void starting() {}
+
+private:
+    virtual bool initClient() {
+        return true;
+    }
+    virtual std::string name() const {
+        return _name;
+    }
+    void doWork();
+    std::deque<lam> d;
+    mongo::mutex m;
+    boost::condition c;
+    std::string _name;
+    bool rq;
+};
+}
 }

@@ -36,17 +36,17 @@
 
 namespace {
 
-    using namespace mongo;
-    using std::vector;
+using namespace mongo;
+using std::vector;
 
-    //
-    // Tests for the ConfigCoordinator
-    //
+//
+// Tests for the ConfigCoordinator
+//
 
-    TEST(ConfigCoordinatorTests, Basic) {
-        MockMultiWriteCommand dispatcher;
-        vector<ConnectionString> configHosts;
-        ConfigCoordinator exec( &dispatcher, configHosts );
-    }
+TEST(ConfigCoordinatorTests, Basic) {
+    MockMultiWriteCommand dispatcher;
+    vector<ConnectionString> configHosts;
+    ConfigCoordinator exec(&dispatcher, configHosts);
+}
 
-} // unnamed namespace
+}  // unnamed namespace

@@ -37,76 +37,67 @@
 
 namespace mongo {
 
-    class IndexDescriptor;
-    class OperationContext;
+class IndexDescriptor;
+class OperationContext;
 
-    class CollectionCatalogEntry {
-    public:
-        CollectionCatalogEntry( const StringData& ns )
-            : _ns( ns ){
-        }
-        virtual ~CollectionCatalogEntry(){}
+class CollectionCatalogEntry {
+public:
+    CollectionCatalogEntry(const StringData& ns) : _ns(ns) {}
+    virtual ~CollectionCatalogEntry() {}
 
-        const NamespaceString& ns() const { return _ns; }
+    const NamespaceString& ns() const {
+        return _ns;
+    }
 
-        // ------- indexes ----------
+    // ------- indexes ----------
 
-        virtual CollectionOptions getCollectionOptions( OperationContext* txn ) const = 0;
+    virtual CollectionOptions getCollectionOptions(OperationContext* txn) const = 0;
 
-        virtual int getTotalIndexCount( OperationContext* txn ) const = 0;
+    virtual int getTotalIndexCount(OperationContext* txn) const = 0;
 
-        virtual int getCompletedIndexCount( OperationContext* txn ) const = 0;
+    virtual int getCompletedIndexCount(OperationContext* txn) const = 0;
 
-        virtual int getMaxAllowedIndexes() const = 0;
+    virtual int getMaxAllowedIndexes() const = 0;
 
-        virtual void getAllIndexes( OperationContext* txn,
-                                    std::vector<std::string>* names ) const = 0;
+    virtual void getAllIndexes(OperationContext* txn, std::vector<std::string>* names) const = 0;
 
-        virtual BSONObj getIndexSpec( OperationContext* txn,
-                                      const StringData& idxName ) const = 0;
+    virtual BSONObj getIndexSpec(OperationContext* txn, const StringData& idxName) const = 0;
 
-        virtual bool isIndexMultikey( OperationContext* txn,
-                                      const StringData& indexName) const = 0;
+    virtual bool isIndexMultikey(OperationContext* txn, const StringData& indexName) const = 0;
 
-        virtual bool setIndexIsMultikey(OperationContext* txn,
-                                        const StringData& indexName,
-                                        bool multikey = true) = 0;
+    virtual bool setIndexIsMultikey(OperationContext* txn,
+                                    const StringData& indexName,
+                                    bool multikey = true) = 0;
 
-        virtual RecordId getIndexHead( OperationContext* txn,
-                                      const StringData& indexName ) const = 0;
+    virtual RecordId getIndexHead(OperationContext* txn, const StringData& indexName) const = 0;
 
-        virtual void setIndexHead( OperationContext* txn,
-                                   const StringData& indexName,
-                                   const RecordId& newHead ) = 0;
+    virtual void setIndexHead(OperationContext* txn,
+                              const StringData& indexName,
+                              const RecordId& newHead) = 0;
 
-        virtual bool isIndexReady( OperationContext* txn,
-                                   const StringData& indexName ) const = 0;
+    virtual bool isIndexReady(OperationContext* txn, const StringData& indexName) const = 0;
 
-        virtual Status removeIndex( OperationContext* txn,
-                                    const StringData& indexName ) = 0;
+    virtual Status removeIndex(OperationContext* txn, const StringData& indexName) = 0;
 
-        virtual Status prepareForIndexBuild( OperationContext* txn,
-                                             const IndexDescriptor* spec ) = 0;
+    virtual Status prepareForIndexBuild(OperationContext* txn, const IndexDescriptor* spec) = 0;
 
-        virtual void indexBuildSuccess( OperationContext* txn,
-                                        const StringData& indexName ) = 0;
+    virtual void indexBuildSuccess(OperationContext* txn, const StringData& indexName) = 0;
 
-        /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
-         * The specified index must already contain an expireAfterSeconds field, and the value in
-         * that field and newExpireSecs must both be numeric.
-         */
-        virtual void updateTTLSetting( OperationContext* txn,
-                                       const StringData& idxName,
-                                       long long newExpireSeconds ) = 0;
+    /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
+     * The specified index must already contain an expireAfterSeconds field, and the value in
+     * that field and newExpireSecs must both be numeric.
+     */
+    virtual void updateTTLSetting(OperationContext* txn,
+                                  const StringData& idxName,
+                                  long long newExpireSeconds) = 0;
 
-        /**
-         * Sets the flags field of CollectionOptions to newValue.
-         * Subsequent calls to getCollectionOptions should have flags==newValue and flagsSet==true.
-         */
-        virtual void updateFlags(OperationContext* txn, int newValue) = 0;
+    /**
+     * Sets the flags field of CollectionOptions to newValue.
+     * Subsequent calls to getCollectionOptions should have flags==newValue and flagsSet==true.
+     */
+    virtual void updateFlags(OperationContext* txn, int newValue) = 0;
 
-    private:
-        NamespaceString _ns;
-    };
-
+private:
+    NamespaceString _ns;
+};
 }

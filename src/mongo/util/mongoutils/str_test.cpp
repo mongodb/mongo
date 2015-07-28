@@ -34,48 +34,48 @@
 
 namespace {
 
-    namespace str = mongoutils::str;
+namespace str = mongoutils::str;
 
-    TEST(StripTrailingTests, RemoveFromHead) {
-        std::string data("remove from head");
-        str::stripTrailing(data, "re");
-        ASSERT_EQUALS("mov fom had", data);
-    }
+TEST(StripTrailingTests, RemoveFromHead) {
+    std::string data("remove from head");
+    str::stripTrailing(data, "re");
+    ASSERT_EQUALS("mov fom had", data);
+}
 
-    TEST(StripTrailingTests, RemoveFromTail) {
-        std::string data("remove from tail");
-        str::stripTrailing(data, "ail");
-        ASSERT_EQUALS("remove from t", data);
-    }
+TEST(StripTrailingTests, RemoveFromTail) {
+    std::string data("remove from tail");
+    str::stripTrailing(data, "ail");
+    ASSERT_EQUALS("remove from t", data);
+}
 
-    TEST(StripTrailingTests, RemoveSpaces) {
-        std::string data("remove spaces");
-        str::stripTrailing(data, " a");
-        ASSERT_EQUALS("removespces", data);
-    }
+TEST(StripTrailingTests, RemoveSpaces) {
+    std::string data("remove spaces");
+    str::stripTrailing(data, " a");
+    ASSERT_EQUALS("removespces", data);
+}
 
-    TEST(StripTrailingTests, RemoveFromMiddle) {
-        std::string data("remove from middle");
-        str::stripTrailing(data, "from");
-        ASSERT_EQUALS("eve  iddle", data);
-    }
+TEST(StripTrailingTests, RemoveFromMiddle) {
+    std::string data("remove from middle");
+    str::stripTrailing(data, "from");
+    ASSERT_EQUALS("eve  iddle", data);
+}
 
-    TEST(StripTrailingTests, RemoveFromEmpty) {
-        std::string data("");
-        str::stripTrailing(data, "from");
-        ASSERT_EQUALS("", data);
-    }
+TEST(StripTrailingTests, RemoveFromEmpty) {
+    std::string data("");
+    str::stripTrailing(data, "from");
+    ASSERT_EQUALS("", data);
+}
 
-    TEST(StripTrailingTests, RemoveEmpty) {
-        std::string data("remove empty");
-        str::stripTrailing(data, "");
-        ASSERT_EQUALS("remove empty", data);
-    }
+TEST(StripTrailingTests, RemoveEmpty) {
+    std::string data("remove empty");
+    str::stripTrailing(data, "");
+    ASSERT_EQUALS("remove empty", data);
+}
 
-    TEST(StripTrailingTests, RemoveBringsEmptyResult) {
-        std::string data("remove");
-        str::stripTrailing(data, "remove");
-        ASSERT_EQUALS("", data);
-    }
+TEST(StripTrailingTests, RemoveBringsEmptyResult) {
+    std::string data("remove");
+    str::stripTrailing(data, "remove");
+    ASSERT_EQUALS("", data);
+}
 
 }  // namespace

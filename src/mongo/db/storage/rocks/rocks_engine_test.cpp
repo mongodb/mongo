@@ -43,28 +43,32 @@
 #include "rocks_engine.h"
 
 namespace mongo {
-    class RocksEngineHarnessHelper : public KVHarnessHelper {
-    public:
-        RocksEngineHarnessHelper() : _dbpath("mongo-rocks-engine-test") {
-            boost::filesystem::remove_all(_dbpath.path());
-            restartEngine();
-        }
+class RocksEngineHarnessHelper : public KVHarnessHelper {
+public:
+    RocksEngineHarnessHelper() : _dbpath("mongo-rocks-engine-test") {
+        boost::filesystem::remove_all(_dbpath.path());
+        restartEngine();
+    }
 
-        virtual ~RocksEngineHarnessHelper() = default;
+    virtual ~RocksEngineHarnessHelper() = default;
 
-        virtual KVEngine* getEngine() { return _engine.get(); }
+    virtual KVEngine* getEngine() {
+        return _engine.get();
+    }
 
-        virtual KVEngine* restartEngine() {
-            _engine.reset(nullptr);
-            _engine.reset(new RocksEngine(_dbpath.path(), true));
-            return _engine.get();
-        }
+    virtual KVEngine* restartEngine() {
+        _engine.reset(nullptr);
+        _engine.reset(new RocksEngine(_dbpath.path(), true));
+        return _engine.get();
+    }
 
-    private:
-        unittest::TempDir _dbpath;
+private:
+    unittest::TempDir _dbpath;
 
-        boost::scoped_ptr<RocksEngine> _engine;
-    };
+    boost::scoped_ptr<RocksEngine> _engine;
+};
 
-    KVHarnessHelper* KVHarnessHelper::create() { return new RocksEngineHarnessHelper(); }
+KVHarnessHelper* KVHarnessHelper::create() {
+    return new RocksEngineHarnessHelper();
+}
 }

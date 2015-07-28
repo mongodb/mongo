@@ -32,6 +32,6 @@
 
 namespace mongo {
 
-    bool StaticObserver::_destroyingStatics = false;
+bool StaticObserver::_destroyingStatics = false;
 
-} // namespace mongo
+}  // namespace mongo

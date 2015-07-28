@@ -34,44 +34,37 @@
 
 namespace mongo {
 
-    // Extracts the value for 'pattern' for both 'lhs' and 'rhs' and return true if 'lhs' <
-    // 'rhs'. We expect that both 'lhs' and 'rhs' be key patterns.
-    struct PatternElementCmp {
-        BSONObj sortPattern;
-        bool useWholeValue;
+// Extracts the value for 'pattern' for both 'lhs' and 'rhs' and return true if 'lhs' <
+// 'rhs'. We expect that both 'lhs' and 'rhs' be key patterns.
+struct PatternElementCmp {
+    BSONObj sortPattern;
+    bool useWholeValue;
 
-        PatternElementCmp()
-            : sortPattern(BSONObj())
-            , useWholeValue(true)  {}
+    PatternElementCmp() : sortPattern(BSONObj()), useWholeValue(true) {}
 
-        PatternElementCmp(const BSONObj& pattern)
-            : sortPattern(pattern)
-            , useWholeValue(pattern.hasField("")){
+    PatternElementCmp(const BSONObj& pattern)
+        : sortPattern(pattern), useWholeValue(pattern.hasField("")) {}
+
+    bool operator()(const mutablebson::Element& lhs, const mutablebson::Element& rhs) const {
+        if (useWholeValue) {
+            const int comparedValue = lhs.compareWithElement(rhs, false);
+
+            const bool reversed = (sortPattern.firstElement().number() < 0);
+
+            return (reversed ? comparedValue > 0 : comparedValue < 0);
+        } else {
+            // TODO: Push on to mutable in the future, and to support non-contiguous Elements.
+            BSONObj lhsObj =
+                lhs.getType() == Object ? lhs.getValueObject() : lhs.getValue().wrap("");
+            BSONObj rhsObj =
+                rhs.getType() == Object ? rhs.getValueObject() : rhs.getValue().wrap("");
+
+            BSONObj lhsKey = lhsObj.extractFields(sortPattern, true);
+            BSONObj rhsKey = rhsObj.extractFields(sortPattern, true);
+
+            return lhsKey.woCompare(rhsKey, sortPattern) < 0;
         }
+    }
+};
 
-        bool operator()(const mutablebson::Element& lhs, const mutablebson::Element& rhs) const {
-            if (useWholeValue) {
-                const int comparedValue = lhs.compareWithElement( rhs, false );
-
-                const bool reversed = (sortPattern.firstElement().number() < 0 );
-
-                return (reversed ? comparedValue > 0 : comparedValue < 0);
-            }
-            else {
-                //TODO: Push on to mutable in the future, and to support non-contiguous Elements.
-                BSONObj lhsObj = lhs.getType() == Object ?
-                                            lhs.getValueObject() :
-                                            lhs.getValue().wrap("");
-                BSONObj rhsObj = rhs.getType() == Object ?
-                                            rhs.getValueObject() :
-                                            rhs.getValue().wrap("");
-
-                BSONObj lhsKey = lhsObj.extractFields(sortPattern, true);
-                BSONObj rhsKey = rhsObj.extractFields(sortPattern, true);
-
-                return lhsKey.woCompare(rhsKey, sortPattern) < 0;
-            }
-        }
-    };
-
-} // namespace mongo
+}  // namespace mongo

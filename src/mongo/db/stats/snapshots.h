@@ -39,74 +39,76 @@
  */
 namespace mongo {
 
-    class SnapshotThread;
+class SnapshotThread;
 
-    /**
-     * stores a point in time snapshot
-     * i.e. all counters at a given time
-     */
-    class SnapshotData {
-        void takeSnapshot();
+/**
+ * stores a point in time snapshot
+ * i.e. all counters at a given time
+ */
+class SnapshotData {
+    void takeSnapshot();
 
-        unsigned long long _created;
-        Top::UsageMap _usage;
+    unsigned long long _created;
+    Top::UsageMap _usage;
 
-        friend class SnapshotThread;
-        friend class SnapshotDelta;
-        friend class Snapshots;
-    };
+    friend class SnapshotThread;
+    friend class SnapshotDelta;
+    friend class Snapshots;
+};
 
-    /**
-     * contains performance information for a time period
-     */
-    class SnapshotDelta {
-    public:
-        SnapshotDelta( const SnapshotData& older , const SnapshotData& newer );
+/**
+ * contains performance information for a time period
+ */
+class SnapshotDelta {
+public:
+    SnapshotDelta(const SnapshotData& older, const SnapshotData& newer);
 
-        unsigned long long start() const {
-            return _older._created;
-        }
+    unsigned long long start() const {
+        return _older._created;
+    }
 
-        unsigned long long elapsed() const {
-            return _elapsed;
-        }
+    unsigned long long elapsed() const {
+        return _elapsed;
+    }
 
-        Top::UsageMap collectionUsageDiff();
+    Top::UsageMap collectionUsageDiff();
 
-    private:
-        const SnapshotData& _older;
-        const SnapshotData& _newer;
+private:
+    const SnapshotData& _older;
+    const SnapshotData& _newer;
 
-        unsigned long long _elapsed;
-    };
+    unsigned long long _elapsed;
+};
 
-    class Snapshots {
-    public:
-        Snapshots(int n=100);
+class Snapshots {
+public:
+    Snapshots(int n = 100);
 
-        const SnapshotData* takeSnapshot();
+    const SnapshotData* takeSnapshot();
 
-        int numDeltas() const { return _stored-1; }
+    int numDeltas() const {
+        return _stored - 1;
+    }
 
-        const SnapshotData& getPrev( int numBack = 0 );
-        std::auto_ptr<SnapshotDelta> computeDelta( int numBack = 0 );
+    const SnapshotData& getPrev(int numBack = 0);
+    std::auto_ptr<SnapshotDelta> computeDelta(int numBack = 0);
 
-    private:
-        mongo::mutex _lock;
-        int _n;
-        boost::scoped_array<SnapshotData> _snapshots;
-        int _loc;
-        int _stored;
-    };
+private:
+    mongo::mutex _lock;
+    int _n;
+    boost::scoped_array<SnapshotData> _snapshots;
+    int _loc;
+    int _stored;
+};
 
-    class SnapshotThread : public BackgroundJob {
-    public:
-        virtual std::string name() const { return "snapshot"; }
-        void run();
-    };
+class SnapshotThread : public BackgroundJob {
+public:
+    virtual std::string name() const {
+        return "snapshot";
+    }
+    void run();
+};
 
-    extern Snapshots statsSnapshots;
-    extern SnapshotThread snapshotThread;
-
-
+extern Snapshots statsSnapshots;
+extern SnapshotThread snapshotThread;
 }

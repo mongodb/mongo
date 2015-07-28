@@ -24,87 +24,85 @@
 
 namespace mongo {
 
-    /**
-     * Instantiation of AtomicIntrinsics<> for all word types T.
-     */
-    template <typename T, typename IsTLarge=void>
-    class AtomicIntrinsics {
-    public:
+/**
+ * Instantiation of AtomicIntrinsics<> for all word types T.
+ */
+template <typename T, typename IsTLarge = void>
+class AtomicIntrinsics {
+public:
+    static T compareAndSwap(volatile T* dest, T expected, T newValue) {
+        return __sync_val_compare_and_swap(dest, expected, newValue);
+    }
 
-        static T compareAndSwap(volatile T* dest, T expected, T newValue) {
-            return __sync_val_compare_and_swap(dest, expected, newValue);
+    static T swap(volatile T* dest, T newValue) {
+        T currentValue = *dest;
+        while (true) {
+            const T result = compareAndSwap(dest, currentValue, newValue);
+            if (result == currentValue)
+                return result;
+            currentValue = result;
         }
+    }
 
-        static T swap(volatile T* dest, T newValue) {
-            T currentValue = *dest;
-            while (true) {
-                const T result = compareAndSwap(dest, currentValue, newValue);
-                if (result == currentValue)
-                    return result;
-                currentValue = result;
-            }
+    static T load(volatile const T* value) {
+        __sync_synchronize();
+        T result = *value;
+        __sync_synchronize();
+        return result;
+    }
+
+    static T loadRelaxed(volatile const T* value) {
+        asm volatile("" ::: "memory");
+        return *value;
+    }
+
+    static void store(volatile T* dest, T newValue) {
+        __sync_synchronize();
+        *dest = newValue;
+        __sync_synchronize();
+    }
+
+    static T fetchAndAdd(volatile T* dest, T increment) {
+        return __sync_fetch_and_add(dest, increment);
+    }
+
+private:
+    AtomicIntrinsics();
+    ~AtomicIntrinsics();
+};
+
+template <typename T>
+class AtomicIntrinsics<T, typename boost::disable_if_c<sizeof(T) <= sizeof(void*)>::type> {
+public:
+    static T compareAndSwap(volatile T* dest, T expected, T newValue) {
+        return __sync_val_compare_and_swap(dest, expected, newValue);
+    }
+
+    static T swap(volatile T* dest, T newValue) {
+        T currentValue = *dest;
+        while (true) {
+            const T result = compareAndSwap(dest, currentValue, newValue);
+            if (result == currentValue)
+                return result;
+            currentValue = result;
         }
+    }
 
-        static T load(volatile const T* value) {
-            __sync_synchronize();
-            T result = *value;
-            __sync_synchronize();
-            return result;
-        }
+    static T load(volatile const T* value) {
+        return compareAndSwap(const_cast<volatile T*>(value), T(0), T(0));
+    }
 
-        static T loadRelaxed(volatile const T* value) {
-            asm volatile("" ::: "memory");
-            return *value;
-        }
+    static void store(volatile T* dest, T newValue) {
+        swap(dest, newValue);
+    }
 
-        static void store(volatile T* dest, T newValue) {
-            __sync_synchronize();
-            *dest = newValue;
-            __sync_synchronize();
-        }
+    static T fetchAndAdd(volatile T* dest, T increment) {
+        return __sync_fetch_and_add(dest, increment);
+    }
 
-        static T fetchAndAdd(volatile T* dest, T increment) {
-            return __sync_fetch_and_add(dest, increment);
-        }
-
-    private:
-        AtomicIntrinsics();
-        ~AtomicIntrinsics();
-    };
-
-    template <typename T>
-    class AtomicIntrinsics<T, typename boost::disable_if_c<sizeof(T) <= sizeof(void*)>::type> {
-    public:
-
-        static T compareAndSwap(volatile T* dest, T expected, T newValue) {
-            return __sync_val_compare_and_swap(dest, expected, newValue);
-        }
-
-        static T swap(volatile T* dest, T newValue) {
-            T currentValue = *dest;
-            while (true) {
-                const T result = compareAndSwap(dest, currentValue, newValue);
-                if (result == currentValue)
-                    return result;
-                currentValue = result;
-            }
-        }
-
-        static T load(volatile const T* value) {
-            return compareAndSwap(const_cast<volatile T*>(value), T(0), T(0));
-        }
-
-        static void store(volatile T* dest, T newValue) {
-            swap(dest, newValue);
-        }
-
-        static T fetchAndAdd(volatile T* dest, T increment) {
-            return __sync_fetch_and_add(dest, increment);
-        }
-
-    private:
-        AtomicIntrinsics();
-        ~AtomicIntrinsics();
-    };
+private:
+    AtomicIntrinsics();
+    ~AtomicIntrinsics();
+};
 
 }  // namespace mongo

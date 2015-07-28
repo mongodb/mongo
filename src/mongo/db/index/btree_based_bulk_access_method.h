@@ -41,128 +41,132 @@
 
 namespace mongo {
 
-    class BtreeBasedBulkAccessMethod : public IndexAccessMethod {
-    public:
-        /**
-         * Does not take ownership of any pointers.
-         * All pointers must outlive 'this'.
-         */
-        BtreeBasedBulkAccessMethod(OperationContext* txn,
-                                   BtreeBasedAccessMethod* real,
-                                   SortedDataInterface* interface,
-                                   const IndexDescriptor* descriptor);
+class BtreeBasedBulkAccessMethod : public IndexAccessMethod {
+public:
+    /**
+     * Does not take ownership of any pointers.
+     * All pointers must outlive 'this'.
+     */
+    BtreeBasedBulkAccessMethod(OperationContext* txn,
+                               BtreeBasedAccessMethod* real,
+                               SortedDataInterface* interface,
+                               const IndexDescriptor* descriptor);
 
-        ~BtreeBasedBulkAccessMethod() {}
+    ~BtreeBasedBulkAccessMethod() {}
 
-        virtual Status insert(OperationContext* txn,
-                              const BSONObj& obj,
-                              const RecordId& loc,
-                              const InsertDeleteOptions& options,
-                              int64_t* numInserted);
+    virtual Status insert(OperationContext* txn,
+                          const BSONObj& obj,
+                          const RecordId& loc,
+                          const InsertDeleteOptions& options,
+                          int64_t* numInserted);
 
-        Status commit(std::set<RecordId>* dupsToDrop, bool mayInterrupt, bool dupsAllowed);
+    Status commit(std::set<RecordId>* dupsToDrop, bool mayInterrupt, bool dupsAllowed);
 
-        // Exposed for testing.
-        static ExternalSortComparison* getComparison(int version, const BSONObj& keyPattern);
+    // Exposed for testing.
+    static ExternalSortComparison* getComparison(int version, const BSONObj& keyPattern);
 
-        //
-        // Stuff below here is a no-op of one form or another.
-        //
+    //
+    // Stuff below here is a no-op of one form or another.
+    //
 
-        virtual Status commitBulk(IndexAccessMethod* bulk,
-                                  bool mayInterrupt,
-                                  bool dupsAllowed,
-                                  std::set<RecordId>* dups) {
-            invariant(this == bulk);
-            return Status::OK();
-        }
+    virtual Status commitBulk(IndexAccessMethod* bulk,
+                              bool mayInterrupt,
+                              bool dupsAllowed,
+                              std::set<RecordId>* dups) {
+        invariant(this == bulk);
+        return Status::OK();
+    }
 
-        virtual Status touch(OperationContext* txn, const BSONObj& obj) {
-            return _notAllowed();
-        }
+    virtual Status touch(OperationContext* txn, const BSONObj& obj) {
+        return _notAllowed();
+    }
 
-        virtual Status touch(OperationContext* txn) const {
-            return _notAllowed();
-        }
+    virtual Status touch(OperationContext* txn) const {
+        return _notAllowed();
+    }
 
-        virtual Status validate(OperationContext* txn, bool full, int64_t* numKeys, BSONObjBuilder* output) {
-            return _notAllowed();
-        }
+    virtual Status validate(OperationContext* txn,
+                            bool full,
+                            int64_t* numKeys,
+                            BSONObjBuilder* output) {
+        return _notAllowed();
+    }
 
-        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
-            const {
-            return false;
-        }
+    virtual bool appendCustomStats(OperationContext* txn,
+                                   BSONObjBuilder* output,
+                                   double scale) const {
+        return false;
+    }
 
-        virtual Status remove(OperationContext* txn,
-                              const BSONObj& obj,
-                              const RecordId& loc,
-                              const InsertDeleteOptions& options,
-                              int64_t* numDeleted) {
-            return _notAllowed();
-        }
+    virtual Status remove(OperationContext* txn,
+                          const BSONObj& obj,
+                          const RecordId& loc,
+                          const InsertDeleteOptions& options,
+                          int64_t* numDeleted) {
+        return _notAllowed();
+    }
 
-        virtual Status validateUpdate(OperationContext* txn,
-                                      const BSONObj& from,
-                                      const BSONObj& to,
-                                      const RecordId& loc,
-                                      const InsertDeleteOptions& options,
-                                      UpdateTicket* ticket) {
-            return _notAllowed();
-        }
+    virtual Status validateUpdate(OperationContext* txn,
+                                  const BSONObj& from,
+                                  const BSONObj& to,
+                                  const RecordId& loc,
+                                  const InsertDeleteOptions& options,
+                                  UpdateTicket* ticket) {
+        return _notAllowed();
+    }
 
-        virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
-            return -1;
-        }
+    virtual long long getSpaceUsedBytes(OperationContext* txn) const {
+        return -1;
+    }
 
-        virtual Status update(OperationContext* txn,
-                              const UpdateTicket& ticket,
-                              int64_t* numUpdated) {
-            return _notAllowed();
-        }
+    virtual Status update(OperationContext* txn, const UpdateTicket& ticket, int64_t* numUpdated) {
+        return _notAllowed();
+    }
 
-        virtual Status newCursor(OperationContext*txn,
-                                 const CursorOptions& opts,
-                                 IndexCursor** out) const {
-            return _notAllowed();
-        }
+    virtual Status newCursor(OperationContext* txn,
+                             const CursorOptions& opts,
+                             IndexCursor** out) const {
+        return _notAllowed();
+    }
 
-        virtual Status initializeAsEmpty(OperationContext* txn) {
-            return _notAllowed();
-        }
+    virtual Status initializeAsEmpty(OperationContext* txn) {
+        return _notAllowed();
+    }
 
-        virtual IndexAccessMethod* initiateBulk(OperationContext* txn) {
-            return NULL;
-        }
+    virtual IndexAccessMethod* initiateBulk(OperationContext* txn) {
+        return NULL;
+    }
 
-        OperationContext* getOperationContext() { return _txn; }
+    OperationContext* getOperationContext() {
+        return _txn;
+    }
 
-    private:
-        typedef Sorter<BSONObj, RecordId> BSONObjExternalSorter;
+private:
+    typedef Sorter<BSONObj, RecordId> BSONObjExternalSorter;
 
-        Status _notAllowed() const {
-            return Status(ErrorCodes::InternalError, "cannot use bulk for this yet");
-        }
+    Status _notAllowed() const {
+        return Status(ErrorCodes::InternalError, "cannot use bulk for this yet");
+    }
 
-        // Not owned here.
-        BtreeBasedAccessMethod* _real;
+    // Not owned here.
+    BtreeBasedAccessMethod* _real;
 
-        // Not owned here.
-        SortedDataInterface* _interface;
+    // Not owned here.
+    SortedDataInterface* _interface;
 
-        // The external sorter.
-        boost::scoped_ptr<BSONObjExternalSorter> _sorter;
+    // The external sorter.
+    boost::scoped_ptr<BSONObjExternalSorter> _sorter;
 
-        // How many docs are we indexing?
-        unsigned long long _docsInserted;
+    // How many docs are we indexing?
+    unsigned long long _docsInserted;
 
-        // And how many keys?
-        unsigned long long _keysInserted;
+    // And how many keys?
+    unsigned long long _keysInserted;
 
-        // Does any document have >1 key?
-        bool _isMultiKey;
+    // Does any document have >1 key?
+    bool _isMultiKey;
 
-        OperationContext* _txn;
-    };
+    OperationContext* _txn;
+};
 
 }  // namespace mongo

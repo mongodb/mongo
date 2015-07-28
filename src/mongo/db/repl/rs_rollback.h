@@ -29,39 +29,38 @@
 #pragma once
 
 namespace mongo {
-    class OperationContext;
-    class OpTime;
+class OperationContext;
+class OpTime;
 
 namespace repl {
-    class OplogReader; 
-    class ReplicationCoordinator;
+class OplogReader;
+class ReplicationCoordinator;
 
-    /**
-     * Initiates the rollback process.
-     * This function assumes the preconditions for undertaking rollback have already been met;
-     * we have ops in our oplog that our sync source does not have, and we are not currently
-     * PRIMARY.
-     * The rollback procedure is:
-     * - find the common point between this node and its sync source
-     * - undo operations by fetching all documents affected, then replaying
-     *   the sync source's oplog until we reach the time in the oplog when we fetched the last
-     *   document.
-     * This function can throw std::exception on failures.
-     * This function runs a command on the sync source to detect if the sync source rolls back
-     * while our rollback is in progress.
-     * 
-     * @param txn Used to read and write from this node's databases
-     * @param lastOpTimeWritten The last OpTime applied by the applier
-     * @param oplogreader Must already be connected to a sync source.  Used to fetch documents.
-     * @param replCoord Used to track the rollback ID and to change the follower state
-     * 
-     * Failures: some failure cases are fatal; others throw std::exception.
-     */
+/**
+ * Initiates the rollback process.
+ * This function assumes the preconditions for undertaking rollback have already been met;
+ * we have ops in our oplog that our sync source does not have, and we are not currently
+ * PRIMARY.
+ * The rollback procedure is:
+ * - find the common point between this node and its sync source
+ * - undo operations by fetching all documents affected, then replaying
+ *   the sync source's oplog until we reach the time in the oplog when we fetched the last
+ *   document.
+ * This function can throw std::exception on failures.
+ * This function runs a command on the sync source to detect if the sync source rolls back
+ * while our rollback is in progress.
+ *
+ * @param txn Used to read and write from this node's databases
+ * @param lastOpTimeWritten The last OpTime applied by the applier
+ * @param oplogreader Must already be connected to a sync source.  Used to fetch documents.
+ * @param replCoord Used to track the rollback ID and to change the follower state
+ *
+ * Failures: some failure cases are fatal; others throw std::exception.
+ */
 
-    void syncRollback(OperationContext* txn,
-                      OpTime lastOpTimeWritten,
-                      OplogReader* oplogreader,
-                      ReplicationCoordinator* replCoord);
-
+void syncRollback(OperationContext* txn,
+                  OpTime lastOpTimeWritten,
+                  OplogReader* oplogreader,
+                  ReplicationCoordinator* replCoord);
 }
 }

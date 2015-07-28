@@ -33,48 +33,43 @@
 namespace mongo {
 namespace {
 
-    TEST(BsonCheck, CheckNothingLegal) {
-        const char *const *nada = NULL;
-        ASSERT_OK(bsonCheckOnlyHasFields("", BSONObj(), nada, nada));
-        ASSERT_EQUALS(ErrorCodes::BadValue,
-                      bsonCheckOnlyHasFields("", BSON("a" << 1), nada, nada));
-    }
+TEST(BsonCheck, CheckNothingLegal) {
+    const char* const* nada = NULL;
+    ASSERT_OK(bsonCheckOnlyHasFields("", BSONObj(), nada, nada));
+    ASSERT_EQUALS(ErrorCodes::BadValue, bsonCheckOnlyHasFields("", BSON("a" << 1), nada, nada));
+}
 
-    const char *const legals[] = {
-        "aField",
-        "anotherField",
-        "thirdField"
-    };
+const char* const legals[] = {"aField", "anotherField", "thirdField"};
 
-    TEST(BsonCheck, CheckHasOnlyOnEmptyObject){
-        ASSERT_OK(bsonCheckOnlyHasFields(
-                          "",
-                          BSONObj(),
-                          legals));
-    }
+TEST(BsonCheck, CheckHasOnlyOnEmptyObject) {
+    ASSERT_OK(bsonCheckOnlyHasFields("", BSONObj(), legals));
+}
 
-    TEST(BsonCheck, CheckHasOnlyLegalFields) {
-        ASSERT_OK(bsonCheckOnlyHasFields(
-                          "",
-                          BSON("aField" << "value" << "thirdField" << 1 << "anotherField" << 2),
-                          legals));
-        ASSERT_OK(bsonCheckOnlyHasFields(
-                          "",
-                          BSON("aField" << "value" << "thirdField" << 1),
-                          legals));
+TEST(BsonCheck, CheckHasOnlyLegalFields) {
+    ASSERT_OK(bsonCheckOnlyHasFields("",
+                                     BSON("aField"
+                                          << "value"
+                                          << "thirdField" << 1 << "anotherField" << 2),
+                                     legals));
+    ASSERT_OK(bsonCheckOnlyHasFields("",
+                                     BSON("aField"
+                                          << "value"
+                                          << "thirdField" << 1),
+                                     legals));
 
-        ASSERT_EQUALS(ErrorCodes::BadValue, bsonCheckOnlyHasFields(
-                              "",
-                              BSON("aField" << "value" << "illegal" << 4 << "thirdField" << 1),
-                              legals));
-    }
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  bsonCheckOnlyHasFields("",
+                                         BSON("aField"
+                                              << "value"
+                                              << "illegal" << 4 << "thirdField" << 1),
+                                         legals));
+}
 
-    TEST(BsonCheck, CheckNoDuplicates) {
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, bsonCheckOnlyHasFields(
-                              "",
-                              BSON("aField" << 1 << "anotherField" << 2 << "aField" << 3),
-                              legals));
-    }
+TEST(BsonCheck, CheckNoDuplicates) {
+    ASSERT_EQUALS(ErrorCodes::DuplicateKey,
+                  bsonCheckOnlyHasFields(
+                      "", BSON("aField" << 1 << "anotherField" << 2 << "aField" << 3), legals));
+}
 
 }  // namespace
 }  // namespace mongo

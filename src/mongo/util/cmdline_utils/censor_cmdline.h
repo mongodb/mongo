@@ -35,15 +35,14 @@
 
 namespace mongo {
 
-    namespace cmdline_utils {
+namespace cmdline_utils {
 
-        /**
-         * Blot out sensitive fields in the argv array.
-         */
-        void censorArgvArray(int argc, char** argv);
-        void censorArgsVector(std::vector<std::string>* args);
-        void censorBSONObj(BSONObj* params);
+/**
+ * Blot out sensitive fields in the argv array.
+ */
+void censorArgvArray(int argc, char** argv);
+void censorArgsVector(std::vector<std::string>* args);
+void censorBSONObj(BSONObj* params);
 
-    } // namespace cmdline_utils
+}  // namespace cmdline_utils
 }
-

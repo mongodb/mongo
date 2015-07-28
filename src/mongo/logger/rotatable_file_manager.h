@@ -40,52 +40,53 @@
 namespace mongo {
 namespace logger {
 
-    typedef StatusWith<RotatableFileWriter*> StatusWithRotatableFileWriter;
+typedef StatusWith<RotatableFileWriter*> StatusWithRotatableFileWriter;
+
+/**
+ * Utility object that owns and manages rotation for RotatableFileWriters.
+ *
+ * Unlike RotatableFileWriter, this type leaves synchronization to its consumers.
+ */
+class RotatableFileManager {
+    MONGO_DISALLOW_COPYING(RotatableFileManager);
+
+public:
+    typedef std::pair<std::string, Status> FileNameStatusPair;
+    typedef std::vector<FileNameStatusPair> FileNameStatusPairVector;
+
+    RotatableFileManager();
+    ~RotatableFileManager();
 
     /**
-     * Utility object that owns and manages rotation for RotatableFileWriters.
+     * Opens "name" in mode "append" and returns a new RotatableFileWriter set to
+     * operate on the file.
      *
-     * Unlike RotatableFileWriter, this type leaves synchronization to its consumers.
+     * If the manager already has opened "name", returns ErrorCodes::FileAlreadyOpen.
+     * May also return failure codes issued by RotatableFileWriter::Use::setFileName().
      */
-    class RotatableFileManager {
-        MONGO_DISALLOW_COPYING(RotatableFileManager);
-    public:
-        typedef std::pair<std::string, Status> FileNameStatusPair;
-        typedef std::vector<FileNameStatusPair> FileNameStatusPairVector;
+    StatusWithRotatableFileWriter openFile(const std::string& name, bool append);
 
-        RotatableFileManager();
-        ~RotatableFileManager();
+    /**
+     * Gets a RotatableFileWriter for writing to "name", if the manager owns one, or NULL if
+     * not.
+     */
+    RotatableFileWriter* getFile(const std::string& name);
 
-        /**
-         * Opens "name" in mode "append" and returns a new RotatableFileWriter set to
-         * operate on the file.
-         *
-         * If the manager already has opened "name", returns ErrorCodes::FileAlreadyOpen.
-         * May also return failure codes issued by RotatableFileWriter::Use::setFileName().
-         */
-        StatusWithRotatableFileWriter openFile(const std::string& name, bool append);
+    /**
+     * Rotates all managed files, renaming each file by appending "renameTargetSuffix".
+     *
+     * renameFiles - true we rename the log file, false we expect it was renamed externally
+     *
+     * Returns a vector of <filename, Status> pairs for filenames with non-OK rotate status.
+     * An empty vector indicates that all files were rotated successfully.
+     */
+    FileNameStatusPairVector rotateAll(bool renameFiles, const std::string& renameTargetSuffix);
 
-        /**
-         * Gets a RotatableFileWriter for writing to "name", if the manager owns one, or NULL if
-         * not.
-         */
-        RotatableFileWriter* getFile(const std::string& name);
+private:
+    typedef unordered_map<std::string, RotatableFileWriter*> WriterByNameMap;
 
-        /**
-         * Rotates all managed files, renaming each file by appending "renameTargetSuffix".
-         *
-         * renameFiles - true we rename the log file, false we expect it was renamed externally
-         *
-         * Returns a vector of <filename, Status> pairs for filenames with non-OK rotate status.
-         * An empty vector indicates that all files were rotated successfully.
-         */
-        FileNameStatusPairVector rotateAll(bool renameFiles, const std::string& renameTargetSuffix);
-
-    private:
-        typedef unordered_map<std::string, RotatableFileWriter*> WriterByNameMap;
-
-        WriterByNameMap _writers;
-    };
+    WriterByNameMap _writers;
+};
 
 }  // namespace logger
 }  // namespace mongo

@@ -35,61 +35,59 @@
 
 namespace mongo {
 
-    MongoBridgeGlobalParams mongoBridgeGlobalParams;
+MongoBridgeGlobalParams mongoBridgeGlobalParams;
 
-    Status addMongoBridgeOptions(moe::OptionSection* options) {
-
-        options->addOptionChaining("help", "help", moe::Switch, "produce help message");
-
-
-        options->addOptionChaining("port", "port", moe::Int, "port to listen for mongo messages");
+Status addMongoBridgeOptions(moe::OptionSection* options) {
+    options->addOptionChaining("help", "help", moe::Switch, "produce help message");
 
 
-        options->addOptionChaining("dest", "dest", moe::String, "uri of remote mongod instance");
+    options->addOptionChaining("port", "port", moe::Int, "port to listen for mongo messages");
 
 
-        options->addOptionChaining("delay", "delay", moe::Int,
-                "transfer delay in milliseconds (default = 0)")
-                                  .setDefault(moe::Value(0));
+    options->addOptionChaining("dest", "dest", moe::String, "uri of remote mongod instance");
 
 
-        return Status::OK();
+    options->addOptionChaining(
+                 "delay", "delay", moe::Int, "transfer delay in milliseconds (default = 0)")
+        .setDefault(moe::Value(0));
+
+
+    return Status::OK();
+}
+
+void printMongoBridgeHelp(std::ostream* out) {
+    *out << "Usage: mongobridge --port <port> --dest <dest> [ --delay <ms> ] [ --help ]"
+         << std::endl;
+    *out << moe::startupOptions.helpString();
+    *out << std::flush;
+}
+
+bool handlePreValidationMongoBridgeOptions(const moe::Environment& params) {
+    if (params.count("help")) {
+        printMongoBridgeHelp(&std::cout);
+        return false;
+    }
+    return true;
+}
+
+Status storeMongoBridgeOptions(const moe::Environment& params,
+                               const std::vector<std::string>& args) {
+    if (!params.count("port")) {
+        return Status(ErrorCodes::BadValue, "Missing required option: \"--port\"");
     }
 
-    void printMongoBridgeHelp(std::ostream* out) {
-        *out << "Usage: mongobridge --port <port> --dest <dest> [ --delay <ms> ] [ --help ]"
-             << std::endl;
-        *out << moe::startupOptions.helpString();
-        *out << std::flush;
+    if (!params.count("dest")) {
+        return Status(ErrorCodes::BadValue, "Missing required option: \"--dest\"");
     }
 
-    bool handlePreValidationMongoBridgeOptions(const moe::Environment& params) {
-        if (params.count("help")) {
-            printMongoBridgeHelp(&std::cout);
-            return false;
-        }
-        return true;
+    mongoBridgeGlobalParams.port = params["port"].as<int>();
+    mongoBridgeGlobalParams.destUri = params["dest"].as<std::string>();
+
+    if (params.count("delay")) {
+        mongoBridgeGlobalParams.delay = params["delay"].as<int>();
     }
 
-    Status storeMongoBridgeOptions(const moe::Environment& params,
-                                   const std::vector<std::string>& args) {
+    return Status::OK();
+}
 
-        if (!params.count("port")) {
-            return Status(ErrorCodes::BadValue, "Missing required option: \"--port\"");
-        }
-
-        if (!params.count("dest")) {
-            return Status(ErrorCodes::BadValue, "Missing required option: \"--dest\"");
-        }
-
-        mongoBridgeGlobalParams.port = params["port"].as<int>();
-        mongoBridgeGlobalParams.destUri = params["dest"].as<std::string>();
-
-        if (params.count("delay")) {
-            mongoBridgeGlobalParams.delay = params["delay"].as<int>();
-        }
-
-        return Status::OK();
-    }
-
-} // namespace mongo
+}  // namespace mongo

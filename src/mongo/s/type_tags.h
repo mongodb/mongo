@@ -36,160 +36,176 @@
 
 namespace mongo {
 
+/**
+ * This class represents the layout and contents of documents contained in the
+ * config.tags collection. All manipulation of documents coming from that
+ * collection should be done with this class.
+ *
+ * Usage Example:
+ *
+ *     // Contact the config. 'conn' has been obtained before.
+ *     DBClientBase* conn;
+ *     BSONObj query = QUERY(TagsType::exampleField("exampleFieldName"));
+ *     exampleDoc = conn->findOne(TagsType::ConfigNS, query);
+ *
+ *     // Process the response.
+ *     TagsType exampleType;
+ *     std::string errMsg;
+ *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+ *         // Can't use 'exampleType'. Take action.
+ *     }
+ *     // use 'exampleType'
+ *
+ */
+class TagsType {
+    MONGO_DISALLOW_COPYING(TagsType);
+
+public:
+    //
+    // schema declarations
+    //
+
+    // Name of the tags collection in the config server.
+    static const std::string ConfigNS;
+
+    // Field names and types in the tags collection type.
+    static const BSONField<std::string> ns;
+    static const BSONField<std::string> tag;
+    static const BSONField<BSONObj> min;
+    static const BSONField<BSONObj> max;
+
+    //
+    // tags type methods
+    //
+
+    TagsType();
+    ~TagsType();
+
     /**
-     * This class represents the layout and contents of documents contained in the
-     * config.tags collection. All manipulation of documents coming from that
-     * collection should be done with this class.
-     *
-     * Usage Example:
-     *
-     *     // Contact the config. 'conn' has been obtained before.
-     *     DBClientBase* conn;
-     *     BSONObj query = QUERY(TagsType::exampleField("exampleFieldName"));
-     *     exampleDoc = conn->findOne(TagsType::ConfigNS, query);
-     *
-     *     // Process the response.
-     *     TagsType exampleType;
-     *     std::string errMsg;
-     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
-     *         // Can't use 'exampleType'. Take action.
-     *     }
-     *     // use 'exampleType'
-     *
+     * Returns true if all the mandatory fields are present and have valid
+     * representations. Otherwise returns false and fills in the optional 'errMsg' string.
      */
-    class TagsType {
-        MONGO_DISALLOW_COPYING(TagsType);
-    public:
+    bool isValid(std::string* errMsg) const;
 
-        //
-        // schema declarations
-        //
+    /**
+     * Returns the BSON representation of the entry.
+     */
+    BSONObj toBSON() const;
 
-        // Name of the tags collection in the config server.
-        static const std::string ConfigNS;
+    /**
+     * Clears and populates the internal state using the 'source' BSON object if the
+     * latter contains valid values. Otherwise sets errMsg and returns false.
+     */
+    bool parseBSON(const BSONObj& source, std::string* errMsg);
 
-        // Field names and types in the tags collection type.
-        static const BSONField<std::string> ns;
-        static const BSONField<std::string> tag;
-        static const BSONField<BSONObj> min;
-        static const BSONField<BSONObj> max;
+    /**
+     * Clears the internal state.
+     */
+    void clear();
 
-        //
-        // tags type methods
-        //
+    /**
+     * Copies all the fields present in 'this' to 'other'.
+     */
+    void cloneTo(TagsType* other) const;
 
-        TagsType();
-        ~TagsType();
+    /**
+     * Returns a std::string representation of the current internal state.
+     */
+    std::string toString() const;
 
-        /**
-         * Returns true if all the mandatory fields are present and have valid
-         * representations. Otherwise returns false and fills in the optional 'errMsg' string.
-         */
-        bool isValid(std::string* errMsg) const;
+    //
+    // individual field accessors
+    //
 
-        /**
-         * Returns the BSON representation of the entry.
-         */
-        BSONObj toBSON() const;
+    // Mandatory Fields
+    void setNS(const StringData& ns) {
+        _ns = ns.toString();
+        _isNsSet = true;
+    }
 
-        /**
-         * Clears and populates the internal state using the 'source' BSON object if the
-         * latter contains valid values. Otherwise sets errMsg and returns false.
-         */
-        bool parseBSON(const BSONObj& source, std::string* errMsg);
+    void unsetNS() {
+        _isNsSet = false;
+    }
 
-        /**
-         * Clears the internal state.
-         */
-        void clear();
+    bool isNSSet() const {
+        return _isNsSet;
+    }
 
-        /**
-         * Copies all the fields present in 'this' to 'other'.
-         */
-        void cloneTo(TagsType* other) const;
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string& getNS() const {
+        dassert(_isNsSet);
+        return _ns;
+    }
 
-        /**
-         * Returns a std::string representation of the current internal state.
-         */
-        std::string toString() const;
+    void setTag(const StringData& tag) {
+        _tag = tag.toString();
+        _isTagSet = true;
+    }
 
-        //
-        // individual field accessors
-        //
+    void unsetTag() {
+        _isTagSet = false;
+    }
 
-        // Mandatory Fields
-        void setNS(const StringData& ns) {
-            _ns = ns.toString();
-            _isNsSet = true;
-        }
+    bool isTagSet() const {
+        return _isTagSet;
+    }
 
-        void unsetNS() { _isNsSet = false; }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string& getTag() const {
+        dassert(_isTagSet);
+        return _tag;
+    }
 
-        bool isNSSet() const { return _isNsSet; }
+    void setMin(const BSONObj& min) {
+        _min = min.getOwned();
+        _isMinSet = true;
+    }
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getNS() const {
-            dassert(_isNsSet);
-            return _ns;
-        }
+    void unsetMin() {
+        _isMinSet = false;
+    }
 
-        void setTag(const StringData& tag) {
-            _tag = tag.toString();
-            _isTagSet = true;
-        }
+    bool isMinSet() const {
+        return _isMinSet;
+    }
 
-        void unsetTag() { _isTagSet = false; }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const BSONObj getMin() const {
+        dassert(_isMinSet);
+        return _min;
+    }
 
-        bool isTagSet() const { return _isTagSet; }
+    void setMax(const BSONObj& max) {
+        _max = max.getOwned();
+        _isMaxSet = true;
+    }
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getTag() const {
-            dassert(_isTagSet);
-            return _tag;
-        }
+    void unsetMax() {
+        _isMaxSet = false;
+    }
 
-        void setMin(const BSONObj& min) {
-            _min = min.getOwned();
-            _isMinSet = true;
-        }
+    bool isMaxSet() const {
+        return _isMaxSet;
+    }
 
-        void unsetMin() { _isMinSet = false; }
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const BSONObj getMax() const {
+        dassert(_isMaxSet);
+        return _max;
+    }
 
-        bool isMinSet() const { return _isMinSet; }
+    // Optional Fields
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const BSONObj getMin() const {
-            dassert(_isMinSet);
-            return _min;
-        }
+private:
+    // Convention: (M)andatory, (O)ptional, (S)pecial rule.
+    std::string _ns;  // (M)  namespace this tag is for
+    bool _isNsSet;
+    std::string _tag;  // (M)  tag name
+    bool _isTagSet;
+    BSONObj _min;  // (M)  first key of the tag, including
+    bool _isMinSet;
+    BSONObj _max;  // (M)  last key of the tag, non-including
+    bool _isMaxSet;
+};
 
-        void setMax(const BSONObj& max) {
-            _max = max.getOwned();
-            _isMaxSet = true;
-        }
-
-        void unsetMax() { _isMaxSet = false; }
-
-        bool isMaxSet() const { return _isMaxSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const BSONObj getMax() const {
-            dassert(_isMaxSet);
-            return _max;
-        }
-
-        // Optional Fields
-
-    private:
-        // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _ns;     // (M)  namespace this tag is for
-        bool _isNsSet;
-        std::string _tag;     // (M)  tag name
-        bool _isTagSet;
-        BSONObj _min;     // (M)  first key of the tag, including
-        bool _isMinSet;
-        BSONObj _max;     // (M)  last key of the tag, non-including
-        bool _isMaxSet;
-    };
-
-} // namespace mongo
+}  // namespace mongo

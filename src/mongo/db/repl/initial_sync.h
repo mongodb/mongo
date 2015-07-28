@@ -33,21 +33,21 @@
 namespace mongo {
 namespace repl {
 
-    class BackgroundSyncInterface;
+class BackgroundSyncInterface;
+
+/**
+ * Initial clone and sync
+ */
+class InitialSync : public SyncTail {
+public:
+    virtual ~InitialSync();
+    InitialSync(BackgroundSyncInterface* q);
 
     /**
-     * Initial clone and sync
+     * applies up to endOpTime, fetching missing documents as needed.
      */
-    class InitialSync : public SyncTail {
-    public:
-        virtual ~InitialSync();
-        InitialSync(BackgroundSyncInterface *q);
+    void oplogApplication(OperationContext* txn, const OpTime& endOpTime);
+};
 
-        /**
-         * applies up to endOpTime, fetching missing documents as needed.
-         */
-        void oplogApplication(OperationContext* txn, const OpTime& endOpTime);
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

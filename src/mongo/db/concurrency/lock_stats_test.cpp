@@ -34,69 +34,69 @@
 
 namespace mongo {
 
-    TEST(LockStats, NoWait) {
-        const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.NoWait"));
+TEST(LockStats, NoWait) {
+    const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.NoWait"));
 
-        resetGlobalLockStats();
+    resetGlobalLockStats();
 
-        LockerForTests locker(MODE_IX);
-        locker.lock(resId, MODE_X);
-        locker.unlock(resId);
+    LockerForTests locker(MODE_IX);
+    locker.lock(resId, MODE_X);
+    locker.unlock(resId);
 
-        // Make sure that the waits/blocks are zero
-        SingleThreadedLockStats stats;
-        reportGlobalLockingStats(&stats);
+    // Make sure that the waits/blocks are zero
+    SingleThreadedLockStats stats;
+    reportGlobalLockingStats(&stats);
 
-        ASSERT_EQUALS(1, stats.get(resId, MODE_X).numAcquisitions);
-        ASSERT_EQUALS(0, stats.get(resId, MODE_X).numWaits);
-        ASSERT_EQUALS(0, stats.get(resId, MODE_X).combinedWaitTimeMicros);
+    ASSERT_EQUALS(1, stats.get(resId, MODE_X).numAcquisitions);
+    ASSERT_EQUALS(0, stats.get(resId, MODE_X).numWaits);
+    ASSERT_EQUALS(0, stats.get(resId, MODE_X).combinedWaitTimeMicros);
+}
+
+TEST(LockStats, Wait) {
+    const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Wait"));
+
+    resetGlobalLockStats();
+
+    LockerForTests locker(MODE_IX);
+    locker.lock(resId, MODE_X);
+
+    {
+        // This will block
+        LockerForTests lockerConflict(MODE_IX);
+        ASSERT_EQUALS(LOCK_WAITING, lockerConflict.lockBegin(resId, MODE_S));
+
+        // Sleep 1 millisecond so the wait time passes
+        ASSERT_EQUALS(LOCK_TIMEOUT, lockerConflict.lockComplete(resId, MODE_S, 1, false));
     }
 
-    TEST(LockStats, Wait) {
-        const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Wait"));
+    // Make sure that the waits/blocks are non-zero
+    SingleThreadedLockStats stats;
+    reportGlobalLockingStats(&stats);
 
-        resetGlobalLockStats();
+    ASSERT_EQUALS(1, stats.get(resId, MODE_X).numAcquisitions);
+    ASSERT_EQUALS(0, stats.get(resId, MODE_X).numWaits);
+    ASSERT_EQUALS(0, stats.get(resId, MODE_X).combinedWaitTimeMicros);
 
-        LockerForTests locker(MODE_IX);
-        locker.lock(resId, MODE_X);
+    ASSERT_EQUALS(1, stats.get(resId, MODE_S).numAcquisitions);
+    ASSERT_EQUALS(1, stats.get(resId, MODE_S).numWaits);
+    ASSERT_GREATER_THAN(stats.get(resId, MODE_S).combinedWaitTimeMicros, 0);
+}
 
-        {
-            // This will block
-            LockerForTests lockerConflict(MODE_IX);
-            ASSERT_EQUALS(LOCK_WAITING, lockerConflict.lockBegin(resId, MODE_S));
+TEST(LockStats, Reporting) {
+    const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Reporting"));
 
-            // Sleep 1 millisecond so the wait time passes
-            ASSERT_EQUALS(LOCK_TIMEOUT, lockerConflict.lockComplete(resId, MODE_S, 1, false));
-        }
+    resetGlobalLockStats();
 
-        // Make sure that the waits/blocks are non-zero
-        SingleThreadedLockStats stats;
-        reportGlobalLockingStats(&stats);
+    LockerForTests locker(MODE_IX);
+    locker.lock(resId, MODE_X);
+    locker.unlock(resId);
 
-        ASSERT_EQUALS(1, stats.get(resId, MODE_X).numAcquisitions);
-        ASSERT_EQUALS(0, stats.get(resId, MODE_X).numWaits);
-        ASSERT_EQUALS(0, stats.get(resId, MODE_X).combinedWaitTimeMicros);
+    // Make sure that the waits/blocks are zero
+    SingleThreadedLockStats stats;
+    reportGlobalLockingStats(&stats);
 
-        ASSERT_EQUALS(1, stats.get(resId, MODE_S).numAcquisitions);
-        ASSERT_EQUALS(1, stats.get(resId, MODE_S).numWaits);
-        ASSERT_GREATER_THAN(stats.get(resId, MODE_S).combinedWaitTimeMicros, 0);
-    }
+    BSONObjBuilder builder;
+    stats.report(&builder);
+}
 
-    TEST(LockStats, Reporting) {
-        const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Reporting"));
-
-        resetGlobalLockStats();
-
-        LockerForTests locker(MODE_IX);
-        locker.lock(resId, MODE_X);
-        locker.unlock(resId);
-
-        // Make sure that the waits/blocks are zero
-        SingleThreadedLockStats stats;
-        reportGlobalLockingStats(&stats);
-
-        BSONObjBuilder builder;
-        stats.report(&builder);
-    }
-
-} // namespace mongo
+}  // namespace mongo

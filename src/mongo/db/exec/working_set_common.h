@@ -32,96 +32,95 @@
 
 namespace mongo {
 
-    class WorkingSetCommon {
-    public:
-        /**
-         * Get an owned copy of the BSONObj the WSM refers to.
-         * Requires either a valid BSONObj or valid RecordId.
-         * Returns true if the fetch and invalidate succeeded, false otherwise.
-         */
-        static bool fetchAndInvalidateLoc(OperationContext* txn,
-                                          WorkingSetMember* member,
-                                          const Collection* collection);
-
-        /**
-         * Iterates over 'workingSet' members that have transitioned to the LOC_AND_IDX state since
-         * the last yield. For all members still in the LOC_AND_IDX state, fetches the associated
-         * document and puts the member in "loc with unowned obj" state.
-         *
-         * This "force-fetching" is called on saveState() for storage-engines that support document-
-         * level locking. This ensures that all WS members are still valid, even after the
-         * OperationContext becomes invalid due to a yield.
-         *
-         * Note that although we use the "loc and unowned obj" state, document-level locking storage
-         * engines are assumed to be returning owned BSON. This is an assumption that may not be
-         * valid for future versions, but must remain valid on the v3.0 branch. Therefore, it is ok
-         * to have a "loc and unowned obj" survive a yield.
-         */
-        static void forceFetchAllLocs(OperationContext* txn,
-                                      WorkingSet* workingSet,
+class WorkingSetCommon {
+public:
+    /**
+     * Get an owned copy of the BSONObj the WSM refers to.
+     * Requires either a valid BSONObj or valid RecordId.
+     * Returns true if the fetch and invalidate succeeded, false otherwise.
+     */
+    static bool fetchAndInvalidateLoc(OperationContext* txn,
+                                      WorkingSetMember* member,
                                       const Collection* collection);
 
-        /**
-         * After a NEED_FETCH is requested, this is used to actually retrieve the document
-         * corresponding to 'member' from 'collection', and to set the state of 'member'
-         * appropriately.
-         */
-        static void completeFetch(OperationContext* txn,
-                                  WorkingSetMember* member,
+    /**
+     * Iterates over 'workingSet' members that have transitioned to the LOC_AND_IDX state since
+     * the last yield. For all members still in the LOC_AND_IDX state, fetches the associated
+     * document and puts the member in "loc with unowned obj" state.
+     *
+     * This "force-fetching" is called on saveState() for storage-engines that support document-
+     * level locking. This ensures that all WS members are still valid, even after the
+     * OperationContext becomes invalid due to a yield.
+     *
+     * Note that although we use the "loc and unowned obj" state, document-level locking storage
+     * engines are assumed to be returning owned BSON. This is an assumption that may not be
+     * valid for future versions, but must remain valid on the v3.0 branch. Therefore, it is ok
+     * to have a "loc and unowned obj" survive a yield.
+     */
+    static void forceFetchAllLocs(OperationContext* txn,
+                                  WorkingSet* workingSet,
                                   const Collection* collection);
 
-        /**
-         * Initialize the fields in 'dest' from 'src', creating copies of owned objects as needed.
-         */
-        static void initFrom(WorkingSetMember* dest, const WorkingSetMember& src);
+    /**
+     * After a NEED_FETCH is requested, this is used to actually retrieve the document
+     * corresponding to 'member' from 'collection', and to set the state of 'member'
+     * appropriately.
+     */
+    static void completeFetch(OperationContext* txn,
+                              WorkingSetMember* member,
+                              const Collection* collection);
 
-        /**
-         * Build a BSONObj which represents a Status to return in a WorkingSet.
-         */
-        static BSONObj buildMemberStatusObject(const Status& status);
+    /**
+     * Initialize the fields in 'dest' from 'src', creating copies of owned objects as needed.
+     */
+    static void initFrom(WorkingSetMember* dest, const WorkingSetMember& src);
 
-        /**
-         * Allocate a new WSM and initialize it with
-         * the code and reason from the status.
-         * Owned BSON object will have the following layout:
-         * {
-         *     ok: <ok>, // 1 for OK; 0 otherwise.
-         *     code: <code>, // Status::code()
-         *     errmsg: <errmsg> // Status::reason()
-         * }
-         */
-        static WorkingSetID allocateStatusMember(WorkingSet* ws, const Status& status);
+    /**
+     * Build a BSONObj which represents a Status to return in a WorkingSet.
+     */
+    static BSONObj buildMemberStatusObject(const Status& status);
 
-        /**
-         * Returns true if object was created by allocateStatusMember().
-         */
-        static bool isValidStatusMemberObject(const BSONObj& obj);
+    /**
+     * Allocate a new WSM and initialize it with
+     * the code and reason from the status.
+     * Owned BSON object will have the following layout:
+     * {
+     *     ok: <ok>, // 1 for OK; 0 otherwise.
+     *     code: <code>, // Status::code()
+     *     errmsg: <errmsg> // Status::reason()
+     * }
+     */
+    static WorkingSetID allocateStatusMember(WorkingSet* ws, const Status& status);
 
-        /**
-         * Returns object in working set member created with allocateStatusMember().
-         * Does not assume isValidStatusMemberObject.
-         * If the WSID is invalid or the working set member is created by
-         * allocateStatusMember, objOut will not be updated.
-         */
-        static void getStatusMemberObject(const WorkingSet& ws, WorkingSetID wsid,
-                                          BSONObj* objOut);
+    /**
+     * Returns true if object was created by allocateStatusMember().
+     */
+    static bool isValidStatusMemberObject(const BSONObj& obj);
 
-        /**
-         * Returns status from working set member object.
-         * Assumes isValidStatusMemberObject().
-         */
-        static Status getMemberObjectStatus(const BSONObj& memberObj);
+    /**
+     * Returns object in working set member created with allocateStatusMember().
+     * Does not assume isValidStatusMemberObject.
+     * If the WSID is invalid or the working set member is created by
+     * allocateStatusMember, objOut will not be updated.
+     */
+    static void getStatusMemberObject(const WorkingSet& ws, WorkingSetID wsid, BSONObj* objOut);
 
-        /**
-         * Returns status from working set member created with allocateStatusMember().
-         * Assumes isValidStatusMemberObject().
-         */
-        static Status getMemberStatus(const WorkingSetMember& member);
+    /**
+     * Returns status from working set member object.
+     * Assumes isValidStatusMemberObject().
+     */
+    static Status getMemberObjectStatus(const BSONObj& memberObj);
 
-        /**
-         * Formats working set member object created with allocateStatusMember().
-         */
-        static std::string toStatusString(const BSONObj& obj);
-    };
+    /**
+     * Returns status from working set member created with allocateStatusMember().
+     * Assumes isValidStatusMemberObject().
+     */
+    static Status getMemberStatus(const WorkingSetMember& member);
+
+    /**
+     * Formats working set member object created with allocateStatusMember().
+     */
+    static std::string toStatusString(const BSONObj& obj);
+};
 
 }  // namespace mongo

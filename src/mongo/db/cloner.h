@@ -35,99 +35,100 @@
 
 namespace mongo {
 
-    struct CloneOptions;
-    class DBClientBase;
-    class NamespaceString;
-    class OperationContext;
+struct CloneOptions;
+class DBClientBase;
+class NamespaceString;
+class OperationContext;
 
 
-    class Cloner {
-        MONGO_DISALLOW_COPYING(Cloner);
-    public:
-        Cloner();
+class Cloner {
+    MONGO_DISALLOW_COPYING(Cloner);
 
-        void setConnection(DBClientBase* c) {
-            _conn.reset(c);
-        }
+public:
+    Cloner();
 
-        /** copy the entire database */
-        bool go(OperationContext* txn,
-                const std::string& toDBName,
-                const std::string& masterHost,
-                const CloneOptions& opts,
-                std::set<std::string>* clonedColls,
-                std::string& errmsg,
-                int *errCode = 0);
+    void setConnection(DBClientBase* c) {
+        _conn.reset(c);
+    }
 
-        bool copyCollection(OperationContext* txn,
-                            const std::string& ns,
-                            const BSONObj& query,
-                            std::string& errmsg,
-                            bool mayYield,
-                            bool mayBeInterrupted,
-                            bool copyIndexes = true,
-                            bool logForRepl = true );
+    /** copy the entire database */
+    bool go(OperationContext* txn,
+            const std::string& toDBName,
+            const std::string& masterHost,
+            const CloneOptions& opts,
+            std::set<std::string>* clonedColls,
+            std::string& errmsg,
+            int* errCode = 0);
 
-    private:
-        void copy(OperationContext* txn,
-                  const std::string& toDBName,
-                  const NamespaceString& from_ns,
-                  const BSONObj& from_opts,
-                  const NamespaceString& to_ns,
-                  bool logForRepl,
-                  bool masterSameProcess,
-                  bool slaveOk,
-                  bool mayYield,
-                  bool mayBeInterrupted,
-                  Query q);
+    bool copyCollection(OperationContext* txn,
+                        const std::string& ns,
+                        const BSONObj& query,
+                        std::string& errmsg,
+                        bool mayYield,
+                        bool mayBeInterrupted,
+                        bool copyIndexes = true,
+                        bool logForRepl = true);
 
-        void copyIndexes(OperationContext* txn,
-                         const std::string& toDBName,
-                         const NamespaceString& from_ns,
-                         const BSONObj& from_opts,
-                         const NamespaceString& to_ns,
-                         bool logForRepl,
-                         bool masterSameProcess,
-                         bool slaveOk,
-                         bool mayYield,
-                         bool mayBeInterrupted);
+private:
+    void copy(OperationContext* txn,
+              const std::string& toDBName,
+              const NamespaceString& from_ns,
+              const BSONObj& from_opts,
+              const NamespaceString& to_ns,
+              bool logForRepl,
+              bool masterSameProcess,
+              bool slaveOk,
+              bool mayYield,
+              bool mayBeInterrupted,
+              Query q);
 
-        struct Fun;
-        std::auto_ptr<DBClientBase> _conn;
-    };
+    void copyIndexes(OperationContext* txn,
+                     const std::string& toDBName,
+                     const NamespaceString& from_ns,
+                     const BSONObj& from_opts,
+                     const NamespaceString& to_ns,
+                     bool logForRepl,
+                     bool masterSameProcess,
+                     bool slaveOk,
+                     bool mayYield,
+                     bool mayBeInterrupted);
 
-    /**
-     *  slaveOk     - if true it is ok if the source of the data is !ismaster.
-     *  useReplAuth - use the credentials we normally use as a replication slave for the cloning
-     *  snapshot    - use $snapshot mode for copying collections.  note this should not be used
-     *                when it isn't required, as it will be slower.  for example,
-     *                repairDatabase need not use it.
-     */
-    struct CloneOptions {
-        CloneOptions() {
-            logForRepl = true;
-            slaveOk = false;
-            useReplAuth = false;
-            snapshot = true;
-            mayYield = true;
-            mayBeInterrupted = false;
+    struct Fun;
+    std::auto_ptr<DBClientBase> _conn;
+};
 
-            syncData = true;
-            syncIndexes = true;
-        }
+/**
+ *  slaveOk     - if true it is ok if the source of the data is !ismaster.
+ *  useReplAuth - use the credentials we normally use as a replication slave for the cloning
+ *  snapshot    - use $snapshot mode for copying collections.  note this should not be used
+ *                when it isn't required, as it will be slower.  for example,
+ *                repairDatabase need not use it.
+ */
+struct CloneOptions {
+    CloneOptions() {
+        logForRepl = true;
+        slaveOk = false;
+        useReplAuth = false;
+        snapshot = true;
+        mayYield = true;
+        mayBeInterrupted = false;
 
-        std::string fromDB;
-        std::set<std::string> collsToIgnore;
+        syncData = true;
+        syncIndexes = true;
+    }
 
-        bool logForRepl;
-        bool slaveOk;
-        bool useReplAuth;
-        bool snapshot;
-        bool mayYield;
-        bool mayBeInterrupted;
+    std::string fromDB;
+    std::set<std::string> collsToIgnore;
 
-        bool syncData;
-        bool syncIndexes;
-    };
+    bool logForRepl;
+    bool slaveOk;
+    bool useReplAuth;
+    bool snapshot;
+    bool mayYield;
+    bool mayBeInterrupted;
 
-} // namespace mongo
+    bool syncData;
+    bool syncIndexes;
+};
+
+}  // namespace mongo

@@ -57,26 +57,25 @@
 using namespace mongo;
 
 namespace {
-    namespace file = boost::filesystem;
-    namespace ptime = boost::posix_time;
+namespace file = boost::filesystem;
+namespace ptime = boost::posix_time;
 
-    typedef unsigned long long bytes_t;
-    typedef long long micros_t;
+typedef unsigned long long bytes_t;
+typedef long long micros_t;
 
-    const long DEFAULT_FILE_SIZE_MB =  128;
-    const file::path DEFAULT_PATH = file::temp_directory_path();
-    const int DEFAULT_NTRIALS = 10;
-    const bool DEFAULT_BSON_OUT = false;
+const long DEFAULT_FILE_SIZE_MB = 128;
+const file::path DEFAULT_PATH = file::temp_directory_path();
+const int DEFAULT_NTRIALS = 10;
+const bool DEFAULT_BSON_OUT = false;
 
-    // used to convert B/usec to MB/sec
-    const double MICROSEC_PER_SEC = 1e6;
-    const double MB_PER_BYTE =  1.0 / (1 << 20);
-    const double MB_SEC_CONVERSION_FACTOR = MICROSEC_PER_SEC * MB_PER_BYTE;
+// used to convert B/usec to MB/sec
+const double MICROSEC_PER_SEC = 1e6;
+const double MB_PER_BYTE = 1.0 / (1 << 20);
+const double MB_SEC_CONVERSION_FACTOR = MICROSEC_PER_SEC * MB_PER_BYTE;
 
-    double toMbSec(const bytes_t bytes, const micros_t micros) {
-        return (static_cast<double>(bytes) / static_cast<double>(micros)) *
-            MB_SEC_CONVERSION_FACTOR;
-    }
+double toMbSec(const bytes_t bytes, const micros_t micros) {
+    return (static_cast<double>(bytes) / static_cast<double>(micros)) * MB_SEC_CONVERSION_FACTOR;
+}
 }
 
 struct BenchmarkParams {
@@ -91,8 +90,7 @@ struct BenchmarkParams {
 class FileAllocatorBenchmark {
 public:
     FileAllocatorBenchmark(const BenchmarkParams& params)
-        : _fa(FileAllocator::get())
-        , _params(params) {
+        : _fa(FileAllocator::get()), _params(params) {
         _fa->start();
 
         if (!file::create_directory(_params.path)) {
@@ -109,8 +107,8 @@ public:
 
     void run() {
         if (!_params.quiet) {
-            std::cout << "Allocating " << _params.ntrials << " files of size "
-                      << _params.bytes << " bytes in " << _params.path << std::endl;
+            std::cout << "Allocating " << _params.ntrials << " files of size " << _params.bytes
+                      << " bytes in " << _params.path << std::endl;
         }
 
         for (int n = 0; n < _params.ntrials; ++n) {
@@ -123,9 +121,9 @@ public:
             try {
                 _fa->allocateAsap(filePath.string(), size_allocated);
             } catch (const DBException& ex) {
-                std::cerr << "Exception thrown while allocating file:"  << std::endl;
+                std::cerr << "Exception thrown while allocating file:" << std::endl;
                 std::cerr << ex.what() << std::endl;
-                throw; // rethrow so that destructor is called
+                throw;  // rethrow so that destructor is called
             }
 
             if (size_allocated != static_cast<bytes_t>(_params.bytes)) {
@@ -165,24 +163,25 @@ private:
     }
 
     void printResult(const std::string& name, const micros_t duration, const bytes_t bytes) {
-        std::cout << name << ": " << duration << " usec = "
-                  << toMbSec(bytes, duration) << " MB/sec" << std::endl;
-
+        std::cout << name << ": " << duration << " usec = " << toMbSec(bytes, duration) << " MB/sec"
+                  << std::endl;
     }
 
     void textReport() {
         benchResults results = computeResults();
 
-        std::cout << "Results for " << _params.ntrials << " allocations of "
-                  << _params.bytes << " bytes: " << std::endl;
+        std::cout << "Results for " << _params.ntrials << " allocations of " << _params.bytes
+                  << " bytes: " << std::endl;
 
         printResult("avg", results.avg, _params.bytes);
         printResult("max", results.max, _params.bytes);
         printResult("min", results.min, _params.bytes);
     }
 
-    void addResult(BSONObjBuilder& obj, const std::string& name,
-                   const micros_t duration, const bytes_t bytes) {
+    void addResult(BSONObjBuilder& obj,
+                   const std::string& name,
+                   const micros_t duration,
+                   const bytes_t bytes) {
         BSONObjBuilder so(obj.subobjStart(name));
         so.append("usec", duration);
         so.append("MBsec", toMbSec(bytes, duration));
@@ -226,36 +225,39 @@ namespace moe = mongo::optionenvironment;
 
 Status addFileAllocatorBenchOptions(moe::OptionSection& options) {
     options.addOptionChaining("help", "help", moe::Switch, "Display help");
-    options.addOptionChaining("megabytes", "megabytes", moe::Long,
+    options.addOptionChaining("megabytes",
+                              "megabytes",
+                              moe::Long,
                               "The number of megabytes to allocate for each file")
         .setDefault(moe::Value(DEFAULT_FILE_SIZE_MB));
 
-    options.addOptionChaining("path", "path", moe::String,
+    options.addOptionChaining("path",
+                              "path",
+                              moe::String,
                               str::stream() << "The directory path to allocate the file(s) in "
                                             << "during testing. Files will be allocated in a "
                                             << "uniquely named temporary directory within the "
                                             << "specified path")
         .setDefault(moe::Value(DEFAULT_PATH.string()));
 
-    options.addOptionChaining("ntrials", "ntrials", moe::Int,
-                              "The number of trials to perform")
+    options.addOptionChaining("ntrials", "ntrials", moe::Int, "The number of trials to perform")
         .setDefault(moe::Value(DEFAULT_NTRIALS));
 
-    options.addOptionChaining("quiet", "quiet", moe::Switch,
-                              "Suppress the plaintext report");
+    options.addOptionChaining("quiet", "quiet", moe::Switch, "Suppress the plaintext report");
 
-    options.addOptionChaining("jsonReport", "jsonReport", moe::String,
-                              str::stream() << "If set, results will be saved as a JSON document to "
-                                            << "the specified file path. If specified with no "
-                                            << "arguments the report will be printed to standard "
-                                            << "out")
-        .setImplicit(moe::Value(std::string("-")));
+    options.addOptionChaining("jsonReport",
+                              "jsonReport",
+                              moe::String,
+                              str::stream()
+                                  << "If set, results will be saved as a JSON document to "
+                                  << "the specified file path. If specified with no "
+                                  << "arguments the report will be printed to standard "
+                                  << "out").setImplicit(moe::Value(std::string("-")));
 
     return Status::OK();
 }
 
-Status validateFileAllocatorBenchOptions(const moe::OptionSection& options,
-                                         moe::Environment& env) {
+Status validateFileAllocatorBenchOptions(const moe::OptionSection& options, moe::Environment& env) {
     Status ret = env.validate();
     if (!ret.isOK()) {
         return ret;
@@ -325,8 +327,7 @@ MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(FileAllocatorBenchOptions)(InitializerCon
 }
 
 MONGO_STARTUP_OPTIONS_VALIDATE(FileAllocatorBenchOptions)(InitializerContext* context) {
-    return validateFileAllocatorBenchOptions(moe::startupOptions,
-                                             moe::startupOptionsParsed);
+    return validateFileAllocatorBenchOptions(moe::startupOptions, moe::startupOptionsParsed);
 }
 
 MONGO_STARTUP_OPTIONS_STORE(FileAllocatorBenchOptions)(InitializerContext* context) {

@@ -34,99 +34,98 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
-    using std::vector;
+using std::auto_ptr;
+using std::vector;
 
-    // static
-    const char* LimitStage::kStageType = "LIMIT";
+// static
+const char* LimitStage::kStageType = "LIMIT";
 
-    LimitStage::LimitStage(int limit, WorkingSet* ws, PlanStage* child)
-        : _ws(ws), _child(child), _numToReturn(limit), _commonStats(kStageType) { }
+LimitStage::LimitStage(int limit, WorkingSet* ws, PlanStage* child)
+    : _ws(ws), _child(child), _numToReturn(limit), _commonStats(kStageType) {}
 
-    LimitStage::~LimitStage() { }
+LimitStage::~LimitStage() {}
 
-    bool LimitStage::isEOF() { return (0 == _numToReturn) || _child->isEOF(); }
+bool LimitStage::isEOF() {
+    return (0 == _numToReturn) || _child->isEOF();
+}
 
-    PlanStage::StageState LimitStage::work(WorkingSetID* out) {
-        ++_commonStats.works;
+PlanStage::StageState LimitStage::work(WorkingSetID* out) {
+    ++_commonStats.works;
 
-        // Adds the amount of time taken by work() to executionTimeMillis.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
+    // Adds the amount of time taken by work() to executionTimeMillis.
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        if (0 == _numToReturn) {
-            // We've returned as many results as we're limited to.
-            return PlanStage::IS_EOF;
+    if (0 == _numToReturn) {
+        // We've returned as many results as we're limited to.
+        return PlanStage::IS_EOF;
+    }
+
+    WorkingSetID id = WorkingSet::INVALID_ID;
+    StageState status = _child->work(&id);
+
+    if (PlanStage::ADVANCED == status) {
+        *out = id;
+        --_numToReturn;
+        ++_commonStats.advanced;
+        return PlanStage::ADVANCED;
+    } else if (PlanStage::FAILURE == status) {
+        *out = id;
+        // If a stage fails, it may create a status WSM to indicate why it
+        // failed, in which case 'id' is valid.  If ID is invalid, we
+        // create our own error message.
+        if (WorkingSet::INVALID_ID == id) {
+            mongoutils::str::stream ss;
+            ss << "limit stage failed to read in results from child";
+            Status status(ErrorCodes::InternalError, ss);
+            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
         }
-
-        WorkingSetID id = WorkingSet::INVALID_ID;
-        StageState status = _child->work(&id);
-
-        if (PlanStage::ADVANCED == status) {
-            *out = id;
-            --_numToReturn;
-            ++_commonStats.advanced;
-            return PlanStage::ADVANCED;
-        }
-        else if (PlanStage::FAILURE == status) {
-            *out = id;
-            // If a stage fails, it may create a status WSM to indicate why it
-            // failed, in which case 'id' is valid.  If ID is invalid, we
-            // create our own error message.
-            if (WorkingSet::INVALID_ID == id) {
-                mongoutils::str::stream ss;
-                ss << "limit stage failed to read in results from child";
-                Status status(ErrorCodes::InternalError, ss);
-                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
-            }
-            return status;
-        }
-        else if (PlanStage::NEED_TIME == status) {
-            ++_commonStats.needTime;
-        }
-        else if (PlanStage::NEED_FETCH == status) {
-            ++_commonStats.needFetch;
-            *out = id;
-        }
-
         return status;
+    } else if (PlanStage::NEED_TIME == status) {
+        ++_commonStats.needTime;
+    } else if (PlanStage::NEED_FETCH == status) {
+        ++_commonStats.needFetch;
+        *out = id;
     }
 
-    void LimitStage::saveState() {
-        ++_commonStats.yields;
-        _child->saveState();
-    }
+    return status;
+}
 
-    void LimitStage::restoreState(OperationContext* opCtx) {
-        ++_commonStats.unyields;
-        _child->restoreState(opCtx);
-    }
+void LimitStage::saveState() {
+    ++_commonStats.yields;
+    _child->saveState();
+}
 
-    void LimitStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-        ++_commonStats.invalidates;
-        _child->invalidate(txn, dl, type);
-    }
+void LimitStage::restoreState(OperationContext* opCtx) {
+    ++_commonStats.unyields;
+    _child->restoreState(opCtx);
+}
 
-    vector<PlanStage*> LimitStage::getChildren() const {
-        vector<PlanStage*> children;
-        children.push_back(_child.get());
-        return children;
-    }
+void LimitStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    ++_commonStats.invalidates;
+    _child->invalidate(txn, dl, type);
+}
 
-    PlanStageStats* LimitStage::getStats() {
-        _commonStats.isEOF = isEOF();
-        _specificStats.limit = _numToReturn;
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_LIMIT));
-        ret->specific.reset(new LimitStats(_specificStats));
-        ret->children.push_back(_child->getStats());
-        return ret.release();
-    }
+vector<PlanStage*> LimitStage::getChildren() const {
+    vector<PlanStage*> children;
+    children.push_back(_child.get());
+    return children;
+}
 
-    const CommonStats* LimitStage::getCommonStats() {
-        return &_commonStats;
-    }
+PlanStageStats* LimitStage::getStats() {
+    _commonStats.isEOF = isEOF();
+    _specificStats.limit = _numToReturn;
+    auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_LIMIT));
+    ret->specific.reset(new LimitStats(_specificStats));
+    ret->children.push_back(_child->getStats());
+    return ret.release();
+}
 
-    const SpecificStats* LimitStage::getSpecificStats() {
-        return &_specificStats;
-    }
+const CommonStats* LimitStage::getCommonStats() {
+    return &_commonStats;
+}
+
+const SpecificStats* LimitStage::getSpecificStats() {
+    return &_specificStats;
+}
 
 }  // namespace mongo

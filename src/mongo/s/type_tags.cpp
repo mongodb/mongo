@@ -32,148 +32,153 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
-    const std::string TagsType::ConfigNS = "config.tags";
+const std::string TagsType::ConfigNS = "config.tags";
 
-    const BSONField<std::string> TagsType::ns("ns");
-    const BSONField<std::string> TagsType::tag("tag");
-    const BSONField<BSONObj> TagsType::min("min");
-    const BSONField<BSONObj> TagsType::max("max");
+const BSONField<std::string> TagsType::ns("ns");
+const BSONField<std::string> TagsType::tag("tag");
+const BSONField<BSONObj> TagsType::min("min");
+const BSONField<BSONObj> TagsType::max("max");
 
-    TagsType::TagsType() {
-        clear();
+TagsType::TagsType() {
+    clear();
+}
+
+TagsType::~TagsType() {}
+
+bool TagsType::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    TagsType::~TagsType() {
+    // All the mandatory fields must be present.
+    if (!_isNsSet) {
+        *errMsg = stream() << "missing " << ns.name() << " field";
+        return false;
+    }
+    if (!_isTagSet) {
+        *errMsg = stream() << "missing " << tag.name() << " field";
+        return false;
+    }
+    if (!_isMinSet) {
+        *errMsg = stream() << "missing " << min.name() << " field";
+        return false;
+    }
+    if (!_isMaxSet) {
+        *errMsg = stream() << "missing " << max.name() << " field";
+        return false;
     }
 
-    bool TagsType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
+    // NOTE: all the following semantic checks should eventually become the caller's
+    // responsibility, and should be moved out of this class completely
 
-        // All the mandatory fields must be present.
-        if (!_isNsSet) {
-            *errMsg = stream() << "missing " << ns.name() << " field";
+    // 'min' and 'max' must share the same fields.
+    if (_min.nFields() != _max.nFields()) {
+        *errMsg = stream() << "min and max have a different number of keys";
+        return false;
+    }
+    BSONObjIterator minIt(_min);
+    BSONObjIterator maxIt(_max);
+    while (minIt.more() && maxIt.more()) {
+        BSONElement minElem = minIt.next();
+        BSONElement maxElem = maxIt.next();
+        if (strcmp(minElem.fieldName(), maxElem.fieldName())) {
+            *errMsg = stream() << "min and max must have the same set of keys";
             return false;
         }
-        if (!_isTagSet) {
-            *errMsg = stream() << "missing " << tag.name() << " field";
-            return false;
-        }
-        if (!_isMinSet) {
-            *errMsg = stream() << "missing " << min.name() << " field";
-            return false;
-        }
-        if (!_isMaxSet) {
-            *errMsg = stream() << "missing " << max.name() << " field";
-            return false;
-        }
-
-        // NOTE: all the following semantic checks should eventually become the caller's
-        // responsibility, and should be moved out of this class completely
-
-        // 'min' and 'max' must share the same fields.
-        if (_min.nFields() != _max.nFields()) {
-            *errMsg = stream() << "min and max have a different number of keys";
-            return false;
-        }
-        BSONObjIterator minIt(_min);
-        BSONObjIterator maxIt(_max);
-        while (minIt.more() && maxIt.more()) {
-            BSONElement minElem = minIt.next();
-            BSONElement maxElem = maxIt.next();
-            if (strcmp(minElem.fieldName(), maxElem.fieldName())) {
-                *errMsg = stream() << "min and max must have the same set of keys";
-                return false;
-            }
-        }
-
-        // 'max' should be greater than 'min'.
-        if (_min.woCompare(_max) >= 0) {
-            *errMsg = stream() << "max key must be greater than min key";
-            return false;
-        }
-
-        return true;
     }
 
-    BSONObj TagsType::toBSON() const {
-        BSONObjBuilder builder;
-
-        if (_isNsSet) builder.append(ns(), _ns);
-        if (_isTagSet) builder.append(tag(), _tag);
-        if (_isMinSet) builder.append(min(), _min);
-        if (_isMaxSet) builder.append(max(), _max);
-
-        return builder.obj();
+    // 'max' should be greater than 'min'.
+    if (_min.woCompare(_max) >= 0) {
+        *errMsg = stream() << "max key must be greater than min key";
+        return false;
     }
 
-    bool TagsType::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+    return true;
+}
 
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
+BSONObj TagsType::toBSON() const {
+    BSONObjBuilder builder;
 
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, ns, &_ns, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNsSet = fieldState == FieldParser::FIELD_SET;
+    if (_isNsSet)
+        builder.append(ns(), _ns);
+    if (_isTagSet)
+        builder.append(tag(), _tag);
+    if (_isMinSet)
+        builder.append(min(), _min);
+    if (_isMaxSet)
+        builder.append(max(), _max);
 
-        fieldState = FieldParser::extract(source, tag, &_tag, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isTagSet = fieldState == FieldParser::FIELD_SET;
+    return builder.obj();
+}
 
-        fieldState = FieldParser::extract(source, min, &_min, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isMinSet = fieldState == FieldParser::FIELD_SET;
+bool TagsType::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-        fieldState = FieldParser::extract(source, max, &_max, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isMaxSet = fieldState == FieldParser::FIELD_SET;
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-        return true;
-    }
+    FieldParser::FieldState fieldState;
+    fieldState = FieldParser::extract(source, ns, &_ns, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isNsSet = fieldState == FieldParser::FIELD_SET;
 
-    void TagsType::clear() {
+    fieldState = FieldParser::extract(source, tag, &_tag, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isTagSet = fieldState == FieldParser::FIELD_SET;
 
-        _ns.clear();
-        _isNsSet = false;
+    fieldState = FieldParser::extract(source, min, &_min, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isMinSet = fieldState == FieldParser::FIELD_SET;
 
-        _tag.clear();
-        _isTagSet = false;
+    fieldState = FieldParser::extract(source, max, &_max, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isMaxSet = fieldState == FieldParser::FIELD_SET;
 
-        _min = BSONObj();
-        _isMinSet = false;
+    return true;
+}
 
-        _max = BSONObj();
-        _isMaxSet = false;
+void TagsType::clear() {
+    _ns.clear();
+    _isNsSet = false;
 
-    }
+    _tag.clear();
+    _isTagSet = false;
 
-    void TagsType::cloneTo(TagsType* other) const {
-        other->clear();
+    _min = BSONObj();
+    _isMinSet = false;
 
-        other->_ns = _ns;
-        other->_isNsSet = _isNsSet;
+    _max = BSONObj();
+    _isMaxSet = false;
+}
 
-        other->_tag = _tag;
-        other->_isTagSet = _isTagSet;
+void TagsType::cloneTo(TagsType* other) const {
+    other->clear();
 
-        other->_min = _min;
-        other->_isMinSet = _isMinSet;
+    other->_ns = _ns;
+    other->_isNsSet = _isNsSet;
 
-        other->_max = _max;
-        other->_isMaxSet = _isMaxSet;
+    other->_tag = _tag;
+    other->_isTagSet = _isTagSet;
 
-    }
+    other->_min = _min;
+    other->_isMinSet = _isMinSet;
 
-    std::string TagsType::toString() const {
-        return toBSON().toString();
-    }
+    other->_max = _max;
+    other->_isMaxSet = _isMaxSet;
+}
 
-} // namespace mongo
+std::string TagsType::toString() const {
+    return toBSON().toString();
+}
+
+}  // namespace mongo

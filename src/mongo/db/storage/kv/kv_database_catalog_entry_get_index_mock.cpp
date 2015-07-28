@@ -34,11 +34,10 @@
 
 namespace mongo {
 
-    // Used to satisfy link dependencies in unit test - not invoked.
-    IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* txn,
-                                                        const CollectionCatalogEntry* collection,
-                                                        IndexCatalogEntry* index) {
-        invariant( false );
-    }
-
+// Used to satisfy link dependencies in unit test - not invoked.
+IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* txn,
+                                                    const CollectionCatalogEntry* collection,
+                                                    IndexCatalogEntry* index) {
+    invariant(false);
+}
 }

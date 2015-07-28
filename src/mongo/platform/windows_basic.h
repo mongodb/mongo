@@ -70,22 +70,22 @@
 // No need to set WINVER, SdkDdkVer.h does that for us, we double check this below.
 
 // for rand_s() usage:
-# define _CRT_RAND_S
-# ifndef NOMINMAX
-#  define NOMINMAX
-# endif
+#define _CRT_RAND_S
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 
 // Do not complain that about standard library functions that Windows believes should have
 // underscores in front of them, such as unlink().
 #define _CRT_NONSTDC_NO_DEPRECATE
 
 // tell windows.h not to include a bunch of headers we don't need:
-# define WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
 
-# include <winsock2.h> //this must be included before the first windows.h include
-# include <ws2tcpip.h>
-# include <wspiapi.h>
-# include <windows.h>
+#include <winsock2.h>  //this must be included before the first windows.h include
+#include <ws2tcpip.h>
+#include <wspiapi.h>
+#include <windows.h>
 
 // Should come either from the command line, or if not set there, the inclusion of sdkddkver.h
 // via windows.h above should set it based in _WIN32_WINNT, which is assuredly set by now.

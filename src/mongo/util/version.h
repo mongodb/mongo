@@ -34,48 +34,45 @@
 #include "mongo/bson/bsonobj.h"
 
 namespace mongo {
-    // mongo version
-    extern const char versionString[];
-    extern const int versionNumber;
-    std::string mongodVersion();
+// mongo version
+extern const char versionString[];
+extern const int versionNumber;
+std::string mongodVersion();
 
-    // mongo git version
-    const char* gitVersion();
-    void printGitVersion();
+// mongo git version
+const char* gitVersion();
+void printGitVersion();
 
-    // Checks whether another version is the same major version as us
-    bool isSameMajorVersion(const char* version);
+// Checks whether another version is the same major version as us
+bool isSameMajorVersion(const char* version);
 
-    const char * gitVersion();
-    const char * compiledJSEngine();
-    const char * allocator();
-    const char * loaderFlags();
-    const char * compilerFlags();
-    const char * sysInfo();
-    const std::string openSSLVersion(
-        const std::string& prefix = "",
-        const std::string& suffix = ""
-    );
+const char* gitVersion();
+const char* compiledJSEngine();
+const char* allocator();
+const char* loaderFlags();
+const char* compilerFlags();
+const char* sysInfo();
+const std::string openSSLVersion(const std::string& prefix = "", const std::string& suffix = "");
 
-    void printAllocator();
-    void printGitVersion();
-    void printOpenSSLVersion();
-    void printSysInfo();
-    void printTargetMinOS();
+void printAllocator();
+void printGitVersion();
+void printOpenSSLVersion();
+void printSysInfo();
+void printTargetMinOS();
 
-    extern const int kMongoVersionMajor;
-    extern const int kMongoVersionMinor;
-    extern const int kMongoVersionPatch;
-    extern const int kMongoVersionExtra;
-    extern const char kMongoVersionExtraStr[];
+extern const int kMongoVersionMajor;
+extern const int kMongoVersionMinor;
+extern const int kMongoVersionPatch;
+extern const int kMongoVersionExtra;
+extern const char kMongoVersionExtraStr[];
 
-    void appendBuildInfo(BSONObjBuilder& result);
+void appendBuildInfo(BSONObjBuilder& result);
 
-    extern const int kMongoVersionMajor;
-    extern const int kMongoVersionMinor;
-    extern const int kMongoVersionPatch;
-    extern const int kMongoVersionExtra;
-    extern const char kMongoVersionExtraStr[];
+extern const int kMongoVersionMajor;
+extern const int kMongoVersionMinor;
+extern const int kMongoVersionPatch;
+extern const int kMongoVersionExtra;
+extern const char kMongoVersionExtraStr[];
 }  // namespace mongo
 
 #endif  // UTIL_VERSION_HEADER

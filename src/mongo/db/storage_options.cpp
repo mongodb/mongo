@@ -34,39 +34,33 @@
 
 namespace mongo {
 
-    StorageGlobalParams storageGlobalParams;
+StorageGlobalParams storageGlobalParams;
 
-    /**
-     * The directory where the mongod instance stores its data.
-     */
+/**
+ * The directory where the mongod instance stores its data.
+ */
 #ifdef _WIN32
-    const char* StorageGlobalParams::kDefaultDbPath = "\\data\\db\\";
-    const char* StorageGlobalParams::kDefaultConfigDbPath = "\\data\\configdb\\";
+const char* StorageGlobalParams::kDefaultDbPath = "\\data\\db\\";
+const char* StorageGlobalParams::kDefaultConfigDbPath = "\\data\\configdb\\";
 #else
-    const char* StorageGlobalParams::kDefaultDbPath = "/data/db";
-    const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
+const char* StorageGlobalParams::kDefaultDbPath = "/data/db";
+const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
 #endif
 
-    /**
-     * Specify whether all queries must use indexes.
-     * If 1, MongoDB will not execute queries that require a table scan and will return an error.
-     * NOT recommended for production use.
-     */
-    ExportedServerParameter<bool> NoTableScanSetting(ServerParameterSet::getGlobal(),
-                                                     "notablescan",
-                                                     &storageGlobalParams.noTableScan,
-                                                     true,
-                                                     true);
+/**
+ * Specify whether all queries must use indexes.
+ * If 1, MongoDB will not execute queries that require a table scan and will return an error.
+ * NOT recommended for production use.
+ */
+ExportedServerParameter<bool> NoTableScanSetting(
+    ServerParameterSet::getGlobal(), "notablescan", &storageGlobalParams.noTableScan, true, true);
 
-    /**
-     * Specify the interval in seconds between fsync operations where mongod flushes its
-     * working memory to disk. By default, mongod flushes memory to disk every 60 seconds.
-     * In almost every situation you should not set this value and use the default setting.
-     */
-    ExportedServerParameter<double> SyncdelaySetting(ServerParameterSet::getGlobal(),
-                                                     "syncdelay",
-                                                     &storageGlobalParams.syncdelay,
-                                                     true,
-                                                     true);
+/**
+ * Specify the interval in seconds between fsync operations where mongod flushes its
+ * working memory to disk. By default, mongod flushes memory to disk every 60 seconds.
+ * In almost every situation you should not set this value and use the default setting.
+ */
+ExportedServerParameter<double> SyncdelaySetting(
+    ServerParameterSet::getGlobal(), "syncdelay", &storageGlobalParams.syncdelay, true, true);
 
-} // namespace mongo
+}  // namespace mongo

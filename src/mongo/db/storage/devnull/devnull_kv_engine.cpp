@@ -37,207 +37,233 @@
 
 namespace mongo {
 
-    class EmptyRecordIterator: public RecordIterator {
-    public:
-        virtual bool isEOF() { return true; }
-        virtual RecordId curr() { return RecordId(); }
-        virtual RecordId getNext() { return RecordId(); }
-        virtual void invalidate(const RecordId& dl) { }
-        virtual void saveState() { }
-        virtual bool restoreState(OperationContext* txn) { return false; }
-        virtual RecordData dataFor( const RecordId& loc ) const {
-            invariant( false );
-        }
-    };
+class EmptyRecordIterator : public RecordIterator {
+public:
+    virtual bool isEOF() {
+        return true;
+    }
+    virtual RecordId curr() {
+        return RecordId();
+    }
+    virtual RecordId getNext() {
+        return RecordId();
+    }
+    virtual void invalidate(const RecordId& dl) {}
+    virtual void saveState() {}
+    virtual bool restoreState(OperationContext* txn) {
+        return false;
+    }
+    virtual RecordData dataFor(const RecordId& loc) const {
+        invariant(false);
+    }
+};
 
-    class DevNullRecordStore : public RecordStore {
-    public:
-        DevNullRecordStore( const StringData& ns, const CollectionOptions& options )
-            : RecordStore( ns ), _options( options ) {
-            _numInserts = 0;
-            _dummy = BSON( "_id" << 1 );
-        }
-
-        virtual const char* name() const { return "devnull"; }
-
-        virtual void setCappedDeleteCallback(CappedDocumentDeleteCallback*){}
-
-        virtual long long dataSize( OperationContext* txn ) const { return 0; }
-
-        virtual long long numRecords( OperationContext* txn ) const { return 0; }
-
-        virtual bool isCapped() const { return _options.capped; }
-
-        virtual int64_t storageSize( OperationContext* txn,
-                                     BSONObjBuilder* extraInfo = NULL,
-                                     int infoLevel = 0 ) const {
-            return 0;
-        }
-
-        virtual RecordData dataFor( OperationContext* txn, const RecordId& loc) const {
-            return RecordData( _dummy.objdata(), _dummy.objsize() );
-        }
-
-        virtual bool findRecord( OperationContext* txn, const RecordId& loc, RecordData* rd ) const {
-            return false;
-        }
-
-        virtual void deleteRecord( OperationContext* txn, const RecordId& dl ) {}
-
-        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
-                                                  const char* data,
-                                                  int len,
-                                                  bool enforceQuota ) {
-            _numInserts++;
-            return StatusWith<RecordId>( RecordId( 6, 4 ) );
-        }
-
-        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
-                                                  const DocWriter* doc,
-                                                  bool enforceQuota ) {
-            _numInserts++;
-            return StatusWith<RecordId>( RecordId( 6, 4 ) );
-        }
-
-        virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
-                                                  const RecordId& oldLocation,
-                                                  const char* data,
-                                                  int len,
-                                                  bool enforceQuota,
-                                                  UpdateNotifier* notifier ) {
-            return StatusWith<RecordId>( oldLocation );
-        }
-
-        virtual bool updateWithDamagesSupported() const {
-            return false;
-        }
-
-        virtual Status updateWithDamages( OperationContext* txn,
-                                          const RecordId& loc,
-                                          const RecordData& oldRec,
-                                          const char* damageSource,
-                                          const mutablebson::DamageVector& damages ) {
-            invariant(false);
-        }
-
-        virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const RecordId& start,
-                                             const CollectionScanParams::Direction& dir ) const {
-            return new EmptyRecordIterator();
-        }
-
-        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const {
-            return new EmptyRecordIterator();
-        }
-
-        virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const {
-            std::vector<RecordIterator*> v;
-            v.push_back( new EmptyRecordIterator() );
-            return v;
-        }
-
-        virtual Status truncate( OperationContext* txn ) { return Status::OK(); }
-
-        virtual void temp_cappedTruncateAfter(OperationContext* txn,
-                                              RecordId end,
-                                              bool inclusive) { }
-
-        virtual Status validate( OperationContext* txn,
-                                 bool full, bool scanData,
-                                 ValidateAdaptor* adaptor,
-                                 ValidateResults* results, BSONObjBuilder* output ) {
-            return Status::OK();
-        }
-
-        virtual void appendCustomStats( OperationContext* txn,
-                                        BSONObjBuilder* result,
-                                        double scale ) const {
-            result->appendNumber( "numInserts", _numInserts );
-        }
-
-        virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const {
-            return Status::OK();
-        }
-
-        virtual void updateStatsAfterRepair(OperationContext* txn,
-                                            long long numRecords,
-                                            long long dataSize) {
-        }
-
-    private:
-        CollectionOptions _options;
-        long long _numInserts;
-        BSONObj _dummy;
-    };
-
-    class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
-        MONGO_DISALLOW_COPYING(DevNullSortedDataBuilderInterface);
-
-    public:
-        DevNullSortedDataBuilderInterface() { }
-
-        virtual Status addKey(const BSONObj& key, const RecordId& loc) {
-            return Status::OK();
-        }
-    };
-
-    class DevNullSortedDataInterface : public SortedDataInterface {
-    public:
-        virtual ~DevNullSortedDataInterface() { }
-
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
-                                                           bool dupsAllowed) {
-            return new DevNullSortedDataBuilderInterface();
-        }
-
-        virtual Status insert(OperationContext* txn,
-                              const BSONObj& key,
-                              const RecordId& loc,
-                              bool dupsAllowed) { return Status::OK(); }
-
-        virtual void unindex(OperationContext* txn,
-                             const BSONObj& key,
-                             const RecordId& loc,
-                             bool dupsAllowed) { }
-
-        virtual Status dupKeyCheck(OperationContext* txn,
-                                   const BSONObj& key,
-                                   const RecordId& loc) { return Status::OK(); }
-
-        virtual void fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
-                                  BSONObjBuilder* output) const { }
-
-        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
-            const {
-            return false;
-        }
-
-        virtual long long getSpaceUsedBytes( OperationContext* txn ) const { return 0; }
-
-        virtual bool isEmpty(OperationContext* txn) { return true; }
-
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const {
-            return NULL;
-        }
-
-        virtual Status initAsEmpty(OperationContext* txn) { return Status::OK(); }
-    };
-
-
-    RecordStore* DevNullKVEngine::getRecordStore( OperationContext* opCtx,
-                                                  const StringData& ns,
-                                                  const StringData& ident,
-                                                  const CollectionOptions& options ) {
-        if ( ident == "_mdb_catalog" ) {
-            return new InMemoryRecordStore( ns, &_catalogInfo );
-        }
-        return new DevNullRecordStore( ns, options );
+class DevNullRecordStore : public RecordStore {
+public:
+    DevNullRecordStore(const StringData& ns, const CollectionOptions& options)
+        : RecordStore(ns), _options(options) {
+        _numInserts = 0;
+        _dummy = BSON("_id" << 1);
     }
 
-    SortedDataInterface* DevNullKVEngine::getSortedDataInterface( OperationContext* opCtx,
-                                                                  const StringData& ident,
-                                                                  const IndexDescriptor* desc ) {
-        return new DevNullSortedDataInterface();
+    virtual const char* name() const {
+        return "devnull";
     }
 
+    virtual void setCappedDeleteCallback(CappedDocumentDeleteCallback*) {}
+
+    virtual long long dataSize(OperationContext* txn) const {
+        return 0;
+    }
+
+    virtual long long numRecords(OperationContext* txn) const {
+        return 0;
+    }
+
+    virtual bool isCapped() const {
+        return _options.capped;
+    }
+
+    virtual int64_t storageSize(OperationContext* txn,
+                                BSONObjBuilder* extraInfo = NULL,
+                                int infoLevel = 0) const {
+        return 0;
+    }
+
+    virtual RecordData dataFor(OperationContext* txn, const RecordId& loc) const {
+        return RecordData(_dummy.objdata(), _dummy.objsize());
+    }
+
+    virtual bool findRecord(OperationContext* txn, const RecordId& loc, RecordData* rd) const {
+        return false;
+    }
+
+    virtual void deleteRecord(OperationContext* txn, const RecordId& dl) {}
+
+    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
+                                              const char* data,
+                                              int len,
+                                              bool enforceQuota) {
+        _numInserts++;
+        return StatusWith<RecordId>(RecordId(6, 4));
+    }
+
+    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
+                                              const DocWriter* doc,
+                                              bool enforceQuota) {
+        _numInserts++;
+        return StatusWith<RecordId>(RecordId(6, 4));
+    }
+
+    virtual StatusWith<RecordId> updateRecord(OperationContext* txn,
+                                              const RecordId& oldLocation,
+                                              const char* data,
+                                              int len,
+                                              bool enforceQuota,
+                                              UpdateNotifier* notifier) {
+        return StatusWith<RecordId>(oldLocation);
+    }
+
+    virtual bool updateWithDamagesSupported() const {
+        return false;
+    }
+
+    virtual Status updateWithDamages(OperationContext* txn,
+                                     const RecordId& loc,
+                                     const RecordData& oldRec,
+                                     const char* damageSource,
+                                     const mutablebson::DamageVector& damages) {
+        invariant(false);
+    }
+
+    virtual RecordIterator* getIterator(OperationContext* txn,
+                                        const RecordId& start,
+                                        const CollectionScanParams::Direction& dir) const {
+        return new EmptyRecordIterator();
+    }
+
+    virtual RecordIterator* getIteratorForRepair(OperationContext* txn) const {
+        return new EmptyRecordIterator();
+    }
+
+    virtual std::vector<RecordIterator*> getManyIterators(OperationContext* txn) const {
+        std::vector<RecordIterator*> v;
+        v.push_back(new EmptyRecordIterator());
+        return v;
+    }
+
+    virtual Status truncate(OperationContext* txn) {
+        return Status::OK();
+    }
+
+    virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {}
+
+    virtual Status validate(OperationContext* txn,
+                            bool full,
+                            bool scanData,
+                            ValidateAdaptor* adaptor,
+                            ValidateResults* results,
+                            BSONObjBuilder* output) {
+        return Status::OK();
+    }
+
+    virtual void appendCustomStats(OperationContext* txn,
+                                   BSONObjBuilder* result,
+                                   double scale) const {
+        result->appendNumber("numInserts", _numInserts);
+    }
+
+    virtual Status touch(OperationContext* txn, BSONObjBuilder* output) const {
+        return Status::OK();
+    }
+
+    virtual void updateStatsAfterRepair(OperationContext* txn,
+                                        long long numRecords,
+                                        long long dataSize) {}
+
+private:
+    CollectionOptions _options;
+    long long _numInserts;
+    BSONObj _dummy;
+};
+
+class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
+    MONGO_DISALLOW_COPYING(DevNullSortedDataBuilderInterface);
+
+public:
+    DevNullSortedDataBuilderInterface() {}
+
+    virtual Status addKey(const BSONObj& key, const RecordId& loc) {
+        return Status::OK();
+    }
+};
+
+class DevNullSortedDataInterface : public SortedDataInterface {
+public:
+    virtual ~DevNullSortedDataInterface() {}
+
+    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
+        return new DevNullSortedDataBuilderInterface();
+    }
+
+    virtual Status insert(OperationContext* txn,
+                          const BSONObj& key,
+                          const RecordId& loc,
+                          bool dupsAllowed) {
+        return Status::OK();
+    }
+
+    virtual void unindex(OperationContext* txn,
+                         const BSONObj& key,
+                         const RecordId& loc,
+                         bool dupsAllowed) {}
+
+    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) {
+        return Status::OK();
+    }
+
+    virtual void fullValidate(OperationContext* txn,
+                              bool full,
+                              long long* numKeysOut,
+                              BSONObjBuilder* output) const {}
+
+    virtual bool appendCustomStats(OperationContext* txn,
+                                   BSONObjBuilder* output,
+                                   double scale) const {
+        return false;
+    }
+
+    virtual long long getSpaceUsedBytes(OperationContext* txn) const {
+        return 0;
+    }
+
+    virtual bool isEmpty(OperationContext* txn) {
+        return true;
+    }
+
+    virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const {
+        return NULL;
+    }
+
+    virtual Status initAsEmpty(OperationContext* txn) {
+        return Status::OK();
+    }
+};
+
+
+RecordStore* DevNullKVEngine::getRecordStore(OperationContext* opCtx,
+                                             const StringData& ns,
+                                             const StringData& ident,
+                                             const CollectionOptions& options) {
+    if (ident == "_mdb_catalog") {
+        return new InMemoryRecordStore(ns, &_catalogInfo);
+    }
+    return new DevNullRecordStore(ns, options);
+}
+
+SortedDataInterface* DevNullKVEngine::getSortedDataInterface(OperationContext* opCtx,
+                                                             const StringData& ident,
+                                                             const IndexDescriptor* desc) {
+    return new DevNullSortedDataInterface();
+}
 }

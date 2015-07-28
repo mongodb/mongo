@@ -50,270 +50,261 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
+using std::endl;
+using std::string;
 
 namespace repl {
 
-    // used in replAuthenticate
-    static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
+// used in replAuthenticate
+static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
-    SyncSourceFeedback::SyncSourceFeedback() : _positionChanged(false),
-                                               _handshakeNeeded(false),
-                                               _shutdownSignaled(false) {}
-    SyncSourceFeedback::~SyncSourceFeedback() {}
+SyncSourceFeedback::SyncSourceFeedback()
+    : _positionChanged(false), _handshakeNeeded(false), _shutdownSignaled(false) {}
+SyncSourceFeedback::~SyncSourceFeedback() {}
 
-    void SyncSourceFeedback::_resetConnection() {
-        LOG(1) << "resetting connection in sync source feedback";
-        _connection.reset();
-    }
+void SyncSourceFeedback::_resetConnection() {
+    LOG(1) << "resetting connection in sync source feedback";
+    _connection.reset();
+}
 
-    bool SyncSourceFeedback::replAuthenticate() {
-        if (!getGlobalAuthorizationManager()->isAuthEnabled())
-            return true;
+bool SyncSourceFeedback::replAuthenticate() {
+    if (!getGlobalAuthorizationManager()->isAuthEnabled())
+        return true;
 
-        if (!isInternalAuthSet())
-            return false;
-        return authenticateInternalUser(_connection.get());
-    }
+    if (!isInternalAuthSet())
+        return false;
+    return authenticateInternalUser(_connection.get());
+}
 
-    void SyncSourceFeedback::ensureMe(OperationContext* txn) {
-        string myname = getHostName();
-        {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dlk(txn->lockState(), "local", MODE_X);
-            Client::Context ctx(txn, "local");
+void SyncSourceFeedback::ensureMe(OperationContext* txn) {
+    string myname = getHostName();
+    {
+        ScopedTransaction transaction(txn, MODE_IX);
+        Lock::DBLock dlk(txn->lockState(), "local", MODE_X);
+        Client::Context ctx(txn, "local");
 
-            // local.me is an identifier for a server for getLastError w:2+
-            if (!Helpers::getSingleton(txn, "local.me", _me) ||
-                !_me.hasField("host") ||
-                _me["host"].String() != myname) {
+        // local.me is an identifier for a server for getLastError w:2+
+        if (!Helpers::getSingleton(txn, "local.me", _me) || !_me.hasField("host") ||
+            _me["host"].String() != myname) {
+            WriteUnitOfWork wunit(txn);
 
-                WriteUnitOfWork wunit(txn);
+            // clean out local.me
+            Helpers::emptyCollection(txn, "local.me");
 
-                // clean out local.me
-                Helpers::emptyCollection(txn, "local.me");
+            // repopulate
+            BSONObjBuilder b;
+            b.appendOID("_id", 0, true);
+            b.append("host", myname);
+            _me = b.obj();
+            Helpers::putSingleton(txn, "local.me", _me);
 
-                // repopulate
-                BSONObjBuilder b;
-                b.appendOID("_id", 0, true);
-                b.append("host", myname);
-                _me = b.obj();
-                Helpers::putSingleton(txn, "local.me", _me);
-
-                wunit.commit();
-            }
-            // _me is used outside of a read lock, so we must copy it out of the mmap
-            _me = _me.getOwned();
+            wunit.commit();
         }
+        // _me is used outside of a read lock, so we must copy it out of the mmap
+        _me = _me.getOwned();
     }
+}
 
-    bool SyncSourceFeedback::replHandshake(OperationContext* txn) {
-        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        if (replCoord->getMemberState().primary()) {
-            // primary has no one to handshake to
-            return true;
-        }
-        // construct a vector of handshake obj for us as well as all chained members
-        std::vector<BSONObj> handshakeObjs;
-        replCoord->prepareReplSetUpdatePositionCommandHandshakes(&handshakeObjs);
-        LOG(1) << "handshaking upstream updater";
-        for (std::vector<BSONObj>::iterator it = handshakeObjs.begin();
-                it != handshakeObjs.end();
-                ++it) {
-            BSONObj res;
-            try {
-                LOG(2) << "Sending to " << _connection.get()->toString() << " the replication "
-                        "handshake: " << *it;
-                if (!_connection->runCommand("admin", *it, res)) {
-                    std::string errMsg = res["errmsg"].valuestrsafe();
-                    massert(17447, "upstream updater is not supported by the member from which we"
-                            " are syncing, please update all nodes to 2.6 or later.",
-                            errMsg.find("no such cmd") == std::string::npos);
-
-                    log() << "replSet error while handshaking the upstream updater: "
-                        << errMsg;
-
-                    // sleep half a second if we are not in our sync source's config
-                    // TODO(dannenberg) after 3.0, remove the string comparison 
-                    if (res["code"].numberInt() == ErrorCodes::NodeNotFound ||
-                            errMsg.find("could not be found in replica set config while attempting "
-                                        "to associate it with") != std::string::npos) {
-
-                        // black list sync target for 10 seconds and find a new one
-                        replCoord->blacklistSyncSource(_syncTarget,
-                                                       Date_t(curTimeMillis64() + 10*1000));
-                        BackgroundSync::get()->clearSyncTarget();
-                    }
-
-                    _resetConnection();
-                    return false;
-                }
-            }
-            catch (const DBException& e) {
-                log() << "SyncSourceFeedback error sending handshake: " << e.what() << endl;
-                _resetConnection();
-                return false;
-            }
-        }
+bool SyncSourceFeedback::replHandshake(OperationContext* txn) {
+    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+    if (replCoord->getMemberState().primary()) {
+        // primary has no one to handshake to
         return true;
     }
-
-    bool SyncSourceFeedback::_connect(OperationContext* txn, const HostAndPort& host) {
-        if (hasConnection()) {
-            return true;
-        }
-        log() << "replset setting syncSourceFeedback to " << host.toString();
-        _connection.reset(new DBClientConnection(false, OplogReader::tcp_timeout));
-        string errmsg;
+    // construct a vector of handshake obj for us as well as all chained members
+    std::vector<BSONObj> handshakeObjs;
+    replCoord->prepareReplSetUpdatePositionCommandHandshakes(&handshakeObjs);
+    LOG(1) << "handshaking upstream updater";
+    for (std::vector<BSONObj>::iterator it = handshakeObjs.begin(); it != handshakeObjs.end();
+         ++it) {
+        BSONObj res;
         try {
-            if (!_connection->connect(host, errmsg) ||
-                (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate())) {
+            LOG(2) << "Sending to " << _connection.get()->toString() << " the replication "
+                                                                        "handshake: " << *it;
+            if (!_connection->runCommand("admin", *it, res)) {
+                std::string errMsg = res["errmsg"].valuestrsafe();
+                massert(17447,
+                        "upstream updater is not supported by the member from which we"
+                        " are syncing, please update all nodes to 2.6 or later.",
+                        errMsg.find("no such cmd") == std::string::npos);
+
+                log() << "replSet error while handshaking the upstream updater: " << errMsg;
+
+                // sleep half a second if we are not in our sync source's config
+                // TODO(dannenberg) after 3.0, remove the string comparison
+                if (res["code"].numberInt() == ErrorCodes::NodeNotFound ||
+                    errMsg.find(
+                        "could not be found in replica set config while attempting "
+                        "to associate it with") != std::string::npos) {
+                    // black list sync target for 10 seconds and find a new one
+                    replCoord->blacklistSyncSource(_syncTarget,
+                                                   Date_t(curTimeMillis64() + 10 * 1000));
+                    BackgroundSync::get()->clearSyncTarget();
+                }
+
                 _resetConnection();
-                log() << "repl: " << errmsg << endl;
                 return false;
             }
-        }
-        catch (const DBException& e) {
-            log() << "Error connecting to " << host.toString() << ": " << e.what();
+        } catch (const DBException& e) {
+            log() << "SyncSourceFeedback error sending handshake: " << e.what() << endl;
             _resetConnection();
             return false;
         }
+    }
+    return true;
+}
 
-        return hasConnection();
+bool SyncSourceFeedback::_connect(OperationContext* txn, const HostAndPort& host) {
+    if (hasConnection()) {
+        return true;
+    }
+    log() << "replset setting syncSourceFeedback to " << host.toString();
+    _connection.reset(new DBClientConnection(false, OplogReader::tcp_timeout));
+    string errmsg;
+    try {
+        if (!_connection->connect(host, errmsg) ||
+            (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate())) {
+            _resetConnection();
+            log() << "repl: " << errmsg << endl;
+            return false;
+        }
+    } catch (const DBException& e) {
+        log() << "Error connecting to " << host.toString() << ": " << e.what();
+        _resetConnection();
+        return false;
     }
 
-    void SyncSourceFeedback::forwardSlaveHandshake() {
+    return hasConnection();
+}
+
+void SyncSourceFeedback::forwardSlaveHandshake() {
+    boost::unique_lock<boost::mutex> lock(_mtx);
+    _handshakeNeeded = true;
+    _cond.notify_all();
+}
+
+void SyncSourceFeedback::forwardSlaveProgress() {
+    boost::unique_lock<boost::mutex> lock(_mtx);
+    _positionChanged = true;
+    _cond.notify_all();
+}
+
+Status SyncSourceFeedback::updateUpstream(OperationContext* txn) {
+    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+    if (replCoord->getMemberState().primary()) {
+        // primary has no one to update to
+        return Status::OK();
+    }
+    BSONObjBuilder cmd;
+    {
         boost::unique_lock<boost::mutex> lock(_mtx);
-        _handshakeNeeded = true;
-        _cond.notify_all();
-    }
-
-    void SyncSourceFeedback::forwardSlaveProgress() {
-        boost::unique_lock<boost::mutex> lock(_mtx);
-        _positionChanged = true;
-        _cond.notify_all();
-    }
-
-    Status SyncSourceFeedback::updateUpstream(OperationContext* txn) {
-        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        if (replCoord->getMemberState().primary()) {
-            // primary has no one to update to
+        if (_handshakeNeeded) {
+            // Don't send updates if there are nodes that haven't yet been handshaked
+            return Status(ErrorCodes::NodeNotFound,
+                          "Need to send handshake before updating position upstream");
+        }
+        // the command could not be created, likely because the node was removed from the set
+        if (!replCoord->prepareReplSetUpdatePositionCommand(&cmd)) {
             return Status::OK();
         }
-        BSONObjBuilder cmd;
+    }
+    BSONObj res;
+
+    LOG(2) << "Sending slave oplog progress to upstream updater: " << cmd.done();
+    try {
+        _connection->runCommand("admin", cmd.obj(), res);
+    } catch (const DBException& e) {
+        log() << "SyncSourceFeedback error sending update: " << e.what() << endl;
+        // blacklist sync target for .5 seconds and find a new one
+        replCoord->blacklistSyncSource(_syncTarget, Date_t(curTimeMillis64() + 500));
+        BackgroundSync::get()->clearSyncTarget();
+        _resetConnection();
+        return e.toStatus();
+    }
+
+    Status status = Command::getStatusFromCommandResult(res);
+    if (!status.isOK()) {
+        log() << "SyncSourceFeedback error sending update, response: " << res.toString() << endl;
+        // blacklist sync target for .5 seconds and find a new one
+        replCoord->blacklistSyncSource(_syncTarget, Date_t(curTimeMillis64() + 500));
+        BackgroundSync::get()->clearSyncTarget();
+        _resetConnection();
+    }
+    return status;
+}
+
+void SyncSourceFeedback::shutdown() {
+    boost::unique_lock<boost::mutex> lock(_mtx);
+    _shutdownSignaled = true;
+    _cond.notify_all();
+}
+
+void SyncSourceFeedback::run() {
+    Client::initThread("SyncSourceFeedback");
+    OperationContextImpl txn;
+
+    bool positionChanged = false;
+    bool handshakeNeeded = false;
+    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+    while (!inShutdown()) {  // TODO(spencer): Remove once legacy repl coordinator is gone.
         {
             boost::unique_lock<boost::mutex> lock(_mtx);
-            if (_handshakeNeeded) {
-                // Don't send updates if there are nodes that haven't yet been handshaked
-                return Status(ErrorCodes::NodeNotFound,
-                              "Need to send handshake before updating position upstream");
+            while (!_positionChanged && !_handshakeNeeded && !_shutdownSignaled) {
+                _cond.wait(lock);
             }
-            // the command could not be created, likely because the node was removed from the set
-            if (!replCoord->prepareReplSetUpdatePositionCommand(&cmd)) {
-                return Status::OK();
-            }
-        }
-        BSONObj res;
 
-        LOG(2) << "Sending slave oplog progress to upstream updater: " << cmd.done();
-        try {
-            _connection->runCommand("admin", cmd.obj(), res);
+            if (_shutdownSignaled) {
+                break;
+            }
+
+            positionChanged = _positionChanged;
+            handshakeNeeded = _handshakeNeeded;
+            _positionChanged = false;
+            _handshakeNeeded = false;
         }
-        catch (const DBException& e) {
-            log() << "SyncSourceFeedback error sending update: " << e.what() << endl;
-            // blacklist sync target for .5 seconds and find a new one
-            replCoord->blacklistSyncSource(_syncTarget,
-                                           Date_t(curTimeMillis64() + 500));
-            BackgroundSync::get()->clearSyncTarget();
+
+        MemberState state = replCoord->getMemberState();
+        if (state.primary() || state.startup()) {
             _resetConnection();
-            return e.toStatus();
+            continue;
         }
-
-        Status status = Command::getStatusFromCommandResult(res);
-        if (!status.isOK()) {
-            log() << "SyncSourceFeedback error sending update, response: " << res.toString() <<endl;
-            // blacklist sync target for .5 seconds and find a new one
-            replCoord->blacklistSyncSource(_syncTarget,
-                                           Date_t(curTimeMillis64() + 500));
-            BackgroundSync::get()->clearSyncTarget();
+        const HostAndPort target = BackgroundSync::get()->getSyncTarget();
+        if (_syncTarget != target) {
             _resetConnection();
+            _syncTarget = target;
         }
-        return status;
-    }
-
-    void SyncSourceFeedback::shutdown() {
-        boost::unique_lock<boost::mutex> lock(_mtx);
-        _shutdownSignaled = true;
-        _cond.notify_all();
-    }
-
-    void SyncSourceFeedback::run() {
-        Client::initThread("SyncSourceFeedback");
-        OperationContextImpl txn;
-
-        bool positionChanged = false;
-        bool handshakeNeeded = false;
-        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        while (!inShutdown()) { // TODO(spencer): Remove once legacy repl coordinator is gone.
-            {
-                boost::unique_lock<boost::mutex> lock(_mtx);
-                while (!_positionChanged && !_handshakeNeeded && !_shutdownSignaled) {
-                    _cond.wait(lock);
-                }
-
-                if (_shutdownSignaled) {
-                    break;
-                }
-
-                positionChanged = _positionChanged;
-                handshakeNeeded = _handshakeNeeded;
-                _positionChanged = false;
-                _handshakeNeeded = false;
-            }
-
-            MemberState state = replCoord->getMemberState();
-            if (state.primary() || state.startup()) {
-                _resetConnection();
+        if (!hasConnection()) {
+            // fix connection if need be
+            if (target.empty()) {
+                sleepmillis(500);
                 continue;
             }
-            const HostAndPort target = BackgroundSync::get()->getSyncTarget();
-            if (_syncTarget != target) {
-                _resetConnection();
-                _syncTarget = target;
+            if (!_connect(&txn, target)) {
+                sleepmillis(500);
+                continue;
             }
-            if (!hasConnection()) {
-                // fix connection if need be
-                if (target.empty()) {
-                    sleepmillis(500);
-                    continue;
-                }
-                if (!_connect(&txn, target)) {
-                    sleepmillis(500);
-                    continue;
-                }
-                handshakeNeeded = true;
+            handshakeNeeded = true;
+        }
+        if (handshakeNeeded) {
+            positionChanged = true;
+            if (!replHandshake(&txn)) {
+                boost::unique_lock<boost::mutex> lock(_mtx);
+                _handshakeNeeded = true;
+                continue;
             }
-            if (handshakeNeeded) {
-                positionChanged = true;
-                if (!replHandshake(&txn)) {
-                    boost::unique_lock<boost::mutex> lock(_mtx);
+        }
+        if (positionChanged) {
+            Status status = updateUpstream(&txn);
+            if (!status.isOK()) {
+                boost::unique_lock<boost::mutex> lock(_mtx);
+                _positionChanged = true;
+                if (status == ErrorCodes::NodeNotFound) {
                     _handshakeNeeded = true;
-                    continue;
-                }
-            }
-            if (positionChanged) {
-                Status status = updateUpstream(&txn);
-                if (!status.isOK()) {
-                    boost::unique_lock<boost::mutex> lock(_mtx);
-                    _positionChanged = true;
-                    if (status == ErrorCodes::NodeNotFound) {
-                        _handshakeNeeded = true;
-                    }
                 }
             }
         }
-        cc().shutdown();
     }
-} // namespace repl
-} // namespace mongo
+    cc().shutdown();
+}
+}  // namespace repl
+}  // namespace mongo

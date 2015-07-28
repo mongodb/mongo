@@ -37,50 +37,43 @@ using namespace std;
 
 namespace mongo {
 
-    ProcessInfo::ProcessInfo( ProcessId pid ) {
-    }
+ProcessInfo::ProcessInfo(ProcessId pid) {}
 
-    ProcessInfo::~ProcessInfo() {
-    }
+ProcessInfo::~ProcessInfo() {}
 
-    bool ProcessInfo::supported() {
-        return false;
-    }
+bool ProcessInfo::supported() {
+    return false;
+}
 
-    int ProcessInfo::getVirtualMemorySize() {
-        return -1;
-    }
+int ProcessInfo::getVirtualMemorySize() {
+    return -1;
+}
 
-    int ProcessInfo::getResidentSize() {
-        return -1;
-    }
+int ProcessInfo::getResidentSize() {
+    return -1;
+}
 
-    double ProcessInfo::getSystemMemoryPressurePercentage() {
-        return 0.0;
-    }
+double ProcessInfo::getSystemMemoryPressurePercentage() {
+    return 0.0;
+}
 
-    bool ProcessInfo::checkNumaEnabled() { 
-        return false;
-    }
+bool ProcessInfo::checkNumaEnabled() {
+    return false;
+}
 
-    bool ProcessInfo::blockCheckSupported() {
-        return false;
-    }
+bool ProcessInfo::blockCheckSupported() {
+    return false;
+}
 
-    void ProcessInfo::SystemInfo::collectSystemInfo() {
+void ProcessInfo::SystemInfo::collectSystemInfo() {}
 
-    }
+void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
 
-    void ProcessInfo::getExtraInfo( BSONObjBuilder& info ) {
-        
-    }
+bool ProcessInfo::blockInMemory(const void* start) {
+    verify(0);
+}
 
-    bool ProcessInfo::blockInMemory(const void* start) {
-        verify(0);
-    }
-
-    bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
-        verify(0);
-    }
-
+bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
+    verify(0);
+}
 }

@@ -34,29 +34,34 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    // Global version manager
-    VersionManager versionManager;
+// Global version manager
+VersionManager versionManager;
 
-    void VersionManager::resetShardVersionCB( DBClientBase * conn ) {
-        return;
-    }
+void VersionManager::resetShardVersionCB(DBClientBase* conn) {
+    return;
+}
 
-    bool VersionManager::isVersionableCB( DBClientBase* conn ){
-        return false;
-    }
+bool VersionManager::isVersionableCB(DBClientBase* conn) {
+    return false;
+}
 
-    bool VersionManager::forceRemoteCheckShardVersionCB( const string& ns ){
-        return true;
-    }
+bool VersionManager::forceRemoteCheckShardVersionCB(const string& ns) {
+    return true;
+}
 
-    bool VersionManager::checkShardVersionCB( DBClientBase* conn_in , const string& ns , bool authoritative , int tryNumber ) {
-        return false;
-    }
+bool VersionManager::checkShardVersionCB(DBClientBase* conn_in,
+                                         const string& ns,
+                                         bool authoritative,
+                                         int tryNumber) {
+    return false;
+}
 
-    bool VersionManager::checkShardVersionCB( ShardConnection* conn_in , bool authoritative , int tryNumber ) {
-        return false;
-    }
+bool VersionManager::checkShardVersionCB(ShardConnection* conn_in,
+                                         bool authoritative,
+                                         int tryNumber) {
+    return false;
+}
 
 }  // namespace mongo

@@ -40,29 +40,26 @@
 
 namespace mongo {
 
-    Status checkAuthForListCollectionsCommand(ClientBasic* client,
-                                              const std::string& dbname,
-                                              const BSONObj& cmdObj) {
-        AuthorizationSession* authzSession = client->getAuthorizationSession();
+Status checkAuthForListCollectionsCommand(ClientBasic* client,
+                                          const std::string& dbname,
+                                          const BSONObj& cmdObj) {
+    AuthorizationSession* authzSession = client->getAuthorizationSession();
 
-        // Check for the listCollections ActionType on the database
-        // or find on system.namespaces for pre 3.0 systems.
-        if (authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(dbname),
-                ActionType::listCollections)) {
-            return Status::OK();
-        }
-
-        if (authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(
-                    NamespaceString(dbname, "system.namespaces")),
-                ActionType::find)) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized,
-                        str::stream() << "Not authorized to list collections on db: " <<
-                        dbname);
+    // Check for the listCollections ActionType on the database
+    // or find on system.namespaces for pre 3.0 systems.
+    if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
+                                                       ActionType::listCollections)) {
+        return Status::OK();
     }
 
-} // namespace mongo
+    if (authzSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.namespaces")),
+            ActionType::find)) {
+        return Status::OK();
+    }
+
+    return Status(ErrorCodes::Unauthorized,
+                  str::stream() << "Not authorized to list collections on db: " << dbname);
+}
+
+}  // namespace mongo

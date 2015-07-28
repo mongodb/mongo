@@ -37,82 +37,82 @@
 
 namespace mongo {
 
+/**
+ * This stage turns a RecordId into a BSONObj.
+ *
+ * In WorkingSetMember terms, it transitions from LOC_AND_IDX to LOC_AND_OBJ by reading
+ * the record at the provided loc.  Returns verbatim any data that already has an object.
+ *
+ * Preconditions: Valid RecordId.
+ */
+class FetchStage : public PlanStage {
+public:
+    FetchStage(OperationContext* txn,
+               WorkingSet* ws,
+               PlanStage* child,
+               const MatchExpression* filter,
+               const Collection* collection);
+
+    virtual ~FetchStage();
+
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
+
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_FETCH;
+    }
+
+    PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats();
+
+    virtual const SpecificStats* getSpecificStats();
+
+    static const char* kStageType;
+
+private:
     /**
-     * This stage turns a RecordId into a BSONObj.
-     *
-     * In WorkingSetMember terms, it transitions from LOC_AND_IDX to LOC_AND_OBJ by reading
-     * the record at the provided loc.  Returns verbatim any data that already has an object.
-     *
-     * Preconditions: Valid RecordId.
+     * If the member (with id memberID) passes our filter, set *out to memberID and return that
+     * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
      */
-    class FetchStage : public PlanStage {
-    public:
-        FetchStage(OperationContext* txn,
-                   WorkingSet* ws,
-                   PlanStage* child,
-                   const MatchExpression* filter,
-                   const Collection* collection);
+    StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
 
-        virtual ~FetchStage();
+    OperationContext* _txn;
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+    // Collection which is used by this stage. Used to resolve record ids retrieved by child
+    // stages. The lifetime of the collection must supersede that of the stage.
+    const Collection* _collection;
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    // _ws is not owned by us.
+    WorkingSet* _ws;
+    boost::scoped_ptr<PlanStage> _child;
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    // The filter is not owned by us.
+    const MatchExpression* _filter;
 
-        virtual StageType stageType() const { return STAGE_FETCH; }
+    // If we want to return a RecordId and it points to something that's not in memory,
+    // we return a "please page this in" result. We add a RecordFetcher given back to us by the
+    // storage engine to the WSM. The RecordFetcher is used by the PlanExecutor when it handles
+    // the fetch request.
+    //
+    // Some stages which request fetches don't need to use '_idBeingPagedIn' (e.g.,
+    // CollectionScan) because they are implemented with an underlying iterator which keeps
+    // track of the next WSM to be returned. A FetchStage has no such iterator, but rather
+    // streams its results from the child. Therefore, when it requests a yield via NEED_FETCH,
+    // the current WSM must be saved so that the fetched result can be returned on the next
+    // call to work(). This also requires special invalidation handling not found in stages like
+    // CollectionScan for when '_idBeingPagedIn' is invalidated before it can be returned.
+    WorkingSetID _idBeingPagedIn;
 
-        PlanStageStats* getStats();
-
-        virtual const CommonStats* getCommonStats();
-
-        virtual const SpecificStats* getSpecificStats();
-
-        static const char* kStageType;
-
-    private:
-
-        /**
-         * If the member (with id memberID) passes our filter, set *out to memberID and return that
-         * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
-         */
-        StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID,
-                                   WorkingSetID* out);
-
-        OperationContext* _txn;
-
-        // Collection which is used by this stage. Used to resolve record ids retrieved by child
-        // stages. The lifetime of the collection must supersede that of the stage.
-        const Collection* _collection;
-
-        // _ws is not owned by us.
-        WorkingSet* _ws;
-        boost::scoped_ptr<PlanStage> _child;
-
-        // The filter is not owned by us.
-        const MatchExpression* _filter;
-
-        // If we want to return a RecordId and it points to something that's not in memory,
-        // we return a "please page this in" result. We add a RecordFetcher given back to us by the
-        // storage engine to the WSM. The RecordFetcher is used by the PlanExecutor when it handles
-        // the fetch request.
-        //
-        // Some stages which request fetches don't need to use '_idBeingPagedIn' (e.g.,
-        // CollectionScan) because they are implemented with an underlying iterator which keeps
-        // track of the next WSM to be returned. A FetchStage has no such iterator, but rather
-        // streams its results from the child. Therefore, when it requests a yield via NEED_FETCH,
-        // the current WSM must be saved so that the fetched result can be returned on the next
-        // call to work(). This also requires special invalidation handling not found in stages like
-        // CollectionScan for when '_idBeingPagedIn' is invalidated before it can be returned.
-        WorkingSetID _idBeingPagedIn;
-
-        // Stats
-        CommonStats _commonStats;
-        FetchStats _specificStats;
-    };
+    // Stats
+    CommonStats _commonStats;
+    FetchStats _specificStats;
+};
 
 }  // namespace mongo

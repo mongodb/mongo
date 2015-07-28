@@ -34,25 +34,20 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    ServerStatusMetric::ServerStatusMetric(const string& nameIn)
-        : _name( nameIn ),
-          _leafName( _parseLeafName( nameIn ) ) {
-
-        if ( MetricTree::theMetricTree == 0 )
-            MetricTree::theMetricTree = new MetricTree();
-        MetricTree::theMetricTree->add( this );
-    }
-
-    string ServerStatusMetric::_parseLeafName( const string& name ) {
-        size_t idx = name.rfind( "." );
-        if ( idx == string::npos )
-            return name;
-
-        return name.substr( idx + 1 );
-    }
-
-
+ServerStatusMetric::ServerStatusMetric(const string& nameIn)
+    : _name(nameIn), _leafName(_parseLeafName(nameIn)) {
+    if (MetricTree::theMetricTree == 0)
+        MetricTree::theMetricTree = new MetricTree();
+    MetricTree::theMetricTree->add(this);
 }
 
+string ServerStatusMetric::_parseLeafName(const string& name) {
+    size_t idx = name.rfind(".");
+    if (idx == string::npos)
+        return name;
+
+    return name.substr(idx + 1);
+}
+}

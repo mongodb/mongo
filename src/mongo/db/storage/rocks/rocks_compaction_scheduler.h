@@ -44,25 +44,29 @@
 
 namespace mongo {
 
-    class RocksCompactionScheduler {
-    public:
-        RocksCompactionScheduler(rocksdb::DB* db) : _db(db) { _timer.reset(); }
+class RocksCompactionScheduler {
+public:
+    RocksCompactionScheduler(rocksdb::DB* db) : _db(db) {
+        _timer.reset();
+    }
 
-        static int getSkippedDeletionsThreshold() { return kSkippedDeletionsThreshold; }
+    static int getSkippedDeletionsThreshold() {
+        return kSkippedDeletionsThreshold;
+    }
 
-        void reportSkippedDeletionsAboveThreshold(const std::string& prefix);
+    void reportSkippedDeletionsAboveThreshold(const std::string& prefix);
 
-    private:
-        rocksdb::DB* _db;  // not owned
+private:
+    rocksdb::DB* _db;  // not owned
 
-        boost::mutex _lock;
-        // protected by _lock
-        Timer _timer;
+    boost::mutex _lock;
+    // protected by _lock
+    Timer _timer;
 
-        // Don't trigger compactions more often than every 10min
-        static const int kMinCompactionIntervalMins = 10;
-        // We'll compact the prefix if any operation on the prefix reports more than 50.000
-        // deletions it had to skip over (this is about 10ms extra overhead)
-        static const int kSkippedDeletionsThreshold = 50000;
-    };
+    // Don't trigger compactions more often than every 10min
+    static const int kMinCompactionIntervalMins = 10;
+    // We'll compact the prefix if any operation on the prefix reports more than 50.000
+    // deletions it had to skip over (this is about 10ms extra overhead)
+    static const int kSkippedDeletionsThreshold = 50000;
+};
 }

@@ -37,110 +37,111 @@
 namespace mongo {
 namespace {
 
-    class GlobalLockServerStatusSection : public ServerStatusSection {
-    public:
-        GlobalLockServerStatusSection() : ServerStatusSection("globalLock") {
-            _started = curTimeMillis64();
-        }
+class GlobalLockServerStatusSection : public ServerStatusSection {
+public:
+    GlobalLockServerStatusSection() : ServerStatusSection("globalLock") {
+        _started = curTimeMillis64();
+    }
 
-        virtual bool includeByDefault() const { return true; }
+    virtual bool includeByDefault() const {
+        return true;
+    }
 
-        virtual BSONObj generateSection(OperationContext* txn,
-                                        const BSONElement& configElement) const {
+    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+        int numTotal = 0;
+        int numWriteLocked = 0;
+        int numReadLocked = 0;
+        int numWaitingRead = 0;
+        int numWaitingWrite = 0;
 
-            int numTotal = 0;
-            int numWriteLocked = 0;
-            int numReadLocked = 0;
-            int numWaitingRead = 0;
-            int numWaitingWrite = 0;
+        // This returns the blocked lock states
+        {
+            boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
 
-            // This returns the blocked lock states
-            {
-                boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+            // Count all clients
+            numTotal = Client::clients.size();
 
-                // Count all clients
-                numTotal = Client::clients.size();
+            ClientSet::const_iterator it = Client::clients.begin();
+            for (; it != Client::clients.end(); it++) {
+                Client* client = *it;
+                invariant(client);
 
-                ClientSet::const_iterator it = Client::clients.begin();
-                for (; it != Client::clients.end(); it++) {
-                    Client* client = *it;
-                    invariant(client);
+                boost::unique_lock<Client> uniqueLock(*client);
 
-                    boost::unique_lock<Client> uniqueLock(*client);
+                const OperationContext* opCtx = client->getOperationContext();
+                if (opCtx == NULL)
+                    continue;
 
-                    const OperationContext* opCtx = client->getOperationContext();
-                    if (opCtx == NULL) continue;
+                if (opCtx->lockState()->isWriteLocked()) {
+                    numWriteLocked++;
 
-                    if (opCtx->lockState()->isWriteLocked()) {
-                        numWriteLocked++;
-
-                        if (opCtx->lockState()->getWaitingResource().isValid()) {
-                            numWaitingWrite++;
-                        }
+                    if (opCtx->lockState()->getWaitingResource().isValid()) {
+                        numWaitingWrite++;
                     }
-                    else if (opCtx->lockState()->isReadLocked()) {
-                        numReadLocked++;
+                } else if (opCtx->lockState()->isReadLocked()) {
+                    numReadLocked++;
 
-                        if (opCtx->lockState()->getWaitingResource().isValid()) {
-                            numWaitingRead++;
-                        }
+                    if (opCtx->lockState()->getWaitingResource().isValid()) {
+                        numWaitingRead++;
                     }
                 }
             }
-
-            // Construct the actual return value out of the mutex
-            BSONObjBuilder ret;
-
-            ret.append("totalTime", (long long)(1000 * (curTimeMillis64() - _started)));
-
-            {
-                BSONObjBuilder currentQueueBuilder(ret.subobjStart("currentQueue"));
-
-                currentQueueBuilder.append("total", numWaitingRead + numWaitingWrite);
-                currentQueueBuilder.append("readers", numWaitingRead);
-                currentQueueBuilder.append("writers", numWaitingWrite);
-                currentQueueBuilder.done();
-            }
-
-            {
-                BSONObjBuilder activeClientsBuilder(ret.subobjStart("activeClients"));
-
-                activeClientsBuilder.append("total", numTotal);
-                activeClientsBuilder.append("readers", numReadLocked);
-                activeClientsBuilder.append("writers", numWriteLocked);
-                activeClientsBuilder.done();
-            }
-
-            ret.done();
-
-            return ret.obj();
         }
 
-    private:
-        unsigned long long _started;
+        // Construct the actual return value out of the mutex
+        BSONObjBuilder ret;
 
-    } globalLockServerStatusSection;
+        ret.append("totalTime", (long long)(1000 * (curTimeMillis64() - _started)));
 
+        {
+            BSONObjBuilder currentQueueBuilder(ret.subobjStart("currentQueue"));
 
-    class LockStatsServerStatusSection : public ServerStatusSection {
-    public:
-        LockStatsServerStatusSection() : ServerStatusSection("locks") { }
-
-        virtual bool includeByDefault() const { return true; }
-
-        virtual BSONObj generateSection(OperationContext* txn,
-                                        const BSONElement& configElement) const {
-            BSONObjBuilder ret;
-
-            SingleThreadedLockStats stats;
-            reportGlobalLockingStats(&stats);
-
-            stats.report(&ret);
-
-            return ret.obj();
+            currentQueueBuilder.append("total", numWaitingRead + numWaitingWrite);
+            currentQueueBuilder.append("readers", numWaitingRead);
+            currentQueueBuilder.append("writers", numWaitingWrite);
+            currentQueueBuilder.done();
         }
 
-    } lockStatsServerStatusSection;
+        {
+            BSONObjBuilder activeClientsBuilder(ret.subobjStart("activeClients"));
 
-} // namespace
-} // namespace mongo
+            activeClientsBuilder.append("total", numTotal);
+            activeClientsBuilder.append("readers", numReadLocked);
+            activeClientsBuilder.append("writers", numWriteLocked);
+            activeClientsBuilder.done();
+        }
+
+        ret.done();
+
+        return ret.obj();
+    }
+
+private:
+    unsigned long long _started;
+
+} globalLockServerStatusSection;
+
+
+class LockStatsServerStatusSection : public ServerStatusSection {
+public:
+    LockStatsServerStatusSection() : ServerStatusSection("locks") {}
+
+    virtual bool includeByDefault() const {
+        return true;
+    }
+
+    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+        BSONObjBuilder ret;
+
+        SingleThreadedLockStats stats;
+        reportGlobalLockingStats(&stats);
+
+        stats.report(&ret);
+
+        return ret.obj();
+    }
+
+} lockStatsServerStatusSection;
+
+}  // namespace
+}  // namespace mongo

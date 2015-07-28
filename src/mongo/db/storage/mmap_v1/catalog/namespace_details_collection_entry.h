@@ -37,82 +37,73 @@
 
 namespace mongo {
 
-    class NamespaceDetails;
+class NamespaceDetails;
 
-    class MMAPV1DatabaseCatalogEntry;;
-    class RecordStore;
-    class OperationContext;
+class MMAPV1DatabaseCatalogEntry;
+;
+class RecordStore;
+class OperationContext;
 
-    class NamespaceDetailsCollectionCatalogEntry : public CollectionCatalogEntry {
-    public:
-        NamespaceDetailsCollectionCatalogEntry( StringData ns,
-                                                NamespaceDetails* details,
-                                                RecordStore* namespacesRecordStore,
-                                                RecordStore* indexRecordStore,
-                                                MMAPV1DatabaseCatalogEntry* db );
+class NamespaceDetailsCollectionCatalogEntry : public CollectionCatalogEntry {
+public:
+    NamespaceDetailsCollectionCatalogEntry(StringData ns,
+                                           NamespaceDetails* details,
+                                           RecordStore* namespacesRecordStore,
+                                           RecordStore* indexRecordStore,
+                                           MMAPV1DatabaseCatalogEntry* db);
 
-        virtual ~NamespaceDetailsCollectionCatalogEntry(){}
+    virtual ~NamespaceDetailsCollectionCatalogEntry() {}
 
-        virtual CollectionOptions getCollectionOptions(OperationContext* txn) const;
+    virtual CollectionOptions getCollectionOptions(OperationContext* txn) const;
 
-        virtual int getTotalIndexCount(OperationContext* txn) const;
+    virtual int getTotalIndexCount(OperationContext* txn) const;
 
-        virtual int getCompletedIndexCount(OperationContext* txn) const;
+    virtual int getCompletedIndexCount(OperationContext* txn) const;
 
-        virtual int getMaxAllowedIndexes() const;
+    virtual int getMaxAllowedIndexes() const;
 
-        virtual void getAllIndexes( OperationContext* txn,
-                                    std::vector<std::string>* names ) const;
+    virtual void getAllIndexes(OperationContext* txn, std::vector<std::string>* names) const;
 
-        virtual BSONObj getIndexSpec( OperationContext* txn,
-                                      const StringData& idxName ) const;
+    virtual BSONObj getIndexSpec(OperationContext* txn, const StringData& idxName) const;
 
-        virtual bool isIndexMultikey(OperationContext* txn,
-                                     const StringData& indexName) const;
-        virtual bool isIndexMultikey(int idxNo) const;
+    virtual bool isIndexMultikey(OperationContext* txn, const StringData& indexName) const;
+    virtual bool isIndexMultikey(int idxNo) const;
 
-        virtual bool setIndexIsMultikey(OperationContext* txn,
-                                        int idxNo,
-                                        bool multikey = true);
-        virtual bool setIndexIsMultikey(OperationContext* txn,
-                                        const StringData& indexName,
-                                        bool multikey = true);
+    virtual bool setIndexIsMultikey(OperationContext* txn, int idxNo, bool multikey = true);
+    virtual bool setIndexIsMultikey(OperationContext* txn,
+                                    const StringData& indexName,
+                                    bool multikey = true);
 
-        virtual RecordId getIndexHead( OperationContext* txn,
-                                       const StringData& indexName ) const;
+    virtual RecordId getIndexHead(OperationContext* txn, const StringData& indexName) const;
 
-        virtual void setIndexHead( OperationContext* txn,
-                                   const StringData& indexName,
-                                   const RecordId& newHead );
+    virtual void setIndexHead(OperationContext* txn,
+                              const StringData& indexName,
+                              const RecordId& newHead);
 
-        virtual bool isIndexReady( OperationContext* txn,
-                                   const StringData& indexName ) const;
+    virtual bool isIndexReady(OperationContext* txn, const StringData& indexName) const;
 
-        virtual Status removeIndex( OperationContext* txn,
-                                    const StringData& indexName );
+    virtual Status removeIndex(OperationContext* txn, const StringData& indexName);
 
-        virtual Status prepareForIndexBuild( OperationContext* txn,
-                                             const IndexDescriptor* spec );
+    virtual Status prepareForIndexBuild(OperationContext* txn, const IndexDescriptor* spec);
 
-        virtual void indexBuildSuccess( OperationContext* txn,
-                                        const StringData& indexName );
+    virtual void indexBuildSuccess(OperationContext* txn, const StringData& indexName);
 
-        virtual void updateTTLSetting( OperationContext* txn,
-                                       const StringData& idxName,
-                                       long long newExpireSeconds );
+    virtual void updateTTLSetting(OperationContext* txn,
+                                  const StringData& idxName,
+                                  long long newExpireSeconds);
 
-        virtual void updateFlags(OperationContext* txn, int newValue);
+    virtual void updateFlags(OperationContext* txn, int newValue);
 
-        // not part of interface, but available to my storage engine
+    // not part of interface, but available to my storage engine
 
-        int _findIndexNumber( OperationContext* txn, const StringData& indexName) const;
+    int _findIndexNumber(OperationContext* txn, const StringData& indexName) const;
 
-    private:
-        NamespaceDetails* _details;
-        RecordStore* _namespacesRecordStore;
-        RecordStore* _indexRecordStore;
-        MMAPV1DatabaseCatalogEntry* _db;
+private:
+    NamespaceDetails* _details;
+    RecordStore* _namespacesRecordStore;
+    RecordStore* _indexRecordStore;
+    MMAPV1DatabaseCatalogEntry* _db;
 
-        friend class MMAPV1DatabaseCatalogEntry;
-    };
+    friend class MMAPV1DatabaseCatalogEntry;
+};
 }

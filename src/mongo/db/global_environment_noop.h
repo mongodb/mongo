@@ -30,34 +30,33 @@
 
 namespace mongo {
 
-    class GlobalEnvironmentNoop : public GlobalEnvironmentExperiment {
-    public:
-        StorageEngine* getGlobalStorageEngine();
+class GlobalEnvironmentNoop : public GlobalEnvironmentExperiment {
+public:
+    StorageEngine* getGlobalStorageEngine();
 
-        void setGlobalStorageEngine(const std::string& name);
+    void setGlobalStorageEngine(const std::string& name);
 
-        void shutdownGlobalStorageEngineCleanly();
+    void shutdownGlobalStorageEngineCleanly();
 
-        void registerStorageEngine(const std::string& name,
-                                   const StorageEngine::Factory* factory);
+    void registerStorageEngine(const std::string& name, const StorageEngine::Factory* factory);
 
-        bool isRegisteredStorageEngine(const std::string& name);
+    bool isRegisteredStorageEngine(const std::string& name);
 
-        StorageFactoriesIterator* makeStorageFactoriesIterator();
+    StorageFactoriesIterator* makeStorageFactoriesIterator();
 
-        bool killOperation(unsigned int opId);
+    bool killOperation(unsigned int opId);
 
-        void killAllUserOperations(const OperationContext* txn);
+    void killAllUserOperations(const OperationContext* txn);
 
-        void setKillAllOperations();
+    void setKillAllOperations();
 
-        void unsetKillAllOperations();
+    void unsetKillAllOperations();
 
-        bool getKillAllOperations();
+    bool getKillAllOperations();
 
-        void registerKillOpListener(KillOpListenerInterface* listener);
+    void registerKillOpListener(KillOpListenerInterface* listener);
 
-        OperationContext* newOpCtx();
-    };
+    OperationContext* newOpCtx();
+};
 
 }  // namespace mongo

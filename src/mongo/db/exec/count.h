@@ -34,102 +34,104 @@
 
 namespace mongo {
 
+/**
+ * A description of a request for a count operation. Copyable.
+ */
+struct CountRequest {
+    // Namespace to operate on (e.g. "foo.bar").
+    std::string ns;
+
+    // A predicate describing the set of documents to count.
+    //
+    // NOTE:
+    //   Parsing the raw BSON to our AST is left for later so that the parse method does not
+    //   have to look at the catalog. Specifically, creating a CanonicalQuery requires a
+    //   Collection* due to the WhereCallback, and we'd rather not have the parse method require
+    //   a Collection*.
+    BSONObj query;
+
+    // Indicates to the query planner that it should generate a count plan using a
+    // particular index.
+    BSONObj hint;
+
+    // An integer limiting the number of documents to count.
+    long long limit;
+
+    // An integer indicating to not include the first n documents in the count.
+    long long skip;
+
+    // Whether this is an explain of a count.
+    bool explain;
+};
+
+/**
+ * Stage used by the count command. This stage sits at the root of a plan tree
+ * and counts the number of results returned by its child stage.
+ *
+ * This should not be confused with the CountScan stage. CountScan is a special
+ * index access stage which can optimize index access for count operations in
+ * some cases. On the other hand, *every* count op has a CountStage at its root.
+ *
+ * Only returns NEED_TIME until hitting EOF. The count result can be obtained by examining
+ * the specific stats.
+ */
+class CountStage : public PlanStage {
+public:
+    CountStage(OperationContext* txn,
+               Collection* collection,
+               const CountRequest& request,
+               WorkingSet* ws,
+               PlanStage* child);
+
+    virtual ~CountStage();
+
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
+
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_COUNT;
+    }
+
+    PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats();
+
+    virtual const SpecificStats* getSpecificStats();
+
+    static const char* kStageType;
+
+private:
     /**
-     * A description of a request for a count operation. Copyable.
+     * Computes the count in the case of an empty query, applying the skip and
+     * limit if necessary. The result is stored in '_specificStats'.
      */
-    struct CountRequest {
-        // Namespace to operate on (e.g. "foo.bar").
-        std::string ns;
+    void trivialCount();
 
-        // A predicate describing the set of documents to count.
-        //
-        // NOTE:
-        //   Parsing the raw BSON to our AST is left for later so that the parse method does not
-        //   have to look at the catalog. Specifically, creating a CanonicalQuery requires a
-        //   Collection* due to the WhereCallback, and we'd rather not have the parse method require
-        //   a Collection*.
-        BSONObj query;
+    // Transactional context for read locks. Not owned by us.
+    OperationContext* _txn;
 
-        // Indicates to the query planner that it should generate a count plan using a
-        // particular index.
-        BSONObj hint;
+    // The collection over which we are counting.
+    Collection* _collection;
 
-        // An integer limiting the number of documents to count.
-        long long limit;
+    CountRequest _request;
 
-        // An integer indicating to not include the first n documents in the count.
-        long long skip;
+    // The number of documents that we still need to skip.
+    long long _leftToSkip;
 
-        // Whether this is an explain of a count.
-        bool explain;
-    };
+    // The working set used to pass intermediate results between stages. Not owned
+    // by us.
+    WorkingSet* _ws;
 
-    /**
-     * Stage used by the count command. This stage sits at the root of a plan tree
-     * and counts the number of results returned by its child stage.
-     *
-     * This should not be confused with the CountScan stage. CountScan is a special
-     * index access stage which can optimize index access for count operations in
-     * some cases. On the other hand, *every* count op has a CountStage at its root.
-     *
-     * Only returns NEED_TIME until hitting EOF. The count result can be obtained by examining
-     * the specific stats.
-     */
-    class CountStage : public PlanStage {
-    public:
-        CountStage(OperationContext* txn,
-                   Collection* collection,
-                   const CountRequest& request,
-                   WorkingSet* ws,
-                   PlanStage* child);
+    boost::scoped_ptr<PlanStage> _child;
 
-        virtual ~CountStage();
-
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
-
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-        virtual std::vector<PlanStage*> getChildren() const;
-
-        virtual StageType stageType() const { return STAGE_COUNT; }
-
-        PlanStageStats* getStats();
-
-        virtual const CommonStats* getCommonStats();
-
-        virtual const SpecificStats* getSpecificStats();
-
-        static const char* kStageType;
-
-    private:
-        /**
-         * Computes the count in the case of an empty query, applying the skip and
-         * limit if necessary. The result is stored in '_specificStats'.
-         */
-        void trivialCount();
-
-        // Transactional context for read locks. Not owned by us.
-        OperationContext* _txn;
-
-        // The collection over which we are counting.
-        Collection* _collection;
-
-        CountRequest _request;
-
-        // The number of documents that we still need to skip.
-        long long _leftToSkip;
-
-        // The working set used to pass intermediate results between stages. Not owned
-        // by us.
-        WorkingSet* _ws;
-
-        boost::scoped_ptr<PlanStage> _child;
-
-        CommonStats _commonStats;
-        CountStats _specificStats;
-    };
+    CommonStats _commonStats;
+    CountStats _specificStats;
+};
 
 }  // namespace mongo

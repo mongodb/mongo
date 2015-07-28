@@ -34,58 +34,56 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
 namespace {
-    boost::thread_specific_ptr<std::string> _threadName;
+boost::thread_specific_ptr<std::string> _threadName;
 
 #if defined(_WIN32)
 
 #define MS_VC_EXCEPTION 0x406D1388
-#pragma pack(push,8)
-    typedef struct tagTHREADNAME_INFO {
-        DWORD dwType; // Must be 0x1000.
-        LPCSTR szName; // Pointer to name (in user addr space).
-        DWORD dwThreadID; // Thread ID (-1=caller thread).
-        DWORD dwFlags; // Reserved for future use, must be zero.
-    } THREADNAME_INFO;
+#pragma pack(push, 8)
+typedef struct tagTHREADNAME_INFO {
+    DWORD dwType;      // Must be 0x1000.
+    LPCSTR szName;     // Pointer to name (in user addr space).
+    DWORD dwThreadID;  // Thread ID (-1=caller thread).
+    DWORD dwFlags;     // Reserved for future use, must be zero.
+} THREADNAME_INFO;
 #pragma pack(pop)
 
-    void setWinThreadName(const char *name) {
-        /* is the sleep here necessary???
-           Sleep(10);
-           */
-        THREADNAME_INFO info;
-        info.dwType = 0x1000;
-        info.szName = name;
-        info.dwThreadID = -1;
-        info.dwFlags = 0;
-        __try {
-            RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
-        }
-        __except(EXCEPTION_EXECUTE_HANDLER) {
-        }
+void setWinThreadName(const char* name) {
+    /* is the sleep here necessary???
+       Sleep(10);
+       */
+    THREADNAME_INFO info;
+    info.dwType = 0x1000;
+    info.szName = name;
+    info.dwThreadID = -1;
+    info.dwFlags = 0;
+    __try {
+        RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
     }
+    __except(EXCEPTION_EXECUTE_HANDLER) {}
+}
 #endif
 
 }  // namespace
 
-    void setThreadName(StringData name) {
-        _threadName.reset(new string(name.rawData(), name.size()));
+void setThreadName(StringData name) {
+    _threadName.reset(new string(name.rawData(), name.size()));
 
-#if defined( DEBUG ) && defined( _WIN32 )
-        // naming might be expensive so don't do "conn*" over and over
-        setWinThreadName(_threadName.get()->c_str());
+#if defined(DEBUG) && defined(_WIN32)
+    // naming might be expensive so don't do "conn*" over and over
+    setWinThreadName(_threadName.get()->c_str());
 #endif
+}
 
+const std::string& getThreadName() {
+    std::string* s;
+    while (!(s = _threadName.get())) {
+        setThreadName("");
     }
-
-    const std::string& getThreadName() {
-        std::string* s;
-        while (!(s = _threadName.get())) {
-            setThreadName("");
-        }
-        return *s;
-    }
+    return *s;
+}
 
 }  // namespace mongo

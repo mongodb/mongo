@@ -42,98 +42,94 @@ using std::stringstream;
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+using boost::scoped_ptr;
 
-    // Insert a record and verify its contents by calling dataFor()
-    // on the returned RecordId.
-    TEST( RecordStoreTestHarness, DataFor ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Insert a record and verify its contents by calling dataFor()
+// on the returned RecordId.
+TEST(RecordStoreTestHarness, DataFor) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    string data = "record-";
+    RecordId loc;
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        string data = "record-";
-        RecordId loc;
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                RecordData record = rs->dataFor( opCtx.get(), loc );
-                ASSERT_EQUALS( data.size() + 1, static_cast<size_t>( record.size() ) );
-                ASSERT_EQUALS( data, record.data() );
-            }
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
         }
     }
 
-    // Insert multiple records and verify their contents by calling dataFor()
-    // on each of the returned RecordIds.
-    TEST( RecordStoreTestHarness, DataForMultiple ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+    }
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+            RecordData record = rs->dataFor(opCtx.get(), loc);
+            ASSERT_EQUALS(data.size() + 1, static_cast<size_t>(record.size()));
+            ASSERT_EQUALS(data, record.data());
         }
+    }
+}
 
-        const int nToInsert = 10;
-        RecordId locs[nToInsert];
-        for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                stringstream ss;
-                ss << "record----" << i;
-                string data = ss.str();
+// Insert multiple records and verify their contents by calling dataFor()
+// on each of the returned RecordIds.
+TEST(RecordStoreTestHarness, DataForMultiple) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                locs[i] = res.getValue();
-                uow.commit();
-            }
-        }
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
 
+    const int nToInsert = 10;
+    RecordId locs[nToInsert];
+    for (int i = 0; i < nToInsert; i++) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
-        }
+            stringstream ss;
+            ss << "record----" << i;
+            string data = ss.str();
 
-        for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                stringstream ss;
-                ss << "record----" << i;
-                string data = ss.str();
-
-                RecordData record = rs->dataFor( opCtx.get(), locs[i] );
-                ASSERT_EQUALS( data.size() + 1, static_cast<size_t>( record.size() ) );
-                ASSERT_EQUALS( data, record.data() );
-            }
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            locs[i] = res.getValue();
+            uow.commit();
         }
     }
 
-} // namespace mongo
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
+
+    for (int i = 0; i < nToInsert; i++) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            stringstream ss;
+            ss << "record----" << i;
+            string data = ss.str();
+
+            RecordData record = rs->dataFor(opCtx.get(), locs[i]);
+            ASSERT_EQUALS(data.size() + 1, static_cast<size_t>(record.size()));
+            ASSERT_EQUALS(data, record.data());
+        }
+    }
+}
+
+}  // namespace mongo

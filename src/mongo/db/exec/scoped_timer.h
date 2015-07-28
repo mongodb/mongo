@@ -32,26 +32,27 @@
 
 namespace mongo {
 
-    /**
-     * This class increments a counter by a rough estimate of the time elapsed since its
-     * construction when it goes out of scope.
-     */
-    class ScopedTimer {
-        MONGO_DISALLOW_COPYING(ScopedTimer);
-    public:
-        ScopedTimer(long long* counter);
+/**
+ * This class increments a counter by a rough estimate of the time elapsed since its
+ * construction when it goes out of scope.
+ */
+class ScopedTimer {
+    MONGO_DISALLOW_COPYING(ScopedTimer);
 
-        ~ScopedTimer();
+public:
+    ScopedTimer(long long* counter);
 
-    private:
-        // Default constructor disallowed.
-        ScopedTimer();
+    ~ScopedTimer();
 
-        // Reference to the counter that we are incrementing with the elapsed time.
-        long long* _counter;
+private:
+    // Default constructor disallowed.
+    ScopedTimer();
 
-        // Time at which the timer was constructed.
-        long long _start;
-    };
+    // Reference to the counter that we are incrementing with the elapsed time.
+    long long* _counter;
+
+    // Time at which the timer was constructed.
+    long long _start;
+};
 
 }  // namespace mongo

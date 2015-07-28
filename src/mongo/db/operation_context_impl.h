@@ -35,42 +35,42 @@
 
 namespace mongo {
 
-    class OperationContextImpl : public OperationContext  {
-    public:
-        OperationContextImpl();
+class OperationContextImpl : public OperationContext {
+public:
+    OperationContextImpl();
 
-        virtual ~OperationContextImpl();
+    virtual ~OperationContextImpl();
 
-        virtual RecoveryUnit* recoveryUnit() const;
+    virtual RecoveryUnit* recoveryUnit() const;
 
-        virtual RecoveryUnit* releaseRecoveryUnit();
+    virtual RecoveryUnit* releaseRecoveryUnit();
 
-        virtual void setRecoveryUnit(RecoveryUnit* unit);
+    virtual void setRecoveryUnit(RecoveryUnit* unit);
 
-        virtual Locker* lockState() const;
+    virtual Locker* lockState() const;
 
-        virtual ProgressMeter* setMessage(const char* msg,
-                                          const std::string& name,
-                                          unsigned long long progressMeterTotal,
-                                          int secondsBetween);
+    virtual ProgressMeter* setMessage(const char* msg,
+                                      const std::string& name,
+                                      unsigned long long progressMeterTotal,
+                                      int secondsBetween);
 
-        virtual std::string getNS() const;
+    virtual std::string getNS() const;
 
-        virtual Client* getClient() const;
+    virtual Client* getClient() const;
 
-        virtual CurOp* getCurOp() const;
+    virtual CurOp* getCurOp() const;
 
-        virtual unsigned int getOpID() const;
+    virtual unsigned int getOpID() const;
 
-        virtual void checkForInterrupt() const;
-        virtual Status checkForInterruptNoAssert() const;
+    virtual void checkForInterrupt() const;
+    virtual Status checkForInterruptNoAssert() const;
 
-        virtual bool isPrimaryFor( const StringData& ns );
+    virtual bool isPrimaryFor(const StringData& ns);
 
-    private:
-        std::auto_ptr<RecoveryUnit> _recovery;
-        Client* const _client; // cached, not owned
-        Locker* const _locker; // cached, not owned
-    };
+private:
+    std::auto_ptr<RecoveryUnit> _recovery;
+    Client* const _client;  // cached, not owned
+    Locker* const _locker;  // cached, not owned
+};
 
 }  // namespace mongo

@@ -30,13 +30,13 @@
 
 namespace mongo {
 
-    enum InvalidationType {
-        // The RecordId is about to be deleted.  The receiver of this invalidate call cannot use
-        // the RecordId after it returns from the invalidate.
-        INVALIDATION_DELETION,
+enum InvalidationType {
+    // The RecordId is about to be deleted.  The receiver of this invalidate call cannot use
+    // the RecordId after it returns from the invalidate.
+    INVALIDATION_DELETION,
 
-        // The RecordId's contents are about to change.
-        INVALIDATION_MUTATION,
-    };
+    // The RecordId's contents are about to change.
+    INVALIDATION_MUTATION,
+};
 
 }  // namespace mongo

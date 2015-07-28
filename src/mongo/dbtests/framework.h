@@ -36,7 +36,7 @@
 #include <string>
 
 namespace mongo {
-    namespace dbtests {
-        int runDbTests(int argc, char ** argv);
-    }  // dbtests
+namespace dbtests {
+int runDbTests(int argc, char** argv);
+}  // dbtests
 }  // namespace mongo

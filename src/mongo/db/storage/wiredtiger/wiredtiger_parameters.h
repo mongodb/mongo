@@ -32,21 +32,21 @@
 
 namespace mongo {
 
-    /**
-     * WT_CONNECTION::reconfigure get/setParameter support
-     */
-    class WiredTigerEngineRuntimeConfigParameter : public ServerParameter {
-        MONGO_DISALLOW_COPYING(WiredTigerEngineRuntimeConfigParameter);
-    public:
-        explicit WiredTigerEngineRuntimeConfigParameter(WiredTigerKVEngine* engine);
+/**
+ * WT_CONNECTION::reconfigure get/setParameter support
+ */
+class WiredTigerEngineRuntimeConfigParameter : public ServerParameter {
+    MONGO_DISALLOW_COPYING(WiredTigerEngineRuntimeConfigParameter);
 
-        virtual void append(OperationContext* txn, BSONObjBuilder& b,
-                            const std::string& name);
-        virtual Status set(const BSONElement& newValueElement);
+public:
+    explicit WiredTigerEngineRuntimeConfigParameter(WiredTigerKVEngine* engine);
 
-        virtual Status setFromString(const std::string& str);
+    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual Status set(const BSONElement& newValueElement);
 
-    private:
-        WiredTigerKVEngine* _engine;
-    };
+    virtual Status setFromString(const std::string& str);
+
+private:
+    WiredTigerKVEngine* _engine;
+};
 }

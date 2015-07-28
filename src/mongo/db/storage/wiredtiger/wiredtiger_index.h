@@ -38,150 +38,144 @@
 
 namespace mongo {
 
-    class IndexCatalogEntry;
-    class IndexDescriptor;
-    struct WiredTigerItem;
+class IndexCatalogEntry;
+class IndexDescriptor;
+struct WiredTigerItem;
 
-    class WiredTigerIndex : public SortedDataInterface {
-    public:
+class WiredTigerIndex : public SortedDataInterface {
+public:
+    /**
+     * Parses index options for wired tiger configuration string suitable for table creation.
+     * The document 'options' is typically obtained from the 'storageEngine.wiredTiger' field
+     * of an IndexDescriptor's info object.
+     */
+    static StatusWith<std::string> parseIndexOptions(const BSONObj& options);
 
-        /**
-         * Parses index options for wired tiger configuration string suitable for table creation.
-         * The document 'options' is typically obtained from the 'storageEngine.wiredTiger' field
-         * of an IndexDescriptor's info object.
-         */
-        static StatusWith<std::string> parseIndexOptions(const BSONObj& options);
+    /**
+     * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
+     * Configuration string is constructed from:
+     *     built-in defaults
+     *     'extraConfig'
+     *     storageEngine.wiredTiger.configString in index descriptor's info object.
+     * Performs simple validation on the supplied parameters.
+     * Returns error status if validation fails.
+     * Note that even if this function returns an OK status, WT_SESSION:create() may still
+     * fail with the constructed configuration string.
+     */
+    static StatusWith<std::string> generateCreateString(const std::string& extraConfig,
+                                                        const IndexDescriptor& desc);
 
-        /**
-         * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
-         * Configuration string is constructed from:
-         *     built-in defaults
-         *     'extraConfig'
-         *     storageEngine.wiredTiger.configString in index descriptor's info object.
-         * Performs simple validation on the supplied parameters.
-         * Returns error status if validation fails.
-         * Note that even if this function returns an OK status, WT_SESSION:create() may still
-         * fail with the constructed configuration string.
-         */
-        static StatusWith<std::string> generateCreateString(const std::string& extraConfig,
-                                                            const IndexDescriptor& desc);
+    /**
+     * Creates a WiredTiger table suitable for implementing a MongoDB index.
+     * 'config' should be created with generateCreateString().
+     */
+    static int Create(OperationContext* txn, const std::string& uri, const std::string& config);
 
-        /**
-         * Creates a WiredTiger table suitable for implementing a MongoDB index.
-         * 'config' should be created with generateCreateString().
-         */
-        static int Create(OperationContext* txn,
+    /**
+     * @param unique - If this is a unique index.
+     *                 Note: even if unique, it may be allowed ot be non-unique at times.
+     */
+    WiredTigerIndex(OperationContext* ctx, const std::string& uri, const IndexDescriptor* desc);
+
+    virtual Status insert(OperationContext* txn,
+                          const BSONObj& key,
+                          const RecordId& loc,
+                          bool dupsAllowed);
+
+    virtual void unindex(OperationContext* txn,
+                         const BSONObj& key,
+                         const RecordId& loc,
+                         bool dupsAllowed);
+
+    virtual void fullValidate(OperationContext* txn,
+                              bool full,
+                              long long* numKeysOut,
+                              BSONObjBuilder* output) const;
+    virtual bool appendCustomStats(OperationContext* txn,
+                                   BSONObjBuilder* output,
+                                   double scale) const;
+    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
+
+    virtual bool isEmpty(OperationContext* txn);
+
+    virtual long long getSpaceUsedBytes(OperationContext* txn) const;
+
+    bool isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& loc);
+
+    virtual Status initAsEmpty(OperationContext* txn);
+
+    const std::string& uri() const {
+        return _uri;
+    }
+
+    uint64_t instanceId() const {
+        return _instanceId;
+    }
+    Ordering ordering() const {
+        return _ordering;
+    }
+
+    virtual bool unique() const = 0;
+
+    Status dupKeyError(const BSONObj& key);
+
+protected:
+    virtual Status _insert(WT_CURSOR* c,
+                           const BSONObj& key,
+                           const RecordId& loc,
+                           bool dupsAllowed) = 0;
+
+    virtual void _unindex(WT_CURSOR* c,
+                          const BSONObj& key,
+                          const RecordId& loc,
+                          bool dupsAllowed) = 0;
+
+    class BulkBuilder;
+    class StandardBulkBuilder;
+    class UniqueBulkBuilder;
+
+    const Ordering _ordering;
+    std::string _uri;
+    uint64_t _instanceId;
+    std::string _collectionNamespace;
+    std::string _indexName;
+};
+
+
+class WiredTigerIndexUnique : public WiredTigerIndex {
+public:
+    WiredTigerIndexUnique(OperationContext* ctx,
                           const std::string& uri,
-                          const std::string& config);
+                          const IndexDescriptor* desc);
 
-        /**
-         * @param unique - If this is a unique index.
-         *                 Note: even if unique, it may be allowed ot be non-unique at times.
-         */
-        WiredTigerIndex(OperationContext* ctx,
-                        const std::string& uri,
-                        const IndexDescriptor* desc);
+    virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
+    SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
-        virtual Status insert(OperationContext* txn,
-                              const BSONObj& key,
-                              const RecordId& loc,
-                              bool dupsAllowed);
+    virtual bool unique() const {
+        return true;
+    }
 
-        virtual void unindex(OperationContext* txn,
-                             const BSONObj& key,
-                             const RecordId& loc,
-                             bool dupsAllowed);
+    virtual Status _insert(WT_CURSOR* c, const BSONObj& key, const RecordId& loc, bool dupsAllowed);
 
-        virtual void fullValidate(OperationContext* txn, bool full, long long *numKeysOut,
-                                  BSONObjBuilder* output) const;
-        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
-            const;
-        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
+    virtual void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& loc, bool dupsAllowed);
+};
 
-        virtual bool isEmpty(OperationContext* txn);
+class WiredTigerIndexStandard : public WiredTigerIndex {
+public:
+    WiredTigerIndexStandard(OperationContext* ctx,
+                            const std::string& uri,
+                            const IndexDescriptor* desc);
 
-        virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
+    virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
+    SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
-        bool isDup(WT_CURSOR *c, const BSONObj& key, const RecordId& loc );
+    virtual bool unique() const {
+        return false;
+    }
 
-        virtual Status initAsEmpty(OperationContext* txn);
+    virtual Status _insert(WT_CURSOR* c, const BSONObj& key, const RecordId& loc, bool dupsAllowed);
 
-        const std::string& uri() const { return _uri; }
+    virtual void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& loc, bool dupsAllowed);
+};
 
-        uint64_t instanceId() const { return _instanceId; }
-        Ordering ordering() const { return _ordering; }
-
-        virtual bool unique() const = 0;
-
-        Status dupKeyError(const BSONObj& key);
-
-    protected:
-
-        virtual Status _insert( WT_CURSOR* c,
-                                const BSONObj& key,
-                                const RecordId& loc,
-                                bool dupsAllowed ) = 0;
-
-        virtual void _unindex( WT_CURSOR* c,
-                               const BSONObj& key,
-                               const RecordId& loc,
-                               bool dupsAllowed ) = 0;
-
-        class BulkBuilder;
-        class StandardBulkBuilder;
-        class UniqueBulkBuilder;
-
-        const Ordering _ordering;
-        std::string _uri;
-        uint64_t _instanceId;
-        std::string _collectionNamespace;
-        std::string _indexName;
-    };
-
-
-    class WiredTigerIndexUnique : public WiredTigerIndex {
-    public:
-        WiredTigerIndexUnique( OperationContext* ctx,
-                               const std::string& uri,
-                               const IndexDescriptor* desc );
-
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
-        SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
-
-        virtual bool unique() const { return true; }
-
-        virtual Status _insert( WT_CURSOR* c,
-                                const BSONObj& key,
-                                const RecordId& loc,
-                                bool dupsAllowed );
-
-        virtual void _unindex( WT_CURSOR* c,
-                               const BSONObj& key,
-                               const RecordId& loc,
-                               bool dupsAllowed );
-    };
-
-    class WiredTigerIndexStandard : public WiredTigerIndex {
-    public:
-        WiredTigerIndexStandard( OperationContext* ctx,
-                                 const std::string& uri,
-                                 const IndexDescriptor* desc );
-
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
-        SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
-
-        virtual bool unique() const { return false; }
-
-        virtual Status _insert( WT_CURSOR* c,
-                                const BSONObj& key,
-                                const RecordId& loc,
-                                bool dupsAllowed );
-
-        virtual void _unindex( WT_CURSOR* c,
-                               const BSONObj& key,
-                               const RecordId& loc,
-                               bool dupsAllowed );
-
-    };
-
-} // namespace
+}  // namespace

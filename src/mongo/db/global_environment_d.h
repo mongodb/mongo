@@ -37,78 +37,74 @@
 
 namespace mongo {
 
-    class Client;
-    class StorageEngineLockFile;
+class Client;
+class StorageEngineLockFile;
 
-    class GlobalEnvironmentMongoD : public GlobalEnvironmentExperiment {
-    public:
-        typedef std::map<std::string, const StorageEngine::Factory*> FactoryMap;
+class GlobalEnvironmentMongoD : public GlobalEnvironmentExperiment {
+public:
+    typedef std::map<std::string, const StorageEngine::Factory*> FactoryMap;
 
-        GlobalEnvironmentMongoD();
+    GlobalEnvironmentMongoD();
 
-        ~GlobalEnvironmentMongoD();
+    ~GlobalEnvironmentMongoD();
 
-        StorageEngine* getGlobalStorageEngine();
+    StorageEngine* getGlobalStorageEngine();
 
-        void setGlobalStorageEngine(const std::string& name);
+    void setGlobalStorageEngine(const std::string& name);
 
-        void shutdownGlobalStorageEngineCleanly();
+    void shutdownGlobalStorageEngineCleanly();
 
-        void registerStorageEngine(const std::string& name,
-                                   const StorageEngine::Factory* factory);
+    void registerStorageEngine(const std::string& name, const StorageEngine::Factory* factory);
 
-        bool isRegisteredStorageEngine(const std::string& name);
+    bool isRegisteredStorageEngine(const std::string& name);
 
-        StorageFactoriesIterator* makeStorageFactoriesIterator();
+    StorageFactoriesIterator* makeStorageFactoriesIterator();
 
-        void setKillAllOperations();
+    void setKillAllOperations();
 
-        void unsetKillAllOperations();
+    void unsetKillAllOperations();
 
-        bool getKillAllOperations();
+    bool getKillAllOperations();
 
-        bool killOperation(unsigned int opId);
+    bool killOperation(unsigned int opId);
 
-        void killAllUserOperations(const OperationContext* txn);
+    void killAllUserOperations(const OperationContext* txn);
 
-        void registerKillOpListener(KillOpListenerInterface* listener);
+    void registerKillOpListener(KillOpListenerInterface* listener);
 
-        OperationContext* newOpCtx();
+    OperationContext* newOpCtx();
 
 
-    private:
+private:
+    bool _killOperationsAssociatedWithClientAndOpId_inlock(Client* client, unsigned int opId);
 
-        bool _killOperationsAssociatedWithClientAndOpId_inlock(Client* client, unsigned int opId);
+    bool _globalKill;
 
-        bool _globalKill;
+    // protected by Client::clientsMutex
+    std::vector<KillOpListenerInterface*> _killOpListeners;
 
-        // protected by Client::clientsMutex
-        std::vector<KillOpListenerInterface*> _killOpListeners;
+    boost::scoped_ptr<StorageEngineLockFile> _lockFile;
 
-        boost::scoped_ptr<StorageEngineLockFile> _lockFile;
+    // logically owned here, but never deleted by anyone.
+    StorageEngine* _storageEngine;
 
-        // logically owned here, but never deleted by anyone.
-        StorageEngine* _storageEngine;
+    // All possible storage engines are registered here through MONGO_INIT.
+    FactoryMap _storageFactories;
+};
 
-        // All possible storage engines are registered here through MONGO_INIT.
-        FactoryMap _storageFactories;
-    };
+class StorageFactoriesIteratorMongoD : public StorageFactoriesIterator {
+public:
+    typedef GlobalEnvironmentMongoD::FactoryMap::const_iterator FactoryMapIterator;
+    StorageFactoriesIteratorMongoD(const FactoryMapIterator& begin, const FactoryMapIterator& end);
 
-    class StorageFactoriesIteratorMongoD : public StorageFactoriesIterator {
-    public:
+    virtual ~StorageFactoriesIteratorMongoD();
+    virtual bool more() const;
+    virtual const StorageEngine::Factory* const& next();
+    virtual const StorageEngine::Factory* const& get() const;
 
-        typedef GlobalEnvironmentMongoD::FactoryMap::const_iterator FactoryMapIterator;
-        StorageFactoriesIteratorMongoD(const FactoryMapIterator& begin,
-                                       const FactoryMapIterator& end);
-
-        virtual ~StorageFactoriesIteratorMongoD();
-        virtual bool more() const;
-        virtual const StorageEngine::Factory* const & next();
-        virtual const StorageEngine::Factory* const & get() const;
-
-    private:
-        FactoryMapIterator _curr;
-        FactoryMapIterator _end;
-    };
+private:
+    FactoryMapIterator _curr;
+    FactoryMapIterator _end;
+};
 
 }  // namespace mongo

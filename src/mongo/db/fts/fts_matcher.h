@@ -36,42 +36,41 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        class FTSMatcher {
-        public:
-            FTSMatcher( const FTSQuery& query, const FTSSpec& spec );
+class FTSMatcher {
+public:
+    FTSMatcher(const FTSQuery& query, const FTSSpec& spec);
 
-            /**
-             * @return true if obj has a negated term
-             */
-            bool hasNegativeTerm(const BSONObj& obj ) const;
+    /**
+     * @return true if obj has a negated term
+     */
+    bool hasNegativeTerm(const BSONObj& obj) const;
 
-            /**
-             * @return true if obj is ok by all phrases
-             *         so all full phrases and no negated
-             */
-            bool phrasesMatch( const BSONObj& obj ) const;
-            bool phraseMatch( const std::string& phrase, const BSONObj& obj ) const;
+    /**
+     * @return true if obj is ok by all phrases
+     *         so all full phrases and no negated
+     */
+    bool phrasesMatch(const BSONObj& obj) const;
+    bool phraseMatch(const std::string& phrase, const BSONObj& obj) const;
 
-            bool matchesNonTerm( const BSONObj& obj ) const {
-                return !hasNegativeTerm( obj ) && phrasesMatch( obj );
-            }
-
-        private:
-            /**
-             * @return true if raw has a negated term
-             */
-            bool _hasNegativeTerm_string( const FTSLanguage* language, const std::string& raw ) const;
-
-            /**
-             * @return true if raw has a phrase
-             */
-            bool _phraseMatches( const std::string& phrase, const std::string& raw ) const;
-
-            FTSQuery _query;
-            FTSSpec  _spec;
-        };
-
+    bool matchesNonTerm(const BSONObj& obj) const {
+        return !hasNegativeTerm(obj) && phrasesMatch(obj);
     }
+
+private:
+    /**
+     * @return true if raw has a negated term
+     */
+    bool _hasNegativeTerm_string(const FTSLanguage* language, const std::string& raw) const;
+
+    /**
+     * @return true if raw has a phrase
+     */
+    bool _phraseMatches(const std::string& phrase, const std::string& raw) const;
+
+    FTSQuery _query;
+    FTSSpec _spec;
+};
+}
 }

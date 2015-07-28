@@ -58,27 +58,36 @@ static std::vector<std::string> svec(const char* first, ...) {
 }
 
 TEST(NtService, ConstructServiceCommandLine) {
-    ASSERT_TRUE(svec("--dbpath=C:\\Data\\",
-                       "-logpath",
-                       "C:\\Program Files (x86)\\MongoDB\\Logs\\MongoDB.log",
-                       "--service",
-                       NULL) ==
-                  ntservice::constructServiceArgv(
-                          svec("-service", "--service",
-                               "--dbpath=C:\\Data\\",
-                               "--install", "-install",
-                               "--reinstall", "-reinstall",
-                               "--servicePassword==a\\b\\",
-                               "--servicePassword", "=a\\b\\",
-                               "--serviceUser", "andy",
-                               "--serviceName", "MongoDB",
-                               "-servicePassword==a\\b\\",
-                               "-servicePassword", "=a\\b\\",
-                               "-serviceUser", "andy",
-                               "-serviceName", "MongoDB",
-                               "-logpath",
-                               "C:\\Program Files (x86)\\MongoDB\\Logs\\MongoDB.log",
-                               NULL)));
+    ASSERT_TRUE(
+        svec("--dbpath=C:\\Data\\",
+             "-logpath",
+             "C:\\Program Files (x86)\\MongoDB\\Logs\\MongoDB.log",
+             "--service",
+             NULL) ==
+        ntservice::constructServiceArgv(svec("-service",
+                                             "--service",
+                                             "--dbpath=C:\\Data\\",
+                                             "--install",
+                                             "-install",
+                                             "--reinstall",
+                                             "-reinstall",
+                                             "--servicePassword==a\\b\\",
+                                             "--servicePassword",
+                                             "=a\\b\\",
+                                             "--serviceUser",
+                                             "andy",
+                                             "--serviceName",
+                                             "MongoDB",
+                                             "-servicePassword==a\\b\\",
+                                             "-servicePassword",
+                                             "=a\\b\\",
+                                             "-serviceUser",
+                                             "andy",
+                                             "-serviceName",
+                                             "MongoDB",
+                                             "-logpath",
+                                             "C:\\Program Files (x86)\\MongoDB\\Logs\\MongoDB.log",
+                                             NULL)));
 }
 
 TEST(NtService, RegressionSERVER_7252) {
@@ -100,10 +109,9 @@ TEST(NtService, RegressionSERVER_7252) {
     ASSERT_TRUE(NULL != inputArgvWide);
     ASSERT_GREATER_THAN_OR_EQUALS(inputArgc, 0);
     std::vector<std::string> inputArgvUtf8(inputArgc);
-    ASSERT_TRUE(inputArgvUtf8.end() == std::transform(inputArgvWide,
-                                                      inputArgvWide + inputArgc,
-                                                      inputArgvUtf8.begin(),
-                                                      toUtf8String));
+    ASSERT_TRUE(inputArgvUtf8.end() ==
+                std::transform(
+                    inputArgvWide, inputArgvWide + inputArgc, inputArgvUtf8.begin(), toUtf8String));
     LocalFree(inputArgvWide);
 
     // Finally, confirm that we properly transform the argument vector and from it construct a legit
@@ -114,10 +122,11 @@ TEST(NtService, RegressionSERVER_7252) {
 
 // CRUTCHES!
 namespace mongo {
-    void Client::initThread(const char* desc, AbstractMessagingPort* mp) {
-    }
-    void removeControlCHandler() {}
-    void signalShutdown() {}
-    bool inShutdown() { return false; }
-    void exitCleanly(ExitCode code) { }
+void Client::initThread(const char* desc, AbstractMessagingPort* mp) {}
+void removeControlCHandler() {}
+void signalShutdown() {}
+bool inShutdown() {
+    return false;
+}
+void exitCleanly(ExitCode code) {}
 }  // namespace mongo

@@ -31,25 +31,25 @@
 #if defined(__sunos__) || !defined(MONGO_HAVE_EXECINFO_BACKTRACE)
 
 namespace mongo {
-    namespace pal {
-        int backtrace(void** array, int size);
-        char** backtrace_symbols(void* const* array, int size);
-        void backtrace_symbols_fd(void* const* array, int size, int fd);
-    } // namespace pal
-    using pal::backtrace;
-    using pal::backtrace_symbols;
-    using pal::backtrace_symbols_fd;
-} // namespace mongo
+namespace pal {
+int backtrace(void** array, int size);
+char** backtrace_symbols(void* const* array, int size);
+void backtrace_symbols_fd(void* const* array, int size, int fd);
+}  // namespace pal
+using pal::backtrace;
+using pal::backtrace_symbols;
+using pal::backtrace_symbols_fd;
+}  // namespace mongo
 
 #else
 
 #include <execinfo.h>
 
 namespace mongo {
-    using ::backtrace;
-    using ::backtrace_symbols;
-    using ::backtrace_symbols_fd;
-} // namespace mongo
+using ::backtrace;
+using ::backtrace_symbols;
+using ::backtrace_symbols_fd;
+}  // namespace mongo
 
 #endif
 #endif

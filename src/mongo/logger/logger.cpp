@@ -34,32 +34,30 @@
 namespace mongo {
 namespace logger {
 
-    static LogManager* theGlobalLogManager;  // NULL at program start, before even static
-                                             // initialization.
+static LogManager* theGlobalLogManager;  // NULL at program start, before even static
+                                         // initialization.
 
-    static RotatableFileManager theGlobalRotatableFileManager;
+static RotatableFileManager theGlobalRotatableFileManager;
 
-    LogManager* globalLogManager() {
-        if (MONGO_unlikely(!theGlobalLogManager)) {
-            theGlobalLogManager = new LogManager;
-        }
-        return theGlobalLogManager;
+LogManager* globalLogManager() {
+    if (MONGO_unlikely(!theGlobalLogManager)) {
+        theGlobalLogManager = new LogManager;
     }
+    return theGlobalLogManager;
+}
 
-    RotatableFileManager* globalRotatableFileManager() {
-        return &theGlobalRotatableFileManager;
-    }
+RotatableFileManager* globalRotatableFileManager() {
+    return &theGlobalRotatableFileManager;
+}
 
-    /**
-     * Just in case no static initializer called globalLogManager, make sure that the global log
-     * manager is instantiated while we're still in a single-threaded context.
-     */
-    MONGO_INITIALIZER_GENERAL(GlobalLogManager, ("ValidateLocale"), ("default"))(
-            InitializerContext*) {
-
-        globalLogManager();
-        return Status::OK();
-    }
+/**
+ * Just in case no static initializer called globalLogManager, make sure that the global log
+ * manager is instantiated while we're still in a single-threaded context.
+ */
+MONGO_INITIALIZER_GENERAL(GlobalLogManager, ("ValidateLocale"), ("default"))(InitializerContext*) {
+    globalLogManager();
+    return Status::OK();
+}
 
 }  // namespace logger
 }  // namespace mongo

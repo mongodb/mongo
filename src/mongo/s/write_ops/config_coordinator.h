@@ -37,28 +37,25 @@
 
 namespace mongo {
 
-    class ConfigCoordinator {
-    public:
+class ConfigCoordinator {
+public:
+    ConfigCoordinator(MultiCommandDispatch* dispatcher,
+                      const std::vector<ConnectionString>& configHosts);
 
-        ConfigCoordinator( MultiCommandDispatch* dispatcher,
-                           const std::vector<ConnectionString>& configHosts );
+    void executeBatch(const BatchedCommandRequest& request,
+                      BatchedCommandResponse* response,
+                      bool fsyncCheck);
 
-        void executeBatch( const BatchedCommandRequest& request,
-                           BatchedCommandResponse* response,
-                           bool fsyncCheck );
+private:
+    /**
+     * Initialize configDB string in config server or if already initialized,
+     * check that it matches. Returns false if an error occured.
+     */
+    bool _checkConfigString(BatchedCommandResponse* clientResponse);
 
-    private:
+    // Not owned here
+    MultiCommandDispatch* _dispatcher;
 
-        /**
-         * Initialize configDB string in config server or if already initialized,
-         * check that it matches. Returns false if an error occured.
-         */
-        bool _checkConfigString(BatchedCommandResponse* clientResponse);
-
-        // Not owned here
-        MultiCommandDispatch* _dispatcher;
-
-        std::vector<ConnectionString> _configHosts;
-    };
-
+    std::vector<ConnectionString> _configHosts;
+};
 }

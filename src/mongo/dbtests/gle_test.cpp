@@ -38,78 +38,81 @@ using mongo::MsgAssertionException;
  */
 namespace {
 
-    using std::string;
+using std::string;
 
-    static const char* const _ns = "unittests.gle";
+static const char* const _ns = "unittests.gle";
 
-    /**
-     * Verify that when the command fails we get back an error message.
-     */
-    class GetLastErrorCommandFailure {
-    public:
-        void run() {
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
+/**
+ * Verify that when the command fails we get back an error message.
+ */
+class GetLastErrorCommandFailure {
+public:
+    void run() {
+        OperationContextImpl txn;
+        DBDirectClient client(&txn);
 
-            client.insert(_ns, BSON( "test" << "test"));
+        client.insert(_ns,
+                      BSON("test"
+                           << "test"));
 
-            // Cannot mix fsync + j, will make command fail
-            string gleString = client.getLastError(true, true, 10, 10);
-            ASSERT_NOT_EQUALS(gleString, "");
-        }
-    };
+        // Cannot mix fsync + j, will make command fail
+        string gleString = client.getLastError(true, true, 10, 10);
+        ASSERT_NOT_EQUALS(gleString, "");
+    }
+};
 
-    /**
-     * Verify that the write succeeds
-     */
-    class GetLastErrorClean {
-    public:
-        void run() {
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
+/**
+ * Verify that the write succeeds
+ */
+class GetLastErrorClean {
+public:
+    void run() {
+        OperationContextImpl txn;
+        DBDirectClient client(&txn);
 
-            client.insert(_ns, BSON( "test" << "test"));
+        client.insert(_ns,
+                      BSON("test"
+                           << "test"));
 
-            // Make sure there was no error
-            string gleString = client.getLastError();
-            ASSERT_EQUALS(gleString, "");
-        }
-    };
+        // Make sure there was no error
+        string gleString = client.getLastError();
+        ASSERT_EQUALS(gleString, "");
+    }
+};
 
-    /**
-     * Verify that the write succeed first, then error on dup
-     */
-    class GetLastErrorFromDup {
-    public:
-        void run() {
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
+/**
+ * Verify that the write succeed first, then error on dup
+ */
+class GetLastErrorFromDup {
+public:
+    void run() {
+        OperationContextImpl txn;
+        DBDirectClient client(&txn);
 
-            client.insert(_ns, BSON( "_id" << 1));
+        client.insert(_ns, BSON("_id" << 1));
 
-            // Make sure there was no error
-            string gleString = client.getLastError();
-            ASSERT_EQUALS(gleString, "");
+        // Make sure there was no error
+        string gleString = client.getLastError();
+        ASSERT_EQUALS(gleString, "");
 
-            //insert dup
-            client.insert(_ns, BSON( "_id" << 1));
-            // Make sure there was an error
-            gleString = client.getLastError();
-            ASSERT_NOT_EQUALS(gleString, "");
-        }
-    };
+        // insert dup
+        client.insert(_ns, BSON("_id" << 1));
+        // Make sure there was an error
+        gleString = client.getLastError();
+        ASSERT_NOT_EQUALS(gleString, "");
+    }
+};
 
-    class All : public Suite {
-    public:
-        All() : Suite( "gle" ) {
-        }
+class All : public Suite {
+public:
+    All() : Suite("gle") {}
 
-        void setupTests() {
-            add< GetLastErrorClean >();
-            add< GetLastErrorCommandFailure >();
-            add< GetLastErrorFromDup >();
-        }
-    };
+    void setupTests() {
+        add<GetLastErrorClean>();
+        add<GetLastErrorCommandFailure>();
+        add<GetLastErrorFromDup>();
+    }
+};
 
-    SuiteInstance<All> myall;
+SuiteInstance<All> myall;
 }

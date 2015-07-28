@@ -35,12 +35,10 @@
 
 namespace mongo {
 
-    /**
-     * Hashes the password so that it can be stored in a user object or used for MONGODB-CR
-     * authentication.
-     */
-    std::string createPasswordDigest(const StringData& username,
-                                     const StringData& clearTextPassword);
+/**
+ * Hashes the password so that it can be stored in a user object or used for MONGODB-CR
+ * authentication.
+ */
+std::string createPasswordDigest(const StringData& username, const StringData& clearTextPassword);
 
-} // namespace mongo
-
+}  // namespace mongo

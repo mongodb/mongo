@@ -31,15 +31,15 @@
 #include "mongo/bson/optime.h"
 
 namespace mongo {
-    void setGlobalOptime(const OpTime& newTime);
+void setGlobalOptime(const OpTime& newTime);
 
-    /**
-     * Returns the value of the global OpTime generated last time or set.
-     */
-    OpTime getLastSetOptime();
+/**
+ * Returns the value of the global OpTime generated last time or set.
+ */
+OpTime getLastSetOptime();
 
-    /**
-     * Generates a new and unique OpTime.
-     */
-    OpTime getNextGlobalOptime();
+/**
+ * Generates a new and unique OpTime.
+ */
+OpTime getNextGlobalOptime();
 }

@@ -50,117 +50,104 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
+using std::endl;
+using std::string;
 
-    Request::Request( Message& m, AbstractMessagingPort* p ) :
-        _m(m) , _d( m ) , _p(p) , _didInit(false) {
+Request::Request(Message& m, AbstractMessagingPort* p) : _m(m), _d(m), _p(p), _didInit(false) {
+    _id = _m.header().getId();
 
-        _id = _m.header().getId();
+    _txn.reset(new OperationContextNoop());
 
-        _txn.reset(new OperationContextNoop());
+    _clientInfo = ClientInfo::get();
+    if (p) {
+        _clientInfo->newPeerRequest(p->remote());
+    } else {
+        _clientInfo->newRequest();
+    }
+}
 
-        _clientInfo = ClientInfo::get();
-        if ( p ) {
-            _clientInfo->newPeerRequest( p->remote() );
-        }
-        else {
-            _clientInfo->newRequest();
-        }
+void Request::init() {
+    if (_didInit)
+        return;
+    _didInit = true;
+    reset();
+    _clientInfo->getAuthorizationSession()->startRequest(_txn.get());
+}
+
+// Deprecated, will move to the strategy itself
+void Request::reset() {
+    _m.header().setId(_id);
+    _clientInfo->clearRequestInfo();
+
+    if (!_d.messageShouldHaveNs()) {
+        return;
     }
 
-    void Request::init() {
-        if ( _didInit )
-            return;
-        _didInit = true;
-        reset();
-        _clientInfo->getAuthorizationSession()->startRequest(_txn.get());
+    uassert(
+        13644, "can't use 'local' database through mongos", !str::startsWith(getns(), "local."));
+
+    grid.getDBConfig(getns());
+}
+
+void Request::process(int attempt) {
+    init();
+    int op = _m.operation();
+    verify(op > dbMsg);
+
+    int msgId = (int)(_m.header().getId());
+
+    Timer t;
+    LOG(3) << "Request::process begin ns: " << getns() << " msg id: " << msgId << " op: " << op
+           << " attempt: " << attempt << endl;
+
+    _d.markSet();
+
+    bool iscmd = false;
+    if (op == dbKillCursors) {
+        cursorCache.gotKillCursors(_m);
+        globalOpCounters.gotOp(op, iscmd);
+    } else if (op == dbQuery) {
+        NamespaceString nss(getns());
+        iscmd = nss.isCommand() || nss.isSpecialCommand();
+
+        if (iscmd) {
+            int n = _d.getQueryNToReturn();
+            uassert(16978,
+                    str::stream() << "bad numberToReturn (" << n
+                                  << ") for $cmd type ns - can only be 1 or -1",
+                    n == 1 || n == -1);
+
+            STRATEGY->clientCommandOp(*this);
+        } else {
+            STRATEGY->queryOp(*this);
+        }
+
+        globalOpCounters.gotOp(op, iscmd);
+    } else if (op == dbGetMore) {
+        STRATEGY->getMore(*this);
+        globalOpCounters.gotOp(op, iscmd);
+    } else {
+        STRATEGY->writeOp(op, *this);
+        // globalOpCounters are handled by write commands.
     }
 
-    // Deprecated, will move to the strategy itself
-    void Request::reset() {
-        _m.header().setId(_id);
-        _clientInfo->clearRequestInfo();
+    LOG(3) << "Request::process end ns: " << getns() << " msg id: " << msgId << " op: " << op
+           << " attempt: " << attempt << " " << t.millis() << "ms" << endl;
+}
 
-        if ( !_d.messageShouldHaveNs()) {
-            return;
+void Request::reply(Message& response, const string& fromServer) {
+    verify(_didInit);
+    long long cursor = response.header().getCursor();
+    if (cursor) {
+        if (fromServer.size()) {
+            cursorCache.storeRef(fromServer, cursor, getns());
+        } else {
+            // probably a getMore
+            // make sure we have a ref for this
+            verify(cursorCache.getRef(cursor).size());
         }
-
-        uassert( 13644 , "can't use 'local' database through mongos" , ! str::startsWith( getns() , "local." ) );
-
-        grid.getDBConfig( getns() );
     }
+    _p->reply(_m, response, _id);
+}
 
-    void Request::process( int attempt ) {
-        init();
-        int op = _m.operation();
-        verify( op > dbMsg );
-
-        int msgId = (int)(_m.header().getId());
-
-        Timer t;
-        LOG(3) << "Request::process begin ns: " << getns()
-               << " msg id: " << msgId
-               << " op: " << op
-               << " attempt: " << attempt
-               << endl;
-
-        _d.markSet();
-
-        bool iscmd = false;
-        if ( op == dbKillCursors ) {
-            cursorCache.gotKillCursors( _m );
-            globalOpCounters.gotOp( op , iscmd );
-        }
-        else if ( op == dbQuery ) {
-            NamespaceString nss(getns());
-            iscmd = nss.isCommand() || nss.isSpecialCommand();
-
-            if (iscmd) {
-                int n = _d.getQueryNToReturn();
-                uassert( 16978, str::stream() << "bad numberToReturn (" << n
-                                              << ") for $cmd type ns - can only be 1 or -1",
-                         n == 1 || n == -1 );
-
-                STRATEGY->clientCommandOp(*this);
-            }
-            else {
-                STRATEGY->queryOp( *this );
-            }
-
-            globalOpCounters.gotOp( op , iscmd );
-        }
-        else if ( op == dbGetMore ) {
-            STRATEGY->getMore( *this );
-            globalOpCounters.gotOp( op , iscmd );
-        }
-        else {
-            STRATEGY->writeOp( op, *this );
-            // globalOpCounters are handled by write commands.
-        }
-
-        LOG(3) << "Request::process end ns: " << getns()
-               << " msg id: " << msgId
-               << " op: " << op
-               << " attempt: " << attempt
-               << " " << t.millis() << "ms"
-               << endl;
-    }
-
-    void Request::reply( Message & response , const string& fromServer ) {
-        verify( _didInit );
-        long long cursor = response.header().getCursor();
-        if ( cursor ) {
-            if ( fromServer.size() ) {
-                cursorCache.storeRef(fromServer, cursor, getns());
-            }
-            else {
-                // probably a getMore
-                // make sure we have a ref for this
-                verify( cursorCache.getRef( cursor ).size() );
-            }
-        }
-        _p->reply( _m , response , _id );
-    }
-
-} // namespace mongo
+}  // namespace mongo

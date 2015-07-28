@@ -32,52 +32,52 @@
 namespace mongo {
 namespace logger {
 
-    ComponentMessageLogDomain::ComponentMessageLogDomain() {}
+ComponentMessageLogDomain::ComponentMessageLogDomain() {}
 
-    ComponentMessageLogDomain::~ComponentMessageLogDomain() {}
+ComponentMessageLogDomain::~ComponentMessageLogDomain() {}
 
-    bool ComponentMessageLogDomain::hasMinimumLogSeverity(LogComponent component) const {
-        return _settings.hasMinimumLogSeverity(component);
-    }
+bool ComponentMessageLogDomain::hasMinimumLogSeverity(LogComponent component) const {
+    return _settings.hasMinimumLogSeverity(component);
+}
 
-    bool ComponentMessageLogDomain::shouldLog(LogComponent component, LogSeverity severity) const {
-        return _settings.shouldLog(component, severity);
-    }
+bool ComponentMessageLogDomain::shouldLog(LogComponent component, LogSeverity severity) const {
+    return _settings.shouldLog(component, severity);
+}
 
-    bool ComponentMessageLogDomain::shouldLog(LogComponent component1, LogComponent component2,
-                                        LogSeverity severity) const {
-        return _settings.shouldLog(component1, severity) ||
-               _settings.shouldLog(component2, severity);
-    }
+bool ComponentMessageLogDomain::shouldLog(LogComponent component1,
+                                          LogComponent component2,
+                                          LogSeverity severity) const {
+    return _settings.shouldLog(component1, severity) || _settings.shouldLog(component2, severity);
+}
 
-    bool ComponentMessageLogDomain::shouldLog(LogComponent component1, LogComponent component2,
-                                        LogComponent component3,
-                                        LogSeverity severity) const {
-        return _settings.shouldLog(component1, severity) ||
-               _settings.shouldLog(component2, severity) ||
-               _settings.shouldLog(component3, severity);
-    }
+bool ComponentMessageLogDomain::shouldLog(LogComponent component1,
+                                          LogComponent component2,
+                                          LogComponent component3,
+                                          LogSeverity severity) const {
+    return _settings.shouldLog(component1, severity) || _settings.shouldLog(component2, severity) ||
+        _settings.shouldLog(component3, severity);
+}
 
-    LogSeverity ComponentMessageLogDomain::getMinimumLogSeverity() const {
-        return _settings.getMinimumLogSeverity(LogComponent::kDefault);
-    }
+LogSeverity ComponentMessageLogDomain::getMinimumLogSeverity() const {
+    return _settings.getMinimumLogSeverity(LogComponent::kDefault);
+}
 
-    LogSeverity ComponentMessageLogDomain::getMinimumLogSeverity(LogComponent component) const {
-        return _settings.getMinimumLogSeverity(component);
-    }
+LogSeverity ComponentMessageLogDomain::getMinimumLogSeverity(LogComponent component) const {
+    return _settings.getMinimumLogSeverity(component);
+}
 
-    void ComponentMessageLogDomain::setMinimumLoggedSeverity(LogSeverity severity) {
-        _settings.setMinimumLoggedSeverity(LogComponent::kDefault, severity);
-    }
+void ComponentMessageLogDomain::setMinimumLoggedSeverity(LogSeverity severity) {
+    _settings.setMinimumLoggedSeverity(LogComponent::kDefault, severity);
+}
 
-    void ComponentMessageLogDomain::setMinimumLoggedSeverity(LogComponent component,
-                                                       LogSeverity severity) {
-        _settings.setMinimumLoggedSeverity(component, severity);
-    }
+void ComponentMessageLogDomain::setMinimumLoggedSeverity(LogComponent component,
+                                                         LogSeverity severity) {
+    _settings.setMinimumLoggedSeverity(component, severity);
+}
 
-    void ComponentMessageLogDomain::clearMinimumLoggedSeverity(LogComponent component) {
-        _settings.clearMinimumLoggedSeverity(component);
-    }
+void ComponentMessageLogDomain::clearMinimumLoggedSeverity(LogComponent component) {
+    _settings.clearMinimumLoggedSeverity(component);
+}
 
 }  // namespace logger
 }  // namespace mongo

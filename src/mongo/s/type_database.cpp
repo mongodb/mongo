@@ -32,106 +32,109 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
-    const std::string DatabaseType::ConfigNS = "config.databases";
+const std::string DatabaseType::ConfigNS = "config.databases";
 
-    const BSONField<std::string> DatabaseType::name("_id");
-    const BSONField<std::string> DatabaseType::primary("primary");
-    const BSONField<bool> DatabaseType::draining("draining", false);
-    const BSONField<bool> DatabaseType::DEPRECATED_partitioned("partitioned");
-    const BSONField<std::string> DatabaseType::DEPRECATED_name("name");
-    const BSONField<bool> DatabaseType::DEPRECATED_sharded("sharded");
+const BSONField<std::string> DatabaseType::name("_id");
+const BSONField<std::string> DatabaseType::primary("primary");
+const BSONField<bool> DatabaseType::draining("draining", false);
+const BSONField<bool> DatabaseType::DEPRECATED_partitioned("partitioned");
+const BSONField<std::string> DatabaseType::DEPRECATED_name("name");
+const BSONField<bool> DatabaseType::DEPRECATED_sharded("sharded");
 
-    DatabaseType::DatabaseType() {
-        clear();
+DatabaseType::DatabaseType() {
+    clear();
+}
+
+DatabaseType::~DatabaseType() {}
+
+bool DatabaseType::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    DatabaseType::~DatabaseType() {
+    // All the mandatory fields must be present.
+    if (!_isNameSet) {
+        *errMsg = stream() << "missing " << name.name() << " field";
+        return false;
+    }
+    if (!_isPrimarySet) {
+        *errMsg = stream() << "missing " << primary.name() << " field";
+        return false;
     }
 
-    bool DatabaseType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
+    return true;
+}
 
-        // All the mandatory fields must be present.
-        if (!_isNameSet) {
-            *errMsg = stream() << "missing " << name.name() << " field";
-            return false;
-        }
-        if (!_isPrimarySet) {
-            *errMsg = stream() << "missing " << primary.name() << " field";
-            return false;
-        }
+BSONObj DatabaseType::toBSON() const {
+    BSONObjBuilder builder;
 
-        return true;
-    }
+    if (_isNameSet)
+        builder.append(name(), _name);
+    if (_isPrimarySet)
+        builder.append(primary(), _primary);
+    if (_isDrainingSet)
+        builder.append(draining(), _draining);
 
-    BSONObj DatabaseType::toBSON() const {
-        BSONObjBuilder builder;
+    return builder.obj();
+}
 
-        if (_isNameSet) builder.append(name(), _name);
-        if (_isPrimarySet) builder.append(primary(), _primary);
-        if (_isDrainingSet) builder.append(draining(), _draining);
+bool DatabaseType::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-        return builder.obj();
-    }
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-    bool DatabaseType::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+    FieldParser::FieldState fieldState;
+    fieldState = FieldParser::extract(source, name, &_name, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isNameSet = fieldState == FieldParser::FIELD_SET;
 
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
+    fieldState = FieldParser::extract(source, primary, &_primary, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isPrimarySet = fieldState == FieldParser::FIELD_SET;
 
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, name, &_name, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNameSet = fieldState == FieldParser::FIELD_SET;
+    fieldState = FieldParser::extract(source, draining, &_draining, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isDrainingSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, primary, &_primary, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isPrimarySet = fieldState == FieldParser::FIELD_SET;
+    return true;
+}
 
-        fieldState = FieldParser::extract(source, draining, &_draining, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isDrainingSet = fieldState == FieldParser::FIELD_SET;
+void DatabaseType::clear() {
+    _name.clear();
+    _isNameSet = false;
 
-        return true;
-    }
+    _primary.clear();
+    _isPrimarySet = false;
 
-    void DatabaseType::clear() {
+    _draining = false;
+    _isDrainingSet = false;
+}
 
-        _name.clear();
-        _isNameSet = false;
+void DatabaseType::cloneTo(DatabaseType* other) const {
+    other->clear();
 
-        _primary.clear();
-        _isPrimarySet = false;
+    other->_name = _name;
+    other->_isNameSet = _isNameSet;
 
-        _draining = false;
-        _isDrainingSet = false;
+    other->_primary = _primary;
+    other->_isPrimarySet = _isPrimarySet;
 
-    }
+    other->_draining = _draining;
+    other->_isDrainingSet = _isDrainingSet;
+}
 
-    void DatabaseType::cloneTo(DatabaseType* other) const {
-        other->clear();
+std::string DatabaseType::toString() const {
+    return toBSON().toString();
+}
 
-        other->_name = _name;
-        other->_isNameSet = _isNameSet;
-
-        other->_primary = _primary;
-        other->_isPrimarySet = _isPrimarySet;
-
-        other->_draining = _draining;
-        other->_isDrainingSet = _isDrainingSet;
-
-    }
-
-    std::string DatabaseType::toString() const {
-        return toBSON().toString();
-    }
-
-} // namespace mongo
+}  // namespace mongo

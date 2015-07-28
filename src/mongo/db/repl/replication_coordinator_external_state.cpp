@@ -33,8 +33,8 @@
 namespace mongo {
 namespace repl {
 
-    ReplicationCoordinatorExternalState::ReplicationCoordinatorExternalState() {}
-    ReplicationCoordinatorExternalState::~ReplicationCoordinatorExternalState() {}
+ReplicationCoordinatorExternalState::ReplicationCoordinatorExternalState() {}
+ReplicationCoordinatorExternalState::~ReplicationCoordinatorExternalState() {}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

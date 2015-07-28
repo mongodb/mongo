@@ -37,250 +37,250 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+using boost::scoped_ptr;
 
-    // Insert multiple keys and try to iterate through all of them
-    // using a forward cursor while calling savePosition() and
-    // restorePosition() in succession.
-    TEST( SortedDataInterface, SaveAndRestorePositionWhileIterateCursor ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+// Insert multiple keys and try to iterate through all of them
+// using a forward cursor while calling savePosition() and
+// restorePosition() in succession.
+TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        int nToInsert = 10;
-        for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                BSONObj key = BSON( "" << i );
-                RecordId loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( minKey, RecordId::min() ) );
-            for ( int i = 0; i < nToInsert; i++ ) {
-                ASSERT( !cursor->isEOF() );
-                ASSERT_EQUALS( BSON( "" << i ), cursor->getKey() );
-                ASSERT_EQUALS( RecordId( 42, i * 2 ), cursor->getRecordId() );
-                cursor->advance();
-                cursor->savePosition();
-                cursor->restorePosition( opCtx.get() );
-            }
-            ASSERT( cursor->isEOF() );
+            WriteUnitOfWork uow(opCtx.get());
+            BSONObj key = BSON("" << i);
+            RecordId loc(42, i * 2);
+            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+            uow.commit();
         }
     }
 
-    // Insert multiple keys and try to iterate through all of them
-    // using a reverse cursor while calling savePosition() and
-    // restorePosition() in succession.
-    TEST( SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        int nToInsert = 10;
-        for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                BSONObj key = BSON( "" << i );
-                RecordId loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-            ASSERT( !cursor->locate( maxKey, RecordId::max() ) );
-            for ( int i = nToInsert - 1; i >= 0; i-- ) {
-                ASSERT( !cursor->isEOF() );
-                ASSERT_EQUALS( BSON( "" << i ), cursor->getKey() );
-                ASSERT_EQUALS( RecordId( 42, i * 2 ), cursor->getRecordId() );
-                cursor->advance();
-                cursor->savePosition();
-                cursor->restorePosition( opCtx.get() );
-            }
-            ASSERT( cursor->isEOF() );
-        }
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
-    // Insert the same key multiple times and try to iterate through each
-    // occurrence using a forward cursor while calling savePosition() and
-    // restorePosition() in succession. Verify that the RecordId is saved
-    // as part of the current position of the cursor.
-    TEST( SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        int nToInsert = 10;
-        for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                RecordId loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc, true /* allow duplicates */ ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( minKey, RecordId::min() ) );
-            for ( int i = 0; i < nToInsert; i++ ) {
-                ASSERT( !cursor->isEOF() );
-                ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( RecordId( 42, i * 2 ), cursor->getRecordId() );
-                cursor->advance();
-                cursor->savePosition();
-                cursor->restorePosition( opCtx.get() );
-            }
-            ASSERT( cursor->isEOF() );
-        }
-    }
-
-    // Insert the same key multiple times and try to iterate through each
-    // occurrence using a reverse cursor while calling savePosition() and
-    // restorePosition() in succession. Verify that the RecordId is saved
-    // as part of the current position of the cursor.
-    TEST( SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        int nToInsert = 10;
-        for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                RecordId loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc, true /* allow duplicates */ ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-            ASSERT( !cursor->locate( maxKey, RecordId::max() ) );
-            for ( int i = nToInsert - 1; i >= 0; i-- ) {
-                ASSERT( !cursor->isEOF() );
-                ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( RecordId( 42, i * 2 ), cursor->getRecordId() );
-                cursor->advance();
-                cursor->savePosition();
-                cursor->restorePosition( opCtx.get() );
-            }
-            ASSERT( cursor->isEOF() );
-        }
-    }
-
-    // Call savePosition() on a forward cursor without ever calling restorePosition().
-    // May be useful to run this test under valgrind to verify there are no leaks.
-    TEST( SortedDataInterface, SavePositionWithoutRestore ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), 1));
+        ASSERT(!cursor->locate(minKey, RecordId::min()));
+        for (int i = 0; i < nToInsert; i++) {
+            ASSERT(!cursor->isEOF());
+            ASSERT_EQUALS(BSON("" << i), cursor->getKey());
+            ASSERT_EQUALS(RecordId(42, i * 2), cursor->getRecordId());
+            cursor->advance();
             cursor->savePosition();
+            cursor->restorePosition(opCtx.get());
+        }
+        ASSERT(cursor->isEOF());
+    }
+}
+
+// Insert multiple keys and try to iterate through all of them
+// using a reverse cursor while calling savePosition() and
+// restorePosition() in succession.
+TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            BSONObj key = BSON("" << i);
+            RecordId loc(42, i * 2);
+            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+            uow.commit();
         }
     }
 
-    // Call savePosition() on a reverse cursor without ever calling restorePosition().
-    // May be useful to run this test under valgrind to verify there are no leaks.
-    TEST( SortedDataInterface, SavePositionWithoutRestoreReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+    }
 
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), -1));
+        ASSERT(!cursor->locate(maxKey, RecordId::max()));
+        for (int i = nToInsert - 1; i >= 0; i--) {
+            ASSERT(!cursor->isEOF());
+            ASSERT_EQUALS(BSON("" << i), cursor->getKey());
+            ASSERT_EQUALS(RecordId(42, i * 2), cursor->getRecordId());
+            cursor->advance();
             cursor->savePosition();
+            cursor->restorePosition(opCtx.get());
+        }
+        ASSERT(cursor->isEOF());
+    }
+}
+
+// Insert the same key multiple times and try to iterate through each
+// occurrence using a forward cursor while calling savePosition() and
+// restorePosition() in succession. Verify that the RecordId is saved
+// as part of the current position of the cursor.
+TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            RecordId loc(42, i * 2);
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc, true /* allow duplicates */));
+            uow.commit();
         }
     }
 
-} // namespace mongo
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), 1));
+        ASSERT(!cursor->locate(minKey, RecordId::min()));
+        for (int i = 0; i < nToInsert; i++) {
+            ASSERT(!cursor->isEOF());
+            ASSERT_EQUALS(key1, cursor->getKey());
+            ASSERT_EQUALS(RecordId(42, i * 2), cursor->getRecordId());
+            cursor->advance();
+            cursor->savePosition();
+            cursor->restorePosition(opCtx.get());
+        }
+        ASSERT(cursor->isEOF());
+    }
+}
+
+// Insert the same key multiple times and try to iterate through each
+// occurrence using a reverse cursor while calling savePosition() and
+// restorePosition() in succession. Verify that the RecordId is saved
+// as part of the current position of the cursor.
+TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysReversed) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            RecordId loc(42, i * 2);
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc, true /* allow duplicates */));
+            uow.commit();
+        }
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), -1));
+        ASSERT(!cursor->locate(maxKey, RecordId::max()));
+        for (int i = nToInsert - 1; i >= 0; i--) {
+            ASSERT(!cursor->isEOF());
+            ASSERT_EQUALS(key1, cursor->getKey());
+            ASSERT_EQUALS(RecordId(42, i * 2), cursor->getRecordId());
+            cursor->advance();
+            cursor->savePosition();
+            cursor->restorePosition(opCtx.get());
+        }
+        ASSERT(cursor->isEOF());
+    }
+}
+
+// Call savePosition() on a forward cursor without ever calling restorePosition().
+// May be useful to run this test under valgrind to verify there are no leaks.
+TEST(SortedDataInterface, SavePositionWithoutRestore) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
+            uow.commit();
+        }
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), 1));
+        cursor->savePosition();
+    }
+}
+
+// Call savePosition() on a reverse cursor without ever calling restorePosition().
+// May be useful to run this test under valgrind to verify there are no leaks.
+TEST(SortedDataInterface, SavePositionWithoutRestoreReversed) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            uow.commit();
+        }
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), -1));
+        cursor->savePosition();
+    }
+}
+
+}  // namespace mongo

@@ -34,47 +34,47 @@
 
 namespace mongo {
 
-    /**
-     * Instantiation of AtomicIntrinsics<> for all word types T.
-     */
-    template <typename T, typename IsTLarge=void>
-    class AtomicIntrinsics {
-    public:
+/**
+ * Instantiation of AtomicIntrinsics<> for all word types T.
+ */
+template <typename T, typename IsTLarge = void>
+class AtomicIntrinsics {
+public:
+    static T compareAndSwap(volatile T* dest, T expected, T newValue) {
+        __atomic_compare_exchange(
+            dest, &expected, &newValue, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+        return expected;
+    }
 
-        static T compareAndSwap(volatile T* dest, T expected, T newValue) {
-            __atomic_compare_exchange(dest, &expected, &newValue, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-            return expected;
-        }
+    static T swap(volatile T* dest, T newValue) {
+        T result;
+        __atomic_exchange(dest, &newValue, &result, __ATOMIC_SEQ_CST);
+        return result;
+    }
 
-        static T swap(volatile T* dest, T newValue) {
-            T result;
-            __atomic_exchange(dest, &newValue, &result, __ATOMIC_SEQ_CST);
-            return result;
-        }
+    static T load(volatile const T* value) {
+        T result;
+        __atomic_load(value, &result, __ATOMIC_SEQ_CST);
+        return result;
+    }
 
-        static T load(volatile const T* value) {
-            T result;
-            __atomic_load(value, &result, __ATOMIC_SEQ_CST);
-            return result;
-        }
+    static T loadRelaxed(volatile const T* value) {
+        T result;
+        __atomic_load(value, &result, __ATOMIC_RELAXED);
+        return result;
+    }
 
-        static T loadRelaxed(volatile const T* value) {
-            T result;
-            __atomic_load(value, &result, __ATOMIC_RELAXED);
-            return result;
-        }
+    static void store(volatile T* dest, T newValue) {
+        __atomic_store(dest, &newValue, __ATOMIC_SEQ_CST);
+    }
 
-        static void store(volatile T* dest, T newValue) {
-            __atomic_store(dest, &newValue, __ATOMIC_SEQ_CST);
-        }
+    static T fetchAndAdd(volatile T* dest, T increment) {
+        return __atomic_fetch_add(dest, increment, __ATOMIC_SEQ_CST);
+    }
 
-        static T fetchAndAdd(volatile T* dest, T increment) {
-            return __atomic_fetch_add(dest, increment, __ATOMIC_SEQ_CST);
-        }
-
-    private:
-        AtomicIntrinsics();
-        ~AtomicIntrinsics();
-    };
+private:
+    AtomicIntrinsics();
+    ~AtomicIntrinsics();
+};
 
 }  // namespace mongo

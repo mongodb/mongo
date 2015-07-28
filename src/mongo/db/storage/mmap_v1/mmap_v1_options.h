@@ -37,60 +37,59 @@
 
 namespace mongo {
 
-    struct MMAPV1Options {
+struct MMAPV1Options {
+    MMAPV1Options()
+        : lenForNewNsFiles(16 * 1024 * 1024),
+          preallocj(true),
+          prealloc(false),
+          journalCommitInterval(0),  // 0 means use default
+          quota(false),
+          quotaFiles(8) {}
 
-        MMAPV1Options() :
-            lenForNewNsFiles(16 * 1024 * 1024),
-            preallocj(true),
-            prealloc(false),
-            journalCommitInterval(0), // 0 means use default
-            quota(false),
-            quotaFiles(8) {}
+    // --nssize
+    // Specifies the default size for namespace files, which are files that end in .ns.
+    // Each collection and index counts as a namespace.
+    unsigned lenForNewNsFiles;
 
-        // --nssize
-        // Specifies the default size for namespace files, which are files that end in .ns.
-        // Each collection and index counts as a namespace.
-        unsigned lenForNewNsFiles;
+    bool preallocj;   // --nopreallocj no preallocation of journal files
+    bool prealloc;    // --noprealloc no preallocation of data files
+    bool smallfiles;  // --smallfiles allocate smaller data files
 
-        bool preallocj;        // --nopreallocj no preallocation of journal files
-        bool prealloc;         // --noprealloc no preallocation of data files
-        bool smallfiles;       // --smallfiles allocate smaller data files
+    // --journalCommitInterval
+    // The maximum amount of time the mongod process allows between journal operations.
+    // Values can range from 2 to 300 milliseconds. Lower values increase the durability
+    // of the journal, at the expense of disk performance.
+    unsigned journalCommitInterval;  // group/batch commit interval ms
 
-        // --journalCommitInterval
-        // The maximum amount of time the mongod process allows between journal operations.
-        // Values can range from 2 to 300 milliseconds. Lower values increase the durability
-        // of the journal, at the expense of disk performance.
-        unsigned journalCommitInterval; // group/batch commit interval ms
-
-        // --journalOptions 7            dump journal and terminate without doing anything further
-        // --journalOptions 4            recover and terminate without listening
-        enum { // bits to be ORed
-            JournalDumpJournal = 1,   // dump diagnostics on the journal during recovery
-            JournalScanOnly = 2,      // don't do any real work, just scan and dump if dump
-                                      // specified
-            JournalRecoverOnly = 4,   // terminate after recovery step
-            JournalParanoid = 8,      // paranoid mode enables extra checks
-            JournalAlwaysCommit = 16, // do a group commit every time the writelock is released
-            JournalAlwaysRemap = 32,  // remap the private view after every group commit
-                                      // (may lag to the next write lock acquisition,
-                                      // but will do all files then)
-            JournalNoCheckSpace = 64  // don't check that there is enough room for journal files
-                                      // before startup (for diskfull tests)
-        };
-        int journalOptions;    // --journalOptions <n> for debugging
-
-        // --quota
-        // Enables a maximum limit for the number data files each database can have.
-        // When running with the --quota option, MongoDB has a maximum of 8 data files
-        // per database. Adjust the quota with --quotaFiles.
-        bool quota;
-
-        // --quotaFiles
-        // Modifies the limit on the number of data files per database.
-        // --quotaFiles option requires that you set --quota.
-        int quotaFiles;        // --quotaFiles
+    // --journalOptions 7            dump journal and terminate without doing anything further
+    // --journalOptions 4            recover and terminate without listening
+    enum {                         // bits to be ORed
+        JournalDumpJournal = 1,    // dump diagnostics on the journal during recovery
+        JournalScanOnly = 2,       // don't do any real work, just scan and dump if dump
+                                   // specified
+        JournalRecoverOnly = 4,    // terminate after recovery step
+        JournalParanoid = 8,       // paranoid mode enables extra checks
+        JournalAlwaysCommit = 16,  // do a group commit every time the writelock is released
+        JournalAlwaysRemap = 32,   // remap the private view after every group commit
+                                   // (may lag to the next write lock acquisition,
+                                   // but will do all files then)
+        JournalNoCheckSpace = 64   // don't check that there is enough room for journal files
+                                   // before startup (for diskfull tests)
     };
+    int journalOptions;  // --journalOptions <n> for debugging
 
-    extern MMAPV1Options mmapv1GlobalOptions;
+    // --quota
+    // Enables a maximum limit for the number data files each database can have.
+    // When running with the --quota option, MongoDB has a maximum of 8 data files
+    // per database. Adjust the quota with --quotaFiles.
+    bool quota;
 
-} // namespace mongo
+    // --quotaFiles
+    // Modifies the limit on the number of data files per database.
+    // --quotaFiles option requires that you set --quota.
+    int quotaFiles;  // --quotaFiles
+};
+
+extern MMAPV1Options mmapv1GlobalOptions;
+
+}  // namespace mongo

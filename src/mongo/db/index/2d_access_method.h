@@ -35,30 +35,32 @@
 
 namespace mongo {
 
-    class IndexCatalogEntry;
-    class IndexCursor;
-    class IndexDescriptor;
-    struct TwoDIndexingParams;
+class IndexCatalogEntry;
+class IndexCursor;
+class IndexDescriptor;
+struct TwoDIndexingParams;
 
-    class TwoDAccessMethod : public BtreeBasedAccessMethod {
-    public:
-        using BtreeBasedAccessMethod::_descriptor;
+class TwoDAccessMethod : public BtreeBasedAccessMethod {
+public:
+    using BtreeBasedAccessMethod::_descriptor;
 
-        TwoDAccessMethod(IndexCatalogEntry* btreeState,
-                         SortedDataInterface* btree);
-        virtual ~TwoDAccessMethod() { }
+    TwoDAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
+    virtual ~TwoDAccessMethod() {}
 
-    private:
+private:
+    const IndexDescriptor* getDescriptor() {
+        return _descriptor;
+    }
+    TwoDIndexingParams& getParams() {
+        return _params;
+    }
 
-        const IndexDescriptor* getDescriptor() { return _descriptor; }
-        TwoDIndexingParams& getParams() { return _params; }
+    // This really gets the 'locs' from the provided obj.
+    void getKeys(const BSONObj& obj, std::vector<BSONObj>& locs) const;
 
-        // This really gets the 'locs' from the provided obj.
-        void getKeys(const BSONObj& obj, std::vector<BSONObj>& locs) const;
+    virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
-
-        TwoDIndexingParams _params;
-    };
+    TwoDIndexingParams _params;
+};
 
 }  // namespace mongo

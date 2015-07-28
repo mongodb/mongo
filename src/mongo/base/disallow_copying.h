@@ -40,6 +40,6 @@
  *    };
  */
 #define MONGO_DISALLOW_COPYING(CLASS) \
-    private:                                    \
-    CLASS(const CLASS&);                        \
+private:                              \
+    CLASS(const CLASS&);              \
     CLASS& operator=(const CLASS&)

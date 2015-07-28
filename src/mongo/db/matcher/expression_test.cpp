@@ -39,69 +39,66 @@
 
 namespace mongo {
 
-    TEST( MatchExpressionTest, Parse1 ) {
-        //TreeMatchExpression* e = NULL;
-        //Status s = MatchExpression::parse( BSON( "x" << 1 ), &e );
-        //ASSERT_TRUE( s.isOK() );
+TEST(MatchExpressionTest, Parse1) {
+    // TreeMatchExpression* e = NULL;
+    // Status s = MatchExpression::parse( BSON( "x" << 1 ), &e );
+    // ASSERT_TRUE( s.isOK() );
+}
+
+TEST(LeafMatchExpressionTest, Equal1) {
+    BSONObj temp = BSON("x" << 5);
+    EqualityMatchExpression e;
+    e.init("x", temp["x"]);
+
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [5] }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [1,5] }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [1,5,2] }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [5,2] }")));
+
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : null }")));
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : [4,2] }")));
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : [[5]] }")));
+}
+
+TEST(LeafMatchExpressionTest, Comp1) {
+    BSONObj temp = BSON("x" << 5);
+
+    {
+        LTEMatchExpression e;
+        e.init("x", temp["x"]);
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
     }
 
-    TEST( LeafMatchExpressionTest, Equal1 ) {
-        BSONObj temp = BSON( "x" << 5 );
-        EqualityMatchExpression e;
-        e.init( "x", temp["x"] );
-
-        ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : 5 }" ) ) );
-        ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : [5] }" ) ) );
-        ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : [1,5] }" ) ) );
-        ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : [1,5,2] }" ) ) );
-        ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : [5,2] }" ) ) );
-
-        ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : null }" ) ) );
-        ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 6 }" ) ) );
-        ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : [4,2] }" ) ) );
-        ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : [[5]] }" ) ) );
+    {
+        LTMatchExpression e;
+        e.init("x", temp["x"]);
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
     }
 
-    TEST( LeafMatchExpressionTest, Comp1 ) {
-        BSONObj temp = BSON( "x" << 5 );
-
-        {
-            LTEMatchExpression e;
-            e.init( "x", temp["x"] );
-            ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : 5 }" ) ) );
-            ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : 4 }" ) ) );
-            ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 6 }" ) ) );
-            ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 'eliot' }" ) ) );
-        }
-
-        {
-            LTMatchExpression e;
-            e.init( "x", temp["x"] );
-            ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 5 }" ) ) );
-            ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : 4 }" ) ) );
-            ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 6 }" ) ) );
-            ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 'eliot' }" ) ) );
-        }
-
-        {
-            GTEMatchExpression e;
-            e.init( "x", temp["x"] );
-            ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : 5 }" ) ) );
-            ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 4 }" ) ) );
-            ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : 6 }" ) ) );
-            ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 'eliot' }" ) ) );
-        }
-
-        {
-            GTMatchExpression e;
-            e.init( "x", temp["x"] );
-            ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 5 }" ) ) );
-            ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 4 }" ) ) );
-            ASSERT_TRUE( e.matchesBSON( fromjson( "{ x : 6 }" ) ) );
-            ASSERT_FALSE( e.matchesBSON( fromjson( "{ x : 'eliot' }" ) ) );
-        }
-
-
+    {
+        GTEMatchExpression e;
+        e.init("x", temp["x"]);
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
     }
 
+    {
+        GTMatchExpression e;
+        e.init("x", temp["x"]);
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
+    }
+}
 }

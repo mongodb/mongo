@@ -44,89 +44,84 @@
  */
 namespace mongo {
 
-    using std::auto_ptr;
-    using std::endl;
+using std::auto_ptr;
+using std::endl;
 
-    void SnapshotData::takeSnapshot() {
-        _created = curTimeMicros64();
-        Top::global.cloneMap(_usage);
+void SnapshotData::takeSnapshot() {
+    _created = curTimeMicros64();
+    Top::global.cloneMap(_usage);
+}
+
+SnapshotDelta::SnapshotDelta(const SnapshotData& older, const SnapshotData& newer)
+    : _older(older), _newer(newer) {
+    verify(_newer._created > _older._created);
+    _elapsed = _newer._created - _older._created;
+}
+
+Top::UsageMap SnapshotDelta::collectionUsageDiff() {
+    verify(_newer._created > _older._created);
+    Top::UsageMap u;
+
+    for (Top::UsageMap::const_iterator i = _newer._usage.begin(); i != _newer._usage.end(); ++i) {
+        Top::UsageMap::const_iterator j = _older._usage.find(i->first);
+        if (j != _older._usage.end())
+            u[i->first] = Top::CollectionData(j->second, i->second);
+        else
+            u[i->first] = i->second;
     }
+    return u;
+}
 
-    SnapshotDelta::SnapshotDelta( const SnapshotData& older , const SnapshotData& newer )
-        : _older( older ) , _newer( newer ) {
-        verify( _newer._created > _older._created );
-        _elapsed = _newer._created - _older._created;
-    }
+Snapshots::Snapshots(int n)
+    : _lock("Snapshots"), _n(n), _snapshots(new SnapshotData[n]), _loc(0), _stored(0) {}
 
-    Top::UsageMap SnapshotDelta::collectionUsageDiff() {
-        verify( _newer._created > _older._created );
-        Top::UsageMap u;
+const SnapshotData* Snapshots::takeSnapshot() {
+    scoped_lock lk(_lock);
+    _loc = (_loc + 1) % _n;
+    _snapshots[_loc].takeSnapshot();
+    if (_stored < _n)
+        _stored++;
+    return &_snapshots[_loc];
+}
 
-        for ( Top::UsageMap::const_iterator i=_newer._usage.begin(); i != _newer._usage.end(); ++i ) {
-            Top::UsageMap::const_iterator j = _older._usage.find(i->first);
-            if (j != _older._usage.end())
-                u[i->first] = Top::CollectionData( j->second , i->second );
-            else
-                u[i->first] = i->second;
-        }
-        return u;
-    }
+auto_ptr<SnapshotDelta> Snapshots::computeDelta(int numBack) {
+    scoped_lock lk(_lock);
+    auto_ptr<SnapshotDelta> p;
+    if (numBack < numDeltas())
+        p.reset(new SnapshotDelta(getPrev(numBack + 1), getPrev(numBack)));
+    return p;
+}
 
-    Snapshots::Snapshots(int n)
-        : _lock("Snapshots"), _n(n)
-        , _snapshots(new SnapshotData[n])
-        , _loc(0)
-        , _stored(0)
-    {}
+const SnapshotData& Snapshots::getPrev(int numBack) {
+    int x = _loc - numBack;
+    if (x < 0)
+        x += _n;
+    return _snapshots[x];
+}
 
-    const SnapshotData* Snapshots::takeSnapshot() {
-        scoped_lock lk(_lock);
-        _loc = ( _loc + 1 ) % _n;
-        _snapshots[_loc].takeSnapshot();
-        if ( _stored < _n )
-            _stored++;
-        return &_snapshots[_loc];
-    }
+void SnapshotThread::run() {
+    Client::initThread("snapshot");
+    Client& client = cc();
 
-    auto_ptr<SnapshotDelta> Snapshots::computeDelta( int numBack ) {
-        scoped_lock lk(_lock);
-        auto_ptr<SnapshotDelta> p;
-        if ( numBack < numDeltas() )
-            p.reset( new SnapshotDelta( getPrev(numBack+1) , getPrev(numBack) ) );
-        return p;
-    }
+    long long numLoops = 0;
 
-    const SnapshotData& Snapshots::getPrev( int numBack ) {
-        int x = _loc - numBack;
-        if ( x < 0 )
-            x += _n;
-        return _snapshots[x];
-    }
+    const SnapshotData* prev = 0;
 
-    void SnapshotThread::run() {
-        Client::initThread("snapshot");
-        Client& client = cc();
-
-        long long numLoops = 0;
-
-        const SnapshotData* prev = 0;
-
-        while ( ! inShutdown() ) {
-            try {
-                const SnapshotData* s = statsSnapshots.takeSnapshot();
-                prev = s;
-            }
-            catch ( std::exception& e ) {
-                log() << "ERROR in SnapshotThread: " << e.what() << endl;
-            }
-
-            numLoops++;
-            sleepsecs(4);
+    while (!inShutdown()) {
+        try {
+            const SnapshotData* s = statsSnapshots.takeSnapshot();
+            prev = s;
+        } catch (std::exception& e) {
+            log() << "ERROR in SnapshotThread: " << e.what() << endl;
         }
 
-        client.shutdown();
+        numLoops++;
+        sleepsecs(4);
     }
 
-    Snapshots statsSnapshots;
-    SnapshotThread snapshotThread;
+    client.shutdown();
+}
+
+Snapshots statsSnapshots;
+SnapshotThread snapshotThread;
 }

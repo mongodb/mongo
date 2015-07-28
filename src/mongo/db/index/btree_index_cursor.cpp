@@ -39,85 +39,76 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::vector;
+using std::string;
+using std::vector;
 
-    BtreeIndexCursor::BtreeIndexCursor(SortedDataInterface::Cursor* cursor) : _cursor(cursor) { }
+BtreeIndexCursor::BtreeIndexCursor(SortedDataInterface::Cursor* cursor) : _cursor(cursor) {}
 
-    bool BtreeIndexCursor::isEOF() const { return _cursor->isEOF(); }
+bool BtreeIndexCursor::isEOF() const {
+    return _cursor->isEOF();
+}
 
-    Status BtreeIndexCursor::seek(const BSONObj& position) {
-        _cursor->locate(position, 
-                        1 == _cursor->getDirection() ? RecordId::min() : RecordId::max());
-        return Status::OK();
-    }
+Status BtreeIndexCursor::seek(const BSONObj& position) {
+    _cursor->locate(position, 1 == _cursor->getDirection() ? RecordId::min() : RecordId::max());
+    return Status::OK();
+}
 
-    void BtreeIndexCursor::seek(const BSONObj& position, bool afterKey) {
-        const bool forward = (1 == _cursor->getDirection());
-        _cursor->locate(position, (afterKey == forward) ? RecordId::max() : RecordId::min());
-    }
+void BtreeIndexCursor::seek(const BSONObj& position, bool afterKey) {
+    const bool forward = (1 == _cursor->getDirection());
+    _cursor->locate(position, (afterKey == forward) ? RecordId::max() : RecordId::min());
+}
 
-    bool BtreeIndexCursor::pointsAt(const BtreeIndexCursor& other) {
-        return _cursor->pointsToSamePlaceAs(*other._cursor);
-    }
+bool BtreeIndexCursor::pointsAt(const BtreeIndexCursor& other) {
+    return _cursor->pointsToSamePlaceAs(*other._cursor);
+}
 
-    Status BtreeIndexCursor::seek(const vector<const BSONElement*>& position,
-                                  const vector<bool>& inclusive) {
+Status BtreeIndexCursor::seek(const vector<const BSONElement*>& position,
+                              const vector<bool>& inclusive) {
+    BSONObj emptyObj;
 
-        BSONObj emptyObj;
+    _cursor->customLocate(emptyObj, 0, false, position, inclusive);
+    return Status::OK();
+}
 
-        _cursor->customLocate(emptyObj,
-                              0,
-                              false,
-                              position,
-                              inclusive);
-        return Status::OK();
-    }
+Status BtreeIndexCursor::skip(const BSONObj& keyBegin,
+                              int keyBeginLen,
+                              bool afterKey,
+                              const vector<const BSONElement*>& keyEnd,
+                              const vector<bool>& keyEndInclusive) {
+    _cursor->advanceTo(keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive);
+    return Status::OK();
+}
 
-    Status BtreeIndexCursor::skip(const BSONObj &keyBegin,
-                                  int keyBeginLen,
-                                  bool afterKey,
-                                  const vector<const BSONElement*>& keyEnd,
-                                  const vector<bool>& keyEndInclusive) {
+BSONObj BtreeIndexCursor::getKey() const {
+    return _cursor->getKey();
+}
 
-        _cursor->advanceTo(keyBegin,
-                           keyBeginLen,
-                           afterKey,
-                           keyEnd,
-                           keyEndInclusive);
-        return Status::OK();
-    }
+RecordId BtreeIndexCursor::getValue() const {
+    return _cursor->getRecordId();
+}
 
-    BSONObj BtreeIndexCursor::getKey() const {
-        return _cursor->getKey();
-    }
+void BtreeIndexCursor::next() {
+    advance();
+}
 
-    RecordId BtreeIndexCursor::getValue() const {
-        return _cursor->getRecordId();
-    }
+Status BtreeIndexCursor::savePosition() {
+    _cursor->savePosition();
+    return Status::OK();
+}
 
-    void BtreeIndexCursor::next() {
-        advance();
-    }
+Status BtreeIndexCursor::restorePosition(OperationContext* txn) {
+    _cursor->restorePosition(txn);
+    return Status::OK();
+}
 
-    Status BtreeIndexCursor::savePosition() {
-        _cursor->savePosition();
-        return Status::OK();
-    }
+string BtreeIndexCursor::toString() {
+    // TODO: is this ever called?
+    return "I AM A BTREE INDEX CURSOR!\n";
+}
 
-    Status BtreeIndexCursor::restorePosition(OperationContext* txn) {
-        _cursor->restorePosition(txn);
-        return Status::OK();
-    }
-
-    string BtreeIndexCursor::toString() {
-        // TODO: is this ever called?
-        return "I AM A BTREE INDEX CURSOR!\n";
-    }
-
-    // Move to the next/prev. key.  Used by normal getNext and also skipping unused keys.
-    void BtreeIndexCursor::advance() {
-        _cursor->advance();
-    }
+// Move to the next/prev. key.  Used by normal getNext and also skipping unused keys.
+void BtreeIndexCursor::advance() {
+    _cursor->advance();
+}
 
 }  // namespace mongo

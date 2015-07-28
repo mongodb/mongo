@@ -33,11 +33,11 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-    struct TextUnitTest : public StartupTest {
-        void run() {
-            verify( parseLL("123") == 123 );
-            verify( parseLL("-123000000000") == -123000000000LL );
-        }
-    } textUnitTest;
+struct TextUnitTest : public StartupTest {
+    void run() {
+        verify(parseLL("123") == 123);
+        verify(parseLL("-123000000000") == -123000000000LL);
+    }
+} textUnitTest;
 
 }  // namespace mongo

@@ -42,146 +42,138 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-    namespace threadpool {
+namespace threadpool {
 
-        using std::endl;
-        
-        // Worker thread
-        class Worker : boost::noncopyable {
-        public:
-            explicit Worker(ThreadPool& owner, const std::string& threadName)
-                : _owner(owner)
-                , _is_done(true)
-                , _thread(stdx::bind(&Worker::loop, this, threadName))
-            {}
+using std::endl;
 
-            // destructor will block until current operation is completed
-            // Acts as a "join" on this thread
-            ~Worker() {
-                _task.put(Task());
-                _thread.join();
+// Worker thread
+class Worker : boost::noncopyable {
+public:
+    explicit Worker(ThreadPool& owner, const std::string& threadName)
+        : _owner(owner), _is_done(true), _thread(stdx::bind(&Worker::loop, this, threadName)) {}
+
+    // destructor will block until current operation is completed
+    // Acts as a "join" on this thread
+    ~Worker() {
+        _task.put(Task());
+        _thread.join();
+    }
+
+    void set_task(Task& func) {
+        verify(func);
+        verify(_is_done);
+        _is_done = false;
+
+        _task.put(func);
+    }
+
+private:
+    ThreadPool& _owner;
+    MVar<Task> _task;
+    bool _is_done;  // only used for error detection
+    boost::thread _thread;
+
+    void loop(const std::string& threadName) {
+        setThreadName(threadName);
+        while (true) {
+            Task task = _task.take();
+            if (!task)
+                break;  // ends the thread
+
+            try {
+                task();
+            } catch (DBException& e) {
+                log() << "Unhandled DBException: " << e.toString() << endl;
+            } catch (std::exception& e) {
+                log() << "Unhandled std::exception in worker thread: " << e.what() << endl;
+                ;
+            } catch (...) {
+                log() << "Unhandled non-exception in worker thread" << endl;
             }
-
-            void set_task(Task& func) {
-                verify(func);
-                verify(_is_done);
-                _is_done = false;
-
-                _task.put(func);
-            }
-
-        private:
-            ThreadPool& _owner;
-            MVar<Task> _task;
-            bool _is_done; // only used for error detection
-            boost::thread _thread;
-
-            void loop(const std::string& threadName) {
-                setThreadName(threadName);
-                while (true) {
-                    Task task = _task.take();
-                    if (!task)
-                        break; // ends the thread
-
-                    try {
-                        task();
-                    }
-                    catch (DBException& e) {
-                        log() << "Unhandled DBException: " << e.toString() << endl;
-                    }
-                    catch (std::exception& e) {
-                        log() << "Unhandled std::exception in worker thread: " << e.what() << endl;;
-                    }
-                    catch (...) {
-                        log() << "Unhandled non-exception in worker thread" << endl;
-                    }
-                    _is_done = true;
-                    _owner.task_done(this);
-                }
-            }
-        };
-
-        ThreadPool::ThreadPool(int nThreads, const std::string& threadNamePrefix)
-            : _mutex("ThreadPool"), _tasksRemaining(0)
-            , _nThreads(nThreads)
-            , _threadNamePrefix(threadNamePrefix) {
-            startThreads();
+            _is_done = true;
+            _owner.task_done(this);
         }
+    }
+};
 
-        ThreadPool::ThreadPool(const DoNotStartThreadsTag&,
-                               int nThreads,
-                               const std::string& threadNamePrefix)
-            : _mutex("ThreadPool"), _tasksRemaining(0)
-            , _nThreads(nThreads)
-            , _threadNamePrefix(threadNamePrefix) {
+ThreadPool::ThreadPool(int nThreads, const std::string& threadNamePrefix)
+    : _mutex("ThreadPool"),
+      _tasksRemaining(0),
+      _nThreads(nThreads),
+      _threadNamePrefix(threadNamePrefix) {
+    startThreads();
+}
+
+ThreadPool::ThreadPool(const DoNotStartThreadsTag&,
+                       int nThreads,
+                       const std::string& threadNamePrefix)
+    : _mutex("ThreadPool"),
+      _tasksRemaining(0),
+      _nThreads(nThreads),
+      _threadNamePrefix(threadNamePrefix) {}
+
+void ThreadPool::startThreads() {
+    scoped_lock lock(_mutex);
+    for (int i = 0; i < _nThreads; ++i) {
+        const std::string threadName(_threadNamePrefix.empty() ? _threadNamePrefix : str::stream()
+                                             << _threadNamePrefix << i);
+        Worker* worker = new Worker(*this, threadName);
+        if (_tasks.empty()) {
+            _freeWorkers.push_front(worker);
+        } else {
+            worker->set_task(_tasks.front());
+            _tasks.pop_front();
         }
+    }
+}
 
-        void ThreadPool::startThreads() {
-            scoped_lock lock(_mutex);
-            for (int i = 0; i < _nThreads; ++i) {
-                const std::string threadName(_threadNamePrefix.empty() ?
-                                                        _threadNamePrefix :
-                                                        str::stream() << _threadNamePrefix << i);
-                Worker* worker = new Worker(*this, threadName);
-                if (_tasks.empty()) {
-                    _freeWorkers.push_front(worker);
-                }
-                else {
-                    worker->set_task(_tasks.front());
-                    _tasks.pop_front();
-                }
-            }
-        }
+ThreadPool::~ThreadPool() {
+    join();
 
-        ThreadPool::~ThreadPool() {
-            join();
+    verify(_tasksRemaining == 0);
 
-            verify(_tasksRemaining == 0);
+    while (!_freeWorkers.empty()) {
+        delete _freeWorkers.front();
+        _freeWorkers.pop_front();
+    }
+}
 
-            while(!_freeWorkers.empty()) {
-                delete _freeWorkers.front();
-                _freeWorkers.pop_front();
-            }
-        }
+void ThreadPool::join() {
+    scoped_lock lock(_mutex);
+    while (_tasksRemaining) {
+        _condition.wait(lock.boost());
+    }
+}
 
-        void ThreadPool::join() {
-            scoped_lock lock(_mutex);
-            while(_tasksRemaining) {
-                _condition.wait(lock.boost());
-            }
-        }
+void ThreadPool::schedule(Task task) {
+    scoped_lock lock(_mutex);
 
-        void ThreadPool::schedule(Task task) {
-            scoped_lock lock(_mutex);
+    _tasksRemaining++;
 
-            _tasksRemaining++;
+    if (!_freeWorkers.empty()) {
+        _freeWorkers.front()->set_task(task);
+        _freeWorkers.pop_front();
+    } else {
+        _tasks.push_back(task);
+    }
+}
 
-            if (!_freeWorkers.empty()) {
-                _freeWorkers.front()->set_task(task);
-                _freeWorkers.pop_front();
-            }
-            else {
-                _tasks.push_back(task);
-            }
-        }
+// should only be called by a worker from the worker thread
+void ThreadPool::task_done(Worker* worker) {
+    scoped_lock lock(_mutex);
 
-        // should only be called by a worker from the worker thread
-        void ThreadPool::task_done(Worker* worker) {
-            scoped_lock lock(_mutex);
+    if (!_tasks.empty()) {
+        worker->set_task(_tasks.front());
+        _tasks.pop_front();
+    } else {
+        _freeWorkers.push_front(worker);
+    }
 
-            if (!_tasks.empty()) {
-                worker->set_task(_tasks.front());
-                _tasks.pop_front();
-            }
-            else {
-                _freeWorkers.push_front(worker);
-            }
+    _tasksRemaining--;
 
-            _tasksRemaining--;
+    if (_tasksRemaining == 0)
+        _condition.notify_all();
+}
 
-            if(_tasksRemaining == 0)
-                _condition.notify_all();
-        }
-
-    } //namespace threadpool
-} //namespace mongo
+}  // namespace threadpool
+}  // namespace mongo

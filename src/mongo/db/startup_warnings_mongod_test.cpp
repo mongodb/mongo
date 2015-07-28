@@ -37,101 +37,101 @@
 
 namespace {
 
-    using mongo::unittest::TempDir;
+using mongo::unittest::TempDir;
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidDirectory) {
-        StatusWith<std::string> result =
-            StartupWarningsMongod::readTransparentHugePagesParameter("no_such_directory", "param");
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidDirectory) {
+    StatusWith<std::string> result =
+        StartupWarningsMongod::readTransparentHugePagesParameter("no_such_directory", "param");
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidFile) {
+    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterInvalidFile");
+    StatusWith<std::string> result =
+        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterEmptyFile) {
+    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterInvalidFile");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream(filename.c_str());
     }
+    StatusWith<std::string> result =
+        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::FileStreamFailed, result.getStatus().code());
+}
 
-    TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidFile) {
-        TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterInvalidFile");
-        StatusWith<std::string> result =
-            StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterBlankLine) {
+    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterBlankLine");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream ofs(filename.c_str());
+        ofs << std::endl;
     }
+    StatusWith<std::string> result =
+        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
+}
 
-    TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterEmptyFile) {
-        TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterInvalidFile");
-        {
-            std::string filename(tempDir.path() + "/param");
-            std::ofstream(filename.c_str());
-        }
-        StatusWith<std::string> result =
-            StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(ErrorCodes::FileStreamFailed, result.getStatus().code());
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidFormat) {
+    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterBlankLine");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream ofs(filename.c_str());
+        ofs << "always madvise never" << std::endl;
     }
+    StatusWith<std::string> result =
+        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
+}
 
-    TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterBlankLine) {
-        TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterBlankLine");
-        {
-            std::string filename(tempDir.path() + "/param");
-            std::ofstream ofs(filename.c_str());
-            ofs << std::endl;
-        }
-        StatusWith<std::string> result =
-            StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterEmptyOpMode) {
+    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterEmptyOpMode");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream ofs(filename.c_str());
+        ofs << "always madvise [] never" << std::endl;
     }
+    StatusWith<std::string> result =
+        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+}
 
-    TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidFormat) {
-        TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterBlankLine");
-        {
-            std::string filename(tempDir.path() + "/param");
-            std::ofstream ofs(filename.c_str());
-            ofs << "always madvise never" << std::endl;
-        }
-        StatusWith<std::string> result =
-            StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterUnrecognizedOpMode) {
+    TempDir tempDir(
+        "StartupWarningsMongodTest_ReadTransparentHugePagesParameterUnrecognizedOpMode");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream ofs(filename.c_str());
+        ofs << "always madvise never [unknown]" << std::endl;
     }
+    StatusWith<std::string> result =
+        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+}
 
-    TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterEmptyOpMode) {
-        TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterEmptyOpMode");
-        {
-            std::string filename(tempDir.path() + "/param");
-            std::ofstream ofs(filename.c_str());
-            ofs << "always madvise [] never" << std::endl;
-        }
-        StatusWith<std::string> result =
-            StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterValidFormat) {
+    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterBlankLine");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream ofs(filename.c_str());
+        ofs << "always madvise [never]" << std::endl;
     }
-
-    TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterUnrecognizedOpMode) {
-        TempDir tempDir(
-            "StartupWarningsMongodTest_ReadTransparentHugePagesParameterUnrecognizedOpMode");
-        {
-            std::string filename(tempDir.path() + "/param");
-            std::ofstream ofs(filename.c_str());
-            ofs << "always madvise never [unknown]" << std::endl;
-        }
-        StatusWith<std::string> result =
-            StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
-    }
-
-    TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterValidFormat) {
-        TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterBlankLine");
-        {
-            std::string filename(tempDir.path() + "/param");
-            std::ofstream ofs(filename.c_str());
-            ofs << "always madvise [never]" << std::endl;
-        }
-        StatusWith<std::string> result =
-            StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
-        ASSERT_OK(result.getStatus());
-        ASSERT_EQUALS("never", result.getValue());
-    }
+    StatusWith<std::string> result =
+        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS("never", result.getValue());
+}
 
 }  // namespace

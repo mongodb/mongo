@@ -34,32 +34,31 @@
 
 namespace mongo {
 
-    namespace {
+namespace {
 
-        /**
-         * Updates log severity of 'verboseQueryLogComponent' in global log domain.
-         */
-        bool setVerboseQueryLogging(bool newValue) {
-            bool old = logger::globalLogDomain()->shouldLog(verboseQueryLogComponent,
+/**
+ * Updates log severity of 'verboseQueryLogComponent' in global log domain.
+ */
+bool setVerboseQueryLogging(bool newValue) {
+    bool old =
+        logger::globalLogDomain()->shouldLog(verboseQueryLogComponent, verboseQueryLogSeverity);
+    if (newValue) {
+        logger::globalLogDomain()->setMinimumLoggedSeverity(verboseQueryLogComponent,
                                                             verboseQueryLogSeverity);
-            if (newValue) {
-                logger::globalLogDomain()->setMinimumLoggedSeverity(verboseQueryLogComponent,
-                                                                    verboseQueryLogSeverity);
-            }
-            else {
-                logger::globalLogDomain()->clearMinimumLoggedSeverity(verboseQueryLogComponent);
-            }
-            return old;
-        }
-
-    } // namespace
-
-    bool qlogOff() {
-        return setVerboseQueryLogging(false);
+    } else {
+        logger::globalLogDomain()->clearMinimumLoggedSeverity(verboseQueryLogComponent);
     }
+    return old;
+}
 
-    bool qlogOn() {
-        return setVerboseQueryLogging(true);
-    }
+}  // namespace
+
+bool qlogOff() {
+    return setVerboseQueryLogging(false);
+}
+
+bool qlogOn() {
+    return setVerboseQueryLogging(true);
+}
 
 }  // namespace mongo

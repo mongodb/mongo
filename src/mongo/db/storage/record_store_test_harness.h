@@ -34,21 +34,21 @@
 
 namespace mongo {
 
-    class RecordStore;
-    class RecoveryUnit;
+class RecordStore;
+class RecoveryUnit;
 
-    class HarnessHelper {
-    public:
-        HarnessHelper(){}
-        virtual ~HarnessHelper(){}
+class HarnessHelper {
+public:
+    HarnessHelper() {}
+    virtual ~HarnessHelper() {}
 
-        virtual RecordStore* newNonCappedRecordStore() = 0;
-        virtual RecoveryUnit* newRecoveryUnit() = 0;
+    virtual RecordStore* newNonCappedRecordStore() = 0;
+    virtual RecoveryUnit* newRecoveryUnit() = 0;
 
-        virtual OperationContext* newOperationContext() {
-            return new OperationContextNoop( newRecoveryUnit() );
-        }
-    };
+    virtual OperationContext* newOperationContext() {
+        return new OperationContextNoop(newRecoveryUnit());
+    }
+};
 
-    HarnessHelper* newHarnessHelper();
+HarnessHelper* newHarnessHelper();
 }

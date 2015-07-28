@@ -34,16 +34,16 @@
 
 namespace mongo {
 
-    Status rocksToMongoStatus_slow(const rocksdb::Status& status, const char* prefix) {
-        if (status.ok()) {
-            return Status::OK();
-        }
-
-        if (status.IsCorruption()) {
-            return Status(ErrorCodes::BadValue, status.ToString());
-        }
-
-        return Status(ErrorCodes::InternalError, status.ToString());
+Status rocksToMongoStatus_slow(const rocksdb::Status& status, const char* prefix) {
+    if (status.ok()) {
+        return Status::OK();
     }
+
+    if (status.IsCorruption()) {
+        return Status(ErrorCodes::BadValue, status.ToString());
+    }
+
+    return Status(ErrorCodes::InternalError, status.ToString());
+}
 
 }  // namespace mongo

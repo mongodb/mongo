@@ -42,57 +42,57 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
-    using std::vector;
+using std::endl;
+using std::string;
+using std::vector;
 
-    class OperationContext;
+class OperationContext;
 
-    const char * curNs = "in client mode";
+const char* curNs = "in client mode";
 
-    bool dbexitCalled = false;
-    // This mutex helps the shell serialize output on exit,
-    // to avoid deadlocks at shutdown.  So it also protects
-    // the global dbexitCalled.
-    namespace shell_utils {
-        mongo::mutex &mongoProgramOutputMutex(*(new mongo::mutex("mongoProgramOutputMutex")));
+bool dbexitCalled = false;
+// This mutex helps the shell serialize output on exit,
+// to avoid deadlocks at shutdown.  So it also protects
+// the global dbexitCalled.
+namespace shell_utils {
+mongo::mutex& mongoProgramOutputMutex(*(new mongo::mutex("mongoProgramOutputMutex")));
+}
+
+void dbexit(ExitCode returnCode, const char* whyMsg) {
+    {
+        mongo::mutex::scoped_lock lk(shell_utils::mongoProgramOutputMutex);
+        dbexitCalled = true;
     }
+    log() << "dbexit called" << endl;
+    if (whyMsg)
+        log() << " b/c " << whyMsg << endl;
+    log() << "exiting" << endl;
+    quickExit(returnCode);
+}
 
-    void dbexit( ExitCode returnCode, const char *whyMsg ) {
-        {
-            mongo::mutex::scoped_lock lk( shell_utils::mongoProgramOutputMutex );
-            dbexitCalled = true;
-        }
-        log() << "dbexit called" << endl;
-        if ( whyMsg )
-            log() << " b/c " << whyMsg << endl;
-        log() << "exiting" << endl;
-        quickExit( returnCode );
-    }
+bool inShutdown() {
+    return dbexitCalled;
+}
 
-    bool inShutdown() {
-        return dbexitCalled;
-    }
+bool haveLocalShardingInfo(const string& ns) {
+    return false;
+}
 
-    bool haveLocalShardingInfo( const string& ns ) {
-        return false;
-    }
+DBClientBase* createDirectClient(OperationContext* txn) {
+    uassert(10256, "no createDirectClient in clientOnly", 0);
+    return 0;
+}
 
-    DBClientBase* createDirectClient(OperationContext* txn) {
-        uassert( 10256 ,  "no createDirectClient in clientOnly" , 0 );
-        return 0;
-    }
+void Shard::getAllShards(vector<Shard>& all) {
+    verify(0);
+}
 
-    void Shard::getAllShards( vector<Shard>& all ) {
-        verify(0);
-    }
+bool Shard::isAShardNode(const string& ident) {
+    verify(0);
+    return false;
+}
 
-    bool Shard::isAShardNode( const string& ident ) {
-        verify(0);
-        return false;
-    }
-
-    ClientBasic* ClientBasic::getCurrent() {
-        return 0;
-    }
+ClientBasic* ClientBasic::getCurrent() {
+    return 0;
+}
 }

@@ -36,41 +36,45 @@
 
 namespace mongo {
 
-    // todo: rename this to ThreadSafeString or something
-    /** there is now one mutex per DiagStr.  If you have hundreds or millions of
-        DiagStrs you'll need to do something different.
-    */
-    class DiagStr {
-        mutable SpinLock m;
-        std::string _s;
-    public:
-        DiagStr(const DiagStr& r) : _s(r.get()) { }
-        DiagStr(const std::string& r) : _s(r) { }
-        DiagStr() { }
-        bool empty() const { 
-            scoped_spinlock lk(m);
-            return _s.empty();
-        }
-        std::string get() const {
-            scoped_spinlock lk(m);
-            return _s;
-        }
-        void set(const char *s) {
-            scoped_spinlock lk(m);
-            _s = s;
-        }
-        void set(const std::string& s) {
-            scoped_spinlock lk(m);
-            _s = s;
-        }
-        operator std::string() const { return get(); }
-        void operator=(const std::string& s) { set(s); }
-        void operator=(const DiagStr& rhs) { 
-            set( rhs.get() );
-        }
+// todo: rename this to ThreadSafeString or something
+/** there is now one mutex per DiagStr.  If you have hundreds or millions of
+    DiagStrs you'll need to do something different.
+*/
+class DiagStr {
+    mutable SpinLock m;
+    std::string _s;
 
-        // == is not defined.  use get() == ... instead.  done this way so one thinks about if composing multiple operations
-        bool operator==(const std::string& s) const;
-    };
+public:
+    DiagStr(const DiagStr& r) : _s(r.get()) {}
+    DiagStr(const std::string& r) : _s(r) {}
+    DiagStr() {}
+    bool empty() const {
+        scoped_spinlock lk(m);
+        return _s.empty();
+    }
+    std::string get() const {
+        scoped_spinlock lk(m);
+        return _s;
+    }
+    void set(const char* s) {
+        scoped_spinlock lk(m);
+        _s = s;
+    }
+    void set(const std::string& s) {
+        scoped_spinlock lk(m);
+        _s = s;
+    }
+    operator std::string() const {
+        return get();
+    }
+    void operator=(const std::string& s) {
+        set(s);
+    }
+    void operator=(const DiagStr& rhs) {
+        set(rhs.get());
+    }
 
+    // == is not defined.  use get() == ... instead.  done this way so one thinks about if composing multiple operations
+    bool operator==(const std::string& s) const;
+};
 }

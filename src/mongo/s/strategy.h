@@ -36,87 +36,82 @@
 
 namespace mongo {
 
-    class BatchItemRef;
+class BatchItemRef;
 
-    /**
-     * Legacy interface for processing client read/write/cmd requests.
-     */
-    class Strategy {
-    public:
+/**
+ * Legacy interface for processing client read/write/cmd requests.
+ */
+class Strategy {
+public:
+    Strategy() {}
 
-        Strategy() {}
+    void queryOp(Request& r);
 
-        void queryOp( Request& r );
+    void getMore(Request& r);
 
-        void getMore( Request& r );
+    void writeOp(int op, Request& r);
 
-        void writeOp( int op , Request& r );
-
-        struct CommandResult {
-            Shard shardTarget;
-            ConnectionString target;
-            BSONObj result;
-        };
-
-        /**
-         * Executes a command against a particular database, and targets the command based on a
-         * collection in that database.
-         *
-         * This version should be used by internal commands when possible.
-         *
-         * TODO: Replace these methods and all other methods of command dispatch with a more general
-         * command op framework.
-         */
-        void commandOp( const std::string& db,
-                        const BSONObj& command,
-                        int options,
-                        const std::string& versionedNS,
-                        const BSONObj& targetingQuery,
-                        std::vector<CommandResult>* results );
-
-        /**
-         * Executes a write command against a particular database, and targets the command based on
-         * a write operation.
-         *
-         * Does *not* retry or retarget if the metadata is stale.
-         *
-         * Similar to commandOp() above, but the targeting rules are different for writes than for
-         * reads.
-         */
-        Status commandOpWrite(const std::string& db,
-                              const BSONObj& command,
-                              BatchItemRef targetingBatchItem,
-                              std::vector<CommandResult>* results);
-
-        /**
-         * Some commands can only be run in a sharded configuration against a namespace that has
-         * not been sharded. Use this method to execute such commands.
-         *
-         * Does *not* retry or retarget if the metadata is stale.
-         *
-         * On success, fills in 'shardResult' with output from the namespace's primary shard. This
-         * output may itself indicate an error status on the shard.
-         */
-        Status commandOpUnsharded(const std::string& db,
-                                  const BSONObj& command,
-                                  int options,
-                                  const std::string& versionedNS,
-                                  CommandResult* shardResult);
-
-        /**
-         * Executes a command represented in the Request on the sharded cluster.
-         *
-         * DEPRECATED: should not be used by new code.
-         */
-        void clientCommandOp( Request& r );
-
-    protected:
-
-        bool handleSpecialNamespaces( Request& r , QueryMessage& q );
-
+    struct CommandResult {
+        Shard shardTarget;
+        ConnectionString target;
+        BSONObj result;
     };
 
-    extern Strategy* STRATEGY;
+    /**
+     * Executes a command against a particular database, and targets the command based on a
+     * collection in that database.
+     *
+     * This version should be used by internal commands when possible.
+     *
+     * TODO: Replace these methods and all other methods of command dispatch with a more general
+     * command op framework.
+     */
+    void commandOp(const std::string& db,
+                   const BSONObj& command,
+                   int options,
+                   const std::string& versionedNS,
+                   const BSONObj& targetingQuery,
+                   std::vector<CommandResult>* results);
 
+    /**
+     * Executes a write command against a particular database, and targets the command based on
+     * a write operation.
+     *
+     * Does *not* retry or retarget if the metadata is stale.
+     *
+     * Similar to commandOp() above, but the targeting rules are different for writes than for
+     * reads.
+     */
+    Status commandOpWrite(const std::string& db,
+                          const BSONObj& command,
+                          BatchItemRef targetingBatchItem,
+                          std::vector<CommandResult>* results);
+
+    /**
+     * Some commands can only be run in a sharded configuration against a namespace that has
+     * not been sharded. Use this method to execute such commands.
+     *
+     * Does *not* retry or retarget if the metadata is stale.
+     *
+     * On success, fills in 'shardResult' with output from the namespace's primary shard. This
+     * output may itself indicate an error status on the shard.
+     */
+    Status commandOpUnsharded(const std::string& db,
+                              const BSONObj& command,
+                              int options,
+                              const std::string& versionedNS,
+                              CommandResult* shardResult);
+
+    /**
+     * Executes a command represented in the Request on the sharded cluster.
+     *
+     * DEPRECATED: should not be used by new code.
+     */
+    void clientCommandOp(Request& r);
+
+protected:
+    bool handleSpecialNamespaces(Request& r, QueryMessage& q);
+};
+
+extern Strategy* STRATEGY;
 }
-

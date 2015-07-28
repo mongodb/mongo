@@ -36,40 +36,45 @@
 
 namespace {
 
-    using mongo::BSONObj;
-    using mongo::ConfigDiffTracker;
-    using std::string;
-    using std::pair;
-    using std::make_pair;
+using mongo::BSONObj;
+using mongo::ConfigDiffTracker;
+using std::string;
+using std::pair;
+using std::make_pair;
 
-    // XXX
-    // We'd move ChunkDiffUnitTest here
-    // We can check the queries it generates.
-    // We can check if is populating the attaching structures properly
-    //
+// XXX
+// We'd move ChunkDiffUnitTest here
+// We can check the queries it generates.
+// We can check if is populating the attaching structures properly
+//
 
-    // The default pass-through adapter for using config diffs.
-    class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj,string> {
-    public:
+// The default pass-through adapter for using config diffs.
+class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj, string> {
+public:
+    DefaultDiffAdapter() {}
+    virtual ~DefaultDiffAdapter() {}
 
-        DefaultDiffAdapter() {}
-        virtual ~DefaultDiffAdapter() {}
-
-        virtual bool isTracked(const BSONObj& chunkDoc) const { return true; }
-        virtual BSONObj maxFrom(const BSONObj& max) const { return max; }
-
-        virtual pair<BSONObj,BSONObj> rangeFor(const BSONObj& chunkDoc,
-                                               const BSONObj& min,
-                                               const BSONObj& max) const {
-            return make_pair(min, max);
-        }
-
-        virtual string shardFor(const string& name) const { return name; }
-    };
-
-    TEST(Basics, Simple) {
-        DefaultDiffAdapter differ;
-        ASSERT_TRUE(true);
+    virtual bool isTracked(const BSONObj& chunkDoc) const {
+        return true;
+    }
+    virtual BSONObj maxFrom(const BSONObj& max) const {
+        return max;
     }
 
-} // unnamed namespace
+    virtual pair<BSONObj, BSONObj> rangeFor(const BSONObj& chunkDoc,
+                                            const BSONObj& min,
+                                            const BSONObj& max) const {
+        return make_pair(min, max);
+    }
+
+    virtual string shardFor(const string& name) const {
+        return name;
+    }
+};
+
+TEST(Basics, Simple) {
+    DefaultDiffAdapter differ;
+    ASSERT_TRUE(true);
+}
+
+}  // unnamed namespace

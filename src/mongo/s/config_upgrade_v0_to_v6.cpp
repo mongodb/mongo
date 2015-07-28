@@ -40,61 +40,60 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
+using std::endl;
+using std::string;
 
-    using mongo::str::stream;
+using mongo::str::stream;
 
-    /**
-     * Upgrade v0 to v6 described here
-     *
-     * This upgrade takes the config server from empty to an initial version.
-     */
-    bool doUpgradeV0ToV6(const ConnectionString& configLoc,
-                         const VersionType& lastVersionInfo,
-                         string* errMsg)
-    {
-        string dummy;
-        if (!errMsg) errMsg = &dummy;
+/**
+ * Upgrade v0 to v6 described here
+ *
+ * This upgrade takes the config server from empty to an initial version.
+ */
+bool doUpgradeV0ToV6(const ConnectionString& configLoc,
+                     const VersionType& lastVersionInfo,
+                     string* errMsg) {
+    string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-        verify(lastVersionInfo.getCurrentVersion() == UpgradeHistory_EmptyVersion);
+    verify(lastVersionInfo.getCurrentVersion() == UpgradeHistory_EmptyVersion);
 
-        //
-        // Even though the initial config write is a single-document update, that single document
-        // is on multiple config servers and requests can interleave.  The upgrade lock prevents
-        // this.
-        //
+    //
+    // Even though the initial config write is a single-document update, that single document
+    // is on multiple config servers and requests can interleave.  The upgrade lock prevents
+    // this.
+    //
 
-        log() << "writing initial config version at v" << CURRENT_CONFIG_VERSION << endl;
+    log() << "writing initial config version at v" << CURRENT_CONFIG_VERSION << endl;
 
-        OID newClusterId = OID::gen();
+    OID newClusterId = OID::gen();
 
-        VersionType versionInfo;
+    VersionType versionInfo;
 
-        // Upgrade to new version
-        versionInfo.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
-        versionInfo.setCurrentVersion(CURRENT_CONFIG_VERSION);
-        versionInfo.setClusterId(newClusterId);
+    // Upgrade to new version
+    versionInfo.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
+    versionInfo.setCurrentVersion(CURRENT_CONFIG_VERSION);
+    versionInfo.setClusterId(newClusterId);
 
-        verify(versionInfo.isValid(NULL));
+    verify(versionInfo.isValid(NULL));
 
-        // If the cluster has not previously been initialized, we need to set the version before
-        // using so subsequent mongoses use the config data the same way.  This requires all three
-        // config servers online initially.
-        Status result = clusterUpdate(VersionType::ConfigNS, BSON("_id" << 1),
-                versionInfo.toBSON(),
-                true /* upsert */,
-                false /* multi */,
-                WriteConcernOptions::AllConfigs,
-                NULL);
+    // If the cluster has not previously been initialized, we need to set the version before
+    // using so subsequent mongoses use the config data the same way.  This requires all three
+    // config servers online initially.
+    Status result = clusterUpdate(VersionType::ConfigNS,
+                                  BSON("_id" << 1),
+                                  versionInfo.toBSON(),
+                                  true /* upsert */,
+                                  false /* multi */,
+                                  WriteConcernOptions::AllConfigs,
+                                  NULL);
 
-        if ( !result.isOK() ) {
-            *errMsg = stream() << "error writing initial config version: "
-                               << result.reason();
-            return false;
-        }
-
-        return true;
+    if (!result.isOK()) {
+        *errMsg = stream() << "error writing initial config version: " << result.reason();
+        return false;
     }
 
+    return true;
+}
 }

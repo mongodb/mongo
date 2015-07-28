@@ -28,16 +28,15 @@
 
 namespace mongo {
 
-    /**
-     * Returns true if the config servers have the same contents since the last check
-     * was performed. Currently checks only the config.chunks and config.databases.
-     */
-    bool isConfigServerConsistent();
+/**
+ * Returns true if the config servers have the same contents since the last check
+ * was performed. Currently checks only the config.chunks and config.databases.
+ */
+bool isConfigServerConsistent();
 
-    /**
-     * Starts the thread that periodically checks data consistency amongst the config servers.
-     * Note: this is not thread safe.
-     */
-    bool startConfigServerChecker();
+/**
+ * Starts the thread that periodically checks data consistency amongst the config servers.
+ * Note: this is not thread safe.
+ */
+bool startConfigServerChecker();
 }
-

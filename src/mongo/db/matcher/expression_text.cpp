@@ -33,62 +33,60 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    Status TextMatchExpression::init( const string& query, const string& language ) {
-        _query = query;
-        _language = language;
-        return initPath( "_fts" );
+Status TextMatchExpression::init(const string& query, const string& language) {
+    _query = query;
+    _language = language;
+    return initPath("_fts");
+}
+
+bool TextMatchExpression::matchesSingleElement(const BSONElement& e) const {
+    // See ops/update.cpp.
+    // This node is removed by the query planner.  It's only ever called if we're getting an
+    // elemMatchKey.
+    return true;
+}
+
+void TextMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << "TEXT : query=" << _query << ", language=" << _language << ", tag=";
+    MatchExpression::TagData* td = getTag();
+    if (NULL != td) {
+        td->debugString(&debug);
+    } else {
+        debug << "NULL";
     }
+    debug << "\n";
+}
 
-    bool TextMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        // See ops/update.cpp.
-        // This node is removed by the query planner.  It's only ever called if we're getting an
-        // elemMatchKey.
-        return true;
+void TextMatchExpression::toBSON(BSONObjBuilder* out) const {
+    out->append("$text", BSON("$search" << _query << "$language" << _language));
+}
+
+bool TextMatchExpression::equivalent(const MatchExpression* other) const {
+    if (matchType() != other->matchType()) {
+        return false;
     }
+    const TextMatchExpression* realOther = static_cast<const TextMatchExpression*>(other);
 
-    void TextMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace(debug, level);
-        debug << "TEXT : query=" << _query << ", language=" << _language << ", tag=";
-        MatchExpression::TagData* td = getTag();
-        if ( NULL != td ) {
-            td->debugString( &debug );
-        }
-        else {
-            debug << "NULL";
-        }
-        debug << "\n";
+    // TODO This is way too crude.  It looks for string equality, but it should be looking for
+    // common parsed form
+    if (realOther->getQuery() != _query) {
+        return false;
     }
-
-    void TextMatchExpression::toBSON(BSONObjBuilder* out) const {
-        out->append("$text", BSON("$search" << _query << "$language" << _language));
+    if (realOther->getLanguage() != _language) {
+        return false;
     }
+    return true;
+}
 
-    bool TextMatchExpression::equivalent( const MatchExpression* other ) const {
-        if ( matchType() != other->matchType() ) {
-            return false;
-        }
-        const TextMatchExpression* realOther = static_cast<const TextMatchExpression*>( other );
-
-        // TODO This is way too crude.  It looks for string equality, but it should be looking for
-        // common parsed form
-        if ( realOther->getQuery() != _query ) {
-            return false;
-        }
-        if ( realOther->getLanguage() != _language ) {
-            return false;
-        }
-        return true;
+LeafMatchExpression* TextMatchExpression::shallowClone() const {
+    TextMatchExpression* next = new TextMatchExpression();
+    next->init(_query, _language);
+    if (getTag()) {
+        next->setTag(getTag()->clone());
     }
-
-    LeafMatchExpression* TextMatchExpression::shallowClone() const {
-        TextMatchExpression* next = new TextMatchExpression();
-        next->init( _query, _language );
-        if ( getTag() ) {
-            next->setTag( getTag()->clone() );
-        }
-        return next;
-    }
-
+    return next;
+}
 }

@@ -37,33 +37,36 @@
 namespace mongo {
 namespace logger {
 
+/**
+ * Container for managing log domains.
+ *
+ * Use this while setting up the logging system, before launching any threads.
+ */
+class LogManager {
+    MONGO_DISALLOW_COPYING(LogManager);
+
+public:
+    LogManager();
+    ~LogManager();
+
     /**
-     * Container for managing log domains.
-     *
-     * Use this while setting up the logging system, before launching any threads.
+     * Gets the global domain for this manager.  It has no name.
      */
-    class LogManager {
-        MONGO_DISALLOW_COPYING(LogManager);
-    public:
-        LogManager();
-        ~LogManager();
+    ComponentMessageLogDomain* getGlobalDomain() {
+        return &_globalDomain;
+    }
 
-        /**
-         * Gets the global domain for this manager.  It has no name.
-         */
-        ComponentMessageLogDomain* getGlobalDomain() { return &_globalDomain; }
+    /**
+     * Get the log domain with the given name, creating if needed.
+     */
+    MessageLogDomain* getNamedDomain(const std::string& name);
 
-        /**
-         * Get the log domain with the given name, creating if needed.
-         */
-        MessageLogDomain* getNamedDomain(const std::string& name);
+private:
+    typedef unordered_map<std::string, MessageLogDomain*> DomainsByNameMap;
 
-    private:
-        typedef unordered_map<std::string, MessageLogDomain*> DomainsByNameMap;
-
-        DomainsByNameMap _domains;
-        ComponentMessageLogDomain _globalDomain;
-    };
+    DomainsByNameMap _domains;
+    ComponentMessageLogDomain _globalDomain;
+};
 
 }  // namespace logger
 }  // namespace mongo

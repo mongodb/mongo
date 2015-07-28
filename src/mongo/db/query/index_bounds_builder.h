@@ -36,161 +36,158 @@
 
 namespace mongo {
 
+/**
+ * Translates expressions over fields into bounds on an index.
+ */
+class IndexBoundsBuilder {
+public:
     /**
-     * Translates expressions over fields into bounds on an index.
+     * Describes various degrees of precision with which predicates can be evaluated based
+     * on the index bounds.
+     *
+     * The integer values of the enum are significant, and are assigned in order of
+     * increasing tightness. These values are used when we need to do comparison between two
+     * BoundsTightness values. Such comparisons can answer questions such as "Does predicate
+     * X have tighter or looser bounds than predicate Y?".
      */
-    class IndexBoundsBuilder {
-    public:
-        /**
-         * Describes various degrees of precision with which predicates can be evaluated based
-         * on the index bounds.
-         *
-         * The integer values of the enum are significant, and are assigned in order of
-         * increasing tightness. These values are used when we need to do comparison between two
-         * BoundsTightness values. Such comparisons can answer questions such as "Does predicate
-         * X have tighter or looser bounds than predicate Y?".
-         */
-        enum BoundsTightness {
-            // Index bounds are inexact, and a fetch is required.
-            INEXACT_FETCH = 0,
+    enum BoundsTightness {
+        // Index bounds are inexact, and a fetch is required.
+        INEXACT_FETCH = 0,
 
-            // Index bounds are inexact, but no fetch is required
-            INEXACT_COVERED = 1,
+        // Index bounds are inexact, but no fetch is required
+        INEXACT_COVERED = 1,
 
-            // Index bounds are exact.
-            EXACT = 2
-        };
+        // Index bounds are exact.
+        EXACT = 2
+    };
 
-        /**
-         * Populate the provided O.I.L. with one interval goes from MinKey to MaxKey (or vice-versa
-         * depending on the index direction).
-         */
-        static void allValuesForField(const BSONElement& elt, OrderedIntervalList* out);
+    /**
+     * Populate the provided O.I.L. with one interval goes from MinKey to MaxKey (or vice-versa
+     * depending on the index direction).
+     */
+    static void allValuesForField(const BSONElement& elt, OrderedIntervalList* out);
 
-        /**
-         * Turn the MatchExpression in 'expr' into a set of index bounds.  The field that 'expr' is
-         * concerned with is indexed according to the keypattern element 'elt' from index 'index'.
-         *
-         * If 'expr' is elemMatch, the index tag is affixed to a child.
-         *
-         * The expression must be a predicate over one field.  That is, expr->isLeaf() or
-         * expr->isArray() must be true, and expr->isLogical() must be false.  
-         */
-        static void translate(const MatchExpression* expr,
-                              const BSONElement& elt,
-                              const IndexEntry& index,
-                              OrderedIntervalList* oilOut,
-                              BoundsTightness* tightnessOut);
+    /**
+     * Turn the MatchExpression in 'expr' into a set of index bounds.  The field that 'expr' is
+     * concerned with is indexed according to the keypattern element 'elt' from index 'index'.
+     *
+     * If 'expr' is elemMatch, the index tag is affixed to a child.
+     *
+     * The expression must be a predicate over one field.  That is, expr->isLeaf() or
+     * expr->isArray() must be true, and expr->isLogical() must be false.
+     */
+    static void translate(const MatchExpression* expr,
+                          const BSONElement& elt,
+                          const IndexEntry& index,
+                          OrderedIntervalList* oilOut,
+                          BoundsTightness* tightnessOut);
 
-        /**
-         * Creates bounds for 'expr' (indexed according to 'elt').  Intersects those bounds
-         * with the bounds in oilOut, which is an in/out parameter.
-         */
-        static void translateAndIntersect(const MatchExpression* expr,
-                                          const BSONElement& elt,
-                                          const IndexEntry& index,
-                                          OrderedIntervalList* oilOut,
-                                          BoundsTightness* tightnessOut);
-
-        /**
-         * Creates bounds for 'expr' (indexed according to 'elt').  Unions those bounds
-         * with the bounds in oilOut, which is an in/out parameter.
-         */
-        static void translateAndUnion(const MatchExpression* expr,
+    /**
+     * Creates bounds for 'expr' (indexed according to 'elt').  Intersects those bounds
+     * with the bounds in oilOut, which is an in/out parameter.
+     */
+    static void translateAndIntersect(const MatchExpression* expr,
                                       const BSONElement& elt,
                                       const IndexEntry& index,
                                       OrderedIntervalList* oilOut,
                                       BoundsTightness* tightnessOut);
 
-        /**
-         * Make a range interval from the provided object.
-         * The object must have exactly two fields.  The first field is the start, the second the
-         * end.
-         * The two inclusive flags indicate whether or not the start/end fields are included in the
-         * interval (closed interval if included, open if not).
-         */
-        static Interval makeRangeInterval(const BSONObj& obj,
-                                          bool startInclusive,
-                                          bool endInclusive);
-
-        static Interval makeRangeInterval(const std::string& start,
-                                          const std::string& end,
-                                          bool startInclusive,
-                                          bool endInclusive);
-
-        /**
-         * Make a point interval from the provided object.
-         * The object must have exactly one field which is the value of the point interval.
-         */
-        static Interval makePointInterval(const BSONObj& obj);
-        static Interval makePointInterval(const std::string& str);
-        static Interval makePointInterval(double d);
-
-        /**
-         * Since we have no BSONValue we must make an object that's a copy of a piece of another
-         * object.
-         */
-        static BSONObj objFromElement(const BSONElement& elt);
-
-        /**
-         * Swap start/end in the provided interval.
-         */
-        static void reverseInterval(Interval* ival);
-
-        /**
-         * Copied almost verbatim from db/queryutil.cpp.
-         *
-         *  returns a std::string that when used as a matcher, would match a super set of regex()
-         *
-         *  returns "" for complex regular expressions
-         *
-         *  used to optimize queries in some simple regex cases that start with '^'
-         */
-        static std::string simpleRegex(const char* regex,
-                                  const char* flags,
+    /**
+     * Creates bounds for 'expr' (indexed according to 'elt').  Unions those bounds
+     * with the bounds in oilOut, which is an in/out parameter.
+     */
+    static void translateAndUnion(const MatchExpression* expr,
+                                  const BSONElement& elt,
+                                  const IndexEntry& index,
+                                  OrderedIntervalList* oilOut,
                                   BoundsTightness* tightnessOut);
 
-        /**
-         * Returns an Interval from minKey to maxKey
-         */
-        static Interval allValues();
+    /**
+     * Make a range interval from the provided object.
+     * The object must have exactly two fields.  The first field is the start, the second the
+     * end.
+     * The two inclusive flags indicate whether or not the start/end fields are included in the
+     * interval (closed interval if included, open if not).
+     */
+    static Interval makeRangeInterval(const BSONObj& obj, bool startInclusive, bool endInclusive);
 
-        static void translateRegex(const RegexMatchExpression* rme,
-                                   OrderedIntervalList* oil,
+    static Interval makeRangeInterval(const std::string& start,
+                                      const std::string& end,
+                                      bool startInclusive,
+                                      bool endInclusive);
+
+    /**
+     * Make a point interval from the provided object.
+     * The object must have exactly one field which is the value of the point interval.
+     */
+    static Interval makePointInterval(const BSONObj& obj);
+    static Interval makePointInterval(const std::string& str);
+    static Interval makePointInterval(double d);
+
+    /**
+     * Since we have no BSONValue we must make an object that's a copy of a piece of another
+     * object.
+     */
+    static BSONObj objFromElement(const BSONElement& elt);
+
+    /**
+     * Swap start/end in the provided interval.
+     */
+    static void reverseInterval(Interval* ival);
+
+    /**
+     * Copied almost verbatim from db/queryutil.cpp.
+     *
+     *  returns a std::string that when used as a matcher, would match a super set of regex()
+     *
+     *  returns "" for complex regular expressions
+     *
+     *  used to optimize queries in some simple regex cases that start with '^'
+     */
+    static std::string simpleRegex(const char* regex,
+                                   const char* flags,
                                    BoundsTightness* tightnessOut);
 
-        static void translateEquality(const BSONElement& data,
-                                      bool isHashed,
-                                      OrderedIntervalList* oil,
-                                      BoundsTightness* tightnessOut);
+    /**
+     * Returns an Interval from minKey to maxKey
+     */
+    static Interval allValues();
 
-        static void unionize(OrderedIntervalList* oilOut);
-        static void intersectize(const OrderedIntervalList& arg,
-                                 OrderedIntervalList* oilOut);
+    static void translateRegex(const RegexMatchExpression* rme,
+                               OrderedIntervalList* oil,
+                               BoundsTightness* tightnessOut);
 
-        /**
-         * Fills out 'bounds' with the bounds for an index scan over all values of the
-         * index described by 'keyPattern' in the default forward direction.
-         */
-        static void allValuesBounds(const BSONObj& keyPattern, IndexBounds* bounds);
+    static void translateEquality(const BSONElement& data,
+                                  bool isHashed,
+                                  OrderedIntervalList* oil,
+                                  BoundsTightness* tightnessOut);
 
-        /**
-         * Assumes each OIL in 'bounds' is increasing.
-         *
-         * Aligns OILs (and bounds) according to the 'kp' direction * the scanDir.
-         */
-        static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
+    static void unionize(OrderedIntervalList* oilOut);
+    static void intersectize(const OrderedIntervalList& arg, OrderedIntervalList* oilOut);
 
-        /**
-         * Returns 'true' if the bounds 'bounds' can be represented as one interval between
-         * 'startKey' and 'endKey'.  Inclusivity of each bound is set through the relevant
-         * (name)KeyInclusive parameter.  Returns 'false' if otherwise.
-         */
-        static bool isSingleInterval(const IndexBounds& bounds,
-                                     BSONObj* startKey,
-                                     bool* startKeyInclusive,
-                                     BSONObj* endKey,
-                                     bool* endKeyInclusive);
-    };
+    /**
+     * Fills out 'bounds' with the bounds for an index scan over all values of the
+     * index described by 'keyPattern' in the default forward direction.
+     */
+    static void allValuesBounds(const BSONObj& keyPattern, IndexBounds* bounds);
+
+    /**
+     * Assumes each OIL in 'bounds' is increasing.
+     *
+     * Aligns OILs (and bounds) according to the 'kp' direction * the scanDir.
+     */
+    static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
+
+    /**
+     * Returns 'true' if the bounds 'bounds' can be represented as one interval between
+     * 'startKey' and 'endKey'.  Inclusivity of each bound is set through the relevant
+     * (name)KeyInclusive parameter.  Returns 'false' if otherwise.
+     */
+    static bool isSingleInterval(const IndexBounds& bounds,
+                                 BSONObj* startKey,
+                                 bool* startKeyInclusive,
+                                 BSONObj* endKey,
+                                 bool* endKeyInclusive);
+};
 
 }  // namespace mongo

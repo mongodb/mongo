@@ -33,8 +33,7 @@
 namespace mongo {
 namespace stdx {
 
-    using std::list;
+using std::list;
 
 }  // namespace stdx
 }  // namespace mongo
-

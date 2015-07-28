@@ -37,74 +37,71 @@
 
 namespace mongo {
 
-    class DevNullKVEngine : public KVEngine {
-    public:
-        virtual ~DevNullKVEngine(){}
+class DevNullKVEngine : public KVEngine {
+public:
+    virtual ~DevNullKVEngine() {}
 
-        virtual RecoveryUnit* newRecoveryUnit() {
-            return new RecoveryUnitNoop();
-        }
+    virtual RecoveryUnit* newRecoveryUnit() {
+        return new RecoveryUnitNoop();
+    }
 
-        virtual Status createRecordStore( OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& ident,
-                                          const CollectionOptions& options ) {
-            return Status::OK();
-        }
+    virtual Status createRecordStore(OperationContext* opCtx,
+                                     const StringData& ns,
+                                     const StringData& ident,
+                                     const CollectionOptions& options) {
+        return Status::OK();
+    }
 
-        virtual RecordStore* getRecordStore( OperationContext* opCtx,
-                                             const StringData& ns,
+    virtual RecordStore* getRecordStore(OperationContext* opCtx,
+                                        const StringData& ns,
+                                        const StringData& ident,
+                                        const CollectionOptions& options);
+
+    virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              const StringData& ident,
-                                             const CollectionOptions& options );
+                                             const IndexDescriptor* desc) {
+        return Status::OK();
+    }
 
-        virtual Status createSortedDataInterface( OperationContext* opCtx,
-                                                  const StringData& ident,
-                                                  const IndexDescriptor* desc ) {
-            return Status::OK();
-        }
+    virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
+                                                        const StringData& ident,
+                                                        const IndexDescriptor* desc);
 
-        virtual SortedDataInterface* getSortedDataInterface( OperationContext* opCtx,
-                                                             const StringData& ident,
-                                                             const IndexDescriptor* desc );
+    virtual Status dropIdent(OperationContext* opCtx, const StringData& ident) {
+        return Status::OK();
+    }
 
-        virtual Status dropIdent( OperationContext* opCtx,
-                                  const StringData& ident ) {
-            return Status::OK();
-        }
+    virtual bool supportsDocLocking() const {
+        return true;
+    }
 
-        virtual bool supportsDocLocking() const {
-            return true;
-        }
+    virtual bool supportsDirectoryPerDB() const {
+        return false;
+    }
 
-        virtual bool supportsDirectoryPerDB() const {
-            return false;
-        }
+    virtual bool isDurable() const {
+        return true;
+    }
 
-        virtual bool isDurable() const {
-            return true;
-        }
+    virtual int64_t getIdentSize(OperationContext* opCtx, const StringData& ident) {
+        return 1;
+    }
 
-        virtual int64_t getIdentSize( OperationContext* opCtx,
-                                      const StringData& ident ) {
-            return 1;
-        }
+    virtual Status repairIdent(OperationContext* opCtx, const StringData& ident) {
+        return Status::OK();
+    }
 
-        virtual Status repairIdent( OperationContext* opCtx,
-                                    const StringData& ident ) {
-            return Status::OK();
-        }
+    virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const {
+        return true;
+    }
 
-        virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const {
-            return true;
-        }
+    std::vector<std::string> getAllIdents(OperationContext* opCtx) const {
+        return std::vector<std::string>();
+    }
 
-        std::vector<std::string> getAllIdents( OperationContext* opCtx ) const {
-            return std::vector<std::string>();
-        }
+    virtual void cleanShutdown(){};
 
-        virtual void cleanShutdown() {};
-
-    private:
-        boost::shared_ptr<void> _catalogInfo;
-    };
+private:
+    boost::shared_ptr<void> _catalogInfo;
+};
 }

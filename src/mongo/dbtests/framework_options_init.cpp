@@ -35,29 +35,28 @@
 #include "mongo/util/quick_exit.h"
 
 namespace mongo {
-    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(FrameworkOptions)(InitializerContext* context) {
-        return addTestFrameworkOptions(&moe::startupOptions);
-    }
+MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(FrameworkOptions)(InitializerContext* context) {
+    return addTestFrameworkOptions(&moe::startupOptions);
+}
 
-    MONGO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
-        if (!handlePreValidationTestFrameworkOptions(moe::startupOptionsParsed, context->args())) {
-            quickExit(EXIT_SUCCESS);
-        }
-        Status ret = moe::startupOptionsParsed.validate();
-        if (!ret.isOK()) {
-            return ret;
-        }
-        return Status::OK();
+MONGO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
+    if (!handlePreValidationTestFrameworkOptions(moe::startupOptionsParsed, context->args())) {
+        quickExit(EXIT_SUCCESS);
     }
+    Status ret = moe::startupOptionsParsed.validate();
+    if (!ret.isOK()) {
+        return ret;
+    }
+    return Status::OK();
+}
 
-    MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
-        Status ret = storeTestFrameworkOptions(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            std::cerr << ret.toString() << std::endl;
-            std::cerr << "try '" << context->args()[0] << " --help' for more information"
-                      << std::endl;
-            quickExit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
+MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
+    Status ret = storeTestFrameworkOptions(moe::startupOptionsParsed, context->args());
+    if (!ret.isOK()) {
+        std::cerr << ret.toString() << std::endl;
+        std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
+        quickExit(EXIT_BADOPTIONS);
     }
+    return Status::OK();
+}
 }

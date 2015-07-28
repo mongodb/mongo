@@ -38,29 +38,26 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+using boost::shared_ptr;
 
-    class InMemoryHarnessHelper : public HarnessHelper {
-    public:
-        InMemoryHarnessHelper()
-            : _order( Ordering::make( BSONObj() ) ) {
-        }
+class InMemoryHarnessHelper : public HarnessHelper {
+public:
+    InMemoryHarnessHelper() : _order(Ordering::make(BSONObj())) {}
 
-        virtual SortedDataInterface* newSortedDataInterface( bool unique ) {
-            return getInMemoryBtreeImpl(_order, &_data);
-        }
-
-        virtual RecoveryUnit* newRecoveryUnit() {
-            return new InMemoryRecoveryUnit();
-        }
-
-    private:
-        shared_ptr<void> _data; // used by InMemoryBtreeImpl
-        Ordering _order;
-    };
-
-    HarnessHelper* newHarnessHelper() {
-        return new InMemoryHarnessHelper();
+    virtual SortedDataInterface* newSortedDataInterface(bool unique) {
+        return getInMemoryBtreeImpl(_order, &_data);
     }
 
+    virtual RecoveryUnit* newRecoveryUnit() {
+        return new InMemoryRecoveryUnit();
+    }
+
+private:
+    shared_ptr<void> _data;  // used by InMemoryBtreeImpl
+    Ordering _order;
+};
+
+HarnessHelper* newHarnessHelper() {
+    return new InMemoryHarnessHelper();
+}
 }

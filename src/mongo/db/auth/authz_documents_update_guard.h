@@ -33,37 +33,38 @@
 
 namespace mongo {
 
-    class AuthorizationManager;
+class AuthorizationManager;
 
-    /*
-     * Guard object for locking the lock that serializes all writes to the persistent authorization
-     * documents.
+/*
+ * Guard object for locking the lock that serializes all writes to the persistent authorization
+ * documents.
+ */
+class AuthzDocumentsUpdateGuard {
+    MONGO_DISALLOW_COPYING(AuthzDocumentsUpdateGuard);
+
+public:
+    explicit AuthzDocumentsUpdateGuard(AuthorizationManager* authzManager);
+    ~AuthzDocumentsUpdateGuard();
+
+    /**
+     * Tries to acquire the global lock guarding modifications to all persistent data related
+     * to authorization, namely the admin.system.users, admin.system.roles, and
+     * admin.system.version collections.  This serializes all writers to the authorization
+     * documents, but does not impact readers.
+     * Returns whether or not it was successful at acquiring the lock.
      */
-    class AuthzDocumentsUpdateGuard {
-        MONGO_DISALLOW_COPYING(AuthzDocumentsUpdateGuard);
-    public:
-        explicit AuthzDocumentsUpdateGuard(AuthorizationManager* authzManager);
-        ~AuthzDocumentsUpdateGuard();
+    bool tryLock(const StringData& why);
 
-        /**
-         * Tries to acquire the global lock guarding modifications to all persistent data related
-         * to authorization, namely the admin.system.users, admin.system.roles, and
-         * admin.system.version collections.  This serializes all writers to the authorization
-         * documents, but does not impact readers.
-         * Returns whether or not it was successful at acquiring the lock.
-         */
-        bool tryLock(const StringData& why);
+    /**
+     * Releases the lock guarding modifications to persistent authorization data, which must
+     * already be held.
+     */
+    void unlock();
 
-        /**
-         * Releases the lock guarding modifications to persistent authorization data, which must
-         * already be held.
-         */
-        void unlock();
+private:
+    AuthorizationManager* _authzManager;
+    // True if the Guard has locked the lock that guards modifications to authz documents.
+    bool _lockedForUpdate;
+};
 
-    private:
-        AuthorizationManager* _authzManager;
-        // True if the Guard has locked the lock that guards modifications to authz documents.
-        bool _lockedForUpdate;
-    };
-
-} // namespace mongo
+}  // namespace mongo

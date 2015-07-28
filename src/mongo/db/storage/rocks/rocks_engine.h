@@ -54,139 +54,154 @@
 #include "rocks_transaction.h"
 
 namespace rocksdb {
-    class ColumnFamilyHandle;
-    struct ColumnFamilyDescriptor;
-    struct ColumnFamilyOptions;
-    class DB;
-    class Comparator;
-    class Iterator;
-    struct Options;
-    struct ReadOptions;
+class ColumnFamilyHandle;
+struct ColumnFamilyDescriptor;
+struct ColumnFamilyOptions;
+class DB;
+class Comparator;
+class Iterator;
+struct Options;
+struct ReadOptions;
 }
 
 namespace mongo {
 
-    struct CollectionOptions;
-    class RocksIndexBase;
-    class RocksRecordStore;
+struct CollectionOptions;
+class RocksIndexBase;
+class RocksRecordStore;
 
-    class RocksEngine : public KVEngine {
-        MONGO_DISALLOW_COPYING( RocksEngine );
-    public:
-        RocksEngine(const std::string& path, bool durable);
-        virtual ~RocksEngine();
+class RocksEngine : public KVEngine {
+    MONGO_DISALLOW_COPYING(RocksEngine);
 
-        virtual RecoveryUnit* newRecoveryUnit() override;
+public:
+    RocksEngine(const std::string& path, bool durable);
+    virtual ~RocksEngine();
 
-        virtual Status createRecordStore(OperationContext* opCtx,
-                                         const StringData& ns,
-                                         const StringData& ident,
-                                         const CollectionOptions& options) override;
+    virtual RecoveryUnit* newRecoveryUnit() override;
 
-        virtual RecordStore* getRecordStore(OperationContext* opCtx, const StringData& ns,
-                                            const StringData& ident,
-                                            const CollectionOptions& options) override;
+    virtual Status createRecordStore(OperationContext* opCtx,
+                                     const StringData& ns,
+                                     const StringData& ident,
+                                     const CollectionOptions& options) override;
 
-        virtual Status createSortedDataInterface(OperationContext* opCtx, const StringData& ident,
-                                                 const IndexDescriptor* desc) override;
+    virtual RecordStore* getRecordStore(OperationContext* opCtx,
+                                        const StringData& ns,
+                                        const StringData& ident,
+                                        const CollectionOptions& options) override;
 
-        virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
-                                                            const StringData& ident,
-                                                            const IndexDescriptor* desc) override;
+    virtual Status createSortedDataInterface(OperationContext* opCtx,
+                                             const StringData& ident,
+                                             const IndexDescriptor* desc) override;
 
-        virtual Status dropIdent(OperationContext* opCtx, const StringData& ident) override;
+    virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
+                                                        const StringData& ident,
+                                                        const IndexDescriptor* desc) override;
 
-        virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const override;
+    virtual Status dropIdent(OperationContext* opCtx, const StringData& ident) override;
 
-        virtual std::vector<std::string> getAllIdents( OperationContext* opCtx ) const override;
+    virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const override;
 
-        virtual bool supportsDocLocking() const override {
-            return true;
-        }
+    virtual std::vector<std::string> getAllIdents(OperationContext* opCtx) const override;
 
-        virtual bool supportsDirectoryPerDB() const override {
-            return false;
-        }
+    virtual bool supportsDocLocking() const override {
+        return true;
+    }
 
-        virtual bool isDurable() const override { return _durable; }
+    virtual bool supportsDirectoryPerDB() const override {
+        return false;
+    }
 
-        virtual int64_t getIdentSize(OperationContext* opCtx, const StringData& ident);
+    virtual bool isDurable() const override {
+        return _durable;
+    }
 
-        virtual Status repairIdent(OperationContext* opCtx,
-                                    const StringData& ident) {
-            return Status::OK();
-        }
+    virtual int64_t getIdentSize(OperationContext* opCtx, const StringData& ident);
 
-        virtual void cleanShutdown();
+    virtual Status repairIdent(OperationContext* opCtx, const StringData& ident) {
+        return Status::OK();
+    }
 
-        /**
-         * Initializes a background job to remove excess documents in the oplog collections.
-         * This applies to the capped collections in the local.oplog.* namespaces (specifically
-         * local.oplog.rs for replica sets and local.oplog.$main for master/slave replication).
-         * Returns true if a background job is running for the namespace.
-         */
-        static bool initRsOplogBackgroundThread(StringData ns);
+    virtual void cleanShutdown();
 
-        // rocks specific api
+    /**
+     * Initializes a background job to remove excess documents in the oplog collections.
+     * This applies to the capped collections in the local.oplog.* namespaces (specifically
+     * local.oplog.rs for replica sets and local.oplog.$main for master/slave replication).
+     * Returns true if a background job is running for the namespace.
+     */
+    static bool initRsOplogBackgroundThread(StringData ns);
 
-        rocksdb::DB* getDB() { return _db.get(); }
-        const rocksdb::DB* getDB() const { return _db.get(); }
-        size_t getBlockCacheUsage() const { return _block_cache->GetUsage(); }
-        std::shared_ptr<rocksdb::Cache> getBlockCache() { return _block_cache; }
-        std::unordered_set<uint32_t> getDroppedPrefixes() const;
+    // rocks specific api
 
-        RocksTransactionEngine* getTransactionEngine() { return &_transactionEngine; }
+    rocksdb::DB* getDB() {
+        return _db.get();
+    }
+    const rocksdb::DB* getDB() const {
+        return _db.get();
+    }
+    size_t getBlockCacheUsage() const {
+        return _block_cache->GetUsage();
+    }
+    std::shared_ptr<rocksdb::Cache> getBlockCache() {
+        return _block_cache;
+    }
+    std::unordered_set<uint32_t> getDroppedPrefixes() const;
 
-        int getMaxWriteMBPerSec() const { return _maxWriteMBPerSec; }
-        void setMaxWriteMBPerSec(int maxWriteMBPerSec);
+    RocksTransactionEngine* getTransactionEngine() {
+        return &_transactionEngine;
+    }
 
-        Status backup(const std::string& path);
+    int getMaxWriteMBPerSec() const {
+        return _maxWriteMBPerSec;
+    }
+    void setMaxWriteMBPerSec(int maxWriteMBPerSec);
 
-    private:
-        Status _createIdentPrefix(const StringData& ident);
-        std::string _getIdentPrefix(const StringData& ident);
+    Status backup(const std::string& path);
 
-        rocksdb::Options _options() const;
+private:
+    Status _createIdentPrefix(const StringData& ident);
+    std::string _getIdentPrefix(const StringData& ident);
 
-        std::string _path;
-        boost::scoped_ptr<rocksdb::DB> _db;
-        std::shared_ptr<rocksdb::Cache> _block_cache;
-        int _maxWriteMBPerSec;
-        std::shared_ptr<rocksdb::RateLimiter> _rateLimiter;
+    rocksdb::Options _options() const;
 
-        const bool _durable;
+    std::string _path;
+    boost::scoped_ptr<rocksdb::DB> _db;
+    std::shared_ptr<rocksdb::Cache> _block_cache;
+    int _maxWriteMBPerSec;
+    std::shared_ptr<rocksdb::RateLimiter> _rateLimiter;
 
-        // ident prefix map stores mapping from ident to a prefix (uint32_t)
-        mutable boost::mutex _identPrefixMapMutex;
-        typedef StringMap<uint32_t> IdentPrefixMap;
-        IdentPrefixMap _identPrefixMap;
-        std::string _oplogIdent;
+    const bool _durable;
 
-        // protected by _identPrefixMapMutex
-        uint32_t _maxPrefix;
+    // ident prefix map stores mapping from ident to a prefix (uint32_t)
+    mutable boost::mutex _identPrefixMapMutex;
+    typedef StringMap<uint32_t> IdentPrefixMap;
+    IdentPrefixMap _identPrefixMap;
+    std::string _oplogIdent;
 
-        // _identObjectMapMutex protects both _identIndexMap and _identCollectionMap. It should
-        // never be locked together with _identPrefixMapMutex
-        mutable boost::mutex _identObjectMapMutex;
-        // mapping from ident --> index object. we don't own the object
-        StringMap<RocksIndexBase*> _identIndexMap;
-        // mapping from ident --> collection object
-        StringMap<RocksRecordStore*> _identCollectionMap;
+    // protected by _identPrefixMapMutex
+    uint32_t _maxPrefix;
 
-        // set of all prefixes that are deleted. we delete them in the background thread
-        mutable boost::mutex _droppedPrefixesMutex;
-        std::unordered_set<uint32_t> _droppedPrefixes;
+    // _identObjectMapMutex protects both _identIndexMap and _identCollectionMap. It should
+    // never be locked together with _identPrefixMapMutex
+    mutable boost::mutex _identObjectMapMutex;
+    // mapping from ident --> index object. we don't own the object
+    StringMap<RocksIndexBase*> _identIndexMap;
+    // mapping from ident --> collection object
+    StringMap<RocksRecordStore*> _identCollectionMap;
 
-        // This is for concurrency control
-        RocksTransactionEngine _transactionEngine;
+    // set of all prefixes that are deleted. we delete them in the background thread
+    mutable boost::mutex _droppedPrefixesMutex;
+    std::unordered_set<uint32_t> _droppedPrefixes;
 
-        // CounterManages manages counters like numRecords and dataSize for record stores
-        boost::scoped_ptr<RocksCounterManager> _counterManager;
+    // This is for concurrency control
+    RocksTransactionEngine _transactionEngine;
 
-        boost::scoped_ptr<RocksCompactionScheduler> _compactionScheduler;
+    // CounterManages manages counters like numRecords and dataSize for record stores
+    boost::scoped_ptr<RocksCounterManager> _counterManager;
 
-        static const std::string kMetadataPrefix;
-        static const std::string kDroppedPrefix;
-    };
+    boost::scoped_ptr<RocksCompactionScheduler> _compactionScheduler;
 
+    static const std::string kMetadataPrefix;
+    static const std::string kDroppedPrefix;
+};
 }

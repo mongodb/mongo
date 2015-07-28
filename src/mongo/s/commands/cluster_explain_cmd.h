@@ -32,55 +32,66 @@
 
 namespace mongo {
 
-    /**
-     * Implements the explain command on mongos.
-     *
-     * "Old-style" explains (i.e. queries which have the $explain flag set), do not run
-     * through this path. Such explains will be supported for backwards compatibility,
-     * and must succeed in multiversion clusters.
-     *
-     * "New-style" explains use the explain command. When the explain command is routed
-     * through mongos, it is forwarded to all relevant shards. If *any* shard does not
-     * support a new-style explain, then the entire explain will fail (i.e. new-style
-     * explains cannot be used in multiversion clusters).
-     */
-    class ClusterExplainCmd : public Command {
+/**
+ * Implements the explain command on mongos.
+ *
+ * "Old-style" explains (i.e. queries which have the $explain flag set), do not run
+ * through this path. Such explains will be supported for backwards compatibility,
+ * and must succeed in multiversion clusters.
+ *
+ * "New-style" explains use the explain command. When the explain command is routed
+ * through mongos, it is forwarded to all relevant shards. If *any* shard does not
+ * support a new-style explain, then the entire explain will fail (i.e. new-style
+ * explains cannot be used in multiversion clusters).
+ */
+class ClusterExplainCmd : public Command {
     MONGO_DISALLOW_COPYING(ClusterExplainCmd);
-    public:
-        ClusterExplainCmd() : Command("explain") { }
 
-        virtual bool isWriteCommandForConfigServer() const { return false; }
+public:
+    ClusterExplainCmd() : Command("explain") {}
 
-        /**
-         * Running an explain on a secondary requires explicitly setting slaveOk.
-         */
-        virtual bool slaveOk() const { return false; }
-        virtual bool slaveOverrideOk() const { return true; }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual bool maintenanceOk() const { return false; }
+    /**
+     * Running an explain on a secondary requires explicitly setting slaveOk.
+     */
+    virtual bool slaveOk() const {
+        return false;
+    }
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
 
-        virtual bool adminOnly() const { return false; }
+    virtual bool maintenanceOk() const {
+        return false;
+    }
 
-        virtual void help( std::stringstream& help ) const {
-            help << "explain database reads and writes";
-        }
+    virtual bool adminOnly() const {
+        return false;
+    }
 
-        /**
-         * You are authorized to run an explain if you are authorized to run
-         * the command that you are explaining. The auth check is performed recursively
-         * on the nested command.
-         */
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj);
+    virtual void help(std::stringstream& help) const {
+        help << "explain database reads and writes";
+    }
 
-        virtual bool run(OperationContext* txn, const std::string& dbName,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl);
+    /**
+     * You are authorized to run an explain if you are authorized to run
+     * the command that you are explaining. The auth check is performed recursively
+     * on the nested command.
+     */
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj);
 
-    };
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbName,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result,
+                     bool fromRepl);
+};
 
-} // namespace mongo
+}  // namespace mongo

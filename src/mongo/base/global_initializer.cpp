@@ -31,17 +31,17 @@
 
 namespace mongo {
 
-    Initializer& getGlobalInitializer() {
-        static Initializer theGlobalInitializer;
-        return theGlobalInitializer;
-    }
+Initializer& getGlobalInitializer() {
+    static Initializer theGlobalInitializer;
+    return theGlobalInitializer;
+}
 
 namespace {
 
-    // Make sure that getGlobalInitializer() is called at least once before main(), and so at least
-    // once in a single-threaded context.  Otherwise, static initialization inside
-    // getGlobalInitializer() won't be thread-safe.
-    Initializer* _theGlobalInitializer = &getGlobalInitializer();
+// Make sure that getGlobalInitializer() is called at least once before main(), and so at least
+// once in a single-threaded context.  Otherwise, static initialization inside
+// getGlobalInitializer() won't be thread-safe.
+Initializer* _theGlobalInitializer = &getGlobalInitializer();
 
 }  // namespace
 

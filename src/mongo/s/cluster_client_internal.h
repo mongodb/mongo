@@ -43,67 +43,66 @@
 
 namespace mongo {
 
-    //
-    // Helper methods for querying information about a cluster
-    //
+//
+// Helper methods for querying information about a cluster
+//
 
-    /**
-     * Tries to check the versions of all active hosts in a cluster.  Not 100% accurate, but pretty
-     * effective if hosts are reachable.
-     *
-     * Returns OK if hosts are compatible as far as we know, RemoteValidationError if hosts are not
-     * compatible, and an error Status if anything else goes wrong.
-     */
-    Status checkClusterMongoVersions(const ConnectionString& configLoc,
-                                     const std::string& minMongoVersion);
+/**
+ * Tries to check the versions of all active hosts in a cluster.  Not 100% accurate, but pretty
+ * effective if hosts are reachable.
+ *
+ * Returns OK if hosts are compatible as far as we know, RemoteValidationError if hosts are not
+ * compatible, and an error Status if anything else goes wrong.
+ */
+Status checkClusterMongoVersions(const ConnectionString& configLoc,
+                                 const std::string& minMongoVersion);
 
-    /**
-     * Returns all collections in the cluster, found at this moment.
-     *
-     * Returns OK if loaded successfully, error Status if not.
-     */
-    Status findAllCollections(const ConnectionString& configLoc,
-                              OwnedPointerMap<std::string, CollectionType>* collections);
+/**
+ * Returns all collections in the cluster, found at this moment.
+ *
+ * Returns OK if loaded successfully, error Status if not.
+ */
+Status findAllCollections(const ConnectionString& configLoc,
+                          OwnedPointerMap<std::string, CollectionType>* collections);
 
-    /**
-     * Returns all collections in the cluster, but does not throw an error if epochs are not
-     * set for the collections.
-     *
-     * Returns OK if loaded successfully, error Status if not.
-     */
-    Status findAllCollectionsV3(const ConnectionString& configLoc,
-                                OwnedPointerMap<std::string, CollectionType>* collections);
+/**
+ * Returns all collections in the cluster, but does not throw an error if epochs are not
+ * set for the collections.
+ *
+ * Returns OK if loaded successfully, error Status if not.
+ */
+Status findAllCollectionsV3(const ConnectionString& configLoc,
+                            OwnedPointerMap<std::string, CollectionType>* collections);
 
-    /**
-     * Returns all chunks for a collection in the cluster.
-     *
-     * Returns OK if loaded successfully, error Status if not.
-     */
-    Status findAllChunks(const ConnectionString& configLoc,
-                         const std::string& ns,
-                         OwnedPointerVector<ChunkType>* chunks);
+/**
+ * Returns all chunks for a collection in the cluster.
+ *
+ * Returns OK if loaded successfully, error Status if not.
+ */
+Status findAllChunks(const ConnectionString& configLoc,
+                     const std::string& ns,
+                     OwnedPointerVector<ChunkType>* chunks);
 
-    /**
-     * Logs to the config.changelog collection
-     *
-     * Returns OK if loaded successfully, error Status if not.
-     */
-    Status logConfigChange(const ConnectionString& configLoc,
-                           const std::string& clientHost,
-                           const std::string& ns,
-                           const std::string& description,
-                           const BSONObj& details);
+/**
+ * Logs to the config.changelog collection
+ *
+ * Returns OK if loaded successfully, error Status if not.
+ */
+Status logConfigChange(const ConnectionString& configLoc,
+                       const std::string& clientHost,
+                       const std::string& ns,
+                       const std::string& description,
+                       const BSONObj& details);
 
-    //
-    // Needed to normalize exception behavior of connections and cursors
-    // TODO: Remove when we refactor the client connection interface to something more consistent.
-    //
+//
+// Needed to normalize exception behavior of connections and cursors
+// TODO: Remove when we refactor the client connection interface to something more consistent.
+//
 
-    // Helper function which throws on bad GLEs for non-SCC config servers
-    void _checkGLE(ScopedDbConnection& conn);
+// Helper function which throws on bad GLEs for non-SCC config servers
+void _checkGLE(ScopedDbConnection& conn);
 
-    // Helper function which throws for invalid cursor initialization.
-    // Note: cursor ownership will be passed to this function.
-    DBClientCursor* _safeCursor(std::auto_ptr<DBClientCursor> cursor);
-
+// Helper function which throws for invalid cursor initialization.
+// Note: cursor ownership will be passed to this function.
+DBClientCursor* _safeCursor(std::auto_ptr<DBClientCursor> cursor);
 }

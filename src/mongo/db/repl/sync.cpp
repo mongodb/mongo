@@ -48,109 +48,103 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
+using std::endl;
+using std::string;
 
 namespace repl {
 
-    void Sync::setHostname(const string& hostname) {
-        hn = hostname;
+void Sync::setHostname(const string& hostname) {
+    hn = hostname;
+}
+
+BSONObj Sync::getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
+    OplogReader missingObjReader;  // why are we using OplogReader to run a non-oplog query?
+    const char* ns = o.getStringField("ns");
+
+    // capped collections
+    Collection* collection = db->getCollection(ns);
+    if (collection && collection->isCapped()) {
+        log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")"
+              << endl;
+        return BSONObj();
     }
 
-    BSONObj Sync::getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
-        OplogReader missingObjReader; // why are we using OplogReader to run a non-oplog query?
-        const char *ns = o.getStringField("ns");
-
-        // capped collections
-        Collection* collection = db->getCollection(ns);
-        if ( collection && collection->isCapped() ) {
-            log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
-            return BSONObj();
+    const int retryMax = 3;
+    for (int retryCount = 1; retryCount <= retryMax; ++retryCount) {
+        if (retryCount != 1) {
+            // if we are retrying, sleep a bit to let the network possibly recover
+            sleepsecs(retryCount * retryCount);
         }
-
-        const int retryMax = 3;
-        for (int retryCount = 1; retryCount <= retryMax; ++retryCount) {
-            if (retryCount != 1) {
-                // if we are retrying, sleep a bit to let the network possibly recover
-                sleepsecs(retryCount * retryCount);
-            }
-            try {
-                bool ok = missingObjReader.connect(HostAndPort(hn));
-                if (!ok) {
-                    warning() << "network problem detected while connecting to the "
-                              << "sync source, attempt " << retryCount << " of "
-                              << retryMax << endl;
-                        continue;  // try again
-                }
-            } 
-            catch (const SocketException&) {
+        try {
+            bool ok = missingObjReader.connect(HostAndPort(hn));
+            if (!ok) {
                 warning() << "network problem detected while connecting to the "
-                          << "sync source, attempt " << retryCount << " of "
-                          << retryMax << endl;
-                continue; // try again
+                          << "sync source, attempt " << retryCount << " of " << retryMax << endl;
+                continue;  // try again
             }
-
-            // might be more than just _id in the update criteria
-            BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj();
-            BSONObj missingObj;
-            try {
-                missingObj = missingObjReader.findOne(ns, query);
-            } 
-            catch (const SocketException&) {
-                warning() << "network problem detected while fetching a missing document from the "
-                          << "sync source, attempt " << retryCount << " of "
-                          << retryMax << endl;
-                continue; // try again
-            } 
-            catch (DBException& e) {
-                log() << "replication assertion fetching missing object: " << e.what() << endl;
-                throw;
-            }
-
-            // success!
-            return missingObj;
+        } catch (const SocketException&) {
+            warning() << "network problem detected while connecting to the "
+                      << "sync source, attempt " << retryCount << " of " << retryMax << endl;
+            continue;  // try again
         }
-        // retry count exceeded
-        msgasserted(15916, 
-                    str::stream() << "Can no longer connect to initial sync source: " << hn);
+
+        // might be more than just _id in the update criteria
+        BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj();
+        BSONObj missingObj;
+        try {
+            missingObj = missingObjReader.findOne(ns, query);
+        } catch (const SocketException&) {
+            warning() << "network problem detected while fetching a missing document from the "
+                      << "sync source, attempt " << retryCount << " of " << retryMax << endl;
+            continue;  // try again
+        } catch (DBException& e) {
+            log() << "replication assertion fetching missing object: " << e.what() << endl;
+            throw;
+        }
+
+        // success!
+        return missingObj;
     }
+    // retry count exceeded
+    msgasserted(15916, str::stream() << "Can no longer connect to initial sync source: " << hn);
+}
 
-    bool Sync::shouldRetry(OperationContext* txn, const BSONObj& o) {
-        const NamespaceString nss(o.getStringField("ns"));
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            // Take an X lock on the database in order to preclude other modifications.
-            // Also, the database might not exist yet, so create it.
-            AutoGetOrCreateDb autoDb(txn, nss.db(), MODE_X);
-            Database* const db = autoDb.getDb();
+bool Sync::shouldRetry(OperationContext* txn, const BSONObj& o) {
+    const NamespaceString nss(o.getStringField("ns"));
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        // Take an X lock on the database in order to preclude other modifications.
+        // Also, the database might not exist yet, so create it.
+        AutoGetOrCreateDb autoDb(txn, nss.db(), MODE_X);
+        Database* const db = autoDb.getDb();
 
-            // we don't have the object yet, which is possible on initial sync.  get it.
-            log() << "adding missing object" << endl; // rare enough we can log
-            BSONObj missingObj = getMissingDoc(txn, db, o);
+        // we don't have the object yet, which is possible on initial sync.  get it.
+        log() << "adding missing object" << endl;  // rare enough we can log
+        BSONObj missingObj = getMissingDoc(txn, db, o);
 
-            if( missingObj.isEmpty() ) {
-                log() << "missing object not found on source."
-                         " presumably deleted later in oplog";
-                log() << "o2: " << o.getObjectField("o2").toString();
-                log() << "o firstfield: " << o.getObjectField("o").firstElementFieldName();
-                return false;
-            }
-            else {
-                WriteUnitOfWork wunit(txn);
+        if (missingObj.isEmpty()) {
+            log() << "missing object not found on source."
+                     " presumably deleted later in oplog";
+            log() << "o2: " << o.getObjectField("o2").toString();
+            log() << "o firstfield: " << o.getObjectField("o").firstElementFieldName();
+            return false;
+        } else {
+            WriteUnitOfWork wunit(txn);
 
-                Collection* const coll = db->getOrCreateCollection(txn, nss.toString());
-                invariant(coll);
+            Collection* const coll = db->getOrCreateCollection(txn, nss.toString());
+            invariant(coll);
 
-                StatusWith<RecordId> result = coll->insertDocument(txn, missingObj, true);
-                uassert(15917,
-                        str::stream() << "failed to insert missing doc: "
-                                      << result.getStatus().toString(),
-                        result.isOK() );
-                LOG(1) << "inserted missing doc: " << missingObj.toString() << endl;
-                wunit.commit();
-                return true;
-            }
-        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "InsertRetry", nss.ns());
+            StatusWith<RecordId> result = coll->insertDocument(txn, missingObj, true);
+            uassert(
+                15917,
+                str::stream() << "failed to insert missing doc: " << result.getStatus().toString(),
+                result.isOK());
+            LOG(1) << "inserted missing doc: " << missingObj.toString() << endl;
+            wunit.commit();
+            return true;
+        }
     }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "InsertRetry", nss.ns());
+}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

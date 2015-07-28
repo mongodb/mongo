@@ -38,51 +38,49 @@
 
 namespace mongo {
 
-    class MONGO_CLIENT_API HttpClient : boost::noncopyable {
+class MONGO_CLIENT_API HttpClient : boost::noncopyable {
+public:
+    typedef std::map<std::string, std::string> Headers;
+
+    class MONGO_CLIENT_API Result {
     public:
+        Result() {}
 
-        typedef std::map<std::string,std::string> Headers;
+        const std::string& getEntireResponse() const {
+            return _entireResponse;
+        }
 
-        class MONGO_CLIENT_API Result {
-        public:
-            Result() {}
+        Headers getHeaders() const {
+            return _headers;
+        }
 
-            const std::string& getEntireResponse() const {
-                return _entireResponse;
-            }
-
-            Headers getHeaders() const {
-                return _headers;
-            }
-
-            const std::string& getBody() const {
-                return _body;
-            }
-
-        private:
-
-            void _init( int code , std::string entire );
-
-            int _code;
-            std::string _entireResponse;
-
-            Headers _headers;
-            std::string _body;
-
-            friend class HttpClient;
-        };
-
-        /**
-         * @return response code
-         */
-        int get( const std::string& url , Result * result = 0 );
-
-        /**
-         * @return response code
-         */
-        int post( const std::string& url , const std::string& body , Result * result = 0 );
+        const std::string& getBody() const {
+            return _body;
+        }
 
     private:
-        int _go( const char * command , std::string url , const char * body , Result * result );
+        void _init(int code, std::string entire);
+
+        int _code;
+        std::string _entireResponse;
+
+        Headers _headers;
+        std::string _body;
+
+        friend class HttpClient;
     };
+
+    /**
+     * @return response code
+     */
+    int get(const std::string& url, Result* result = 0);
+
+    /**
+     * @return response code
+     */
+    int post(const std::string& url, const std::string& body, Result* result = 0);
+
+private:
+    int _go(const char* command, std::string url, const char* body, Result* result);
+};
 }

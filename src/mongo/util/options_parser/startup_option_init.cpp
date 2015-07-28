@@ -34,38 +34,49 @@
 
 /* Groups for all of option handling */
 MONGO_INITIALIZER_GROUP(BeginStartupOptionHandling,
-                        ("GlobalLogManager", "ValidateLocale"), ("EndStartupOptionHandling"))
+                        ("GlobalLogManager", "ValidateLocale"),
+                        ("EndStartupOptionHandling"))
 
 /* Groups for option registration */
 MONGO_INITIALIZER_GROUP(BeginStartupOptionRegistration,
-                        ("BeginStartupOptionHandling"), ("EndStartupOptionRegistration"))
+                        ("BeginStartupOptionHandling"),
+                        ("EndStartupOptionRegistration"))
 
 /* Groups for general option registration (useful for controlling the order in which options are
  * registered for modules, which affects the order in which they are printed in help output) */
 MONGO_INITIALIZER_GROUP(BeginGeneralStartupOptionRegistration,
-                        ("BeginStartupOptionRegistration"), ("EndGeneralStartupOptionRegistration"))
+                        ("BeginStartupOptionRegistration"),
+                        ("EndGeneralStartupOptionRegistration"))
 MONGO_INITIALIZER_GROUP(EndGeneralStartupOptionRegistration,
-                        ("BeginGeneralStartupOptionRegistration"), ("EndStartupOptionRegistration"))
+                        ("BeginGeneralStartupOptionRegistration"),
+                        ("EndStartupOptionRegistration"))
 
 MONGO_INITIALIZER_GROUP(EndStartupOptionRegistration,
-                        ("BeginStartupOptionRegistration"), ("BeginStartupOptionParsing"))
+                        ("BeginStartupOptionRegistration"),
+                        ("BeginStartupOptionParsing"))
 
 /* Groups for option parsing */
 MONGO_INITIALIZER_GROUP(BeginStartupOptionParsing,
-                        ("EndStartupOptionRegistration"), ("EndStartupOptionParsing"))
+                        ("EndStartupOptionRegistration"),
+                        ("EndStartupOptionParsing"))
 MONGO_INITIALIZER_GROUP(EndStartupOptionParsing,
-                        ("BeginStartupOptionParsing"), ("BeginStartupOptionValidation"))
+                        ("BeginStartupOptionParsing"),
+                        ("BeginStartupOptionValidation"))
 
 /* Groups for option validation */
 MONGO_INITIALIZER_GROUP(BeginStartupOptionValidation,
-                        ("EndStartupOptionParsing"), ("EndStartupOptionValidation"))
+                        ("EndStartupOptionParsing"),
+                        ("EndStartupOptionValidation"))
 MONGO_INITIALIZER_GROUP(EndStartupOptionValidation,
-                        ("BeginStartupOptionValidation"), ("BeginStartupOptionStorage"))
+                        ("BeginStartupOptionValidation"),
+                        ("BeginStartupOptionStorage"))
 
 /* Groups for option storage */
 MONGO_INITIALIZER_GROUP(BeginStartupOptionStorage,
-                        ("EndStartupOptionValidation"), ("EndStartupOptionStorage"))
+                        ("EndStartupOptionValidation"),
+                        ("EndStartupOptionStorage"))
 MONGO_INITIALIZER_GROUP(EndStartupOptionStorage,
-                        ("BeginStartupOptionStorage"), ("EndStartupOptionHandling"))
+                        ("BeginStartupOptionStorage"),
+                        ("EndStartupOptionHandling"))
 
 MONGO_INITIALIZER_GROUP(EndStartupOptionHandling, ("BeginStartupOptionHandling"), ("default"))

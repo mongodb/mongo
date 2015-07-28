@@ -37,263 +37,258 @@
 namespace mongo {
 namespace repl {
 
-    using std::vector;
+using std::vector;
 
-    ReplicationCoordinatorMock::ReplicationCoordinatorMock(const ReplSettings& settings) :
-            _settings(settings) {}
-    ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
+ReplicationCoordinatorMock::ReplicationCoordinatorMock(const ReplSettings& settings)
+    : _settings(settings) {}
+ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
 
-    void ReplicationCoordinatorMock::startReplication(OperationContext* txn) {
-        // TODO
-    }
+void ReplicationCoordinatorMock::startReplication(OperationContext* txn) {
+    // TODO
+}
 
-    void ReplicationCoordinatorMock::shutdown() {
-        // TODO
-    }
+void ReplicationCoordinatorMock::shutdown() {
+    // TODO
+}
 
-    const ReplSettings& ReplicationCoordinatorMock::getSettings() const {
-        return _settings;
-    }
+const ReplSettings& ReplicationCoordinatorMock::getSettings() const {
+    return _settings;
+}
 
-    bool ReplicationCoordinatorMock::isReplEnabled() const {
-        return _settings.usingReplSets() || _settings.master || _settings.slave;
-    }
+bool ReplicationCoordinatorMock::isReplEnabled() const {
+    return _settings.usingReplSets() || _settings.master || _settings.slave;
+}
 
-    ReplicationCoordinator::Mode ReplicationCoordinatorMock::getReplicationMode() const {
-        return modeNone;
-    }
+ReplicationCoordinator::Mode ReplicationCoordinatorMock::getReplicationMode() const {
+    return modeNone;
+}
 
-    MemberState ReplicationCoordinatorMock::getMemberState() const {
-        // TODO
-        invariant(false);
-    }
+MemberState ReplicationCoordinatorMock::getMemberState() const {
+    // TODO
+    invariant(false);
+}
 
-    bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState() const {
-        invariant(false);
-    }
+bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState() const {
+    invariant(false);
+}
 
-    Seconds ReplicationCoordinatorMock::getSlaveDelaySecs() const {
-        return Seconds(0);
-    }
+Seconds ReplicationCoordinatorMock::getSlaveDelaySecs() const {
+    return Seconds(0);
+}
 
-    void ReplicationCoordinatorMock::clearSyncSourceBlacklist() {}
+void ReplicationCoordinatorMock::clearSyncSourceBlacklist() {}
 
-    ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorMock::awaitReplication(
-            const OperationContext* txn,
-            const OpTime& ts,
-            const WriteConcernOptions& writeConcern) {
-        // TODO
-        return StatusAndDuration(Status::OK(), Milliseconds(0));
-    }
+ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorMock::awaitReplication(
+    const OperationContext* txn, const OpTime& ts, const WriteConcernOptions& writeConcern) {
+    // TODO
+    return StatusAndDuration(Status::OK(), Milliseconds(0));
+}
 
-    ReplicationCoordinator::StatusAndDuration
-            ReplicationCoordinatorMock::awaitReplicationOfLastOpForClient(
-                    const OperationContext* txn,
-                    const WriteConcernOptions& writeConcern) {
-        return StatusAndDuration(Status::OK(), Milliseconds(0));
-    }
+ReplicationCoordinator::StatusAndDuration
+ReplicationCoordinatorMock::awaitReplicationOfLastOpForClient(
+    const OperationContext* txn, const WriteConcernOptions& writeConcern) {
+    return StatusAndDuration(Status::OK(), Milliseconds(0));
+}
 
-    Status ReplicationCoordinatorMock::stepDown(OperationContext* txn,
-                                                bool force,
-                                                const Milliseconds& waitTime,
-                                                const Milliseconds& stepdownTime) {
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::stepDown(OperationContext* txn,
+                                            bool force,
+                                            const Milliseconds& waitTime,
+                                            const Milliseconds& stepdownTime) {
+    return Status::OK();
+}
 
-    bool ReplicationCoordinatorMock::isMasterForReportingPurposes() {
-        // TODO
-        return true;
-    }
+bool ReplicationCoordinatorMock::isMasterForReportingPurposes() {
+    // TODO
+    return true;
+}
 
-    bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(const StringData& dbName) {
-        // TODO
-        return true;
-    }
+bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(const StringData& dbName) {
+    // TODO
+    return true;
+}
 
-    Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* txn,
-                                                             const NamespaceString& ns,
-                                                             bool slaveOk) {
-        // TODO
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* txn,
+                                                         const NamespaceString& ns,
+                                                         bool slaveOk) {
+    // TODO
+    return Status::OK();
+}
 
-    bool ReplicationCoordinatorMock::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
-        // TODO
-        return false;
-    }
+bool ReplicationCoordinatorMock::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
+    // TODO
+    return false;
+}
 
-    Status ReplicationCoordinatorMock::setLastOptimeForSlave(const OID& rid, const OpTime& ts) {
-        return Status::OK();
-    }
-    
-    void ReplicationCoordinatorMock::setMyHeartbeatMessage(const std::string& msg) {
-        // TODO
-    }
+Status ReplicationCoordinatorMock::setLastOptimeForSlave(const OID& rid, const OpTime& ts) {
+    return Status::OK();
+}
 
-    void ReplicationCoordinatorMock::setMyLastOptime(const OpTime& ts) {}
+void ReplicationCoordinatorMock::setMyHeartbeatMessage(const std::string& msg) {
+    // TODO
+}
 
-    void ReplicationCoordinatorMock::resetMyLastOptime() {}
+void ReplicationCoordinatorMock::setMyLastOptime(const OpTime& ts) {}
 
-    OpTime ReplicationCoordinatorMock::getMyLastOptime() const {
-        // TODO
-        return OpTime();
-    }
+void ReplicationCoordinatorMock::resetMyLastOptime() {}
+
+OpTime ReplicationCoordinatorMock::getMyLastOptime() const {
+    // TODO
+    return OpTime();
+}
 
 
-    OID ReplicationCoordinatorMock::getElectionId() {
-        // TODO
-        return OID();
-    }
+OID ReplicationCoordinatorMock::getElectionId() {
+    // TODO
+    return OID();
+}
 
-    OID ReplicationCoordinatorMock::getMyRID() const {
-        return OID();
-    }
+OID ReplicationCoordinatorMock::getMyRID() const {
+    return OID();
+}
 
-    int ReplicationCoordinatorMock::getMyId() const {
-        return 0;
-    }
+int ReplicationCoordinatorMock::getMyId() const {
+    return 0;
+}
 
-    bool ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
-        return true;
-    }
+bool ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
+    return true;
+}
 
-    bool ReplicationCoordinatorMock::isWaitingForApplierToDrain() {
-        return false;
-    }
+bool ReplicationCoordinatorMock::isWaitingForApplierToDrain() {
+    return false;
+}
 
-    void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*) {}
+void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*) {}
 
-    void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
+void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 
-    bool ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
-            BSONObjBuilder* cmdBuilder) {
-        return true;
-    }
+bool ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) {
+    return true;
+}
 
-    void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommandHandshakes(
-            std::vector<BSONObj>* handshakes) {}
+void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommandHandshakes(
+    std::vector<BSONObj>* handshakes) {}
 
-    void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result) {
-        // TODO
-    }
+void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result) {
+    // TODO
+}
 
-    Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
+    return Status::OK();
+}
 
-    void ReplicationCoordinatorMock::fillIsMasterForReplSet(IsMasterResponse* result) {}
+void ReplicationCoordinatorMock::fillIsMasterForReplSet(IsMasterResponse* result) {}
 
-    void ReplicationCoordinatorMock::appendSlaveInfoData(BSONObjBuilder* result) {}
+void ReplicationCoordinatorMock::appendSlaveInfoData(BSONObjBuilder* result) {}
 
-    Status ReplicationCoordinatorMock::setMaintenanceMode(bool activate) {
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::setMaintenanceMode(bool activate) {
+    return Status::OK();
+}
 
-    bool ReplicationCoordinatorMock::getMaintenanceMode() {
-        return false;
-    }
+bool ReplicationCoordinatorMock::getMaintenanceMode() {
+    return false;
+}
 
-    Status ReplicationCoordinatorMock::processReplSetSyncFrom(const HostAndPort& target,
-                                                              BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processReplSetSyncFrom(const HostAndPort& target,
+                                                          BSONObjBuilder* resultObj) {
+    // TODO
+    return Status::OK();
+}
 
-    Status ReplicationCoordinatorMock::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
+    // TODO
+    return Status::OK();
+}
 
-    Status ReplicationCoordinatorMock::processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                                        ReplSetHeartbeatResponse* response) {
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processHeartbeat(const ReplSetHeartbeatArgs& args,
+                                                    ReplSetHeartbeatResponse* response) {
+    return Status::OK();
+}
 
-    Status ReplicationCoordinatorMock::processReplSetReconfig(OperationContext* txn,
-                                                              const ReplSetReconfigArgs& args,
-                                                              BSONObjBuilder* resultObj) {
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processReplSetReconfig(OperationContext* txn,
+                                                          const ReplSetReconfigArgs& args,
+                                                          BSONObjBuilder* resultObj) {
+    return Status::OK();
+}
 
-    Status ReplicationCoordinatorMock::processReplSetInitiate(OperationContext* txn,
-                                                              const BSONObj& configObj,
-                                                              BSONObjBuilder* resultObj) {
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processReplSetInitiate(OperationContext* txn,
+                                                          const BSONObj& configObj,
+                                                          BSONObjBuilder* resultObj) {
+    return Status::OK();
+}
 
-    Status ReplicationCoordinatorMock::processReplSetGetRBID(BSONObjBuilder* resultObj) {
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processReplSetGetRBID(BSONObjBuilder* resultObj) {
+    return Status::OK();
+}
 
-    void ReplicationCoordinatorMock::incrementRollbackID() {}
+void ReplicationCoordinatorMock::incrementRollbackID() {}
 
-    Status ReplicationCoordinatorMock::processReplSetFresh(const ReplSetFreshArgs& args,
-                                                           BSONObjBuilder* resultObj) {
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processReplSetFresh(const ReplSetFreshArgs& args,
+                                                       BSONObjBuilder* resultObj) {
+    return Status::OK();
+}
 
-    Status ReplicationCoordinatorMock::processReplSetElect(const ReplSetElectArgs& args,
-                                                           BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processReplSetElect(const ReplSetElectArgs& args,
+                                                       BSONObjBuilder* resultObj) {
+    // TODO
+    return Status::OK();
+}
 
-    Status ReplicationCoordinatorMock::processReplSetUpdatePosition(
-            const UpdatePositionArgs& updates) {
-        // TODO
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processReplSetUpdatePosition(const UpdatePositionArgs& updates) {
+    // TODO
+    return Status::OK();
+}
 
-    Status ReplicationCoordinatorMock::processHandshake(OperationContext* txn,
-                                                        const HandshakeArgs& handshake) {
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::processHandshake(OperationContext* txn,
+                                                    const HandshakeArgs& handshake) {
+    return Status::OK();
+}
 
-    bool ReplicationCoordinatorMock::buildsIndexes() {
-        // TODO
-        return true;
-    }
+bool ReplicationCoordinatorMock::buildsIndexes() {
+    // TODO
+    return true;
+}
 
-    std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
-        return std::vector<HostAndPort>();
-    }
+std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
+    return std::vector<HostAndPort>();
+}
 
-    vector<HostAndPort> ReplicationCoordinatorMock::getOtherNodesInReplSet() const {
-        return std::vector<HostAndPort>();
-    }
+vector<HostAndPort> ReplicationCoordinatorMock::getOtherNodesInReplSet() const {
+    return std::vector<HostAndPort>();
+}
 
-    Status ReplicationCoordinatorMock::checkIfWriteConcernCanBeSatisfied(
-            const WriteConcernOptions& writeConcern) const {
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::checkIfWriteConcernCanBeSatisfied(
+    const WriteConcernOptions& writeConcern) const {
+    return Status::OK();
+}
 
-    WriteConcernOptions ReplicationCoordinatorMock::getGetLastErrorDefault() {
-        return WriteConcernOptions();
-    }
+WriteConcernOptions ReplicationCoordinatorMock::getGetLastErrorDefault() {
+    return WriteConcernOptions();
+}
 
-    Status ReplicationCoordinatorMock::checkReplEnabledForCommand(BSONObjBuilder* result) {
-        // TODO
-        return Status::OK();
-    }
+Status ReplicationCoordinatorMock::checkReplEnabledForCommand(BSONObjBuilder* result) {
+    // TODO
+    return Status::OK();
+}
 
-    HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource(const OpTime& lastOpTimeFetched) {
-        invariant(false);
-        return HostAndPort();
-    }
+HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource(const OpTime& lastOpTimeFetched) {
+    invariant(false);
+    return HostAndPort();
+}
 
-    void ReplicationCoordinatorMock::blacklistSyncSource(const HostAndPort& host, Date_t until) {
-        invariant(false);
-    }
+void ReplicationCoordinatorMock::blacklistSyncSource(const HostAndPort& host, Date_t until) {
+    invariant(false);
+}
 
-    void ReplicationCoordinatorMock::resetLastOpTimeFromOplog(OperationContext* txn) {
-        invariant(false);
-    }
+void ReplicationCoordinatorMock::resetLastOpTimeFromOplog(OperationContext* txn) {
+    invariant(false);
+}
 
-    bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& currentSource) {
-        invariant(false);
-    }
+bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& currentSource) {
+    invariant(false);
+}
 
-    void ReplicationCoordinatorMock::summarizeAsHtml(ReplSetHtmlSummary* output) {}
+void ReplicationCoordinatorMock::summarizeAsHtml(ReplSetHtmlSummary* output) {}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

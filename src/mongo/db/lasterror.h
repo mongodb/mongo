@@ -37,134 +37,132 @@
 #include "mongo/bson/oid.h"
 
 namespace mongo {
-    class BSONObjBuilder;
-    class Message;
+class BSONObjBuilder;
+class Message;
 
-    static const char kUpsertedFieldName[] = "upserted";
-    static const char kGLEStatsFieldName[] = "$gleStats";
-    static const char kGLEStatsLastOpTimeFieldName[] = "lastOpTime";
-    static const char kGLEStatsElectionIdFieldName[] = "electionId";
+static const char kUpsertedFieldName[] = "upserted";
+static const char kGLEStatsFieldName[] = "$gleStats";
+static const char kGLEStatsLastOpTimeFieldName[] = "lastOpTime";
+static const char kGLEStatsElectionIdFieldName[] = "electionId";
 
-    struct LastError {
-        int code;
-        std::string msg;
-        enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
-        // _id field value from inserted doc, returned as kUpsertedFieldName (above)
-        BSONObj upsertedId;
-        OID writebackId; // this shouldn't get reset so that old GLE are handled
-        int writebackSince;
-        long long nObjects;
-        int nPrev;
-        bool valid;
-        bool disabled;
-        void writeback(const OID& oid) {
-            reset( true );
-            writebackId = oid;
-            writebackSince = 0;
-        }
-        void raiseError(int _code , const char *_msg) {
-            reset( true );
-            code = _code;
-            msg = _msg;
-        }
-        void recordUpdate( bool _updateObjects , long long _nObjects , BSONObj _upsertedId ) {
-            reset( true );
-            nObjects = _nObjects;
-            updatedExisting = _updateObjects ? True : False;
-            if ( _upsertedId.valid() && _upsertedId.hasField(kUpsertedFieldName) )
-                upsertedId = _upsertedId;
+struct LastError {
+    int code;
+    std::string msg;
+    enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
+    // _id field value from inserted doc, returned as kUpsertedFieldName (above)
+    BSONObj upsertedId;
+    OID writebackId;  // this shouldn't get reset so that old GLE are handled
+    int writebackSince;
+    long long nObjects;
+    int nPrev;
+    bool valid;
+    bool disabled;
+    void writeback(const OID& oid) {
+        reset(true);
+        writebackId = oid;
+        writebackSince = 0;
+    }
+    void raiseError(int _code, const char* _msg) {
+        reset(true);
+        code = _code;
+        msg = _msg;
+    }
+    void recordUpdate(bool _updateObjects, long long _nObjects, BSONObj _upsertedId) {
+        reset(true);
+        nObjects = _nObjects;
+        updatedExisting = _updateObjects ? True : False;
+        if (_upsertedId.valid() && _upsertedId.hasField(kUpsertedFieldName))
+            upsertedId = _upsertedId;
+    }
+    void recordDelete(long long nDeleted) {
+        reset(true);
+        nObjects = nDeleted;
+    }
+    LastError() {
+        reset();
+        writebackSince = 0;
+    }
+    void reset(bool _valid = false) {
+        code = 0;
+        msg.clear();
+        updatedExisting = NotUpdate;
+        nObjects = 0;
+        nPrev = 1;
+        valid = _valid;
+        disabled = false;
+        upsertedId = BSONObj();
+    }
 
-        }
-        void recordDelete( long long nDeleted ) {
-            reset( true );
-            nObjects = nDeleted;
-        }
-        LastError() {
-            reset();
-            writebackSince = 0;
-        }
-        void reset( bool _valid = false ) {
-            code = 0;
-            msg.clear();
-            updatedExisting = NotUpdate;
-            nObjects = 0;
-            nPrev = 1;
-            valid = _valid;
-            disabled = false;
-            upsertedId = BSONObj();
-        }
+    /**
+     * @return if there is an err
+     */
+    bool appendSelf(BSONObjBuilder& b, bool blankErr = true);
 
-        /**
-         * @return if there is an err
-         */
-        bool appendSelf( BSONObjBuilder &b , bool blankErr = true );
+    /**
+     * appends fields which are not "error" related
+     * this whole mechanism needs to be re-written
+     * but needs a lot of real thought
+     */
+    void appendSelfStatus(BSONObjBuilder& b);
 
-        /**
-         * appends fields which are not "error" related
-         * this whole mechanism needs to be re-written
-         * but needs a lot of real thought
-         */
-        void appendSelfStatus( BSONObjBuilder &b );
-
-        struct Disabled : boost::noncopyable {
-            Disabled( LastError * le ) {
-                _le = le;
-                if ( _le ) {
-                    _prev = _le->disabled;
-                    _le->disabled = true;
-                }
-                else {
-                    _prev = false;
-                }
+    struct Disabled : boost::noncopyable {
+        Disabled(LastError* le) {
+            _le = le;
+            if (_le) {
+                _prev = _le->disabled;
+                _le->disabled = true;
+            } else {
+                _prev = false;
             }
+        }
 
-            ~Disabled() {
-                if ( _le )
-                    _le->disabled = _prev;
-            }
+        ~Disabled() {
+            if (_le)
+                _le->disabled = _prev;
+        }
 
-            LastError * _le;
-            bool _prev;
-        };
-
-        static LastError noError;
+        LastError* _le;
+        bool _prev;
     };
 
-    extern class LastErrorHolder {
-    public:
-        LastErrorHolder(){}
-        ~LastErrorHolder();
+    static LastError noError;
+};
 
-        LastError * get( bool create = false );
-        LastError * getSafe();
-        LastError * _get( bool create = false ); // may return a disabled LastError
+extern class LastErrorHolder {
+public:
+    LastErrorHolder() {}
+    ~LastErrorHolder();
 
-        void reset( LastError * le );
+    LastError* get(bool create = false);
+    LastError* getSafe();
+    LastError* _get(bool create = false);  // may return a disabled LastError
 
-        /** ok to call more than once. */
-        void initThread();
+    void reset(LastError* le);
 
-        int getID();
-        
-        void release();
+    /** ok to call more than once. */
+    void initThread();
 
-        /** when db receives a message/request, call this */
-        LastError * startRequest( Message& m , LastError * connectionOwned );
+    int getID();
 
-        void disconnect( int clientId );
+    void release();
 
-        // used to disable lastError reporting while processing a killCursors message
-        // disable causes get() to return 0.
-        LastError *disableForCommand(); // only call once per command invocation!
-    private:
-        boost::thread_specific_ptr<LastError> _tl;
+    /** when db receives a message/request, call this */
+    LastError* startRequest(Message& m, LastError* connectionOwned);
 
-        struct Status {
-            time_t time;
-            LastError *lerr;
-        };
-    } lastError;
+    void disconnect(int clientId);
 
-    void setLastError(int code , const char *msg);
+    // used to disable lastError reporting while processing a killCursors message
+    // disable causes get() to return 0.
+    LastError* disableForCommand();  // only call once per command invocation!
+private:
+    boost::thread_specific_ptr<LastError> _tl;
 
-} // namespace mongo
+    struct Status {
+        time_t time;
+        LastError* lerr;
+    };
+} lastError;
+
+void setLastError(int code, const char* msg);
+
+}  // namespace mongo

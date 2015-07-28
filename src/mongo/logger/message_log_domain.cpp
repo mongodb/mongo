@@ -34,7 +34,7 @@
 namespace mongo {
 namespace logger {
 
-    template class LogDomain<MessageEventEphemeral>;
+template class LogDomain<MessageEventEphemeral>;
 
 }  // namespace logger
 }  // namespace mongo

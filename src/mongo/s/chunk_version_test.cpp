@@ -35,94 +35,89 @@
 namespace mongo {
 namespace {
 
-    /**
-     * Tests parsing of BSON for versions.  In version 2.2, this parsing is meant to be very
-     * flexible so different formats can be tried and enforced later.
-     *
-     * Formats are:
-     *
-     * A) { vFieldName : <TSTYPE>, [ vFieldNameEpoch : <OID> ], ... }
-     * B) { fieldName : [ <TSTYPE>, <OID> ], ... }
-     *
-     * vFieldName is a specifyable name - usually "version" (default) or "lastmod".  <TSTYPE> is a
-     * type convertible to Timestamp, ideally Timestamp but also numeric.
-     * <OID> is a value of type OID.
-     *
-     */
-    TEST(Compatibility, LegacyFormatA) {
-        BSONObjBuilder versionObjB;
-        versionObjB.appendTimestamp( "testVersion",
-                                     ChunkVersion( 1, 1, OID() ).toLong() );
-        versionObjB.append( "testVersionEpoch", OID::gen() );
-        BSONObj versionObj = versionObjB.obj();
+/**
+ * Tests parsing of BSON for versions.  In version 2.2, this parsing is meant to be very
+ * flexible so different formats can be tried and enforced later.
+ *
+ * Formats are:
+ *
+ * A) { vFieldName : <TSTYPE>, [ vFieldNameEpoch : <OID> ], ... }
+ * B) { fieldName : [ <TSTYPE>, <OID> ], ... }
+ *
+ * vFieldName is a specifyable name - usually "version" (default) or "lastmod".  <TSTYPE> is a
+ * type convertible to Timestamp, ideally Timestamp but also numeric.
+ * <OID> is a value of type OID.
+ *
+ */
+TEST(Compatibility, LegacyFormatA) {
+    BSONObjBuilder versionObjB;
+    versionObjB.appendTimestamp("testVersion", ChunkVersion(1, 1, OID()).toLong());
+    versionObjB.append("testVersionEpoch", OID::gen());
+    BSONObj versionObj = versionObjB.obj();
 
-        ChunkVersion parsed =
-            ChunkVersion::fromBSON( versionObj[ "testVersion" ] );
+    ChunkVersion parsed = ChunkVersion::fromBSON(versionObj["testVersion"]);
 
-        ASSERT( ChunkVersion::canParseBSON( versionObj[ "testVersion" ] ) );
-        ASSERT( parsed.majorVersion() == 1 );
-        ASSERT( parsed.minorVersion() == 1 );
-        ASSERT( ! parsed.epoch().isSet() );
+    ASSERT(ChunkVersion::canParseBSON(versionObj["testVersion"]));
+    ASSERT(parsed.majorVersion() == 1);
+    ASSERT(parsed.minorVersion() == 1);
+    ASSERT(!parsed.epoch().isSet());
 
-        parsed = ChunkVersion::fromBSON( versionObj, "testVersion" );
+    parsed = ChunkVersion::fromBSON(versionObj, "testVersion");
 
-        ASSERT( ChunkVersion::canParseBSON( versionObj, "testVersion" ) );
-        ASSERT( parsed.majorVersion() == 1 );
-        ASSERT( parsed.minorVersion() == 1 );
-        ASSERT( parsed.epoch().isSet() );
-    }
+    ASSERT(ChunkVersion::canParseBSON(versionObj, "testVersion"));
+    ASSERT(parsed.majorVersion() == 1);
+    ASSERT(parsed.minorVersion() == 1);
+    ASSERT(parsed.epoch().isSet());
+}
 
-    TEST(Compatibility, SubArrayFormatB) {
-        BSONObjBuilder tsObjB;
-        tsObjB.appendTimestamp( "ts", ChunkVersion( 1, 1, OID() ).toLong() );
-        BSONObj tsObj = tsObjB.obj();
+TEST(Compatibility, SubArrayFormatB) {
+    BSONObjBuilder tsObjB;
+    tsObjB.appendTimestamp("ts", ChunkVersion(1, 1, OID()).toLong());
+    BSONObj tsObj = tsObjB.obj();
 
-        BSONObjBuilder versionObjB;
-        BSONArrayBuilder subArrB( versionObjB.subarrayStart( "testVersion" ) );
-        // Append this weird way so we're sure we get a timestamp type
-        subArrB.append( tsObj.firstElement() );
-        subArrB.append( OID::gen() );
-        subArrB.done();
-        BSONObj versionObj = versionObjB.obj();
+    BSONObjBuilder versionObjB;
+    BSONArrayBuilder subArrB(versionObjB.subarrayStart("testVersion"));
+    // Append this weird way so we're sure we get a timestamp type
+    subArrB.append(tsObj.firstElement());
+    subArrB.append(OID::gen());
+    subArrB.done();
+    BSONObj versionObj = versionObjB.obj();
 
-        ChunkVersion parsed =
-            ChunkVersion::fromBSON( versionObj[ "testVersion" ] );
+    ChunkVersion parsed = ChunkVersion::fromBSON(versionObj["testVersion"]);
 
-        ASSERT( ChunkVersion::canParseBSON( versionObj[ "testVersion" ] ) );
-        ASSERT( ChunkVersion::canParseBSON( BSONArray( versionObj[ "testVersion" ].Obj() ) ) );
-        ASSERT( parsed.majorVersion() == 1 );
-        ASSERT( parsed.minorVersion() == 1 );
-        ASSERT( parsed.epoch().isSet() );
-    }
+    ASSERT(ChunkVersion::canParseBSON(versionObj["testVersion"]));
+    ASSERT(ChunkVersion::canParseBSON(BSONArray(versionObj["testVersion"].Obj())));
+    ASSERT(parsed.majorVersion() == 1);
+    ASSERT(parsed.minorVersion() == 1);
+    ASSERT(parsed.epoch().isSet());
+}
 
-    TEST(Comparison, StrictEqual) {
+TEST(Comparison, StrictEqual) {
+    OID epoch = OID::gen();
 
-        OID epoch = OID::gen();
+    ASSERT(ChunkVersion(3, 1, epoch).isStrictlyEqualTo(ChunkVersion(3, 1, epoch)));
+    ASSERT(!ChunkVersion(3, 1, epoch).isStrictlyEqualTo(ChunkVersion(3, 1, OID())));
+    ASSERT(!ChunkVersion(3, 1, OID()).isStrictlyEqualTo(ChunkVersion(3, 1, epoch)));
+    ASSERT(ChunkVersion(3, 1, OID()).isStrictlyEqualTo(ChunkVersion(3, 1, OID())));
+    ASSERT(!ChunkVersion(4, 2, epoch).isStrictlyEqualTo(ChunkVersion(4, 1, epoch)));
+}
 
-        ASSERT( ChunkVersion( 3, 1, epoch ).isStrictlyEqualTo( ChunkVersion( 3, 1, epoch ) ) );
-        ASSERT( !ChunkVersion( 3, 1, epoch ).isStrictlyEqualTo( ChunkVersion( 3, 1, OID() ) ) );
-        ASSERT( !ChunkVersion( 3, 1, OID() ).isStrictlyEqualTo( ChunkVersion( 3, 1, epoch ) ) );
-        ASSERT( ChunkVersion( 3, 1, OID() ).isStrictlyEqualTo( ChunkVersion( 3, 1, OID() ) ) );
-        ASSERT( !ChunkVersion( 4, 2, epoch ).isStrictlyEqualTo( ChunkVersion( 4, 1, epoch ) ) );
-    }
+TEST(Comparison, OlderThan) {
+    OID epoch = OID::gen();
 
-    TEST(Comparison, OlderThan) {
+    ASSERT(ChunkVersion(3, 1, epoch).isOlderThan(ChunkVersion(4, 1, epoch)));
+    ASSERT(!ChunkVersion(4, 1, epoch).isOlderThan(ChunkVersion(3, 1, epoch)));
 
-        OID epoch = OID::gen();
+    ASSERT(ChunkVersion(3, 1, epoch).isOlderThan(ChunkVersion(3, 2, epoch)));
+    ASSERT(!ChunkVersion(3, 2, epoch).isOlderThan(ChunkVersion(3, 1, epoch)));
 
-        ASSERT( ChunkVersion( 3, 1, epoch ).isOlderThan( ChunkVersion( 4, 1, epoch ) ) );
-        ASSERT( !ChunkVersion( 4, 1, epoch ).isOlderThan( ChunkVersion( 3, 1, epoch ) ) );
+    ASSERT(!ChunkVersion(3, 1, epoch).isOlderThan(ChunkVersion(4, 1, OID())));
+    ASSERT(!ChunkVersion(4, 1, OID()).isOlderThan(ChunkVersion(3, 1, epoch)));
 
-        ASSERT( ChunkVersion( 3, 1, epoch ).isOlderThan( ChunkVersion( 3, 2, epoch ) ) );
-        ASSERT( !ChunkVersion( 3, 2, epoch ).isOlderThan( ChunkVersion( 3, 1, epoch ) ) );
+    ASSERT(ChunkVersion(3, 2, epoch).isOlderThan(ChunkVersion(4, 1, epoch)));
 
-        ASSERT( !ChunkVersion( 3, 1, epoch ).isOlderThan( ChunkVersion( 4, 1, OID() ) ) );
-        ASSERT( !ChunkVersion( 4, 1, OID() ).isOlderThan( ChunkVersion( 3, 1, epoch ) ) );
+    ASSERT(!ChunkVersion(3, 1, epoch).isOlderThan(ChunkVersion(3, 1, epoch)));
+}
 
-        ASSERT( ChunkVersion( 3, 2, epoch ).isOlderThan( ChunkVersion( 4, 1, epoch ) ) );
-
-        ASSERT( !ChunkVersion( 3, 1, epoch ).isOlderThan( ChunkVersion( 3, 1, epoch ) ) );
-    }
-
-} // unnamed namespace
-} // namespace mongo
+}  // unnamed namespace
+}  // namespace mongo

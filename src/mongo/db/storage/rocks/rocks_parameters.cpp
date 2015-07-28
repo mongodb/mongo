@@ -42,114 +42,120 @@
 
 namespace mongo {
 
-    RocksRateLimiterServerParameter::RocksRateLimiterServerParameter(RocksEngine* engine)
-        : ServerParameter(ServerParameterSet::getGlobal(), "rocksdbRuntimeConfigMaxWriteMBPerSec",
-                          false, true),
-          _engine(engine) {}
+RocksRateLimiterServerParameter::RocksRateLimiterServerParameter(RocksEngine* engine)
+    : ServerParameter(
+          ServerParameterSet::getGlobal(), "rocksdbRuntimeConfigMaxWriteMBPerSec", false, true),
+      _engine(engine) {}
 
-    void RocksRateLimiterServerParameter::append(OperationContext* txn, BSONObjBuilder& b,
-                                                 const std::string& name) {
-        b.append(name, _engine->getMaxWriteMBPerSec());
-    }
-
-    Status RocksRateLimiterServerParameter::set(const BSONElement& newValueElement) {
-        if (!newValueElement.isNumber()) {
-            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a number");
-        }
-        return _set(newValueElement.numberInt());
-    }
-
-    Status RocksRateLimiterServerParameter::setFromString(const std::string& str) {
-        int num = 0;
-        Status status = parseNumberFromString(str, &num);
-        if (!status.isOK()) return status;
-        return _set(num);
-    }
-
-    Status RocksRateLimiterServerParameter::_set(int newNum) {
-        if (newNum <= 0) {
-            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be > 0");
-        }
-        log() << "RocksDB: changing rate limiter to " << newNum << "MB/s";
-        _engine->setMaxWriteMBPerSec(newNum);
-
-        return Status::OK();
-    }
-
-    RocksBackupServerParameter::RocksBackupServerParameter(RocksEngine* engine)
-        : ServerParameter(ServerParameterSet::getGlobal(), "rocksdbBackup", false, true),
-          _engine(engine) {}
-
-    void RocksBackupServerParameter::append(OperationContext* txn, BSONObjBuilder& b,
-                                            const std::string& name) {
-        b.append(name, "");
-    }
-
-    Status RocksBackupServerParameter::set(const BSONElement& newValueElement) {
-        auto str = newValueElement.str();
-        if (str.size() == 0) {
-            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a string");
-        }
-        return setFromString(str);
-    }
-
-    Status RocksBackupServerParameter::setFromString(const std::string& str) {
-        return _engine->backup(str);
-    }
-
-    RocksCompactServerParameter::RocksCompactServerParameter(RocksEngine* engine)
-        : ServerParameter(ServerParameterSet::getGlobal(), "rocksdbCompact", false, true),
-          _engine(engine) {}
-
-    void RocksCompactServerParameter::append(OperationContext* txn, BSONObjBuilder& b,
+void RocksRateLimiterServerParameter::append(OperationContext* txn,
+                                             BSONObjBuilder& b,
                                              const std::string& name) {
-        b.append(name, "");
+    b.append(name, _engine->getMaxWriteMBPerSec());
+}
+
+Status RocksRateLimiterServerParameter::set(const BSONElement& newValueElement) {
+    if (!newValueElement.isNumber()) {
+        return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a number");
     }
+    return _set(newValueElement.numberInt());
+}
 
-    Status RocksCompactServerParameter::set(const BSONElement& newValueElement) {
-        return setFromString("");
+Status RocksRateLimiterServerParameter::setFromString(const std::string& str) {
+    int num = 0;
+    Status status = parseNumberFromString(str, &num);
+    if (!status.isOK())
+        return status;
+    return _set(num);
+}
+
+Status RocksRateLimiterServerParameter::_set(int newNum) {
+    if (newNum <= 0) {
+        return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be > 0");
     }
+    log() << "RocksDB: changing rate limiter to " << newNum << "MB/s";
+    _engine->setMaxWriteMBPerSec(newNum);
 
-    Status RocksCompactServerParameter::setFromString(const std::string& str) {
-        auto s = rocksdb::experimental::SuggestCompactRange(_engine->getDB(), nullptr, nullptr);
-        return rocksToMongoStatus(s);
+    return Status::OK();
+}
+
+RocksBackupServerParameter::RocksBackupServerParameter(RocksEngine* engine)
+    : ServerParameter(ServerParameterSet::getGlobal(), "rocksdbBackup", false, true),
+      _engine(engine) {}
+
+void RocksBackupServerParameter::append(OperationContext* txn,
+                                        BSONObjBuilder& b,
+                                        const std::string& name) {
+    b.append(name, "");
+}
+
+Status RocksBackupServerParameter::set(const BSONElement& newValueElement) {
+    auto str = newValueElement.str();
+    if (str.size() == 0) {
+        return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a string");
     }
+    return setFromString(str);
+}
 
-    RocksCacheSizeParameter::RocksCacheSizeParameter(RocksEngine* engine)
-        : ServerParameter(ServerParameterSet::getGlobal(), "rocksdbRuntimeConfigCacheSizeGB", false,
-                          true),
-          _engine(engine) {}
+Status RocksBackupServerParameter::setFromString(const std::string& str) {
+    return _engine->backup(str);
+}
 
-    void RocksCacheSizeParameter::append(OperationContext* txn, BSONObjBuilder& b,
+RocksCompactServerParameter::RocksCompactServerParameter(RocksEngine* engine)
+    : ServerParameter(ServerParameterSet::getGlobal(), "rocksdbCompact", false, true),
+      _engine(engine) {}
+
+void RocksCompactServerParameter::append(OperationContext* txn,
+                                         BSONObjBuilder& b,
                                          const std::string& name) {
-        const long long bytesInGB = 1024 * 1024 * 1024LL;
-        long long cacheSizeInGB = _engine->getBlockCache()->GetCapacity() / bytesInGB;
-        b.append(name, cacheSizeInGB);
-    }
+    b.append(name, "");
+}
 
-    Status RocksCacheSizeParameter::set(const BSONElement& newValueElement) {
-        if (!newValueElement.isNumber()) {
-            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a number");
-        }
-        return _set(newValueElement.numberInt());
-    }
+Status RocksCompactServerParameter::set(const BSONElement& newValueElement) {
+    return setFromString("");
+}
 
-    Status RocksCacheSizeParameter::setFromString(const std::string& str) {
-        int num = 0;
-        Status status = parseNumberFromString(str, &num);
-        if (!status.isOK()) return status;
-        return _set(num);
-    }
+Status RocksCompactServerParameter::setFromString(const std::string& str) {
+    auto s = rocksdb::experimental::SuggestCompactRange(_engine->getDB(), nullptr, nullptr);
+    return rocksToMongoStatus(s);
+}
 
-    Status RocksCacheSizeParameter::_set(int newNum) {
-        if (newNum <= 0) {
-            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be > 0");
-        }
-        log() << "RocksDB: changing block cache size to " << newNum << "GB";
-        const long long bytesInGB = 1024 * 1024 * 1024LL;
-        size_t newSizeInBytes = static_cast<size_t>(newNum * bytesInGB);
-        _engine->getBlockCache()->SetCapacity(newSizeInBytes);
+RocksCacheSizeParameter::RocksCacheSizeParameter(RocksEngine* engine)
+    : ServerParameter(
+          ServerParameterSet::getGlobal(), "rocksdbRuntimeConfigCacheSizeGB", false, true),
+      _engine(engine) {}
 
-        return Status::OK();
+void RocksCacheSizeParameter::append(OperationContext* txn,
+                                     BSONObjBuilder& b,
+                                     const std::string& name) {
+    const long long bytesInGB = 1024 * 1024 * 1024LL;
+    long long cacheSizeInGB = _engine->getBlockCache()->GetCapacity() / bytesInGB;
+    b.append(name, cacheSizeInGB);
+}
+
+Status RocksCacheSizeParameter::set(const BSONElement& newValueElement) {
+    if (!newValueElement.isNumber()) {
+        return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a number");
     }
+    return _set(newValueElement.numberInt());
+}
+
+Status RocksCacheSizeParameter::setFromString(const std::string& str) {
+    int num = 0;
+    Status status = parseNumberFromString(str, &num);
+    if (!status.isOK())
+        return status;
+    return _set(num);
+}
+
+Status RocksCacheSizeParameter::_set(int newNum) {
+    if (newNum <= 0) {
+        return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be > 0");
+    }
+    log() << "RocksDB: changing block cache size to " << newNum << "GB";
+    const long long bytesInGB = 1024 * 1024 * 1024LL;
+    size_t newSizeInBytes = static_cast<size_t>(newNum * bytesInGB);
+    _engine->getBlockCache()->SetCapacity(newSizeInBytes);
+
+    return Status::OK();
+}
 }

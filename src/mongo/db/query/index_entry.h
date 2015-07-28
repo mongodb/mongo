@@ -36,98 +36,81 @@
 
 namespace mongo {
 
+/**
+ * This name sucks, but every name involving 'index' is used somewhere.
+ */
+struct IndexEntry {
     /**
-     * This name sucks, but every name involving 'index' is used somewhere.
+     * Use this constructor if you're making an IndexEntry from the catalog.
      */
-    struct IndexEntry {
-        /**
-         * Use this constructor if you're making an IndexEntry from the catalog.
-         */
-        IndexEntry(const BSONObj& kp,
-                   const std::string& accessMethod,
-                   bool mk,
-                   bool sp,
-                   bool unq,
-                   const std::string& n,
-                   const BSONObj& io)
-            : keyPattern(kp),
-              multikey(mk),
-              sparse(sp),
-              unique(unq),
-              name(n),
-              infoObj(io) {
+    IndexEntry(const BSONObj& kp,
+               const std::string& accessMethod,
+               bool mk,
+               bool sp,
+               bool unq,
+               const std::string& n,
+               const BSONObj& io)
+        : keyPattern(kp), multikey(mk), sparse(sp), unique(unq), name(n), infoObj(io) {
+        type = IndexNames::nameToType(accessMethod);
+    }
 
-            type = IndexNames::nameToType(accessMethod);
+    /**
+     * For testing purposes only.
+     */
+    IndexEntry(
+        const BSONObj& kp, bool mk, bool sp, bool unq, const std::string& n, const BSONObj& io)
+        : keyPattern(kp), multikey(mk), sparse(sp), unique(unq), name(n), infoObj(io) {
+        type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
+    }
+
+    /**
+     * For testing purposes only.
+     */
+    IndexEntry(const BSONObj& kp)
+        : keyPattern(kp),
+          multikey(false),
+          sparse(false),
+          unique(false),
+          name("test_foo"),
+          infoObj(BSONObj()) {
+        type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
+    }
+
+    BSONObj keyPattern;
+
+    bool multikey;
+
+    bool sparse;
+
+    bool unique;
+
+    std::string name;
+
+    // Geo indices have extra parameters.  We need those available to plan correctly.
+    BSONObj infoObj;
+
+    // What type of index is this?  (What access method can we use on the index described
+    // by the keyPattern?)
+    IndexType type;
+
+    std::string toString() const {
+        mongoutils::str::stream ss;
+        ss << "kp: " << keyPattern.toString();
+
+        if (multikey) {
+            ss << " multikey";
         }
 
-        /**
-         * For testing purposes only.
-         */
-        IndexEntry(const BSONObj& kp,
-                   bool mk,
-                   bool sp,
-                   bool unq,
-                   const std::string& n,
-                   const BSONObj& io)
-            : keyPattern(kp),
-              multikey(mk),
-              sparse(sp),
-              unique(unq),
-              name(n),
-              infoObj(io) {
-
-            type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
+        if (sparse) {
+            ss << " sparse";
         }
 
-        /**
-         * For testing purposes only.
-         */
-        IndexEntry(const BSONObj& kp)
-            : keyPattern(kp),
-              multikey(false),
-              sparse(false),
-              unique(false),
-              name("test_foo"),
-              infoObj(BSONObj()) {
-
-            type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
+        if (!infoObj.isEmpty()) {
+            ss << " io: " << infoObj.toString();
         }
 
-        BSONObj keyPattern;
-
-        bool multikey;
-
-        bool sparse;
-
-        bool unique;
-
-        std::string name;
-
-        // Geo indices have extra parameters.  We need those available to plan correctly.
-        BSONObj infoObj;
-
-        // What type of index is this?  (What access method can we use on the index described
-        // by the keyPattern?)
-        IndexType type;
-
-        std::string toString() const {
-            mongoutils::str::stream ss;
-            ss << "kp: "  << keyPattern.toString();
-
-            if (multikey) {
-                ss << " multikey";
-            }
-
-            if (sparse) {
-                ss << " sparse";
-            }
-
-            if (!infoObj.isEmpty()) {
-                ss << " io: " << infoObj.toString();
-            }
-
-            return ss;
-        }
-    };
+        return ss;
+    }
+};
 
 }  // namespace mongo

@@ -29,11 +29,9 @@
 
 namespace mongo {
 
-    MongoAuthenticationSession::MongoAuthenticationSession(nonce64 nonce) :
-        AuthenticationSession(AuthenticationSession::SESSION_TYPE_MONGO),
-        _nonce(nonce) {
-    }
+MongoAuthenticationSession::MongoAuthenticationSession(nonce64 nonce)
+    : AuthenticationSession(AuthenticationSession::SESSION_TYPE_MONGO), _nonce(nonce) {}
 
-    MongoAuthenticationSession::~MongoAuthenticationSession() {}
+MongoAuthenticationSession::~MongoAuthenticationSession() {}
 
 }  // namespace mongo

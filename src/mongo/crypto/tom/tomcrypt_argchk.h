@@ -20,8 +20,11 @@
 #include <signal.h>
 
 /* this is the default LibTomCrypt macro  */
-void crypt_argchk(const char *v, const char *s, int d);
-#define LTC_ARGCHK(x) if (!(x)) { crypt_argchk(#x, __FILE__, __LINE__); }
+void crypt_argchk(const char* v, const char* s, int d);
+#define LTC_ARGCHK(x)                         \
+    if (!(x)) {                               \
+        crypt_argchk(#x, __FILE__, __LINE__); \
+    }
 #define LTC_ARGCHKVD(x) LTC_ARGCHK(x)
 
 #elif ARGTYPE == 1
@@ -32,7 +35,10 @@ void crypt_argchk(const char *v, const char *s, int d);
 
 #elif ARGTYPE == 2
 
-#define LTC_ARGCHK(x) if (!(x)) { fprintf(stderr, "\nwarning: ARGCHK failed at %s:%d\n", __FILE__, __LINE__); }
+#define LTC_ARGCHK(x)                                                               \
+    if (!(x)) {                                                                     \
+        fprintf(stderr, "\nwarning: ARGCHK failed at %s:%d\n", __FILE__, __LINE__); \
+    }
 #define LTC_ARGCHKVD(x) LTC_ARGCHK(x)
 
 #elif ARGTYPE == 3
@@ -42,8 +48,12 @@ void crypt_argchk(const char *v, const char *s, int d);
 
 #elif ARGTYPE == 4
 
-#define LTC_ARGCHK(x)   if (!(x)) return CRYPT_INVALID_ARG;
-#define LTC_ARGCHKVD(x) if (!(x)) return;
+#define LTC_ARGCHK(x) \
+    if (!(x))         \
+        return CRYPT_INVALID_ARG;
+#define LTC_ARGCHKVD(x) \
+    if (!(x))           \
+        return;
 
 #endif
 

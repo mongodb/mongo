@@ -37,44 +37,39 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+using boost::scoped_ptr;
 
-    ClientBasic::ClientBasic(AbstractMessagingPort* messagingPort) : _messagingPort(messagingPort) {
-    }
-    ClientBasic::~ClientBasic() {}
+ClientBasic::ClientBasic(AbstractMessagingPort* messagingPort) : _messagingPort(messagingPort) {}
+ClientBasic::~ClientBasic() {}
 
-    AuthenticationSession* ClientBasic::getAuthenticationSession() {
-        return _authenticationSession.get();
-    }
+AuthenticationSession* ClientBasic::getAuthenticationSession() {
+    return _authenticationSession.get();
+}
 
-    void ClientBasic::resetAuthenticationSession(
-            AuthenticationSession* newSession) {
+void ClientBasic::resetAuthenticationSession(AuthenticationSession* newSession) {
+    _authenticationSession.reset(newSession);
+}
 
-        _authenticationSession.reset(newSession);
-    }
+void ClientBasic::swapAuthenticationSession(scoped_ptr<AuthenticationSession>& other) {
+    _authenticationSession.swap(other);
+}
 
-    void ClientBasic::swapAuthenticationSession(
-            scoped_ptr<AuthenticationSession>& other) {
+bool ClientBasic::hasAuthorizationSession() const {
+    return _authorizationSession.get();
+}
 
-        _authenticationSession.swap(other);
-    }
+AuthorizationSession* ClientBasic::getAuthorizationSession() const {
+    massert(16481,
+            "No AuthorizationManager has been set up for this connection",
+            hasAuthorizationSession());
+    return _authorizationSession.get();
+}
 
-    bool ClientBasic::hasAuthorizationSession() const {
-        return _authorizationSession.get();
-    }
-
-    AuthorizationSession* ClientBasic::getAuthorizationSession() const {
-            massert(16481,
-                    "No AuthorizationManager has been set up for this connection",
-                    hasAuthorizationSession());
-            return _authorizationSession.get();
-    }
-
-    void ClientBasic::setAuthorizationSession(AuthorizationSession* authorizationSession) {
-        massert(16477,
-                "An AuthorizationManager has already been set up for this connection",
-                !hasAuthorizationSession());
-        _authorizationSession.reset(authorizationSession);
-    }
+void ClientBasic::setAuthorizationSession(AuthorizationSession* authorizationSession) {
+    massert(16477,
+            "An AuthorizationManager has already been set up for this connection",
+            !hasAuthorizationSession());
+    _authorizationSession.reset(authorizationSession);
+}
 
 }  // namespace mongo

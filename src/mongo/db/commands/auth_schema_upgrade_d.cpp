@@ -44,105 +44,95 @@
 namespace mongo {
 namespace {
 
-    using std::string;
+using std::string;
 
-    Status checkReplicaMemberVersions() {
-
-        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-        if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet)
-            return Status::OK();
-
-        std::list<repl::Target> rsMembers;
-        std::vector<HostAndPort> rsMemberHosts = replCoord->getOtherNodesInReplSet();
-        for (size_t i = 0; i < rsMemberHosts.size(); ++i) {
-            rsMembers.push_back(repl::Target(rsMemberHosts[i].toString()));
-        }
-
-        try {
-            multiCommand(BSON("buildInfo" << 1), rsMembers);
-        }
-        catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-
-        for (std::list<repl::Target>::const_iterator iter = rsMembers.begin();
-             iter != rsMembers.end();
-             ++iter) {
-
-            if (!iter->ok) {
-                logger::LogstreamBuilder wlog = warning();
-                wlog << "During authSchemaUpgrade, could not run buildInfo command on " <<
-                    iter->toHost;
-                if (!iter->result.isEmpty())
-                    wlog << "; response was " << iter->result.toString();
-                wlog << "; ignoring.";
-                continue;
-            }
-
-            const char* version = iter->result["version"].valuestrsafe();
-            if (!*version) {
-                return Status(ErrorCodes::RemoteValidationError, mongoutils::str::stream() <<
-                              "Missing or non-string \"version\" field in result of buildInfo "
-                              "command sent to " << iter->toHost << "; found " <<
-                              iter->result["version"]);
-            }
-
-            if (!isSameMajorVersion(version)) {
-                auto foundVersionArray = iter->result["versionArray"].Array();
-                return Status(ErrorCodes::RemoteValidationError, mongoutils::str::stream() <<
-                              "To upgrade auth schema in a replica set, all members must be "
-                              "running the same release series of mongod; found " <<
-                              foundVersionArray[0].Int() << '.' << foundVersionArray[1].Int() <<
-                              " on host  " << iter->toHost << " but expected " <<
-                              kMongoVersionMajor << '.' << kMongoVersionMinor);
-            }
-        }
+Status checkReplicaMemberVersions() {
+    repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+    if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet)
         return Status::OK();
+
+    std::list<repl::Target> rsMembers;
+    std::vector<HostAndPort> rsMemberHosts = replCoord->getOtherNodesInReplSet();
+    for (size_t i = 0; i < rsMemberHosts.size(); ++i) {
+        rsMembers.push_back(repl::Target(rsMemberHosts[i].toString()));
     }
 
-    class CmdAuthSchemaUpgradeD : public CmdAuthSchemaUpgrade {
-        virtual bool run(
-                OperationContext* txn,
-                const string& dbname,
-                BSONObj& cmdObj,
-                int options,
-                string& errmsg,
-                BSONObjBuilder& result,
-                bool fromRepl) {
+    try {
+        multiCommand(BSON("buildInfo" << 1), rsMembers);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 
-            int maxSteps;
-            bool upgradeShardServers;
-            BSONObj writeConcern;
-            Status status = auth::parseAuthSchemaUpgradeStepCommand(
-                    cmdObj,
-                    dbname,
-                    &maxSteps,
-                    &upgradeShardServers,
-                    &writeConcern);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
+    for (std::list<repl::Target>::const_iterator iter = rsMembers.begin(); iter != rsMembers.end();
+         ++iter) {
+        if (!iter->ok) {
+            logger::LogstreamBuilder wlog = warning();
+            wlog << "During authSchemaUpgrade, could not run buildInfo command on " << iter->toHost;
+            if (!iter->result.isEmpty())
+                wlog << "; response was " << iter->result.toString();
+            wlog << "; ignoring.";
+            continue;
+        }
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        const char* version = iter->result["version"].valuestrsafe();
+        if (!*version) {
+            return Status(ErrorCodes::RemoteValidationError,
+                          mongoutils::str::stream()
+                              << "Missing or non-string \"version\" field in result of buildInfo "
+                                 "command sent to " << iter->toHost << "; found "
+                              << iter->result["version"]);
+        }
 
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("auth schema upgrade")) {
-                return appendCommandStatus(
-                        result,
-                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-            }
+        if (!isSameMajorVersion(version)) {
+            auto foundVersionArray = iter->result["versionArray"].Array();
+            return Status(ErrorCodes::RemoteValidationError,
+                          mongoutils::str::stream()
+                              << "To upgrade auth schema in a replica set, all members must be "
+                                 "running the same release series of mongod; found "
+                              << foundVersionArray[0].Int() << '.' << foundVersionArray[1].Int()
+                              << " on host  " << iter->toHost << " but expected "
+                              << kMongoVersionMajor << '.' << kMongoVersionMinor);
+        }
+    }
+    return Status::OK();
+}
 
-            status = checkReplicaMemberVersions();
-            if (!status.isOK())
-                return appendCommandStatus(result, status);
-
-            status = authzManager->upgradeSchema(txn, maxSteps, writeConcern);
-            if (status.isOK())
-                result.append("done", true);
+class CmdAuthSchemaUpgradeD : public CmdAuthSchemaUpgrade {
+    virtual bool run(OperationContext* txn,
+                     const string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     string& errmsg,
+                     BSONObjBuilder& result,
+                     bool fromRepl) {
+        int maxSteps;
+        bool upgradeShardServers;
+        BSONObj writeConcern;
+        Status status = auth::parseAuthSchemaUpgradeStepCommand(
+            cmdObj, dbname, &maxSteps, &upgradeShardServers, &writeConcern);
+        if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-    } cmdAuthSchemaUpgradeStep;
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+
+        AuthzDocumentsUpdateGuard updateGuard(authzManager);
+        if (!updateGuard.tryLock("auth schema upgrade")) {
+            return appendCommandStatus(
+                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
+        }
+
+        status = checkReplicaMemberVersions();
+        if (!status.isOK())
+            return appendCommandStatus(result, status);
+
+        status = authzManager->upgradeSchema(txn, maxSteps, writeConcern);
+        if (status.isOK())
+            result.append("done", true);
+        return appendCommandStatus(result, status);
+    }
+
+} cmdAuthSchemaUpgradeStep;
 
 }  // namespace
 }  // namespace mongo

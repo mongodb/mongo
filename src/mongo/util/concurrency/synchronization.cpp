@@ -38,81 +38,80 @@
 namespace mongo {
 
 namespace {
-    ThreadIdleCallback threadIdleCallback;
-} // namespace
+ThreadIdleCallback threadIdleCallback;
+}  // namespace
 
-    void registerThreadIdleCallback(ThreadIdleCallback callback) {
-        invariant(!threadIdleCallback);
-        threadIdleCallback = callback;
+void registerThreadIdleCallback(ThreadIdleCallback callback) {
+    invariant(!threadIdleCallback);
+    threadIdleCallback = callback;
+}
+
+void markThreadIdle() {
+    if (!threadIdleCallback) {
+        return;
     }
-
-    void markThreadIdle() {
-        if (!threadIdleCallback) {
-            return;
-        }
-        try {
-            threadIdleCallback();
-        }
-        catch (...) {
-            severe() << "Exception escaped from threadIdleCallback";
-            fassertFailedNoTrace(28603);
-        }
+    try {
+        threadIdleCallback();
+    } catch (...) {
+        severe() << "Exception escaped from threadIdleCallback";
+        fassertFailedNoTrace(28603);
     }
+}
 
-    Notification::Notification() : _mutex ( "Notification" ) {
-        lookFor = 1;
-        cur = 0;
+Notification::Notification() : _mutex("Notification") {
+    lookFor = 1;
+    cur = 0;
+}
+
+void Notification::waitToBeNotified() {
+    scoped_lock lock(_mutex);
+    while (lookFor != cur)
+        _condition.wait(lock.boost());
+    lookFor++;
+}
+
+void Notification::notifyOne() {
+    scoped_lock lock(_mutex);
+    verify(cur != lookFor);
+    cur++;
+    _condition.notify_one();
+}
+
+/* --- NotifyAll --- */
+
+NotifyAll::NotifyAll() : _mutex("NotifyAll") {
+    _lastDone = 0;
+    _lastReturned = 0;
+    _nWaiting = 0;
+}
+
+NotifyAll::When NotifyAll::now() {
+    scoped_lock lock(_mutex);
+    return ++_lastReturned;
+}
+
+void NotifyAll::waitFor(When e) {
+    scoped_lock lock(_mutex);
+    ++_nWaiting;
+    while (_lastDone < e) {
+        _condition.wait(lock.boost());
     }
+}
 
-    void Notification::waitToBeNotified() {
-        scoped_lock lock( _mutex );
-        while ( lookFor != cur )
-            _condition.wait( lock.boost() );
-        lookFor++;
+void NotifyAll::awaitBeyondNow() {
+    scoped_lock lock(_mutex);
+    ++_nWaiting;
+    When e = ++_lastReturned;
+    while (_lastDone <= e) {
+        _condition.wait(lock.boost());
     }
+}
 
-    void Notification::notifyOne() {
-        scoped_lock lock( _mutex );
-        verify( cur != lookFor );
-        cur++;
-        _condition.notify_one();
-    }
+void NotifyAll::notifyAll(When e) {
+    scoped_lock lock(_mutex);
+    _lastDone = e;
+    _nWaiting = 0;
+    _condition.notify_all();
+}
 
-    /* --- NotifyAll --- */
-
-    NotifyAll::NotifyAll() : _mutex("NotifyAll") { 
-        _lastDone = 0;
-        _lastReturned = 0;
-        _nWaiting = 0;
-    }
-
-    NotifyAll::When NotifyAll::now() { 
-        scoped_lock lock( _mutex );
-        return ++_lastReturned;
-    }
-
-    void NotifyAll::waitFor(When e) {
-        scoped_lock lock( _mutex );
-        ++_nWaiting;
-        while( _lastDone < e ) {
-            _condition.wait( lock.boost() );
-        }
-    }
-
-    void NotifyAll::awaitBeyondNow() { 
-        scoped_lock lock( _mutex );
-        ++_nWaiting;
-        When e = ++_lastReturned;
-        while( _lastDone <= e ) {
-            _condition.wait( lock.boost() );
-        }
-    }
-
-    void NotifyAll::notifyAll(When e) {
-        scoped_lock lock( _mutex );
-        _lastDone = e;
-        _nWaiting = 0;
-        _condition.notify_all();
-    }
-
-} // namespace mongo
+}  // namespace mongo

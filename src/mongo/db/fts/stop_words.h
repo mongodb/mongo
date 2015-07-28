@@ -39,24 +39,25 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        class StopWords {
-        public:
-            StopWords();
-            StopWords( const std::set<std::string>& words );
+class StopWords {
+public:
+    StopWords();
+    StopWords(const std::set<std::string>& words);
 
-            bool isStopWord( const std::string& word ) const {
-                return _words.count( word ) > 0;
-            }
-
-            size_t numStopWords() const { return _words.size(); }
-
-            static const StopWords* getStopWords( const FTSLanguage& language );
-        private:
-            unordered_set<std::string> _words;
-        };
-
+    bool isStopWord(const std::string& word) const {
+        return _words.count(word) > 0;
     }
-}
 
+    size_t numStopWords() const {
+        return _words.size();
+    }
+
+    static const StopWords* getStopWords(const FTSLanguage& language);
+
+private:
+    unordered_set<std::string> _words;
+};
+}
+}

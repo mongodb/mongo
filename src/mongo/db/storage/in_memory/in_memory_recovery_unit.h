@@ -38,41 +38,42 @@
 
 namespace mongo {
 
-    class SortedDataInterface;
+class SortedDataInterface;
 
-    class InMemoryRecoveryUnit : public RecoveryUnit {
-    public:
-        InMemoryRecoveryUnit() : _depth(0) {}
-        virtual ~InMemoryRecoveryUnit();
+class InMemoryRecoveryUnit : public RecoveryUnit {
+public:
+    InMemoryRecoveryUnit() : _depth(0) {}
+    virtual ~InMemoryRecoveryUnit();
 
-        virtual void beginUnitOfWork(OperationContext* opCtx);
-        virtual void commitUnitOfWork();
-        virtual void endUnitOfWork();
+    virtual void beginUnitOfWork(OperationContext* opCtx);
+    virtual void commitUnitOfWork();
+    virtual void endUnitOfWork();
 
-        virtual bool awaitCommit() {
-            return true;
-        }
+    virtual bool awaitCommit() {
+        return true;
+    }
 
-        virtual void commitAndRestart() {}
+    virtual void commitAndRestart() {}
 
-        virtual void registerChange(Change* change) {
-            _changes.push_back(ChangePtr(change));
-        }
+    virtual void registerChange(Change* change) {
+        _changes.push_back(ChangePtr(change));
+    }
 
-        virtual void* writingPtr(void* data, size_t len) {
-            invariant(!"don't call writingPtr");
-        }
+    virtual void* writingPtr(void* data, size_t len) {
+        invariant(!"don't call writingPtr");
+    }
 
-        virtual void setRollbackWritesDisabled() {}
+    virtual void setRollbackWritesDisabled() {}
 
-        virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
+    virtual SnapshotId getSnapshotId() const {
+        return SnapshotId();
+    }
 
-    private:
-        typedef boost::shared_ptr<Change> ChangePtr;
-        typedef std::vector<ChangePtr> Changes;
+private:
+    typedef boost::shared_ptr<Change> ChangePtr;
+    typedef std::vector<ChangePtr> Changes;
 
-        int _depth;
-        Changes _changes;
-    };
-
+    int _depth;
+    Changes _changes;
+};
 }

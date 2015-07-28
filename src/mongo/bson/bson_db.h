@@ -44,70 +44,71 @@
 
 namespace mongo {
 
-    /**
-    Timestamps are a special BSON datatype that is used internally for replication.
-    Append a timestamp element to the object being ebuilt.
-    @param time - in millis (but stored in seconds)
-    */
-    inline BSONObjBuilder& BSONObjBuilder::appendTimestamp( const StringData& fieldName , unsigned long long time , unsigned int inc ) {
-        OpTime t( (unsigned) (time / 1000) , inc );
-        appendTimestamp( fieldName , t.asDate() );
-        return *this;
-    }
+/**
+Timestamps are a special BSON datatype that is used internally for replication.
+Append a timestamp element to the object being ebuilt.
+@param time - in millis (but stored in seconds)
+*/
+inline BSONObjBuilder& BSONObjBuilder::appendTimestamp(const StringData& fieldName,
+                                                       unsigned long long time,
+                                                       unsigned int inc) {
+    OpTime t((unsigned)(time / 1000), inc);
+    appendTimestamp(fieldName, t.asDate());
+    return *this;
+}
 
-    inline BSONObjBuilder& BSONObjBuilder::append(const StringData& fieldName, OpTime optime) {
-        appendTimestamp(fieldName, optime.asDate());
-        return *this;
-    }
+inline BSONObjBuilder& BSONObjBuilder::append(const StringData& fieldName, OpTime optime) {
+    appendTimestamp(fieldName, optime.asDate());
+    return *this;
+}
 
-    inline OpTime BSONElement::_opTime() const {
-        if( type() == mongo::Date || type() == Timestamp )
-            return OpTime(ConstDataView(value()).readLE<unsigned long long>());
-        return OpTime();
-    }
+inline OpTime BSONElement::_opTime() const {
+    if (type() == mongo::Date || type() == Timestamp)
+        return OpTime(ConstDataView(value()).readLE<unsigned long long>());
+    return OpTime();
+}
 
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const DateNowLabeler& id) {
-        _builder->appendDate(_fieldName, jsTime());
-        _fieldName = StringData();
-        return *_builder;
-    }
+inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const DateNowLabeler& id) {
+    _builder->appendDate(_fieldName, jsTime());
+    _fieldName = StringData();
+    return *_builder;
+}
 
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const NullLabeler& id) {
-        _builder->appendNull(_fieldName);
-        _fieldName = StringData();
-        return *_builder;
-    }
+inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const NullLabeler& id) {
+    _builder->appendNull(_fieldName);
+    _fieldName = StringData();
+    return *_builder;
+}
 
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const UndefinedLabeler& id) {
-        _builder->appendUndefined(_fieldName);
-        _fieldName = StringData();
-        return *_builder;
-    }
+inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const UndefinedLabeler& id) {
+    _builder->appendUndefined(_fieldName);
+    _fieldName = StringData();
+    return *_builder;
+}
 
 
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const MinKeyLabeler& id) {
-        _builder->appendMinKey(_fieldName);
-        _fieldName = StringData();
-        return *_builder;
-    }
+inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const MinKeyLabeler& id) {
+    _builder->appendMinKey(_fieldName);
+    _fieldName = StringData();
+    return *_builder;
+}
 
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const MaxKeyLabeler& id) {
-        _builder->appendMaxKey(_fieldName);
-        _fieldName = StringData();
-        return *_builder;
-    }
+inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const MaxKeyLabeler& id) {
+    _builder->appendMaxKey(_fieldName);
+    _fieldName = StringData();
+    return *_builder;
+}
 
-    template<class T> inline
-    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) {
-        _builder->append(_fieldName, value);
-        _fieldName = StringData();
-        return *_builder;
-    }
+template <class T>
+inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(T value) {
+    _builder->append(_fieldName, value);
+    _fieldName = StringData();
+    return *_builder;
+}
 
-    template<class T>
-    BSONObjBuilder& Labeler::operator<<( T value ) {
-        s_->subobj()->append( l_.l_, value );
-        return *s_->_builder;
-    }
-
+template <class T>
+BSONObjBuilder& Labeler::operator<<(T value) {
+    s_->subobj()->append(l_.l_, value);
+    return *s_->_builder;
+}
 }

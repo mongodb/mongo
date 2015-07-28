@@ -39,17 +39,16 @@ namespace mongo {
 
 namespace repl {
 
-    void _MultiCommandJob::run() {
-        try {
-            ScopedConn c(d.toHost);
-            LOG(1) << "multiCommand running on host " << d.toHost;
-            d.ok = c.runCommand("admin", cmd, d.result);
-            LOG(1) << "multiCommand response: " << d.result;
-        }
-        catch (const DBException& e) {
-            LOG(1) << "dev caught " << e.what() << " on multiCommand to " << d.toHost;
-        }
+void _MultiCommandJob::run() {
+    try {
+        ScopedConn c(d.toHost);
+        LOG(1) << "multiCommand running on host " << d.toHost;
+        d.ok = c.runCommand("admin", cmd, d.result);
+        LOG(1) << "multiCommand response: " << d.result;
+    } catch (const DBException& e) {
+        LOG(1) << "dev caught " << e.what() << " on multiCommand to " << d.toHost;
     }
+}
 
 }  // namespace repl
 }  // namespace mongo

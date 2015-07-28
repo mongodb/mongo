@@ -44,71 +44,68 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
 namespace unittest {
-    namespace str = mongoutils::str;
-    namespace moe = mongo::optionenvironment;
+namespace str = mongoutils::str;
+namespace moe = mongo::optionenvironment;
 
 namespace {
-    boost::filesystem::path defaultRoot;
+boost::filesystem::path defaultRoot;
 
-    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(TempDirOptions)(InitializerContext* context) {
-        moe::startupOptions.addOptionChaining("tempPath",
-                                              "tempPath",
-                                              moe::String,
-                                              "directory to place mongo::TempDir subdirectories");
-        return Status::OK();
-    }
-
-    MONGO_INITIALIZER(SetTempDirDefaultRoot)(InitializerContext* context) {
-        if (moe::startupOptionsParsed.count("tempPath")) {
-            defaultRoot = moe::startupOptionsParsed["tempPath"].as<string>();
-        } else {
-            defaultRoot = boost::filesystem::temp_directory_path();
-        }
-
-        if (!boost::filesystem::exists(defaultRoot)) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Attempted to use a tempPath (" << defaultRoot.string()
-                                        << ") that doesn't exist");
-        }
-
-        if (!boost::filesystem::is_directory(defaultRoot)) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Attempted to use a tempPath (" << defaultRoot.string()
-                                        << ") that exists, but isn't a directory");
-        }
-        return Status::OK();
-    }
+MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(TempDirOptions)(InitializerContext* context) {
+    moe::startupOptions.addOptionChaining(
+        "tempPath", "tempPath", moe::String, "directory to place mongo::TempDir subdirectories");
+    return Status::OK();
 }
 
-    TempDir::TempDir(const std::string& namePrefix) {
-        fassert(17146, namePrefix.find_first_of("/\\") == std::string::npos);
-
-        // This gives the dir name 64 bits of randomness.
-        const boost::filesystem::path dirName =
-            boost::filesystem::unique_path(namePrefix + "-%%%%-%%%%-%%%%-%%%%");
-
-        _path = (defaultRoot / dirName).string();
-
-        bool createdNewDirectory = boost::filesystem::create_directory(_path);
-        if (!createdNewDirectory) {
-            error() << "unique path (" << _path << ") already existed";
-            fassertFailed(17147);
-        }
-
-        ::mongo::unittest::log() << "Created temporary directory: " << _path;
+MONGO_INITIALIZER(SetTempDirDefaultRoot)(InitializerContext* context) {
+    if (moe::startupOptionsParsed.count("tempPath")) {
+        defaultRoot = moe::startupOptionsParsed["tempPath"].as<string>();
+    } else {
+        defaultRoot = boost::filesystem::temp_directory_path();
     }
 
-    TempDir::~TempDir() {
-        try {
-            boost::filesystem::remove_all(_path);
-        }
-        catch (const std::exception& e) {
-            warning() << "error encountered recursively deleting directory '" << _path << "': "
-                      << e.what() << ". Ignoring and continuing.";
-        }
+    if (!boost::filesystem::exists(defaultRoot)) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Attempted to use a tempPath (" << defaultRoot.string()
+                                    << ") that doesn't exist");
     }
-} // namespace unittest
-} // namespace mongo
+
+    if (!boost::filesystem::is_directory(defaultRoot)) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Attempted to use a tempPath (" << defaultRoot.string()
+                                    << ") that exists, but isn't a directory");
+    }
+    return Status::OK();
+}
+}
+
+TempDir::TempDir(const std::string& namePrefix) {
+    fassert(17146, namePrefix.find_first_of("/\\") == std::string::npos);
+
+    // This gives the dir name 64 bits of randomness.
+    const boost::filesystem::path dirName =
+        boost::filesystem::unique_path(namePrefix + "-%%%%-%%%%-%%%%-%%%%");
+
+    _path = (defaultRoot / dirName).string();
+
+    bool createdNewDirectory = boost::filesystem::create_directory(_path);
+    if (!createdNewDirectory) {
+        error() << "unique path (" << _path << ") already existed";
+        fassertFailed(17147);
+    }
+
+    ::mongo::unittest::log() << "Created temporary directory: " << _path;
+}
+
+TempDir::~TempDir() {
+    try {
+        boost::filesystem::remove_all(_path);
+    } catch (const std::exception& e) {
+        warning() << "error encountered recursively deleting directory '" << _path
+                  << "': " << e.what() << ". Ignoring and continuing.";
+    }
+}
+}  // namespace unittest
+}  // namespace mongo

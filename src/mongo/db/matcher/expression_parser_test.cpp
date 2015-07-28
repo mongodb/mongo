@@ -39,77 +39,79 @@
 
 namespace mongo {
 
-    TEST( MatchExpressionParserTest, SimpleEQ1 ) {
-        BSONObj query = BSON( "x" << 2 );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
+TEST(MatchExpressionParserTest, SimpleEQ1) {
+    BSONObj query = BSON("x" << 2);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
 
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
 
-        delete result.getValue();
-    }
+    delete result.getValue();
+}
 
-    TEST( MatchExpressionParserTest, Multiple1 ) {
-        BSONObj query = BSON( "x" << 5 << "y" << BSON( "$gt" << 5 << "$lt" << 8 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
+TEST(MatchExpressionParserTest, Multiple1) {
+    BSONObj query = BSON("x" << 5 << "y" << BSON("$gt" << 5 << "$lt" << 8));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
 
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 5 << "y" << 7 ) ) );
-        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 5 << "y" << 6 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 6 << "y" << 7 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 << "y" << 9 ) ) );
-        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 << "y" << 4 ) ) );
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 7)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 6)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 6 << "y" << 7)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 9)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 4)));
 
-        delete result.getValue();
-    }
+    delete result.getValue();
+}
 
-    TEST( AtomicMatchExpressionTest, Simple1 ) {
-        BSONObj query = BSON( "x" << 5 << "$atomic" << BSON( "$gt" << 5 << "$lt" << 8 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        delete result.getValue();
+TEST(AtomicMatchExpressionTest, Simple1) {
+    BSONObj query = BSON("x" << 5 << "$atomic" << BSON("$gt" << 5 << "$lt" << 8));
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    delete result.getValue();
 
-        query = BSON( "x" << 5 << "$isolated" << 1 );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
-        delete result.getValue();
+    query = BSON("x" << 5 << "$isolated" << 1);
+    result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
+    delete result.getValue();
 
-        query = BSON( "x" << 5 << "y" << BSON( "$isolated" << 1 ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
+    query = BSON("x" << 5 << "y" << BSON("$isolated" << 1));
+    result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
 
-    StatusWith<int> fib( int n ) {
-        if ( n < 0 ) return StatusWith<int>( ErrorCodes::BadValue, "paramter to fib has to be >= 0" );
-        if ( n <= 1 ) return StatusWith<int>( 1 );
-        StatusWith<int> a = fib( n - 1 );
-        StatusWith<int> b = fib( n - 2 );
-        if ( !a.isOK() ) return a;
-        if ( !b.isOK() ) return b;
-        return StatusWith<int>( a.getValue() + b.getValue() );
-    }
+StatusWith<int> fib(int n) {
+    if (n < 0)
+        return StatusWith<int>(ErrorCodes::BadValue, "paramter to fib has to be >= 0");
+    if (n <= 1)
+        return StatusWith<int>(1);
+    StatusWith<int> a = fib(n - 1);
+    StatusWith<int> b = fib(n - 2);
+    if (!a.isOK())
+        return a;
+    if (!b.isOK())
+        return b;
+    return StatusWith<int>(a.getValue() + b.getValue());
+}
 
-    TEST( StatusWithTest, Fib1 ) {
-        StatusWith<int> x = fib( -2 );
-        ASSERT( !x.isOK() );
+TEST(StatusWithTest, Fib1) {
+    StatusWith<int> x = fib(-2);
+    ASSERT(!x.isOK());
 
-        x = fib(0);
-        ASSERT( x.isOK() );
-        ASSERT( 1 == x.getValue() );
+    x = fib(0);
+    ASSERT(x.isOK());
+    ASSERT(1 == x.getValue());
 
-        x = fib(1);
-        ASSERT( x.isOK() );
-        ASSERT( 1 == x.getValue() );
+    x = fib(1);
+    ASSERT(x.isOK());
+    ASSERT(1 == x.getValue());
 
-        x = fib(2);
-        ASSERT( x.isOK() );
-        ASSERT( 2 == x.getValue() );
+    x = fib(2);
+    ASSERT(x.isOK());
+    ASSERT(2 == x.getValue());
 
-        x = fib(3);
-        ASSERT( x.isOK() );
-        ASSERT( 3 == x.getValue() );
-
-
-    }
+    x = fib(3);
+    ASSERT(x.isOK());
+    ASSERT(3 == x.getValue());
+}
 }

@@ -31,61 +31,64 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-    namespace dur {
+namespace dur {
 
-        /** journaling stats.  the model here is that the commit thread is the only writer, and that reads are
-            uncommon (from a serverStatus command and such).  Thus, there should not be multicore chatter overhead.
-        */
-        struct Stats {
+/** journaling stats.  the model here is that the commit thread is the only writer, and that reads are
+    uncommon (from a serverStatus command and such).  Thus, there should not be multicore chatter overhead.
+*/
+struct Stats {
+    struct S {
+        std::string _CSVHeader() const;
+        std::string _asCSV() const;
 
-            struct S {
-                std::string _CSVHeader() const;
-                std::string _asCSV() const;
+        void _asObj(BSONObjBuilder* builder) const;
 
-                void _asObj(BSONObjBuilder* builder) const;
+        void reset();
 
-                void reset();
-
-                uint64_t getCurrentDurationMillis() const {
-                    return ((curTimeMicros64() - _startTimeMicros) / 1000);
-                }
-
-
-                // Not reported. Internal use only.
-                uint64_t _startTimeMicros;
-
-                // Reported statistics
-                unsigned _durationMillis;
-
-                unsigned _commits;
-                unsigned _commitsInWriteLock;
-
-                uint64_t _journaledBytes;
-                uint64_t _uncompressedBytes;
-                uint64_t _writeToDataFilesBytes;
-
-                uint64_t _prepLogBufferMicros;
-                uint64_t _writeToJournalMicros;
-                uint64_t _writeToDataFilesMicros;
-                uint64_t _remapPrivateViewMicros;
-                uint64_t _commitsMicros;
-                uint64_t _commitsInWriteLockMicros;
-            };
+        uint64_t getCurrentDurationMillis() const {
+            return ((curTimeMicros64() - _startTimeMicros) / 1000);
+        }
 
 
-            Stats();
-            void reset();
+        // Not reported. Internal use only.
+        uint64_t _startTimeMicros;
 
-            BSONObj asObj() const;
+        // Reported statistics
+        unsigned _durationMillis;
 
-            const S* curr() const { return &_stats[_currIdx]; }
-            S* curr() { return &_stats[_currIdx]; }
+        unsigned _commits;
+        unsigned _commitsInWriteLock;
 
-        private:
-            S _stats[5];
-            unsigned _currIdx;
-        };
+        uint64_t _journaledBytes;
+        uint64_t _uncompressedBytes;
+        uint64_t _writeToDataFilesBytes;
 
-        extern Stats stats;
+        uint64_t _prepLogBufferMicros;
+        uint64_t _writeToJournalMicros;
+        uint64_t _writeToDataFilesMicros;
+        uint64_t _remapPrivateViewMicros;
+        uint64_t _commitsMicros;
+        uint64_t _commitsInWriteLockMicros;
+    };
+
+
+    Stats();
+    void reset();
+
+    BSONObj asObj() const;
+
+    const S* curr() const {
+        return &_stats[_currIdx];
     }
+    S* curr() {
+        return &_stats[_currIdx];
+    }
+
+private:
+    S _stats[5];
+    unsigned _currIdx;
+};
+
+extern Stats stats;
+}
 }

@@ -33,15 +33,15 @@
 namespace mongo {
 
 namespace logger {
-    class Tee;
-} // namespace logger
+class Tee;
+}  // namespace logger
 
 namespace repl {
 
-    void fillRsLog(std::stringstream* s);
+void fillRsLog(std::stringstream* s);
 
-    // ramlog used for replSet actions
-    extern logger::Tee* rsLog;
+// ramlog used for replSet actions
+extern logger::Tee* rsLog;
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

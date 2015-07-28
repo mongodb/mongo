@@ -46,62 +46,60 @@
 
 namespace mongo {
 
-    ParsedDelete::ParsedDelete(OperationContext* txn, const DeleteRequest* request) :
-        _txn(txn),
-        _request(request) { }
+ParsedDelete::ParsedDelete(OperationContext* txn, const DeleteRequest* request)
+    : _txn(txn), _request(request) {}
 
-    Status ParsedDelete::parseRequest() {
-        dassert(!_canonicalQuery.get());
+Status ParsedDelete::parseRequest() {
+    dassert(!_canonicalQuery.get());
 
-        if (CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
-            return Status::OK();
-        }
-
-        return parseQueryToCQ();
+    if (CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
+        return Status::OK();
     }
 
-    Status ParsedDelete::parseQueryToCQ() {
-        dassert(!_canonicalQuery.get());
+    return parseQueryToCQ();
+}
 
-        CanonicalQuery* cqRaw;
-        const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
+Status ParsedDelete::parseQueryToCQ() {
+    dassert(!_canonicalQuery.get());
 
-        Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
-                                                     _request->getQuery(),
-                                                     _request->isExplain(),
-                                                     &cqRaw,
-                                                     whereCallback);
+    CanonicalQuery* cqRaw;
+    const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
 
-        if (status.isOK()) {
-            _canonicalQuery.reset(cqRaw);
-        }
+    Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
+                                                 _request->getQuery(),
+                                                 _request->isExplain(),
+                                                 &cqRaw,
+                                                 whereCallback);
 
-        return status;
+    if (status.isOK()) {
+        _canonicalQuery.reset(cqRaw);
     }
 
-    const DeleteRequest* ParsedDelete::getRequest() const {
-        return _request;
-    }
+    return status;
+}
 
-    bool ParsedDelete::canYield() const {
-        return !_request->isGod() &&
-            PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() &&
-            !isIsolated();
-    }
+const DeleteRequest* ParsedDelete::getRequest() const {
+    return _request;
+}
 
-    bool ParsedDelete::isIsolated() const {
-        return _canonicalQuery.get()
-            ? QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC)
-            : LiteParsedQuery::isQueryIsolated(_request->getQuery());
-    }
+bool ParsedDelete::canYield() const {
+    return !_request->isGod() && PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() &&
+        !isIsolated();
+}
 
-    bool ParsedDelete::hasParsedQuery() const {
-        return _canonicalQuery.get() != NULL;
-    }
+bool ParsedDelete::isIsolated() const {
+    return _canonicalQuery.get()
+        ? QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC)
+        : LiteParsedQuery::isQueryIsolated(_request->getQuery());
+}
 
-    CanonicalQuery* ParsedDelete::releaseParsedQuery() {
-        invariant(_canonicalQuery.get() != NULL);
-        return _canonicalQuery.release();
-    }
+bool ParsedDelete::hasParsedQuery() const {
+    return _canonicalQuery.get() != NULL;
+}
+
+CanonicalQuery* ParsedDelete::releaseParsedQuery() {
+    invariant(_canonicalQuery.get() != NULL);
+    return _canonicalQuery.release();
+}
 
 }  // namespace mongo

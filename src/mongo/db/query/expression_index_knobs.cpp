@@ -32,8 +32,8 @@
 
 namespace mongo {
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalGeoPredicateQuery2DMaxCoveringCells, int, 16);
+MONGO_EXPORT_SERVER_PARAMETER(internalGeoPredicateQuery2DMaxCoveringCells, int, 16);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalGeoNearQuery2DMaxCoveringCells, int, 16);
+MONGO_EXPORT_SERVER_PARAMETER(internalGeoNearQuery2DMaxCoveringCells, int, 16);
 
 }  // namespace mongo

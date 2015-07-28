@@ -33,66 +33,57 @@
 
 namespace mongo {
 
-    using boost::intrusive_ptr;
+using boost::intrusive_ptr;
 
-    void AccumulatorSum::processInternal(const Value& input, bool merging) {
-        // do nothing with non numeric types
-        if (!input.numeric())
-            return;
+void AccumulatorSum::processInternal(const Value& input, bool merging) {
+    // do nothing with non numeric types
+    if (!input.numeric())
+        return;
 
-        // upgrade to the widest type required to hold the result
-        totalType = Value::getWidestNumeric(totalType, input.getType());
+    // upgrade to the widest type required to hold the result
+    totalType = Value::getWidestNumeric(totalType, input.getType());
 
-        if (totalType == NumberInt || totalType == NumberLong) {
-            long long v = input.coerceToLong();
-            longTotal += v;
-            doubleTotal += v;
-        }
-        else if (totalType == NumberDouble) {
-            double v = input.coerceToDouble();
-            doubleTotal += v;
-        }
-        else {
-            // non numerics should have returned above so we should never get here
-            verify(false);
-        }
+    if (totalType == NumberInt || totalType == NumberLong) {
+        long long v = input.coerceToLong();
+        longTotal += v;
+        doubleTotal += v;
+    } else if (totalType == NumberDouble) {
+        double v = input.coerceToDouble();
+        doubleTotal += v;
+    } else {
+        // non numerics should have returned above so we should never get here
+        verify(false);
     }
+}
 
-    intrusive_ptr<Accumulator> AccumulatorSum::create() {
-        return new AccumulatorSum();
-    }
+intrusive_ptr<Accumulator> AccumulatorSum::create() {
+    return new AccumulatorSum();
+}
 
-    Value AccumulatorSum::getValue(bool toBeMerged) const {
-        if (totalType == NumberLong) {
-            return Value(longTotal);
-        }
-        else if (totalType == NumberDouble) {
-            return Value(doubleTotal);
-        }
-        else if (totalType == NumberInt) {
-            return Value::createIntOrLong(longTotal);
-        }
-        else {
-            massert(16000, "$sum resulted in a non-numeric type", false);
-        }
+Value AccumulatorSum::getValue(bool toBeMerged) const {
+    if (totalType == NumberLong) {
+        return Value(longTotal);
+    } else if (totalType == NumberDouble) {
+        return Value(doubleTotal);
+    } else if (totalType == NumberInt) {
+        return Value::createIntOrLong(longTotal);
+    } else {
+        massert(16000, "$sum resulted in a non-numeric type", false);
     }
+}
 
-    AccumulatorSum::AccumulatorSum()
-        : totalType(NumberInt)
-        , longTotal(0)
-        , doubleTotal(0)
-    {
-        // This is a fixed size Accumulator so we never need to update this
-        _memUsageBytes = sizeof(*this);
-    }
+AccumulatorSum::AccumulatorSum() : totalType(NumberInt), longTotal(0), doubleTotal(0) {
+    // This is a fixed size Accumulator so we never need to update this
+    _memUsageBytes = sizeof(*this);
+}
 
-    void AccumulatorSum::reset() {
-        totalType = NumberInt;
-        longTotal = 0;
-        doubleTotal = 0;
-    }
+void AccumulatorSum::reset() {
+    totalType = NumberInt;
+    longTotal = 0;
+    doubleTotal = 0;
+}
 
-    const char *AccumulatorSum::getOpName() const {
-        return "$sum";
-    }
+const char* AccumulatorSum::getOpName() const {
+    return "$sum";
+}
 }

@@ -37,65 +37,65 @@
 
 namespace mongo {
 
-    /**
-     * This class represents the layout and content of an idem inside the 'upserted' array
-     * of a write command's response (see batched_command_response.h)
-     */
-    class BatchedUpsertDetail : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(BatchedUpsertDetail);
-    public:
+/**
+ * This class represents the layout and content of an idem inside the 'upserted' array
+ * of a write command's response (see batched_command_response.h)
+ */
+class BatchedUpsertDetail : public BSONSerializable {
+    MONGO_DISALLOW_COPYING(BatchedUpsertDetail);
 
-        //
-        // schema declarations
-        //
+public:
+    //
+    // schema declarations
+    //
 
-        static const BSONField<int> index;
-        static const BSONField<BSONObj> upsertedID; // ID type
+    static const BSONField<int> index;
+    static const BSONField<BSONObj> upsertedID;  // ID type
 
-        //
-        // construction / destruction
-        //
+    //
+    // construction / destruction
+    //
 
-        BatchedUpsertDetail();
-        virtual ~BatchedUpsertDetail();
+    BatchedUpsertDetail();
+    virtual ~BatchedUpsertDetail();
 
-        /** Copies all the fields present in 'this' to 'other'. */
-        void cloneTo(BatchedUpsertDetail* other) const;
+    /** Copies all the fields present in 'this' to 'other'. */
+    void cloneTo(BatchedUpsertDetail* other) const;
 
-        //
-        // bson serializable interface implementation
-        //
+    //
+    // bson serializable interface implementation
+    //
 
-        virtual bool isValid(std::string* errMsg) const;
-        virtual BSONObj toBSON() const;
-        virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-        virtual void clear();
-        virtual std::string toString() const;
+    virtual bool isValid(std::string* errMsg) const;
+    virtual BSONObj toBSON() const;
+    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
+    virtual void clear();
+    virtual std::string toString() const;
 
-        //
-        // individual field accessors
-        //
+    //
+    // individual field accessors
+    //
 
-        void setIndex(int index);
-        void unsetIndex();
-        bool isIndexSet() const;
-        int getIndex() const;
+    void setIndex(int index);
+    void unsetIndex();
+    bool isIndexSet() const;
+    int getIndex() const;
 
-        void setUpsertedID(const BSONObj& upsertedID);
-        void unsetUpsertedID();
-        bool isUpsertedIDSet() const;
-        const BSONObj& getUpsertedID() const;
+    void setUpsertedID(const BSONObj& upsertedID);
+    void unsetUpsertedID();
+    bool isUpsertedIDSet() const;
+    const BSONObj& getUpsertedID() const;
 
-    private:
-        // Convention: (M)andatory, (O)ptional
+private:
+    // Convention: (M)andatory, (O)ptional
 
-        // (M)  number of the batch item the upsert refers to
-        int _index;
-        bool _isIndexSet;
+    // (M)  number of the batch item the upsert refers to
+    int _index;
+    bool _isIndexSet;
 
-        // (M)  _id for the upserted document
-        BSONObj _upsertedID;
-        bool _isUpsertedIDSet;
-    };
+    // (M)  _id for the upserted document
+    BSONObj _upsertedID;
+    bool _isUpsertedIDSet;
+};
 
-} // namespace mongo
+}  // namespace mongo

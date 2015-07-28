@@ -40,56 +40,55 @@ namespace mongo {
 
 namespace repl {
 
-    using std::string;
+using std::string;
 
-    /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
-                              const std::string& cfgString,
-                              std::string& setname,
-                              std::vector<HostAndPort>& seeds,
-                              std::set<HostAndPort>& seedSet) {
-        const char *p = cfgString.c_str();
-        const char *slash = strchr(p, '/');
-        if( slash )
-            setname = string(p, slash-p);
-        else
-            setname = p;
-        uassert(13093,
-                "bad --replSet config string format is: <setname>[/<seedhost1>,<seedhost2>,...]",
-                !setname.empty());
+/** @param cfgString <setname>/<seedhost1>,<seedhost2> */
+void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
+                          const std::string& cfgString,
+                          std::string& setname,
+                          std::vector<HostAndPort>& seeds,
+                          std::set<HostAndPort>& seedSet) {
+    const char* p = cfgString.c_str();
+    const char* slash = strchr(p, '/');
+    if (slash)
+        setname = string(p, slash - p);
+    else
+        setname = p;
+    uassert(13093,
+            "bad --replSet config string format is: <setname>[/<seedhost1>,<seedhost2>,...]",
+            !setname.empty());
 
-        if( slash == 0 )
-            return;
+    if (slash == 0)
+        return;
 
-        p = slash + 1;
-        while( 1 ) {
-            const char *comma = strchr(p, ',');
-            if( comma == 0 ) comma = strchr(p,0);
-            if( p == comma )
-                break;
-            {
-                HostAndPort m;
-                try {
-                    m = HostAndPort( string(p, comma-p) );
-                }
-                catch(...) {
-                    uassert(13114, "bad --replSet seed hostname", false);
-                }
-                uassert(13096, "bad --replSet command line config string - dups?",
-                        seedSet.count(m) == 0);
-                seedSet.insert(m);
-                //uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
-                if (externalState->isSelf(m)) {
-                    LOG(1) << "replSet ignoring seed " << m.toString() << " (=self)";
-                }
-                else
-                    seeds.push_back(m);
-                if( *comma == 0 )
-                    break;
-                p = comma + 1;
+    p = slash + 1;
+    while (1) {
+        const char* comma = strchr(p, ',');
+        if (comma == 0)
+            comma = strchr(p, 0);
+        if (p == comma)
+            break;
+        {
+            HostAndPort m;
+            try {
+                m = HostAndPort(string(p, comma - p));
+            } catch (...) {
+                uassert(13114, "bad --replSet seed hostname", false);
             }
+            uassert(
+                13096, "bad --replSet command line config string - dups?", seedSet.count(m) == 0);
+            seedSet.insert(m);
+            // uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
+            if (externalState->isSelf(m)) {
+                LOG(1) << "replSet ignoring seed " << m.toString() << " (=self)";
+            } else
+                seeds.push_back(m);
+            if (*comma == 0)
+                break;
+            p = comma + 1;
         }
     }
+}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

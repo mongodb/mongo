@@ -37,27 +37,27 @@
 namespace mongo {
 namespace repl {
 
-    class ReplicationCoordinatorExternalState;
+class ReplicationCoordinatorExternalState;
 
-    void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
-                              const std::string& cfgString,
-                              std::string& setname,
-                              std::vector<HostAndPort>& seeds,
-                              std::set<HostAndPort>& seedSet);
+void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
+                          const std::string& cfgString,
+                          std::string& setname,
+                          std::vector<HostAndPort>& seeds,
+                          std::set<HostAndPort>& seedSet);
 
-    /** Parameter given to the --replSet command line option (parsed).
-        Syntax is "<setname>/<seedhost1>,<seedhost2>"
-        where setname is a name and seedhost is "<host>[:<port>]" */
-    class ReplSetSeedList {
-    public:
-        ReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
-                        const std::string& cfgString) {
-            parseReplSetSeedList(externalState, cfgString, setname, seeds, seedSet);
-        }
-        std::string setname;
-        std::vector<HostAndPort> seeds;
-        std::set<HostAndPort> seedSet;
-    };
+/** Parameter given to the --replSet command line option (parsed).
+    Syntax is "<setname>/<seedhost1>,<seedhost2>"
+    where setname is a name and seedhost is "<host>[:<port>]" */
+class ReplSetSeedList {
+public:
+    ReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
+                    const std::string& cfgString) {
+        parseReplSetSeedList(externalState, cfgString, setname, seeds, seedSet);
+    }
+    std::string setname;
+    std::vector<HostAndPort> seeds;
+    std::set<HostAndPort> seedSet;
+};
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

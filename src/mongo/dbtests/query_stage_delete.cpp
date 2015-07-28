@@ -42,138 +42,143 @@
 
 namespace QueryStageDelete {
 
-    using boost::scoped_ptr;
-    using std::vector;
+using boost::scoped_ptr;
+using std::vector;
 
-    //
-    // Stage-specific tests.
-    //
+//
+// Stage-specific tests.
+//
 
-    class QueryStageDeleteBase {
-    public:
-        QueryStageDeleteBase() : _client(&_txn) {
-            Client::WriteContext ctx(&_txn, ns());
+class QueryStageDeleteBase {
+public:
+    QueryStageDeleteBase() : _client(&_txn) {
+        Client::WriteContext ctx(&_txn, ns());
 
-            for (size_t i = 0; i < numObj(); ++i) {
-                BSONObjBuilder bob;
-                bob.append("foo", static_cast<long long int>(i));
-                _client.insert(ns(), bob.obj());
+        for (size_t i = 0; i < numObj(); ++i) {
+            BSONObjBuilder bob;
+            bob.append("foo", static_cast<long long int>(i));
+            _client.insert(ns(), bob.obj());
+        }
+    }
+
+    virtual ~QueryStageDeleteBase() {
+        Client::WriteContext ctx(&_txn, ns());
+        _client.dropCollection(ns());
+    }
+
+    void remove(const BSONObj& obj) {
+        _client.remove(ns(), obj);
+    }
+
+    void getLocs(Collection* collection,
+                 CollectionScanParams::Direction direction,
+                 vector<RecordId>* out) {
+        WorkingSet ws;
+
+        CollectionScanParams params;
+        params.collection = collection;
+        params.direction = direction;
+        params.tailable = false;
+
+        scoped_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+        while (!scan->isEOF()) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = scan->work(&id);
+            if (PlanStage::ADVANCED == state) {
+                WorkingSetMember* member = ws.get(id);
+                verify(member->hasLoc());
+                out->push_back(member->loc);
             }
         }
+    }
 
-        virtual ~QueryStageDeleteBase() {
-            Client::WriteContext ctx(&_txn, ns());
-            _client.dropCollection(ns());
+    static size_t numObj() {
+        return 50;
+    }
+
+    static const char* ns() {
+        return "unittests.QueryStageDelete";
+    }
+
+protected:
+    OperationContextImpl _txn;
+
+private:
+    DBDirectClient _client;
+};
+
+//
+// Test invalidation for the delete stage.  Use the delete stage to delete some objects
+// retrieved by a collscan, then invalidate the upcoming object, then expect the delete stage to
+// skip over it and successfully delete the rest.
+//
+class QueryStageDeleteInvalidateUpcomingObject : public QueryStageDeleteBase {
+public:
+    void run() {
+        Client::WriteContext ctx(&_txn, ns());
+
+        Collection* coll = ctx.getCollection();
+
+        // Get the RecordIds that would be returned by an in-order scan.
+        vector<RecordId> locs;
+        getLocs(coll, CollectionScanParams::FORWARD, &locs);
+
+        // Configure the scan.
+        CollectionScanParams collScanParams;
+        collScanParams.collection = coll;
+        collScanParams.direction = CollectionScanParams::FORWARD;
+        collScanParams.tailable = false;
+
+        // Configure the delete stage.
+        DeleteStageParams deleteStageParams;
+        deleteStageParams.isMulti = true;
+        deleteStageParams.shouldCallLogOp = false;
+
+        WorkingSet ws;
+        DeleteStage deleteStage(&_txn,
+                                deleteStageParams,
+                                &ws,
+                                coll,
+                                new CollectionScan(&_txn, collScanParams, &ws, NULL));
+
+        const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage.getSpecificStats());
+
+        const size_t targetDocIndex = 10;
+
+        while (stats->docsDeleted < targetDocIndex) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = deleteStage.work(&id);
+            ASSERT_EQUALS(PlanStage::NEED_TIME, state);
         }
 
-        void remove(const BSONObj& obj) {
-            _client.remove(ns(), obj);
+        // Remove locs[targetDocIndex];
+        deleteStage.saveState();
+        deleteStage.invalidate(&_txn, locs[targetDocIndex], INVALIDATION_DELETION);
+        BSONObj targetDoc = coll->docFor(&_txn, locs[targetDocIndex]).value();
+        ASSERT(!targetDoc.isEmpty());
+        remove(targetDoc);
+        deleteStage.restoreState(&_txn);
+
+        // Remove the rest.
+        while (!deleteStage.isEOF()) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = deleteStage.work(&id);
+            invariant(PlanStage::NEED_TIME == state || PlanStage::IS_EOF == state);
         }
 
-        void getLocs(Collection* collection,
-                     CollectionScanParams::Direction direction,
-                     vector<RecordId>* out) {
-            WorkingSet ws;
+        ASSERT_EQUALS(numObj() - 1, stats->docsDeleted);
+    }
+};
 
-            CollectionScanParams params;
-            params.collection = collection;
-            params.direction = direction;
-            params.tailable = false;
+class All : public Suite {
+public:
+    All() : Suite("query_stage_delete") {}
 
-            scoped_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
-            while (!scan->isEOF()) {
-                WorkingSetID id = WorkingSet::INVALID_ID;
-                PlanStage::StageState state = scan->work(&id);
-                if (PlanStage::ADVANCED == state) {
-                    WorkingSetMember* member = ws.get(id);
-                    verify(member->hasLoc());
-                    out->push_back(member->loc);
-                }
-            }
-        }
+    void setupTests() {
+        // Stage-specific tests below.
+        add<QueryStageDeleteInvalidateUpcomingObject>();
+    }
+};
 
-        static size_t numObj() { return 50; }
-
-        static const char* ns() { return "unittests.QueryStageDelete"; }
-
-    protected:
-        OperationContextImpl _txn;
-
-    private:
-        DBDirectClient _client;
-    };
-
-    //
-    // Test invalidation for the delete stage.  Use the delete stage to delete some objects
-    // retrieved by a collscan, then invalidate the upcoming object, then expect the delete stage to
-    // skip over it and successfully delete the rest.
-    //
-    class QueryStageDeleteInvalidateUpcomingObject : public QueryStageDeleteBase {
-    public:
-        void run() {
-            Client::WriteContext ctx(&_txn, ns());
-
-            Collection* coll = ctx.getCollection();
-
-            // Get the RecordIds that would be returned by an in-order scan.
-            vector<RecordId> locs;
-            getLocs(coll, CollectionScanParams::FORWARD, &locs);
-
-            // Configure the scan.
-            CollectionScanParams collScanParams;
-            collScanParams.collection = coll;
-            collScanParams.direction = CollectionScanParams::FORWARD;
-            collScanParams.tailable = false;
-
-            // Configure the delete stage.
-            DeleteStageParams deleteStageParams;
-            deleteStageParams.isMulti = true;
-            deleteStageParams.shouldCallLogOp = false;
-
-            WorkingSet ws;
-            DeleteStage deleteStage(&_txn, deleteStageParams, &ws, coll,
-                                    new CollectionScan(&_txn, collScanParams, &ws, NULL));
-
-            const DeleteStats* stats =
-                static_cast<const DeleteStats*>(deleteStage.getSpecificStats());
-
-            const size_t targetDocIndex = 10;
-
-            while (stats->docsDeleted < targetDocIndex) {
-                WorkingSetID id = WorkingSet::INVALID_ID;
-                PlanStage::StageState state = deleteStage.work(&id);
-                ASSERT_EQUALS(PlanStage::NEED_TIME, state);
-            }
-
-            // Remove locs[targetDocIndex];
-            deleteStage.saveState();
-            deleteStage.invalidate(&_txn, locs[targetDocIndex], INVALIDATION_DELETION);
-            BSONObj targetDoc = coll->docFor(&_txn, locs[targetDocIndex]).value();
-            ASSERT(!targetDoc.isEmpty());
-            remove(targetDoc);
-            deleteStage.restoreState(&_txn);
-
-            // Remove the rest.
-            while (!deleteStage.isEOF()) {
-                WorkingSetID id = WorkingSet::INVALID_ID;
-                PlanStage::StageState state = deleteStage.work(&id);
-                invariant(PlanStage::NEED_TIME == state || PlanStage::IS_EOF == state);
-            }
-
-            ASSERT_EQUALS(numObj() - 1, stats->docsDeleted);
-        }
-    };
-
-    class All : public Suite {
-    public:
-        All() : Suite("query_stage_delete") {}
-
-        void setupTests() {
-            // Stage-specific tests below.
-            add<QueryStageDeleteInvalidateUpcomingObject>();
-        }
-    };
-
-    SuiteInstance<All> all;
-
+SuiteInstance<All> all;
 }

@@ -36,128 +36,127 @@
 
 namespace mongo {
 
-    class CollectionMetadata;
-    class CollectionType;
-    class DBClientCursor;
+class CollectionMetadata;
+class CollectionType;
+class DBClientCursor;
+
+/**
+ * The MetadataLoader is responsible for interfacing with the config servers and previous
+ * metadata to build new instances of CollectionMetadata.  MetadataLoader is the "builder"
+ * class for metadata.
+ *
+ * CollectionMetadata has both persisted and volatile state (for now) - the persisted
+ * config server chunk state and the volatile pending state which is only tracked locally
+ * while a server is the primary.  This requires a two-step loading process - the persisted
+ * chunk state *cannot* be loaded in a DBLock lock while the pending chunk state *must* be.
+ *
+ * Example usage:
+ * beforeMetadata = <get latest local metadata>;
+ * remoteMetadata = makeCollectionMetadata( beforeMetadata, remoteMetadata );
+ * DBLock lock(txn, dbname, MODE_X);
+ * afterMetadata = <get latest local metadata>;
+ * promotePendingChunks( afterMetadata, remoteMetadata );
+ *
+ * The loader will go out of its way to try to fetch the smaller amount possible of data
+ * from the config server without sacrificing the freshness and accuracy of the metadata it
+ * builds. (See ConfigDiffTracker class.)
+ *
+ * The class is not thread safe.
+ */
+class MetadataLoader {
+public:
+    /**
+     * Takes a connection std::string to the config servers to be used for loading data. Note
+     * that we make no restrictions about which connection std::string that is, including
+     * CUSTOM, which we rely on in testing.
+     */
+    explicit MetadataLoader(const ConnectionString& configLoc);
+
+    ~MetadataLoader();
 
     /**
-     * The MetadataLoader is responsible for interfacing with the config servers and previous
-     * metadata to build new instances of CollectionMetadata.  MetadataLoader is the "builder"
-     * class for metadata.
+     * Fills a new metadata instance representing the chunkset of the collection 'ns'
+     * (or its entirety, if not sharded) that lives on 'shard' with data from the config server.
+     * Optionally, uses an 'oldMetadata' for the same 'ns'/'shard'; the contents of
+     * 'oldMetadata' can help reducing the amount of data read from the config servers.
      *
-     * CollectionMetadata has both persisted and volatile state (for now) - the persisted 
-     * config server chunk state and the volatile pending state which is only tracked locally
-     * while a server is the primary.  This requires a two-step loading process - the persisted
-     * chunk state *cannot* be loaded in a DBLock lock while the pending chunk state *must* be.
-     * 
-     * Example usage: 
-     * beforeMetadata = <get latest local metadata>;
-     * remoteMetadata = makeCollectionMetadata( beforeMetadata, remoteMetadata );
-     * DBLock lock(txn, dbname, MODE_X);
-     * afterMetadata = <get latest local metadata>;
-     * promotePendingChunks( afterMetadata, remoteMetadata );
+     * Locking note:
+     *    + Must not be called in a DBLock, since this loads over the network
      *
-     * The loader will go out of its way to try to fetch the smaller amount possible of data
-     * from the config server without sacrificing the freshness and accuracy of the metadata it
-     * builds. (See ConfigDiffTracker class.)
+     * OK on success.
      *
-     * The class is not thread safe.
+     * Failure return values:
+     * Abnormal:
+     * @return FailedToParse if there was an error parsing the remote config data
+     * Normal:
+     * @return NamespaceNotFound if the collection no longer exists
+     * @return HostUnreachable if there was an error contacting the config servers
+     * @return RemoteChangeDetected if the data loaded was modified by another operation
      */
-    class MetadataLoader {
-    public:
+    Status makeCollectionMetadata(const std::string& ns,
+                                  const std::string& shard,
+                                  const CollectionMetadata* oldMetadata,
+                                  CollectionMetadata* metadata) const;
 
-        /**
-         * Takes a connection std::string to the config servers to be used for loading data. Note
-         * that we make no restrictions about which connection std::string that is, including
-         * CUSTOM, which we rely on in testing.
-         */
-        explicit MetadataLoader( const ConnectionString& configLoc );
+    /**
+     * Replaces the pending chunks of the remote metadata with the more up-to-date pending
+     * chunks of the 'after' metadata (metadata from after the remote load), and removes pending
+     * chunks which are now regular chunks.
+     *
+     * Pending chunks should always correspond to one or zero chunks in the remoteMetadata
+     * if the epochs are the same and the remote version is the same or higher, otherwise they
+     * are not applicable.
+     *
+     * Locking note:
+     *    + Must be called in a DBLock, to ensure validity of afterMetadata
+     *
+     * Returns OK if pending chunks correctly follow the rule above or are not applicable
+     * Returns RemoteChangeDetected if pending chunks do not follow the rule above, indicating
+     *                              either the config server or us has changed unexpectedly.
+     *                              This should only occur with manual editing of the config
+     *                              server.
+     *
+     * TODO:  This is a bit ugly but necessary for now.  If/when pending chunk info is stored on
+     * the config server, this should go away.
+     */
+    Status promotePendingChunks(const CollectionMetadata* afterMetadata,
+                                CollectionMetadata* remoteMetadata) const;
 
-        ~MetadataLoader();
+private:
+    ConnectionString _configLoc;
 
-        /**
-         * Fills a new metadata instance representing the chunkset of the collection 'ns'
-         * (or its entirety, if not sharded) that lives on 'shard' with data from the config server.
-         * Optionally, uses an 'oldMetadata' for the same 'ns'/'shard'; the contents of
-         * 'oldMetadata' can help reducing the amount of data read from the config servers.
-         *
-         * Locking note:
-         *    + Must not be called in a DBLock, since this loads over the network
-         *
-         * OK on success.
-         *
-         * Failure return values:
-         * Abnormal:
-         * @return FailedToParse if there was an error parsing the remote config data
-         * Normal:
-         * @return NamespaceNotFound if the collection no longer exists
-         * @return HostUnreachable if there was an error contacting the config servers
-         * @return RemoteChangeDetected if the data loaded was modified by another operation
-         */
-        Status makeCollectionMetadata( const std::string& ns,
-                                       const std::string& shard,
-                                       const CollectionMetadata* oldMetadata,
-                                       CollectionMetadata* metadata ) const;
+    /**
+     * Returns OK and fills in the internal state of 'metadata' with general collection
+     * information, not including chunks.
+     *
+     * If information about the collection can be accessed or is invalid, returns:
+     * @return NamespaceNotFound if the collection no longer exists
+     * @return FailedToParse if there was an error parsing the remote config data
+     * @return HostUnreachable if there was an error contacting the config servers
+     * @return RemoteChangeDetected if the collection doc loaded is unexpectedly different
+     *
+     */
+    Status initCollection(const std::string& ns,
+                          const std::string& shard,
+                          CollectionMetadata* metadata) const;
 
-        /**
-         * Replaces the pending chunks of the remote metadata with the more up-to-date pending
-         * chunks of the 'after' metadata (metadata from after the remote load), and removes pending
-         * chunks which are now regular chunks.
-         *
-         * Pending chunks should always correspond to one or zero chunks in the remoteMetadata
-         * if the epochs are the same and the remote version is the same or higher, otherwise they
-         * are not applicable.
-         *
-         * Locking note:
-         *    + Must be called in a DBLock, to ensure validity of afterMetadata
-         *
-         * Returns OK if pending chunks correctly follow the rule above or are not applicable 
-         * Returns RemoteChangeDetected if pending chunks do not follow the rule above, indicating
-         *                              either the config server or us has changed unexpectedly.
-         *                              This should only occur with manual editing of the config
-         *                              server.
-         *
-         * TODO:  This is a bit ugly but necessary for now.  If/when pending chunk info is stored on
-         * the config server, this should go away.
-         */
-        Status promotePendingChunks( const CollectionMetadata* afterMetadata,
-                                     CollectionMetadata* remoteMetadata ) const;
+    /**
+     * Returns OK and fills in the chunk state of 'metadata' to portray the chunks of the
+     * collection 'ns' that sit in 'shard'. If provided, uses the contents of 'oldMetadata'
+     * as a base (see description in initCollection above).
+     *
+     * If information about the chunks can be accessed or is invalid, returns:
+     * @return HostUnreachable if there was an error contacting the config servers
+     * @return RemoteChangeDetected if the chunks loaded are unexpectedly different
+     *
+     * For backwards compatibility,
+     * @return NamespaceNotFound if there are no chunks loaded and an epoch change is detected
+     * TODO: @return FailedToParse
+     */
+    Status initChunks(const std::string& ns,
+                      const std::string& shard,
+                      const CollectionMetadata* oldMetadata,
+                      CollectionMetadata* metadata) const;
+};
 
-    private:
-        ConnectionString _configLoc;
-
-        /**
-         * Returns OK and fills in the internal state of 'metadata' with general collection
-         * information, not including chunks.
-         *
-         * If information about the collection can be accessed or is invalid, returns:
-         * @return NamespaceNotFound if the collection no longer exists
-         * @return FailedToParse if there was an error parsing the remote config data
-         * @return HostUnreachable if there was an error contacting the config servers
-         * @return RemoteChangeDetected if the collection doc loaded is unexpectedly different
-         *
-         */
-        Status initCollection( const std::string& ns,
-                               const std::string& shard,
-                               CollectionMetadata* metadata ) const;
-
-        /**
-         * Returns OK and fills in the chunk state of 'metadata' to portray the chunks of the
-         * collection 'ns' that sit in 'shard'. If provided, uses the contents of 'oldMetadata'
-         * as a base (see description in initCollection above).
-         *
-         * If information about the chunks can be accessed or is invalid, returns:
-         * @return HostUnreachable if there was an error contacting the config servers
-         * @return RemoteChangeDetected if the chunks loaded are unexpectedly different
-         *
-         * For backwards compatibility,
-         * @return NamespaceNotFound if there are no chunks loaded and an epoch change is detected
-         * TODO: @return FailedToParse
-         */
-        Status initChunks( const std::string& ns,
-                           const std::string& shard,
-                           const CollectionMetadata* oldMetadata,
-                           CollectionMetadata* metadata ) const;
-    };
-
-} // namespace mongo
+}  // namespace mongo

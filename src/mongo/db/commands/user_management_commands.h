@@ -32,19 +32,19 @@
 
 namespace mongo {
 
-    class CmdAuthSchemaUpgrade : public Command {
-    public:
-        CmdAuthSchemaUpgrade();
-        virtual ~CmdAuthSchemaUpgrade();
+class CmdAuthSchemaUpgrade : public Command {
+public:
+    CmdAuthSchemaUpgrade();
+    virtual ~CmdAuthSchemaUpgrade();
 
-        virtual bool isWriteCommandForConfigServer() const;
-        virtual bool slaveOk() const;
-        virtual bool adminOnly() const;
-        virtual void help(std::stringstream& ss) const;
+    virtual bool isWriteCommandForConfigServer() const;
+    virtual bool slaveOk() const;
+    virtual bool adminOnly() const;
+    virtual void help(std::stringstream& ss) const;
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj);
-    };
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj);
+};
 
 }  // namespace mongo

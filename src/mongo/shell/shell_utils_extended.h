@@ -32,9 +32,9 @@
 
 namespace mongo {
 
-    class Scope;
-    
-    namespace shell_utils {
-        void installShellUtilsExtended( Scope& scope );
-    }
+class Scope;
+
+namespace shell_utils {
+void installShellUtilsExtended(Scope& scope);
+}
 }

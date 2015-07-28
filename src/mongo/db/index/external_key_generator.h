@@ -40,7 +40,7 @@
  */
 namespace mongo {
 
-    // Returns whether or not the largest key the index will generate for the document is too large.
-    bool isAnyIndexKeyTooLarge(const BSONObj& index, const BSONObj& doc);
+// Returns whether or not the largest key the index will generate for the document is too large.
+bool isAnyIndexKeyTooLarge(const BSONObj& index, const BSONObj& doc);
 
 }  // namespace mongo

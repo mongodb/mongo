@@ -35,9 +35,9 @@
 
 namespace mongo {
 
-    // static
-    bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
-        return false;
-    }
+// static
+bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
+    return false;
+}
 
 }  // namespace mongo

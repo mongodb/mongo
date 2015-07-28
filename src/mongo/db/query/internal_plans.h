@@ -38,119 +38,108 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
+
+/**
+ * The internal planner is a one-stop shop for "off-the-shelf" plans.  Most internal procedures
+ * that do not require advanced queries could be served by plans already in here.
+ */
+class InternalPlanner {
+public:
+    enum Direction {
+        FORWARD = 1,
+        BACKWARD = -1,
+    };
+
+    enum IndexScanOptions {
+        // The client is interested in the default outputs of an index scan: BSONObj of the key,
+        // RecordId of the record that's indexed.  The client does its own fetching if required.
+        IXSCAN_DEFAULT = 0,
+
+        // The client wants the fetched object and the RecordId that refers to it.  Delegating
+        // the fetch to the runner allows fetching outside of a lock.
+        IXSCAN_FETCH = 1,
+    };
 
     /**
-     * The internal planner is a one-stop shop for "off-the-shelf" plans.  Most internal procedures
-     * that do not require advanced queries could be served by plans already in here.
+     * Return a collection scan.  Caller owns pointer.
      */
-    class InternalPlanner {
-    public:
-        enum Direction {
-            FORWARD = 1,
-            BACKWARD = -1,
-        };
+    static PlanExecutor* collectionScan(OperationContext* txn,
+                                        const StringData& ns,
+                                        Collection* collection,
+                                        const Direction direction = FORWARD,
+                                        const RecordId startLoc = RecordId()) {
+        WorkingSet* ws = new WorkingSet();
 
-        enum IndexScanOptions {
-            // The client is interested in the default outputs of an index scan: BSONObj of the key,
-            // RecordId of the record that's indexed.  The client does its own fetching if required.
-            IXSCAN_DEFAULT = 0,
-
-            // The client wants the fetched object and the RecordId that refers to it.  Delegating
-            // the fetch to the runner allows fetching outside of a lock.
-            IXSCAN_FETCH = 1,
-        };
-
-        /**
-         * Return a collection scan.  Caller owns pointer.
-         */
-        static PlanExecutor* collectionScan(OperationContext* txn,
-                                            const StringData& ns,
-                                            Collection* collection,
-                                            const Direction direction = FORWARD,
-                                            const RecordId startLoc = RecordId()) {
-            WorkingSet* ws = new WorkingSet();
-
-            if (NULL == collection) {
-                EOFStage* eof = new EOFStage();
-                PlanExecutor* exec;
-                // Takes ownership of 'ws' and 'eof'.
-                Status execStatus =  PlanExecutor::make(txn,
-                                                        ws,
-                                                        eof,
-                                                        ns.toString(),
-                                                        PlanExecutor::YIELD_MANUAL,
-                                                        &exec);
-                invariant(execStatus.isOK());
-                return exec;
-            }
-
-            invariant( ns == collection->ns().ns() );
-
-            CollectionScanParams params;
-            params.collection = collection;
-            params.start = startLoc;
-
-            if (FORWARD == direction) {
-                params.direction = CollectionScanParams::FORWARD;
-            }
-            else {
-                params.direction = CollectionScanParams::BACKWARD;
-            }
-
-            CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
+        if (NULL == collection) {
+            EOFStage* eof = new EOFStage();
             PlanExecutor* exec;
-            // Takes ownership of 'ws' and 'cs'.
-            Status execStatus = PlanExecutor::make(txn,
-                                                   ws,
-                                                   cs,
-                                                   collection,
-                                                   PlanExecutor::YIELD_MANUAL,
-                                                   &exec);
+            // Takes ownership of 'ws' and 'eof'.
+            Status execStatus =
+                PlanExecutor::make(txn, ws, eof, ns.toString(), PlanExecutor::YIELD_MANUAL, &exec);
             invariant(execStatus.isOK());
             return exec;
         }
 
-        /**
-         * Return an index scan.  Caller owns returned pointer.
-         */
-        static PlanExecutor* indexScan(OperationContext* txn,
-                                       const Collection* collection,
-                                       const IndexDescriptor* descriptor,
-                                       const BSONObj& startKey, const BSONObj& endKey,
-                                       bool endKeyInclusive, Direction direction = FORWARD,
-                                       int options = 0) {
-            invariant(collection);
-            invariant(descriptor);
+        invariant(ns == collection->ns().ns());
 
-            IndexScanParams params;
-            params.descriptor = descriptor;
-            params.direction = direction;
-            params.bounds.isSimpleRange = true;
-            params.bounds.startKey = startKey;
-            params.bounds.endKey = endKey;
-            params.bounds.endKeyInclusive = endKeyInclusive;
+        CollectionScanParams params;
+        params.collection = collection;
+        params.start = startLoc;
 
-            WorkingSet* ws = new WorkingSet();
-            IndexScan* ix = new IndexScan(txn, params, ws, NULL);
-
-            PlanStage* root = ix;
-
-            if (IXSCAN_FETCH & options) {
-                root = new FetchStage(txn, ws, root, NULL, collection);
-            }
-
-            PlanExecutor* exec;
-            // Takes ownership of 'ws' and 'root'.
-            Status execStatus = PlanExecutor::make(txn,
-                                                   ws,
-                                                   root,
-                                                   collection,
-                                                   PlanExecutor::YIELD_MANUAL,
-                                                   &exec);
-            invariant(execStatus.isOK());
-            return exec;
+        if (FORWARD == direction) {
+            params.direction = CollectionScanParams::FORWARD;
+        } else {
+            params.direction = CollectionScanParams::BACKWARD;
         }
-    };
+
+        CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
+        PlanExecutor* exec;
+        // Takes ownership of 'ws' and 'cs'.
+        Status execStatus =
+            PlanExecutor::make(txn, ws, cs, collection, PlanExecutor::YIELD_MANUAL, &exec);
+        invariant(execStatus.isOK());
+        return exec;
+    }
+
+    /**
+     * Return an index scan.  Caller owns returned pointer.
+     */
+    static PlanExecutor* indexScan(OperationContext* txn,
+                                   const Collection* collection,
+                                   const IndexDescriptor* descriptor,
+                                   const BSONObj& startKey,
+                                   const BSONObj& endKey,
+                                   bool endKeyInclusive,
+                                   Direction direction = FORWARD,
+                                   int options = 0) {
+        invariant(collection);
+        invariant(descriptor);
+
+        IndexScanParams params;
+        params.descriptor = descriptor;
+        params.direction = direction;
+        params.bounds.isSimpleRange = true;
+        params.bounds.startKey = startKey;
+        params.bounds.endKey = endKey;
+        params.bounds.endKeyInclusive = endKeyInclusive;
+
+        WorkingSet* ws = new WorkingSet();
+        IndexScan* ix = new IndexScan(txn, params, ws, NULL);
+
+        PlanStage* root = ix;
+
+        if (IXSCAN_FETCH & options) {
+            root = new FetchStage(txn, ws, root, NULL, collection);
+        }
+
+        PlanExecutor* exec;
+        // Takes ownership of 'ws' and 'root'.
+        Status execStatus =
+            PlanExecutor::make(txn, ws, root, collection, PlanExecutor::YIELD_MANUAL, &exec);
+        invariant(execStatus.isOK());
+        return exec;
+    }
+};
 
 }  // namespace mongo

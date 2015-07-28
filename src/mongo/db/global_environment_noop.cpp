@@ -34,49 +34,46 @@
 
 namespace mongo {
 
-    StorageEngine* GlobalEnvironmentNoop::getGlobalStorageEngine() {
-        return NULL;
-    }
+StorageEngine* GlobalEnvironmentNoop::getGlobalStorageEngine() {
+    return NULL;
+}
 
-    void GlobalEnvironmentNoop::setGlobalStorageEngine(const std::string& name) {
-    }
+void GlobalEnvironmentNoop::setGlobalStorageEngine(const std::string& name) {}
 
-    void GlobalEnvironmentNoop::shutdownGlobalStorageEngineCleanly() {
-    }
+void GlobalEnvironmentNoop::shutdownGlobalStorageEngineCleanly() {}
 
-    void GlobalEnvironmentNoop::registerStorageEngine(const std::string& name,
-                                                      const StorageEngine::Factory* factory) {
-        // Takes ownership of 'factory' and deletes it because we don't need it.
-        delete factory;
-    }
+void GlobalEnvironmentNoop::registerStorageEngine(const std::string& name,
+                                                  const StorageEngine::Factory* factory) {
+    // Takes ownership of 'factory' and deletes it because we don't need it.
+    delete factory;
+}
 
-    bool GlobalEnvironmentNoop::isRegisteredStorageEngine(const std::string& name) {
-        return false;
-    }
+bool GlobalEnvironmentNoop::isRegisteredStorageEngine(const std::string& name) {
+    return false;
+}
 
-    StorageFactoriesIterator* GlobalEnvironmentNoop::makeStorageFactoriesIterator() {
-        return NULL;
-    }
+StorageFactoriesIterator* GlobalEnvironmentNoop::makeStorageFactoriesIterator() {
+    return NULL;
+}
 
-    void GlobalEnvironmentNoop::setKillAllOperations() { }
+void GlobalEnvironmentNoop::setKillAllOperations() {}
 
-    void GlobalEnvironmentNoop::unsetKillAllOperations() { }
+void GlobalEnvironmentNoop::unsetKillAllOperations() {}
 
-    bool GlobalEnvironmentNoop::getKillAllOperations() {
-        return false;
-    }
+bool GlobalEnvironmentNoop::getKillAllOperations() {
+    return false;
+}
 
-    bool GlobalEnvironmentNoop::killOperation(unsigned int opId) {
-        return false;
-    }
+bool GlobalEnvironmentNoop::killOperation(unsigned int opId) {
+    return false;
+}
 
-    void GlobalEnvironmentNoop::killAllUserOperations(const OperationContext* txn) {}
+void GlobalEnvironmentNoop::killAllUserOperations(const OperationContext* txn) {}
 
-    void GlobalEnvironmentNoop::registerKillOpListener(KillOpListenerInterface* listener) {
-    }
+void GlobalEnvironmentNoop::registerKillOpListener(KillOpListenerInterface* listener) {}
 
-    OperationContext* GlobalEnvironmentNoop::newOpCtx() {
-        return new OperationContextNoop();
-    }
+OperationContext* GlobalEnvironmentNoop::newOpCtx() {
+    return new OperationContextNoop();
+}
 
 }  // namespace mongo

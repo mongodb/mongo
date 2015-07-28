@@ -49,40 +49,37 @@
 
 namespace mongo {
 
-    IndexAccessMethod* KVDatabaseCatalogEntry::getIndex( OperationContext* txn,
-                                                         const CollectionCatalogEntry* collection,
-                                                         IndexCatalogEntry* index ) {
-        IndexDescriptor* desc = index->descriptor();
+IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* txn,
+                                                    const CollectionCatalogEntry* collection,
+                                                    IndexCatalogEntry* index) {
+    IndexDescriptor* desc = index->descriptor();
 
-        const string& type = desc->getAccessMethodName();
+    const string& type = desc->getAccessMethodName();
 
-        string ident = _engine->getCatalog()->getIndexIdent( txn,
-                                                             collection->ns().ns(),
-                                                             desc->indexName() );
+    string ident =
+        _engine->getCatalog()->getIndexIdent(txn, collection->ns().ns(), desc->indexName());
 
-        SortedDataInterface* sdi =
-            _engine->getEngine()->getSortedDataInterface( txn, ident, desc );
+    SortedDataInterface* sdi = _engine->getEngine()->getSortedDataInterface(txn, ident, desc);
 
-        if ("" == type)
-            return new BtreeAccessMethod( index, sdi );
+    if ("" == type)
+        return new BtreeAccessMethod(index, sdi);
 
-        if (IndexNames::HASHED == type)
-            return new HashAccessMethod( index, sdi );
+    if (IndexNames::HASHED == type)
+        return new HashAccessMethod(index, sdi);
 
-        if (IndexNames::GEO_2DSPHERE == type)
-            return new S2AccessMethod( index, sdi );
+    if (IndexNames::GEO_2DSPHERE == type)
+        return new S2AccessMethod(index, sdi);
 
-        if (IndexNames::TEXT == type)
-            return new FTSAccessMethod( index, sdi );
+    if (IndexNames::TEXT == type)
+        return new FTSAccessMethod(index, sdi);
 
-        if (IndexNames::GEO_HAYSTACK == type)
-            return new HaystackAccessMethod( index, sdi );
+    if (IndexNames::GEO_HAYSTACK == type)
+        return new HaystackAccessMethod(index, sdi);
 
-        if (IndexNames::GEO_2D == type)
-            return new TwoDAccessMethod( index, sdi );
+    if (IndexNames::GEO_2D == type)
+        return new TwoDAccessMethod(index, sdi);
 
-        log() << "Can't find index for keyPattern " << desc->keyPattern();
-        invariant( false );
-    }
-
+    log() << "Can't find index for keyPattern " << desc->keyPattern();
+    invariant(false);
+}
 }

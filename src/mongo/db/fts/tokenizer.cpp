@@ -36,107 +36,105 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        Tokenizer::Tokenizer( const FTSLanguage& language, const StringData& str )
-            : _pos(0), _raw( str ) {
-            _english = ( language.str() == "english" );
-            _skipWhitespace();
-            _previousWhiteSpace = true;
-        }
+Tokenizer::Tokenizer(const FTSLanguage& language, const StringData& str) : _pos(0), _raw(str) {
+    _english = (language.str() == "english");
+    _skipWhitespace();
+    _previousWhiteSpace = true;
+}
 
-        bool Tokenizer::more() const {
-            return _pos < _raw.size();
-        }
+bool Tokenizer::more() const {
+    return _pos < _raw.size();
+}
 
-        Token Tokenizer::next() {
-            if ( _pos >= _raw.size() )
-                return Token( Token::INVALID, "", 0, false );
+Token Tokenizer::next() {
+    if (_pos >= _raw.size())
+        return Token(Token::INVALID, "", 0, false);
 
-            unsigned start = _pos++;
-            Token::Type type = _type( _raw[start] );
-            if ( type == Token::WHITESPACE ) abort();
+    unsigned start = _pos++;
+    Token::Type type = _type(_raw[start]);
+    if (type == Token::WHITESPACE)
+        abort();
 
-            if ( type == Token::TEXT )
-                while ( _pos < _raw.size() && _type( _raw[_pos] ) == type )
-                    _pos++;
+    if (type == Token::TEXT)
+        while (_pos < _raw.size() && _type(_raw[_pos]) == type)
+            _pos++;
 
-            StringData ret = _raw.substr( start, _pos - start );
-            bool old = _previousWhiteSpace;
-            _previousWhiteSpace = _skipWhitespace();
-            return Token( type, ret, start, old );
-        }
-
-
-        bool Tokenizer::_skipWhitespace() {
-            unsigned start = _pos;
-            while ( _pos < _raw.size() && _type( _raw[_pos] ) == Token::WHITESPACE )
-                _pos++;
-            return _pos > start;
-        }
+    StringData ret = _raw.substr(start, _pos - start);
+    bool old = _previousWhiteSpace;
+    _previousWhiteSpace = _skipWhitespace();
+    return Token(type, ret, start, old);
+}
 
 
-        Token::Type Tokenizer::_type( char c ) const {
-            switch ( c ) {
-            case ' ':
-            case '\f':
-            case '\v':
-            case '\t':
-            case '\r':
-            case '\n':
-                return Token::WHITESPACE;
-            case '\'':
-                if ( _english )
-                    return Token::TEXT;
-                else
-                    return Token::WHITESPACE;
+bool Tokenizer::_skipWhitespace() {
+    unsigned start = _pos;
+    while (_pos < _raw.size() && _type(_raw[_pos]) == Token::WHITESPACE)
+        _pos++;
+    return _pos > start;
+}
 
-            case '~':
-            case '`':
 
-            case '!':
-            case '@':
-            case '#':
-            case '$':
-            case '%':
-            case '^':
-            case '&':
-            case '*':
-            case '(':
-            case ')':
-
-            case '-':
-
-            case '=':
-            case '+':
-
-            case '[':
-            case ']':
-            case '{':
-            case '}':
-            case '|':
-            case '\\':
-
-            case ';':
-            case ':':
-
-            case '"':
-
-            case '<':
-            case '>':
-
-            case ',':
-            case '.':
-
-            case '/':
-            case '?':
-
-                return Token::DELIMITER;
-            default:
+Token::Type Tokenizer::_type(char c) const {
+    switch (c) {
+        case ' ':
+        case '\f':
+        case '\v':
+        case '\t':
+        case '\r':
+        case '\n':
+            return Token::WHITESPACE;
+        case '\'':
+            if (_english)
                 return Token::TEXT;
-            }
-        }
+            else
+                return Token::WHITESPACE;
 
+        case '~':
+        case '`':
+
+        case '!':
+        case '@':
+        case '#':
+        case '$':
+        case '%':
+        case '^':
+        case '&':
+        case '*':
+        case '(':
+        case ')':
+
+        case '-':
+
+        case '=':
+        case '+':
+
+        case '[':
+        case ']':
+        case '{':
+        case '}':
+        case '|':
+        case '\\':
+
+        case ';':
+        case ':':
+
+        case '"':
+
+        case '<':
+        case '>':
+
+        case ',':
+        case '.':
+
+        case '/':
+        case '?':
+
+            return Token::DELIMITER;
+        default:
+            return Token::TEXT;
     }
-
+}
+}
 }

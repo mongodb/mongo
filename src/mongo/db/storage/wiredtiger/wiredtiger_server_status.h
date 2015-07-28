@@ -34,19 +34,19 @@
 
 namespace mongo {
 
-    class WiredTigerKVEngine;
+class WiredTigerKVEngine;
 
-    /**
-     * Adds "wiredTiger" to the results of db.serverStatus().
-     */
-    class WiredTigerServerStatusSection : public ServerStatusSection {
-    public:
-        WiredTigerServerStatusSection(WiredTigerKVEngine* engine);
-        virtual bool includeByDefault() const;
-        virtual BSONObj generateSection(OperationContext* txn,
-                                        const BSONElement& configElement) const;
-    private:
-        WiredTigerKVEngine* _engine;
-    };
+/**
+ * Adds "wiredTiger" to the results of db.serverStatus().
+ */
+class WiredTigerServerStatusSection : public ServerStatusSection {
+public:
+    WiredTigerServerStatusSection(WiredTigerKVEngine* engine);
+    virtual bool includeByDefault() const;
+    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const;
+
+private:
+    WiredTigerKVEngine* _engine;
+};
 
 }  // namespace mongo

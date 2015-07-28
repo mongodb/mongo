@@ -37,102 +37,98 @@
 
 namespace mongo {
 
-    class CustomDirectClient: public DBDirectClient {
-    public:
-        CustomDirectClient(OperationContext* txn) : DBDirectClient(txn) {
-            setWireVersions(minWireVersion, maxWireVersion);
-        }
+class CustomDirectClient : public DBDirectClient {
+public:
+    CustomDirectClient(OperationContext* txn) : DBDirectClient(txn) {
+        setWireVersions(minWireVersion, maxWireVersion);
+    }
 
-        virtual ConnectionString::ConnectionType type() const {
-            return ConnectionString::CUSTOM;
-        }
+    virtual ConnectionString::ConnectionType type() const {
+        return ConnectionString::CUSTOM;
+    }
 
-        virtual bool recv( Message& m ) {
-            // This is tailored to act as a dummy response for write commands.
+    virtual bool recv(Message& m) {
+        // This is tailored to act as a dummy response for write commands.
 
-            BufBuilder bb;
-            bb.skip(sizeof(QueryResult::Value));
+        BufBuilder bb;
+        bb.skip(sizeof(QueryResult::Value));
 
-            BSONObj cmdResult(BSON("ok" << 1));
+        BSONObj cmdResult(BSON("ok" << 1));
 
-            bb.appendBuf(cmdResult.objdata(), cmdResult.objsize());
+        bb.appendBuf(cmdResult.objdata(), cmdResult.objsize());
 
-            QueryResult::View qr = bb.buf();
-            bb.decouple();
-            qr.setResultFlagsToOk();
-            qr.msgdata().setLen(bb.len());
-            qr.msgdata().setOperation(opReply);
-            qr.setCursorId(0);
-            qr.setStartingFrom(0);
-            qr.setNReturned(1);
-            m.setData(qr.view2ptr(), true);
+        QueryResult::View qr = bb.buf();
+        bb.decouple();
+        qr.setResultFlagsToOk();
+        qr.msgdata().setLen(bb.len());
+        qr.msgdata().setOperation(opReply);
+        qr.setCursorId(0);
+        qr.setStartingFrom(0);
+        qr.setNReturned(1);
+        m.setData(qr.view2ptr(), true);
 
-            return true;
-        }
-    };
+        return true;
+    }
+};
 
-    class CustomConnectHook : public ConnectionString::ConnectionHook {
-    public:
-        CustomConnectHook(OperationContext* txn) : _txn(txn) { }
+class CustomConnectHook : public ConnectionString::ConnectionHook {
+public:
+    CustomConnectHook(OperationContext* txn) : _txn(txn) {}
 
-        virtual DBClientBase* connect(const ConnectionString& connStr,
-                                      std::string& errmsg,
-                                      double socketTimeout)
-        {
-            // Note - must be new, since it gets owned elsewhere
-            return new CustomDirectClient(_txn);
-        }
+    virtual DBClientBase* connect(const ConnectionString& connStr,
+                                  std::string& errmsg,
+                                  double socketTimeout) {
+        // Note - must be new, since it gets owned elsewhere
+        return new CustomDirectClient(_txn);
+    }
 
-    private:
-        OperationContext* const _txn;
-    };
+private:
+    OperationContext* const _txn;
+};
+
+/**
+ * Fixture for testing complicated operations against a "virtual" config server.
+ *
+ * Use this if your test requires complex commands and writing to many collections,
+ * otherwise a unit test in the mock framework may be a better option.
+ */
+class ConfigServerFixture : public mongo::unittest::Test {
+public:
+    ConfigServerFixture();
 
     /**
-     * Fixture for testing complicated operations against a "virtual" config server.
-     *
-     * Use this if your test requires complex commands and writing to many collections,
-     * otherwise a unit test in the mock framework may be a better option.
+     * Returns a connection std::string to the virtual config server.
      */
-    class ConfigServerFixture: public mongo::unittest::Test {
-    public:
+    ConnectionString configSvr() const {
+        return ConnectionString(HostAndPort("$dummy:10000"));
+    }
 
-        ConfigServerFixture();
+    /**
+     * Clears all data on the server
+     */
+    void clearServer();
 
-        /**
-         * Returns a connection std::string to the virtual config server.
-         */
-        ConnectionString configSvr() const {
-            return ConnectionString(HostAndPort("$dummy:10000"));
-        }
+    void clearVersion();
+    void clearShards();
+    void clearDatabases();
+    void clearCollections();
+    void clearChunks();
+    void clearPings();
+    void clearChangelog();
 
-        /**
-         * Clears all data on the server
-         */
-        void clearServer();
+    /**
+     * Dumps the contents of the config server to the log.
+     */
+    void dumpServer();
 
-        void clearVersion();
-        void clearShards();
-        void clearDatabases();
-        void clearCollections();
-        void clearChunks();
-        void clearPings();
-        void clearChangelog();
+protected:
+    virtual void setUp();
 
-        /**
-         * Dumps the contents of the config server to the log.
-         */
-        void dumpServer();
-
-    protected:
-
-        virtual void setUp();
-
-        virtual void tearDown();
+    virtual void tearDown();
 
 
-        OperationContextImpl _txn;
-        CustomDirectClient _client;
-        CustomConnectHook* _connectHook;
-    };
-
+    OperationContextImpl _txn;
+    CustomDirectClient _client;
+    CustomConnectHook* _connectHook;
+};
 }

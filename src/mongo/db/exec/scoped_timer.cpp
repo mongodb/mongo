@@ -34,14 +34,12 @@
 
 namespace mongo {
 
-    ScopedTimer::ScopedTimer(long long* counter) :
-        _counter(counter),
-        _start(Listener::getElapsedTimeMillis()) {
-    }
+ScopedTimer::ScopedTimer(long long* counter)
+    : _counter(counter), _start(Listener::getElapsedTimeMillis()) {}
 
-    ScopedTimer::~ScopedTimer() {
-        long long elapsed = Listener::getElapsedTimeMillis() - _start;
-        *_counter += elapsed;
-    }
+ScopedTimer::~ScopedTimer() {
+    long long elapsed = Listener::getElapsedTimeMillis() - _start;
+    *_counter += elapsed;
+}
 
 }  // namespace mongo

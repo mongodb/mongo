@@ -31,112 +31,111 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(KeyPattern, ExtendRangeBound) {
+TEST(KeyPattern, ExtendRangeBound) {
+    BSONObj bound = BSON("a" << 55);
+    BSONObj longBound = BSON("a" << 55 << "b" << 66);
 
-        BSONObj bound = BSON("a" << 55);
-        BSONObj longBound = BSON("a" << 55 << "b" << 66);
-
-        //test keyPattern shorter than bound, should fail
-        {
-            KeyPattern keyPat(BSON("a" << 1));
-            ASSERT_THROWS(keyPat.extendRangeBound(longBound, false), MsgAssertionException);
-        }
-
-        //test keyPattern doesn't match bound, should fail
-        {
-            KeyPattern keyPat(BSON("b" << 1));
-            ASSERT_THROWS(keyPat.extendRangeBound(bound, false), MsgAssertionException);
-        }
-        {
-            KeyPattern keyPat(BSON("a" << 1 << "c" << 1));
-            ASSERT_THROWS(keyPat.extendRangeBound(longBound, false), MsgAssertionException);
-        }
-
-        //test keyPattern same as bound
-        {
-            KeyPattern keyPat(BSON("a" << 1));
-            BSONObj newB = keyPat.extendRangeBound(bound, false);
-            ASSERT_EQUALS(newB, BSON("a" << 55));
-        }
-        {
-            KeyPattern keyPat(BSON("a" << 1));
-            BSONObj newB = keyPat.extendRangeBound(bound, false);
-            ASSERT_EQUALS(newB, BSON("a" << 55));
-        }
-
-        //test keyPattern longer than bound, simple
-        {
-            KeyPattern keyPat(BSON("a" << 1 << "b" << 1));
-            BSONObj newB = keyPat.extendRangeBound(bound, false);
-            ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MINKEY));
-        }
-        {
-            KeyPattern keyPat(BSON("a" << 1 << "b" << 1));
-            BSONObj newB = keyPat.extendRangeBound(bound, true);
-            ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MAXKEY));
-        }
-
-        //test keyPattern longer than bound, more complex pattern directions
-        {
-            KeyPattern keyPat(BSON("a" << 1 << "b" << -1));
-            BSONObj newB = keyPat.extendRangeBound(bound, false);
-            ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MAXKEY));
-        }
-        {
-            KeyPattern keyPat(BSON("a" << 1 << "b" << -1));
-            BSONObj newB = keyPat.extendRangeBound(bound, true);
-            ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MINKEY));
-        }
-        {
-
-            KeyPattern keyPat(BSON("a" << 1 << "b" << -1 << "c" << 1));
-            BSONObj newB = keyPat.extendRangeBound(bound, false);
-            ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MAXKEY << "c" << MINKEY));
-        }
-        {
-            KeyPattern keyPat(BSON("a" << 1 << "b" << -1 << "c" << 1));
-            BSONObj newB = keyPat.extendRangeBound(bound, true);
-            ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MINKEY << "c" << MAXKEY));
-        }
+    // test keyPattern shorter than bound, should fail
+    {
+        KeyPattern keyPat(BSON("a" << 1));
+        ASSERT_THROWS(keyPat.extendRangeBound(longBound, false), MsgAssertionException);
     }
 
-    TEST(KeyPattern, GlobalMinMax) {
-
-        //
-        // Simple KeyPatterns
-        //
-
-        ASSERT_EQUALS(KeyPattern(BSON("a" << 1)).globalMin(), BSON("a" << MINKEY));
-        ASSERT_EQUALS(KeyPattern(BSON("a" << 1)).globalMax(), BSON("a" << MAXKEY));
-
-        ASSERT_EQUALS(KeyPattern(BSON("a" << -1)).globalMin(), BSON("a" << MAXKEY));
-        ASSERT_EQUALS(KeyPattern(BSON("a" << -1)).globalMax(), BSON("a" << MINKEY));
-
-        ASSERT_EQUALS(KeyPattern(BSON("a" << 1 << "b" << 1.0)).globalMin(),
-                      BSON("a" << MINKEY << "b" << MINKEY));
-        ASSERT_EQUALS(KeyPattern(BSON("a" << 1 << "b" << 1.0)).globalMax(),
-                      BSON("a" << MAXKEY << "b" << MAXKEY));
-
-        ASSERT_EQUALS(KeyPattern(BSON("a" << 1 << "b" << -1.0f)).globalMin(),
-                      BSON("a" << MINKEY << "b" << MAXKEY));
-        ASSERT_EQUALS(KeyPattern(BSON("a" << 1 << "b" << -1.0f)).globalMax(),
-                      BSON("a" << MAXKEY << "b" << MINKEY));
-
-        ASSERT_EQUALS(KeyPattern(BSON("a" << "hashed")).globalMin(), BSON("a" << MINKEY));
-        ASSERT_EQUALS(KeyPattern(BSON("a" << "hashed")).globalMax(), BSON("a" << MAXKEY));
-
-        //
-        // Nested KeyPatterns
-        //
-
-        ASSERT_EQUALS(KeyPattern(BSON("a.b" << 1)).globalMin(), BSON("a.b" << MINKEY));
-        ASSERT_EQUALS(KeyPattern(BSON("a.b" << 1)).globalMax(), BSON("a.b" << MAXKEY));
-
-        ASSERT_EQUALS(KeyPattern(BSON("a.b.c" << -1)).globalMin(), BSON("a.b.c" << MAXKEY));
-        ASSERT_EQUALS(KeyPattern(BSON("a.b.c" << -1)).globalMax(), BSON("a.b.c" << MINKEY));
+    // test keyPattern doesn't match bound, should fail
+    {
+        KeyPattern keyPat(BSON("b" << 1));
+        ASSERT_THROWS(keyPat.extendRangeBound(bound, false), MsgAssertionException);
+    }
+    {
+        KeyPattern keyPat(BSON("a" << 1 << "c" << 1));
+        ASSERT_THROWS(keyPat.extendRangeBound(longBound, false), MsgAssertionException);
     }
 
+    // test keyPattern same as bound
+    {
+        KeyPattern keyPat(BSON("a" << 1));
+        BSONObj newB = keyPat.extendRangeBound(bound, false);
+        ASSERT_EQUALS(newB, BSON("a" << 55));
+    }
+    {
+        KeyPattern keyPat(BSON("a" << 1));
+        BSONObj newB = keyPat.extendRangeBound(bound, false);
+        ASSERT_EQUALS(newB, BSON("a" << 55));
+    }
+
+    // test keyPattern longer than bound, simple
+    {
+        KeyPattern keyPat(BSON("a" << 1 << "b" << 1));
+        BSONObj newB = keyPat.extendRangeBound(bound, false);
+        ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MINKEY));
+    }
+    {
+        KeyPattern keyPat(BSON("a" << 1 << "b" << 1));
+        BSONObj newB = keyPat.extendRangeBound(bound, true);
+        ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MAXKEY));
+    }
+
+    // test keyPattern longer than bound, more complex pattern directions
+    {
+        KeyPattern keyPat(BSON("a" << 1 << "b" << -1));
+        BSONObj newB = keyPat.extendRangeBound(bound, false);
+        ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MAXKEY));
+    }
+    {
+        KeyPattern keyPat(BSON("a" << 1 << "b" << -1));
+        BSONObj newB = keyPat.extendRangeBound(bound, true);
+        ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MINKEY));
+    }
+    {
+        KeyPattern keyPat(BSON("a" << 1 << "b" << -1 << "c" << 1));
+        BSONObj newB = keyPat.extendRangeBound(bound, false);
+        ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MAXKEY << "c" << MINKEY));
+    }
+    {
+        KeyPattern keyPat(BSON("a" << 1 << "b" << -1 << "c" << 1));
+        BSONObj newB = keyPat.extendRangeBound(bound, true);
+        ASSERT_EQUALS(newB, BSON("a" << 55 << "b" << MINKEY << "c" << MAXKEY));
+    }
 }
 
+TEST(KeyPattern, GlobalMinMax) {
+    //
+    // Simple KeyPatterns
+    //
+
+    ASSERT_EQUALS(KeyPattern(BSON("a" << 1)).globalMin(), BSON("a" << MINKEY));
+    ASSERT_EQUALS(KeyPattern(BSON("a" << 1)).globalMax(), BSON("a" << MAXKEY));
+
+    ASSERT_EQUALS(KeyPattern(BSON("a" << -1)).globalMin(), BSON("a" << MAXKEY));
+    ASSERT_EQUALS(KeyPattern(BSON("a" << -1)).globalMax(), BSON("a" << MINKEY));
+
+    ASSERT_EQUALS(KeyPattern(BSON("a" << 1 << "b" << 1.0)).globalMin(),
+                  BSON("a" << MINKEY << "b" << MINKEY));
+    ASSERT_EQUALS(KeyPattern(BSON("a" << 1 << "b" << 1.0)).globalMax(),
+                  BSON("a" << MAXKEY << "b" << MAXKEY));
+
+    ASSERT_EQUALS(KeyPattern(BSON("a" << 1 << "b" << -1.0f)).globalMin(),
+                  BSON("a" << MINKEY << "b" << MAXKEY));
+    ASSERT_EQUALS(KeyPattern(BSON("a" << 1 << "b" << -1.0f)).globalMax(),
+                  BSON("a" << MAXKEY << "b" << MINKEY));
+
+    ASSERT_EQUALS(KeyPattern(BSON("a"
+                                  << "hashed")).globalMin(),
+                  BSON("a" << MINKEY));
+    ASSERT_EQUALS(KeyPattern(BSON("a"
+                                  << "hashed")).globalMax(),
+                  BSON("a" << MAXKEY));
+
+    //
+    // Nested KeyPatterns
+    //
+
+    ASSERT_EQUALS(KeyPattern(BSON("a.b" << 1)).globalMin(), BSON("a.b" << MINKEY));
+    ASSERT_EQUALS(KeyPattern(BSON("a.b" << 1)).globalMax(), BSON("a.b" << MAXKEY));
+
+    ASSERT_EQUALS(KeyPattern(BSON("a.b.c" << -1)).globalMin(), BSON("a.b.c" << MAXKEY));
+    ASSERT_EQUALS(KeyPattern(BSON("a.b.c" << -1)).globalMax(), BSON("a.b.c" << MINKEY));
+}
+}

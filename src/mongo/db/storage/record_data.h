@@ -35,45 +35,54 @@
 
 namespace mongo {
 
+/**
+ * A replacement for the Record class. This class represents data in a record store.
+ * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
+ * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
+ * it must point to the same array as _data.
+ */
+class RecordData {
+public:
+    RecordData() : _data(NULL), _size(0) {}
+    RecordData(const char* data, int size) : _data(data), _size(size) {}
+
+    RecordData(SharedBuffer ownedData, int size)
+        : _data(ownedData.get()), _size(size), _ownedData(ownedData.moveFrom()) {}
+
+    const char* data() const {
+        return _data;
+    }
+
+    int size() const {
+        return _size;
+    }
+
     /**
-     * A replacement for the Record class. This class represents data in a record store.
-     * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
-     * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
-     * it must point to the same array as _data.
+     * Returns true if this owns its own memory, and false otherwise
      */
-    class RecordData {
-    public:
-        RecordData() : _data( NULL ), _size( 0 ) {}
-        RecordData(const char* data, int size): _data(data), _size(size) { }
+    bool isOwned() const {
+        return _ownedData.get();
+    }
 
-        RecordData(SharedBuffer ownedData, int size)
-                : _data(ownedData.get()), _size(size), _ownedData(ownedData.moveFrom()) {
-        }
+    SharedBuffer releaseBuffer() {
+        return _ownedData.moveFrom();
+    }
 
-        const char* data() const { return _data; }
+    BSONObj toBson() const {
+        return isOwned() ? BSONObj(_ownedData) : BSONObj(_data);
+    }
 
-        int size() const { return _size; }
+    BSONObj releaseToBson() {
+        return isOwned() ? BSONObj(releaseBuffer()) : BSONObj(_data);
+    }
 
-        /**
-         * Returns true if this owns its own memory, and false otherwise
-         */
-        bool isOwned() const { return _ownedData.get(); }
+    // TODO uncomment once we require compilers that support overloading for rvalue this.
+    // BSONObj toBson() && { return releaseToBson(); }
 
-        SharedBuffer releaseBuffer() {
-            return _ownedData.moveFrom();
-        }
+private:
+    const char* _data;
+    int _size;
+    SharedBuffer _ownedData;
+};
 
-        BSONObj toBson() const { return isOwned() ? BSONObj(_ownedData) : BSONObj(_data); }
-
-        BSONObj releaseToBson() { return isOwned() ? BSONObj(releaseBuffer()) : BSONObj(_data); }
-
-        // TODO uncomment once we require compilers that support overloading for rvalue this.
-        // BSONObj toBson() && { return releaseToBson(); }
-
-    private:
-        const char* _data;
-        int _size;
-        SharedBuffer _ownedData;
-    };
-
-} // namespace mongo
+}  // namespace mongo

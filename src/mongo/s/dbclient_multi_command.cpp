@@ -42,197 +42,191 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
-    using std::deque;
-    using std::string;
+using boost::scoped_ptr;
+using std::deque;
+using std::string;
 
-    DBClientMultiCommand::PendingCommand::PendingCommand( const ConnectionString& endpoint,
-                                                          const StringData& dbName,
-                                                          const BSONObj& cmdObj ) :
-        endpoint( endpoint ),
-        dbName( dbName.toString() ),
-        cmdObj( cmdObj ),
-        conn( NULL ),
-        status( Status::OK() ) {
+DBClientMultiCommand::PendingCommand::PendingCommand(const ConnectionString& endpoint,
+                                                     const StringData& dbName,
+                                                     const BSONObj& cmdObj)
+    : endpoint(endpoint),
+      dbName(dbName.toString()),
+      cmdObj(cmdObj),
+      conn(NULL),
+      status(Status::OK()) {}
+
+void DBClientMultiCommand::addCommand(const ConnectionString& endpoint,
+                                      const StringData& dbName,
+                                      const BSONSerializable& request) {
+    PendingCommand* command = new PendingCommand(endpoint, dbName, request.toBSON());
+    _pendingCommands.push_back(command);
+}
+
+namespace {
+
+//
+// For sanity checks of batch write operations
+//
+
+BatchedCommandRequest::BatchType getBatchWriteType(const BSONObj& cmdObj) {
+    string cmdName = cmdObj.firstElement().fieldName();
+    if (cmdName == "insert")
+        return BatchedCommandRequest::BatchType_Insert;
+    if (cmdName == "update")
+        return BatchedCommandRequest::BatchType_Update;
+    if (cmdName == "delete")
+        return BatchedCommandRequest::BatchType_Delete;
+    return BatchedCommandRequest::BatchType_Unknown;
+}
+
+bool isBatchWriteCommand(const BSONObj& cmdObj) {
+    return getBatchWriteType(cmdObj) != BatchedCommandRequest::BatchType_Unknown;
+}
+
+bool hasBatchWriteFeature(DBClientBase* conn) {
+    return conn->getMinWireVersion() <= BATCH_COMMANDS &&
+        conn->getMaxWireVersion() >= BATCH_COMMANDS;
+}
+}
+
+// THROWS
+static void sayAsCmd(DBClientBase* conn, const StringData& dbName, const BSONObj& cmdObj) {
+    Message toSend;
+    BSONObjBuilder usersBuilder;
+    usersBuilder.appendElements(cmdObj);
+    audit::appendImpersonatedUsers(&usersBuilder);
+
+    // see query.h for the protocol we are using here.
+    BufBuilder bufB;
+    bufB.appendNum(0);                            // command/query options
+    bufB.appendStr(dbName.toString() + ".$cmd");  // write command ns
+    bufB.appendNum(0);                            // ntoskip (0 for command)
+    bufB.appendNum(1);                            // ntoreturn (1 for command)
+    usersBuilder.obj().appendSelfToBufBuilder(bufB);
+    toSend.setData(dbQuery, bufB.buf(), bufB.len());
+
+    // Send our command
+    conn->say(toSend);
+}
+
+// THROWS
+static void recvAsCmd(DBClientBase* conn, Message* toRecv, BSONObj* result) {
+    if (!conn->recv(*toRecv)) {
+        // Confusingly, socket exceptions here are written to the log, not thrown.
+        uasserted(17255,
+                  "error receiving write command response, "
+                  "possible socket exception - see logs");
     }
 
-    void DBClientMultiCommand::addCommand( const ConnectionString& endpoint,
-                                           const StringData& dbName,
-                                           const BSONSerializable& request ) {
-        PendingCommand* command = new PendingCommand( endpoint, dbName, request.toBSON() );
-        _pendingCommands.push_back( command );
-    }
+    // A query result is returned from commands
+    QueryResult::View recvdQuery = toRecv->singleData().view2ptr();
+    *result = BSONObj(recvdQuery.data());
+}
 
-    namespace {
-
-        //
-        // For sanity checks of batch write operations
-        //
-
-        BatchedCommandRequest::BatchType getBatchWriteType( const BSONObj& cmdObj ) {
-            string cmdName = cmdObj.firstElement().fieldName();
-            if ( cmdName == "insert" ) return BatchedCommandRequest::BatchType_Insert;
-            if ( cmdName == "update" ) return BatchedCommandRequest::BatchType_Update;
-            if ( cmdName == "delete" ) return BatchedCommandRequest::BatchType_Delete;
-            return BatchedCommandRequest::BatchType_Unknown;
-        }
-
-        bool isBatchWriteCommand( const BSONObj& cmdObj ) {
-            return getBatchWriteType( cmdObj ) != BatchedCommandRequest::BatchType_Unknown;
-        }
-
-        bool hasBatchWriteFeature( DBClientBase* conn ) {
-            return conn->getMinWireVersion() <= BATCH_COMMANDS
-                   && conn->getMaxWireVersion() >= BATCH_COMMANDS;
-        }
-    }
-
-    // THROWS
-    static void sayAsCmd( DBClientBase* conn, const StringData& dbName, const BSONObj& cmdObj ) {
-        Message toSend;
-        BSONObjBuilder usersBuilder;
-        usersBuilder.appendElements(cmdObj);
-        audit::appendImpersonatedUsers(&usersBuilder);
-        
-        // see query.h for the protocol we are using here.
-        BufBuilder bufB;
-        bufB.appendNum( 0 ); // command/query options
-        bufB.appendStr( dbName.toString() + ".$cmd" ); // write command ns
-        bufB.appendNum( 0 ); // ntoskip (0 for command)
-        bufB.appendNum( 1 ); // ntoreturn (1 for command)
-        usersBuilder.obj().appendSelfToBufBuilder( bufB );
-        toSend.setData( dbQuery, bufB.buf(), bufB.len() );
-
-        // Send our command
-        conn->say( toSend );
-    }
-
-    // THROWS
-    static void recvAsCmd( DBClientBase* conn, Message* toRecv, BSONObj* result ) {
-
-        if ( !conn->recv( *toRecv ) ) {
-            // Confusingly, socket exceptions here are written to the log, not thrown.
-            uasserted( 17255, "error receiving write command response, "
-                       "possible socket exception - see logs" );
-        }
-
-        // A query result is returned from commands
-        QueryResult::View recvdQuery = toRecv->singleData().view2ptr();
-        *result = BSONObj( recvdQuery.data() );
-    }
-
-    void DBClientMultiCommand::sendAll() {
-
-        for ( deque<PendingCommand*>::iterator it = _pendingCommands.begin();
-            it != _pendingCommands.end(); ++it ) {
-
-            PendingCommand* command = *it;
-            dassert( NULL == command->conn );
-
-            try {
-                dassert( command->endpoint.type() == ConnectionString::MASTER ||
-                    command->endpoint.type() == ConnectionString::CUSTOM );
-
-                // TODO: Fix the pool up to take millis directly
-                int timeoutSecs = _timeoutMillis / 1000;
-                command->conn = shardConnectionPool.get( command->endpoint, timeoutSecs );
-
-                // Sanity check if we're sending a batch write that we're talking to a new-enough
-                // server.
-                massert(28563, str::stream() << "cannot send batch write operation to server "
-                                             << command->conn->toString(),
-                       !isBatchWriteCommand(command->cmdObj) ||
-                       hasBatchWriteFeature(command->conn));
-
-                sayAsCmd( command->conn, command->dbName, command->cmdObj );
-            }
-            catch ( const DBException& ex ) {
-                command->status = ex.toStatus();
-
-                if ( NULL != command->conn ) {
-
-                    // Confusingly, the pool needs to know about failed connections so that it can
-                    // invalidate other connections which might be bad.  But if the connection
-                    // doesn't seem bad, don't send it back, because we don't want to reuse it.
-                    if ( !command->conn->isFailed() ) {
-                        delete command->conn;
-                    }
-                    else {
-                        shardConnectionPool.release( command->endpoint.toString(), command->conn );
-                    }
-
-                    command->conn = NULL;
-                }
-            }
-        }
-    }
-
-    int DBClientMultiCommand::numPending() const {
-        return static_cast<int>( _pendingCommands.size() );
-    }
-
-    Status DBClientMultiCommand::recvAny( ConnectionString* endpoint, BSONSerializable* response ) {
-
-        scoped_ptr<PendingCommand> command( _pendingCommands.front() );
-        _pendingCommands.pop_front();
-
-        *endpoint = command->endpoint;
-        if ( !command->status.isOK() ) return command->status;
-
-        dassert( NULL != command->conn );
+void DBClientMultiCommand::sendAll() {
+    for (deque<PendingCommand*>::iterator it = _pendingCommands.begin();
+         it != _pendingCommands.end();
+         ++it) {
+        PendingCommand* command = *it;
+        dassert(NULL == command->conn);
 
         try {
+            dassert(command->endpoint.type() == ConnectionString::MASTER ||
+                    command->endpoint.type() == ConnectionString::CUSTOM);
 
-            // Holds the data and BSONObj for the command result
-            Message toRecv;
-            BSONObj result;
+            // TODO: Fix the pool up to take millis directly
+            int timeoutSecs = _timeoutMillis / 1000;
+            command->conn = shardConnectionPool.get(command->endpoint, timeoutSecs);
 
-            recvAsCmd( command->conn, &toRecv, &result );
+            // Sanity check if we're sending a batch write that we're talking to a new-enough
+            // server.
+            massert(28563,
+                    str::stream() << "cannot send batch write operation to server "
+                                  << command->conn->toString(),
+                    !isBatchWriteCommand(command->cmdObj) || hasBatchWriteFeature(command->conn));
 
-            shardConnectionPool.release( command->endpoint.toString(), command->conn );
-            command->conn = NULL;
+            sayAsCmd(command->conn, command->dbName, command->cmdObj);
+        } catch (const DBException& ex) {
+            command->status = ex.toStatus();
 
-            string errMsg;
-            if ( !response->parseBSON( result, &errMsg ) || !response->isValid( &errMsg ) ) {
-                return Status( ErrorCodes::FailedToParse, errMsg );
+            if (NULL != command->conn) {
+                // Confusingly, the pool needs to know about failed connections so that it can
+                // invalidate other connections which might be bad.  But if the connection
+                // doesn't seem bad, don't send it back, because we don't want to reuse it.
+                if (!command->conn->isFailed()) {
+                    delete command->conn;
+                } else {
+                    shardConnectionPool.release(command->endpoint.toString(), command->conn);
+                }
+
+                command->conn = NULL;
             }
         }
-        catch ( const DBException& ex ) {
+    }
+}
 
-            // Confusingly, the pool needs to know about failed connections so that it can
-            // invalidate other connections which might be bad.  But if the connection doesn't seem
-            // bad, don't send it back, because we don't want to reuse it.
-            if ( !command->conn->isFailed() ) {
-                delete command->conn;
-            }
-            else {
-                shardConnectionPool.release( command->endpoint.toString(), command->conn );
-            }
-            command->conn = NULL;
+int DBClientMultiCommand::numPending() const {
+    return static_cast<int>(_pendingCommands.size());
+}
 
-            return ex.toStatus();
+Status DBClientMultiCommand::recvAny(ConnectionString* endpoint, BSONSerializable* response) {
+    scoped_ptr<PendingCommand> command(_pendingCommands.front());
+    _pendingCommands.pop_front();
+
+    *endpoint = command->endpoint;
+    if (!command->status.isOK())
+        return command->status;
+
+    dassert(NULL != command->conn);
+
+    try {
+        // Holds the data and BSONObj for the command result
+        Message toRecv;
+        BSONObj result;
+
+        recvAsCmd(command->conn, &toRecv, &result);
+
+        shardConnectionPool.release(command->endpoint.toString(), command->conn);
+        command->conn = NULL;
+
+        string errMsg;
+        if (!response->parseBSON(result, &errMsg) || !response->isValid(&errMsg)) {
+            return Status(ErrorCodes::FailedToParse, errMsg);
         }
-
-        return Status::OK();
-    }
-
-    DBClientMultiCommand::~DBClientMultiCommand() {
-
-        // Cleanup anything outstanding, do *not* return stuff to the pool, that might error
-        for ( deque<PendingCommand*>::iterator it = _pendingCommands.begin();
-            it != _pendingCommands.end(); ++it ) {
-
-            PendingCommand* command = *it;
-
-            if ( NULL != command->conn ) delete command->conn;
-            delete command;
-            command = NULL;
+    } catch (const DBException& ex) {
+        // Confusingly, the pool needs to know about failed connections so that it can
+        // invalidate other connections which might be bad.  But if the connection doesn't seem
+        // bad, don't send it back, because we don't want to reuse it.
+        if (!command->conn->isFailed()) {
+            delete command->conn;
+        } else {
+            shardConnectionPool.release(command->endpoint.toString(), command->conn);
         }
+        command->conn = NULL;
 
-        _pendingCommands.clear();
+        return ex.toStatus();
     }
 
-    void DBClientMultiCommand::setTimeoutMillis( int milliSecs ) {
-        _timeoutMillis = milliSecs;
+    return Status::OK();
+}
+
+DBClientMultiCommand::~DBClientMultiCommand() {
+    // Cleanup anything outstanding, do *not* return stuff to the pool, that might error
+    for (deque<PendingCommand*>::iterator it = _pendingCommands.begin();
+         it != _pendingCommands.end();
+         ++it) {
+        PendingCommand* command = *it;
+
+        if (NULL != command->conn)
+            delete command->conn;
+        delete command;
+        command = NULL;
     }
+
+    _pendingCommands.clear();
+}
+
+void DBClientMultiCommand::setTimeoutMillis(int milliSecs) {
+    _timeoutMillis = milliSecs;
+}
 }

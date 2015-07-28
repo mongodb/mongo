@@ -35,20 +35,20 @@
 
 namespace mongo {
 
-    void* mongoMalloc(size_t size) {
-        void* x = std::malloc(size);
-        if (x == NULL) {
-            reportOutOfMemoryErrorAndExit();
-        }
-        return x;
+void* mongoMalloc(size_t size) {
+    void* x = std::malloc(size);
+    if (x == NULL) {
+        reportOutOfMemoryErrorAndExit();
     }
+    return x;
+}
 
-    void* mongoRealloc(void *ptr, size_t size) {
-        void* x = std::realloc(ptr, size);
-        if (x == NULL) {
-            reportOutOfMemoryErrorAndExit();
-        }
-        return x;
+void* mongoRealloc(void* ptr, size_t size) {
+    void* x = std::realloc(ptr, size);
+    if (x == NULL) {
+        reportOutOfMemoryErrorAndExit();
     }
+    return x;
+}
 
-} // namespace mongo
+}  // namespace mongo

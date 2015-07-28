@@ -40,33 +40,33 @@ using std::string;
 
 namespace mongo {
 
-    // Verify that the name of the record store is not NULL and nonempty.
-    TEST ( RecordStoreTestHarness, RecordStoreName ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Verify that the name of the record store is not NULL and nonempty.
+TEST(RecordStoreTestHarness, RecordStoreName) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-        {
-            const char *name = rs->name();
-            ASSERT( name != NULL && name[0] != '\0' );
-        }
+    {
+        const char* name = rs->name();
+        ASSERT(name != NULL && name[0] != '\0');
     }
+}
 
-    // Verify that the namespace of the record store is nonempty.
-    TEST( RecordStoreTestHarness, Namespace ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Verify that the namespace of the record store is nonempty.
+TEST(RecordStoreTestHarness, Namespace) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-        {
-            string ns = rs->ns();
-            ASSERT( ns[0] != '\0' );
-        }
+    {
+        string ns = rs->ns();
+        ASSERT(ns[0] != '\0');
     }
+}
 
-    // Call isCapped() on a non-capped collection and verify the result is false.
-    TEST( RecordStoreTestHarness, IsNotCapped ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-        ASSERT( !rs->isCapped() );
-    }
+// Call isCapped() on a non-capped collection and verify the result is false.
+TEST(RecordStoreTestHarness, IsNotCapped) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    ASSERT(!rs->isCapped());
+}
 
-} // namespace mongo
+}  // namespace mongo

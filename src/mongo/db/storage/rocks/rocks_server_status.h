@@ -32,20 +32,19 @@
 
 namespace mongo {
 
-    class RocksEngine;
+class RocksEngine;
 
-    /**
-     * Adds "RocksDB" to the results of db.serverStatus().
-     */
-    class RocksServerStatusSection : public ServerStatusSection {
-    public:
-        RocksServerStatusSection(RocksEngine* engine);
-        virtual bool includeByDefault() const;
-        virtual BSONObj generateSection(OperationContext* txn,
-                                        const BSONElement& configElement) const;
+/**
+ * Adds "RocksDB" to the results of db.serverStatus().
+ */
+class RocksServerStatusSection : public ServerStatusSection {
+public:
+    RocksServerStatusSection(RocksEngine* engine);
+    virtual bool includeByDefault() const;
+    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const;
 
-    private:
-        RocksEngine* _engine;
-    };
+private:
+    RocksEngine* _engine;
+};
 
 }  // namespace mongo

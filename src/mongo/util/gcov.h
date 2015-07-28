@@ -29,8 +29,12 @@
 #pragma once
 
 #ifdef MONGO_GCOV
-extern "C" { void __gcov_flush(); }
-inline void flushForGcov() { __gcov_flush(); }
+extern "C" {
+void __gcov_flush();
+}
+inline void flushForGcov() {
+    __gcov_flush();
+}
 #else
 inline void flushForGcov() {}
 #endif

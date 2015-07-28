@@ -58,94 +58,96 @@ namespace moe = mongo::optionenvironment;
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
+using std::endl;
+using std::string;
 
-    namespace dbtests {
+namespace dbtests {
 
-        mutex globalCurrentTestNameMutex("globalCurrentTestNameMutex");
-        std::string globalCurrentTestName;
+mutex globalCurrentTestNameMutex("globalCurrentTestNameMutex");
+std::string globalCurrentTestName;
 
-        class TestWatchDog : public BackgroundJob {
-        public:
-            virtual string name() const { return "TestWatchDog"; }
-            virtual void run(){
+class TestWatchDog : public BackgroundJob {
+public:
+    virtual string name() const {
+        return "TestWatchDog";
+    }
+    virtual void run() {
+        int minutesRunning = 0;
+        std::string lastRunningTestName, currentTestName;
 
-                int minutesRunning = 0;
-                std::string lastRunningTestName, currentTestName;
-
-                {
-                    scoped_lock lk( globalCurrentTestNameMutex );
-                    lastRunningTestName = globalCurrentTestName;
-                }
-
-                while (true) {
-                    sleepsecs(60);
-                    minutesRunning++;
-
-                    {
-                        scoped_lock lk( globalCurrentTestNameMutex );
-                        currentTestName = globalCurrentTestName;
-                    }
-
-                    if (currentTestName != lastRunningTestName) {
-                        minutesRunning = 0;
-                        lastRunningTestName = currentTestName;
-                    }
-
-                    if (minutesRunning > 30){
-                        log() << currentTestName << " has been running for more than 30 minutes. aborting." << endl;
-                        ::abort();
-                    }
-                    else if (minutesRunning > 1){
-                        warning() << currentTestName << " has been running for more than " << minutesRunning-1 << " minutes." << endl;
-
-                        // See what is stuck
-                        getGlobalLockManager()->dump();
-                    }
-                }
-            }
-        };
-
-        int runDbTests(int argc, char** argv) {
-            frameworkGlobalParams.perfHist = 1;
-            frameworkGlobalParams.seed = time( 0 );
-            frameworkGlobalParams.runsPerTest = 1;
-
-            Client::initThread("testsuite");
-
-            srand( (unsigned) frameworkGlobalParams.seed );
-            printGitVersion();
-            printOpenSSLVersion();
-            printSysInfo();
-
-            getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
-
-            TestWatchDog twd;
-            twd.go();
-
-            int ret = ::mongo::unittest::Suite::run(frameworkGlobalParams.suites,
-                                                    frameworkGlobalParams.filter,
-                                                    frameworkGlobalParams.runsPerTest);
-
-
-            cc().shutdown();
-            exitCleanly( (ExitCode)ret ); // so everything shuts down cleanly
-            return ret;
+        {
+            scoped_lock lk(globalCurrentTestNameMutex);
+            lastRunningTestName = globalCurrentTestName;
         }
-    }  // namespace dbtests
+
+        while (true) {
+            sleepsecs(60);
+            minutesRunning++;
+
+            {
+                scoped_lock lk(globalCurrentTestNameMutex);
+                currentTestName = globalCurrentTestName;
+            }
+
+            if (currentTestName != lastRunningTestName) {
+                minutesRunning = 0;
+                lastRunningTestName = currentTestName;
+            }
+
+            if (minutesRunning > 30) {
+                log() << currentTestName << " has been running for more than 30 minutes. aborting."
+                      << endl;
+                ::abort();
+            } else if (minutesRunning > 1) {
+                warning() << currentTestName << " has been running for more than "
+                          << minutesRunning - 1 << " minutes." << endl;
+
+                // See what is stuck
+                getGlobalLockManager()->dump();
+            }
+        }
+    }
+};
+
+int runDbTests(int argc, char** argv) {
+    frameworkGlobalParams.perfHist = 1;
+    frameworkGlobalParams.seed = time(0);
+    frameworkGlobalParams.runsPerTest = 1;
+
+    Client::initThread("testsuite");
+
+    srand((unsigned)frameworkGlobalParams.seed);
+    printGitVersion();
+    printOpenSSLVersion();
+    printSysInfo();
+
+    getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
+
+    TestWatchDog twd;
+    twd.go();
+
+    int ret = ::mongo::unittest::Suite::run(frameworkGlobalParams.suites,
+                                            frameworkGlobalParams.filter,
+                                            frameworkGlobalParams.runsPerTest);
+
+
+    cc().shutdown();
+    exitCleanly((ExitCode)ret);  // so everything shuts down cleanly
+    return ret;
+}
+}  // namespace dbtests
 
 #ifdef _WIN32
 namespace ntservice {
-    bool shouldStartService() {
-        return false;
-    }
+bool shouldStartService() {
+    return false;
+}
 }
 #endif
 
 }  // namespace mongo
 
-void mongo::unittest::onCurrentTestNameChange( const std::string &testName ) {
-    scoped_lock lk( mongo::dbtests::globalCurrentTestNameMutex );
+void mongo::unittest::onCurrentTestNameChange(const std::string& testName) {
+    scoped_lock lk(mongo::dbtests::globalCurrentTestNameMutex);
     mongo::dbtests::globalCurrentTestName = testName;
 }

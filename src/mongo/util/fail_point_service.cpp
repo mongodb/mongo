@@ -32,25 +32,25 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+using boost::scoped_ptr;
 
-    MONGO_FP_DECLARE(dummy); // used by jstests/libs/fail_point.js
+MONGO_FP_DECLARE(dummy);  // used by jstests/libs/fail_point.js
 
-    scoped_ptr<FailPointRegistry> _fpRegistry(NULL);
+scoped_ptr<FailPointRegistry> _fpRegistry(NULL);
 
-    MONGO_INITIALIZER(FailPointRegistry)(InitializerContext* context) {
-        _fpRegistry.reset(new FailPointRegistry());
-        return Status::OK();
-    }
+MONGO_INITIALIZER(FailPointRegistry)(InitializerContext* context) {
+    _fpRegistry.reset(new FailPointRegistry());
+    return Status::OK();
+}
 
-    MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered,
-                              MONGO_NO_PREREQUISITES,
-                              MONGO_NO_DEPENDENTS)(InitializerContext* context) {
-        _fpRegistry->freeze();
-        return Status::OK();
-    }
+MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered,
+                          MONGO_NO_PREREQUISITES,
+                          MONGO_NO_DEPENDENTS)(InitializerContext* context) {
+    _fpRegistry->freeze();
+    return Status::OK();
+}
 
-    FailPointRegistry* getGlobalFailPointRegistry() {
-        return _fpRegistry.get();
-    }
+FailPointRegistry* getGlobalFailPointRegistry() {
+    return _fpRegistry.get();
+}
 }

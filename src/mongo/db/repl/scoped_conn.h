@@ -41,118 +41,122 @@
 namespace mongo {
 namespace repl {
 
-    /** here we keep a single connection (with reconnect) for a set of hosts,
-        one each, and allow one user at a time per host.  if in use already for that
-        host, we block.  so this is an easy way to keep a 1-deep pool of connections
-        that many threads can share.
+/** here we keep a single connection (with reconnect) for a set of hosts,
+    one each, and allow one user at a time per host.  if in use already for that
+    host, we block.  so this is an easy way to keep a 1-deep pool of connections
+    that many threads can share.
 
-        thread-safe.
+    thread-safe.
 
-        Example:
-        {
-            ScopedConn c("foo.acme.com:9999");
-            c->runCommand(...);
-        }
+    Example:
+    {
+        ScopedConn c("foo.acme.com:9999");
+        c->runCommand(...);
+    }
 
-        throws exception on connect error (but fine to try again later with a new
-        scopedconn object for same host).
-    */
-    class ScopedConn {
-    public:
-        // A flag to keep ScopedConns open when all other sockets are disconnected
-        static const unsigned keepOpen;
+    throws exception on connect error (but fine to try again later with a new
+    scopedconn object for same host).
+*/
+class ScopedConn {
+public:
+    // A flag to keep ScopedConns open when all other sockets are disconnected
+    static const unsigned keepOpen;
 
-        /** throws assertions if connect failure etc. */
-        ScopedConn(const std::string& hostport);
-        ~ScopedConn() {
-            // conLock releases...
-        }
-        void reconnect() {
-            connInfo->cc.reset(new DBClientConnection(true, connInfo->getTimeout()));
-            connInfo->cc->_logLevel = logger::LogSeverity::Debug(2);
-            connInfo->connected = false;
-            connect();
+    /** throws assertions if connect failure etc. */
+    ScopedConn(const std::string& hostport);
+    ~ScopedConn() {
+        // conLock releases...
+    }
+    void reconnect() {
+        connInfo->cc.reset(new DBClientConnection(true, connInfo->getTimeout()));
+        connInfo->cc->_logLevel = logger::LogSeverity::Debug(2);
+        connInfo->connected = false;
+        connect();
+    }
+
+    void setTimeout(time_t timeout) {
+        connInfo->setTimeout(timeout);
+    }
+
+    /* If we were to run a query and not exhaust the cursor, future use of the connection would be problematic.
+       So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes
+       ScopedConn limited in functionality but very safe.  More non-cursor wrappers can be added here if needed.
+       */
+    bool runCommand(const std::string& dbname, const BSONObj& cmd, BSONObj& info, int options = 0) {
+        return conn()->runCommand(dbname, cmd, info, options);
+    }
+    unsigned long long count(const std::string& ns) {
+        return conn()->count(ns);
+    }
+    BSONObj findOne(const std::string& ns,
+                    const Query& q,
+                    const BSONObj* fieldsToReturn = 0,
+                    int queryOptions = 0) {
+        return conn()->findOne(ns, q, fieldsToReturn, queryOptions);
+    }
+
+private:
+    std::auto_ptr<scoped_lock> connLock;
+    static mongo::mutex mapMutex;
+    struct ConnectionInfo {
+        mongo::mutex lock;
+        boost::scoped_ptr<DBClientConnection> cc;
+        bool connected;
+        ConnectionInfo();
+
+        void tagPort() {
+            MessagingPort& mp = cc->port();
+            mp.tag |= ScopedConn::keepOpen;
         }
 
         void setTimeout(time_t timeout) {
-            connInfo->setTimeout(timeout);
+            _timeout = timeout;
+            cc->setSoTimeout(_timeout);
         }
 
-        /* If we were to run a query and not exhaust the cursor, future use of the connection would be problematic.
-           So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes
-           ScopedConn limited in functionality but very safe.  More non-cursor wrappers can be added here if needed.
-           */
-        bool runCommand(const std::string &dbname, const BSONObj& cmd, BSONObj &info, int options=0) {
-            return conn()->runCommand(dbname, cmd, info, options);
-        }
-        unsigned long long count(const std::string &ns) {
-            return conn()->count(ns);
-        }
-        BSONObj findOne(const std::string &ns, const Query& q, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
-            return conn()->findOne(ns, q, fieldsToReturn, queryOptions);
+        int getTimeout() {
+            return _timeout;
         }
 
     private:
-        std::auto_ptr<scoped_lock> connLock;
-        static mongo::mutex mapMutex;
-        struct ConnectionInfo {
-            mongo::mutex lock;
-            boost::scoped_ptr<DBClientConnection> cc;
-            bool connected;
-            ConnectionInfo();
-
-            void tagPort() {
-                MessagingPort& mp = cc->port();
-                mp.tag |= ScopedConn::keepOpen;
-            }
-
-            void setTimeout(time_t timeout) {
-                _timeout = timeout;
-                cc->setSoTimeout(_timeout);
-            }
-
-            int getTimeout() {
-                return _timeout;
-            }
-
-        private:
-            int _timeout;
-        } *connInfo;
-        typedef std::map<std::string,ScopedConn::ConnectionInfo*> M;
-        static M& _map;
-        boost::scoped_ptr<DBClientConnection>& conn() { return connInfo->cc; }
-        const std::string _hostport;
-
-        // we should already be locked...
-        bool connect();
-
-    };
-
-    inline ScopedConn::ScopedConn(const std::string& hostport) : _hostport(hostport) {
-        bool first = false;
-        {
-            scoped_lock lk(mapMutex);
-            connInfo = _map[_hostport];
-            if( connInfo == 0 ) {
-                connInfo = _map[_hostport] = new ConnectionInfo();
-                first = true;
-                connLock.reset( new scoped_lock(connInfo->lock) );
-            }
-        }
-
-        // already locked connLock above
-        if (first) {
-            connect();
-            return;
-        }
-
-        connLock.reset( new scoped_lock(connInfo->lock) );
-        if (connInfo->connected) {
-            return;
-        }
-
-        // Keep trying to connect if we're not yet connected
-        connect();
+        int _timeout;
+    } * connInfo;
+    typedef std::map<std::string, ScopedConn::ConnectionInfo*> M;
+    static M& _map;
+    boost::scoped_ptr<DBClientConnection>& conn() {
+        return connInfo->cc;
     }
-} // namespace repl
-} // namespace mongo
+    const std::string _hostport;
+
+    // we should already be locked...
+    bool connect();
+};
+
+inline ScopedConn::ScopedConn(const std::string& hostport) : _hostport(hostport) {
+    bool first = false;
+    {
+        scoped_lock lk(mapMutex);
+        connInfo = _map[_hostport];
+        if (connInfo == 0) {
+            connInfo = _map[_hostport] = new ConnectionInfo();
+            first = true;
+            connLock.reset(new scoped_lock(connInfo->lock));
+        }
+    }
+
+    // already locked connLock above
+    if (first) {
+        connect();
+        return;
+    }
+
+    connLock.reset(new scoped_lock(connInfo->lock));
+    if (connInfo->connected) {
+        return;
+    }
+
+    // Keep trying to connect if we're not yet connected
+    connect();
+}
+}  // namespace repl
+}  // namespace mongo

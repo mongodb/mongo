@@ -32,11 +32,9 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        const std::string INDEX_NAME = "text";
-        const std::string WILDCARD = "$**";
-
-    }
+const std::string INDEX_NAME = "text";
+const std::string WILDCARD = "$**";
 }
-
+}

@@ -34,41 +34,35 @@
 
 namespace mongo {
 
-    using boost::intrusive_ptr;
+using boost::intrusive_ptr;
 
-    boost::optional<Document> DocumentSourceBsonArray::getNext() {
-        pExpCtx->checkForInterrupt();
+boost::optional<Document> DocumentSourceBsonArray::getNext() {
+    pExpCtx->checkForInterrupt();
 
-        if (!arrayIterator.more())
-            return boost::none;
+    if (!arrayIterator.more())
+        return boost::none;
 
-        return Document(arrayIterator.next().Obj());
+    return Document(arrayIterator.next().Obj());
+}
+
+void DocumentSourceBsonArray::setSource(DocumentSource* pSource) {
+    /* this doesn't take a source */
+    verify(false);
+}
+
+DocumentSourceBsonArray::DocumentSourceBsonArray(const BSONObj& array,
+                                                 const intrusive_ptr<ExpressionContext>& pExpCtx)
+    : DocumentSource(pExpCtx), embeddedObject(array), arrayIterator(embeddedObject) {}
+
+intrusive_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
+    const BSONObj& array, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    return new DocumentSourceBsonArray(array, pExpCtx);
+}
+
+Value DocumentSourceBsonArray::serialize(bool explain) const {
+    if (explain) {
+        return Value(DOC("bsonArray" << Document()));
     }
-
-    void DocumentSourceBsonArray::setSource(DocumentSource *pSource) {
-        /* this doesn't take a source */
-        verify(false);
-    }
-
-    DocumentSourceBsonArray::DocumentSourceBsonArray(
-            const BSONObj& array,
-            const intrusive_ptr<ExpressionContext> &pExpCtx)
-        : DocumentSource(pExpCtx)
-        , embeddedObject(array)
-        , arrayIterator(embeddedObject)
-    {}
-
-    intrusive_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
-            const BSONObj& array,
-            const intrusive_ptr<ExpressionContext> &pExpCtx) {
-
-        return new DocumentSourceBsonArray(array, pExpCtx);
-    }
-
-    Value DocumentSourceBsonArray::serialize(bool explain) const {
-        if (explain) {
-            return Value(DOC("bsonArray" << Document()));
-        }
-        return Value();
-    }
+    return Value();
+}
 }

@@ -34,161 +34,166 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/config.h" // For config server and DBConfig and version refresh
+#include "mongo/s/config.h"  // For config server and DBConfig and version refresh
 #include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
-    using std::vector;
+using std::string;
+using std::stringstream;
+using std::vector;
 
-    /**
-     * Mongos-side command for merging chunks, passes command to appropriate shard.
-     */
-    class ClusterMergeChunksCommand : public Command {
-    public:
-        ClusterMergeChunksCommand() : Command("mergeChunks") {}
+/**
+ * Mongos-side command for merging chunks, passes command to appropriate shard.
+ */
+class ClusterMergeChunksCommand : public Command {
+public:
+    ClusterMergeChunksCommand() : Command("mergeChunks") {}
 
-        virtual void help(stringstream& h) const {
-            h << "Merge Chunks command\n"
-              << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ] }";
+    virtual void help(stringstream& h) const {
+        h << "Merge Chunks command\n"
+          << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ] }";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
+                ActionType::splitChunk)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
-                    ActionType::splitChunk)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-            return Status::OK();
-        }
-
-        virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-            return parseNsFullyQualified(dbname, cmdObj);
-        }
-
-        virtual bool adminOnly() const { return true; }
-        virtual bool slaveOk() const { return false; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-
-        // Required
-        static BSONField<string> nsField;
-        static BSONField<vector<BSONObj> > boundsField;
-
-        // Used to send sharding state
-        static BSONField<string> shardNameField;
-        static BSONField<string> configField;
-
-        // TODO: This refresh logic should be consolidated
-        ChunkManagerPtr refreshChunkCache(const NamespaceString& nss) {
-
-            DBConfigPtr config = grid.getDBConfig(nss.ns());
-            if (!config->isSharded(nss))
-                return ChunkManagerPtr();
-
-            // Refreshes chunks as a side-effect
-            return config->getChunkManagerIfExists(nss, true);
-        }
-
-
-        bool run(OperationContext* txn, const string& dbname,
-                  BSONObj& cmdObj,
-                  int,
-                  string& errmsg,
-                  BSONObjBuilder& result,
-                  bool ) {
-
-            string ns = parseNs(dbname, cmdObj);
-
-            if ( ns.size() == 0 ) {
-                errmsg = "no namespace specified";
-                return false;
-            }
-
-            vector<BSONObj> bounds;
-            if ( !FieldParser::extract( cmdObj, boundsField, &bounds, &errmsg ) ) {
-                return false;
-            }
-
-            if ( bounds.size() == 0 ) {
-                errmsg = "no bounds were specified";
-                return false;
-            }
-
-            if ( bounds.size() != 2 ) {
-                errmsg = "only a min and max bound may be specified";
-                return false;
-            }
-
-            BSONObj minKey = bounds[0];
-            BSONObj maxKey = bounds[1];
-
-            if ( minKey.isEmpty() ) {
-                errmsg = "no min key specified";
-                return false;
-            }
-
-            if ( maxKey.isEmpty() ) {
-                errmsg = "no max key specified";
-                return false;
-            }
-
-            // This refreshes the chunk metadata if stale.
-            ChunkManagerPtr manager = refreshChunkCache(NamespaceString(ns));
-
-            if (!manager) {
-                errmsg = (string) "collection " + ns + " is not sharded, cannot merge chunks";
-                return false;
-            }
-
-            if (!manager->getShardKeyPattern().isShardKey(minKey)
-                || !manager->getShardKeyPattern().isShardKey(maxKey)) {
-                errmsg = stream() << "shard key bounds " << "[" << minKey << "," << maxKey << ")"
-                                  << " are not valid for shard key pattern "
-                                  << manager->getShardKeyPattern().toBSON();
-                return false;
-            }
-
-            minKey = manager->getShardKeyPattern().normalizeShardKey(minKey);
-            maxKey = manager->getShardKeyPattern().normalizeShardKey(maxKey);
-
-            ChunkPtr firstChunk = manager->findIntersectingChunk(minKey);
-            verify(firstChunk);
-            Shard shard = firstChunk->getShard();
-
-            BSONObjBuilder remoteCmdObjB;
-            remoteCmdObjB.append( cmdObj[ ClusterMergeChunksCommand::nsField() ] );
-            remoteCmdObjB.append( cmdObj[ ClusterMergeChunksCommand::boundsField() ] );
-            remoteCmdObjB.append( ClusterMergeChunksCommand::configField(),
-                                  configServer.getPrimary().getAddress().toString() );
-            remoteCmdObjB.append( ClusterMergeChunksCommand::shardNameField(),
-                                  shard.getName() );
-
-            BSONObj remoteResult;
-            // Throws, but handled at level above.  Don't want to rewrap to preserve exception
-            // formatting.
-            ScopedDbConnection conn( shard.getAddress() );
-            bool ok = conn->runCommand( "admin", remoteCmdObjB.obj(), remoteResult );
-            conn.done();
-
-            result.appendElements( remoteResult );
-            return ok;
-        }
-    };
-
-    BSONField<string> ClusterMergeChunksCommand::nsField( "mergeChunks" );
-    BSONField<vector<BSONObj> > ClusterMergeChunksCommand::boundsField( "bounds" );
-
-    BSONField<string> ClusterMergeChunksCommand::configField( "config" );
-    BSONField<string> ClusterMergeChunksCommand::shardNameField( "shardName" );
-
-    MONGO_INITIALIZER(InitMergeChunksPassCommand)(InitializerContext* context) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new ClusterMergeChunksCommand();
         return Status::OK();
     }
+
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+        return parseNsFullyQualified(dbname, cmdObj);
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+    virtual bool slaveOk() const {
+        return false;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    // Required
+    static BSONField<string> nsField;
+    static BSONField<vector<BSONObj>> boundsField;
+
+    // Used to send sharding state
+    static BSONField<string> shardNameField;
+    static BSONField<string> configField;
+
+    // TODO: This refresh logic should be consolidated
+    ChunkManagerPtr refreshChunkCache(const NamespaceString& nss) {
+        DBConfigPtr config = grid.getDBConfig(nss.ns());
+        if (!config->isSharded(nss))
+            return ChunkManagerPtr();
+
+        // Refreshes chunks as a side-effect
+        return config->getChunkManagerIfExists(nss, true);
+    }
+
+
+    bool run(OperationContext* txn,
+             const string& dbname,
+             BSONObj& cmdObj,
+             int,
+             string& errmsg,
+             BSONObjBuilder& result,
+             bool) {
+        string ns = parseNs(dbname, cmdObj);
+
+        if (ns.size() == 0) {
+            errmsg = "no namespace specified";
+            return false;
+        }
+
+        vector<BSONObj> bounds;
+        if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {
+            return false;
+        }
+
+        if (bounds.size() == 0) {
+            errmsg = "no bounds were specified";
+            return false;
+        }
+
+        if (bounds.size() != 2) {
+            errmsg = "only a min and max bound may be specified";
+            return false;
+        }
+
+        BSONObj minKey = bounds[0];
+        BSONObj maxKey = bounds[1];
+
+        if (minKey.isEmpty()) {
+            errmsg = "no min key specified";
+            return false;
+        }
+
+        if (maxKey.isEmpty()) {
+            errmsg = "no max key specified";
+            return false;
+        }
+
+        // This refreshes the chunk metadata if stale.
+        ChunkManagerPtr manager = refreshChunkCache(NamespaceString(ns));
+
+        if (!manager) {
+            errmsg = (string) "collection " + ns + " is not sharded, cannot merge chunks";
+            return false;
+        }
+
+        if (!manager->getShardKeyPattern().isShardKey(minKey) ||
+            !manager->getShardKeyPattern().isShardKey(maxKey)) {
+            errmsg = stream() << "shard key bounds "
+                              << "[" << minKey << "," << maxKey << ")"
+                              << " are not valid for shard key pattern "
+                              << manager->getShardKeyPattern().toBSON();
+            return false;
+        }
+
+        minKey = manager->getShardKeyPattern().normalizeShardKey(minKey);
+        maxKey = manager->getShardKeyPattern().normalizeShardKey(maxKey);
+
+        ChunkPtr firstChunk = manager->findIntersectingChunk(minKey);
+        verify(firstChunk);
+        Shard shard = firstChunk->getShard();
+
+        BSONObjBuilder remoteCmdObjB;
+        remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::nsField()]);
+        remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::boundsField()]);
+        remoteCmdObjB.append(ClusterMergeChunksCommand::configField(),
+                             configServer.getPrimary().getAddress().toString());
+        remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(), shard.getName());
+
+        BSONObj remoteResult;
+        // Throws, but handled at level above.  Don't want to rewrap to preserve exception
+        // formatting.
+        ScopedDbConnection conn(shard.getAddress());
+        bool ok = conn->runCommand("admin", remoteCmdObjB.obj(), remoteResult);
+        conn.done();
+
+        result.appendElements(remoteResult);
+        return ok;
+    }
+};
+
+BSONField<string> ClusterMergeChunksCommand::nsField("mergeChunks");
+BSONField<vector<BSONObj>> ClusterMergeChunksCommand::boundsField("bounds");
+
+BSONField<string> ClusterMergeChunksCommand::configField("config");
+BSONField<string> ClusterMergeChunksCommand::shardNameField("shardName");
+
+MONGO_INITIALIZER(InitMergeChunksPassCommand)(InitializerContext* context) {
+    // Leaked intentionally: a Command registers itself when constructed.
+    new ClusterMergeChunksCommand();
+    return Status::OK();
+}
 }

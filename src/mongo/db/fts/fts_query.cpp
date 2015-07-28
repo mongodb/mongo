@@ -38,164 +38,158 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        using namespace mongoutils;
+using namespace mongoutils;
 
-        using std::set;
-        using std::string;
-        using std::stringstream;
-        using std::vector;
+using std::set;
+using std::string;
+using std::stringstream;
+using std::vector;
 
-        Status FTSQuery::parse(const string& query, const StringData& language,
-                               TextIndexVersion textIndexVersion) {
-            _search = query;
-            StatusWithFTSLanguage swl = FTSLanguage::make( language, textIndexVersion );
-            if ( !swl.getStatus().isOK() ) {
-                return swl.getStatus();
-            }
-            _language = swl.getValue();
+Status FTSQuery::parse(const string& query,
+                       const StringData& language,
+                       TextIndexVersion textIndexVersion) {
+    _search = query;
+    StatusWithFTSLanguage swl = FTSLanguage::make(language, textIndexVersion);
+    if (!swl.getStatus().isOK()) {
+        return swl.getStatus();
+    }
+    _language = swl.getValue();
 
-            const StopWords* stopWords = StopWords::getStopWords( *_language );
-            Stemmer stemmer( *_language );
+    const StopWords* stopWords = StopWords::getStopWords(*_language);
+    Stemmer stemmer(*_language);
 
-            bool inNegation = false;
-            bool inPhrase = false;
+    bool inNegation = false;
+    bool inPhrase = false;
 
-            unsigned quoteOffset = 0;
+    unsigned quoteOffset = 0;
 
-            Tokenizer i( *_language, query );
-            while ( i.more() ) {
-                Token t = i.next();
+    Tokenizer i(*_language, query);
+    while (i.more()) {
+        Token t = i.next();
 
-                if ( t.type == Token::TEXT ) {
-                    string s = t.data.toString();
+        if (t.type == Token::TEXT) {
+            string s = t.data.toString();
 
-                    if ( inPhrase && inNegation ) {
-                        // don't add term
-                    }
-                    else {
-                        _addTerm( stopWords, stemmer, s, inNegation );
-                    }
-
-                    if ( inNegation && !inPhrase )
-                        inNegation = false;
-                }
-                else if ( t.type == Token::DELIMITER ) {
-                    char c = t.data[0];
-                    if ( c == '-' ) {
-                        if ( !inPhrase && t.previousWhiteSpace ) {
-                            // phrases can be negated, and terms not in phrases can be negated.
-                            // terms in phrases can not be negated.
-                            inNegation = true;
-                        }
-                    }
-                    else if ( c == '"' ) {
-                        if ( inPhrase ) {
-                            // end of a phrase
-                            unsigned phraseStart = quoteOffset + 1;
-                            unsigned phraseLength = t.offset - phraseStart;
-                            StringData phrase = StringData( query ).substr( phraseStart,
-                                                                            phraseLength );
-                            if ( inNegation )
-                                _negatedPhrases.push_back( tolowerString( phrase ) );
-                            else
-                                _phrases.push_back( tolowerString( phrase ) );
-                            inNegation = false;
-                            inPhrase = false;
-                        }
-                        else {
-                            // start of a phrase
-                            inPhrase = true;
-                            quoteOffset = t.offset;
-                        }
-                    }
-                }
-                else {
-                    abort();
-                }
+            if (inPhrase && inNegation) {
+                // don't add term
+            } else {
+                _addTerm(stopWords, stemmer, s, inNegation);
             }
 
-            return Status::OK();
-        }
-
-        void FTSQuery::_addTerm( const StopWords* sw, Stemmer& stemmer, const string& term, bool negated ) {
-            string word = tolowerString( term );
-            if ( sw->isStopWord( word ) )
-                return;
-            word = stemmer.stem( word );
-            if ( negated )
-                _negatedTerms.insert( word );
-            else
-                _terms.push_back( word );
-        }
-
-        namespace {
-            void _debugHelp( stringstream& ss, const set<string>& s, const string& sep ) {
-                bool first = true;
-                for ( set<string>::const_iterator i = s.begin(); i != s.end(); ++i ) {
-                    if ( first )
-                        first = false;
+            if (inNegation && !inPhrase)
+                inNegation = false;
+        } else if (t.type == Token::DELIMITER) {
+            char c = t.data[0];
+            if (c == '-') {
+                if (!inPhrase && t.previousWhiteSpace) {
+                    // phrases can be negated, and terms not in phrases can be negated.
+                    // terms in phrases can not be negated.
+                    inNegation = true;
+                }
+            } else if (c == '"') {
+                if (inPhrase) {
+                    // end of a phrase
+                    unsigned phraseStart = quoteOffset + 1;
+                    unsigned phraseLength = t.offset - phraseStart;
+                    StringData phrase = StringData(query).substr(phraseStart, phraseLength);
+                    if (inNegation)
+                        _negatedPhrases.push_back(tolowerString(phrase));
                     else
-                        ss << sep;
-                    ss << *i;
+                        _phrases.push_back(tolowerString(phrase));
+                    inNegation = false;
+                    inPhrase = false;
+                } else {
+                    // start of a phrase
+                    inPhrase = true;
+                    quoteOffset = t.offset;
                 }
             }
-
-            void _debugHelp( stringstream& ss, const vector<string>& v, const string& sep ) {
-                set<string> s( v.begin(), v.end() );
-                _debugHelp( ss, s, sep );
-            }
-
-        }
-
-        string FTSQuery::toString() const {
-            stringstream ss;
-            ss << "FTSQuery\n";
-
-            ss << "  terms: ";
-            _debugHelp( ss, getTerms(), ", " );
-            ss << "\n";
-
-            ss << "  negated terms: ";
-            _debugHelp( ss, getNegatedTerms(), ", " );
-            ss << "\n";
-
-            ss << "  phrases: ";
-            _debugHelp( ss, getPhr(), ", " );
-            ss << "\n";
-
-            ss << "  negated phrases: ";
-            _debugHelp( ss, getNegatedPhr(), ", " );
-            ss << "\n";
-
-            return ss.str();
-        }
-
-        string FTSQuery::debugString() const {
-            stringstream ss;
-
-            _debugHelp( ss, getTerms(), "|" );
-            ss << "||";
-
-            _debugHelp( ss, getNegatedTerms(), "|" );
-            ss << "||";
-
-            _debugHelp( ss, getPhr(), "|" );
-            ss << "||";
-
-            _debugHelp( ss, getNegatedPhr(), "|" );
-
-            return ss.str();
-        }
-
-        BSONObj FTSQuery::toBSON() const {
-            BSONObjBuilder bob;
-            bob.append( "terms", getTerms() );
-            bob.append( "negatedTerms", getNegatedTerms() );
-            bob.append( "phrases", getPhr() );
-            bob.append( "negatedPhrases", getNegatedPhr() );
-            return bob.obj();
+        } else {
+            abort();
         }
     }
+
+    return Status::OK();
+}
+
+void FTSQuery::_addTerm(const StopWords* sw, Stemmer& stemmer, const string& term, bool negated) {
+    string word = tolowerString(term);
+    if (sw->isStopWord(word))
+        return;
+    word = stemmer.stem(word);
+    if (negated)
+        _negatedTerms.insert(word);
+    else
+        _terms.push_back(word);
+}
+
+namespace {
+void _debugHelp(stringstream& ss, const set<string>& s, const string& sep) {
+    bool first = true;
+    for (set<string>::const_iterator i = s.begin(); i != s.end(); ++i) {
+        if (first)
+            first = false;
+        else
+            ss << sep;
+        ss << *i;
+    }
+}
+
+void _debugHelp(stringstream& ss, const vector<string>& v, const string& sep) {
+    set<string> s(v.begin(), v.end());
+    _debugHelp(ss, s, sep);
+}
+}
+
+string FTSQuery::toString() const {
+    stringstream ss;
+    ss << "FTSQuery\n";
+
+    ss << "  terms: ";
+    _debugHelp(ss, getTerms(), ", ");
+    ss << "\n";
+
+    ss << "  negated terms: ";
+    _debugHelp(ss, getNegatedTerms(), ", ");
+    ss << "\n";
+
+    ss << "  phrases: ";
+    _debugHelp(ss, getPhr(), ", ");
+    ss << "\n";
+
+    ss << "  negated phrases: ";
+    _debugHelp(ss, getNegatedPhr(), ", ");
+    ss << "\n";
+
+    return ss.str();
+}
+
+string FTSQuery::debugString() const {
+    stringstream ss;
+
+    _debugHelp(ss, getTerms(), "|");
+    ss << "||";
+
+    _debugHelp(ss, getNegatedTerms(), "|");
+    ss << "||";
+
+    _debugHelp(ss, getPhr(), "|");
+    ss << "||";
+
+    _debugHelp(ss, getNegatedPhr(), "|");
+
+    return ss.str();
+}
+
+BSONObj FTSQuery::toBSON() const {
+    BSONObjBuilder bob;
+    bob.append("terms", getTerms());
+    bob.append("negatedTerms", getNegatedTerms());
+    bob.append("phrases", getPhr());
+    bob.append("negatedPhrases", getNegatedPhr());
+    return bob.obj();
+}
+}
 }

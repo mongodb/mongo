@@ -35,43 +35,43 @@
 
 namespace mongo {
 
-    /* ns:      namespace, e.g. <database>.<collection>
-       pattern: the "where" clause / criteria
-       justOne: stop after 1 match
-       god:     allow access to system namespaces, and don't yield
-    */
-    long long deleteObjects(OperationContext* txn,
-                            Database* db,
-                            const StringData& ns,
-                            BSONObj pattern,
-                            PlanExecutor::YieldPolicy policy,
-                            bool justOne,
-                            bool logop,
-                            bool god,
-                            bool fromMigrate) {
-        NamespaceString nsString(ns);
-        DeleteRequest request(nsString);
-        request.setQuery(pattern);
-        request.setMulti(!justOne);
-        request.setUpdateOpLog(logop);
-        request.setGod(god);
-        request.setFromMigrate(fromMigrate);
-        request.setYieldPolicy(policy);
+/* ns:      namespace, e.g. <database>.<collection>
+   pattern: the "where" clause / criteria
+   justOne: stop after 1 match
+   god:     allow access to system namespaces, and don't yield
+*/
+long long deleteObjects(OperationContext* txn,
+                        Database* db,
+                        const StringData& ns,
+                        BSONObj pattern,
+                        PlanExecutor::YieldPolicy policy,
+                        bool justOne,
+                        bool logop,
+                        bool god,
+                        bool fromMigrate) {
+    NamespaceString nsString(ns);
+    DeleteRequest request(nsString);
+    request.setQuery(pattern);
+    request.setMulti(!justOne);
+    request.setUpdateOpLog(logop);
+    request.setGod(god);
+    request.setFromMigrate(fromMigrate);
+    request.setYieldPolicy(policy);
 
-        Collection* collection = NULL;
-        if (db) {
-            collection = db->getCollection(nsString.ns());
-        }
-
-        ParsedDelete parsedDelete(txn, &request);
-        uassertStatusOK(parsedDelete.parseRequest());
-
-        PlanExecutor* rawExec;
-        uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
-        boost::scoped_ptr<PlanExecutor> exec(rawExec);
-
-        uassertStatusOK(exec->executePlan());
-        return DeleteStage::getNumDeleted(exec.get());
+    Collection* collection = NULL;
+    if (db) {
+        collection = db->getCollection(nsString.ns());
     }
+
+    ParsedDelete parsedDelete(txn, &request);
+    uassertStatusOK(parsedDelete.parseRequest());
+
+    PlanExecutor* rawExec;
+    uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
+    boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+    uassertStatusOK(exec->executePlan());
+    return DeleteStage::getNumDeleted(exec.get());
+}
 
 }  // namespace mongo

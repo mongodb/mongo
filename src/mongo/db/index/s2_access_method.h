@@ -36,28 +36,28 @@
 
 namespace mongo {
 
-    class IndexCursor;
-    struct S2IndexingParams;
+class IndexCursor;
+struct S2IndexingParams;
 
-    class S2AccessMethod : public BtreeBasedAccessMethod {
-    public:
-        using BtreeBasedAccessMethod::_descriptor;
+class S2AccessMethod : public BtreeBasedAccessMethod {
+public:
+    using BtreeBasedAccessMethod::_descriptor;
 
-        S2AccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
-        virtual ~S2AccessMethod() { }
+    S2AccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
+    virtual ~S2AccessMethod() {}
 
-        /**
-         * Takes an index spec object for this index and returns a copy tweaked to conform to the
-         * expected format.  When an index build is initiated, this function is called on the spec
-         * object the user provides, and the return value of this function is the final spec object
-         * that gets saved in the index catalog.  Throws a UserException if 'specObj' is invalid.
-         */
-        static BSONObj fixSpec(const BSONObj& specObj);
+    /**
+     * Takes an index spec object for this index and returns a copy tweaked to conform to the
+     * expected format.  When an index build is initiated, this function is called on the spec
+     * object the user provides, and the return value of this function is the final spec object
+     * that gets saved in the index catalog.  Throws a UserException if 'specObj' is invalid.
+     */
+    static BSONObj fixSpec(const BSONObj& specObj);
 
-    private:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+private:
+    virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
-        S2IndexingParams _params;
-    };
+    S2IndexingParams _params;
+};
 
 }  // namespace mongo

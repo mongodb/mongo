@@ -35,72 +35,72 @@
 
 namespace {
 
-    using mongo::ErrorCodes;
-    using mongo::FieldRef;
-    using mongo::fieldchecker::isUpdatable;
-    using mongo::fieldchecker::isPositional;
-    using mongo::Status;
+using mongo::ErrorCodes;
+using mongo::FieldRef;
+using mongo::fieldchecker::isUpdatable;
+using mongo::fieldchecker::isPositional;
+using mongo::Status;
 
-    TEST(IsUpdatable, Basics) {
-        FieldRef fieldRef("x");
-        ASSERT_OK(isUpdatable(fieldRef));
-    }
+TEST(IsUpdatable, Basics) {
+    FieldRef fieldRef("x");
+    ASSERT_OK(isUpdatable(fieldRef));
+}
 
-    TEST(IsUpdatable, DottedFields) {
-        FieldRef fieldRef("x.y.z");
-        ASSERT_OK(isUpdatable(fieldRef));
-    }
+TEST(IsUpdatable, DottedFields) {
+    FieldRef fieldRef("x.y.z");
+    ASSERT_OK(isUpdatable(fieldRef));
+}
 
-    TEST(IsUpdatable, EmptyFields) {
-        FieldRef fieldRef("");
-        ASSERT_NOT_OK(isUpdatable(fieldRef));
+TEST(IsUpdatable, EmptyFields) {
+    FieldRef fieldRef("");
+    ASSERT_NOT_OK(isUpdatable(fieldRef));
 
-        FieldRef fieldRefDot(".");
-        ASSERT_NOT_OK(isUpdatable(fieldRefDot));
+    FieldRef fieldRefDot(".");
+    ASSERT_NOT_OK(isUpdatable(fieldRefDot));
 
-        /* TODO: Re-enable after review
-        FieldRef fieldRefDollar;
-        fieldRefDollar.parse("$");
-        ASSERT_NOT_OK(isUpdatable(fieldRefDollar));
+    /* TODO: Re-enable after review
+    FieldRef fieldRefDollar;
+    fieldRefDollar.parse("$");
+    ASSERT_NOT_OK(isUpdatable(fieldRefDollar));
 
 */
 
-        FieldRef fieldRefADot("a.");
-        ASSERT_NOT_OK(isUpdatable(fieldRefADot));
+    FieldRef fieldRefADot("a.");
+    ASSERT_NOT_OK(isUpdatable(fieldRefADot));
 
-        FieldRef fieldRefDotB(".b");
-        ASSERT_NOT_OK(isUpdatable(fieldRefDotB));
+    FieldRef fieldRefDotB(".b");
+    ASSERT_NOT_OK(isUpdatable(fieldRefDotB));
 
-        FieldRef fieldRefEmptyMiddle;
-        fieldRefEmptyMiddle.parse("a..b");
-        ASSERT_NOT_OK(isUpdatable(fieldRefEmptyMiddle));
-    }
+    FieldRef fieldRefEmptyMiddle;
+    fieldRefEmptyMiddle.parse("a..b");
+    ASSERT_NOT_OK(isUpdatable(fieldRefEmptyMiddle));
+}
 
-    // Positional checks
-    TEST(isPositional, EntireArrayItem) {
-        FieldRef fieldRefPositional("a.$");
-        size_t pos;
-        size_t count;
-        ASSERT_TRUE(isPositional(fieldRefPositional, &pos, &count));
-        ASSERT_EQUALS(pos, 1u);
-        ASSERT_EQUALS(count, 1u);
-    }
+// Positional checks
+TEST(isPositional, EntireArrayItem) {
+    FieldRef fieldRefPositional("a.$");
+    size_t pos;
+    size_t count;
+    ASSERT_TRUE(isPositional(fieldRefPositional, &pos, &count));
+    ASSERT_EQUALS(pos, 1u);
+    ASSERT_EQUALS(count, 1u);
+}
 
-    TEST(isPositional, ArraySubObject) {
-        FieldRef fieldRefPositional("a.$.b");
-        size_t pos;
-        size_t count;
-        ASSERT_TRUE(isPositional(fieldRefPositional, &pos, &count));
-        ASSERT_EQUALS(pos, 1u);
-        ASSERT_EQUALS(count, 1u);
-    }
+TEST(isPositional, ArraySubObject) {
+    FieldRef fieldRefPositional("a.$.b");
+    size_t pos;
+    size_t count;
+    ASSERT_TRUE(isPositional(fieldRefPositional, &pos, &count));
+    ASSERT_EQUALS(pos, 1u);
+    ASSERT_EQUALS(count, 1u);
+}
 
-    TEST(isPositional, MultiplePositional) {
-        FieldRef fieldRefPositional("a.$.b.$.c");
-        size_t pos;
-        size_t count;
-        ASSERT_TRUE(isPositional(fieldRefPositional, &pos, &count));
-        ASSERT_EQUALS(pos, 1u);
-        ASSERT_EQUALS(count, 2u);
-    }
-} // unnamed namespace
+TEST(isPositional, MultiplePositional) {
+    FieldRef fieldRefPositional("a.$.b.$.c");
+    size_t pos;
+    size_t count;
+    ASSERT_TRUE(isPositional(fieldRefPositional, &pos, &count));
+    ASSERT_EQUALS(pos, 1u);
+    ASSERT_EQUALS(count, 2u);
+}
+}  // unnamed namespace

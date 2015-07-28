@@ -35,105 +35,103 @@
 
 namespace mongo {
 
-    /**
-     * Simple, fixed size hash table used for namespace mapping (effectively the contents of the
-     * MMAP V1 .ns file). Uses a contiguous block of memory, so you can put it in a memory mapped
-     * file very easily.
-     */
-    class NamespaceHashTable {
-        MONGO_DISALLOW_COPYING(NamespaceHashTable);
-    public:
+/**
+ * Simple, fixed size hash table used for namespace mapping (effectively the contents of the
+ * MMAP V1 .ns file). Uses a contiguous block of memory, so you can put it in a memory mapped
+ * file very easily.
+ */
+class NamespaceHashTable {
+    MONGO_DISALLOW_COPYING(NamespaceHashTable);
 
-        typedef stdx::function< void(const Namespace& k, NamespaceDetails& v) > IteratorCallback;
+public:
+    typedef stdx::function<void(const Namespace& k, NamespaceDetails& v)> IteratorCallback;
 
 
-        /* buf must be all zeroes on initialization. */
-        NamespaceHashTable(void* buf, int buflen, const char *name);
+    /* buf must be all zeroes on initialization. */
+    NamespaceHashTable(void* buf, int buflen, const char* name);
 
-        NamespaceDetails* get(const Namespace& k) const {
-            bool found;
-            int i = _find(k, found);
-            if (found) {
-                return &_nodes(i).value;
-            }
-
-            return 0;
+    NamespaceDetails* get(const Namespace& k) const {
+        bool found;
+        int i = _find(k, found);
+        if (found) {
+            return &_nodes(i).value;
         }
 
-        void kill(OperationContext* txn, const Namespace& k) {
-            bool found;
-            int i = _find(k, found);
-            if ( i >= 0 && found ) {
-                Node* n = &_nodes(i);
-                n = txn->recoveryUnit()->writing(n);
-                n->key.kill();
-                n->setUnused();
-            }
+        return 0;
+    }
+
+    void kill(OperationContext* txn, const Namespace& k) {
+        bool found;
+        int i = _find(k, found);
+        if (i >= 0 && found) {
+            Node* n = &_nodes(i);
+            n = txn->recoveryUnit()->writing(n);
+            n->key.kill();
+            n->setUnused();
+        }
+    }
+
+    /** returns false if too full */
+    bool put(OperationContext* txn, const Namespace& k, const NamespaceDetails& value) {
+        bool found;
+        int i = _find(k, found);
+        if (i < 0)
+            return false;
+
+        Node* n = txn->recoveryUnit()->writing(&_nodes(i));
+        if (!found) {
+            n->key = k;
+            n->hash = k.hash();
+        } else {
+            invariant(n->hash == k.hash());
         }
 
-        /** returns false if too full */
-        bool put(OperationContext* txn, const Namespace& k, const NamespaceDetails& value) {
-            bool found;
-            int i = _find(k, found);
-            if (i < 0)
-                return false;
+        n->value = value;
+        return true;
+    }
 
-            Node* n = txn->recoveryUnit()->writing(&_nodes(i));
-            if (!found) {
-                n->key = k;
-                n->hash = k.hash();
-            }
-            else {
-                invariant(n->hash == k.hash());
-            }
-
-            n->value = value;
-            return true;
-        }
-
-        void iterAll(IteratorCallback callback) {
-            for (int i = 0; i < n; i++) {
-                if (_nodes(i).inUse()) {
-                    callback(_nodes(i).key, _nodes(i).value);
-                }
+    void iterAll(IteratorCallback callback) {
+        for (int i = 0; i < n; i++) {
+            if (_nodes(i).inUse()) {
+                callback(_nodes(i).key, _nodes(i).value);
             }
         }
+    }
 
 
-    private:
-
+private:
 #pragma pack(1)
-        struct Node {
-            int hash;
-            Namespace key;
-            NamespaceDetails value;
+    struct Node {
+        int hash;
+        Namespace key;
+        NamespaceDetails value;
 
-            bool inUse() const {
-                return hash != 0;
-            }
+        bool inUse() const {
+            return hash != 0;
+        }
 
-            void setUnused() {
-                hash = 0;
-            }
-        };
+        void setUnused() {
+            hash = 0;
+        }
+    };
 #pragma pack()
 
-        BOOST_STATIC_ASSERT(sizeof(Node) == 628);
+    BOOST_STATIC_ASSERT(sizeof(Node) == 628);
 
 
-        int _find(const Namespace& k, bool& found) const;
+    int _find(const Namespace& k, bool& found) const;
 
-        Node& _nodes(int i) const {
-            Node *nodes = (Node *)_buf;
-            return nodes[i];
-        }
+    Node& _nodes(int i) const {
+        Node* nodes = (Node*)_buf;
+        return nodes[i];
+    }
 
 
-        const char* _name;
-        void* const _buf;
+    const char* _name;
+    void* const _buf;
 
-        int n; // number of hashtable buckets
-        int maxChain;
-    };
+    int n;  // number of hashtable buckets
+    int maxChain;
+};
 
-} // namespace mongo
+}  // namespace mongo

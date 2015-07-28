@@ -36,122 +36,117 @@
 
 namespace mongo {
 
-    /**
-     * A KeyRange represents a range over keys of documents in a namespace, qualified by a
-     * key pattern which defines the documents that are in the key range.
-     *
-     * There may be many different expressions to generate the same key fields from a document - the
-     * keyPattern tells us these expressions.
-     *
-     * Ex:
-     * DocA : { field : "aaaa" }
-     * DocB : { field : "bbb" }
-     * DocC : { field : "ccccc" }
-     *
-     * keyPattern : { field : 1 }
-     * minKey : { field : "aaaa" } : Id(DocA)
-     * maxKey : { field : "ccccc" } : Id(DocB)
-     *
-     * contains Id(DocB)
-     *
-     * keyPattern : { field : "numberofletters" }
-     * minKey : { field : 4 } : numberofletters(DocA)
-     * maxKey : { field : 5 } : numberofletters(DocC)
-     *
-     * does not contain numberofletters(DocB)
-     */
-    struct KeyRange {
+/**
+ * A KeyRange represents a range over keys of documents in a namespace, qualified by a
+ * key pattern which defines the documents that are in the key range.
+ *
+ * There may be many different expressions to generate the same key fields from a document - the
+ * keyPattern tells us these expressions.
+ *
+ * Ex:
+ * DocA : { field : "aaaa" }
+ * DocB : { field : "bbb" }
+ * DocC : { field : "ccccc" }
+ *
+ * keyPattern : { field : 1 }
+ * minKey : { field : "aaaa" } : Id(DocA)
+ * maxKey : { field : "ccccc" } : Id(DocB)
+ *
+ * contains Id(DocB)
+ *
+ * keyPattern : { field : "numberofletters" }
+ * minKey : { field : 4 } : numberofletters(DocA)
+ * maxKey : { field : 5 } : numberofletters(DocC)
+ *
+ * does not contain numberofletters(DocB)
+ */
+struct KeyRange {
+    KeyRange(const std::string& ns,
+             const BSONObj& minKey,
+             const BSONObj& maxKey,
+             const BSONObj& keyPattern)
+        : ns(ns), minKey(minKey), maxKey(maxKey), keyPattern(keyPattern) {}
 
-        KeyRange( const std::string& ns,
-                  const BSONObj& minKey,
-                  const BSONObj& maxKey,
-                  const BSONObj& keyPattern ) :
-                ns( ns ), minKey( minKey ), maxKey( maxKey ), keyPattern( keyPattern )
-        {
-        }
+    KeyRange() {}
 
-        KeyRange() {}
+    std::string ns;
+    BSONObj minKey;
+    BSONObj maxKey;
+    BSONObj keyPattern;
+};
 
-        std::string ns;
-        BSONObj minKey;
-        BSONObj maxKey;
-        BSONObj keyPattern;
-    };
+/**
+ * Returns true if the point is within the range [inclusiveLower, exclusiveUpper).
+ */
+bool rangeContains(const BSONObj& inclusiveLower,
+                   const BSONObj& exclusiveUpper,
+                   const BSONObj& point);
 
-    /**
-     * Returns true if the point is within the range [inclusiveLower, exclusiveUpper).
-     */
-    bool rangeContains( const BSONObj& inclusiveLower,
+/**
+ * Returns true if the bounds specified by [inclusiveLower1, exclusiveUpper1)
+ * intersects with the bounds [inclusiveLower2, exclusiveUpper2).
+ */
+bool rangeOverlaps(const BSONObj& inclusiveLower1,
+                   const BSONObj& exclusiveUpper1,
+                   const BSONObj& inclusiveLower2,
+                   const BSONObj& exclusiveUpper2);
+
+/**
+ * Returns -1 if first range is less than the second range, 0 if equal and 1 if
+ * greater. The ordering is based on comparing both the min first and then uses
+ * the max as the tie breaker.
+ */
+int compareRanges(const BSONObj& rangeMin1,
+                  const BSONObj& rangeMax1,
+                  const BSONObj& rangeMin2,
+                  const BSONObj& rangeMax2);
+
+/**
+ * A RangeMap is a mapping of a BSON range from lower->upper (lower maps to upper), using
+ * standard BSON woCompare.  Upper bound is exclusive.
+ *
+ * NOTE: For overlap testing to work correctly, there may be no overlaps present in the map
+ * itself.
+ */
+typedef std::map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
+
+/**
+ * A RangeVector is a list of [lower,upper) ranges.
+ */
+typedef std::vector<std::pair<BSONObj, BSONObj>> RangeVector;
+
+/**
+ * Returns the overlap of a range [inclusiveLower, exclusiveUpper) with the provided range map
+ * as a vector of ranges from the map.
+ */
+void getRangeMapOverlap(const RangeMap& ranges,
+                        const BSONObj& inclusiveLower,
                         const BSONObj& exclusiveUpper,
-                        const BSONObj& point );
+                        RangeVector* vector);
 
-    /**
-     * Returns true if the bounds specified by [inclusiveLower1, exclusiveUpper1)
-     * intersects with the bounds [inclusiveLower2, exclusiveUpper2).
-     */
-    bool rangeOverlaps( const BSONObj& inclusiveLower1,
-                        const BSONObj& exclusiveUpper1,
-                        const BSONObj& inclusiveLower2,
-                        const BSONObj& exclusiveUpper2 );
+/**
+ * Returns true if the provided range map has ranges which overlap the provided range
+ * [inclusiveLower, exclusiveUpper).
+ */
+bool rangeMapOverlaps(const RangeMap& ranges,
+                      const BSONObj& inclusiveLower,
+                      const BSONObj& exclusiveUpper);
 
-    /**
-     * Returns -1 if first range is less than the second range, 0 if equal and 1 if
-     * greater. The ordering is based on comparing both the min first and then uses
-     * the max as the tie breaker.
-     */
-    int compareRanges( const BSONObj& rangeMin1,
-                       const BSONObj& rangeMax1,
-                       const BSONObj& rangeMin2,
-                       const BSONObj& rangeMax2 );
+/**
+ * Returns true if the provided range map exactly contains the provided range
+ * [inclusiveLower, exclusiveUpper).
+ */
+bool rangeMapContains(const RangeMap& ranges,
+                      const BSONObj& inclusiveLower,
+                      const BSONObj& exclusiveUpper);
 
-    /**
-     * A RangeMap is a mapping of a BSON range from lower->upper (lower maps to upper), using
-     * standard BSON woCompare.  Upper bound is exclusive.
-     *
-     * NOTE: For overlap testing to work correctly, there may be no overlaps present in the map
-     * itself.
-     */
-    typedef std::map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
+/**
+ * std::string representation of [inclusiveLower, exclusiveUpper)
+ */
+std::string rangeToString(const BSONObj& inclusiveLower, const BSONObj& exclusiveUpper);
 
-    /**
-     * A RangeVector is a list of [lower,upper) ranges.
-     */
-    typedef std::vector<std::pair<BSONObj,BSONObj> > RangeVector;
-
-    /**
-     * Returns the overlap of a range [inclusiveLower, exclusiveUpper) with the provided range map
-     * as a vector of ranges from the map.
-     */
-    void getRangeMapOverlap( const RangeMap& ranges,
-                             const BSONObj& inclusiveLower,
-                             const BSONObj& exclusiveUpper,
-                             RangeVector* vector );
-
-    /**
-     * Returns true if the provided range map has ranges which overlap the provided range
-     * [inclusiveLower, exclusiveUpper).
-     */
-    bool rangeMapOverlaps( const RangeMap& ranges,
-                           const BSONObj& inclusiveLower,
-                           const BSONObj& exclusiveUpper );
-
-    /**
-     * Returns true if the provided range map exactly contains the provided range
-     * [inclusiveLower, exclusiveUpper).
-     */
-    bool rangeMapContains( const RangeMap& ranges,
-                           const BSONObj& inclusiveLower,
-                           const BSONObj& exclusiveUpper );
-
-    /**
-     * std::string representation of [inclusiveLower, exclusiveUpper)
-     */
-    std::string rangeToString( const BSONObj& inclusiveLower,
-                               const BSONObj& exclusiveUpper );
-
-    /**
-     * std::string representation of overlapping ranges as a list "[range1),[range2),..."
-     */
-    std::string overlapToString( RangeVector overlap );
-
+/**
+ * std::string representation of overlapping ranges as a list "[range1),[range2),..."
+ */
+std::string overlapToString(RangeVector overlap);
 }

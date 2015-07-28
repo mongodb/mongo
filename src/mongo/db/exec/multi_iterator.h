@@ -35,64 +35,71 @@
 
 namespace mongo {
 
+/**
+ * Iterates over a collection using multiple underlying RecordIterators.
+ *
+ * This is a special stage which is not used automatically by queries. It is intended for
+ * special commands that work with RecordIterators. For example, it is used by the
+ * parallelCollectionScan and repairCursor commands
+ */
+class MultiIteratorStage : public PlanStage {
+public:
+    MultiIteratorStage(OperationContext* txn, WorkingSet* ws, Collection* collection);
+
+    ~MultiIteratorStage() {}
+
     /**
-     * Iterates over a collection using multiple underlying RecordIterators.
-     *
-     * This is a special stage which is not used automatically by queries. It is intended for
-     * special commands that work with RecordIterators. For example, it is used by the
-     * parallelCollectionScan and repairCursor commands
+     * Takes ownership of 'it'.
      */
-    class MultiIteratorStage : public PlanStage {
-    public:
-        MultiIteratorStage(OperationContext* txn, WorkingSet* ws, Collection* collection);
+    void addIterator(RecordIterator* it);
 
-        ~MultiIteratorStage() { }
+    virtual PlanStage::StageState work(WorkingSetID* out);
 
-        /**
-         * Takes ownership of 'it'.
-         */
-        void addIterator(RecordIterator* it);
+    virtual bool isEOF();
 
-        virtual PlanStage::StageState work(WorkingSetID* out);
+    void kill();
 
-        virtual bool isEOF();
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
 
-        void kill();
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
+    //
+    // These should not be used.
+    //
 
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual PlanStageStats* getStats() {
+        return NULL;
+    }
+    virtual CommonStats* getCommonStats() {
+        return NULL;
+    }
+    virtual SpecificStats* getSpecificStats() {
+        return NULL;
+    }
 
-        //
-        // These should not be used.
-        //
+    virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual PlanStageStats* getStats() { return NULL; }
-        virtual CommonStats* getCommonStats() { return NULL; }
-        virtual SpecificStats* getSpecificStats() { return NULL; }
+    virtual StageType stageType() const {
+        return STAGE_MULTI_ITERATOR;
+    }
 
-        virtual std::vector<PlanStage*> getChildren() const;
+private:
+    /**
+     * @return if more data
+     */
+    RecordId _advance();
 
-        virtual StageType stageType() const { return STAGE_MULTI_ITERATOR; }
+    OperationContext* _txn;
+    Collection* _collection;
+    OwnedPointerVector<RecordIterator> _iterators;
 
-    private:
+    // Not owned by us.
+    WorkingSet* _ws;
 
-        /**
-         * @return if more data
-         */
-        RecordId _advance();
+    // We allocate a working set member with this id on construction of the stage. It gets
+    // used for all fetch requests, changing the RecordId as appropriate.
+    const WorkingSetID _wsidForFetch;
+};
 
-        OperationContext* _txn;
-        Collection* _collection;
-        OwnedPointerVector<RecordIterator> _iterators;
-
-        // Not owned by us.
-        WorkingSet* _ws;
-
-        // We allocate a working set member with this id on construction of the stage. It gets
-        // used for all fetch requests, changing the RecordId as appropriate.
-        const WorkingSetID _wsidForFetch;
-    };
-
-} // namespace mongo
+}  // namespace mongo

@@ -36,149 +36,139 @@
 
 namespace {
 
-    using namespace mongo;
-    using namespace mongo::logger;
+using namespace mongo;
+using namespace mongo::logger;
 
-    typedef std::vector<LogComponentSetting> Settings;
+typedef std::vector<LogComponentSetting> Settings;
 
-    TEST(Empty, Empty) {
-        BSONObj input;
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+TEST(Empty, Empty) {
+    BSONObj input;
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_OK(result.getStatus());
-        ASSERT_EQUALS(result.getValue().size(), 0u);
-    }
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getValue().size(), 0u);
+}
 
-    TEST(Flat, Numeric) {
-        BSONObj input = BSON( "verbosity" << 1 );
+TEST(Flat, Numeric) {
+    BSONObj input = BSON("verbosity" << 1);
 
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_OK(result.getStatus());
-        ASSERT_EQUALS(result.getValue().size(), 1u);
-        ASSERT_EQUALS(result.getValue()[0].level, 1);
-        ASSERT_EQUALS(result.getValue()[0].component, LogComponent::kDefault);
-    }
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getValue().size(), 1u);
+    ASSERT_EQUALS(result.getValue()[0].level, 1);
+    ASSERT_EQUALS(result.getValue()[0].component, LogComponent::kDefault);
+}
 
-    TEST(Flat, FailNonNumeric) {
-        BSONObj input = BSON( "verbosity" << "not a number" );
+TEST(Flat, FailNonNumeric) {
+    BSONObj input = BSON("verbosity"
+                         << "not a number");
 
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
-        ASSERT_EQUALS(result.getStatus().reason(),
-                      "Expected default.verbosity to be a number, but found String");
-     }
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+    ASSERT_EQUALS(result.getStatus().reason(),
+                  "Expected default.verbosity to be a number, but found String");
+}
 
-    TEST(Flat, FailBadComponent) {
-        BSONObj input = BSON( "NoSuchComponent" << 2 );
+TEST(Flat, FailBadComponent) {
+    BSONObj input = BSON("NoSuchComponent" << 2);
 
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
-        ASSERT_EQUALS(result.getStatus().reason(),
-                      "Invalid component name default.NoSuchComponent");
-    }
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQUALS(result.getStatus().reason(), "Invalid component name default.NoSuchComponent");
+}
 
-    TEST(Nested, Numeric) {
-        BSONObj input = BSON("accessControl" << BSON("verbosity" << 1));
+TEST(Nested, Numeric) {
+    BSONObj input = BSON("accessControl" << BSON("verbosity" << 1));
 
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_OK(result.getStatus());
-        ASSERT_EQUALS(result.getValue().size(), 1u);
-        ASSERT_EQUALS(result.getValue()[0].level, 1);
-        ASSERT_EQUALS(result.getValue()[0].component, LogComponent::kAccessControl);
-    }
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getValue().size(), 1u);
+    ASSERT_EQUALS(result.getValue()[0].level, 1);
+    ASSERT_EQUALS(result.getValue()[0].component, LogComponent::kAccessControl);
+}
 
-    TEST(Nested, FailNonNumeric) {
-        BSONObj input = BSON("accessControl" << BSON("verbosity" << "Not a number"));
+TEST(Nested, FailNonNumeric) {
+    BSONObj input = BSON("accessControl" << BSON("verbosity"
+                                                 << "Not a number"));
 
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
-        ASSERT_EQUALS(result.getStatus().reason(),
-                      "Expected accessControl.verbosity to be a number, but found String");
-    }
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQUALS(result.getStatus().reason(),
+                  "Expected accessControl.verbosity to be a number, but found String");
+}
 
-    TEST(Nested, FailBadComponent) {
-        BSONObj input = BSON("NoSuchComponent" << BSON("verbosity" << 2));
+TEST(Nested, FailBadComponent) {
+    BSONObj input = BSON("NoSuchComponent" << BSON("verbosity" << 2));
 
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
-        ASSERT_EQUALS(result.getStatus().reason(),
-                      "Invalid component name default.NoSuchComponent");
-    }
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQUALS(result.getStatus().reason(), "Invalid component name default.NoSuchComponent");
+}
 
-    TEST(Multi, Numeric) {
-        BSONObj input = BSON("verbosity" << 2 <<
-                             "accessControl" << BSON("verbosity" << 0) <<
-                             "storage" <<
-                                 BSON("verbosity" << 3 <<
-                                      "journal" << BSON("verbosity" << 5)));
+TEST(Multi, Numeric) {
+    BSONObj input =
+        BSON("verbosity" << 2 << "accessControl" << BSON("verbosity" << 0) << "storage"
+                         << BSON("verbosity" << 3 << "journal" << BSON("verbosity" << 5)));
 
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_OK(result.getStatus());
-        ASSERT_EQUALS(result.getValue().size(), 4u);
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getValue().size(), 4u);
 
-        ASSERT_EQUALS(result.getValue()[0].level, 2);
-        ASSERT_EQUALS(result.getValue()[0].component, LogComponent::kDefault);
-        ASSERT_EQUALS(result.getValue()[1].level, 0);
-        ASSERT_EQUALS(result.getValue()[1].component, LogComponent::kAccessControl);
-        ASSERT_EQUALS(result.getValue()[2].level, 3);
-        ASSERT_EQUALS(result.getValue()[2].component, LogComponent::kStorage);
-        ASSERT_EQUALS(result.getValue()[3].level, 5);
-        ASSERT_EQUALS(result.getValue()[3].component, LogComponent::kJournal);
-    }
+    ASSERT_EQUALS(result.getValue()[0].level, 2);
+    ASSERT_EQUALS(result.getValue()[0].component, LogComponent::kDefault);
+    ASSERT_EQUALS(result.getValue()[1].level, 0);
+    ASSERT_EQUALS(result.getValue()[1].component, LogComponent::kAccessControl);
+    ASSERT_EQUALS(result.getValue()[2].level, 3);
+    ASSERT_EQUALS(result.getValue()[2].component, LogComponent::kStorage);
+    ASSERT_EQUALS(result.getValue()[3].level, 5);
+    ASSERT_EQUALS(result.getValue()[3].component, LogComponent::kJournal);
+}
 
-    TEST(Multi, FailBadComponent) {
-        BSONObj input = BSON("verbosity" << 6 <<
-                             "accessControl"<< BSON("verbosity" << 5) <<
-                             "storage" <<
-                                 BSON("verbosity" << 4 <<
-                                      "journal" << BSON("verbosity" << 6)) <<
-                             "No Such Component" << BSON("verbosity" << 2) <<
-                             "extrafield" << 123);
+TEST(Multi, FailBadComponent) {
+    BSONObj input =
+        BSON("verbosity" << 6 << "accessControl" << BSON("verbosity" << 5) << "storage"
+                         << BSON("verbosity" << 4 << "journal" << BSON("verbosity" << 6))
+                         << "No Such Component" << BSON("verbosity" << 2) << "extrafield" << 123);
 
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
-        ASSERT_EQUALS(result.getStatus().reason(),
-                      "Invalid component name default.No Such Component");
-    }
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQUALS(result.getStatus().reason(), "Invalid component name default.No Such Component");
+}
 
-    TEST(DeeplyNested, FailFast) {
-        BSONObj input = BSON("storage" <<
-                             BSON("this" <<
-                                  BSON("is" <<
-                                       BSON("nested" <<
-                                            BSON("too" << "deeply")))));
+TEST(DeeplyNested, FailFast) {
+    BSONObj input =
+        BSON("storage" << BSON("this" << BSON("is" << BSON("nested" << BSON("too"
+                                                                            << "deeply")))));
 
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
-        ASSERT_EQUALS(result.getStatus().reason(),
-                      "Invalid component name storage.this");
-    }
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQUALS(result.getStatus().reason(), "Invalid component name storage.this");
+}
 
-    TEST(DeeplyNested, FailLast) {
-        BSONObj input = BSON("storage" <<
-                             BSON("journal" <<
-                                  BSON("No Such Component" << "bad")));
+TEST(DeeplyNested, FailLast) {
+    BSONObj input = BSON("storage" << BSON("journal" << BSON("No Such Component"
+                                                             << "bad")));
 
-        StatusWith<Settings> result = parseLogComponentSettings(input);
+    StatusWith<Settings> result = parseLogComponentSettings(input);
 
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
-        ASSERT_EQUALS(result.getStatus().reason(),
-                      "Invalid component name storage.journal.No Such Component");
-    }
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQUALS(result.getStatus().reason(),
+                  "Invalid component name storage.journal.No Such Component");
+}
 }

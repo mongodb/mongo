@@ -33,25 +33,25 @@
 
 namespace mongo {
 
-    AuthzDocumentsUpdateGuard::AuthzDocumentsUpdateGuard(AuthorizationManager* authzManager)
-        : _authzManager(authzManager), _lockedForUpdate(false) {}
+AuthzDocumentsUpdateGuard::AuthzDocumentsUpdateGuard(AuthorizationManager* authzManager)
+    : _authzManager(authzManager), _lockedForUpdate(false) {}
 
-    AuthzDocumentsUpdateGuard::~AuthzDocumentsUpdateGuard() {
-        if (_lockedForUpdate) {
-            unlock();
-        }
+AuthzDocumentsUpdateGuard::~AuthzDocumentsUpdateGuard() {
+    if (_lockedForUpdate) {
+        unlock();
     }
+}
 
-    bool AuthzDocumentsUpdateGuard::tryLock(const StringData& why) {
-        fassert(17126, !_lockedForUpdate);
-        _lockedForUpdate = _authzManager->tryAcquireAuthzUpdateLock(why);
-        return _lockedForUpdate;
-    }
+bool AuthzDocumentsUpdateGuard::tryLock(const StringData& why) {
+    fassert(17126, !_lockedForUpdate);
+    _lockedForUpdate = _authzManager->tryAcquireAuthzUpdateLock(why);
+    return _lockedForUpdate;
+}
 
-    void AuthzDocumentsUpdateGuard::unlock() {
-        fassert(17127, _lockedForUpdate);
-        _authzManager->releaseAuthzUpdateLock();
-        _lockedForUpdate = false;
-    }
+void AuthzDocumentsUpdateGuard::unlock() {
+    fassert(17127, _lockedForUpdate);
+    _authzManager->releaseAuthzUpdateLock();
+    _lockedForUpdate = false;
+}
 
-} // namespace mongo
+}  // namespace mongo

@@ -33,42 +33,42 @@
 
 namespace mongo {
 
-    class SimpleRecordStoreV1;
+class SimpleRecordStoreV1;
 
-    /**
-     * This class iterates over a non-capped collection identified by 'ns'.
-     * The collection must exist when the constructor is called.
-     *
-     * If start is not DiskLoc(), the iteration begins at that DiskLoc.
-     */
-    class SimpleRecordStoreV1Iterator : public RecordIterator {
-    public:
-        SimpleRecordStoreV1Iterator( OperationContext* txn,
-                                     const SimpleRecordStoreV1* records,
-                                     const RecordId& start,
-                                     const CollectionScanParams::Direction& dir );
-        virtual ~SimpleRecordStoreV1Iterator() { }
+/**
+ * This class iterates over a non-capped collection identified by 'ns'.
+ * The collection must exist when the constructor is called.
+ *
+ * If start is not DiskLoc(), the iteration begins at that DiskLoc.
+ */
+class SimpleRecordStoreV1Iterator : public RecordIterator {
+public:
+    SimpleRecordStoreV1Iterator(OperationContext* txn,
+                                const SimpleRecordStoreV1* records,
+                                const RecordId& start,
+                                const CollectionScanParams::Direction& dir);
+    virtual ~SimpleRecordStoreV1Iterator() {}
 
-        virtual bool isEOF();
-        virtual RecordId getNext();
-        virtual RecordId curr();
+    virtual bool isEOF();
+    virtual RecordId getNext();
+    virtual RecordId curr();
 
-        virtual void invalidate(const RecordId& dl);
-        virtual void saveState();
-        virtual bool restoreState(OperationContext* txn);
+    virtual void invalidate(const RecordId& dl);
+    virtual void saveState();
+    virtual bool restoreState(OperationContext* txn);
 
-        virtual RecordData dataFor( const RecordId& loc ) const;
+    virtual RecordData dataFor(const RecordId& loc) const;
 
-    private:
-         // for getNext, not owned
-        OperationContext* _txn;
+private:
+    // for getNext, not owned
+    OperationContext* _txn;
 
-        // The result returned on the next call to getNext().
-        DiskLoc _curr;
+    // The result returned on the next call to getNext().
+    DiskLoc _curr;
 
-        const SimpleRecordStoreV1* _recordStore;
+    const SimpleRecordStoreV1* _recordStore;
 
-        CollectionScanParams::Direction _direction;
-    };
+    CollectionScanParams::Direction _direction;
+};
 
 }  // namespace mongo

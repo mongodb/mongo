@@ -35,108 +35,108 @@
 
 namespace mongo {
 
-    struct CursorOptions;
+struct CursorOptions;
+
+/**
+ * An IndexCursor is the interface through which one traverses the entries of a given
+ * index. The internal structure of an index is kept isolated.
+ *
+ * The cursor must be initialized by seek()ing to a given entry in the index.  The index is
+ * traversed by calling next() or skip()-ping ahead.
+ *
+ * The set of predicates a given index can understand is known a priori.  These predicates may
+ * be simple (a key location for a Btree index) or rich ($within for a geo index).
+ *
+ * Locking is the responsibility of the caller.  The IndexCursor keeps state.  If the caller
+ * wishes to yield or unlock, it must call savePosition() first.  When it decides to unyield it
+ * must call restorePosition().  The cursor may be EOF after a restorePosition().
+ */
+class IndexCursor {
+public:
+    virtual ~IndexCursor() {}
 
     /**
-     * An IndexCursor is the interface through which one traverses the entries of a given
-     * index. The internal structure of an index is kept isolated.
+     * A cursor doesn't point anywhere by default.  You must seek to the start position.
+     * The provided position must be a predicate that the index understands.  The
+     * predicate must describe one value, though there may be several instances
      *
-     * The cursor must be initialized by seek()ing to a given entry in the index.  The index is
-     * traversed by calling next() or skip()-ping ahead.
-     *
-     * The set of predicates a given index can understand is known a priori.  These predicates may
-     * be simple (a key location for a Btree index) or rich ($within for a geo index).
-     *
-     * Locking is the responsibility of the caller.  The IndexCursor keeps state.  If the caller
-     * wishes to yield or unlock, it must call savePosition() first.  When it decides to unyield it
-     * must call restorePosition().  The cursor may be EOF after a restorePosition().
+     * Possible return values:
+     * 1. Success: seeked to the position.
+     * 2. Success: seeked to 'closest' key oriented according to the cursor's direction.
+     * 3. Error: can't seek to the position.
      */
-    class IndexCursor {
-    public:
-        virtual ~IndexCursor() { }
+    virtual Status seek(const BSONObj& position) = 0;
 
-        /**
-         * A cursor doesn't point anywhere by default.  You must seek to the start position.
-         * The provided position must be a predicate that the index understands.  The
-         * predicate must describe one value, though there may be several instances
-         *
-         * Possible return values:
-         * 1. Success: seeked to the position.
-         * 2. Success: seeked to 'closest' key oriented according to the cursor's direction.
-         * 3. Error: can't seek to the position.
-         */
-        virtual Status seek(const BSONObj& position) = 0;
+    //
+    // Iteration support
+    //
 
-        //
-        // Iteration support
-        //
+    // Are we out of documents?
+    virtual bool isEOF() const = 0;
 
-        // Are we out of documents?
-        virtual bool isEOF() const = 0;
+    // Move to the next key/value pair.  Assumes !isEOF().
+    virtual void next() = 0;
 
-        // Move to the next key/value pair.  Assumes !isEOF().
-        virtual void next() = 0;
-        
-        //
-        // Accessors
-        //
+    //
+    // Accessors
+    //
 
-        // Current key we point at.  Assumes !isEOF().
-        virtual BSONObj getKey() const = 0;
+    // Current key we point at.  Assumes !isEOF().
+    virtual BSONObj getKey() const = 0;
 
-        // Current value we point at.  Assumes !isEOF().
-        virtual RecordId getValue() const = 0;
+    // Current value we point at.  Assumes !isEOF().
+    virtual RecordId getValue() const = 0;
 
-        //
-        // Yielding support
-        //
+    //
+    // Yielding support
+    //
 
-        /**
-         * Yielding semantics:
-         * If the entry that a cursor points at is not deleted during a yield, the cursor will
-         * point at that entry after a restore.
-         * An entry inserted during a yield may or may not be returned by an in-progress scan.
-         * An entry deleted during a yield may or may not be returned by an in-progress scan.
-         * An entry modified during a yield may or may not be returned by an in-progress scan.
-         * An entry that is not inserted or deleted during a yield will be returned, and only once.
-         * If the index returns entries in a given order (Btree), this order will be mantained even
-         * if the entry corresponding to a saved position is deleted during a yield.
-         */
+    /**
+     * Yielding semantics:
+     * If the entry that a cursor points at is not deleted during a yield, the cursor will
+     * point at that entry after a restore.
+     * An entry inserted during a yield may or may not be returned by an in-progress scan.
+     * An entry deleted during a yield may or may not be returned by an in-progress scan.
+     * An entry modified during a yield may or may not be returned by an in-progress scan.
+     * An entry that is not inserted or deleted during a yield will be returned, and only once.
+     * If the index returns entries in a given order (Btree), this order will be mantained even
+     * if the entry corresponding to a saved position is deleted during a yield.
+     */
 
-        /**
-         * Save our current position in the index.
-         */
-        virtual Status savePosition() = 0;
+    /**
+     * Save our current position in the index.
+     */
+    virtual Status savePosition() = 0;
 
-        /**
-         * Restore the saved position.  Errors if there is no saved position.
-         * The cursor may be EOF after a restore.
-         */
-        virtual Status restorePosition(OperationContext* txn) = 0;
+    /**
+     * Restore the saved position.  Errors if there is no saved position.
+     * The cursor may be EOF after a restore.
+     */
+    virtual Status restorePosition(OperationContext* txn) = 0;
 
-        // Return a std::string describing the cursor.
-        virtual std::string toString() = 0;
+    // Return a std::string describing the cursor.
+    virtual std::string toString() = 0;
 
-        /**
-         *  Add debugging info to the provided builder.
-         * TODO(hk): We can do this better, perhaps with a more structured format.
-         */
-        virtual void explainDetails(BSONObjBuilder* b) { }
+    /**
+     *  Add debugging info to the provided builder.
+     * TODO(hk): We can do this better, perhaps with a more structured format.
+     */
+    virtual void explainDetails(BSONObjBuilder* b) {}
+};
+
+// All the options we might want to set on a cursor.
+struct CursorOptions {
+    // Set the direction of the scan.  Ignored if the cursor doesn't have directions (geo).
+    enum Direction {
+        DECREASING = -1,
+        INCREASING = 1,
     };
 
-    // All the options we might want to set on a cursor.
-    struct CursorOptions {
-        // Set the direction of the scan.  Ignored if the cursor doesn't have directions (geo).
-        enum Direction {
-            DECREASING = -1,
-            INCREASING = 1,
-        };
+    Direction direction;
 
-        Direction direction;
-
-        // 2d indices need to know exactly how many results you want beforehand.
-        // Ignored by every other index.
-        int numWanted;
-    };
+    // 2d indices need to know exactly how many results you want beforehand.
+    // Ignored by every other index.
+    int numWanted;
+};
 
 }  // namespace mongo

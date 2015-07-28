@@ -34,24 +34,24 @@
 namespace mongo {
 namespace mutablebson {
 
-    // A damage event represents a change of size 'size' byte at starting at offset
-    // 'target_offset' in some target buffer, with the replacement data being 'size' bytes of
-    // data from the 'source' offset. The base addresses against which these offsets are to be
-    // applied are not captured here.
-    struct DamageEvent {
-        typedef uint32_t OffsetSizeType;
+// A damage event represents a change of size 'size' byte at starting at offset
+// 'target_offset' in some target buffer, with the replacement data being 'size' bytes of
+// data from the 'source' offset. The base addresses against which these offsets are to be
+// applied are not captured here.
+struct DamageEvent {
+    typedef uint32_t OffsetSizeType;
 
-        // Offset of source data (in some buffer held elsewhere).
-        OffsetSizeType sourceOffset;
+    // Offset of source data (in some buffer held elsewhere).
+    OffsetSizeType sourceOffset;
 
-        // Offset of target data (in some buffer held elsewhere).
-        OffsetSizeType targetOffset;
+    // Offset of target data (in some buffer held elsewhere).
+    OffsetSizeType targetOffset;
 
-        // Size of the damage region.
-        size_t size;
-    };
+    // Size of the damage region.
+    size_t size;
+};
 
-    typedef std::vector<DamageEvent> DamageVector;
+typedef std::vector<DamageEvent> DamageVector;
 
-} // namespace mutablebson
-} // namespace mongo
+}  // namespace mutablebson
+}  // namespace mongo

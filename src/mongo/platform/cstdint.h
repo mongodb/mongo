@@ -43,17 +43,17 @@
 #endif
 
 namespace mongo {
-    using _MONGO_STDINT_NAMESPACE::int8_t;
-    using _MONGO_STDINT_NAMESPACE::int16_t;
-    using _MONGO_STDINT_NAMESPACE::int32_t;
-    using _MONGO_STDINT_NAMESPACE::int64_t;
-    using _MONGO_STDINT_NAMESPACE::intptr_t;
+using _MONGO_STDINT_NAMESPACE::int8_t;
+using _MONGO_STDINT_NAMESPACE::int16_t;
+using _MONGO_STDINT_NAMESPACE::int32_t;
+using _MONGO_STDINT_NAMESPACE::int64_t;
+using _MONGO_STDINT_NAMESPACE::intptr_t;
 
-    using _MONGO_STDINT_NAMESPACE::uint8_t;
-    using _MONGO_STDINT_NAMESPACE::uint16_t;
-    using _MONGO_STDINT_NAMESPACE::uint32_t;
-    using _MONGO_STDINT_NAMESPACE::uint64_t;
-    using _MONGO_STDINT_NAMESPACE::uintptr_t;
+using _MONGO_STDINT_NAMESPACE::uint8_t;
+using _MONGO_STDINT_NAMESPACE::uint16_t;
+using _MONGO_STDINT_NAMESPACE::uint32_t;
+using _MONGO_STDINT_NAMESPACE::uint64_t;
+using _MONGO_STDINT_NAMESPACE::uintptr_t;
 }  // namespace mongo
 
 #undef _MONGO_STDINT_NAMESPACE

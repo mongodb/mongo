@@ -40,98 +40,101 @@
 #include "mongo/base/string_data.h"
 
 namespace mongo {
-    class RocksTransaction;
+class RocksTransaction;
 
-    class RocksTransactionEngine {
-    public:
-        RocksTransactionEngine();
+class RocksTransactionEngine {
+public:
+    RocksTransactionEngine();
 
-        size_t numKeysTracked();
-        size_t numActiveSnapshots();
+    size_t numKeysTracked();
+    size_t numActiveSnapshots();
 
-    private:
-        // REQUIRES: transaction engine lock locked
-        std::list<uint64_t>::iterator _getLatestSnapshotId_inlock();
+private:
+    // REQUIRES: transaction engine lock locked
+    std::list<uint64_t>::iterator _getLatestSnapshotId_inlock();
 
-        // REQUIRES: transaction engine lock locked
-        // Cleans up the snapshot from the _activeSnapshots list
-        void _cleanupSnapshot_inlock(const std::list<uint64_t>::iterator& snapshotIter);
+    // REQUIRES: transaction engine lock locked
+    // Cleans up the snapshot from the _activeSnapshots list
+    void _cleanupSnapshot_inlock(const std::list<uint64_t>::iterator& snapshotIter);
 
-        uint64_t _getNextTransactionId() {
-          return _nextTransactionId.fetch_add(1);
-        }
+    uint64_t _getNextTransactionId() {
+        return _nextTransactionId.fetch_add(1);
+    }
 
-        // returns true if the key was committed after the snapshotId, thus causing a write
-        // conflict
-        // REQUIRES: transaction engine lock locked
-        bool _isKeyCommittedAfterSnapshot_inlock(const std::string& key, uint64_t snapshotId);
+    // returns true if the key was committed after the snapshotId, thus causing a write
+    // conflict
+    // REQUIRES: transaction engine lock locked
+    bool _isKeyCommittedAfterSnapshot_inlock(const std::string& key, uint64_t snapshotId);
 
-        // REQUIRES: transaction engine lock locked
-        void _registerCommittedKey_inlock(const std::string& key, uint64_t newSnapshotId);
+    // REQUIRES: transaction engine lock locked
+    void _registerCommittedKey_inlock(const std::string& key, uint64_t newSnapshotId);
 
-        // REQUIRES: transaction engine lock locked
-        void _cleanUpKeysCommittedBeforeSnapshot_inlock(uint64_t snapshotId);
+    // REQUIRES: transaction engine lock locked
+    void _cleanUpKeysCommittedBeforeSnapshot_inlock(uint64_t snapshotId);
 
-        friend class RocksTransaction;
-        uint64_t _latestSnapshotId;
-        std::atomic<uint64_t> _nextTransactionId;
-        // Lock when mutating state here
-        boost::mutex _lock;
+    friend class RocksTransaction;
+    uint64_t _latestSnapshotId;
+    std::atomic<uint64_t> _nextTransactionId;
+    // Lock when mutating state here
+    boost::mutex _lock;
 
-        // The following data structures keep information about when were the keys committed.
-        // They can answer the following questions:
-        // * Which stored committed key has the earliest snapshot
-        // * When was a certain key committed
-        // _keysSortedBySnapshot is a list of {key, sequence_id} and it's sorted by the sequence_id.
-        // Committing keys are always monotonically increasing, so to keep it sorted we just need to
-        // push to the end.
-        // _keyInfo is a map from the key to the two-part information about the key:
-        // * snapshot ID of the last commit to this key
-        // * an iterator pointing to the corresponding entry in _keysSortedBySnapshot. This is used
-        // to update the list at the same time as we update the _keyInfo
-        typedef std::list<std::pair<std::string, uint64_t>> KeysSortedBySnapshotList;
-        typedef std::list<std::pair<std::string, uint64_t>>::iterator KeysSortedBySnapshotListIter;
-        KeysSortedBySnapshotList _keysSortedBySnapshot;
-        // map of key -> pair{seq_id, pointer to corresponding _keysSortedBySnapshot}
-        // key is a StringData and it points to the actual string in _keysSortedBySnapshot
-        std::unordered_map<StringData, std::pair<uint64_t, KeysSortedBySnapshotListIter>,
-                           StringData::Hasher> _keyInfo;
-        std::unordered_map<std::string, uint64_t> _uncommittedTransactionId;
+    // The following data structures keep information about when were the keys committed.
+    // They can answer the following questions:
+    // * Which stored committed key has the earliest snapshot
+    // * When was a certain key committed
+    // _keysSortedBySnapshot is a list of {key, sequence_id} and it's sorted by the sequence_id.
+    // Committing keys are always monotonically increasing, so to keep it sorted we just need to
+    // push to the end.
+    // _keyInfo is a map from the key to the two-part information about the key:
+    // * snapshot ID of the last commit to this key
+    // * an iterator pointing to the corresponding entry in _keysSortedBySnapshot. This is used
+    // to update the list at the same time as we update the _keyInfo
+    typedef std::list<std::pair<std::string, uint64_t>> KeysSortedBySnapshotList;
+    typedef std::list<std::pair<std::string, uint64_t>>::iterator KeysSortedBySnapshotListIter;
+    KeysSortedBySnapshotList _keysSortedBySnapshot;
+    // map of key -> pair{seq_id, pointer to corresponding _keysSortedBySnapshot}
+    // key is a StringData and it points to the actual string in _keysSortedBySnapshot
+    std::unordered_map<StringData,
+                       std::pair<uint64_t, KeysSortedBySnapshotListIter>,
+                       StringData::Hasher> _keyInfo;
+    std::unordered_map<std::string, uint64_t> _uncommittedTransactionId;
 
-        // this list is sorted
-        std::list<uint64_t> _activeSnapshots;
-    };
+    // this list is sorted
+    std::list<uint64_t> _activeSnapshots;
+};
 
-    class RocksTransaction {
-    public:
-        RocksTransaction(RocksTransactionEngine* transactionEngine)
-            : _snapshotInitialized(false),
-              _snapshotId(std::numeric_limits<uint64_t>::max()),
-              _transactionId(transactionEngine->_getNextTransactionId()),
-              _transactionEngine(transactionEngine) {}
+class RocksTransaction {
+public:
+    RocksTransaction(RocksTransactionEngine* transactionEngine)
+        : _snapshotInitialized(false),
+          _snapshotId(std::numeric_limits<uint64_t>::max()),
+          _transactionId(transactionEngine->_getNextTransactionId()),
+          _transactionEngine(transactionEngine) {}
 
-        ~RocksTransaction() { abort(); }
+    ~RocksTransaction() {
+        abort();
+    }
 
-        // returns true if OK
-        // returns false on conflict
-        bool registerWrite(const std::string& key);
+    // returns true if OK
+    // returns false on conflict
+    bool registerWrite(const std::string& key);
 
-        void commit();
+    void commit();
 
-        void abort();
+    void abort();
 
-        void recordSnapshotId();
+    void recordSnapshotId();
 
-    private:
-        // REQUIRES: transaction engine lock locked
-        void _cleanup_inlock();
+private:
+    // REQUIRES: transaction engine lock locked
+    void _cleanup_inlock();
 
-        friend class RocksTransactionEngine;
-        bool _snapshotInitialized;
-        uint64_t _snapshotId;
-        std::list<uint64_t>::iterator _activeSnapshotsIter;
-        uint64_t _transactionId;
-        RocksTransactionEngine* _transactionEngine;
-        std::set<std::string> _writtenKeys;
-    };
+    friend class RocksTransactionEngine;
+    bool _snapshotInitialized;
+    uint64_t _snapshotId;
+    std::list<uint64_t>::iterator _activeSnapshotsIter;
+    uint64_t _transactionId;
+    RocksTransactionEngine* _transactionEngine;
+    std::set<std::string> _writtenKeys;
+};
 }

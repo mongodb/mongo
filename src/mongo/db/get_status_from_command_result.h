@@ -29,20 +29,20 @@
 #pragma once
 
 namespace mongo {
-    class BSONObj;
-    class Status;
+class BSONObj;
+class Status;
 
-    /**
-     * Converts "result" into a Status object.  The input is expected to be the object returned
-     * by running a command.  Returns ErrorCodes::CommandResultSchemaViolation if "result" does
-     * not look like the result of a command.
-     *
-     * Command results must have a field called "ok" whose value may be interpreted as a boolean.
-     * If the value interpreted as a boolean is true, the resultant status is Status::OK().
-     * Otherwise, it is an error status.  The code comes from the "code" field, if present and
-     * number-ish, while the reason message will come from the errmsg field, if present and
-     * string-ish.
-     */
-    Status getStatusFromCommandResult(const BSONObj& result);
+/**
+ * Converts "result" into a Status object.  The input is expected to be the object returned
+ * by running a command.  Returns ErrorCodes::CommandResultSchemaViolation if "result" does
+ * not look like the result of a command.
+ *
+ * Command results must have a field called "ok" whose value may be interpreted as a boolean.
+ * If the value interpreted as a boolean is true, the resultant status is Status::OK().
+ * Otherwise, it is an error status.  The code comes from the "code" field, if present and
+ * number-ish, while the reason message will come from the errmsg field, if present and
+ * string-ish.
+ */
+Status getStatusFromCommandResult(const BSONObj& result);
 
 }  // namespace mongo

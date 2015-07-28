@@ -37,133 +37,133 @@
 
 namespace mongo {
 
-    struct DeletedRange {
-        std::string ns;
-        BSONObj min;
-        BSONObj max;
-        BSONObj shardKeyPattern;
-    };
+struct DeletedRange {
+    std::string ns;
+    BSONObj min;
+    BSONObj max;
+    BSONObj shardKeyPattern;
+};
+
+/**
+ * Comparator function object compatible with set.
+ */
+struct DeletedRangeCmp {
+    bool operator()(const DeletedRange& lhs, const DeletedRange& rhs) const;
+};
+
+/**
+ * Mock environment for RangeDeleter with knobs for pausing/resuming
+ * deletes, setting open cursors IDs per namespace and the ability to
+ * record the history of deletes performed through this environment.
+ */
+class RangeDeleterMockEnv : public mongo::RangeDeleterEnv {
+public:
+    RangeDeleterMockEnv();
+
+    void initThread() {}
+
+    //
+    // Environment modification methods.
+    //
 
     /**
-     * Comparator function object compatible with set.
+     * Adds an id to the current set of cursors in the given namespace.
      */
-    struct DeletedRangeCmp {
-        bool operator()(const DeletedRange& lhs, const DeletedRange& rhs) const;
-    };
+    void addCursorId(const StringData& ns, CursorId id);
 
     /**
-     * Mock environment for RangeDeleter with knobs for pausing/resuming
-     * deletes, setting open cursors IDs per namespace and the ability to
-     * record the history of deletes performed through this environment.
+     * Removes the id from the set of open cursors in the given namespace.
      */
-    class RangeDeleterMockEnv: public mongo::RangeDeleterEnv {
-    public:
-        RangeDeleterMockEnv();
+    void removeCursorId(const StringData& ns, CursorId id);
 
-        void initThread() {}
+    //
+    // Environment synchronization methods.
+    //
 
-        //
-        // Environment modification methods.
-        //
+    /**
+     * Blocks all new deletes from proceeding.
+     */
+    void pauseDeletes();
 
-        /**
-         * Adds an id to the current set of cursors in the given namespace.
-         */
-        void addCursorId(const StringData& ns, CursorId id);
+    /**
+     * Unblocks one paused delete.
+     */
+    void resumeOneDelete();
 
-        /**
-         * Removes the id from the set of open cursors in the given namespace.
-         */
-        void removeCursorId(const StringData& ns, CursorId id);
+    /**
+     * Blocks until the getCursor method was called and terminated at least the
+     * specified number of times for the entire lifetime of this deleter.
+     */
+    void waitForNthGetCursor(uint64_t nthCall);
 
-        //
-        // Environment synchronization methods.
-        //
+    /**
+     * Blocks until the deleteRange method was called and at the same time paused
+     * at least the specified number of times for the entire lifetime of this deleter.
+     */
+    void waitForNthPausedDelete(uint64_t nthPause);
 
-        /**
-         * Blocks all new deletes from proceeding.
-         */
-        void pauseDeletes();
+    //
+    // Environment introspection methods.
+    //
 
-        /**
-         * Unblocks one paused delete.
-         */
-        void resumeOneDelete();
+    /**
+     * Returns true if deleteRange was called at least once.
+     */
+    bool deleteOccured() const;
 
-        /**
-         * Blocks until the getCursor method was called and terminated at least the
-         * specified number of times for the entire lifetime of this deleter.
-         */
-        void waitForNthGetCursor(uint64_t nthCall);
+    /**
+     * Returns the last delete. Undefined if deleteOccured is false.
+     */
+    DeletedRange getLastDelete() const;
 
-        /**
-         * Blocks until the deleteRange method was called and at the same time paused
-         * at least the specified number of times for the entire lifetime of this deleter.
-         */
-        void waitForNthPausedDelete(uint64_t nthPause);
+    //
+    // Environment methods.
+    //
 
-        //
-        // Environment introspection methods.
-        //
+    /**
+     * Basic implementation of delete that matches the signature for
+     * RangeDeleterEnv::deleteRange. This does not actually perform the delete
+     * but simply keeps a record of it. Can also be paused by pauseDeletes and
+     * resumed with resumeDeletes.
+     */
+    bool deleteRange(OperationContext* txn,
+                     const RangeDeleteEntry& taskDetails,
+                     long long int* deletedDocs,
+                     std::string* errMsg);
 
-        /**
-         * Returns true if deleteRange was called at least once.
-         */
-        bool deleteOccured() const;
+    /**
+     * Basic implementation of gathering open cursors that matches the signature for
+     * RangeDeleterEnv::getCursorIds. The cursors returned can be modified with
+     * the setCursorId and clearCursorMap methods.
+     */
+    void getCursorIds(OperationContext* txn, const StringData& ns, std::set<CursorId>* in);
 
-        /**
-         * Returns the last delete. Undefined if deleteOccured is false.
-         */
-        DeletedRange getLastDelete() const;
+private:
+    // mutex acquisition ordering:
+    // _envStatMutex -> _pauseDeleteMutex -> _deleteListMutex -> _cursorMapMutex
 
-        //
-        // Environment methods.
-        //
+    mutable mutex _deleteListMutex;
+    std::vector<DeletedRange> _deleteList;
 
-        /**
-         * Basic implementation of delete that matches the signature for
-         * RangeDeleterEnv::deleteRange. This does not actually perform the delete
-         * but simply keeps a record of it. Can also be paused by pauseDeletes and
-         * resumed with resumeDeletes.
-         */
-        bool deleteRange(OperationContext* txn,
-                         const RangeDeleteEntry& taskDetails,
-                         long long int* deletedDocs,
-                         std::string* errMsg);
+    mutex _cursorMapMutex;
+    std::map<std::string, std::set<CursorId>> _cursorMap;
 
-        /**
-         * Basic implementation of gathering open cursors that matches the signature for
-         * RangeDeleterEnv::getCursorIds. The cursors returned can be modified with
-         * the setCursorId and clearCursorMap methods.
-         */
-        void getCursorIds(OperationContext* txn, const StringData& ns, std::set<CursorId>* in);
+    // Protects _pauseDelete & _pausedCount
+    mutex _pauseDeleteMutex;
+    boost::condition _pausedCV;
+    bool _pauseDelete;
 
-    private:
-        // mutex acquisition ordering:
-        // _envStatMutex -> _pauseDeleteMutex -> _deleteListMutex -> _cursorMapMutex
+    // Number of times a delete gets paused.
+    uint64_t _pausedCount;
+    // _pausedCount < nthPause (used by waitForNthPausedDelete)
+    boost::condition _pausedDeleteChangeCV;
 
-        mutable mutex _deleteListMutex;
-        std::vector<DeletedRange> _deleteList;
+    // Protects all variables below this line.
+    mutex _envStatMutex;
 
-        mutex _cursorMapMutex;
-        std::map<std::string, std::set<CursorId> > _cursorMap;
-
-        // Protects _pauseDelete & _pausedCount
-        mutex _pauseDeleteMutex;
-        boost::condition _pausedCV;
-        bool _pauseDelete;
-
-        // Number of times a delete gets paused.
-        uint64_t _pausedCount;
-        // _pausedCount < nthPause (used by waitForNthPausedDelete)
-        boost::condition _pausedDeleteChangeCV;
-
-        // Protects all variables below this line.
-        mutex _envStatMutex;
-
-        // Keeps track of the number of times getCursorIds was called.
-        uint64_t _getCursorsCallCount;
-        // _getCursorsCallCount < nthCall (used by waitForNthGetCursor)
-        boost::condition _cursorsCallCountUpdatedCV;
-    };
+    // Keeps track of the number of times getCursorIds was called.
+    uint64_t _getCursorsCallCount;
+    // _getCursorsCallCount < nthCall (used by waitForNthGetCursor)
+    boost::condition _cursorsCallCountUpdatedCV;
+};
 }

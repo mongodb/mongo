@@ -48,24 +48,23 @@
 
 namespace mongo {
 
-    void RocksCompactionScheduler::reportSkippedDeletionsAboveThreshold(const std::string& prefix) {
-        bool schedule = false;
-        {
-            boost::mutex::scoped_lock lk(_lock);
-            if (_timer.minutes() >= kMinCompactionIntervalMins) {
-                schedule = true;
-                _timer.reset();
-            }
-        }
-        if (schedule) {
-            log() << "Scheduling compaction to clean up tombstones for prefix "
-                  << rocksdb::Slice(prefix).ToString(true);
-            // we schedule compaction now
-            std::string nextPrefix(rocksGetNextPrefix(prefix));
-            rocksdb::Slice begin(prefix), end(nextPrefix);
-            // ignore error
-            rocksdb::experimental::SuggestCompactRange(_db, &begin, &end);
+void RocksCompactionScheduler::reportSkippedDeletionsAboveThreshold(const std::string& prefix) {
+    bool schedule = false;
+    {
+        boost::mutex::scoped_lock lk(_lock);
+        if (_timer.minutes() >= kMinCompactionIntervalMins) {
+            schedule = true;
+            _timer.reset();
         }
     }
-
+    if (schedule) {
+        log() << "Scheduling compaction to clean up tombstones for prefix "
+              << rocksdb::Slice(prefix).ToString(true);
+        // we schedule compaction now
+        std::string nextPrefix(rocksGetNextPrefix(prefix));
+        rocksdb::Slice begin(prefix), end(nextPrefix);
+        // ignore error
+        rocksdb::experimental::SuggestCompactRange(_db, &begin, &end);
+    }
+}
 }

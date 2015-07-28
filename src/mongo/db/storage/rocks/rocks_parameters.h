@@ -33,70 +33,70 @@
 
 namespace mongo {
 
-    // To dynamically configure RocksDB's rate limit, run
-    // db.adminCommand({setParameter:1, rocksdbRuntimeConfigMaxWriteMBPerSec:30})
-    class RocksRateLimiterServerParameter : public ServerParameter {
-        MONGO_DISALLOW_COPYING(RocksRateLimiterServerParameter);
+// To dynamically configure RocksDB's rate limit, run
+// db.adminCommand({setParameter:1, rocksdbRuntimeConfigMaxWriteMBPerSec:30})
+class RocksRateLimiterServerParameter : public ServerParameter {
+    MONGO_DISALLOW_COPYING(RocksRateLimiterServerParameter);
 
-    public:
-        RocksRateLimiterServerParameter(RocksEngine* engine);
-        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
-        virtual Status set(const BSONElement& newValueElement);
-        virtual Status setFromString(const std::string& str);
+public:
+    RocksRateLimiterServerParameter(RocksEngine* engine);
+    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual Status set(const BSONElement& newValueElement);
+    virtual Status setFromString(const std::string& str);
 
-    private:
-        Status _set(int newNum);
-        RocksEngine* _engine;
-    };
+private:
+    Status _set(int newNum);
+    RocksEngine* _engine;
+};
 
-    // We use mongo's setParameter() API to issue a backup request to rocksdb.
-    // To backup entire RocksDB instance, call:
-    // db.adminCommand({setParameter:1, rocksdbBackup: "/var/lib/mongodb/backup/1"})
-    // The directory needs to be an absolute path. It should not exist -- it will be created
-    // automatically.
-    class RocksBackupServerParameter : public ServerParameter {
-        MONGO_DISALLOW_COPYING(RocksBackupServerParameter);
+// We use mongo's setParameter() API to issue a backup request to rocksdb.
+// To backup entire RocksDB instance, call:
+// db.adminCommand({setParameter:1, rocksdbBackup: "/var/lib/mongodb/backup/1"})
+// The directory needs to be an absolute path. It should not exist -- it will be created
+// automatically.
+class RocksBackupServerParameter : public ServerParameter {
+    MONGO_DISALLOW_COPYING(RocksBackupServerParameter);
 
-    public:
-        RocksBackupServerParameter(RocksEngine* engine);
-        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
-        virtual Status set(const BSONElement& newValueElement);
-        virtual Status setFromString(const std::string& str);
+public:
+    RocksBackupServerParameter(RocksEngine* engine);
+    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual Status set(const BSONElement& newValueElement);
+    virtual Status setFromString(const std::string& str);
 
-    private:
-        RocksEngine* _engine;
-    };
+private:
+    RocksEngine* _engine;
+};
 
-    // We use mongo's setParameter() API to issue a compact request to rocksdb.
-    // To compact entire RocksDB instance, call:
-    // db.adminCommand({setParameter:1, rocksdbCompact: 1})
-    class RocksCompactServerParameter : public ServerParameter {
-        MONGO_DISALLOW_COPYING(RocksCompactServerParameter);
+// We use mongo's setParameter() API to issue a compact request to rocksdb.
+// To compact entire RocksDB instance, call:
+// db.adminCommand({setParameter:1, rocksdbCompact: 1})
+class RocksCompactServerParameter : public ServerParameter {
+    MONGO_DISALLOW_COPYING(RocksCompactServerParameter);
 
-    public:
-        RocksCompactServerParameter(RocksEngine* engine);
-        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
-        virtual Status set(const BSONElement& newValueElement);
-        virtual Status setFromString(const std::string& str);
+public:
+    RocksCompactServerParameter(RocksEngine* engine);
+    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual Status set(const BSONElement& newValueElement);
+    virtual Status setFromString(const std::string& str);
 
-    private:
-        RocksEngine* _engine;
-    };
+private:
+    RocksEngine* _engine;
+};
 
-    // We use mongo's setParameter() API to dynamically change the size of the block cache
-    // To compact entire RocksDB instance, call:
-    // db.adminCommand({setParameter:1, rocksdbRuntimeConfigCacheSizeGB: 10})
-    class RocksCacheSizeParameter : public ServerParameter {
-        MONGO_DISALLOW_COPYING(RocksCacheSizeParameter);
+// We use mongo's setParameter() API to dynamically change the size of the block cache
+// To compact entire RocksDB instance, call:
+// db.adminCommand({setParameter:1, rocksdbRuntimeConfigCacheSizeGB: 10})
+class RocksCacheSizeParameter : public ServerParameter {
+    MONGO_DISALLOW_COPYING(RocksCacheSizeParameter);
 
-    public:
-        RocksCacheSizeParameter(RocksEngine* engine);
-        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
-        virtual Status set(const BSONElement& newValueElement);
-        virtual Status setFromString(const std::string& str);
+public:
+    RocksCacheSizeParameter(RocksEngine* engine);
+    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual Status set(const BSONElement& newValueElement);
+    virtual Status setFromString(const std::string& str);
 
-    private:
-        Status _set(int newNum);
-        RocksEngine* _engine;
-    };
+private:
+    Status _set(int newNum);
+    RocksEngine* _engine;
+};
 }

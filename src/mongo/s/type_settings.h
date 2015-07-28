@@ -37,286 +37,298 @@
 
 namespace mongo {
 
-    struct WriteConcernOptions;
+struct WriteConcernOptions;
+
+/**
+ * This class represents the layout and contents of documents contained in the
+ * config.settings collection. All manipulation of documents coming from that
+ * collection should be done with this class.
+ *
+ * Usage Example:
+ *
+ *     // Contact the config. 'conn' has been obtained before.
+ *     DBClientBase* conn;
+ *     BSONObj query = QUERY(SettingsType::exampleField("exampleFieldName"));
+ *     exampleDoc = conn->findOne(SettingsType::ConfigNS, query);
+ *
+ *     // Process the response.
+ *     SettingsType exampleType;
+ *     std::string errMsg;
+ *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+ *         // Can't use 'exampleType'. Take action.
+ *     }
+ *     // use 'exampleType'
+ *
+ * It is the responsibility of the caller to make sure that this object has
+ * the right "key" when calling the getter and serialize methods. The key is
+ * used for identifying the type of document this object represents (for example,
+ * balancer settings or chunk size settings document).
+ */
+class SettingsType {
+    MONGO_DISALLOW_COPYING(SettingsType);
+
+public:
+    //
+    // schema declarations
+    //
+
+    // Name of the settings collection in the config server.
+    static const std::string ConfigNS;
+    static const std::string BalancerDocKey;
+    static const std::string ChunkSizeDocKey;
+
+    // Field names and types in the settings collection type.
+    static const BSONField<std::string> key;
+    static const BSONField<int> chunksize;
+    static const BSONField<bool> balancerStopped;
+    static const BSONField<BSONObj> balancerActiveWindow;
+    static const BSONField<bool> deprecated_secondaryThrottle;
+    static const BSONField<BSONObj> migrationWriteConcern;
+    static const BSONField<bool> waitForDelete;
+
+    //
+    // settings type methods
+    //
+
+    SettingsType();
+    ~SettingsType();
 
     /**
-     * This class represents the layout and contents of documents contained in the
-     * config.settings collection. All manipulation of documents coming from that
-     * collection should be done with this class.
-     *
-     * Usage Example:
-     *
-     *     // Contact the config. 'conn' has been obtained before.
-     *     DBClientBase* conn;
-     *     BSONObj query = QUERY(SettingsType::exampleField("exampleFieldName"));
-     *     exampleDoc = conn->findOne(SettingsType::ConfigNS, query);
-     *
-     *     // Process the response.
-     *     SettingsType exampleType;
-     *     std::string errMsg;
-     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
-     *         // Can't use 'exampleType'. Take action.
-     *     }
-     *     // use 'exampleType'
-     *
-     * It is the responsibility of the caller to make sure that this object has
-     * the right "key" when calling the getter and serialize methods. The key is
-     * used for identifying the type of document this object represents (for example,
-     * balancer settings or chunk size settings document).
+     * Returns true if all the mandatory fields are present and have valid
+     * representations. Otherwise returns false and fills in the optional 'errMsg' string.
      */
-    class SettingsType {
-        MONGO_DISALLOW_COPYING(SettingsType);
-    public:
+    bool isValid(std::string* errMsg) const;
 
-        //
-        // schema declarations
-        //
+    /**
+     * Returns the BSON representation of the entry.
+     */
+    BSONObj toBSON() const;
 
-        // Name of the settings collection in the config server.
-        static const std::string ConfigNS;
-        static const std::string BalancerDocKey;
-        static const std::string ChunkSizeDocKey;
+    /**
+     * Clears and populates the internal state using the 'source' BSON object if the
+     * latter contains valid values. Otherwise sets errMsg and returns false.
+     */
+    bool parseBSON(const BSONObj& source, std::string* errMsg);
 
-        // Field names and types in the settings collection type.
-        static const BSONField<std::string> key;
-        static const BSONField<int> chunksize;
-        static const BSONField<bool> balancerStopped;
-        static const BSONField<BSONObj> balancerActiveWindow;
-        static const BSONField<bool> deprecated_secondaryThrottle;
-        static const BSONField<BSONObj> migrationWriteConcern;
-        static const BSONField<bool> waitForDelete;
+    /**
+     * Clears the internal state.
+     */
+    void clear();
 
-        //
-        // settings type methods
-        //
+    /**
+     * Copies all the fields present in 'this' to 'other'.
+     */
+    void cloneTo(SettingsType* other) const;
 
-        SettingsType();
-        ~SettingsType();
+    /**
+     * Returns a std::string representation of the current internal state.
+     */
+    std::string toString() const;
 
-        /**
-         * Returns true if all the mandatory fields are present and have valid
-         * representations. Otherwise returns false and fills in the optional 'errMsg' string.
-         */
-        bool isValid(std::string* errMsg) const;
+    //
+    // individual field accessors
+    //
 
-        /**
-         * Returns the BSON representation of the entry.
-         */
-        BSONObj toBSON() const;
+    // Mandatory Fields
+    void setKey(const StringData& key) {
+        _key = key.toString();
+        _isKeySet = true;
+    }
 
-        /**
-         * Clears and populates the internal state using the 'source' BSON object if the
-         * latter contains valid values. Otherwise sets errMsg and returns false.
-         */
-        bool parseBSON(const BSONObj& source, std::string* errMsg);
+    void unsetKey() {
+        _isKeySet = false;
+    }
 
-        /**
-         * Clears the internal state.
-         */
-        void clear();
+    bool isKeySet() const {
+        return _isKeySet;
+    }
 
-        /**
-         * Copies all the fields present in 'this' to 'other'.
-         */
-        void cloneTo(SettingsType* other) const;
+    // Calling get*() methods when the member is not set results in undefined behavior
+    const std::string getKey() const {
+        dassert(_isKeySet);
+        return _key;
+    }
 
-        /**
-         * Returns a std::string representation of the current internal state.
-         */
-        std::string toString() const;
+    // Optional Fields
+    void setChunksize(int chunksize) {
+        _chunksize = chunksize;
+        _isChunksizeSet = true;
+    }
 
-        //
-        // individual field accessors
-        //
+    void unsetChunksize() {
+        _isChunksizeSet = false;
+    }
 
-        // Mandatory Fields
-        void setKey(const StringData& key) {
-            _key = key.toString();
-            _isKeySet = true;
+    bool isChunksizeSet() const {
+        return _isChunksizeSet || chunksize.hasDefault();
+    }
+
+    // Calling get*() methods when the member is not set and has no default results in undefined
+    // behavior
+    int getChunksize() const {
+        dassert(_key == ChunkSizeDocKey);
+        if (_isChunksizeSet) {
+            return _chunksize;
+        } else {
+            dassert(chunksize.hasDefault());
+            return chunksize.getDefault();
         }
+    }
+    void setBalancerStopped(bool balancerStopped) {
+        _balancerStopped = balancerStopped;
+        _isBalancerStoppedSet = true;
+    }
 
-        void unsetKey() { _isKeySet = false; }
+    void unsetBalancerStopped() {
+        _isBalancerStoppedSet = false;
+    }
 
-        bool isKeySet() const { return _isKeySet; }
+    bool isBalancerStoppedSet() const {
+        return _isBalancerStoppedSet || balancerStopped.hasDefault();
+    }
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string getKey() const {
-            dassert(_isKeySet);
-            return _key;
+    // Calling get*() methods when the member is not set and has no default results in undefined
+    // behavior
+    bool getBalancerStopped() const {
+        dassert(_key == BalancerDocKey);
+        if (_isBalancerStoppedSet) {
+            return _balancerStopped;
+        } else {
+            dassert(balancerStopped.hasDefault());
+            return balancerStopped.getDefault();
         }
+    }
+    void setBalancerActiveWindow(BSONObj& balancerActiveWindow) {
+        _balancerActiveWindow = balancerActiveWindow.getOwned();
+        _isBalancerActiveWindowSet = true;
+    }
 
-        // Optional Fields
-        void setChunksize(int chunksize) {
-            _chunksize = chunksize;
-            _isChunksizeSet = true;
+    void unsetBalancerActiveWindow() {
+        _isBalancerActiveWindowSet = false;
+    }
+
+    bool isBalancerActiveWindowSet() const {
+        return _isBalancerActiveWindowSet || balancerActiveWindow.hasDefault();
+    }
+
+    // Calling get*() methods when the member is not set and has no default results in undefined
+    // behavior
+    BSONObj getBalancerActiveWindow() const {
+        dassert(_key == BalancerDocKey);
+        if (_isBalancerActiveWindowSet) {
+            return _balancerActiveWindow;
+        } else {
+            dassert(balancerActiveWindow.hasDefault());
+            return balancerActiveWindow.getDefault();
         }
+    }
 
-        void unsetChunksize() { _isChunksizeSet = false; }
+    void setSecondaryThrottle(bool secondaryThrottle) {
+        _secondaryThrottle = secondaryThrottle;
+        _isSecondaryThrottleSet = true;
+    }
 
-        bool isChunksizeSet() const {
-            return _isChunksizeSet || chunksize.hasDefault();
+    void unsetSecondaryThrottle() {
+        _isSecondaryThrottleSet = false;
+    }
+
+    bool isSecondaryThrottleSet() const {
+        return _isSecondaryThrottleSet || deprecated_secondaryThrottle.hasDefault();
+    }
+
+    // Calling get*() methods when the member is not set and has no default results in undefined
+    // behavior
+    bool getSecondaryThrottle() const {
+        dassert(_key == BalancerDocKey);
+        if (_isSecondaryThrottleSet) {
+            return _secondaryThrottle;
+        } else {
+            dassert(deprecated_secondaryThrottle.hasDefault());
+            return deprecated_secondaryThrottle.getDefault();
         }
+    }
 
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        int getChunksize() const {
-            dassert(_key == ChunkSizeDocKey);
-            if (_isChunksizeSet) {
-                return _chunksize;
-            } else {
-                dassert(chunksize.hasDefault());
-                return chunksize.getDefault();
-            }
-        }
-        void setBalancerStopped(bool balancerStopped) {
-            _balancerStopped = balancerStopped;
-            _isBalancerStoppedSet = true;
-        }
+    void setMigrationWriteConcern(const BSONObj& writeConcern) {
+        _migrationWriteConcern = writeConcern;
+        _isMigrationWriteConcernSet = true;
+    }
 
-        void unsetBalancerStopped() { _isBalancerStoppedSet = false; }
+    void unsetMigrationWriteConcern() {
+        _isMigrationWriteConcernSet = false;
+    }
 
-        bool isBalancerStoppedSet() const {
-            return _isBalancerStoppedSet || balancerStopped.hasDefault();
-        }
+    bool isMigrationWriteConcernSet() const {
+        return _isMigrationWriteConcernSet;
+    }
 
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        bool getBalancerStopped() const {
-            dassert(_key == BalancerDocKey);
-            if (_isBalancerStoppedSet) {
-                return _balancerStopped;
-            } else {
-                dassert(balancerStopped.hasDefault());
-                return balancerStopped.getDefault();
-            }
-        }
-        void setBalancerActiveWindow(BSONObj& balancerActiveWindow) {
-            _balancerActiveWindow = balancerActiveWindow.getOwned();
-            _isBalancerActiveWindowSet = true;
-        }
+    // Calling get*() methods when the member is not set and has no default results in undefined
+    // behavior
+    BSONObj getMigrationWriteConcern() const {
+        dassert(_key == BalancerDocKey);
+        dassert(_isMigrationWriteConcernSet);
+        return _migrationWriteConcern;
+    }
 
-        void unsetBalancerActiveWindow() { _isBalancerActiveWindowSet = false; }
+    void setWaitForDelete(bool waitForDelete) {
+        _waitForDelete = waitForDelete;
+        _isWaitForDeleteSet = true;
+    }
 
-        bool isBalancerActiveWindowSet() const {
-            return _isBalancerActiveWindowSet || balancerActiveWindow.hasDefault();
-        }
+    void unsetWaitForDelete() {
+        _isWaitForDeleteSet = false;
+    }
 
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        BSONObj getBalancerActiveWindow() const {
-            dassert(_key == BalancerDocKey);
-            if (_isBalancerActiveWindowSet) {
-                return _balancerActiveWindow;
-            } else {
-                dassert(balancerActiveWindow.hasDefault());
-                return balancerActiveWindow.getDefault();
-            }
-        }
+    bool isWaitForDeleteSet() const {
+        return _isWaitForDeleteSet;
+    }
 
-        void setSecondaryThrottle(bool secondaryThrottle) {
-            _secondaryThrottle = secondaryThrottle;
-            _isSecondaryThrottleSet = true;
-        }
+    // Calling get*() methods when the member is not set and has no default results in undefined
+    // behavior
+    bool getWaitForDelete() const {
+        dassert(_key == BalancerDocKey);
+        dassert(_isWaitForDeleteSet);
+        return _waitForDelete;
+    }
 
-        void unsetSecondaryThrottle() { _isSecondaryThrottleSet = false; }
+    // Helper methods
 
-        bool isSecondaryThrottleSet() const {
-            return _isSecondaryThrottleSet || deprecated_secondaryThrottle.hasDefault();
-        }
+    /**
+     * Extract the write concern settings from this settings. This is only valid when
+     * key is "balancer". Returns NULL if secondary throttle is true but write
+     * concern is not specified.
+     */
+    StatusWith<WriteConcernOptions*> extractWriteConcern() const;
 
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        bool getSecondaryThrottle() const {
-            dassert(_key == BalancerDocKey);
-            if (_isSecondaryThrottleSet) {
-                return _secondaryThrottle;
-            } else {
-                dassert(deprecated_secondaryThrottle.hasDefault());
-                return deprecated_secondaryThrottle.getDefault();
-            }
-        }
+private:
+    // Convention: (M)andatory, (O)ptional, (S)pecial rule.
+    std::string _key;  // (M)  key determining the type of options to use
+    bool _isKeySet;
+    // === chunksize options ===
+    int _chunksize;  // (O)  size of the chunks in our cluster
+    bool _isChunksizeSet;
+    // === balancer options ===
+    bool _balancerStopped;  // (O)  balancer enabled/disabled
+    bool _isBalancerStoppedSet;
 
-        void setMigrationWriteConcern(const BSONObj& writeConcern) {
-            _migrationWriteConcern = writeConcern;
-            _isMigrationWriteConcernSet = true;
-        }
-
-        void unsetMigrationWriteConcern() {
-            _isMigrationWriteConcernSet = false;
-        }
-
-        bool isMigrationWriteConcernSet() const {
-            return _isMigrationWriteConcernSet;
-        }
-
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        BSONObj getMigrationWriteConcern() const {
-            dassert(_key == BalancerDocKey);
-            dassert (_isMigrationWriteConcernSet);
-            return _migrationWriteConcern;
-        }
-
-        void setWaitForDelete(bool waitForDelete) {
-            _waitForDelete = waitForDelete;
-            _isWaitForDeleteSet = true;
-        }
-
-        void unsetWaitForDelete() {
-            _isWaitForDeleteSet = false;
-        }
-
-        bool isWaitForDeleteSet() const {
-            return _isWaitForDeleteSet;
-        }
-
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        bool getWaitForDelete() const {
-            dassert(_key == BalancerDocKey);
-            dassert (_isWaitForDeleteSet);
-            return _waitForDelete;
-        }
-
-        // Helper methods
-
-        /**
-         * Extract the write concern settings from this settings. This is only valid when
-         * key is "balancer". Returns NULL if secondary throttle is true but write
-         * concern is not specified.
-         */
-        StatusWith<WriteConcernOptions*> extractWriteConcern() const;
-
-    private:
-        // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _key;                // (M)  key determining the type of options to use
-        bool _isKeySet;
-                                         // === chunksize options ===
-        int _chunksize;                  // (O)  size of the chunks in our cluster
-        bool _isChunksizeSet;
-                                         // === balancer options ===
-        bool _balancerStopped;           // (O)  balancer enabled/disabled
-        bool _isBalancerStoppedSet;
-
-        BSONObj _balancerActiveWindow;   // (O)  if present, activeWindow is an interval
-        bool _isBalancerActiveWindowSet; // during the day when the balancer should
-                                         // be active.
-                                         // Format: { start: "08:00" , stop:
-                                         // "19:30" }, strftime format is %H:%M
+    BSONObj _balancerActiveWindow;    // (O)  if present, activeWindow is an interval
+    bool _isBalancerActiveWindowSet;  // during the day when the balancer should
+                                      // be active.
+                                      // Format: { start: "08:00" , stop:
+                                      // "19:30" }, strftime format is %H:%M
 
 
-        bool _secondaryThrottle;         // (O)  only migrate chunks as fast as at least
-        bool _isSecondaryThrottleSet;    // one secondary can keep up with
+    bool _secondaryThrottle;       // (O)  only migrate chunks as fast as at least
+    bool _isSecondaryThrottleSet;  // one secondary can keep up with
 
-        // (O)  detailed write concern for *individual* writes during migration.
-        // From side: deletes during cleanup.
-        // To side: deletes to clear the incoming range, deletes to undo migration at abort,
-        //          and writes during cloning.
-        BSONObj _migrationWriteConcern;
-        bool _isMigrationWriteConcernSet;
+    // (O)  detailed write concern for *individual* writes during migration.
+    // From side: deletes during cleanup.
+    // To side: deletes to clear the incoming range, deletes to undo migration at abort,
+    //          and writes during cloning.
+    BSONObj _migrationWriteConcern;
+    bool _isMigrationWriteConcernSet;
 
-        bool _waitForDelete;             // (O)  synchronous migration cleanup.
-        bool _isWaitForDeleteSet;
-    };
+    bool _waitForDelete;  // (O)  synchronous migration cleanup.
+    bool _isWaitForDeleteSet;
+};
 
-} // namespace mongo
+}  // namespace mongo

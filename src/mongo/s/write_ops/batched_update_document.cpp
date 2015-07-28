@@ -33,207 +33,209 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
-    const BSONField<BSONObj> BatchedUpdateDocument::query("q");
-    const BSONField<BSONObj> BatchedUpdateDocument::updateExpr("u");
-    const BSONField<bool> BatchedUpdateDocument::multi("multi", false);
-    const BSONField<bool> BatchedUpdateDocument::upsert("upsert", false);
+const BSONField<BSONObj> BatchedUpdateDocument::query("q");
+const BSONField<BSONObj> BatchedUpdateDocument::updateExpr("u");
+const BSONField<bool> BatchedUpdateDocument::multi("multi", false);
+const BSONField<bool> BatchedUpdateDocument::upsert("upsert", false);
 
-    BatchedUpdateDocument::BatchedUpdateDocument() {
-        clear();
+BatchedUpdateDocument::BatchedUpdateDocument() {
+    clear();
+}
+
+BatchedUpdateDocument::~BatchedUpdateDocument() {}
+
+bool BatchedUpdateDocument::isValid(std::string* errMsg) const {
+    std::string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
     }
 
-    BatchedUpdateDocument::~BatchedUpdateDocument() {
+    // All the mandatory fields must be present.
+    if (!_isQuerySet) {
+        *errMsg = stream() << "missing " << query.name() << " field";
+        return false;
     }
 
-    bool BatchedUpdateDocument::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
-
-        // All the mandatory fields must be present.
-        if (!_isQuerySet) {
-            *errMsg = stream() << "missing " << query.name() << " field";
-            return false;
-        }
-
-        if (!_isUpdateExprSet) {
-            *errMsg = stream() << "missing " << updateExpr.name() << " field";
-            return false;
-        }
-
-        return true;
+    if (!_isUpdateExprSet) {
+        *errMsg = stream() << "missing " << updateExpr.name() << " field";
+        return false;
     }
 
-    BSONObj BatchedUpdateDocument::toBSON() const {
-        BSONObjBuilder builder;
+    return true;
+}
 
-        if (_isQuerySet) builder.append(query(), _query);
+BSONObj BatchedUpdateDocument::toBSON() const {
+    BSONObjBuilder builder;
 
-        if (_isUpdateExprSet) builder.append(updateExpr(), _updateExpr);
+    if (_isQuerySet)
+        builder.append(query(), _query);
 
-        if (_isMultiSet) builder.append(multi(), _multi);
+    if (_isUpdateExprSet)
+        builder.append(updateExpr(), _updateExpr);
 
-        if (_isUpsertSet) builder.append(upsert(), _upsert);
+    if (_isMultiSet)
+        builder.append(multi(), _multi);
 
-        return builder.obj();
-    }
+    if (_isUpsertSet)
+        builder.append(upsert(), _upsert);
 
-    bool BatchedUpdateDocument::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+    return builder.obj();
+}
 
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
+bool BatchedUpdateDocument::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-        FieldParser::FieldState fieldState;
+    std::string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-        BSONObjIterator it(source);
-        while ( it.more() ) {
-            BSONElement elem = it.next();
-            StringData fieldName = elem.fieldNameStringData();
+    FieldParser::FieldState fieldState;
 
-            if ( fieldName == query.name() ) {
-                fieldState = FieldParser::extract(elem, query, &_query, errMsg);
-                if (fieldState == FieldParser::FIELD_INVALID) return false;
-                _isQuerySet = fieldState == FieldParser::FIELD_SET;
-            }
-            else if ( fieldName == updateExpr.name() ) {
-                fieldState = FieldParser::extract(elem, updateExpr, &_updateExpr, errMsg);
-                if (fieldState == FieldParser::FIELD_INVALID) return false;
-                _isUpdateExprSet = fieldState == FieldParser::FIELD_SET;
-            }
-            else if ( fieldName == multi.name() ) {
-                fieldState = FieldParser::extract(elem, multi, &_multi, errMsg);
-                if (fieldState == FieldParser::FIELD_INVALID) return false;
-                _isMultiSet = fieldState == FieldParser::FIELD_SET;
-            }
-            else if ( fieldName == upsert.name() ) {
-                fieldState = FieldParser::extract(elem, upsert, &_upsert, errMsg);
-                if (fieldState == FieldParser::FIELD_INVALID) return false;
-                _isUpsertSet = fieldState == FieldParser::FIELD_SET;
-            }
-        }
+    BSONObjIterator it(source);
+    while (it.more()) {
+        BSONElement elem = it.next();
+        StringData fieldName = elem.fieldNameStringData();
 
-        return true;
-    }
-
-    void BatchedUpdateDocument::clear() {
-        _query = BSONObj();
-        _isQuerySet = false;
-
-        _updateExpr = BSONObj();
-        _isUpdateExprSet = false;
-
-        _multi = false;
-        _isMultiSet = false;
-
-        _upsert = false;
-        _isUpsertSet = false;
-
-    }
-
-    void BatchedUpdateDocument::cloneTo(BatchedUpdateDocument* other) const {
-        other->clear();
-
-        other->_query = _query;
-        other->_isQuerySet = _isQuerySet;
-
-        other->_updateExpr = _updateExpr;
-        other->_isUpdateExprSet = _isUpdateExprSet;
-
-        other->_multi = _multi;
-        other->_isMultiSet = _isMultiSet;
-
-        other->_upsert = _upsert;
-        other->_isUpsertSet = _isUpsertSet;
-    }
-
-    std::string BatchedUpdateDocument::toString() const {
-        return toBSON().toString();
-    }
-
-    void BatchedUpdateDocument::setQuery(const BSONObj& query) {
-        _query = query.getOwned();
-        _isQuerySet = true;
-    }
-
-    void BatchedUpdateDocument::unsetQuery() {
-         _isQuerySet = false;
-     }
-
-    bool BatchedUpdateDocument::isQuerySet() const {
-         return _isQuerySet;
-    }
-
-    const BSONObj& BatchedUpdateDocument::getQuery() const {
-        dassert(_isQuerySet);
-        return _query;
-    }
-
-    void BatchedUpdateDocument::setUpdateExpr(const BSONObj& updateExpr) {
-        _updateExpr = updateExpr.getOwned();
-        _isUpdateExprSet = true;
-    }
-
-    void BatchedUpdateDocument::unsetUpdateExpr() {
-         _isUpdateExprSet = false;
-     }
-
-    bool BatchedUpdateDocument::isUpdateExprSet() const {
-         return _isUpdateExprSet;
-    }
-
-    const BSONObj& BatchedUpdateDocument::getUpdateExpr() const {
-        dassert(_isUpdateExprSet);
-        return _updateExpr;
-    }
-
-    void BatchedUpdateDocument::setMulti(bool multi) {
-        _multi = multi;
-        _isMultiSet = true;
-    }
-
-    void BatchedUpdateDocument::unsetMulti() {
-         _isMultiSet = false;
-     }
-
-    bool BatchedUpdateDocument::isMultiSet() const {
-         return _isMultiSet;
-    }
-
-    bool BatchedUpdateDocument::getMulti() const {
-        if (_isMultiSet) {
-            return _multi;
-        }
-        else {
-            return multi.getDefault();
+        if (fieldName == query.name()) {
+            fieldState = FieldParser::extract(elem, query, &_query, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            _isQuerySet = fieldState == FieldParser::FIELD_SET;
+        } else if (fieldName == updateExpr.name()) {
+            fieldState = FieldParser::extract(elem, updateExpr, &_updateExpr, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            _isUpdateExprSet = fieldState == FieldParser::FIELD_SET;
+        } else if (fieldName == multi.name()) {
+            fieldState = FieldParser::extract(elem, multi, &_multi, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            _isMultiSet = fieldState == FieldParser::FIELD_SET;
+        } else if (fieldName == upsert.name()) {
+            fieldState = FieldParser::extract(elem, upsert, &_upsert, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            _isUpsertSet = fieldState == FieldParser::FIELD_SET;
         }
     }
 
-    void BatchedUpdateDocument::setUpsert(bool upsert) {
-        _upsert = upsert;
-        _isUpsertSet = true;
+    return true;
+}
+
+void BatchedUpdateDocument::clear() {
+    _query = BSONObj();
+    _isQuerySet = false;
+
+    _updateExpr = BSONObj();
+    _isUpdateExprSet = false;
+
+    _multi = false;
+    _isMultiSet = false;
+
+    _upsert = false;
+    _isUpsertSet = false;
+}
+
+void BatchedUpdateDocument::cloneTo(BatchedUpdateDocument* other) const {
+    other->clear();
+
+    other->_query = _query;
+    other->_isQuerySet = _isQuerySet;
+
+    other->_updateExpr = _updateExpr;
+    other->_isUpdateExprSet = _isUpdateExprSet;
+
+    other->_multi = _multi;
+    other->_isMultiSet = _isMultiSet;
+
+    other->_upsert = _upsert;
+    other->_isUpsertSet = _isUpsertSet;
+}
+
+std::string BatchedUpdateDocument::toString() const {
+    return toBSON().toString();
+}
+
+void BatchedUpdateDocument::setQuery(const BSONObj& query) {
+    _query = query.getOwned();
+    _isQuerySet = true;
+}
+
+void BatchedUpdateDocument::unsetQuery() {
+    _isQuerySet = false;
+}
+
+bool BatchedUpdateDocument::isQuerySet() const {
+    return _isQuerySet;
+}
+
+const BSONObj& BatchedUpdateDocument::getQuery() const {
+    dassert(_isQuerySet);
+    return _query;
+}
+
+void BatchedUpdateDocument::setUpdateExpr(const BSONObj& updateExpr) {
+    _updateExpr = updateExpr.getOwned();
+    _isUpdateExprSet = true;
+}
+
+void BatchedUpdateDocument::unsetUpdateExpr() {
+    _isUpdateExprSet = false;
+}
+
+bool BatchedUpdateDocument::isUpdateExprSet() const {
+    return _isUpdateExprSet;
+}
+
+const BSONObj& BatchedUpdateDocument::getUpdateExpr() const {
+    dassert(_isUpdateExprSet);
+    return _updateExpr;
+}
+
+void BatchedUpdateDocument::setMulti(bool multi) {
+    _multi = multi;
+    _isMultiSet = true;
+}
+
+void BatchedUpdateDocument::unsetMulti() {
+    _isMultiSet = false;
+}
+
+bool BatchedUpdateDocument::isMultiSet() const {
+    return _isMultiSet;
+}
+
+bool BatchedUpdateDocument::getMulti() const {
+    if (_isMultiSet) {
+        return _multi;
+    } else {
+        return multi.getDefault();
     }
+}
 
-    void BatchedUpdateDocument::unsetUpsert() {
-         _isUpsertSet = false;
-     }
+void BatchedUpdateDocument::setUpsert(bool upsert) {
+    _upsert = upsert;
+    _isUpsertSet = true;
+}
 
-    bool BatchedUpdateDocument::isUpsertSet() const {
-         return _isUpsertSet;
+void BatchedUpdateDocument::unsetUpsert() {
+    _isUpsertSet = false;
+}
+
+bool BatchedUpdateDocument::isUpsertSet() const {
+    return _isUpsertSet;
+}
+
+bool BatchedUpdateDocument::getUpsert() const {
+    if (_isUpsertSet) {
+        return _upsert;
+    } else {
+        return upsert.getDefault();
     }
+}
 
-    bool BatchedUpdateDocument::getUpsert() const {
-        if (_isUpsertSet) {
-            return _upsert;
-        }
-        else {
-            return upsert.getDefault();
-        }
-    }
-
-} // namespace mongo
+}  // namespace mongo

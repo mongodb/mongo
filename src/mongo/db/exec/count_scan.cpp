@@ -34,218 +34,222 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
-    using std::vector;
+using std::auto_ptr;
+using std::vector;
 
-    // static
-    const char* CountScan::kStageType = "COUNT_SCAN";
+// static
+const char* CountScan::kStageType = "COUNT_SCAN";
 
-    CountScan::CountScan(OperationContext* txn,
-                         const CountScanParams& params,
-                         WorkingSet* workingSet)
-        : _txn(txn),
-          _workingSet(workingSet),
-          _descriptor(params.descriptor),
-          _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
-          _btreeCursor(NULL),
-          _params(params),
-          _hitEnd(false),
-          _shouldDedup(params.descriptor->isMultikey(txn)),
-          _commonStats(kStageType) {
-        _specificStats.keyPattern = _params.descriptor->keyPattern();
-        _specificStats.indexName = _params.descriptor->indexName();
-        _specificStats.isMultiKey = _params.descriptor->isMultikey(txn);
+CountScan::CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet)
+    : _txn(txn),
+      _workingSet(workingSet),
+      _descriptor(params.descriptor),
+      _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
+      _btreeCursor(NULL),
+      _params(params),
+      _hitEnd(false),
+      _shouldDedup(params.descriptor->isMultikey(txn)),
+      _commonStats(kStageType) {
+    _specificStats.keyPattern = _params.descriptor->keyPattern();
+    _specificStats.indexName = _params.descriptor->indexName();
+    _specificStats.isMultiKey = _params.descriptor->isMultikey(txn);
+}
+
+void CountScan::initIndexCursor() {
+    CursorOptions cursorOptions;
+    cursorOptions.direction = CursorOptions::INCREASING;
+
+    IndexCursor* cursor;
+    Status s = _iam->newCursor(_txn, cursorOptions, &cursor);
+    verify(s.isOK());
+    verify(cursor);
+
+    // Is this assumption always valid?  See SERVER-12397
+    _btreeCursor.reset(static_cast<BtreeIndexCursor*>(cursor));
+
+    // _btreeCursor points at our start position.  We move it forward until it hits a cursor
+    // that points at the end.
+    _btreeCursor->seek(_params.startKey, !_params.startKeyInclusive);
+
+    ++_specificStats.keysExamined;
+
+    // Create the cursor that points at our end position.
+    IndexCursor* endCursor;
+    verify(_iam->newCursor(_txn, cursorOptions, &endCursor).isOK());
+    verify(endCursor);
+
+    // Is this assumption always valid?  See SERVER-12397
+    _endCursor.reset(static_cast<BtreeIndexCursor*>(endCursor));
+
+    // If the end key is inclusive we want to point *past* it since that's the end.
+    _endCursor->seek(_params.endKey, _params.endKeyInclusive);
+
+    ++_specificStats.keysExamined;
+
+    // See if we've hit the end already.
+    checkEnd();
+}
+
+void CountScan::checkEnd() {
+    if (isEOF()) {
+        return;
     }
 
-    void CountScan::initIndexCursor() {
-        CursorOptions cursorOptions;
-        cursorOptions.direction = CursorOptions::INCREASING;
+    if (_endCursor->isEOF()) {
+        // If the endCursor is EOF we're only done when our 'current count position' hits EOF.
+        _hitEnd = _btreeCursor->isEOF();
+    } else {
+        // If not, we're only done when we hit the end cursor's (valid) position.
+        _hitEnd = _btreeCursor->pointsAt(*_endCursor.get());
+    }
+}
 
-        IndexCursor *cursor;
-        Status s = _iam->newCursor(_txn, cursorOptions, &cursor);
-        verify(s.isOK());
-        verify(cursor);
+PlanStage::StageState CountScan::work(WorkingSetID* out) {
+    ++_commonStats.works;
 
-        // Is this assumption always valid?  See SERVER-12397
-        _btreeCursor.reset(static_cast<BtreeIndexCursor*>(cursor));
+    // Adds the amount of time taken by work() to executionTimeMillis.
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        // _btreeCursor points at our start position.  We move it forward until it hits a cursor
-        // that points at the end.
-        _btreeCursor->seek(_params.startKey, !_params.startKeyInclusive);
-
-        ++_specificStats.keysExamined;
-
-        // Create the cursor that points at our end position.
-        IndexCursor* endCursor;
-        verify(_iam->newCursor(_txn, cursorOptions, &endCursor).isOK());
-        verify(endCursor);
-
-        // Is this assumption always valid?  See SERVER-12397
-        _endCursor.reset(static_cast<BtreeIndexCursor*>(endCursor));
-
-        // If the end key is inclusive we want to point *past* it since that's the end.
-        _endCursor->seek(_params.endKey, _params.endKeyInclusive);
-
-        ++_specificStats.keysExamined;
-
-        // See if we've hit the end already.
+    if (NULL == _btreeCursor.get()) {
+        // First call to work().  Perform cursor init.
+        initIndexCursor();
         checkEnd();
+        ++_commonStats.needTime;
+        return PlanStage::NEED_TIME;
     }
 
-    void CountScan::checkEnd() {
-        if (isEOF()) { return; }
-
-        if (_endCursor->isEOF()) {
-            // If the endCursor is EOF we're only done when our 'current count position' hits EOF.
-            _hitEnd = _btreeCursor->isEOF();
-        }
-        else {
-            // If not, we're only done when we hit the end cursor's (valid) position.
-            _hitEnd = _btreeCursor->pointsAt(*_endCursor.get());
-        }
+    if (isEOF()) {
+        return PlanStage::IS_EOF;
     }
 
-    PlanStage::StageState CountScan::work(WorkingSetID* out) {
-        ++_commonStats.works;
+    RecordId loc = _btreeCursor->getValue();
+    _btreeCursor->next();
+    checkEnd();
 
-        // Adds the amount of time taken by work() to executionTimeMillis.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
+    ++_specificStats.keysExamined;
 
-        if (NULL == _btreeCursor.get()) {
-            // First call to work().  Perform cursor init.
-            initIndexCursor();
-            checkEnd();
+    if (_shouldDedup) {
+        if (_returned.end() != _returned.find(loc)) {
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
-        }
-
-        if (isEOF()) { return PlanStage::IS_EOF; }
-
-        RecordId loc = _btreeCursor->getValue();
-        _btreeCursor->next();
-        checkEnd();
-
-        ++_specificStats.keysExamined;
-
-        if (_shouldDedup) {
-            if (_returned.end() != _returned.find(loc)) {
-                ++_commonStats.needTime;
-                return PlanStage::NEED_TIME;
-            }
-            else {
-                _returned.insert(loc);
-            }
-        }
-
-        *out = WorkingSet::INVALID_ID;
-        ++_commonStats.advanced;
-        return PlanStage::ADVANCED;
-    }
-
-    bool CountScan::isEOF() {
-        if (NULL == _btreeCursor.get()) {
-            // Have to call work() at least once.
-            return false;
-        }
-
-        return _hitEnd || _btreeCursor->isEOF();
-    }
-
-    void CountScan::saveState() {
-        _txn = NULL;
-        ++_commonStats.yields;
-        if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
-
-        _btreeCursor->savePosition();
-        _endCursor->savePosition();
-    }
-
-    void CountScan::restoreState(OperationContext* opCtx) {
-        invariant(_txn == NULL);
-        _txn = opCtx;
-        ++_commonStats.unyields;
-        if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
-
-        if (!_btreeCursor->restorePosition( opCtx ).isOK()) {
-            _hitEnd = true;
-            return;
-        }
-
-        if (_btreeCursor->isEOF()) {
-            _hitEnd = true;
-            return;
-        }
-
-        // See if we're somehow already past our end key (maybe the thing we were pointing at got
-        // deleted...)
-        int cmp = _btreeCursor->getKey().woCompare(_params.endKey, _descriptor->keyPattern(), false);
-        if (cmp > 0 || (cmp == 0 && !_params.endKeyInclusive)) {
-            _hitEnd = true;
-            return;
-        }
-
-        if (!_endCursor->restorePosition( opCtx ).isOK()) {
-            _hitEnd = true;
-            return;
-        }
-
-        // If we were EOF when we yielded we don't always want to have _btreeCursor run until
-        // EOF.  New documents may have been inserted after our endKey and our end marker
-        // may be before them.
-        //
-        // As an example, say we're counting from 5 to 10 and the index only has keys
-        // for 6, 7, 8, and 9.  btreeCursor will point at a 6 key at the start and the
-        // endCursor will be EOF.  If we insert documents with keys 11 during a yield we
-        // need to relocate the endCursor to point at them as the "end key" of our count.
-        //
-        // If we weren't EOF our end position might have moved around.  Relocate it.
-        _endCursor->seek(_params.endKey, _params.endKeyInclusive);
-
-        // This can change during yielding.
-        _shouldDedup = _descriptor->isMultikey(_txn);
-
-        checkEnd();
-    }
-
-    void CountScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-        ++_commonStats.invalidates;
-
-        // The only state we're responsible for holding is what RecordIds to drop.  If a document
-        // mutates the underlying index cursor will deal with it.
-        if (INVALIDATION_MUTATION == type) {
-            return;
-        }
-
-        // If we see this RecordId again, it may not be the same document it was before, so we want
-        // to return it if we see it again.
-        unordered_set<RecordId, RecordId::Hasher>::iterator it = _returned.find(dl);
-        if (it != _returned.end()) {
-            _returned.erase(it);
+        } else {
+            _returned.insert(loc);
         }
     }
 
-    vector<PlanStage*> CountScan::getChildren() const {
-        vector<PlanStage*> empty;
-        return empty;
+    *out = WorkingSet::INVALID_ID;
+    ++_commonStats.advanced;
+    return PlanStage::ADVANCED;
+}
+
+bool CountScan::isEOF() {
+    if (NULL == _btreeCursor.get()) {
+        // Have to call work() at least once.
+        return false;
     }
 
-    PlanStageStats* CountScan::getStats() {
-        _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT_SCAN));
+    return _hitEnd || _btreeCursor->isEOF();
+}
 
-        CountScanStats* countStats = new CountScanStats(_specificStats);
-        countStats->keyPattern = _specificStats.keyPattern.getOwned();
-        ret->specific.reset(countStats);
-
-        return ret.release();
+void CountScan::saveState() {
+    _txn = NULL;
+    ++_commonStats.yields;
+    if (_hitEnd || (NULL == _btreeCursor.get())) {
+        return;
     }
 
-    const CommonStats* CountScan::getCommonStats() {
-        return &_commonStats;
+    _btreeCursor->savePosition();
+    _endCursor->savePosition();
+}
+
+void CountScan::restoreState(OperationContext* opCtx) {
+    invariant(_txn == NULL);
+    _txn = opCtx;
+    ++_commonStats.unyields;
+    if (_hitEnd || (NULL == _btreeCursor.get())) {
+        return;
     }
 
-    const SpecificStats* CountScan::getSpecificStats() {
-        return &_specificStats;
+    if (!_btreeCursor->restorePosition(opCtx).isOK()) {
+        _hitEnd = true;
+        return;
     }
+
+    if (_btreeCursor->isEOF()) {
+        _hitEnd = true;
+        return;
+    }
+
+    // See if we're somehow already past our end key (maybe the thing we were pointing at got
+    // deleted...)
+    int cmp = _btreeCursor->getKey().woCompare(_params.endKey, _descriptor->keyPattern(), false);
+    if (cmp > 0 || (cmp == 0 && !_params.endKeyInclusive)) {
+        _hitEnd = true;
+        return;
+    }
+
+    if (!_endCursor->restorePosition(opCtx).isOK()) {
+        _hitEnd = true;
+        return;
+    }
+
+    // If we were EOF when we yielded we don't always want to have _btreeCursor run until
+    // EOF.  New documents may have been inserted after our endKey and our end marker
+    // may be before them.
+    //
+    // As an example, say we're counting from 5 to 10 and the index only has keys
+    // for 6, 7, 8, and 9.  btreeCursor will point at a 6 key at the start and the
+    // endCursor will be EOF.  If we insert documents with keys 11 during a yield we
+    // need to relocate the endCursor to point at them as the "end key" of our count.
+    //
+    // If we weren't EOF our end position might have moved around.  Relocate it.
+    _endCursor->seek(_params.endKey, _params.endKeyInclusive);
+
+    // This can change during yielding.
+    _shouldDedup = _descriptor->isMultikey(_txn);
+
+    checkEnd();
+}
+
+void CountScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    ++_commonStats.invalidates;
+
+    // The only state we're responsible for holding is what RecordIds to drop.  If a document
+    // mutates the underlying index cursor will deal with it.
+    if (INVALIDATION_MUTATION == type) {
+        return;
+    }
+
+    // If we see this RecordId again, it may not be the same document it was before, so we want
+    // to return it if we see it again.
+    unordered_set<RecordId, RecordId::Hasher>::iterator it = _returned.find(dl);
+    if (it != _returned.end()) {
+        _returned.erase(it);
+    }
+}
+
+vector<PlanStage*> CountScan::getChildren() const {
+    vector<PlanStage*> empty;
+    return empty;
+}
+
+PlanStageStats* CountScan::getStats() {
+    _commonStats.isEOF = isEOF();
+    auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT_SCAN));
+
+    CountScanStats* countStats = new CountScanStats(_specificStats);
+    countStats->keyPattern = _specificStats.keyPattern.getOwned();
+    ret->specific.reset(countStats);
+
+    return ret.release();
+}
+
+const CommonStats* CountScan::getCommonStats() {
+    return &_commonStats;
+}
+
+const SpecificStats* CountScan::getSpecificStats() {
+    return &_specificStats;
+}
 
 }  // namespace mongo

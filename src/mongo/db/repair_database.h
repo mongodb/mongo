@@ -31,20 +31,19 @@
 #include <string>
 
 namespace mongo {
-    class OperationContext;
-    class Status;
-    class StorageEngine;
-    class StringData;
+class OperationContext;
+class Status;
+class StorageEngine;
+class StringData;
 
-    /**
-     * Repairs a database using a storage engine-specific, best-effort process.
-     * Some data may be lost or modified in the process but the output will
-     * be structurally valid on successful return.
-     */
-    Status repairDatabase(OperationContext* txn,
-                          StorageEngine* engine,
-                          const std::string& dbName,
-                          bool preserveClonedFilesOnFailure = false,
-                          bool backupOriginalFiles = false);
+/**
+ * Repairs a database using a storage engine-specific, best-effort process.
+ * Some data may be lost or modified in the process but the output will
+ * be structurally valid on successful return.
+ */
+Status repairDatabase(OperationContext* txn,
+                      StorageEngine* engine,
+                      const std::string& dbName,
+                      bool preserveClonedFilesOnFailure = false,
+                      bool backupOriginalFiles = false);
 }
-

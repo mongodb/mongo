@@ -35,31 +35,29 @@
 
 namespace mongo {
 
-    /**
-     * The implementation of AuthzSessionExternalState functionality common to mongod and mongos.
-     */
-    class AuthzSessionExternalStateServerCommon : public AuthzSessionExternalState {
-        MONGO_DISALLOW_COPYING(AuthzSessionExternalStateServerCommon);
+/**
+ * The implementation of AuthzSessionExternalState functionality common to mongod and mongos.
+ */
+class AuthzSessionExternalStateServerCommon : public AuthzSessionExternalState {
+    MONGO_DISALLOW_COPYING(AuthzSessionExternalStateServerCommon);
 
-    public:
-        virtual ~AuthzSessionExternalStateServerCommon();
+public:
+    virtual ~AuthzSessionExternalStateServerCommon();
 
-        virtual bool shouldAllowLocalhost() const;
-        virtual bool shouldIgnoreAuthChecks() const;
-        virtual bool serverIsArbiter() const;
+    virtual bool shouldAllowLocalhost() const;
+    virtual bool shouldIgnoreAuthChecks() const;
+    virtual bool serverIsArbiter() const;
 
-    protected:
-        AuthzSessionExternalStateServerCommon(AuthorizationManager* authzManager);
+protected:
+    AuthzSessionExternalStateServerCommon(AuthorizationManager* authzManager);
 
-        // Checks whether or not localhost connections should be given full access and stores the
-        // result in _allowLocalhost.  Currently localhost connections are only given full access
-        // if there are no users in the admin database.
-        void _checkShouldAllowLocalhost(OperationContext* txn);
+    // Checks whether or not localhost connections should be given full access and stores the
+    // result in _allowLocalhost.  Currently localhost connections are only given full access
+    // if there are no users in the admin database.
+    void _checkShouldAllowLocalhost(OperationContext* txn);
 
-    private:
+private:
+    bool _allowLocalhost;
+};
 
-        bool _allowLocalhost;
-
-    };
-
-} // namespace mongo
+}  // namespace mongo

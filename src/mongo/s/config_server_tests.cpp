@@ -35,47 +35,45 @@ namespace mongo {
 
 namespace {
 
-    using std::string;
-    using std::vector;
+using std::string;
+using std::vector;
 
-    ConfigServer configServer;
-    const string serverUrl1 = "server1:27001";
-    const string serverUrl2 = "server2:27002";
-    const string serverUrl3 = "server3:27003";
+ConfigServer configServer;
+const string serverUrl1 = "server1:27001";
+const string serverUrl2 = "server2:27002";
+const string serverUrl3 = "server3:27003";
 
-    TEST(sharding, ConfigHostCheck3Different) {
+TEST(sharding, ConfigHostCheck3Different) {
+    // Test where all three are different - Expected to return true
+    vector<string> configHosts;
+    string errmsg1;
+    configHosts.push_back(serverUrl1);
+    configHosts.push_back(serverUrl2);
+    configHosts.push_back(serverUrl3);
+    ASSERT_TRUE(configServer.checkHostsAreUnique(configHosts, &errmsg1));
+    ASSERT_TRUE(errmsg1.empty());
+}
 
-        //Test where all three are different - Expected to return true
-        vector<string> configHosts;
-        string errmsg1;
-        configHosts.push_back(serverUrl1);
-        configHosts.push_back(serverUrl2);
-        configHosts.push_back(serverUrl3);
-        ASSERT_TRUE(configServer.checkHostsAreUnique(configHosts, &errmsg1));
-        ASSERT_TRUE(errmsg1.empty());
-    }
+TEST(sharding, ConfigHostCheckOneHost) {
+    // Test short circuit with one Host - Expected to return true
+    vector<string> configHosts;
+    string errmsg2;
+    configHosts.push_back(serverUrl2);
+    ASSERT_TRUE(configServer.checkHostsAreUnique(configHosts, &errmsg2));
+    ASSERT_TRUE(errmsg2.empty());
+}
 
-    TEST(sharding, ConfigHostCheckOneHost) {
+TEST(sharding, ConfigHostCheckTwoIdentical) {
+    // Test with two identical hosts - Expected to return false
+    vector<string> configHosts;
+    string errmsg3;
+    configHosts.push_back(serverUrl1);
+    configHosts.push_back(serverUrl2);
+    configHosts.push_back(serverUrl2);
+    ASSERT_FALSE(configServer.checkHostsAreUnique(configHosts, &errmsg3));
+    ASSERT_FALSE(errmsg3.empty());
+}
 
-        //Test short circuit with one Host - Expected to return true
-        vector<string> configHosts;
-        string errmsg2;
-        configHosts.push_back(serverUrl2);
-        ASSERT_TRUE(configServer.checkHostsAreUnique(configHosts, &errmsg2));
-        ASSERT_TRUE(errmsg2.empty());
-    }
+}  // unnamed namespace
 
-    TEST(sharding, ConfigHostCheckTwoIdentical) {
-        //Test with two identical hosts - Expected to return false
-        vector<string> configHosts;
-        string errmsg3;
-        configHosts.push_back(serverUrl1);
-        configHosts.push_back(serverUrl2);
-        configHosts.push_back(serverUrl2);
-        ASSERT_FALSE(configServer.checkHostsAreUnique(configHosts, &errmsg3));
-        ASSERT_FALSE(errmsg3.empty());
-    }
-
-} // unnamed namespace
-
-} // namespace mongo
+}  // namespace mongo

@@ -37,43 +37,43 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+using boost::scoped_ptr;
 
-    // Insert multiple keys and verify that fullValidate() either sets
-    // the `numKeysOut` as the number of entries in the index, or as -1.
-    TEST( SortedDataInterface, FullValidate ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+// Insert multiple keys and verify that fullValidate() either sets
+// the `numKeysOut` as the number of entries in the index, or as -1.
+TEST(SortedDataInterface, FullValidate) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        int nToInsert = 10;
-        for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                BSONObj key = BSON( "" << i );
-                RecordId loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            long long numKeysOut;
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            sorted->fullValidate(opCtx.get(), false, &numKeysOut, NULL);
-            // fullValidate() can set numKeysOut as the number of existing keys or -1.
-            ASSERT( numKeysOut == nToInsert || numKeysOut == -1 );
+            WriteUnitOfWork uow(opCtx.get());
+            BSONObj key = BSON("" << i);
+            RecordId loc(42, i * 2);
+            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+            uow.commit();
         }
     }
 
-} // namespace mongo
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        long long numKeysOut;
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        sorted->fullValidate(opCtx.get(), false, &numKeysOut, NULL);
+        // fullValidate() can set numKeysOut as the number of existing keys or -1.
+        ASSERT(numKeysOut == nToInsert || numKeysOut == -1);
+    }
+}
+
+}  // namespace mongo

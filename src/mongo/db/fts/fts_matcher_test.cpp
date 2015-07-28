@@ -34,66 +34,83 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-    namespace fts {
+namespace fts {
 
-        TEST( FTSMatcher, NegWild1 ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "foo -bar", "english", TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
+TEST(FTSMatcher, NegWild1) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("foo -bar", "english", TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("$**"
+                                                             << "text")))));
 
-            ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "bar" ) ) ) );
-            ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "bar" ) ) ) );
-        }
+    ASSERT(m.hasNegativeTerm(BSON("x" << BSON("y"
+                                              << "bar"))));
+    ASSERT(m.hasNegativeTerm(BSON("x" << BSON("y"
+                                              << "bar"))));
+}
 
-        // Regression test for SERVER-11994.
-        TEST( FTSMatcher, NegWild2 ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "pizza -restaurant", "english", TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
+// Regression test for SERVER-11994.
+TEST(FTSMatcher, NegWild2) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("pizza -restaurant", "english", TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("$**"
+                                                             << "text")))));
 
-            ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "pizza restaurant" ) ) ) );
-            ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "PIZZA RESTAURANT" ) ) ) );
-        }
+    ASSERT(m.hasNegativeTerm(BSON("x" << BSON("y"
+                                              << "pizza restaurant"))));
+    ASSERT(m.hasNegativeTerm(BSON("x" << BSON("y"
+                                              << "PIZZA RESTAURANT"))));
+}
 
-        TEST( FTSMatcher, Phrase1 ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "foo \"table top\"", "english", TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
-            
-            ASSERT( m.phraseMatch( "table top", BSON( "x" << "table top" ) ) );
-            ASSERT( m.phraseMatch( "table top", BSON( "x" << " asd table top asd" ) ) );
-            ASSERT( !m.phraseMatch( "table top", BSON( "x" << "tablz top" ) ) );
-            ASSERT( !m.phraseMatch( "table top", BSON( "x" << " asd tablz top asd" ) ) );
+TEST(FTSMatcher, Phrase1) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("foo \"table top\"", "english", TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("$**"
+                                                             << "text")))));
 
-            ASSERT( m.phrasesMatch( BSON( "x" << "table top" ) ) );
-            ASSERT( !m.phrasesMatch( BSON( "x" << "table a top" ) ) );
+    ASSERT(m.phraseMatch("table top",
+                         BSON("x"
+                              << "table top")));
+    ASSERT(m.phraseMatch("table top",
+                         BSON("x"
+                              << " asd table top asd")));
+    ASSERT(!m.phraseMatch("table top",
+                          BSON("x"
+                               << "tablz top")));
+    ASSERT(!m.phraseMatch("table top",
+                          BSON("x"
+                               << " asd tablz top asd")));
 
-        }
+    ASSERT(m.phrasesMatch(BSON("x"
+                               << "table top")));
+    ASSERT(!m.phrasesMatch(BSON("x"
+                                << "table a top")));
+}
 
-        TEST( FTSMatcher, Phrase2 ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "foo \"table top\"", "english", TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
-            ASSERT( m.phraseMatch( "table top",
-                                   BSON( "x" << BSON_ARRAY( "table top" ) ) ) );
-        }
+TEST(FTSMatcher, Phrase2) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("foo \"table top\"", "english", TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("x"
+                                                             << "text")))));
+    ASSERT(m.phraseMatch("table top", BSON("x" << BSON_ARRAY("table top"))));
+}
 
-        // Test that the matcher parses the document with the document language, not the search
-        // language.
-        TEST( FTSMatcher, ParsesUsingDocLanguage ) {
-            FTSQuery q;
-            ASSERT_OK( q.parse( "-glad", "none", TEXT_INDEX_VERSION_2 ) );
-            FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+// Test that the matcher parses the document with the document language, not the search
+// language.
+TEST(FTSMatcher, ParsesUsingDocLanguage) {
+    FTSQuery q;
+    ASSERT_OK(q.parse("-glad", "none", TEXT_INDEX_VERSION_2));
+    FTSMatcher m(q,
+                 FTSSpec(FTSSpec::fixSpec(BSON("key" << BSON("x"
+                                                             << "text")))));
 
-            // Even though the search language is "none", the document {x: "gladly"} should be
-            // parsed using the English stemmer, and as such should match the negated term "glad".
-            ASSERT( m.hasNegativeTerm( BSON( "x" << "gladly" ) ) );
-        }
-
-    }
+    // Even though the search language is "none", the document {x: "gladly"} should be
+    // parsed using the English stemmer, and as such should match the negated term "glad".
+    ASSERT(m.hasNegativeTerm(BSON("x"
+                                  << "gladly")));
+}
+}
 }

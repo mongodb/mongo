@@ -32,51 +32,62 @@
 
 namespace mongo {
 
-    /**
-     * Implements the find command on mongos.
-     *
-     * TODO: this is just a placeholder. It needs to be implemented for real under SERVER-15176.
-     */
-    class ClusterFindCmd : public Command {
+/**
+ * Implements the find command on mongos.
+ *
+ * TODO: this is just a placeholder. It needs to be implemented for real under SERVER-15176.
+ */
+class ClusterFindCmd : public Command {
     MONGO_DISALLOW_COPYING(ClusterFindCmd);
-    public:
-        ClusterFindCmd() : Command("find") { }
 
-        virtual bool isWriteCommandForConfigServer() const { return false; }
+public:
+    ClusterFindCmd() : Command("find") {}
 
-        virtual bool slaveOk() const { return false; }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
 
-        virtual bool slaveOverrideOk() const { return true; }
+    virtual bool slaveOk() const {
+        return false;
+    }
 
-        virtual bool maintenanceOk() const { return false; }
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
 
-        virtual bool adminOnly() const { return false; }
+    virtual bool maintenanceOk() const {
+        return false;
+    }
 
-        virtual void help(std::stringstream& help) const {
-            help << "query for documents";
-        }
+    virtual bool adminOnly() const {
+        return false;
+    }
 
-        /**
-         * In order to run the find command, you must be authorized for the "find" action
-         * type on the collection.
-         */
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj);
+    virtual void help(std::stringstream& help) const {
+        help << "query for documents";
+    }
 
-        virtual Status explain(OperationContext* txn,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               ExplainCommon::Verbosity verbosity,
-                               BSONObjBuilder* out) const;
+    /**
+     * In order to run the find command, you must be authorized for the "find" action
+     * type on the collection.
+     */
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj);
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj, int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl);
+    virtual Status explain(OperationContext* txn,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           ExplainCommon::Verbosity verbosity,
+                           BSONObjBuilder* out) const;
 
-    };
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result,
+                     bool fromRepl);
+};
 
-} // namespace mongo
+}  // namespace mongo

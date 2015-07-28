@@ -34,55 +34,65 @@
 
 namespace mongo {
 
+/**
+ * The find command will be the main entry point for running queries once runQuery()
+ * is deprecated.
+ *
+ * Currently, only explains run through the FindCmd, and regular queries use the old code
+ * path.
+ */
+class FindCmd : public Command {
+public:
+    FindCmd() : Command("find") {}
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool slaveOverrideOk() const {
+        return true;
+    }
+
+    virtual bool maintenanceOk() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return false;
+    }
+
+    virtual void help(std::stringstream& help) const {
+        help << "query for documents";
+    }
+
     /**
-     * The find command will be the main entry point for running queries once runQuery()
-     * is deprecated.
-     *
-     * Currently, only explains run through the FindCmd, and regular queries use the old code
-     * path.
+     * In order to run the find command, you must be authorized for the "find" action
+     * type on the collection.
      */
-    class FindCmd : public Command {
-    public:
-        FindCmd() : Command("find") { }
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj);
 
-        virtual bool isWriteCommandForConfigServer() const { return false; }
+    virtual Status explain(OperationContext* txn,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           ExplainCommon::Verbosity verbosity,
+                           BSONObjBuilder* out) const;
 
-        virtual bool slaveOk() const { return false; }
-
-        virtual bool slaveOverrideOk() const { return true; }
-
-        virtual bool maintenanceOk() const { return false; }
-
-        virtual bool adminOnly() const { return false; }
-
-        virtual void help( std::stringstream& help ) const {
-            help << "query for documents";
-        }
-
-        /**
-         * In order to run the find command, you must be authorized for the "find" action
-         * type on the collection.
-         */
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj);
-
-        virtual Status explain(OperationContext* txn,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               ExplainCommon::Verbosity verbosity,
-                               BSONObjBuilder* out) const;
-
-        /**
-         * TODO: This needs to be implemented. Currently it does nothing.
-         */
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj, int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl);
-
-    };
+    /**
+     * TODO: This needs to be implemented. Currently it does nothing.
+     */
+    virtual bool run(OperationContext* txn,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result,
+                     bool fromRepl);
+};
 
 }  // namespace mongo

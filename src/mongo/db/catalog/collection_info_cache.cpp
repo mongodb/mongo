@@ -46,92 +46,88 @@
 
 namespace mongo {
 
-    CollectionInfoCache::CollectionInfoCache( Collection* collection )
-        : _collection( collection ),
-          _keysComputed( false ),
-          _planCache(new PlanCache(collection->ns().ns())),
-          _querySettings(new QuerySettings()) { }
+CollectionInfoCache::CollectionInfoCache(Collection* collection)
+    : _collection(collection),
+      _keysComputed(false),
+      _planCache(new PlanCache(collection->ns().ns())),
+      _querySettings(new QuerySettings()) {}
 
-    void CollectionInfoCache::reset( OperationContext* txn ) {
-        LOG(1) << _collection->ns().ns() << ": clearing plan cache - collection info cache reset";
-        clearQueryCache();
-        _keysComputed = false;
-        computeIndexKeys( txn );
-        // query settings is not affected by info cache reset.
-        // index filters should persist throughout life of collection
-    }
+void CollectionInfoCache::reset(OperationContext* txn) {
+    LOG(1) << _collection->ns().ns() << ": clearing plan cache - collection info cache reset";
+    clearQueryCache();
+    _keysComputed = false;
+    computeIndexKeys(txn);
+    // query settings is not affected by info cache reset.
+    // index filters should persist throughout life of collection
+}
 
-    const UpdateIndexData& CollectionInfoCache::indexKeys( OperationContext* txn ) const {
-        // This requires "some" lock, and MODE_IS is an expression for that, for now.
-        dassert(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_IS));
-        invariant(_keysComputed);
-        return _indexedPaths;
-    }
+const UpdateIndexData& CollectionInfoCache::indexKeys(OperationContext* txn) const {
+    // This requires "some" lock, and MODE_IS is an expression for that, for now.
+    dassert(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_IS));
+    invariant(_keysComputed);
+    return _indexedPaths;
+}
 
-    void CollectionInfoCache::computeIndexKeys( OperationContext* txn ) {
-        // This function modified objects attached to the Collection so we need a write lock
-        invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
-        _indexedPaths.clear();
+void CollectionInfoCache::computeIndexKeys(OperationContext* txn) {
+    // This function modified objects attached to the Collection so we need a write lock
+    invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+    _indexedPaths.clear();
 
-        IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(txn, true);
-        while (i.more()) {
-            IndexDescriptor* descriptor = i.next();
+    IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(txn, true);
+    while (i.more()) {
+        IndexDescriptor* descriptor = i.next();
 
-            if (descriptor->getAccessMethodName() != IndexNames::TEXT) {
-                BSONObj key = descriptor->keyPattern();
-                BSONObjIterator j(key);
-                while (j.more()) {
-                    BSONElement e = j.next();
-                    _indexedPaths.addPath(e.fieldName());
-                }
+        if (descriptor->getAccessMethodName() != IndexNames::TEXT) {
+            BSONObj key = descriptor->keyPattern();
+            BSONObjIterator j(key);
+            while (j.more()) {
+                BSONElement e = j.next();
+                _indexedPaths.addPath(e.fieldName());
             }
-            else {
-                fts::FTSSpec ftsSpec(descriptor->infoObj());
+        } else {
+            fts::FTSSpec ftsSpec(descriptor->infoObj());
 
-                if (ftsSpec.wildcard()) {
-                    _indexedPaths.allPathsIndexed();
+            if (ftsSpec.wildcard()) {
+                _indexedPaths.allPathsIndexed();
+            } else {
+                for (size_t i = 0; i < ftsSpec.numExtraBefore(); ++i) {
+                    _indexedPaths.addPath(ftsSpec.extraBefore(i));
                 }
-                else {
-                    for (size_t i = 0; i < ftsSpec.numExtraBefore(); ++i) {
-                        _indexedPaths.addPath(ftsSpec.extraBefore(i));
-                    }
-                    for (fts::Weights::const_iterator it = ftsSpec.weights().begin();
-                         it != ftsSpec.weights().end();
-                         ++it) {
-                        _indexedPaths.addPath(it->first);
-                    }
-                    for (size_t i = 0; i < ftsSpec.numExtraAfter(); ++i) {
-                        _indexedPaths.addPath(ftsSpec.extraAfter(i));
-                    }
-                    // Any update to a path containing "language" as a component could change the
-                    // language of a subdocument.  Add the override field as a path component.
-                    _indexedPaths.addPathComponent(ftsSpec.languageOverrideField());
+                for (fts::Weights::const_iterator it = ftsSpec.weights().begin();
+                     it != ftsSpec.weights().end();
+                     ++it) {
+                    _indexedPaths.addPath(it->first);
                 }
+                for (size_t i = 0; i < ftsSpec.numExtraAfter(); ++i) {
+                    _indexedPaths.addPath(ftsSpec.extraAfter(i));
+                }
+                // Any update to a path containing "language" as a component could change the
+                // language of a subdocument.  Add the override field as a path component.
+                _indexedPaths.addPathComponent(ftsSpec.languageOverrideField());
             }
         }
-
-        _keysComputed = true;
-
     }
 
-    void CollectionInfoCache::notifyOfWriteOp() {
-        if (NULL != _planCache.get()) {
-            _planCache->notifyOfWriteOp();
-        }
-    }
+    _keysComputed = true;
+}
 
-    void CollectionInfoCache::clearQueryCache() {
-        if (NULL != _planCache.get()) {
-            _planCache->clear();
-        }
+void CollectionInfoCache::notifyOfWriteOp() {
+    if (NULL != _planCache.get()) {
+        _planCache->notifyOfWriteOp();
     }
+}
 
-    PlanCache* CollectionInfoCache::getPlanCache() const {
-        return _planCache.get();
+void CollectionInfoCache::clearQueryCache() {
+    if (NULL != _planCache.get()) {
+        _planCache->clear();
     }
+}
 
-    QuerySettings* CollectionInfoCache::getQuerySettings() const {
-        return _querySettings.get();
-    }
+PlanCache* CollectionInfoCache::getPlanCache() const {
+    return _planCache.get();
+}
 
+QuerySettings* CollectionInfoCache::getQuerySettings() const {
+    return _querySettings.get();
+}
 }

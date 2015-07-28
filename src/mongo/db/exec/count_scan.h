@@ -41,92 +41,94 @@
 
 namespace mongo {
 
-    class IndexAccessMethod;
-    class IndexDescriptor;
-    class WorkingSet;
+class IndexAccessMethod;
+class IndexDescriptor;
+class WorkingSet;
 
-    struct CountScanParams {
-        CountScanParams() : descriptor(NULL) { }
+struct CountScanParams {
+    CountScanParams() : descriptor(NULL) {}
 
-        // What index are we traversing?
-        const IndexDescriptor* descriptor;
+    // What index are we traversing?
+    const IndexDescriptor* descriptor;
 
-        BSONObj startKey;
-        bool startKeyInclusive;
+    BSONObj startKey;
+    bool startKeyInclusive;
 
-        BSONObj endKey;
-        bool endKeyInclusive;
-    };
+    BSONObj endKey;
+    bool endKeyInclusive;
+};
+
+/**
+ * Used by the count command.  Scans an index from a start key to an end key.  Does not create
+ * any WorkingSetMember(s) for any of the data, instead returning ADVANCED to indicate to the
+ * caller that another result should be counted.
+ *
+ * Only created through the getExecutorCount path, as count is the only operation that doesn't
+ * care about its data.
+ */
+class CountScan : public PlanStage {
+public:
+    CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet);
+    virtual ~CountScan() {}
+
+    virtual StageState work(WorkingSetID* out);
+    virtual bool isEOF();
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_COUNT_SCAN;
+    }
+
+    virtual PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats();
+
+    virtual const SpecificStats* getSpecificStats();
+
+    static const char* kStageType;
+
+private:
+    /**
+     * Initialize the underlying IndexCursor
+     */
+    void initIndexCursor();
 
     /**
-     * Used by the count command.  Scans an index from a start key to an end key.  Does not create
-     * any WorkingSetMember(s) for any of the data, instead returning ADVANCED to indicate to the
-     * caller that another result should be counted.
-     *
-     * Only created through the getExecutorCount path, as count is the only operation that doesn't
-     * care about its data.
+     * See if we've hit the end yet.
      */
-    class CountScan : public PlanStage {
-    public:
-        CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet);
-        virtual ~CountScan() { }
+    void checkEnd();
 
-        virtual StageState work(WorkingSetID* out);
-        virtual bool isEOF();
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    // transactional context for read locks. Not owned by us
+    OperationContext* _txn;
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    // The WorkingSet we annotate with results.  Not owned by us.
+    WorkingSet* _workingSet;
 
-        virtual StageType stageType() const { return STAGE_COUNT_SCAN; }
+    // Index access.  Both pointers below are owned by Collection -> IndexCatalog.
+    const IndexDescriptor* _descriptor;
+    const IndexAccessMethod* _iam;
 
-        virtual PlanStageStats* getStats();
+    // Our start cursor is _btreeCursor.
+    boost::scoped_ptr<BtreeIndexCursor> _btreeCursor;
 
-        virtual const CommonStats* getCommonStats();
+    // Our end marker.
+    boost::scoped_ptr<BtreeIndexCursor> _endCursor;
 
-        virtual const SpecificStats* getSpecificStats();
+    // Could our index have duplicates?  If so, we use _returned to dedup.
+    unordered_set<RecordId, RecordId::Hasher> _returned;
 
-        static const char* kStageType;
+    CountScanParams _params;
 
-    private:
-        /**
-         * Initialize the underlying IndexCursor
-         */
-        void initIndexCursor();
+    bool _hitEnd;
 
-        /**
-         * See if we've hit the end yet.
-         */
-        void checkEnd();
+    bool _shouldDedup;
 
-        // transactional context for read locks. Not owned by us
-        OperationContext* _txn;
-
-        // The WorkingSet we annotate with results.  Not owned by us.
-        WorkingSet* _workingSet;
-
-        // Index access.  Both pointers below are owned by Collection -> IndexCatalog.
-        const IndexDescriptor* _descriptor;
-        const IndexAccessMethod* _iam;
-
-        // Our start cursor is _btreeCursor.
-        boost::scoped_ptr<BtreeIndexCursor> _btreeCursor;
-
-        // Our end marker.
-        boost::scoped_ptr<BtreeIndexCursor> _endCursor;
-
-        // Could our index have duplicates?  If so, we use _returned to dedup.
-        unordered_set<RecordId, RecordId::Hasher> _returned;
-
-        CountScanParams _params;
-
-        bool _hitEnd;
-
-        bool _shouldDedup;
-
-        CommonStats _commonStats;
-        CountScanStats _specificStats;
-    };
+    CommonStats _commonStats;
+    CountScanStats _specificStats;
+};
 
 }  // namespace mongo

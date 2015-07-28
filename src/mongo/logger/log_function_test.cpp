@@ -47,82 +47,82 @@ using namespace mongo::logger;
 namespace mongo {
 namespace {
 
-    typedef LogTest<MessageEventDetailsEncoder> LogTestDetailsEncoder;
+typedef LogTest<MessageEventDetailsEncoder> LogTestDetailsEncoder;
 
-    // Constants for log component test cases.
-    const LogComponent componentA = LogComponent::kCommand;
-    const LogComponent componentB = MONGO_LOG_DEFAULT_COMPONENT;
+// Constants for log component test cases.
+const LogComponent componentA = LogComponent::kCommand;
+const LogComponent componentB = MONGO_LOG_DEFAULT_COMPONENT;
 
-    // Tests pass through of log component:
-    //     unconditional log functions -> LogStreamBuilder -> MessageEventEphemeral
-    //                                 -> MessageEventDetailsEncoder
-    // MONGO_DEFAULT_LOG_COMPONENT is set to kReplication before including util/log.h
-    // so non-debug logging without explicit component will log with kReplication instead
-    // of kDefault.
-    TEST_F(LogTestDetailsEncoder, LogFunctionsOverrideGlobalComponent) {
-        // severe() - no component specified.
-        severe() << "This is logged";
-        ASSERT_TRUE(shouldLog(LogSeverity::Severe()));
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F " << componentB.getNameForLog()),
-                          std::string::npos);
+// Tests pass through of log component:
+//     unconditional log functions -> LogStreamBuilder -> MessageEventEphemeral
+//                                 -> MessageEventDetailsEncoder
+// MONGO_DEFAULT_LOG_COMPONENT is set to kReplication before including util/log.h
+// so non-debug logging without explicit component will log with kReplication instead
+// of kDefault.
+TEST_F(LogTestDetailsEncoder, LogFunctionsOverrideGlobalComponent) {
+    // severe() - no component specified.
+    severe() << "This is logged";
+    ASSERT_TRUE(shouldLog(LogSeverity::Severe()));
+    ASSERT_EQUALS(1U, _logLines.size());
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F " << componentB.getNameForLog()),
+                      std::string::npos);
 
-        // severe() - with component.
-        _logLines.clear();
-        severe(componentA) << "This is logged";
-        ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Severe()));
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F " << componentA.getNameForLog()),
-                          std::string::npos);
+    // severe() - with component.
+    _logLines.clear();
+    severe(componentA) << "This is logged";
+    ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Severe()));
+    ASSERT_EQUALS(1U, _logLines.size());
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F " << componentA.getNameForLog()),
+                      std::string::npos);
 
-        // error() - no component specified.
-        _logLines.clear();
-        error() << "This is logged";
-        ASSERT_TRUE(shouldLog(LogSeverity::Error()));
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E " << componentB.getNameForLog()),
-                          std::string::npos);
+    // error() - no component specified.
+    _logLines.clear();
+    error() << "This is logged";
+    ASSERT_TRUE(shouldLog(LogSeverity::Error()));
+    ASSERT_EQUALS(1U, _logLines.size());
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E " << componentB.getNameForLog()),
+                      std::string::npos);
 
-        // error() - with component.
-        _logLines.clear();
-        error(componentA) << "This is logged";
-        ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Error()));
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E " << componentA.getNameForLog()),
-                          std::string::npos);
+    // error() - with component.
+    _logLines.clear();
+    error(componentA) << "This is logged";
+    ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Error()));
+    ASSERT_EQUALS(1U, _logLines.size());
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E " << componentA.getNameForLog()),
+                      std::string::npos);
 
-        // warning() - no component specified.
-        _logLines.clear();
-        warning() << "This is logged";
-        ASSERT_TRUE(shouldLog(LogSeverity::Warning()));
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W " << componentB.getNameForLog()),
-                          std::string::npos);
+    // warning() - no component specified.
+    _logLines.clear();
+    warning() << "This is logged";
+    ASSERT_TRUE(shouldLog(LogSeverity::Warning()));
+    ASSERT_EQUALS(1U, _logLines.size());
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W " << componentB.getNameForLog()),
+                      std::string::npos);
 
-        // warning() - with component.
-        _logLines.clear();
-        warning(componentA) << "This is logged";
-        ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Warning()));
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W " << componentA.getNameForLog()),
-                          std::string::npos);
+    // warning() - with component.
+    _logLines.clear();
+    warning(componentA) << "This is logged";
+    ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Warning()));
+    ASSERT_EQUALS(1U, _logLines.size());
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W " << componentA.getNameForLog()),
+                      std::string::npos);
 
-        // log() - no component specified.
-        _logLines.clear();
-        log() << "This is logged";
-        ASSERT_TRUE(shouldLog(LogSeverity::Log()));
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I " << componentB.getNameForLog()),
-                          std::string::npos);
+    // log() - no component specified.
+    _logLines.clear();
+    log() << "This is logged";
+    ASSERT_TRUE(shouldLog(LogSeverity::Log()));
+    ASSERT_EQUALS(1U, _logLines.size());
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I " << componentB.getNameForLog()),
+                      std::string::npos);
 
-        // log() - with component.
-        _logLines.clear();
-        log(componentA) << "This is logged";
-        ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Log()));
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I " << componentA.getNameForLog()),
-                          std::string::npos);
-    }
+    // log() - with component.
+    _logLines.clear();
+    log(componentA) << "This is logged";
+    ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Log()));
+    ASSERT_EQUALS(1U, _logLines.size());
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I " << componentA.getNameForLog()),
+                      std::string::npos);
+}
 
 }  // namespace
 }  // namespace mongo

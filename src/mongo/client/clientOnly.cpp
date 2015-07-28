@@ -32,7 +32,6 @@
 
 namespace mongo {
 
-    StartupTest::StartupTest() {}
-    StartupTest::~StartupTest() {}
-
+StartupTest::StartupTest() {}
+StartupTest::~StartupTest() {}
 }

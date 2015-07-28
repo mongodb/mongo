@@ -40,75 +40,65 @@ namespace repl {
 
 namespace {
 
-    const std::string kRIDFieldName = "handshake";
-    // TODO(danneberg) remove after 3.0 since this field is only allowed for backwards compatibility
-    const std::string kOldMemberConfigFieldName = "config";
-    const std::string kMemberIdFieldName = "member";
+const std::string kRIDFieldName = "handshake";
+// TODO(danneberg) remove after 3.0 since this field is only allowed for backwards compatibility
+const std::string kOldMemberConfigFieldName = "config";
+const std::string kMemberIdFieldName = "member";
 
-    const std::string kLegalHandshakeFieldNames[] = {
-        kRIDFieldName,
-        kOldMemberConfigFieldName,
-        kMemberIdFieldName
-    };
+const std::string kLegalHandshakeFieldNames[] = {
+    kRIDFieldName, kOldMemberConfigFieldName, kMemberIdFieldName};
 
-} // namespace
+}  // namespace
 
-    HandshakeArgs::HandshakeArgs() :
-        _hasRid(false),
-        _hasMemberId(false),
-        _rid(OID()),
-        _memberId(-1) {}
+HandshakeArgs::HandshakeArgs() : _hasRid(false), _hasMemberId(false), _rid(OID()), _memberId(-1) {}
 
-    Status HandshakeArgs::initialize(const BSONObj& argsObj) {
-        Status status = bsonCheckOnlyHasFields("HandshakeArgs",
-                                               argsObj,
-                                               kLegalHandshakeFieldNames);
-        if (!status.isOK())
+Status HandshakeArgs::initialize(const BSONObj& argsObj) {
+    Status status = bsonCheckOnlyHasFields("HandshakeArgs", argsObj, kLegalHandshakeFieldNames);
+    if (!status.isOK())
+        return status;
+
+    BSONElement oid;
+    status = bsonExtractTypedField(argsObj, kRIDFieldName, jstOID, &oid);
+    if (!status.isOK())
+        return status;
+    _rid = oid.OID();
+    _hasRid = true;
+
+    status = bsonExtractIntegerField(argsObj, kMemberIdFieldName, &_memberId);
+    if (!status.isOK()) {
+        // field not necessary for master slave, do not return NoSuchKey Error
+        if (status != ErrorCodes::NoSuchKey) {
             return status;
-
-        BSONElement oid;
-        status = bsonExtractTypedField(argsObj, kRIDFieldName, jstOID, &oid);
-        if (!status.isOK())
-            return status;
-        _rid = oid.OID();
-        _hasRid = true;
-        
-        status = bsonExtractIntegerField(argsObj, kMemberIdFieldName, &_memberId);
-        if (!status.isOK()) {
-            // field not necessary for master slave, do not return NoSuchKey Error
-            if (status != ErrorCodes::NoSuchKey) {
-                return status;
-            }
-            _memberId = -1;
         }
-        else {
-            _hasMemberId = true;
-        }
-
-        return Status::OK();
-    }
-
-    bool HandshakeArgs::isInitialized() const {
-        return _hasRid;
-    }
-
-    void HandshakeArgs::setRid(const OID& newVal) {
-        _rid = newVal;
-        _hasRid = true;
-    }
-
-    void HandshakeArgs::setMemberId(long long newVal) {
-        _memberId = newVal;
+        _memberId = -1;
+    } else {
         _hasMemberId = true;
     }
 
-    BSONObj HandshakeArgs::toBSON() const {
-        invariant(isInitialized());
-        BSONObjBuilder builder;
-        builder.append(kRIDFieldName, _rid);
-        builder.append(kMemberIdFieldName, _memberId);
-        return builder.obj();
-    }
+    return Status::OK();
+}
+
+bool HandshakeArgs::isInitialized() const {
+    return _hasRid;
+}
+
+void HandshakeArgs::setRid(const OID& newVal) {
+    _rid = newVal;
+    _hasRid = true;
+}
+
+void HandshakeArgs::setMemberId(long long newVal) {
+    _memberId = newVal;
+    _hasMemberId = true;
+}
+
+BSONObj HandshakeArgs::toBSON() const {
+    invariant(isInitialized());
+    BSONObjBuilder builder;
+    builder.append(kRIDFieldName, _rid);
+    builder.append(kMemberIdFieldName, _memberId);
+    return builder.obj();
+}
 
 }  // namespace repl
 }  // namespace mongo

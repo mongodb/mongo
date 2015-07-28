@@ -53,81 +53,79 @@
 
 namespace mongo {
 
-    UpdateResult update(OperationContext* txn,
-                        Database* db,
-                        const UpdateRequest& request,
-                        OpDebug* opDebug) {
-        invariant(db);
+UpdateResult update(OperationContext* txn,
+                    Database* db,
+                    const UpdateRequest& request,
+                    OpDebug* opDebug) {
+    invariant(db);
 
-        // Explain should never use this helper.
-        invariant(!request.isExplain());
+    // Explain should never use this helper.
+    invariant(!request.isExplain());
 
-        const NamespaceString& nsString = request.getNamespaceString();
-        Collection* collection = db->getCollection(nsString.ns());
+    const NamespaceString& nsString = request.getNamespaceString();
+    Collection* collection = db->getCollection(nsString.ns());
 
-        // The update stage does not create its own collection.  As such, if the update is
-        // an upsert, create the collection that the update stage inserts into beforehand.
-        if (!collection && request.isUpsert()) {
-            // We have to have an exclusive lock on the db to be allowed to create the collection.
-            // Callers should either get an X or create the collection.
-            const Locker* locker = txn->lockState();
-            invariant(locker->isW() ||
-                      locker->isLockHeldForMode(ResourceId(RESOURCE_DATABASE, nsString.db()),
-                                                MODE_X));
+    // The update stage does not create its own collection.  As such, if the update is
+    // an upsert, create the collection that the update stage inserts into beforehand.
+    if (!collection && request.isUpsert()) {
+        // We have to have an exclusive lock on the db to be allowed to create the collection.
+        // Callers should either get an X or create the collection.
+        const Locker* locker = txn->lockState();
+        invariant(locker->isW() ||
+                  locker->isLockHeldForMode(ResourceId(RESOURCE_DATABASE, nsString.db()), MODE_X));
 
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                ScopedTransaction transaction(txn, MODE_IX);
-                Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
 
-                if (!request.isFromReplication() &&
-                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+            if (!request.isFromReplication() &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
                     nsString.db())) {
-                    uassertStatusOK(Status(ErrorCodes::NotMaster, str::stream()
-                        << "Not primary while creating collection " << nsString.ns()
-                        << " during upsert"));
-                }
+                uassertStatusOK(Status(ErrorCodes::NotMaster,
+                                       str::stream() << "Not primary while creating collection "
+                                                     << nsString.ns() << " during upsert"));
+            }
 
-                WriteUnitOfWork wuow(txn);
-                collection = db->createCollection(txn, nsString.ns());
-                invariant(collection);
+            WriteUnitOfWork wuow(txn);
+            collection = db->createCollection(txn, nsString.ns());
+            invariant(collection);
 
-                if (!request.isFromReplication()) {
-                    repl::logOp(txn,
-                                "c",
-                                (db->name() + ".$cmd").c_str(),
-                                BSON("create" << (nsString.coll())));
-                }
-                wuow.commit();
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", nsString.ns());
+            if (!request.isFromReplication()) {
+                repl::logOp(
+                    txn, "c", (db->name() + ".$cmd").c_str(), BSON("create" << (nsString.coll())));
+            }
+            wuow.commit();
         }
-
-        // Parse the update, get an executor for it, run the executor, get stats out.
-        ParsedUpdate parsedUpdate(txn, &request);
-        uassertStatusOK(parsedUpdate.parseRequest());
-
-        PlanExecutor* rawExec;
-        uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, opDebug, &rawExec));
-        boost::scoped_ptr<PlanExecutor> exec(rawExec);
-
-        uassertStatusOK(exec->executePlan());
-        return UpdateStage::makeUpdateResult(exec.get(), opDebug);
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", nsString.ns());
     }
 
-    BSONObj applyUpdateOperators(const BSONObj& from, const BSONObj& operators) {
-        UpdateDriver::Options opts;
-        UpdateDriver driver(opts);
-        Status status = driver.parse(operators);
-        if (!status.isOK()) {
-            uasserted(16838, status.reason());
-        }
+    // Parse the update, get an executor for it, run the executor, get stats out.
+    ParsedUpdate parsedUpdate(txn, &request);
+    uassertStatusOK(parsedUpdate.parseRequest());
 
-        mutablebson::Document doc(from, mutablebson::Document::kInPlaceDisabled);
-        status = driver.update(StringData(), &doc);
-        if (!status.isOK()) {
-            uasserted(16839, status.reason());
-        }
+    PlanExecutor* rawExec;
+    uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, opDebug, &rawExec));
+    boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
-        return doc.getObject();
+    uassertStatusOK(exec->executePlan());
+    return UpdateStage::makeUpdateResult(exec.get(), opDebug);
+}
+
+BSONObj applyUpdateOperators(const BSONObj& from, const BSONObj& operators) {
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+    Status status = driver.parse(operators);
+    if (!status.isOK()) {
+        uasserted(16838, status.reason());
     }
+
+    mutablebson::Document doc(from, mutablebson::Document::kInPlaceDisabled);
+    status = driver.update(StringData(), &doc);
+    if (!status.isOK()) {
+        uasserted(16839, status.reason());
+    }
+
+    return doc.getObject();
+}
 
 }  // namespace mongo

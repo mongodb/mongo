@@ -34,51 +34,50 @@
 
 namespace mongo {
 
-    using mongoutils::str::stream;
+using mongoutils::str::stream;
 
 namespace fieldchecker {
 
-    Status isUpdatable(const FieldRef& field) {
-        const size_t numParts = field.numParts();
+Status isUpdatable(const FieldRef& field) {
+    const size_t numParts = field.numParts();
 
-        if (numParts == 0) {
+    if (numParts == 0) {
+        return Status(ErrorCodes::EmptyFieldName, "An empty update path is not valid.");
+    }
+
+    for (size_t i = 0; i != numParts; ++i) {
+        const StringData part = field.getPart(i);
+
+        if (part.empty()) {
             return Status(ErrorCodes::EmptyFieldName,
-                          "An empty update path is not valid.");
-        }
-
-        for (size_t i = 0; i != numParts; ++i) {
-            const StringData part = field.getPart(i);
-
-            if (part.empty()) {
-                return Status(ErrorCodes::EmptyFieldName,
-                              mongoutils::str::stream() << "The update path '"
-                              << field.dottedField()
+                          mongoutils::str::stream()
+                              << "The update path '" << field.dottedField()
                               << "' contains an empty field name, which is not allowed.");
-            }
         }
-
-        return Status::OK();
     }
 
-    bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count) {
+    return Status::OK();
+}
 
-        // 'count' is optional.
-        size_t dummy;
-        if (count == NULL) {
-            count = &dummy;
-        }
-
-        *count = 0;
-        size_t size = fieldRef.numParts();
-        for (size_t i=0; i<size; i++) {
-            StringData fieldPart = fieldRef.getPart(i);
-            if ((fieldPart.size() == 1) && (fieldPart[0] == '$')) {
-                if (*count == 0) *pos = i;
-                (*count)++;
-            }
-        }
-        return *count > 0;
+bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count) {
+    // 'count' is optional.
+    size_t dummy;
+    if (count == NULL) {
+        count = &dummy;
     }
 
-} // namespace fieldchecker
-} // namespace mongo
+    *count = 0;
+    size_t size = fieldRef.numParts();
+    for (size_t i = 0; i < size; i++) {
+        StringData fieldPart = fieldRef.getPart(i);
+        if ((fieldPart.size() == 1) && (fieldPart[0] == '$')) {
+            if (*count == 0)
+                *pos = i;
+            (*count)++;
+        }
+    }
+    return *count > 0;
+}
+
+}  // namespace fieldchecker
+}  // namespace mongo

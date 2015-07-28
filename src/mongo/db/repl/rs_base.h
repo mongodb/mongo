@@ -36,55 +36,61 @@
 namespace mongo {
 namespace repl {
 
-    /**
-     * most operations on a ReplSet object should be done while locked. that
-     * logic implemented here.
-     *
-     * Order of locking: lock the replica set, then take a rwlock.
-     */
-    class RSBase : boost::noncopyable {
-    private:
-        mongo::mutex m;
-        int _locked;
-        ThreadLocalValue<bool> _lockedByMe;
-    protected:
-        RSBase() : m("RSBase"), _locked(0) { }
-        ~RSBase() { }
+/**
+ * most operations on a ReplSet object should be done while locked. that
+ * logic implemented here.
+ *
+ * Order of locking: lock the replica set, then take a rwlock.
+ */
+class RSBase : boost::noncopyable {
+private:
+    mongo::mutex m;
+    int _locked;
+    ThreadLocalValue<bool> _lockedByMe;
+
+protected:
+    RSBase() : m("RSBase"), _locked(0) {}
+    ~RSBase() {}
+
+public:
+    class lock {
+        RSBase& rsbase;
+        std::auto_ptr<scoped_lock> sl;
 
     public:
-        class lock {
-            RSBase& rsbase;
-            std::auto_ptr<scoped_lock> sl;
-        public:
-            lock(RSBase* b) : rsbase(*b) {
-                if( rsbase._lockedByMe.get() )
-                    return; // recursive is ok...
+        lock(RSBase* b) : rsbase(*b) {
+            if (rsbase._lockedByMe.get())
+                return;  // recursive is ok...
 
-                sl.reset( new scoped_lock(rsbase.m) );
-                DEV verify(rsbase._locked == 0);
-                rsbase._locked++;
-                rsbase._lockedByMe.set(true);
+            sl.reset(new scoped_lock(rsbase.m));
+            DEV verify(rsbase._locked == 0);
+            rsbase._locked++;
+            rsbase._lockedByMe.set(true);
+        }
+        ~lock() {
+            if (sl.get()) {
+                verify(rsbase._lockedByMe.get());
+                DEV verify(rsbase._locked == 1);
+                rsbase._lockedByMe.set(false);
+                rsbase._locked--;
             }
-            ~lock() {
-                if( sl.get() ) {
-                    verify( rsbase._lockedByMe.get() );
-                    DEV verify(rsbase._locked == 1);
-                    rsbase._lockedByMe.set(false);
-                    rsbase._locked--;
-                }
-            }
-        };
-
-        /* for asserts */
-        bool locked() const { return _locked != 0; }
-
-        /** if true, is locked, and was locked by this thread. note if false, it could be in the
-         *  lock or not for another just for asserts & such so we can make the contracts clear on
-         *  who locks what when.  we don't use these locks that frequently, so the little bit of
-         * overhead is fine.
-         */
-        bool lockedByMe() { return _lockedByMe.get(); }
+        }
     };
 
-} // namespace repl
-} // namespace mongo
+    /* for asserts */
+    bool locked() const {
+        return _locked != 0;
+    }
+
+    /** if true, is locked, and was locked by this thread. note if false, it could be in the
+     *  lock or not for another just for asserts & such so we can make the contracts clear on
+     *  who locks what when.  we don't use these locks that frequently, so the little bit of
+     * overhead is fine.
+     */
+    bool lockedByMe() {
+        return _lockedByMe.get();
+    }
+};
+
+}  // namespace repl
+}  // namespace mongo

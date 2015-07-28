@@ -36,101 +36,96 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        using std::string;
+using std::string;
 
-        FTSMatcher::FTSMatcher( const FTSQuery& query, const FTSSpec& spec )
-            : _query( query ),
-              _spec( spec ) {
-        }
+FTSMatcher::FTSMatcher(const FTSQuery& query, const FTSSpec& spec) : _query(query), _spec(spec) {}
 
-        /*
-         * Checks if the obj contains any of the negTerms, if so returns true, otherwise false
-         * @param obj, object to be checked
-         */
-        bool FTSMatcher::hasNegativeTerm(const BSONObj& obj ) const {
-            // called during search. deals with the case in which we have a term
-            // flagged for exclusion, i.e. "hello -world" we want to remove all
-            // results that include "world"
+/*
+ * Checks if the obj contains any of the negTerms, if so returns true, otherwise false
+ * @param obj, object to be checked
+ */
+bool FTSMatcher::hasNegativeTerm(const BSONObj& obj) const {
+    // called during search. deals with the case in which we have a term
+    // flagged for exclusion, i.e. "hello -world" we want to remove all
+    // results that include "world"
 
-            if ( _query.getNegatedTerms().size() == 0 ) {
-                return false;
-            }
+    if (_query.getNegatedTerms().size() == 0) {
+        return false;
+    }
 
-            FTSElementIterator it( _spec, obj);
+    FTSElementIterator it(_spec, obj);
 
-            while ( it.more() ) {
-                FTSIteratorValue val = it.next();
-                if (_hasNegativeTerm_string( val._language, val._text )) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        /*
-         * Checks if any of the negTerms is in the tokenized string
-         * @param raw, the raw string to be tokenized
-         */
-        bool FTSMatcher::_hasNegativeTerm_string( const FTSLanguage* language,
-                                                  const string& raw ) const {
-
-            Tokenizer i( *language, raw );
-            Stemmer stemmer( *language );
-            while ( i.more() ) {
-                Token t = i.next();
-                if ( t.type != Token::TEXT )
-                    continue;
-                string word = stemmer.stem( tolowerString( t.data ) );
-                if ( _query.getNegatedTerms().count( word ) > 0 )
-                    return true;
-            }
-            return false;
-        }
-
-        bool FTSMatcher::phrasesMatch( const BSONObj& obj ) const {
-            for (unsigned i = 0; i < _query.getPhr().size(); i++ ) {
-                if ( !phraseMatch( _query.getPhr()[i], obj ) ) {
-                    return false;
-                }
-            }
-
-            for (unsigned i = 0; i < _query.getNegatedPhr().size(); i++ ) {
-                if ( phraseMatch( _query.getNegatedPhr()[i], obj ) ) {
-                    return false;
-                }
-            }
-
+    while (it.more()) {
+        FTSIteratorValue val = it.next();
+        if (_hasNegativeTerm_string(val._language, val._text)) {
             return true;
         }
+    }
 
-        /**
-         * Checks if phrase is exactly matched in obj, returns true if so, false otherwise
-         * @param phrase, the string to be matched
-         * @param obj, document in the collection to match against
-         */
-        bool FTSMatcher::phraseMatch( const string& phrase, const BSONObj& obj ) const {
-            FTSElementIterator it( _spec, obj);
+    return false;
+}
 
-            while ( it.more() ) {
-                FTSIteratorValue val = it.next();
-                if (_phraseMatches( phrase, val._text )) {
-                    return true;
-                }
-            }
+/*
+ * Checks if any of the negTerms is in the tokenized string
+ * @param raw, the raw string to be tokenized
+ */
+bool FTSMatcher::_hasNegativeTerm_string(const FTSLanguage* language, const string& raw) const {
+    Tokenizer i(*language, raw);
+    Stemmer stemmer(*language);
+    while (i.more()) {
+        Token t = i.next();
+        if (t.type != Token::TEXT)
+            continue;
+        string word = stemmer.stem(tolowerString(t.data));
+        if (_query.getNegatedTerms().count(word) > 0)
+            return true;
+    }
+    return false;
+}
 
+bool FTSMatcher::phrasesMatch(const BSONObj& obj) const {
+    for (unsigned i = 0; i < _query.getPhr().size(); i++) {
+        if (!phraseMatch(_query.getPhr()[i], obj)) {
             return false;
         }
+    }
 
-        /*
-         * Looks for phrase in a raw string
-         * @param phrase, phrase to match
-         * @param haystack, raw string to be parsed
-         */
-        bool FTSMatcher::_phraseMatches( const string& phrase, const string& haystack ) const {
-            return strcasestr( haystack.c_str(), phrase.c_str() ) != NULL;
+    for (unsigned i = 0; i < _query.getNegatedPhr().size(); i++) {
+        if (phraseMatch(_query.getNegatedPhr()[i], obj)) {
+            return false;
         }
     }
+
+    return true;
+}
+
+/**
+ * Checks if phrase is exactly matched in obj, returns true if so, false otherwise
+ * @param phrase, the string to be matched
+ * @param obj, document in the collection to match against
+ */
+bool FTSMatcher::phraseMatch(const string& phrase, const BSONObj& obj) const {
+    FTSElementIterator it(_spec, obj);
+
+    while (it.more()) {
+        FTSIteratorValue val = it.next();
+        if (_phraseMatches(phrase, val._text)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/*
+ * Looks for phrase in a raw string
+ * @param phrase, phrase to match
+ * @param haystack, raw string to be parsed
+ */
+bool FTSMatcher::_phraseMatches(const string& phrase, const string& haystack) const {
+    return strcasestr(haystack.c_str(), phrase.c_str()) != NULL;
+}
+}
 }

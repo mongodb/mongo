@@ -39,34 +39,32 @@ using mongo::GridFS;
 using mongo::MsgAssertionException;
 
 namespace {
-    
-    class SetChunkSizeTest {
-    public:
-        virtual void run() {
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
 
-            GridFS grid(client, "gridtest");
-            grid.setChunkSize( 5 );
+class SetChunkSizeTest {
+public:
+    virtual void run() {
+        OperationContextImpl txn;
+        DBDirectClient client(&txn);
 
-            ASSERT_EQUALS( 5U, grid.getChunkSize() );
-            ASSERT_THROWS( grid.setChunkSize( 0 ), MsgAssertionException );
-            ASSERT_EQUALS( 5U, grid.getChunkSize() );
-        }
+        GridFS grid(client, "gridtest");
+        grid.setChunkSize(5);
 
-        virtual ~SetChunkSizeTest() {}
-    };
+        ASSERT_EQUALS(5U, grid.getChunkSize());
+        ASSERT_THROWS(grid.setChunkSize(0), MsgAssertionException);
+        ASSERT_EQUALS(5U, grid.getChunkSize());
+    }
 
-    class All : public Suite {
-    public:
-        All() : Suite( "gridfs" ) {
-        }
+    virtual ~SetChunkSizeTest() {}
+};
 
-        void setupTests() {
-            add< SetChunkSizeTest >();
-        }
-    };
+class All : public Suite {
+public:
+    All() : Suite("gridfs") {}
 
-    SuiteInstance<All> myall;
+    void setupTests() {
+        add<SetChunkSizeTest>();
+    }
+};
+
+SuiteInstance<All> myall;
 }
-

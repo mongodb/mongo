@@ -32,19 +32,19 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
-    /**
-     * An abstraction for setting and getting data about the 'head' of an index.  This is the data
-     * that lives in the catalog to identify where an index lives.
-     */
-    class HeadManager {
-    public:
-        virtual ~HeadManager() { }
+/**
+ * An abstraction for setting and getting data about the 'head' of an index.  This is the data
+ * that lives in the catalog to identify where an index lives.
+ */
+class HeadManager {
+public:
+    virtual ~HeadManager() {}
 
-        virtual const RecordId getHead(OperationContext* txn) const = 0;
+    virtual const RecordId getHead(OperationContext* txn) const = 0;
 
-        virtual void setHead(OperationContext* txn, const RecordId newHead) = 0;
-    };
+    virtual void setHead(OperationContext* txn, const RecordId newHead) = 0;
+};
 
 }  // namespace mongo

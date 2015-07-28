@@ -34,8 +34,8 @@
 namespace mongo {
 namespace optionenvironment {
 
-    OptionSection startupOptions("Options");
-    Environment startupOptionsParsed;
+OptionSection startupOptions("Options");
+Environment startupOptionsParsed;
 
-} // namespace optionenvironment
-} // namespace mongo
+}  // namespace optionenvironment
+}  // namespace mongo

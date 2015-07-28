@@ -34,16 +34,16 @@ namespace mongo {
 namespace repl {
 
 namespace {
-    ReplicationCoordinator* coordinator = NULL;
-} // namespace
+ReplicationCoordinator* coordinator = NULL;
+}  // namespace
 
-    ReplicationCoordinator* getGlobalReplicationCoordinator() {
-        return coordinator;
-    }
+ReplicationCoordinator* getGlobalReplicationCoordinator() {
+    return coordinator;
+}
 
-    void setGlobalReplicationCoordinator(ReplicationCoordinator* newCoordinator) {
-        coordinator = newCoordinator;
-    }
+void setGlobalReplicationCoordinator(ReplicationCoordinator* newCoordinator) {
+    coordinator = newCoordinator;
+}
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

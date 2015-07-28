@@ -31,9 +31,9 @@
 
 namespace mongo {
 namespace pal {
-    const char* strcasestr(const char* haystack, const char* needle);
+const char* strcasestr(const char* haystack, const char* needle);
 }
-    using mongo::pal::strcasestr;
+using mongo::pal::strcasestr;
 }
 
 #else
@@ -41,7 +41,7 @@ namespace pal {
 #include <cstring>
 
 namespace mongo {
-    using ::strcasestr;
+using ::strcasestr;
 }
 
 #endif

@@ -33,16 +33,16 @@
 namespace mongo {
 namespace auth {
 
-    /**
-     * Retrieves the schema version of the persistent data describing users and roles from the
-     * remote server connected to with conn.
-     */
-    Status getRemoteStoredAuthorizationVersion(DBClientBase* conn, int* outVersion);
+/**
+ * Retrieves the schema version of the persistent data describing users and roles from the
+ * remote server connected to with conn.
+ */
+Status getRemoteStoredAuthorizationVersion(DBClientBase* conn, int* outVersion);
 
-    /**
-     * Name of the server parameter used to report the auth schema version (via getParameter).
-     */
-    extern const std::string schemaVersionServerParameter;
+/**
+ * Name of the server parameter used to report the auth schema version (via getParameter).
+ */
+extern const std::string schemaVersionServerParameter;
 
 }  // namespace auth
 }  // namespace mongo

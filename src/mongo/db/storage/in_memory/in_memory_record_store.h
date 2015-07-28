@@ -39,220 +39,233 @@
 
 namespace mongo {
 
-    class InMemoryRecordIterator;
+class InMemoryRecordIterator;
 
-    /**
-     * A RecordStore that stores all data in-memory.
-     *
-     * @param cappedMaxSize - required if isCapped. limit uses dataSize() in this impl.
-     */
-    class InMemoryRecordStore : public RecordStore {
-    public:
-        explicit InMemoryRecordStore(const StringData& ns,
-                                     boost::shared_ptr<void>* dataInOut,
-                                     bool isCapped = false,
-                                     int64_t cappedMaxSize = -1,
-                                     int64_t cappedMaxDocs = -1,
-                                     CappedDocumentDeleteCallback* cappedDeleteCallback = NULL);
+/**
+ * A RecordStore that stores all data in-memory.
+ *
+ * @param cappedMaxSize - required if isCapped. limit uses dataSize() in this impl.
+ */
+class InMemoryRecordStore : public RecordStore {
+public:
+    explicit InMemoryRecordStore(const StringData& ns,
+                                 boost::shared_ptr<void>* dataInOut,
+                                 bool isCapped = false,
+                                 int64_t cappedMaxSize = -1,
+                                 int64_t cappedMaxDocs = -1,
+                                 CappedDocumentDeleteCallback* cappedDeleteCallback = NULL);
 
-        virtual const char* name() const;
+    virtual const char* name() const;
 
-        virtual RecordData dataFor( OperationContext* txn, const RecordId& loc ) const;
+    virtual RecordData dataFor(OperationContext* txn, const RecordId& loc) const;
 
-        virtual bool findRecord( OperationContext* txn, const RecordId& loc, RecordData* rd ) const;
+    virtual bool findRecord(OperationContext* txn, const RecordId& loc, RecordData* rd) const;
 
-        virtual void deleteRecord( OperationContext* txn, const RecordId& dl );
+    virtual void deleteRecord(OperationContext* txn, const RecordId& dl);
 
-        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
-                                                  const char* data,
-                                                  int len,
-                                                  bool enforceQuota );
+    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
+                                              const char* data,
+                                              int len,
+                                              bool enforceQuota);
 
-        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
-                                                  const DocWriter* doc,
-                                                  bool enforceQuota );
+    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
+                                              const DocWriter* doc,
+                                              bool enforceQuota);
 
-        virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
-                                                  const RecordId& oldLocation,
-                                                  const char* data,
-                                                  int len,
-                                                  bool enforceQuota,
-                                                  UpdateNotifier* notifier );
+    virtual StatusWith<RecordId> updateRecord(OperationContext* txn,
+                                              const RecordId& oldLocation,
+                                              const char* data,
+                                              int len,
+                                              bool enforceQuota,
+                                              UpdateNotifier* notifier);
 
-        virtual bool updateWithDamagesSupported() const;
+    virtual bool updateWithDamagesSupported() const;
 
-        virtual Status updateWithDamages( OperationContext* txn,
-                                          const RecordId& loc,
-                                          const RecordData& oldRec,
-                                          const char* damageSource,
-                                          const mutablebson::DamageVector& damages );
+    virtual Status updateWithDamages(OperationContext* txn,
+                                     const RecordId& loc,
+                                     const RecordData& oldRec,
+                                     const char* damageSource,
+                                     const mutablebson::DamageVector& damages);
 
-        virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const RecordId& start,
-                                             const CollectionScanParams::Direction& dir) const;
+    virtual RecordIterator* getIterator(OperationContext* txn,
+                                        const RecordId& start,
+                                        const CollectionScanParams::Direction& dir) const;
 
-        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
+    virtual RecordIterator* getIteratorForRepair(OperationContext* txn) const;
 
-        virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
+    virtual std::vector<RecordIterator*> getManyIterators(OperationContext* txn) const;
 
-        virtual Status truncate( OperationContext* txn );
+    virtual Status truncate(OperationContext* txn);
 
-        virtual void temp_cappedTruncateAfter( OperationContext* txn, RecordId end, bool inclusive );
+    virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
 
-        virtual Status validate( OperationContext* txn,
-                                 bool full,
-                                 bool scanData,
-                                 ValidateAdaptor* adaptor,
-                                 ValidateResults* results, BSONObjBuilder* output );
+    virtual Status validate(OperationContext* txn,
+                            bool full,
+                            bool scanData,
+                            ValidateAdaptor* adaptor,
+                            ValidateResults* results,
+                            BSONObjBuilder* output);
 
-        virtual void appendCustomStats( OperationContext* txn,
-                                        BSONObjBuilder* result,
-                                        double scale ) const;
+    virtual void appendCustomStats(OperationContext* txn,
+                                   BSONObjBuilder* result,
+                                   double scale) const;
 
-        virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
+    virtual Status touch(OperationContext* txn, BSONObjBuilder* output) const;
 
-        virtual void increaseStorageSize( OperationContext* txn,  int size, bool enforceQuota );
+    virtual void increaseStorageSize(OperationContext* txn, int size, bool enforceQuota);
 
-        virtual int64_t storageSize( OperationContext* txn,
-                                     BSONObjBuilder* extraInfo = NULL,
-                                     int infoLevel = 0) const;
+    virtual int64_t storageSize(OperationContext* txn,
+                                BSONObjBuilder* extraInfo = NULL,
+                                int infoLevel = 0) const;
 
-        virtual long long dataSize( OperationContext* txn ) const { return _data->dataSize; }
+    virtual long long dataSize(OperationContext* txn) const {
+        return _data->dataSize;
+    }
 
-        virtual long long numRecords( OperationContext* txn ) const {
-            return _data->records.size();
+    virtual long long numRecords(OperationContext* txn) const {
+        return _data->records.size();
+    }
+
+    virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
+                                                     const RecordId& startingPosition) const;
+
+    virtual void updateStatsAfterRepair(OperationContext* txn,
+                                        long long numRecords,
+                                        long long dataSize) {
+        invariant(_data->records.size() == size_t(numRecords));
+        _data->dataSize = dataSize;
+    }
+
+protected:
+    struct InMemoryRecord {
+        InMemoryRecord() : size(0) {}
+        InMemoryRecord(int size) : size(size), data(new char[size]) {}
+
+        RecordData toRecordData() const {
+            return RecordData(data.get(), size);
         }
 
-        virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
-                                                         const RecordId& startingPosition) const;
-
-        virtual void updateStatsAfterRepair(OperationContext* txn,
-                                            long long numRecords,
-                                            long long dataSize) {
-            invariant(_data->records.size() == size_t(numRecords));
-            _data->dataSize = dataSize;
-        }
-
-    protected:
-        struct InMemoryRecord {
-            InMemoryRecord() :size(0) {}
-            InMemoryRecord(int size) :size(size), data(new char[size]) {}
-
-            RecordData toRecordData() const { return RecordData(data.get(), size); }
-
-            int size;
-            boost::shared_array<char> data;
-        };
-
-        virtual const InMemoryRecord* recordFor( const RecordId& loc ) const;
-        virtual InMemoryRecord* recordFor( const RecordId& loc );
-
-    public:
-        //
-        // Not in RecordStore interface
-        //
-
-        typedef std::map<RecordId, InMemoryRecord> Records;
-
-        bool isCapped() const { return _isCapped; }
-        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
-            _cappedDeleteCallback = cb;
-        }
-        bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
-        bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
-
-    private:
-        class InsertChange;
-        class RemoveChange;
-        class TruncateChange;
-
-        StatusWith<RecordId> extractAndCheckLocForOplog(const char* data, int len) const;
-
-        RecordId allocateLoc();
-        bool cappedAndNeedDelete(OperationContext* txn) const;
-        void cappedDeleteAsNeeded(OperationContext* txn);
-
-        // TODO figure out a proper solution to metadata
-        const bool _isCapped;
-        const int64_t _cappedMaxSize;
-        const int64_t _cappedMaxDocs;
-        CappedDocumentDeleteCallback* _cappedDeleteCallback;
-
-        // This is the "persistent" data.
-        struct Data {
-            Data(bool isOplog) :dataSize(0), nextId(1), isOplog(isOplog) {}
-
-            int64_t dataSize;
-            Records records;
-            int64_t nextId;
-            const bool isOplog;
-        };
-
-        Data* const _data;
+        int size;
+        boost::shared_array<char> data;
     };
 
-    class InMemoryRecordIterator : public RecordIterator {
-    public:
-        InMemoryRecordIterator(OperationContext* txn,
-                               const InMemoryRecordStore::Records& records,
-                               const InMemoryRecordStore& rs,
-                               RecordId start = RecordId(),
-                               bool tailable = false);
+    virtual const InMemoryRecord* recordFor(const RecordId& loc) const;
+    virtual InMemoryRecord* recordFor(const RecordId& loc);
 
-        virtual bool isEOF();
+public:
+    //
+    // Not in RecordStore interface
+    //
 
-        virtual RecordId curr();
+    typedef std::map<RecordId, InMemoryRecord> Records;
 
-        virtual RecordId getNext();
+    bool isCapped() const {
+        return _isCapped;
+    }
+    void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
+        _cappedDeleteCallback = cb;
+    }
+    bool cappedMaxDocs() const {
+        invariant(_isCapped);
+        return _cappedMaxDocs;
+    }
+    bool cappedMaxSize() const {
+        invariant(_isCapped);
+        return _cappedMaxSize;
+    }
 
-        virtual void invalidate(const RecordId& dl);
+private:
+    class InsertChange;
+    class RemoveChange;
+    class TruncateChange;
 
-        virtual void saveState();
+    StatusWith<RecordId> extractAndCheckLocForOplog(const char* data, int len) const;
 
-        virtual bool restoreState(OperationContext* txn);
+    RecordId allocateLoc();
+    bool cappedAndNeedDelete(OperationContext* txn) const;
+    void cappedDeleteAsNeeded(OperationContext* txn);
 
-        virtual RecordData dataFor( const RecordId& loc ) const;
+    // TODO figure out a proper solution to metadata
+    const bool _isCapped;
+    const int64_t _cappedMaxSize;
+    const int64_t _cappedMaxDocs;
+    CappedDocumentDeleteCallback* _cappedDeleteCallback;
 
-    private:
-        OperationContext* _txn; // not owned
-        InMemoryRecordStore::Records::const_iterator _it;
-        bool _tailable;
-        RecordId _lastLoc; // only for restarting tailable
-        bool _killedByInvalidate;
+    // This is the "persistent" data.
+    struct Data {
+        Data(bool isOplog) : dataSize(0), nextId(1), isOplog(isOplog) {}
 
-        const InMemoryRecordStore::Records& _records;
-        const InMemoryRecordStore& _rs;
+        int64_t dataSize;
+        Records records;
+        int64_t nextId;
+        const bool isOplog;
     };
 
-    class InMemoryRecordReverseIterator : public RecordIterator {
-    public:
-        InMemoryRecordReverseIterator(OperationContext* txn,
-                                      const InMemoryRecordStore::Records& records,
-                                      const InMemoryRecordStore& rs,
-                                      RecordId start = RecordId());
+    Data* const _data;
+};
 
-        virtual bool isEOF();
+class InMemoryRecordIterator : public RecordIterator {
+public:
+    InMemoryRecordIterator(OperationContext* txn,
+                           const InMemoryRecordStore::Records& records,
+                           const InMemoryRecordStore& rs,
+                           RecordId start = RecordId(),
+                           bool tailable = false);
 
-        virtual RecordId curr();
+    virtual bool isEOF();
 
-        virtual RecordId getNext();
+    virtual RecordId curr();
 
-        virtual void invalidate(const RecordId& dl);
+    virtual RecordId getNext();
 
-        virtual void saveState();
+    virtual void invalidate(const RecordId& dl);
 
-        virtual bool restoreState(OperationContext* txn);
+    virtual void saveState();
 
-        virtual RecordData dataFor( const RecordId& loc ) const;
+    virtual bool restoreState(OperationContext* txn);
 
-    private:
-        OperationContext* _txn; // not owned
-        InMemoryRecordStore::Records::const_reverse_iterator _it;
-        bool _killedByInvalidate;
-        RecordId _savedLoc; // isNull if saved at EOF
+    virtual RecordData dataFor(const RecordId& loc) const;
 
-        const InMemoryRecordStore::Records& _records;
-        const InMemoryRecordStore& _rs;
-    };
+private:
+    OperationContext* _txn;  // not owned
+    InMemoryRecordStore::Records::const_iterator _it;
+    bool _tailable;
+    RecordId _lastLoc;  // only for restarting tailable
+    bool _killedByInvalidate;
 
-} // namespace mongo
+    const InMemoryRecordStore::Records& _records;
+    const InMemoryRecordStore& _rs;
+};
+
+class InMemoryRecordReverseIterator : public RecordIterator {
+public:
+    InMemoryRecordReverseIterator(OperationContext* txn,
+                                  const InMemoryRecordStore::Records& records,
+                                  const InMemoryRecordStore& rs,
+                                  RecordId start = RecordId());
+
+    virtual bool isEOF();
+
+    virtual RecordId curr();
+
+    virtual RecordId getNext();
+
+    virtual void invalidate(const RecordId& dl);
+
+    virtual void saveState();
+
+    virtual bool restoreState(OperationContext* txn);
+
+    virtual RecordData dataFor(const RecordId& loc) const;
+
+private:
+    OperationContext* _txn;  // not owned
+    InMemoryRecordStore::Records::const_reverse_iterator _it;
+    bool _killedByInvalidate;
+    RecordId _savedLoc;  // isNull if saved at EOF
+
+    const InMemoryRecordStore::Records& _records;
+    const InMemoryRecordStore& _rs;
+};
+
+}  // namespace mongo

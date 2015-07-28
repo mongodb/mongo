@@ -34,26 +34,25 @@
 
 namespace mongo {
 
-    class OperationContext;
-    class RecordData;
+class OperationContext;
+class RecordData;
+
+/**
+ * When a capped collection has to delete a document, it needs a way to tell the caller
+ * what its deleting so it can unindex or do any other cleanup.
+ * This is that way.
+ */
+class CappedDocumentDeleteCallback {
+public:
+    virtual ~CappedDocumentDeleteCallback() {}
 
     /**
-     * When a capped collection has to delete a document, it needs a way to tell the caller
-     * what its deleting so it can unindex or do any other cleanup.
-     * This is that way.
+     * This will be called right before loc is deleted when wrapping.
+     * If data is unowned, it is only valid inside of this call. If implementations wish to
+     * stash a pointer, they must copy it.
      */
-    class CappedDocumentDeleteCallback {
-    public:
-        virtual ~CappedDocumentDeleteCallback(){}
-
-        /**
-         * This will be called right before loc is deleted when wrapping.
-         * If data is unowned, it is only valid inside of this call. If implementations wish to
-         * stash a pointer, they must copy it.
-         */
-        virtual Status aboutToDeleteCapped( OperationContext* txn,
-                                            const RecordId& loc,
-                                            RecordData data ) = 0;
-    };
-
+    virtual Status aboutToDeleteCapped(OperationContext* txn,
+                                       const RecordId& loc,
+                                       RecordData data) = 0;
+};
 }

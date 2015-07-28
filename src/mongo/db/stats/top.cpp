@@ -43,75 +43,73 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
-    using std::stringstream;
-    using std::vector;
+using std::endl;
+using std::string;
+using std::stringstream;
+using std::vector;
 
-    Top::UsageData::UsageData( const UsageData& older, const UsageData& newer ) {
-        // this won't be 100% accurate on rollovers and drop(), but at least it won't be negative
-        time  = (newer.time  >= older.time)  ? (newer.time  - older.time)  : newer.time;
-        count = (newer.count >= older.count) ? (newer.count - older.count) : newer.count;
+Top::UsageData::UsageData(const UsageData& older, const UsageData& newer) {
+    // this won't be 100% accurate on rollovers and drop(), but at least it won't be negative
+    time = (newer.time >= older.time) ? (newer.time - older.time) : newer.time;
+    count = (newer.count >= older.count) ? (newer.count - older.count) : newer.count;
+}
+
+Top::CollectionData::CollectionData(const CollectionData& older, const CollectionData& newer)
+    : total(older.total, newer.total),
+      readLock(older.readLock, newer.readLock),
+      writeLock(older.writeLock, newer.writeLock),
+      queries(older.queries, newer.queries),
+      getmore(older.getmore, newer.getmore),
+      insert(older.insert, newer.insert),
+      update(older.update, newer.update),
+      remove(older.remove, newer.remove),
+      commands(older.commands, newer.commands) {}
+
+void Top::record(const StringData& ns, int op, int lockType, long long micros, bool command) {
+    if (ns[0] == '?')
+        return;
+
+    // cout << "record: " << ns << "\t" << op << "\t" << command << endl;
+    SimpleMutex::scoped_lock lk(_lock);
+
+    if ((command || op == dbQuery) && ns == _lastDropped) {
+        _lastDropped = "";
+        return;
     }
 
-    Top::CollectionData::CollectionData( const CollectionData& older, const CollectionData& newer )
-        : total( older.total, newer.total ),
-          readLock( older.readLock, newer.readLock ),
-          writeLock( older.writeLock, newer.writeLock ),
-          queries( older.queries, newer.queries ),
-          getmore( older.getmore, newer.getmore ),
-          insert( older.insert, newer.insert ),
-          update( older.update, newer.update ),
-          remove( older.remove, newer.remove ),
-          commands( older.commands, newer.commands ) {
+    CollectionData& coll = _usage[ns];
+    _record(coll, op, lockType, micros, command);
+}
 
-    }
+void Top::_record(CollectionData& c, int op, int lockType, long long micros, bool command) {
+    c.total.inc(micros);
 
-    void Top::record( const StringData& ns, int op, int lockType, long long micros, bool command ) {
-        if ( ns[0] == '?' )
-            return;
+    if (lockType > 0)
+        c.writeLock.inc(micros);
+    else if (lockType < 0)
+        c.readLock.inc(micros);
 
-        //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
-        SimpleMutex::scoped_lock lk(_lock);
-
-        if ( ( command || op == dbQuery ) && ns == _lastDropped ) {
-            _lastDropped = "";
-            return;
-        }
-
-        CollectionData& coll = _usage[ns];
-        _record( coll, op, lockType, micros, command );
-    }
-
-    void Top::_record( CollectionData& c, int op, int lockType, long long micros, bool command ) {
-        c.total.inc( micros );
-
-        if ( lockType > 0 )
-            c.writeLock.inc( micros );
-        else if ( lockType < 0 )
-            c.readLock.inc( micros );
-
-        switch ( op ) {
+    switch (op) {
         case 0:
             // use 0 for unknown, non-specific
             break;
         case dbUpdate:
-            c.update.inc( micros );
+            c.update.inc(micros);
             break;
         case dbInsert:
-            c.insert.inc( micros );
+            c.insert.inc(micros);
             break;
         case dbQuery:
-            if ( command )
-                c.commands.inc( micros );
+            if (command)
+                c.commands.inc(micros);
             else
-                c.queries.inc( micros );
+                c.queries.inc(micros);
             break;
         case dbGetMore:
-            c.getmore.inc( micros );
+            c.getmore.inc(micros);
             break;
         case dbDelete:
-            c.remove.inc( micros );
+            c.remove.inc(micros);
             break;
         case dbKillCursors:
             break;
@@ -121,91 +119,103 @@ namespace mongo {
             break;
         default:
             log() << "unknown op in Top::record: " << op << endl;
-        }
+    }
+}
 
+void Top::collectionDropped(const StringData& ns) {
+    SimpleMutex::scoped_lock lk(_lock);
+    _usage.erase(ns);
+    _lastDropped = ns.toString();
+}
+
+void Top::cloneMap(Top::UsageMap& out) const {
+    SimpleMutex::scoped_lock lk(_lock);
+    out = _usage;
+}
+
+void Top::append(BSONObjBuilder& b) {
+    SimpleMutex::scoped_lock lk(_lock);
+    _appendToUsageMap(b, _usage);
+}
+
+void Top::_appendToUsageMap(BSONObjBuilder& b, const UsageMap& map) const {
+    // pull all the names into a vector so we can sort them for the user
+
+    vector<string> names;
+    for (UsageMap::const_iterator i = map.begin(); i != map.end(); ++i) {
+        names.push_back(i->first);
     }
 
-    void Top::collectionDropped( const StringData& ns ) {
-        SimpleMutex::scoped_lock lk(_lock);
-        _usage.erase(ns);
-        _lastDropped = ns.toString();
-    }
+    std::sort(names.begin(), names.end());
 
-    void Top::cloneMap(Top::UsageMap& out) const {
-        SimpleMutex::scoped_lock lk(_lock);
-        out = _usage;
-    }
+    for (size_t i = 0; i < names.size(); i++) {
+        BSONObjBuilder bb(b.subobjStart(names[i]));
 
-    void Top::append( BSONObjBuilder& b ) {
-        SimpleMutex::scoped_lock lk( _lock );
-        _appendToUsageMap( b, _usage );
-    }
+        const CollectionData& coll = map.find(names[i])->second;
 
-    void Top::_appendToUsageMap( BSONObjBuilder& b, const UsageMap& map ) const {
-        // pull all the names into a vector so we can sort them for the user
+        _appendStatsEntry(b, "total", coll.total);
 
-        vector<string> names;
-        for ( UsageMap::const_iterator i = map.begin(); i != map.end(); ++i ) {
-            names.push_back( i->first );
-        }
+        _appendStatsEntry(b, "readLock", coll.readLock);
+        _appendStatsEntry(b, "writeLock", coll.writeLock);
 
-        std::sort( names.begin(), names.end() );
+        _appendStatsEntry(b, "queries", coll.queries);
+        _appendStatsEntry(b, "getmore", coll.getmore);
+        _appendStatsEntry(b, "insert", coll.insert);
+        _appendStatsEntry(b, "update", coll.update);
+        _appendStatsEntry(b, "remove", coll.remove);
+        _appendStatsEntry(b, "commands", coll.commands);
 
-        for ( size_t i=0; i<names.size(); i++ ) {
-            BSONObjBuilder bb( b.subobjStart( names[i] ) );
-
-            const CollectionData& coll = map.find(names[i])->second;
-
-            _appendStatsEntry( b, "total", coll.total );
-
-            _appendStatsEntry( b, "readLock", coll.readLock );
-            _appendStatsEntry( b, "writeLock", coll.writeLock );
-
-            _appendStatsEntry( b, "queries", coll.queries );
-            _appendStatsEntry( b, "getmore", coll.getmore );
-            _appendStatsEntry( b, "insert", coll.insert );
-            _appendStatsEntry( b, "update", coll.update );
-            _appendStatsEntry( b, "remove", coll.remove );
-            _appendStatsEntry( b, "commands", coll.commands );
-
-            bb.done();
-        }
-    }
-
-    void Top::_appendStatsEntry( BSONObjBuilder& b, const char * statsName, const UsageData& map ) const {
-        BSONObjBuilder bb( b.subobjStart( statsName ) );
-        bb.appendNumber( "time", map.time );
-        bb.appendNumber( "count", map.count );
         bb.done();
     }
+}
 
-    class TopCmd : public Command {
-    public:
-        TopCmd() : Command( "top", true ) {}
+void Top::_appendStatsEntry(BSONObjBuilder& b, const char* statsName, const UsageData& map) const {
+    BSONObjBuilder bb(b.subobjStart(statsName));
+    bb.appendNumber("time", map.time);
+    bb.appendNumber("count", map.count);
+    bb.done();
+}
 
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void help( stringstream& help ) const { help << "usage by collection, in micros "; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::top);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+class TopCmd : public Command {
+public:
+    TopCmd() : Command("top", true) {}
+
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual bool adminOnly() const {
+        return true;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual void help(stringstream& help) const {
+        help << "usage by collection, in micros ";
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::top);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
+    virtual bool run(OperationContext* txn,
+                     const string&,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result,
+                     bool fromRepl) {
+        {
+            BSONObjBuilder b(result.subobjStart("totals"));
+            b.append("note", "all times in microseconds");
+            Top::global.append(b);
+            b.done();
         }
-        virtual bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            {
-                BSONObjBuilder b( result.subobjStart( "totals" ) );
-                b.append( "note", "all times in microseconds" );
-                Top::global.append( b );
-                b.done();
-            }
-            return true;
-        }
+        return true;
+    }
 
-    } topCmd;
+} topCmd;
 
-    Top Top::global;
-
+Top Top::global;
 }

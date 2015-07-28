@@ -35,37 +35,35 @@
 
 namespace mongo {
 
-    namespace moe = mongo::optionenvironment;
+namespace moe = mongo::optionenvironment;
 
-    class WiredTigerGlobalOptions {
-    public:
-        WiredTigerGlobalOptions() : cacheSizeGB(0),
-                                    checkpointDelaySecs(0),
-                                    statisticsLogDelaySecs(0),
-                                    directoryForIndexes(false),
-                                    useCollectionPrefixCompression(false),
-                                    useIndexPrefixCompression(false)
-        {};
+class WiredTigerGlobalOptions {
+public:
+    WiredTigerGlobalOptions()
+        : cacheSizeGB(0),
+          checkpointDelaySecs(0),
+          statisticsLogDelaySecs(0),
+          directoryForIndexes(false),
+          useCollectionPrefixCompression(false),
+          useIndexPrefixCompression(false){};
 
-        Status add(moe::OptionSection* options);
-        Status store(const moe::Environment& params, const std::vector<std::string>& args);
+    Status add(moe::OptionSection* options);
+    Status store(const moe::Environment& params, const std::vector<std::string>& args);
 
-        size_t cacheSizeGB;
-        size_t checkpointDelaySecs;
-        size_t statisticsLogDelaySecs;
-        std::string journalCompressor;
-        bool directoryForIndexes;
-        std::string engineConfig;
+    size_t cacheSizeGB;
+    size_t checkpointDelaySecs;
+    size_t statisticsLogDelaySecs;
+    std::string journalCompressor;
+    bool directoryForIndexes;
+    std::string engineConfig;
 
-        std::string collectionBlockCompressor;
-        std::string indexBlockCompressor;
-        bool useCollectionPrefixCompression;
-        bool useIndexPrefixCompression;
-        std::string collectionConfig;
-        std::string indexConfig;
+    std::string collectionBlockCompressor;
+    std::string indexBlockCompressor;
+    bool useCollectionPrefixCompression;
+    bool useIndexPrefixCompression;
+    std::string collectionConfig;
+    std::string indexConfig;
+};
 
-    };
-
-    extern WiredTigerGlobalOptions wiredTigerGlobalOptions;
-
+extern WiredTigerGlobalOptions wiredTigerGlobalOptions;
 }

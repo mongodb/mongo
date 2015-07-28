@@ -35,37 +35,38 @@
 
 namespace mongo {
 
-    inline std::string rocksGetNextPrefix(const std::string& prefix) {
-        // next prefix lexicographically, assume same length
-        std::string nextPrefix(prefix);
-        for (int i = static_cast<int>(nextPrefix.size()) - 1; i >= 0; --i) {
-            nextPrefix[i]++;
-            // if it's == 0, that means we've overflowed, so need to keep adding
-            if (nextPrefix[i] != 0) {
-                break;
-            }
+inline std::string rocksGetNextPrefix(const std::string& prefix) {
+    // next prefix lexicographically, assume same length
+    std::string nextPrefix(prefix);
+    for (int i = static_cast<int>(nextPrefix.size()) - 1; i >= 0; --i) {
+        nextPrefix[i]++;
+        // if it's == 0, that means we've overflowed, so need to keep adding
+        if (nextPrefix[i] != 0) {
+            break;
         }
-        return nextPrefix;
     }
+    return nextPrefix;
+}
 
-    Status rocksToMongoStatus_slow(const rocksdb::Status& status, const char* prefix);
+Status rocksToMongoStatus_slow(const rocksdb::Status& status, const char* prefix);
 
-    /**
-     * converts rocksdb status to mongodb status
-     */
-    inline Status rocksToMongoStatus(const rocksdb::Status& status, const char* prefix = NULL) {
-        if (MONGO_likely(status.ok())) {
-            return Status::OK();
-        }
-        return rocksToMongoStatus_slow(status, prefix);
+/**
+ * converts rocksdb status to mongodb status
+ */
+inline Status rocksToMongoStatus(const rocksdb::Status& status, const char* prefix = NULL) {
+    if (MONGO_likely(status.ok())) {
+        return Status::OK();
     }
+    return rocksToMongoStatus_slow(status, prefix);
+}
 
-#define invariantRocksOK(expression) do { \
-        auto _invariantRocksOK_status = expression; \
-        if (MONGO_unlikely(!_invariantRocksOK_status.ok())) { \
-            invariantOKFailed(#expression, rocksToMongoStatus(_invariantRocksOK_status), \
-                              __FILE__, __LINE__); \
-        } \
+#define invariantRocksOK(expression)                                                            \
+    do {                                                                                        \
+        auto _invariantRocksOK_status = expression;                                             \
+        if (MONGO_unlikely(!_invariantRocksOK_status.ok())) {                                   \
+            invariantOKFailed(                                                                  \
+                #expression, rocksToMongoStatus(_invariantRocksOK_status), __FILE__, __LINE__); \
+        }                                                                                       \
     } while (false)
 
 }  // namespace mongo

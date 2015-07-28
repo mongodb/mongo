@@ -1,4 +1,4 @@
-//server.h
+// server.h
 
 /**
 *    Copyright (C) 2012 10gen Inc.
@@ -35,7 +35,7 @@
 #pragma once
 
 #if !defined(MONGO_EXPOSE_MACROS)
-# error this file is for mongo server programs not client lib
+#error this file is for mongo server programs not client lib
 #endif
 
 #include <map>

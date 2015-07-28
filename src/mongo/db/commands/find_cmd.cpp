@@ -44,103 +44,99 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
-    using std::auto_ptr;
-    using std::string;
+using boost::scoped_ptr;
+using std::auto_ptr;
+using std::string;
 
-    static FindCmd findCmd;
+static FindCmd findCmd;
 
-    Status FindCmd::checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-        AuthorizationSession* authzSession = client->getAuthorizationSession();
-        ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
+Status FindCmd::checkAuthForCommand(ClientBasic* client,
+                                    const std::string& dbname,
+                                    const BSONObj& cmdObj) {
+    AuthorizationSession* authzSession = client->getAuthorizationSession();
+    ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 
-        if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::find)) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
-    }
-
-    Status FindCmd::explain(OperationContext* txn,
-                             const std::string& dbname,
-                             const BSONObj& cmdObj,
-                             ExplainCommon::Verbosity verbosity,
-                             BSONObjBuilder* out) const {
-        const string fullns = parseNs(dbname, cmdObj);
-
-        // Parse the command BSON to a LiteParsedQuery.
-        LiteParsedQuery* rawLpq;
-        bool isExplain = true;
-        Status lpqStatus = LiteParsedQuery::make(fullns, cmdObj, isExplain, &rawLpq);
-        if (!lpqStatus.isOK()) {
-            return lpqStatus;
-        }
-        auto_ptr<LiteParsedQuery> lpq(rawLpq);
-
-        const NamespaceString nss(fullns);
-
-        // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
-        // This requires a lock on the collection in case we're parsing $where: where-specific
-        // parsing code assumes we have a lock and creates execution machinery that requires it.
-        CanonicalQuery* rawCq;
-        WhereCallbackReal whereCallback(txn, nss.db());
-        Status canonStatus = CanonicalQuery::canonicalize(lpq.release(), &rawCq, whereCallback);
-        if (!canonStatus.isOK()) {
-            return canonStatus;
-        }
-        auto_ptr<CanonicalQuery> cq(rawCq);
-
-        AutoGetCollectionForRead ctx(txn, nss);
-        // The collection may be NULL. If so, getExecutor() should handle it by returning
-        // an execution tree with an EOFStage.
-        Collection* collection = ctx.getCollection();
-
-        // We have a parsed query. Time to get the execution plan for it.
-        PlanExecutor* rawExec;
-        Status execStatus = Status::OK();
-        if (cq->getParsed().getOptions().oplogReplay) {
-            execStatus = getOplogStartHack(txn, collection, cq.release(), &rawExec);
-        }
-        else {
-            size_t options = QueryPlannerParams::DEFAULT;
-            // TODO: The version attached to the TLS cannot be relied upon, the shard
-            // version should be passed as part of the command parameter.
-            if (shardingState.needCollectionMetadata(cq->getParsed().ns())) {
-                options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
-            }
-
-            execStatus = getExecutor(txn,
-                                     collection,
-                                     cq.release(),
-                                     PlanExecutor::YIELD_AUTO,
-                                     &rawExec,
-                                     options);
-        }
-
-        if (!execStatus.isOK()) {
-            return execStatus;
-        }
-
-        scoped_ptr<PlanExecutor> exec(rawExec);
-
-        // Got the execution tree. Explain it.
-        Explain::explainStages(exec.get(), verbosity, out);
+    if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::find)) {
         return Status::OK();
     }
 
-    bool FindCmd::run(OperationContext* txn,
-                         const string& dbname,
-                         BSONObj& cmdObj, int options,
-                         string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-        // Currently only explains of finds run through the find command. Queries that are not
-        // explained use the legacy OP_QUERY path.
-        // TODO: check the comment above regarding shard versioning.
-        errmsg = "find command not yet implemented";
-        return false;
+    return Status(ErrorCodes::Unauthorized, "unauthorized");
+}
+
+Status FindCmd::explain(OperationContext* txn,
+                        const std::string& dbname,
+                        const BSONObj& cmdObj,
+                        ExplainCommon::Verbosity verbosity,
+                        BSONObjBuilder* out) const {
+    const string fullns = parseNs(dbname, cmdObj);
+
+    // Parse the command BSON to a LiteParsedQuery.
+    LiteParsedQuery* rawLpq;
+    bool isExplain = true;
+    Status lpqStatus = LiteParsedQuery::make(fullns, cmdObj, isExplain, &rawLpq);
+    if (!lpqStatus.isOK()) {
+        return lpqStatus;
+    }
+    auto_ptr<LiteParsedQuery> lpq(rawLpq);
+
+    const NamespaceString nss(fullns);
+
+    // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
+    // This requires a lock on the collection in case we're parsing $where: where-specific
+    // parsing code assumes we have a lock and creates execution machinery that requires it.
+    CanonicalQuery* rawCq;
+    WhereCallbackReal whereCallback(txn, nss.db());
+    Status canonStatus = CanonicalQuery::canonicalize(lpq.release(), &rawCq, whereCallback);
+    if (!canonStatus.isOK()) {
+        return canonStatus;
+    }
+    auto_ptr<CanonicalQuery> cq(rawCq);
+
+    AutoGetCollectionForRead ctx(txn, nss);
+    // The collection may be NULL. If so, getExecutor() should handle it by returning
+    // an execution tree with an EOFStage.
+    Collection* collection = ctx.getCollection();
+
+    // We have a parsed query. Time to get the execution plan for it.
+    PlanExecutor* rawExec;
+    Status execStatus = Status::OK();
+    if (cq->getParsed().getOptions().oplogReplay) {
+        execStatus = getOplogStartHack(txn, collection, cq.release(), &rawExec);
+    } else {
+        size_t options = QueryPlannerParams::DEFAULT;
+        // TODO: The version attached to the TLS cannot be relied upon, the shard
+        // version should be passed as part of the command parameter.
+        if (shardingState.needCollectionMetadata(cq->getParsed().ns())) {
+            options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        }
+
+        execStatus =
+            getExecutor(txn, collection, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec, options);
     }
 
-} // namespace mongo
+    if (!execStatus.isOK()) {
+        return execStatus;
+    }
+
+    scoped_ptr<PlanExecutor> exec(rawExec);
+
+    // Got the execution tree. Explain it.
+    Explain::explainStages(exec.get(), verbosity, out);
+    return Status::OK();
+}
+
+bool FindCmd::run(OperationContext* txn,
+                  const string& dbname,
+                  BSONObj& cmdObj,
+                  int options,
+                  string& errmsg,
+                  BSONObjBuilder& result,
+                  bool fromRepl) {
+    // Currently only explains of finds run through the find command. Queries that are not
+    // explained use the legacy OP_QUERY path.
+    // TODO: check the comment above regarding shard versioning.
+    errmsg = "find command not yet implemented";
+    return false;
+}
+
+}  // namespace mongo

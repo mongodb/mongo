@@ -35,98 +35,98 @@
 
 namespace mongo {
 
-    // output from enumerator to query planner
-    class IndexTag : public MatchExpression::TagData {
-    public:
-        static const size_t kNoIndex;
+// output from enumerator to query planner
+class IndexTag : public MatchExpression::TagData {
+public:
+    static const size_t kNoIndex;
 
-        IndexTag() : index(kNoIndex), pos(0) {}
-        IndexTag(size_t i) : index(i), pos(0) { }
-        IndexTag(size_t i, size_t p) : index(i), pos(p) { }
+    IndexTag() : index(kNoIndex), pos(0) {}
+    IndexTag(size_t i) : index(i), pos(0) {}
+    IndexTag(size_t i, size_t p) : index(i), pos(p) {}
 
-        virtual ~IndexTag() { }
+    virtual ~IndexTag() {}
 
-        virtual void debugString(StringBuilder* builder) const {
-            *builder << " || Selected Index #" << index << " pos " << pos;
+    virtual void debugString(StringBuilder* builder) const {
+        *builder << " || Selected Index #" << index << " pos " << pos;
+    }
+
+    virtual MatchExpression::TagData* clone() const {
+        return new IndexTag(index, pos);
+    }
+
+    // What index should we try to use for this leaf?
+    size_t index;
+
+    // What position are we in the index?  (Compound.)
+    size_t pos;
+};
+
+// used internally
+class RelevantTag : public MatchExpression::TagData {
+public:
+    RelevantTag() : elemMatchExpr(NULL), pathPrefix("") {}
+
+    std::vector<size_t> first;
+    std::vector<size_t> notFirst;
+
+    // We don't know the full path from a node unless we keep notes as we traverse from the
+    // root.  We do this once and store it.
+    // TODO: Do a FieldRef / StringData pass.
+    // TODO: We might want this inside of the MatchExpression.
+    std::string path;
+
+    // Points to the innermost containing $elemMatch. If this tag is
+    // attached to an expression not contained in an $elemMatch, then
+    // 'elemMatchExpr' is NULL. Not owned here.
+    MatchExpression* elemMatchExpr;
+
+    // If not contained inside an elemMatch, 'pathPrefix' contains the
+    // part of 'path' prior to the first dot. For example, if 'path' is
+    // "a.b.c", then 'pathPrefix' is "a". If 'path' is just "a", then
+    // 'pathPrefix' is also "a".
+    //
+    // If tagging a predicate contained in an $elemMatch, 'pathPrefix'
+    // holds the prefix of the path *inside* the $elemMatch. If this
+    // tags predicate {a: {$elemMatch: {"b.c": {$gt: 1}}}}, then
+    // 'pathPrefix' is "b".
+    //
+    // Used by the plan enumerator to make sure that we never
+    // compound two predicates sharing a path prefix.
+    std::string pathPrefix;
+
+    virtual void debugString(StringBuilder* builder) const {
+        *builder << " || First: ";
+        for (size_t i = 0; i < first.size(); ++i) {
+            *builder << first[i] << " ";
         }
-
-        virtual MatchExpression::TagData* clone() const {
-            return new IndexTag(index, pos);
+        *builder << "notFirst: ";
+        for (size_t i = 0; i < notFirst.size(); ++i) {
+            *builder << notFirst[i] << " ";
         }
+        *builder << "full path: " << path;
+    }
 
-        // What index should we try to use for this leaf?
-        size_t index;
+    virtual MatchExpression::TagData* clone() const {
+        RelevantTag* ret = new RelevantTag();
+        ret->first = first;
+        ret->notFirst = notFirst;
+        return ret;
+    }
+};
 
-        // What position are we in the index?  (Compound.)
-        size_t pos;
-    };
+/**
+ * Tags each node of the tree with the lowest numbered index that the sub-tree rooted at that
+ * node uses.
+ *
+ * Nodes that satisfy Indexability::nodeCanUseIndexOnOwnField are already tagged if there
+ * exists an index that that node can use.
+ */
+void tagForSort(MatchExpression* tree);
 
-    // used internally
-    class RelevantTag : public MatchExpression::TagData {
-    public:
-        RelevantTag() : elemMatchExpr(NULL), pathPrefix("") { }
+/**
+ * Sorts the tree using its IndexTag(s). Nodes that use the same index are adjacent to one
+ * another.
+ */
+void sortUsingTags(MatchExpression* tree);
 
-        std::vector<size_t> first;
-        std::vector<size_t> notFirst;
-
-        // We don't know the full path from a node unless we keep notes as we traverse from the
-        // root.  We do this once and store it.
-        // TODO: Do a FieldRef / StringData pass.
-        // TODO: We might want this inside of the MatchExpression.
-        std::string path;
-
-        // Points to the innermost containing $elemMatch. If this tag is
-        // attached to an expression not contained in an $elemMatch, then
-        // 'elemMatchExpr' is NULL. Not owned here.
-        MatchExpression* elemMatchExpr;
-
-        // If not contained inside an elemMatch, 'pathPrefix' contains the
-        // part of 'path' prior to the first dot. For example, if 'path' is
-        // "a.b.c", then 'pathPrefix' is "a". If 'path' is just "a", then
-        // 'pathPrefix' is also "a".
-        //
-        // If tagging a predicate contained in an $elemMatch, 'pathPrefix'
-        // holds the prefix of the path *inside* the $elemMatch. If this
-        // tags predicate {a: {$elemMatch: {"b.c": {$gt: 1}}}}, then
-        // 'pathPrefix' is "b".
-        //
-        // Used by the plan enumerator to make sure that we never
-        // compound two predicates sharing a path prefix.
-        std::string pathPrefix;
-
-        virtual void debugString(StringBuilder* builder) const {
-            *builder << " || First: ";
-            for (size_t i = 0; i < first.size(); ++i) {
-                *builder << first[i] << " ";
-            }
-            *builder << "notFirst: ";
-            for (size_t i = 0; i < notFirst.size(); ++i) {
-                *builder << notFirst[i] << " ";
-            }
-            *builder << "full path: " << path;
-        }
-
-        virtual MatchExpression::TagData* clone() const {
-            RelevantTag* ret = new RelevantTag();
-            ret->first = first;
-            ret->notFirst = notFirst;
-            return ret;
-        }
-    };
-
-    /**
-     * Tags each node of the tree with the lowest numbered index that the sub-tree rooted at that
-     * node uses.
-     *
-     * Nodes that satisfy Indexability::nodeCanUseIndexOnOwnField are already tagged if there
-     * exists an index that that node can use.
-     */
-    void tagForSort(MatchExpression* tree);
-
-    /**
-     * Sorts the tree using its IndexTag(s). Nodes that use the same index are adjacent to one
-     * another.
-     */
-    void sortUsingTags(MatchExpression* tree);
-
-} // namespace mongo
+}  // namespace mongo

@@ -39,69 +39,81 @@
 
 namespace mongo {
 
-    namespace threadpool {
-        class Worker;
+namespace threadpool {
+class Worker;
 
-        typedef stdx::function<void(void)> Task; //nullary function or functor
+typedef stdx::function<void(void)> Task;  // nullary function or functor
 
-        // exported to the mongo namespace
-        class ThreadPool : boost::noncopyable {
-        public:
-            struct DoNotStartThreadsTag {};
+// exported to the mongo namespace
+class ThreadPool : boost::noncopyable {
+public:
+    struct DoNotStartThreadsTag {};
 
-            explicit ThreadPool(int nThreads=8, const std::string& threadNamePrefix="");
-            explicit ThreadPool(const DoNotStartThreadsTag&,
-                                int nThreads=8,
-                                const std::string& threadNamePrefix="");
+    explicit ThreadPool(int nThreads = 8, const std::string& threadNamePrefix = "");
+    explicit ThreadPool(const DoNotStartThreadsTag&,
+                        int nThreads = 8,
+                        const std::string& threadNamePrefix = "");
 
-            // blocks until all tasks are complete (tasks_remaining() == 0)
-            // You should not call schedule while in the destructor
-            ~ThreadPool();
+    // blocks until all tasks are complete (tasks_remaining() == 0)
+    // You should not call schedule while in the destructor
+    ~ThreadPool();
 
-            // Launches the worker threads; call exactly once, if and only if
-            // you used the DoNotStartThreadsTag form of the constructor.
-            void startThreads();
+    // Launches the worker threads; call exactly once, if and only if
+    // you used the DoNotStartThreadsTag form of the constructor.
+    void startThreads();
 
-            // blocks until all tasks are complete (tasks_remaining() == 0)
-            // does not prevent new tasks from being scheduled so could wait forever.
-            // Also, new tasks could be scheduled after this returns.
-            void join();
+    // blocks until all tasks are complete (tasks_remaining() == 0)
+    // does not prevent new tasks from being scheduled so could wait forever.
+    // Also, new tasks could be scheduled after this returns.
+    void join();
 
-            // task will be copied a few times so make sure it's relatively cheap
-            void schedule(Task task);
+    // task will be copied a few times so make sure it's relatively cheap
+    void schedule(Task task);
 
-            // Helpers that wrap schedule and stdx::bind.
-            // Functor and args will be copied a few times so make sure it's relatively cheap
-            template<typename F, typename A>
-            void schedule(F f, A a) { schedule(stdx::bind(f,a)); }
-            template<typename F, typename A, typename B>
-            void schedule(F f, A a, B b) { schedule(stdx::bind(f,a,b)); }
-            template<typename F, typename A, typename B, typename C>
-            void schedule(F f, A a, B b, C c) { schedule(stdx::bind(f,a,b,c)); }
-            template<typename F, typename A, typename B, typename C, typename D>
-            void schedule(F f, A a, B b, C c, D d) { schedule(stdx::bind(f,a,b,c,d)); }
-            template<typename F, typename A, typename B, typename C, typename D, typename E>
-            void schedule(F f, A a, B b, C c, D d, E e) { schedule(stdx::bind(f,a,b,c,d,e)); }
+    // Helpers that wrap schedule and stdx::bind.
+    // Functor and args will be copied a few times so make sure it's relatively cheap
+    template <typename F, typename A>
+    void schedule(F f, A a) {
+        schedule(stdx::bind(f, a));
+    }
+    template <typename F, typename A, typename B>
+    void schedule(F f, A a, B b) {
+        schedule(stdx::bind(f, a, b));
+    }
+    template <typename F, typename A, typename B, typename C>
+    void schedule(F f, A a, B b, C c) {
+        schedule(stdx::bind(f, a, b, c));
+    }
+    template <typename F, typename A, typename B, typename C, typename D>
+    void schedule(F f, A a, B b, C c, D d) {
+        schedule(stdx::bind(f, a, b, c, d));
+    }
+    template <typename F, typename A, typename B, typename C, typename D, typename E>
+    void schedule(F f, A a, B b, C c, D d, E e) {
+        schedule(stdx::bind(f, a, b, c, d, e));
+    }
 
-            int tasks_remaining() { return _tasksRemaining; }
+    int tasks_remaining() {
+        return _tasksRemaining;
+    }
 
-        private:
-            mongo::mutex _mutex;
-            boost::condition _condition;
+private:
+    mongo::mutex _mutex;
+    boost::condition _condition;
 
-            std::list<Worker*> _freeWorkers; //used as LIFO stack (always front)
-            std::list<Task> _tasks; //used as FIFO queue (push_back, pop_front)
-            int _tasksRemaining; // in queue + currently processing
-            int _nThreads; // only used for sanity checking. could be removed in the future.
-            const std::string _threadNamePrefix; // used for logging/diagnostics
+    std::list<Worker*> _freeWorkers;  // used as LIFO stack (always front)
+    std::list<Task> _tasks;           // used as FIFO queue (push_back, pop_front)
+    int _tasksRemaining;              // in queue + currently processing
+    int _nThreads;  // only used for sanity checking. could be removed in the future.
+    const std::string _threadNamePrefix;  // used for logging/diagnostics
 
-            // should only be called by a worker from the worker's thread
-            void task_done(Worker* worker);
-            friend class Worker;
-        };
+    // should only be called by a worker from the worker's thread
+    void task_done(Worker* worker);
+    friend class Worker;
+};
 
-    } //namespace threadpool
+}  // namespace threadpool
 
-    using threadpool::ThreadPool;
+using threadpool::ThreadPool;
 
-} //namespace mongo
+}  // namespace mongo

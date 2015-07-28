@@ -115,15 +115,15 @@
  * A form that takes an existing function or that lets the programmer supply the name
  * of the function to declare would be options.
  */
-#define MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS) \
+#define MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)                        \
     ::mongo::Status _MONGO_INITIALIZER_FUNCTION_NAME(NAME)(::mongo::InitializerContext*); \
-    namespace {                                                         \
-        ::mongo::GlobalInitializerRegisterer _mongoInitializerRegisterer_##NAME( \
-                #NAME,                                                  \
-                _MONGO_INITIALIZER_FUNCTION_NAME(NAME),                 \
-                MONGO_MAKE_STRING_VECTOR PREREQUISITES,                 \
-                MONGO_MAKE_STRING_VECTOR DEPENDENTS);                   \
-    }                                                                   \
+    namespace {                                                                           \
+    ::mongo::GlobalInitializerRegisterer _mongoInitializerRegisterer_##NAME(              \
+        #NAME,                                                                            \
+        _MONGO_INITIALIZER_FUNCTION_NAME(NAME),                                           \
+        MONGO_MAKE_STRING_VECTOR PREREQUISITES,                                           \
+        MONGO_MAKE_STRING_VECTOR DEPENDENTS);                                             \
+    }                                                                                     \
     ::mongo::Status _MONGO_INITIALIZER_FUNCTION_NAME(NAME)
 
 /**
@@ -133,9 +133,10 @@
  * initialization steps into phases, such as "all global parameter declarations completed", "all
  * global parameters initialized".
  */
-#define MONGO_INITIALIZER_GROUP(NAME, PREREQUISITES, DEPENDENTS)        \
-    MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)(         \
-            ::mongo::InitializerContext*) { return ::mongo::Status::OK(); }
+#define MONGO_INITIALIZER_GROUP(NAME, PREREQUISITES, DEPENDENTS)                               \
+    MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)(::mongo::InitializerContext*) { \
+        return ::mongo::Status::OK();                                                          \
+    }
 
 /**
  * Macro to produce a name for a mongo initializer function for an initializer operation

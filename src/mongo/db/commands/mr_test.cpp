@@ -41,121 +41,171 @@ using namespace mongo;
 
 namespace {
 
-    /**
-     * Tests for mr::Config
-     */
+/**
+ * Tests for mr::Config
+ */
 
-    /**
-     * Helper function to verify field of mr::Config::OutputOptions.
-     */
-    template <typename T> void _compareOutputOptionField(const std::string& dbname,
-                                                         const std::string& cmdObjStr,
-                                                         const std::string& fieldName,
-                                                         const T& actual, const T& expected) {
-        if (actual == expected) return;
-        FAIL(str::stream() << "parseOutputOptions(\"" << dbname << ", " << cmdObjStr << "): "
-                           << fieldName << ": Expected: " << expected << ". Actual: " << actual);
+/**
+ * Helper function to verify field of mr::Config::OutputOptions.
+ */
+template <typename T>
+void _compareOutputOptionField(const std::string& dbname,
+                               const std::string& cmdObjStr,
+                               const std::string& fieldName,
+                               const T& actual,
+                               const T& expected) {
+    if (actual == expected)
+        return;
+    FAIL(str::stream() << "parseOutputOptions(\"" << dbname << ", " << cmdObjStr << "): "
+                       << fieldName << ": Expected: " << expected << ". Actual: " << actual);
+}
+
+/**
+ * Returns string representation of mr::Config::OutputType
+ */
+std::string _getOutTypeString(mr::Config::OutputType outType) {
+    switch (outType) {
+        case mr::Config::REPLACE:
+            return "REPLACE";
+        case mr::Config::MERGE:
+            return "MERGE";
+        case mr::Config::REDUCE:
+            return "REDUCE";
+        case mr::Config::INMEMORY:
+            return "INMEMORY";
     }
+    invariant(0);
+}
 
-    /**
-     * Returns string representation of mr::Config::OutputType
-     */
-    std::string _getOutTypeString(mr::Config::OutputType outType) {
-        switch (outType) {
-        case mr::Config::REPLACE: return "REPLACE";
-        case mr::Config::MERGE: return "MERGE";
-        case mr::Config::REDUCE: return "REDUCE";
-        case mr::Config::INMEMORY: return "INMEMORY";
-        }
-        invariant(0);
-    }
+/**
+ * Test helper function to check expected result of parseOutputOptions.
+ */
+void _testConfigParseOutputOptions(const std::string& dbname,
+                                   const std::string& cmdObjStr,
+                                   const std::string& expectedOutDb,
+                                   const std::string& expectedCollectionName,
+                                   const std::string& expectedFinalNamespace,
+                                   bool expectedOutNonAtomic,
+                                   mr::Config::OutputType expectedOutType) {
+    const BSONObj cmdObj = fromjson(cmdObjStr);
+    mr::Config::OutputOptions outputOptions = mr::Config::parseOutputOptions(dbname, cmdObj);
+    _compareOutputOptionField(dbname, cmdObjStr, "outDb", outputOptions.outDB, expectedOutDb);
+    _compareOutputOptionField(
+        dbname, cmdObjStr, "collectionName", outputOptions.collectionName, expectedCollectionName);
+    _compareOutputOptionField(
+        dbname, cmdObjStr, "finalNamespace", outputOptions.finalNamespace, expectedFinalNamespace);
+    _compareOutputOptionField(
+        dbname, cmdObjStr, "outNonAtomic", outputOptions.outNonAtomic, expectedOutNonAtomic);
+    _compareOutputOptionField(dbname,
+                              cmdObjStr,
+                              "outType",
+                              _getOutTypeString(outputOptions.outType),
+                              _getOutTypeString(expectedOutType));
+}
 
-    /**
-     * Test helper function to check expected result of parseOutputOptions.
-     */
-    void _testConfigParseOutputOptions(const std::string& dbname, const std::string& cmdObjStr,
-                                       const std::string& expectedOutDb,
-                                       const std::string& expectedCollectionName,
-                                       const std::string& expectedFinalNamespace,
-                                       bool expectedOutNonAtomic,
-                                       mr::Config::OutputType expectedOutType) {
-        const BSONObj cmdObj = fromjson(cmdObjStr);
-        mr::Config::OutputOptions outputOptions = mr::Config::parseOutputOptions(dbname, cmdObj);
-        _compareOutputOptionField(dbname, cmdObjStr, "outDb", outputOptions.outDB, expectedOutDb);
-        _compareOutputOptionField(dbname, cmdObjStr, "collectionName",
-                                  outputOptions.collectionName, expectedCollectionName);
-        _compareOutputOptionField(dbname, cmdObjStr, "finalNamespace",
-                                  outputOptions.finalNamespace, expectedFinalNamespace);
-        _compareOutputOptionField(dbname, cmdObjStr, "outNonAtomic", outputOptions.outNonAtomic,
-                                  expectedOutNonAtomic);
-        _compareOutputOptionField(dbname, cmdObjStr, "outType",
-                                  _getOutTypeString(outputOptions.outType),
-                                  _getOutTypeString(expectedOutType));
-    }
-
-    /**
-     * Tests for mr::Config::parseOutputOptions.
-     */
-    TEST(ConfigOutputOptionsTest, parseOutputOptions) {
-        // Missing 'out' field.
-        ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{}")), UserException);
-        // 'out' must be either string or object.
-        ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{out: 99}")),
-                      UserException);
-        // 'out.nonAtomic' is not supported with normal, replace or inline.
-        ASSERT_THROWS(mr::Config::parseOutputOptions(
-                          "mydb",
-                          fromjson("{out: {normal: 'mycoll', nonAtomic: true}}")),
-                      UserException);
-        ASSERT_THROWS(mr::Config::parseOutputOptions(
-                          "mydb",
-                          fromjson("{out: {replace: 'mycoll', nonAtomic: true}}")),
-                      UserException);
-        ASSERT_THROWS(mr::Config::parseOutputOptions(
-                          "mydb",
-                          fromjson("{out: {inline: 'mycoll', nonAtomic: true}}")),
-                      UserException);
-        // Unknown output specifer.
-        ASSERT_THROWS(mr::Config::parseOutputOptions(
-                          "mydb",
-                          fromjson("{out: {no_such_out_type: 'mycoll'}}")),
-                      UserException);
+/**
+ * Tests for mr::Config::parseOutputOptions.
+ */
+TEST(ConfigOutputOptionsTest, parseOutputOptions) {
+    // Missing 'out' field.
+    ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{}")), UserException);
+    // 'out' must be either string or object.
+    ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{out: 99}")), UserException);
+    // 'out.nonAtomic' is not supported with normal, replace or inline.
+    ASSERT_THROWS(mr::Config::parseOutputOptions(
+                      "mydb", fromjson("{out: {normal: 'mycoll', nonAtomic: true}}")),
+                  UserException);
+    ASSERT_THROWS(mr::Config::parseOutputOptions(
+                      "mydb", fromjson("{out: {replace: 'mycoll', nonAtomic: true}}")),
+                  UserException);
+    ASSERT_THROWS(mr::Config::parseOutputOptions(
+                      "mydb", fromjson("{out: {inline: 'mycoll', nonAtomic: true}}")),
+                  UserException);
+    // Unknown output specifer.
+    ASSERT_THROWS(
+        mr::Config::parseOutputOptions("mydb", fromjson("{out: {no_such_out_type: 'mycoll'}}")),
+        UserException);
 
 
-        // 'out' is string.
-        _testConfigParseOutputOptions("mydb", "{out: 'mycoll'}",
-                                      "", "mycoll", "mydb.mycoll", false, mr::Config::REPLACE);
-        // 'out' is object.
-        _testConfigParseOutputOptions("mydb", "{out: {normal: 'mycoll'}}",
-                                      "", "mycoll", "mydb.mycoll", false, mr::Config::REPLACE);
-        // 'out.db' overrides dbname parameter
-        _testConfigParseOutputOptions("mydb1", "{out: {replace: 'mycoll', db: 'mydb2'}}",
-                                      "mydb2", "mycoll", "mydb2.mycoll", false,
-                                      mr::Config::REPLACE);
-        // 'out.nonAtomic' is supported with merge and reduce.
-        _testConfigParseOutputOptions("mydb", "{out: {merge: 'mycoll', nonAtomic: true}}",
-                                      "", "mycoll", "mydb.mycoll", true, mr::Config::MERGE);
-        _testConfigParseOutputOptions("mydb", "{out: {reduce: 'mycoll', nonAtomic: true}}",
-                                      "", "mycoll", "mydb.mycoll", true, mr::Config::REDUCE);
-        // inline
-        _testConfigParseOutputOptions("mydb1", "{out: {inline: 'mycoll', db: 'mydb2'}}",
-                                      "mydb2", "", "", false, mr::Config::INMEMORY);
+    // 'out' is string.
+    _testConfigParseOutputOptions(
+        "mydb", "{out: 'mycoll'}", "", "mycoll", "mydb.mycoll", false, mr::Config::REPLACE);
+    // 'out' is object.
+    _testConfigParseOutputOptions("mydb",
+                                  "{out: {normal: 'mycoll'}}",
+                                  "",
+                                  "mycoll",
+                                  "mydb.mycoll",
+                                  false,
+                                  mr::Config::REPLACE);
+    // 'out.db' overrides dbname parameter
+    _testConfigParseOutputOptions("mydb1",
+                                  "{out: {replace: 'mycoll', db: 'mydb2'}}",
+                                  "mydb2",
+                                  "mycoll",
+                                  "mydb2.mycoll",
+                                  false,
+                                  mr::Config::REPLACE);
+    // 'out.nonAtomic' is supported with merge and reduce.
+    _testConfigParseOutputOptions("mydb",
+                                  "{out: {merge: 'mycoll', nonAtomic: true}}",
+                                  "",
+                                  "mycoll",
+                                  "mydb.mycoll",
+                                  true,
+                                  mr::Config::MERGE);
+    _testConfigParseOutputOptions("mydb",
+                                  "{out: {reduce: 'mycoll', nonAtomic: true}}",
+                                  "",
+                                  "mycoll",
+                                  "mydb.mycoll",
+                                  true,
+                                  mr::Config::REDUCE);
+    // inline
+    _testConfigParseOutputOptions("mydb1",
+                                  "{out: {inline: 'mycoll', db: 'mydb2'}}",
+                                  "mydb2",
+                                  "",
+                                  "",
+                                  false,
+                                  mr::Config::INMEMORY);
 
-        // Order should not matter in fields of 'out' object.
-        _testConfigParseOutputOptions("mydb1", "{out: {db: 'mydb2', normal: 'mycoll'}}",
-                                      "mydb2", "mycoll", "mydb2.mycoll", false,
-                                      mr::Config::REPLACE);
-        _testConfigParseOutputOptions("mydb1", "{out: {db: 'mydb2', replace: 'mycoll'}}",
-                                      "mydb2", "mycoll", "mydb2.mycoll", false,
-                                      mr::Config::REPLACE);
-        _testConfigParseOutputOptions("mydb1", "{out: {nonAtomic: true, merge: 'mycoll'}}",
-                                      "", "mycoll", "mydb1.mycoll", true,
-                                      mr::Config::MERGE);
-        _testConfigParseOutputOptions("mydb1", "{out: {nonAtomic: true, reduce: 'mycoll'}}",
-                                      "", "mycoll", "mydb1.mycoll", true,
-                                      mr::Config::REDUCE);
-        _testConfigParseOutputOptions("mydb1", "{out: {db: 'mydb2', inline: 'mycoll'}}",
-                                      "mydb2", "", "", false, mr::Config::INMEMORY);
-    }
+    // Order should not matter in fields of 'out' object.
+    _testConfigParseOutputOptions("mydb1",
+                                  "{out: {db: 'mydb2', normal: 'mycoll'}}",
+                                  "mydb2",
+                                  "mycoll",
+                                  "mydb2.mycoll",
+                                  false,
+                                  mr::Config::REPLACE);
+    _testConfigParseOutputOptions("mydb1",
+                                  "{out: {db: 'mydb2', replace: 'mycoll'}}",
+                                  "mydb2",
+                                  "mycoll",
+                                  "mydb2.mycoll",
+                                  false,
+                                  mr::Config::REPLACE);
+    _testConfigParseOutputOptions("mydb1",
+                                  "{out: {nonAtomic: true, merge: 'mycoll'}}",
+                                  "",
+                                  "mycoll",
+                                  "mydb1.mycoll",
+                                  true,
+                                  mr::Config::MERGE);
+    _testConfigParseOutputOptions("mydb1",
+                                  "{out: {nonAtomic: true, reduce: 'mycoll'}}",
+                                  "",
+                                  "mycoll",
+                                  "mydb1.mycoll",
+                                  true,
+                                  mr::Config::REDUCE);
+    _testConfigParseOutputOptions("mydb1",
+                                  "{out: {db: 'mydb2', inline: 'mycoll'}}",
+                                  "mydb2",
+                                  "",
+                                  "",
+                                  false,
+                                  mr::Config::INMEMORY);
+}
 
 }  // namespace

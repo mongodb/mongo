@@ -33,36 +33,37 @@
 
 namespace mongo {
 
-    /* The idea here is to let all initialization of global variables (classes inheriting from StartupTest)
-       complete before we run the tests -- otherwise order of initilization being arbitrary may mess
-       us up.  The app's main() function should call runTests().
+/* The idea here is to let all initialization of global variables (classes inheriting from StartupTest)
+   complete before we run the tests -- otherwise order of initilization being arbitrary may mess
+   us up.  The app's main() function should call runTests().
 
-       To define a unit test, inherit from this and implement run. instantiate one object for the new class
-       as a global.
+   To define a unit test, inherit from this and implement run. instantiate one object for the new class
+   as a global.
 
-       These tests are ran on *every* startup of mongod, so they have to be very lightweight.  But it is a
-       good quick check for a bad build.
-    */
-    class StartupTest {
-    public:
-        static void runTests();
+   These tests are ran on *every* startup of mongod, so they have to be very lightweight.  But it is a
+   good quick check for a bad build.
+*/
+class StartupTest {
+public:
+    static void runTests();
 
-        static bool testsInProgress() { return running; }
+    static bool testsInProgress() {
+        return running;
+    }
 
-    protected:
-        StartupTest();
-        virtual ~StartupTest();
+protected:
+    StartupTest();
+    virtual ~StartupTest();
 
-    private:
-        static std::vector<StartupTest*> *tests;
-        static bool running;
+private:
+    static std::vector<StartupTest*>* tests;
+    static bool running;
 
-        static void registerTest(StartupTest *t);
+    static void registerTest(StartupTest* t);
 
-        // assert if fails
-        virtual void run() = 0;
+    // assert if fails
+    virtual void run() = 0;
+};
 
-    };
 
-
-} // namespace mongo
+}  // namespace mongo

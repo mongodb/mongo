@@ -34,82 +34,102 @@
 
 namespace mongo {
 
+/**
+ * Internal class used by BtreeAccessMethod to generate keys for indexed documents.
+ * This class is meant to be kept under the index access layer.
+ */
+class BtreeKeyGenerator {
+public:
+    BtreeKeyGenerator(std::vector<const char*> fieldNames,
+                      std::vector<BSONElement> fixed,
+                      bool isSparse);
+    virtual ~BtreeKeyGenerator() {}
+
+    void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
+
+    static const int ParallelArraysCode;
+
+protected:
+    // These are used by the getKeysImpl(s) below.
+    std::vector<const char*> _fieldNames;
+    bool _isIdIndex;
+    bool _isSparse;
+    BSONObj _nullKey;      // a full key with all fields null
+    BSONObj _nullObj;      // only used for _nullElt
+    BSONElement _nullElt;  // jstNull
+    BSONSizeTracker _sizeTracker;
+
+private:
+    // We have V0 and V1.  Sigh.
+    virtual void getKeysImpl(std::vector<const char*> fieldNames,
+                             std::vector<BSONElement> fixed,
+                             const BSONObj& obj,
+                             BSONObjSet* keys) const = 0;
+    std::vector<BSONElement> _fixed;
+};
+
+class BtreeKeyGeneratorV0 : public BtreeKeyGenerator {
+public:
+    BtreeKeyGeneratorV0(std::vector<const char*> fieldNames,
+                        std::vector<BSONElement> fixed,
+                        bool isSparse);
+    virtual ~BtreeKeyGeneratorV0() {}
+
+private:
+    virtual void getKeysImpl(std::vector<const char*> fieldNames,
+                             std::vector<BSONElement> fixed,
+                             const BSONObj& obj,
+                             BSONObjSet* keys) const;
+};
+
+class BtreeKeyGeneratorV1 : public BtreeKeyGenerator {
+public:
+    BtreeKeyGeneratorV1(std::vector<const char*> fieldNames,
+                        std::vector<BSONElement> fixed,
+                        bool isSparse);
+    virtual ~BtreeKeyGeneratorV1() {}
+
+private:
     /**
-     * Internal class used by BtreeAccessMethod to generate keys for indexed documents.
-     * This class is meant to be kept under the index access layer.
+     * @param fieldNames - fields to index, may be postfixes in recursive calls
+     * @param fixed - values that have already been identified for their index fields
+     * @param obj - object from which keys should be extracted, based on names in fieldNames
+     * @param keys - set where index keys are written
+     * @param numNotFound - number of index fields that have already been identified as missing
+     * @param array - array from which keys should be extracted, based on names in fieldNames
+     *        If obj and array are both nonempty, obj will be one of the elements of array.
      */
-    class BtreeKeyGenerator {
-    public:
-        BtreeKeyGenerator(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed, bool isSparse);
-        virtual ~BtreeKeyGenerator() { }
+    virtual void getKeysImpl(std::vector<const char*> fieldNames,
+                             std::vector<BSONElement> fixed,
+                             const BSONObj& obj,
+                             BSONObjSet* keys) const;
 
-        void getKeys(const BSONObj &obj, BSONObjSet *keys) const;
+    // These guys are called by getKeysImpl.
+    void getKeysImplWithArray(std::vector<const char*> fieldNames,
+                              std::vector<BSONElement> fixed,
+                              const BSONObj& obj,
+                              BSONObjSet* keys,
+                              unsigned numNotFound,
+                              const BSONObj& array) const;
+    /**
+     * @param arrayNestedArray - set if the returned element is an array nested directly
+                                 within arr.
+     */
+    BSONElement extractNextElement(const BSONObj& obj,
+                                   const BSONObj& arr,
+                                   const char*& field,
+                                   bool& arrayNestedArray) const;
+    void _getKeysArrEltFixed(std::vector<const char*>& fieldNames,
+                             std::vector<BSONElement>& fixed,
+                             const BSONElement& arrEntry,
+                             BSONObjSet* keys,
+                             unsigned numNotFound,
+                             const BSONElement& arrObjElt,
+                             const std::set<unsigned>& arrIdxs,
+                             bool mayExpandArrayUnembedded) const;
 
-        static const int ParallelArraysCode;
-
-    protected:
-        // These are used by the getKeysImpl(s) below.
-        std::vector<const char*> _fieldNames;
-        bool _isIdIndex;
-        bool _isSparse;
-        BSONObj _nullKey; // a full key with all fields null
-        BSONObj _nullObj;     // only used for _nullElt
-        BSONElement _nullElt; // jstNull
-        BSONSizeTracker _sizeTracker;
-    private:
-        // We have V0 and V1.  Sigh.
-        virtual void getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
-                                 const BSONObj &obj, BSONObjSet *keys) const = 0;
-        std::vector<BSONElement> _fixed;
-    };
-
-    class BtreeKeyGeneratorV0 : public BtreeKeyGenerator {
-    public:
-        BtreeKeyGeneratorV0(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
-                            bool isSparse);
-        virtual ~BtreeKeyGeneratorV0() { }
-
-    private:
-        virtual void getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
-                                 const BSONObj &obj, BSONObjSet *keys) const;
-    };
-
-    class BtreeKeyGeneratorV1 : public BtreeKeyGenerator {
-    public:
-        BtreeKeyGeneratorV1(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
-                            bool isSparse);
-        virtual ~BtreeKeyGeneratorV1() { }
-
-    private:
-        /**
-         * @param fieldNames - fields to index, may be postfixes in recursive calls
-         * @param fixed - values that have already been identified for their index fields
-         * @param obj - object from which keys should be extracted, based on names in fieldNames
-         * @param keys - set where index keys are written
-         * @param numNotFound - number of index fields that have already been identified as missing
-         * @param array - array from which keys should be extracted, based on names in fieldNames
-         *        If obj and array are both nonempty, obj will be one of the elements of array.
-         */        
-        virtual void getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
-                                 const BSONObj &obj, BSONObjSet *keys) const;
-
-        // These guys are called by getKeysImpl.
-        void getKeysImplWithArray(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
-                                  const BSONObj &obj, BSONObjSet *keys, unsigned numNotFound,
-                                  const BSONObj &array) const;
-        /**
-         * @param arrayNestedArray - set if the returned element is an array nested directly
-                                     within arr.
-         */
-        BSONElement extractNextElement(const BSONObj &obj, const BSONObj &arr, const char *&field,
-                                       bool &arrayNestedArray ) const;
-        void _getKeysArrEltFixed(std::vector<const char*> &fieldNames, std::vector<BSONElement> &fixed,
-                                 const BSONElement &arrEntry, BSONObjSet *keys,
-                                 unsigned numNotFound, const BSONElement &arrObjElt,
-                                 const std::set<unsigned> &arrIdxs, bool mayExpandArrayUnembedded) const;
-
-        BSONObj _undefinedObj;
-        BSONElement _undefinedElt;
-    };
+    BSONObj _undefinedObj;
+    BSONElement _undefinedElt;
+};
 
 }  // namespace mongo

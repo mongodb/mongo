@@ -36,103 +36,127 @@
 
 namespace mongo {
 
-    class ProgressMeter : boost::noncopyable {
-    public:
-        ProgressMeter(unsigned long long total,
-                      int secondsBetween = 3,
-                      int checkInterval = 100,
-                      std::string units = "",
-                      std::string name = "Progress")
-                : _showTotal(true),
-                  _units(units) {
-            _name = name.c_str();
-            reset( total , secondsBetween , checkInterval );
-        }
+class ProgressMeter : boost::noncopyable {
+public:
+    ProgressMeter(unsigned long long total,
+                  int secondsBetween = 3,
+                  int checkInterval = 100,
+                  std::string units = "",
+                  std::string name = "Progress")
+        : _showTotal(true), _units(units) {
+        _name = name.c_str();
+        reset(total, secondsBetween, checkInterval);
+    }
 
-        ProgressMeter() : _active(0), _showTotal(true), _units("") {
-            _name = "Progress";
-        }
+    ProgressMeter() : _active(0), _showTotal(true), _units("") {
+        _name = "Progress";
+    }
 
-        // typically you do ProgressMeterHolder
-        void reset( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 );
+    // typically you do ProgressMeterHolder
+    void reset(unsigned long long total, int secondsBetween = 3, int checkInterval = 100);
 
-        void finished() { _active = 0; }
-        bool isActive() const { return _active; }
+    void finished() {
+        _active = 0;
+    }
+    bool isActive() const {
+        return _active;
+    }
 
-        /**
-         * @param n how far along we are relative to the total # we set in CurOp::setMessage
-         * @return if row was printed
-         */
-        bool hit( int n = 1 );
+    /**
+     * @param n how far along we are relative to the total # we set in CurOp::setMessage
+     * @return if row was printed
+     */
+    bool hit(int n = 1);
 
-        void setUnits( const std::string& units ) { _units = units; }
-        std::string getUnit() const { return _units; }
+    void setUnits(const std::string& units) {
+        _units = units;
+    }
+    std::string getUnit() const {
+        return _units;
+    }
 
-        void setName(std::string name) { _name = name.c_str(); }
-        std::string getName() const { return _name.toString(); }
+    void setName(std::string name) {
+        _name = name.c_str();
+    }
+    std::string getName() const {
+        return _name.toString();
+    }
 
-        void setTotalWhileRunning( unsigned long long total ) {
-            _total = total;
-        }
+    void setTotalWhileRunning(unsigned long long total) {
+        _total = total;
+    }
 
-        unsigned long long done() const { return _done; }
+    unsigned long long done() const {
+        return _done;
+    }
 
-        unsigned long long hits() const { return _hits; }
+    unsigned long long hits() const {
+        return _hits;
+    }
 
-        unsigned long long total() const { return _total; }
+    unsigned long long total() const {
+        return _total;
+    }
 
-        void showTotal(bool doShow) {
-            _showTotal = doShow;
-        }
+    void showTotal(bool doShow) {
+        _showTotal = doShow;
+    }
 
-        std::string toString() const;
+    std::string toString() const;
 
-        bool operator==( const ProgressMeter& other ) const { return this == &other; }
+    bool operator==(const ProgressMeter& other) const {
+        return this == &other;
+    }
 
-    private:
+private:
+    bool _active;
 
-        bool _active;
+    unsigned long long _total;
+    bool _showTotal;
+    int _secondsBetween;
+    int _checkInterval;
 
-        unsigned long long _total;
-        bool _showTotal;
-        int _secondsBetween;
-        int _checkInterval;
+    unsigned long long _done;
+    unsigned long long _hits;
+    int _lastTime;
 
-        unsigned long long _done;
-        unsigned long long _hits;
-        int _lastTime;
+    std::string _units;
+    ThreadSafeString _name;
+};
 
-        std::string _units;
-        ThreadSafeString _name;
-    };
+// e.g.:
+// CurOp * op = txn.getCurOp();
+// ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort", "Index: External Sort Progress", d->stats.nrecords, 10));
+// loop { pm.hit(); }
+class ProgressMeterHolder : boost::noncopyable {
+public:
+    ProgressMeterHolder(ProgressMeter& pm) : _pm(pm) {}
 
-    // e.g.: 
-    // CurOp * op = txn.getCurOp();
-    // ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort", "Index: External Sort Progress", d->stats.nrecords, 10));
-    // loop { pm.hit(); }
-    class ProgressMeterHolder : boost::noncopyable {
-    public:
-        ProgressMeterHolder( ProgressMeter& pm )
-            : _pm( pm ) {
-        }
+    ~ProgressMeterHolder() {
+        _pm.finished();
+    }
 
-        ~ProgressMeterHolder() {
-            _pm.finished();
-        }
+    ProgressMeter* operator->() {
+        return &_pm;
+    }
 
-        ProgressMeter* operator->() { return &_pm; }
+    ProgressMeter* get() {
+        return &_pm;
+    }
 
-        ProgressMeter* get() { return &_pm; }
-        
-        bool hit( int n = 1 ) { return _pm.hit( n ); }
+    bool hit(int n = 1) {
+        return _pm.hit(n);
+    }
 
-        void finished() { _pm.finished(); }
+    void finished() {
+        _pm.finished();
+    }
 
-        bool operator==( const ProgressMeter& other ) { return _pm == other; }
+    bool operator==(const ProgressMeter& other) {
+        return _pm == other;
+    }
 
-    private:
-        ProgressMeter& _pm;
-    };
-
-
+private:
+    ProgressMeter& _pm;
+};
 }

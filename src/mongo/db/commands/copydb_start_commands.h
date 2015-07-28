@@ -32,6 +32,6 @@
 
 namespace mongo {
 
-    extern thread_specific_ptr<DBClientBase> authConn_;
+extern thread_specific_ptr<DBClientBase> authConn_;
 
-} // namespace mongo
+}  // namespace mongo

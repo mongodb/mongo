@@ -34,47 +34,46 @@
 
 namespace mongo {
 
-    class RecordFetcher;
+class RecordFetcher;
 
-    class PlanYieldPolicy {
-    public:
-        explicit PlanYieldPolicy(PlanExecutor* exec);
+class PlanYieldPolicy {
+public:
+    explicit PlanYieldPolicy(PlanExecutor* exec);
 
-        /**
-         * Used by YIELD_AUTO plan executors in order to check whether it is time to yield.
-         * PlanExecutors give up their locks periodically in order to be fair to other
-         * threads.
-         */
-        bool shouldYield();
+    /**
+     * Used by YIELD_AUTO plan executors in order to check whether it is time to yield.
+     * PlanExecutors give up their locks periodically in order to be fair to other
+     * threads.
+     */
+    bool shouldYield();
 
-        /**
-         * Resets the yield timer so that we wait for a while before yielding again.
-         */
-        void resetTimer();
+    /**
+     * Resets the yield timer so that we wait for a while before yielding again.
+     */
+    void resetTimer();
 
-        /**
-         * Used to cause a plan executor to give up locks and go to sleep. The PlanExecutor
-         * must *not* be in saved state. Handles calls to save/restore state internally.
-         *
-         * If 'fetcher' is non-NULL, then we are yielding because the storage engine told us
-         * that we will page fault on this record. We use 'fetcher' to retrieve the record
-         * after we give up our locks.
-         *
-         * Returns true if the executor was restored successfully and is still alive. Returns false
-         * if the executor got killed during yield.
-         */
-        bool yield(RecordFetcher* fetcher = NULL);
+    /**
+     * Used to cause a plan executor to give up locks and go to sleep. The PlanExecutor
+     * must *not* be in saved state. Handles calls to save/restore state internally.
+     *
+     * If 'fetcher' is non-NULL, then we are yielding because the storage engine told us
+     * that we will page fault on this record. We use 'fetcher' to retrieve the record
+     * after we give up our locks.
+     *
+     * Returns true if the executor was restored successfully and is still alive. Returns false
+     * if the executor got killed during yield.
+     */
+    bool yield(RecordFetcher* fetcher = NULL);
 
-    private:
-        // Default constructor disallowed in order to ensure initialization of '_planYielding'.
-        PlanYieldPolicy();
+private:
+    // Default constructor disallowed in order to ensure initialization of '_planYielding'.
+    PlanYieldPolicy();
 
-        ElapsedTracker _elapsedTracker;
+    ElapsedTracker _elapsedTracker;
 
-        // The plan executor which this yield policy is responsible for yielding. Must
-        // not outlive the plan executor.
-        PlanExecutor* _planYielding;
-    };
+    // The plan executor which this yield policy is responsible for yielding. Must
+    // not outlive the plan executor.
+    PlanExecutor* _planYielding;
+};
 
-} // namespace mongo
-
+}  // namespace mongo

@@ -33,7 +33,7 @@
 namespace mongo {
 namespace repl {
 
-    ScatterGatherAlgorithm::~ScatterGatherAlgorithm() {}
+ScatterGatherAlgorithm::~ScatterGatherAlgorithm() {}
 
 }  // namespace repl
 }  // namespace mongo

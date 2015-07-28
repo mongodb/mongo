@@ -30,26 +30,26 @@
 
 namespace mongo {
 
+/**
+ * Used for yielding while data is fetched from disk.
+ *
+ * @see RecordStore::recordNeedsFetch
+ */
+class RecordFetcher {
+public:
+    virtual ~RecordFetcher() {}
+
     /**
-     * Used for yielding while data is fetched from disk.
-     *
-     * @see RecordStore::recordNeedsFetch
+     * Performs any setup which is needed prior to yielding locks.
      */
-    class RecordFetcher {
-    public:
-        virtual ~RecordFetcher() { }
+    virtual void setup() = 0;
 
-        /**
-         * Performs any setup which is needed prior to yielding locks.
-         */
-        virtual void setup() = 0;
+    /**
+     * Called after locks are yielded in order to bring data into memory.
+     *
+     * Should not be called more than once.
+     */
+    virtual void fetch() = 0;
+};
 
-        /**
-         * Called after locks are yielded in order to bring data into memory.
-         *
-         * Should not be called more than once.
-         */
-        virtual void fetch() = 0;
-    };
-
-} // namespace mongo
+}  // namespace mongo

@@ -45,4 +45,4 @@ bool sequenceContains(const C& container, const T& value) {
     return find(container.begin(), container.end(), value) != container.end();
 }
 
-} // namespace mongo
+}  // namespace mongo

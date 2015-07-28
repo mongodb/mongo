@@ -36,166 +36,163 @@
 namespace mongo {
 
 #if defined(__linux__)
-    namespace {
-        void _check(int ret) {
-            if (ret == 0)
-                return;
-            int err = errno;
-            severe() << "error in Ticketholder: " << errnoWithDescription(err);
-            fassertFailed(28604);
+namespace {
+void _check(int ret) {
+    if (ret == 0)
+        return;
+    int err = errno;
+    severe() << "error in Ticketholder: " << errnoWithDescription(err);
+    fassertFailed(28604);
+}
+}
+
+TicketHolder::TicketHolder(int num) : _outof(num) {
+    _check(sem_init(&_sem, 0, num));
+}
+
+TicketHolder::~TicketHolder() {
+    _check(sem_destroy(&_sem));
+}
+
+bool TicketHolder::tryAcquire() {
+    while (0 != sem_trywait(&_sem)) {
+        switch (errno) {
+            case EAGAIN:
+                return false;
+            case EINTR:
+                break;
+            default:
+                _check(-1);
         }
     }
+    return true;
+}
 
-    TicketHolder::TicketHolder(int num)
-        : _outof(num) {
-        _check(sem_init(&_sem, 0, num));
-    }
-
-    TicketHolder::~TicketHolder(){
-        _check(sem_destroy(&_sem));
-    }
-
-    bool TicketHolder::tryAcquire() {
-        while (0 != sem_trywait(&_sem)) {
-            switch(errno) {
-            case EAGAIN: return false;
-            case EINTR: break;
-            default: _check(-1);
-            }
-        }
-        return true;
-    }
-
-    void TicketHolder::waitForTicket() {
-        while (0 != sem_wait(&_sem)) {
-            switch(errno) {
-            case EINTR: break;
-            default: _check(-1);
-            }
+void TicketHolder::waitForTicket() {
+    while (0 != sem_wait(&_sem)) {
+        switch (errno) {
+            case EINTR:
+                break;
+            default:
+                _check(-1);
         }
     }
+}
 
-    void TicketHolder::release() {
-        _check(sem_post(&_sem));
+void TicketHolder::release() {
+    _check(sem_post(&_sem));
+}
+
+Status TicketHolder::resize(int newSize) {
+    boost::mutex::scoped_lock lk(_resizeMutex);
+
+    if (newSize < 5)
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Minimum value for semaphore is 5; given " << newSize);
+
+    if (newSize > SEM_VALUE_MAX)
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Maximum value for semaphore is " << SEM_VALUE_MAX
+                                    << "; given " << newSize);
+
+    while (_outof.load() < newSize) {
+        release();
+        _outof.fetchAndAdd(1);
     }
 
-    Status TicketHolder::resize(int newSize) {
-        boost::mutex::scoped_lock lk(_resizeMutex);
-
-        if (newSize < 5)
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Minimum value for semaphore is 5; given "
-                          << newSize);
-
-        if (newSize > SEM_VALUE_MAX)
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Maximum value for semaphore is "
-                          << SEM_VALUE_MAX << "; given " << newSize );
-
-        while (_outof.load() < newSize) {
-            release();
-            _outof.fetchAndAdd(1);
-        }
-
-        while (_outof.load() > newSize) {
-            waitForTicket();
-            _outof.subtractAndFetch(1);
-        }
-
-        invariant(_outof.load() == newSize);
-        return Status::OK();
+    while (_outof.load() > newSize) {
+        waitForTicket();
+        _outof.subtractAndFetch(1);
     }
 
-    int TicketHolder::available() const {
-        int val = 0;
-        _check(sem_getvalue(&_sem, &val));
-        return val;
-    }
+    invariant(_outof.load() == newSize);
+    return Status::OK();
+}
 
-    int TicketHolder::used() const {
-        return outof() - available();
-    }
+int TicketHolder::available() const {
+    int val = 0;
+    _check(sem_getvalue(&_sem, &val));
+    return val;
+}
 
-    int TicketHolder::outof() const {
-        return _outof.load();
-    }
+int TicketHolder::used() const {
+    return outof() - available();
+}
+
+int TicketHolder::outof() const {
+    return _outof.load();
+}
 
 #else
 
-    TicketHolder::TicketHolder( int num )
-        : _outof(num),
-          _num(num),
-          _mutex("TicketHolder") {
+TicketHolder::TicketHolder(int num) : _outof(num), _num(num), _mutex("TicketHolder") {}
+
+TicketHolder::~TicketHolder() {}
+
+bool TicketHolder::tryAcquire() {
+    scoped_lock lk(_mutex);
+    return _tryAcquire();
+}
+
+void TicketHolder::waitForTicket() {
+    scoped_lock lk(_mutex);
+
+    while (!_tryAcquire()) {
+        _newTicket.wait(lk.boost());
+    }
+}
+
+void TicketHolder::release() {
+    {
+        scoped_lock lk(_mutex);
+        _num++;
+    }
+    _newTicket.notify_one();
+}
+
+Status TicketHolder::resize(int newSize) {
+    scoped_lock lk(_mutex);
+
+    int used = _outof.load() - _num;
+    if (used > newSize) {
+        std::stringstream ss;
+        ss << "can't resize since we're using (" << used << ") "
+           << "more than newSize(" << newSize << ")";
+
+        std::string errmsg = ss.str();
+        log() << errmsg;
+        return Status(ErrorCodes::BadValue, errmsg);
     }
 
-    TicketHolder::~TicketHolder(){
-    }
+    _outof.store(newSize);
+    _num = _outof.load() - used;
 
-    bool TicketHolder::tryAcquire() {
-        scoped_lock lk( _mutex );
-        return _tryAcquire();
-    }
+    // Potentially wasteful, but easier to see is correct
+    _newTicket.notify_all();
+    return Status::OK();
+}
 
-    void TicketHolder::waitForTicket() {
-        scoped_lock lk( _mutex );
+int TicketHolder::available() const {
+    return _num;
+}
 
-        while( ! _tryAcquire() ) {
-            _newTicket.wait( lk.boost() );
+int TicketHolder::used() const {
+    return outof() - _num;
+}
+
+int TicketHolder::outof() const {
+    return _outof.load();
+}
+
+bool TicketHolder::_tryAcquire() {
+    if (_num <= 0) {
+        if (_num < 0) {
+            std::cerr << "DISASTER! in TicketHolder" << std::endl;
         }
+        return false;
     }
-
-    void TicketHolder::release() {
-        {
-            scoped_lock lk( _mutex );
-            _num++;
-        }
-        _newTicket.notify_one();
-    }
-
-    Status TicketHolder::resize( int newSize ) {
-        scoped_lock lk( _mutex );
-
-        int used = _outof.load() - _num;
-        if ( used > newSize ) {
-            std::stringstream ss;
-            ss << "can't resize since we're using (" << used << ") "
-               << "more than newSize(" << newSize << ")";
-
-            std::string errmsg = ss.str();
-            log() << errmsg;
-            return Status(ErrorCodes::BadValue, errmsg);
-        }
-
-        _outof.store(newSize);
-        _num = _outof.load() - used;
-
-        // Potentially wasteful, but easier to see is correct
-        _newTicket.notify_all();
-        return Status::OK();
-    }
-
-    int TicketHolder::available() const {
-        return _num;
-    }
-
-    int TicketHolder::used() const {
-        return outof() - _num;
-    }
-
-    int TicketHolder::outof() const {
-        return _outof.load();
-    }
-
-    bool TicketHolder::_tryAcquire(){
-        if ( _num <= 0 ) {
-            if ( _num < 0 ) {
-                std::cerr << "DISASTER! in TicketHolder" << std::endl;
-            }
-            return false;
-        }
-        _num--;
-        return true;
-    }
+    _num--;
+    return true;
+}
 #endif
-
 }

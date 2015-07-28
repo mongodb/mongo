@@ -30,10 +30,10 @@
 
 namespace mongo {
 
-    // Sets SIGTRAP handler to launch GDB
-    // Noop unless on *NIX and compiled with _DEBUG
-    void setupSIGTRAPforGDB();
+// Sets SIGTRAP handler to launch GDB
+// Noop unless on *NIX and compiled with _DEBUG
+void setupSIGTRAPforGDB();
 
-    void breakpoint();
+void breakpoint();
 
-} // namespace mongo
+}  // namespace mongo

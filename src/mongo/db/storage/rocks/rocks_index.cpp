@@ -58,785 +58,800 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
-    using boost::shared_ptr;
-    using std::string;
-    using std::stringstream;
-    using std::vector;
-
-    namespace {
-
-        /**
-         * Strips the field names from a BSON object
-         */
-        BSONObj stripFieldNames( const BSONObj& obj ) {
-            BSONObjBuilder b;
-            BSONObjIterator i( obj );
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                b.appendAs( e, "" );
-            }
-            return b.obj();
-        }
-
-        string dupKeyError(const BSONObj& key) {
-            stringstream ss;
-            ss << "E11000 duplicate key error ";
-            ss << "dup key: " << key.toString();
-            return ss.str();
-        }
-
-        const int kTempKeyMaxSize = 1024;  // Do the same as the heap implementation
-
-        Status checkKeySize(const BSONObj& key) {
-            if (key.objsize() >= kTempKeyMaxSize) {
-                string msg = mongoutils::str::stream()
-                             << "RocksIndex::insert: key too large to index, failing " << ' '
-                             << key.objsize() << ' ' << key;
-                return Status(ErrorCodes::KeyTooLong, msg);
-            }
-            return Status::OK();
-        }
-
-        /**
-         * Functionality shared by both unique and standard index
-         */
-        class RocksCursorBase : public SortedDataInterface::Cursor {
-        public:
-            RocksCursorBase(OperationContext* txn, rocksdb::DB* db, std::string prefix,
-                            bool forward, Ordering order)
-                : _db(db),
-                  _prefix(prefix),
-                  _forward(forward),
-                  _order(order),
-                  _locateCacheValid(false) {
-                auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-                _iterator.reset(ru->NewIterator(_prefix));
-                _currentSequenceNumber = ru->snapshot()->GetSequenceNumber();
-            }
-
-            int getDirection() const { return _forward ? 1 : -1; }
-            bool isEOF() const { return _iterator.get() == nullptr || !_iterator->Valid(); }
-
-            /**
-             * Will only be called with other from same index as this.
-             * All EOF locs should be considered equal.
-             */
-            bool pointsToSamePlaceAs(const Cursor& genOther) const {
-                const RocksCursorBase& other = checked_cast<const RocksCursorBase&>(genOther);
-
-                if (isEOF() && other.isEOF()) {
-                    return true;
-                } else if (isEOF() || other.isEOF()) {
-                    return false;
-                }
-
-                if (_iterator->key() != other._iterator->key()) {
-                    return false;
-                }
-
-                // even if keys are equal, record IDs might be different (for unique indexes, since
-                // in non-unique indexes RecordID is already encoded in the key)
-                return _loc == other._loc;
-            }
-
-            virtual void advance() {
-                // Advance on a cursor at the end is a no-op
-                if (isEOF()) {
-                    return;
-                }
-                advanceCursor();
-                updatePosition();
-            }
-
-            bool locate(const BSONObj& key, const RecordId& loc) {
-                const BSONObj finalKey = stripFieldNames(key);
-
-                if (_locateCacheValid == true && finalKey == _locateCacheKey &&
-                    loc == _locateCacheRecordId) {
-                    // exact same call to locate()
-                    return _locateCacheResult;
-                }
-
-                fillQuery(finalKey, loc, &_query);
-                bool result = _locate(_query, loc);
-                updatePosition();
-                // An explicit search at the start of the range should always return false
-                if (loc == RecordId::min() || loc == RecordId::max()) {
-                    result = false;
-                }
-
-                {
-                    // memoization
-                    _locateCacheKey = finalKey.getOwned();
-                    _locateCacheRecordId = loc;
-                    _locateCacheResult = result;
-                    _locateCacheValid = true;
-                }
-                return result;
-            }
-
-            // same first five args as IndexEntryComparison::makeQueryObject (which is commented).
-            void advanceTo(const BSONObj &keyBegin,
-                           int keyBeginLen,
-                           bool afterKey,
-                           const vector<const BSONElement*>& keyEnd,
-                           const vector<bool>& keyEndInclusive) {
-                // make a key representing the location to which we want to advance.
-                BSONObj key = IndexEntryComparison::makeQueryObject(
-                                         keyBegin,
-                                         keyBeginLen,
-                                         afterKey,
-                                         keyEnd,
-                                         keyEndInclusive,
-                                         getDirection() );
-
-                fillQuery(key, RecordId(), &_query);
-                _locate(_query, RecordId());
-                updatePosition();
-            }
-
-            /**
-             * Locate a key with fields comprised of a combination of keyBegin fields and keyEnd
-             * fields. Also same first five args as IndexEntryComparison::makeQueryObject (which is
-             * commented).
-             */
-            void customLocate(const BSONObj& keyBegin,
-                              int keyBeginLen,
-                              bool afterVersion,
-                              const vector<const BSONElement*>& keyEnd,
-                              const vector<bool>& keyEndInclusive) {
-                advanceTo( keyBegin, keyBeginLen, afterVersion, keyEnd, keyEndInclusive );
-            }
-
-            BSONObj getKey() const {
-                if (isEOF()) {
-                    return BSONObj();
-                }
-
-                if (!_keyBsonCache.isEmpty()) {
-                    return _keyBsonCache;
-                }
-
-                _keyBsonCache =
-                    KeyString::toBson(_key.getBuffer(), _key.getSize(), _order, _typeBits);
-
-                return _keyBsonCache;
-            }
-
-            RecordId getRecordId() const { return _loc; }
-
-            void savePosition() {
-                _savedEOF = isEOF();
-            }
-
-            void restorePosition(OperationContext* txn) {
-                auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-                if (_currentSequenceNumber != ru->snapshot()->GetSequenceNumber()) {
-                    _iterator.reset(ru->NewIterator(_prefix));
-                    _currentSequenceNumber = ru->snapshot()->GetSequenceNumber();
-
-                    if (!_savedEOF) {
-                        _locate(_key, _loc);
-                        updatePosition();
-                    }
-                }
-            }
-
-        protected:
-            // Uses _key for the key. Implemented by unique and standard index
-            virtual bool _locate(const KeyString& query, RecordId loc) = 0;
-
-            virtual void fillQuery(const BSONObj& key, RecordId loc, KeyString* query) const = 0;
-
-            // Called after _key has been filled in. Must not throw WriteConflictException.
-            virtual void updateLocAndTypeBits() = 0;
-
-
-            void advanceCursor() {
-                if (_forward) {
-                    _iterator->Next();
-                } else {
-                    _iterator->Prev();
-                }
-                if (!_iterator->Valid()) {
-                    invariantRocksOK(_iterator->status());
-                }
-            }
-
-            // Seeks to query. Returns true on exact match.
-            bool seekCursor(const KeyString& query) {
-                const rocksdb::Slice keySlice(query.getBuffer(), query.getSize());
-                _iterator->Seek(keySlice);
-                if (!_iterator->Valid()) {
-                    invariantRocksOK(_iterator->status());
-                    if (!_forward) {
-                        // this will give lower bound behavior for backwards
-                        _iterator->SeekToLast();
-                        if (!_iterator->Valid()) {
-                            invariantRocksOK(_iterator->status());
-                        }
-                    }
-                    return false;
-                }
-
-                if (_iterator->key() == keySlice) {
-                    return true;
-                }
-
-                if (!_forward) {
-                    // if we can't find the exact result going backwards, we need to call Prev() so
-                    // that we're at the first value less than (to the left of) what we were
-                    // searching
-                    // for, rather than the first value greater than (to the right of) the value we
-                    // were
-                    // searching for.
-                    _iterator->Prev();
-                    if (!_iterator->Valid()) {
-                        invariantRocksOK(_iterator->status());
-                    }
-                }
-
-                return false;
-            }
-
-            void updatePosition() {
-                if (isEOF()) {
-                    _loc = RecordId();
-                    return;
-                }
-
-                auto key = _iterator->key();
-                _key.resetFromBuffer(key.data(), key.size());
-                _keyBsonCache = BSONObj();    // Invalidate cached BSONObj.
-
-                _locateCacheValid = false;    // Invalidate locate cache
-                _locateCacheKey = BSONObj();  // Invalidate locate cache
-
-                updateLocAndTypeBits();
-            }
-
-            rocksdb::DB* _db;                                       // not owned
-            std::string _prefix;
-            boost::scoped_ptr<rocksdb::Iterator> _iterator;
-            const bool _forward;
-            Ordering _order;
-
-            // These are for storing savePosition/restorePosition state
-            bool _savedEOF;
-            RecordId _savedRecordId;
-            rocksdb::SequenceNumber _currentSequenceNumber;
-
-            KeyString _key;
-            KeyString::TypeBits _typeBits;
-            RecordId _loc;
-            mutable BSONObj _keyBsonCache;  // if isEmpty, cache invalid and must be loaded from
-                                            // _key.
-
-            KeyString _query;
-
-            // These are for caching repeated calls to locate()
-            bool _locateCacheValid;
-            BSONObj _locateCacheKey;
-            RecordId _locateCacheRecordId;
-            bool _locateCacheResult;
-        };
-
-        class RocksStandardCursor : public RocksCursorBase {
-        public:
-            RocksStandardCursor(OperationContext* txn, rocksdb::DB* db, std::string prefix,
-                                bool forward, Ordering order)
-                : RocksCursorBase(txn, db, prefix, forward, order) {}
-
-            virtual void fillQuery(const BSONObj& key, RecordId loc, KeyString* query) const {
-                // Null cursors should start at the zero key to maintain search ordering in the
-                // collator.
-                // Reverse cursors should start on the last matching key.
-                if (loc.isNull()) {
-                    loc = _forward ? RecordId::min() : RecordId::max();
-                }
-
-                query->resetToKey(key, _order, loc);
-            }
-
-            virtual bool _locate(const KeyString& query, RecordId loc) {
-                // loc already encoded in _key
-                return seekCursor(query);
-            }
-
-            virtual void updateLocAndTypeBits() {
-                _loc = KeyString::decodeRecordIdAtEnd(_key.getBuffer(), _key.getSize());
-                auto value = _iterator->value();
-                BufReader br(value.data(), value.size());
-                _typeBits.resetFromBuffer(&br);
-            }
-        };
-
-        class RocksUniqueCursor : public RocksCursorBase {
-        public:
-            RocksUniqueCursor(OperationContext* txn, rocksdb::DB* db, std::string prefix,
-                              bool forward, Ordering order)
-                : RocksCursorBase(txn, db, prefix, forward, order) {}
-
-            virtual void fillQuery(const BSONObj& key, RecordId loc, KeyString* query) const {
-                query->resetToKey(key, _order);  // loc doesn't go in _query for unique indexes
-            }
-
-            virtual bool _locate(const KeyString& query, RecordId loc) {
-                if (!seekCursor(query)) {
-                    // If didn't seek to exact key, start at beginning of wherever we ended up.
-                    return false;
-                }
-                dassert(!isEOF());
-
-                // If we get here we need to look at the actual RecordId for this key and make sure
-                // we are supposed to see it.
-
-                auto value = _iterator->value();
-                BufReader br(value.data(), value.size());
-                RecordId locInIndex = KeyString::decodeRecordId(&br);
-
-                if ((_forward && (locInIndex < loc)) || (!_forward && (locInIndex > loc))) {
-                    advanceCursor();
-                }
-
-                return true;
-            }
-
-            void updateLocAndTypeBits() {
-                // We assume that cursors can only ever see unique indexes in their "pristine"
-                // state,
-                // where no duplicates are possible. The cases where dups are allowed should hold
-                // sufficient locks to ensure that no cursor ever sees them.
-
-                auto value = _iterator->value();
-                BufReader br(value.data(), value.size());
-                _loc = KeyString::decodeRecordId(&br);
-                _typeBits.resetFromBuffer(&br);
-
-                if (!br.atEof()) {
-                    severe() << "Unique index cursor seeing multiple records for key " << getKey();
-                    fassertFailed(28609);
-                }
-            }
-        };
-
-    } // namespace
-
-    /**
-     * Bulk builds a non-unique index.
-     */
-    class RocksIndexBase::StandardBulkBuilder : public SortedDataBuilderInterface {
-    public:
-        StandardBulkBuilder(RocksStandardIndex* index, OperationContext* txn) : _index(index), _txn(txn) {}
-
-        Status addKey(const BSONObj& key, const RecordId& loc) {
-            return _index->insert(_txn, key, loc, true);
-        }
-
-        void commit(bool mayInterrupt) {
-            WriteUnitOfWork uow(_txn);
-            uow.commit();
-        }
-
-    private:
-        RocksStandardIndex* _index;
-        OperationContext* _txn;
-    };
-
-    /**
-     * Bulk builds a unique index.
-     *
-     * In order to support unique indexes in dupsAllowed mode this class only does an actual insert
-     * after it sees a key after the one we are trying to insert. This allows us to gather up all
-     * duplicate locs and insert them all together. This is necessary since bulk cursors can only
-     * append data.
-     */
-    class RocksIndexBase::UniqueBulkBuilder : public SortedDataBuilderInterface {
-    public:
-        UniqueBulkBuilder(std::string prefix, Ordering ordering, OperationContext* txn, bool dupsAllowed)
-            : _prefix(std::move(prefix)), _ordering(ordering), _txn(txn), _dupsAllowed(dupsAllowed) {}
-
-        Status addKey(const BSONObj& newKey, const RecordId& loc) {
-            Status s = checkKeySize(newKey);
-            if (!s.isOK()) {
-                return s;
-            }
-
-            const int cmp = newKey.woCompare(_key, _ordering);
-            if (cmp != 0) {
-                if (!_key.isEmpty()) { // _key.isEmpty() is only true on the first call to addKey().
-                    invariant(cmp > 0); // newKey must be > the last key
-                    // We are done with dups of the last key so we can insert it now.
-                    doInsert();
-                }
-                invariant(_records.empty());
-            }
-            else {
-                // Dup found!
-                if (!_dupsAllowed) {
-                    return Status(ErrorCodes::DuplicateKey, dupKeyError(newKey));
-                }
-
-                // If we get here, we are in the weird mode where dups are allowed on a unique
-                // index, so add ourselves to the list of duplicate locs. This also replaces the
-                // _key which is correct since any dups seen later are likely to be newer.
-            }
-
-            _key = newKey.getOwned();
-            _keyString.resetToKey(_key, _ordering);
-            _records.push_back(std::make_pair(loc, _keyString.getTypeBits()));
-
-            return Status::OK();
-        }
-
-        void commit(bool mayInterrupt) {
-            WriteUnitOfWork uow(_txn);
-            if (!_records.empty()) {
-                // This handles inserting the last unique key.
-                doInsert();
-            }
-            uow.commit();
-        }
-
-    private:
-        void doInsert() {
-            invariant(!_records.empty());
-
-            KeyString value;
-            for (size_t i = 0; i < _records.size(); i++) {
-                value.appendRecordId(_records[i].first);
-                // When there is only one record, we can omit AllZeros TypeBits. Otherwise they need
-                // to be included.
-                if (!(_records[i].second.isAllZeros() && _records.size() == 1)) {
-                    value.appendTypeBits(_records[i].second);
-                }
-            }
-
-            std::string prefixedKey(RocksIndexBase::_makePrefixedKey(_prefix, _keyString));
-            rocksdb::Slice valueSlice(value.getBuffer(), value.getSize());
-
-            auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(_txn);
-            ru->writeBatch()->Put(prefixedKey, valueSlice);
-
-            _records.clear();
-        }
-
-        std::string _prefix;
-        Ordering _ordering;
-        OperationContext* _txn;
-        const bool _dupsAllowed;
-        BSONObj _key;
-        KeyString _keyString;
-        std::vector<std::pair<RecordId, KeyString::TypeBits>> _records;
-    };
-
-    /// RocksIndexBase
-
-    RocksIndexBase::RocksIndexBase(rocksdb::DB* db, std::string prefix, std::string ident,
-                                   Ordering order)
-        : _db(db), _prefix(prefix), _ident(std::move(ident)), _order(order) {
-        {
-            uint64_t storageSize;
-            std::string nextPrefix = std::move(rocksGetNextPrefix(_prefix));
-            rocksdb::Range wholeRange(_prefix, nextPrefix);
-            _db->GetApproximateSizes(&wholeRange, 1, &storageSize);
-            _indexStorageSize.store(static_cast<long long>(storageSize), std::memory_order_relaxed);
-        }
+using boost::scoped_ptr;
+using boost::shared_ptr;
+using std::string;
+using std::stringstream;
+using std::vector;
+
+namespace {
+
+/**
+ * Strips the field names from a BSON object
+ */
+BSONObj stripFieldNames(const BSONObj& obj) {
+    BSONObjBuilder b;
+    BSONObjIterator i(obj);
+    while (i.more()) {
+        BSONElement e = i.next();
+        b.appendAs(e, "");
     }
+    return b.obj();
+}
 
-    void RocksIndexBase::fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
-                                      BSONObjBuilder* output) const {
-        if (numKeysOut) {
-            boost::scoped_ptr<SortedDataInterface::Cursor> cursor(newCursor(txn, 1));
-            cursor->locate(minKey, RecordId::min());
-            *numKeysOut = 0;
-            while (!cursor->isEOF()) {
-                cursor->advance();
-                (*numKeysOut)++;
-            }
-        }
+string dupKeyError(const BSONObj& key) {
+    stringstream ss;
+    ss << "E11000 duplicate key error ";
+    ss << "dup key: " << key.toString();
+    return ss.str();
+}
+
+const int kTempKeyMaxSize = 1024;  // Do the same as the heap implementation
+
+Status checkKeySize(const BSONObj& key) {
+    if (key.objsize() >= kTempKeyMaxSize) {
+        string msg = mongoutils::str::stream()
+            << "RocksIndex::insert: key too large to index, failing " << ' ' << key.objsize() << ' '
+            << key;
+        return Status(ErrorCodes::KeyTooLong, msg);
     }
+    return Status::OK();
+}
 
-    bool RocksIndexBase::isEmpty(OperationContext* txn) {
+/**
+ * Functionality shared by both unique and standard index
+ */
+class RocksCursorBase : public SortedDataInterface::Cursor {
+public:
+    RocksCursorBase(
+        OperationContext* txn, rocksdb::DB* db, std::string prefix, bool forward, Ordering order)
+        : _db(db), _prefix(prefix), _forward(forward), _order(order), _locateCacheValid(false) {
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        boost::scoped_ptr<rocksdb::Iterator> it(ru->NewIterator(_prefix));
-
-        it->SeekToFirst();
-        return !it->Valid();
+        _iterator.reset(ru->NewIterator(_prefix));
+        _currentSequenceNumber = ru->snapshot()->GetSequenceNumber();
     }
 
-    Status RocksIndexBase::initAsEmpty(OperationContext* txn) {
-        // no-op
-        return Status::OK();
+    int getDirection() const {
+        return _forward ? 1 : -1;
+    }
+    bool isEOF() const {
+        return _iterator.get() == nullptr || !_iterator->Valid();
     }
 
-    long long RocksIndexBase::getSpaceUsedBytes(OperationContext* txn) const {
-        // There might be some bytes in the WAL that we don't count here. Some
-        // tests depend on the fact that non-empty indexes have non-zero sizes
-        return static_cast<long long>(
-            std::max(_indexStorageSize.load(std::memory_order_relaxed), static_cast<long long>(1)));
+    /**
+     * Will only be called with other from same index as this.
+     * All EOF locs should be considered equal.
+     */
+    bool pointsToSamePlaceAs(const Cursor& genOther) const {
+        const RocksCursorBase& other = checked_cast<const RocksCursorBase&>(genOther);
+
+        if (isEOF() && other.isEOF()) {
+            return true;
+        } else if (isEOF() || other.isEOF()) {
+            return false;
+        }
+
+        if (_iterator->key() != other._iterator->key()) {
+            return false;
+        }
+
+        // even if keys are equal, record IDs might be different (for unique indexes, since
+        // in non-unique indexes RecordID is already encoded in the key)
+        return _loc == other._loc;
     }
 
-    std::string RocksIndexBase::_makePrefixedKey(const std::string& prefix,
-                                                 const KeyString& encodedKey) {
-        std::string key(prefix);
-        key.append(encodedKey.getBuffer(), encodedKey.getSize());
-        return key;
+    virtual void advance() {
+        // Advance on a cursor at the end is a no-op
+        if (isEOF()) {
+            return;
+        }
+        advanceCursor();
+        updatePosition();
     }
 
-    /// RocksUniqueIndex
+    bool locate(const BSONObj& key, const RecordId& loc) {
+        const BSONObj finalKey = stripFieldNames(key);
 
-    RocksUniqueIndex::RocksUniqueIndex(rocksdb::DB* db, std::string prefix, std::string ident,
-                                       Ordering order)
-        : RocksIndexBase(db, prefix, ident, order) {}
+        if (_locateCacheValid == true && finalKey == _locateCacheKey &&
+            loc == _locateCacheRecordId) {
+            // exact same call to locate()
+            return _locateCacheResult;
+        }
 
-    Status RocksUniqueIndex::insert(OperationContext* txn, const BSONObj& key, const RecordId& loc,
-                                    bool dupsAllowed) {
-        Status s = checkKeySize(key);
+        fillQuery(finalKey, loc, &_query);
+        bool result = _locate(_query, loc);
+        updatePosition();
+        // An explicit search at the start of the range should always return false
+        if (loc == RecordId::min() || loc == RecordId::max()) {
+            result = false;
+        }
+
+        {
+            // memoization
+            _locateCacheKey = finalKey.getOwned();
+            _locateCacheRecordId = loc;
+            _locateCacheResult = result;
+            _locateCacheValid = true;
+        }
+        return result;
+    }
+
+    // same first five args as IndexEntryComparison::makeQueryObject (which is commented).
+    void advanceTo(const BSONObj& keyBegin,
+                   int keyBeginLen,
+                   bool afterKey,
+                   const vector<const BSONElement*>& keyEnd,
+                   const vector<bool>& keyEndInclusive) {
+        // make a key representing the location to which we want to advance.
+        BSONObj key = IndexEntryComparison::makeQueryObject(
+            keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, getDirection());
+
+        fillQuery(key, RecordId(), &_query);
+        _locate(_query, RecordId());
+        updatePosition();
+    }
+
+    /**
+     * Locate a key with fields comprised of a combination of keyBegin fields and keyEnd
+     * fields. Also same first five args as IndexEntryComparison::makeQueryObject (which is
+     * commented).
+     */
+    void customLocate(const BSONObj& keyBegin,
+                      int keyBeginLen,
+                      bool afterVersion,
+                      const vector<const BSONElement*>& keyEnd,
+                      const vector<bool>& keyEndInclusive) {
+        advanceTo(keyBegin, keyBeginLen, afterVersion, keyEnd, keyEndInclusive);
+    }
+
+    BSONObj getKey() const {
+        if (isEOF()) {
+            return BSONObj();
+        }
+
+        if (!_keyBsonCache.isEmpty()) {
+            return _keyBsonCache;
+        }
+
+        _keyBsonCache = KeyString::toBson(_key.getBuffer(), _key.getSize(), _order, _typeBits);
+
+        return _keyBsonCache;
+    }
+
+    RecordId getRecordId() const {
+        return _loc;
+    }
+
+    void savePosition() {
+        _savedEOF = isEOF();
+    }
+
+    void restorePosition(OperationContext* txn) {
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        if (_currentSequenceNumber != ru->snapshot()->GetSequenceNumber()) {
+            _iterator.reset(ru->NewIterator(_prefix));
+            _currentSequenceNumber = ru->snapshot()->GetSequenceNumber();
+
+            if (!_savedEOF) {
+                _locate(_key, _loc);
+                updatePosition();
+            }
+        }
+    }
+
+protected:
+    // Uses _key for the key. Implemented by unique and standard index
+    virtual bool _locate(const KeyString& query, RecordId loc) = 0;
+
+    virtual void fillQuery(const BSONObj& key, RecordId loc, KeyString* query) const = 0;
+
+    // Called after _key has been filled in. Must not throw WriteConflictException.
+    virtual void updateLocAndTypeBits() = 0;
+
+
+    void advanceCursor() {
+        if (_forward) {
+            _iterator->Next();
+        } else {
+            _iterator->Prev();
+        }
+        if (!_iterator->Valid()) {
+            invariantRocksOK(_iterator->status());
+        }
+    }
+
+    // Seeks to query. Returns true on exact match.
+    bool seekCursor(const KeyString& query) {
+        const rocksdb::Slice keySlice(query.getBuffer(), query.getSize());
+        _iterator->Seek(keySlice);
+        if (!_iterator->Valid()) {
+            invariantRocksOK(_iterator->status());
+            if (!_forward) {
+                // this will give lower bound behavior for backwards
+                _iterator->SeekToLast();
+                if (!_iterator->Valid()) {
+                    invariantRocksOK(_iterator->status());
+                }
+            }
+            return false;
+        }
+
+        if (_iterator->key() == keySlice) {
+            return true;
+        }
+
+        if (!_forward) {
+            // if we can't find the exact result going backwards, we need to call Prev() so
+            // that we're at the first value less than (to the left of) what we were
+            // searching
+            // for, rather than the first value greater than (to the right of) the value we
+            // were
+            // searching for.
+            _iterator->Prev();
+            if (!_iterator->Valid()) {
+                invariantRocksOK(_iterator->status());
+            }
+        }
+
+        return false;
+    }
+
+    void updatePosition() {
+        if (isEOF()) {
+            _loc = RecordId();
+            return;
+        }
+
+        auto key = _iterator->key();
+        _key.resetFromBuffer(key.data(), key.size());
+        _keyBsonCache = BSONObj();  // Invalidate cached BSONObj.
+
+        _locateCacheValid = false;    // Invalidate locate cache
+        _locateCacheKey = BSONObj();  // Invalidate locate cache
+
+        updateLocAndTypeBits();
+    }
+
+    rocksdb::DB* _db;  // not owned
+    std::string _prefix;
+    boost::scoped_ptr<rocksdb::Iterator> _iterator;
+    const bool _forward;
+    Ordering _order;
+
+    // These are for storing savePosition/restorePosition state
+    bool _savedEOF;
+    RecordId _savedRecordId;
+    rocksdb::SequenceNumber _currentSequenceNumber;
+
+    KeyString _key;
+    KeyString::TypeBits _typeBits;
+    RecordId _loc;
+    mutable BSONObj _keyBsonCache;  // if isEmpty, cache invalid and must be loaded from
+                                    // _key.
+
+    KeyString _query;
+
+    // These are for caching repeated calls to locate()
+    bool _locateCacheValid;
+    BSONObj _locateCacheKey;
+    RecordId _locateCacheRecordId;
+    bool _locateCacheResult;
+};
+
+class RocksStandardCursor : public RocksCursorBase {
+public:
+    RocksStandardCursor(
+        OperationContext* txn, rocksdb::DB* db, std::string prefix, bool forward, Ordering order)
+        : RocksCursorBase(txn, db, prefix, forward, order) {}
+
+    virtual void fillQuery(const BSONObj& key, RecordId loc, KeyString* query) const {
+        // Null cursors should start at the zero key to maintain search ordering in the
+        // collator.
+        // Reverse cursors should start on the last matching key.
+        if (loc.isNull()) {
+            loc = _forward ? RecordId::min() : RecordId::max();
+        }
+
+        query->resetToKey(key, _order, loc);
+    }
+
+    virtual bool _locate(const KeyString& query, RecordId loc) {
+        // loc already encoded in _key
+        return seekCursor(query);
+    }
+
+    virtual void updateLocAndTypeBits() {
+        _loc = KeyString::decodeRecordIdAtEnd(_key.getBuffer(), _key.getSize());
+        auto value = _iterator->value();
+        BufReader br(value.data(), value.size());
+        _typeBits.resetFromBuffer(&br);
+    }
+};
+
+class RocksUniqueCursor : public RocksCursorBase {
+public:
+    RocksUniqueCursor(
+        OperationContext* txn, rocksdb::DB* db, std::string prefix, bool forward, Ordering order)
+        : RocksCursorBase(txn, db, prefix, forward, order) {}
+
+    virtual void fillQuery(const BSONObj& key, RecordId loc, KeyString* query) const {
+        query->resetToKey(key, _order);  // loc doesn't go in _query for unique indexes
+    }
+
+    virtual bool _locate(const KeyString& query, RecordId loc) {
+        if (!seekCursor(query)) {
+            // If didn't seek to exact key, start at beginning of wherever we ended up.
+            return false;
+        }
+        dassert(!isEOF());
+
+        // If we get here we need to look at the actual RecordId for this key and make sure
+        // we are supposed to see it.
+
+        auto value = _iterator->value();
+        BufReader br(value.data(), value.size());
+        RecordId locInIndex = KeyString::decodeRecordId(&br);
+
+        if ((_forward && (locInIndex < loc)) || (!_forward && (locInIndex > loc))) {
+            advanceCursor();
+        }
+
+        return true;
+    }
+
+    void updateLocAndTypeBits() {
+        // We assume that cursors can only ever see unique indexes in their "pristine"
+        // state,
+        // where no duplicates are possible. The cases where dups are allowed should hold
+        // sufficient locks to ensure that no cursor ever sees them.
+
+        auto value = _iterator->value();
+        BufReader br(value.data(), value.size());
+        _loc = KeyString::decodeRecordId(&br);
+        _typeBits.resetFromBuffer(&br);
+
+        if (!br.atEof()) {
+            severe() << "Unique index cursor seeing multiple records for key " << getKey();
+            fassertFailed(28609);
+        }
+    }
+};
+
+}  // namespace
+
+/**
+ * Bulk builds a non-unique index.
+ */
+class RocksIndexBase::StandardBulkBuilder : public SortedDataBuilderInterface {
+public:
+    StandardBulkBuilder(RocksStandardIndex* index, OperationContext* txn)
+        : _index(index), _txn(txn) {}
+
+    Status addKey(const BSONObj& key, const RecordId& loc) {
+        return _index->insert(_txn, key, loc, true);
+    }
+
+    void commit(bool mayInterrupt) {
+        WriteUnitOfWork uow(_txn);
+        uow.commit();
+    }
+
+private:
+    RocksStandardIndex* _index;
+    OperationContext* _txn;
+};
+
+/**
+ * Bulk builds a unique index.
+ *
+ * In order to support unique indexes in dupsAllowed mode this class only does an actual insert
+ * after it sees a key after the one we are trying to insert. This allows us to gather up all
+ * duplicate locs and insert them all together. This is necessary since bulk cursors can only
+ * append data.
+ */
+class RocksIndexBase::UniqueBulkBuilder : public SortedDataBuilderInterface {
+public:
+    UniqueBulkBuilder(std::string prefix,
+                      Ordering ordering,
+                      OperationContext* txn,
+                      bool dupsAllowed)
+        : _prefix(std::move(prefix)), _ordering(ordering), _txn(txn), _dupsAllowed(dupsAllowed) {}
+
+    Status addKey(const BSONObj& newKey, const RecordId& loc) {
+        Status s = checkKeySize(newKey);
         if (!s.isOK()) {
             return s;
         }
 
-        KeyString encodedKey(key, _order);
-        std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
-
-        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        if (!ru->transaction()->registerWrite(prefixedKey)) {
-            throw WriteConflictException();
-        }
-
-        _indexStorageSize.fetch_add(static_cast<long long>(prefixedKey.size()),
-                                    std::memory_order_relaxed);
-
-        std::string currentValue;
-        auto getStatus = ru->Get(prefixedKey, &currentValue);
-        if (!getStatus.ok() && !getStatus.IsNotFound()) {
-            return rocksToMongoStatus(getStatus);
-        } else if (getStatus.IsNotFound()) {
-            // nothing here. just insert the value
-            KeyString value(loc);
-            if (!encodedKey.getTypeBits().isAllZeros()) {
-                value.appendTypeBits(encodedKey.getTypeBits());
+        const int cmp = newKey.woCompare(_key, _ordering);
+        if (cmp != 0) {
+            if (!_key.isEmpty()) {   // _key.isEmpty() is only true on the first call to addKey().
+                invariant(cmp > 0);  // newKey must be > the last key
+                // We are done with dups of the last key so we can insert it now.
+                doInsert();
             }
-            rocksdb::Slice valueSlice(value.getBuffer(), value.getSize());
-            ru->writeBatch()->Put(prefixedKey, valueSlice);
-            return Status::OK();
-        }
-
-        // we are in a weird state where there might be multiple values for a key
-        // we put them all in the "list"
-        // Note that we can't omit AllZeros when there are multiple locs for a value. When we remove
-        // down to a single value, it will be cleaned up.
-
-        bool insertedLoc = false;
-        KeyString valueVector;
-        BufReader br(currentValue.data(), currentValue.size());
-        while (br.remaining()) {
-            RecordId locInIndex = KeyString::decodeRecordId(&br);
-            if (loc == locInIndex) {
-                return Status::OK();  // already in index
+            invariant(_records.empty());
+        } else {
+            // Dup found!
+            if (!_dupsAllowed) {
+                return Status(ErrorCodes::DuplicateKey, dupKeyError(newKey));
             }
 
-            if (!insertedLoc && loc < locInIndex) {
-                valueVector.appendRecordId(loc);
-                valueVector.appendTypeBits(encodedKey.getTypeBits());
-                insertedLoc = true;
-            }
-
-            // Copy from old to new value
-            valueVector.appendRecordId(locInIndex);
-            valueVector.appendTypeBits(KeyString::TypeBits::fromBuffer(&br));
+            // If we get here, we are in the weird mode where dups are allowed on a unique
+            // index, so add ourselves to the list of duplicate locs. This also replaces the
+            // _key which is correct since any dups seen later are likely to be newer.
         }
 
-        if (!dupsAllowed) {
-            return Status(ErrorCodes::DuplicateKey, dupKeyError(key));
-        }
+        _key = newKey.getOwned();
+        _keyString.resetToKey(_key, _ordering);
+        _records.push_back(std::make_pair(loc, _keyString.getTypeBits()));
 
-        if (!insertedLoc) {
-            // This loc is higher than all currently in the index for this key
-            valueVector.appendRecordId(loc);
-            valueVector.appendTypeBits(encodedKey.getTypeBits());
-        }
-
-        rocksdb::Slice valueVectorSlice(valueVector.getBuffer(), valueVector.getSize());
-        ru->writeBatch()->Put(prefixedKey, valueVectorSlice);
         return Status::OK();
     }
 
-    void RocksUniqueIndex::unindex(OperationContext* txn, const BSONObj& key, const RecordId& loc,
-                                   bool dupsAllowed) {
-        KeyString encodedKey(key, _order);
-        std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
-
-        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        // We can't let two threads unindex the same key
-        if (!ru->transaction()->registerWrite(prefixedKey)) {
-            throw WriteConflictException();
+    void commit(bool mayInterrupt) {
+        WriteUnitOfWork uow(_txn);
+        if (!_records.empty()) {
+            // This handles inserting the last unique key.
+            doInsert();
         }
+        uow.commit();
+    }
 
-        _indexStorageSize.fetch_sub(static_cast<long long>(prefixedKey.size()),
-                                    std::memory_order_relaxed);
+private:
+    void doInsert() {
+        invariant(!_records.empty());
 
-        if (!dupsAllowed) {
-            ru->writeBatch()->Delete(prefixedKey);
-            return;
-        }
-
-        // dups are allowed, so we have to deal with a vector of RecordIds.
-        std::string currentValue;
-        auto getStatus = ru->Get(prefixedKey, &currentValue);
-        if (getStatus.IsNotFound()) {
-            // nothing here. just return
-            return;
-        }
-        invariantRocksOK(getStatus);
-
-        bool foundLoc = false;
-        std::vector<std::pair<RecordId, KeyString::TypeBits>> records;
-
-        BufReader br(currentValue.data(), currentValue.size());
-        while (br.remaining()) {
-            RecordId locInIndex = KeyString::decodeRecordId(&br);
-            KeyString::TypeBits typeBits = KeyString::TypeBits::fromBuffer(&br);
-
-            if (loc == locInIndex) {
-                if (records.empty() && !br.remaining()) {
-                    // This is the common case: we are removing the only loc for this key.
-                    // Remove the whole entry.
-                    ru->writeBatch()->Delete(prefixedKey);
-                    return;
-                }
-
-                foundLoc = true;
-                continue;
-            }
-
-            records.push_back(std::make_pair(locInIndex, typeBits));
-        }
-
-        if (!foundLoc) {
-            warning().stream() << loc << " not found in the index for key " << key;
-            return; // nothing to do
-        }
-
-        // Put other locs for this key back in the index.
-        KeyString newValue;
-        invariant(!records.empty());
-        for (size_t i = 0; i < records.size(); i++) {
-            newValue.appendRecordId(records[i].first);
+        KeyString value;
+        for (size_t i = 0; i < _records.size(); i++) {
+            value.appendRecordId(_records[i].first);
             // When there is only one record, we can omit AllZeros TypeBits. Otherwise they need
             // to be included.
-            if (!(records[i].second.isAllZeros() && records.size() == 1)) {
-                newValue.appendTypeBits(records[i].second);
+            if (!(_records[i].second.isAllZeros() && _records.size() == 1)) {
+                value.appendTypeBits(_records[i].second);
             }
         }
 
-        rocksdb::Slice newValueSlice(newValue.getBuffer(), newValue.getSize());
-        ru->writeBatch()->Put(prefixedKey, newValueSlice);
+        std::string prefixedKey(RocksIndexBase::_makePrefixedKey(_prefix, _keyString));
+        rocksdb::Slice valueSlice(value.getBuffer(), value.getSize());
+
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(_txn);
+        ru->writeBatch()->Put(prefixedKey, valueSlice);
+
+        _records.clear();
     }
 
-    SortedDataInterface::Cursor* RocksUniqueIndex::newCursor(OperationContext* txn,
-                                                             int direction) const {
-        invariant( ( direction == 1 || direction == -1 ) && "invalid value for direction" );
-        return new RocksUniqueCursor(txn, _db, _prefix, direction == 1, _order);
+    std::string _prefix;
+    Ordering _ordering;
+    OperationContext* _txn;
+    const bool _dupsAllowed;
+    BSONObj _key;
+    KeyString _keyString;
+    std::vector<std::pair<RecordId, KeyString::TypeBits>> _records;
+};
+
+/// RocksIndexBase
+
+RocksIndexBase::RocksIndexBase(rocksdb::DB* db,
+                               std::string prefix,
+                               std::string ident,
+                               Ordering order)
+    : _db(db), _prefix(prefix), _ident(std::move(ident)), _order(order) {
+    {
+        uint64_t storageSize;
+        std::string nextPrefix = std::move(rocksGetNextPrefix(_prefix));
+        rocksdb::Range wholeRange(_prefix, nextPrefix);
+        _db->GetApproximateSizes(&wholeRange, 1, &storageSize);
+        _indexStorageSize.store(static_cast<long long>(storageSize), std::memory_order_relaxed);
+    }
+}
+
+void RocksIndexBase::fullValidate(OperationContext* txn,
+                                  bool full,
+                                  long long* numKeysOut,
+                                  BSONObjBuilder* output) const {
+    if (numKeysOut) {
+        boost::scoped_ptr<SortedDataInterface::Cursor> cursor(newCursor(txn, 1));
+        cursor->locate(minKey, RecordId::min());
+        *numKeysOut = 0;
+        while (!cursor->isEOF()) {
+            cursor->advance();
+            (*numKeysOut)++;
+        }
+    }
+}
+
+bool RocksIndexBase::isEmpty(OperationContext* txn) {
+    auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+    boost::scoped_ptr<rocksdb::Iterator> it(ru->NewIterator(_prefix));
+
+    it->SeekToFirst();
+    return !it->Valid();
+}
+
+Status RocksIndexBase::initAsEmpty(OperationContext* txn) {
+    // no-op
+    return Status::OK();
+}
+
+long long RocksIndexBase::getSpaceUsedBytes(OperationContext* txn) const {
+    // There might be some bytes in the WAL that we don't count here. Some
+    // tests depend on the fact that non-empty indexes have non-zero sizes
+    return static_cast<long long>(
+        std::max(_indexStorageSize.load(std::memory_order_relaxed), static_cast<long long>(1)));
+}
+
+std::string RocksIndexBase::_makePrefixedKey(const std::string& prefix,
+                                             const KeyString& encodedKey) {
+    std::string key(prefix);
+    key.append(encodedKey.getBuffer(), encodedKey.getSize());
+    return key;
+}
+
+/// RocksUniqueIndex
+
+RocksUniqueIndex::RocksUniqueIndex(rocksdb::DB* db,
+                                   std::string prefix,
+                                   std::string ident,
+                                   Ordering order)
+    : RocksIndexBase(db, prefix, ident, order) {}
+
+Status RocksUniqueIndex::insert(OperationContext* txn,
+                                const BSONObj& key,
+                                const RecordId& loc,
+                                bool dupsAllowed) {
+    Status s = checkKeySize(key);
+    if (!s.isOK()) {
+        return s;
     }
 
-    Status RocksUniqueIndex::dupKeyCheck(OperationContext* txn, const BSONObj& key,
-                                         const RecordId& loc) {
-        KeyString encodedKey(key, _order);
-        std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
+    KeyString encodedKey(key, _order);
+    std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
 
-        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        std::string value;
-        auto getStatus = ru->Get(prefixedKey, &value);
-        if (!getStatus.ok() && !getStatus.IsNotFound()) {
-            return rocksToMongoStatus(getStatus);
-        } else if (getStatus.IsNotFound()) {
-            // not found, not duplicate key
-            return Status::OK();
+    auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+    if (!ru->transaction()->registerWrite(prefixedKey)) {
+        throw WriteConflictException();
+    }
+
+    _indexStorageSize.fetch_add(static_cast<long long>(prefixedKey.size()),
+                                std::memory_order_relaxed);
+
+    std::string currentValue;
+    auto getStatus = ru->Get(prefixedKey, &currentValue);
+    if (!getStatus.ok() && !getStatus.IsNotFound()) {
+        return rocksToMongoStatus(getStatus);
+    } else if (getStatus.IsNotFound()) {
+        // nothing here. just insert the value
+        KeyString value(loc);
+        if (!encodedKey.getTypeBits().isAllZeros()) {
+            value.appendTypeBits(encodedKey.getTypeBits());
+        }
+        rocksdb::Slice valueSlice(value.getBuffer(), value.getSize());
+        ru->writeBatch()->Put(prefixedKey, valueSlice);
+        return Status::OK();
+    }
+
+    // we are in a weird state where there might be multiple values for a key
+    // we put them all in the "list"
+    // Note that we can't omit AllZeros when there are multiple locs for a value. When we remove
+    // down to a single value, it will be cleaned up.
+
+    bool insertedLoc = false;
+    KeyString valueVector;
+    BufReader br(currentValue.data(), currentValue.size());
+    while (br.remaining()) {
+        RecordId locInIndex = KeyString::decodeRecordId(&br);
+        if (loc == locInIndex) {
+            return Status::OK();  // already in index
         }
 
-        // If the key exists, check if we already have this loc at this key. If so, we don't
-        // consider that to be a dup.
-        BufReader br(value.data(), value.size());
-        while (br.remaining()) {
-            if (KeyString::decodeRecordId(&br) == loc) {
-                return Status::OK();
-            }
-
-            KeyString::TypeBits::fromBuffer(&br);  // Just calling this to advance reader.
+        if (!insertedLoc && loc < locInIndex) {
+            valueVector.appendRecordId(loc);
+            valueVector.appendTypeBits(encodedKey.getTypeBits());
+            insertedLoc = true;
         }
+
+        // Copy from old to new value
+        valueVector.appendRecordId(locInIndex);
+        valueVector.appendTypeBits(KeyString::TypeBits::fromBuffer(&br));
+    }
+
+    if (!dupsAllowed) {
         return Status(ErrorCodes::DuplicateKey, dupKeyError(key));
     }
 
-    SortedDataBuilderInterface* RocksUniqueIndex::getBulkBuilder(OperationContext* txn,
-                                                                 bool dupsAllowed) {
-        return new RocksIndexBase::UniqueBulkBuilder(_prefix, _order, txn, dupsAllowed);
+    if (!insertedLoc) {
+        // This loc is higher than all currently in the index for this key
+        valueVector.appendRecordId(loc);
+        valueVector.appendTypeBits(encodedKey.getTypeBits());
     }
 
-    /// RocksStandardIndex
-    RocksStandardIndex::RocksStandardIndex(rocksdb::DB* db, std::string prefix, std::string ident,
-                                           Ordering order)
-        : RocksIndexBase(db, prefix, ident, order) {}
+    rocksdb::Slice valueVectorSlice(valueVector.getBuffer(), valueVector.getSize());
+    ru->writeBatch()->Put(prefixedKey, valueVectorSlice);
+    return Status::OK();
+}
 
-    Status RocksStandardIndex::insert(OperationContext* txn, const BSONObj& key,
-                                      const RecordId& loc, bool dupsAllowed) {
-        invariant(dupsAllowed);
-        Status s = checkKeySize(key);
-        if (!s.isOK()) {
-            return s;
+void RocksUniqueIndex::unindex(OperationContext* txn,
+                               const BSONObj& key,
+                               const RecordId& loc,
+                               bool dupsAllowed) {
+    KeyString encodedKey(key, _order);
+    std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
+
+    auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+    // We can't let two threads unindex the same key
+    if (!ru->transaction()->registerWrite(prefixedKey)) {
+        throw WriteConflictException();
+    }
+
+    _indexStorageSize.fetch_sub(static_cast<long long>(prefixedKey.size()),
+                                std::memory_order_relaxed);
+
+    if (!dupsAllowed) {
+        ru->writeBatch()->Delete(prefixedKey);
+        return;
+    }
+
+    // dups are allowed, so we have to deal with a vector of RecordIds.
+    std::string currentValue;
+    auto getStatus = ru->Get(prefixedKey, &currentValue);
+    if (getStatus.IsNotFound()) {
+        // nothing here. just return
+        return;
+    }
+    invariantRocksOK(getStatus);
+
+    bool foundLoc = false;
+    std::vector<std::pair<RecordId, KeyString::TypeBits>> records;
+
+    BufReader br(currentValue.data(), currentValue.size());
+    while (br.remaining()) {
+        RecordId locInIndex = KeyString::decodeRecordId(&br);
+        KeyString::TypeBits typeBits = KeyString::TypeBits::fromBuffer(&br);
+
+        if (loc == locInIndex) {
+            if (records.empty() && !br.remaining()) {
+                // This is the common case: we are removing the only loc for this key.
+                // Remove the whole entry.
+                ru->writeBatch()->Delete(prefixedKey);
+                return;
+            }
+
+            foundLoc = true;
+            continue;
         }
 
-        KeyString encodedKey(key, _order, loc);
-        std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
+        records.push_back(std::make_pair(locInIndex, typeBits));
+    }
 
-        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        if (!ru->transaction()->registerWrite(prefixedKey)) {
-            throw WriteConflictException();
+    if (!foundLoc) {
+        warning().stream() << loc << " not found in the index for key " << key;
+        return;  // nothing to do
+    }
+
+    // Put other locs for this key back in the index.
+    KeyString newValue;
+    invariant(!records.empty());
+    for (size_t i = 0; i < records.size(); i++) {
+        newValue.appendRecordId(records[i].first);
+        // When there is only one record, we can omit AllZeros TypeBits. Otherwise they need
+        // to be included.
+        if (!(records[i].second.isAllZeros() && records.size() == 1)) {
+            newValue.appendTypeBits(records[i].second);
         }
+    }
 
-        rocksdb::Slice value;
-        if (!encodedKey.getTypeBits().isAllZeros()) {
-            value =
-                rocksdb::Slice(reinterpret_cast<const char*>(encodedKey.getTypeBits().getBuffer()),
-                               encodedKey.getTypeBits().getSize());
-        }
+    rocksdb::Slice newValueSlice(newValue.getBuffer(), newValue.getSize());
+    ru->writeBatch()->Put(prefixedKey, newValueSlice);
+}
 
-        _indexStorageSize.fetch_add(static_cast<long long>(prefixedKey.size()),
-                                    std::memory_order_relaxed);
-        ru->writeBatch()->Put(prefixedKey, value);
+SortedDataInterface::Cursor* RocksUniqueIndex::newCursor(OperationContext* txn,
+                                                         int direction) const {
+    invariant((direction == 1 || direction == -1) && "invalid value for direction");
+    return new RocksUniqueCursor(txn, _db, _prefix, direction == 1, _order);
+}
 
+Status RocksUniqueIndex::dupKeyCheck(OperationContext* txn,
+                                     const BSONObj& key,
+                                     const RecordId& loc) {
+    KeyString encodedKey(key, _order);
+    std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
+
+    auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+    std::string value;
+    auto getStatus = ru->Get(prefixedKey, &value);
+    if (!getStatus.ok() && !getStatus.IsNotFound()) {
+        return rocksToMongoStatus(getStatus);
+    } else if (getStatus.IsNotFound()) {
+        // not found, not duplicate key
         return Status::OK();
     }
 
-    void RocksStandardIndex::unindex(OperationContext* txn, const BSONObj& key, const RecordId& loc,
-                                     bool dupsAllowed) {
-        invariant(dupsAllowed);
-
-        KeyString encodedKey(key, _order, loc);
-        std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
-
-        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        if (!ru->transaction()->registerWrite(prefixedKey)) {
-            throw WriteConflictException();
+    // If the key exists, check if we already have this loc at this key. If so, we don't
+    // consider that to be a dup.
+    BufReader br(value.data(), value.size());
+    while (br.remaining()) {
+        if (KeyString::decodeRecordId(&br) == loc) {
+            return Status::OK();
         }
 
-        _indexStorageSize.fetch_sub(static_cast<long long>(prefixedKey.size()),
-                                    std::memory_order_relaxed);
-        ru->writeBatch()->Delete(prefixedKey);
+        KeyString::TypeBits::fromBuffer(&br);  // Just calling this to advance reader.
+    }
+    return Status(ErrorCodes::DuplicateKey, dupKeyError(key));
+}
+
+SortedDataBuilderInterface* RocksUniqueIndex::getBulkBuilder(OperationContext* txn,
+                                                             bool dupsAllowed) {
+    return new RocksIndexBase::UniqueBulkBuilder(_prefix, _order, txn, dupsAllowed);
+}
+
+/// RocksStandardIndex
+RocksStandardIndex::RocksStandardIndex(rocksdb::DB* db,
+                                       std::string prefix,
+                                       std::string ident,
+                                       Ordering order)
+    : RocksIndexBase(db, prefix, ident, order) {}
+
+Status RocksStandardIndex::insert(OperationContext* txn,
+                                  const BSONObj& key,
+                                  const RecordId& loc,
+                                  bool dupsAllowed) {
+    invariant(dupsAllowed);
+    Status s = checkKeySize(key);
+    if (!s.isOK()) {
+        return s;
     }
 
-    SortedDataInterface::Cursor* RocksStandardIndex::newCursor(OperationContext* txn,
-                                                               int direction) const {
-        invariant( ( direction == 1 || direction == -1 ) && "invalid value for direction" );
-        return new RocksStandardCursor(txn, _db, _prefix, direction == 1, _order);
+    KeyString encodedKey(key, _order, loc);
+    std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
+
+    auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+    if (!ru->transaction()->registerWrite(prefixedKey)) {
+        throw WriteConflictException();
     }
 
-    SortedDataBuilderInterface* RocksStandardIndex::getBulkBuilder(OperationContext* txn,
-                                                                   bool dupsAllowed) {
-        invariant(dupsAllowed);
-        return new RocksIndexBase::StandardBulkBuilder(this, txn);
+    rocksdb::Slice value;
+    if (!encodedKey.getTypeBits().isAllZeros()) {
+        value = rocksdb::Slice(reinterpret_cast<const char*>(encodedKey.getTypeBits().getBuffer()),
+                               encodedKey.getTypeBits().getSize());
     }
+
+    _indexStorageSize.fetch_add(static_cast<long long>(prefixedKey.size()),
+                                std::memory_order_relaxed);
+    ru->writeBatch()->Put(prefixedKey, value);
+
+    return Status::OK();
+}
+
+void RocksStandardIndex::unindex(OperationContext* txn,
+                                 const BSONObj& key,
+                                 const RecordId& loc,
+                                 bool dupsAllowed) {
+    invariant(dupsAllowed);
+
+    KeyString encodedKey(key, _order, loc);
+    std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
+
+    auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+    if (!ru->transaction()->registerWrite(prefixedKey)) {
+        throw WriteConflictException();
+    }
+
+    _indexStorageSize.fetch_sub(static_cast<long long>(prefixedKey.size()),
+                                std::memory_order_relaxed);
+    ru->writeBatch()->Delete(prefixedKey);
+}
+
+SortedDataInterface::Cursor* RocksStandardIndex::newCursor(OperationContext* txn,
+                                                           int direction) const {
+    invariant((direction == 1 || direction == -1) && "invalid value for direction");
+    return new RocksStandardCursor(txn, _db, _prefix, direction == 1, _order);
+}
+
+SortedDataBuilderInterface* RocksStandardIndex::getBulkBuilder(OperationContext* txn,
+                                                               bool dupsAllowed) {
+    invariant(dupsAllowed);
+    return new RocksIndexBase::StandardBulkBuilder(this, txn);
+}
 
 }  // namespace mongo

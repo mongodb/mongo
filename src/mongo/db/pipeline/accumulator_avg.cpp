@@ -35,62 +35,56 @@
 
 namespace mongo {
 
-    using boost::intrusive_ptr;
+using boost::intrusive_ptr;
 
 namespace {
-    const char subTotalName[] = "subTotal";
-    const char countName[] = "count";
+const char subTotalName[] = "subTotal";
+const char countName[] = "count";
 }
 
-    void AccumulatorAvg::processInternal(const Value& input, bool merging) {
-        if (!merging) {
-            // non numeric types have no impact on average
-            if (!input.numeric())
-                return;
+void AccumulatorAvg::processInternal(const Value& input, bool merging) {
+    if (!merging) {
+        // non numeric types have no impact on average
+        if (!input.numeric())
+            return;
 
-            _total += input.getDouble();
-            _count += 1;
-        }
-        else {
-            // We expect an object that contains both a subtotal and a count.
-            // This is what getValue(true) produced below.
-            verify(input.getType() == Object);
-            _total += input[subTotalName].getDouble();
-            _count += input[countName].getLong();
-        }
+        _total += input.getDouble();
+        _count += 1;
+    } else {
+        // We expect an object that contains both a subtotal and a count.
+        // This is what getValue(true) produced below.
+        verify(input.getType() == Object);
+        _total += input[subTotalName].getDouble();
+        _count += input[countName].getLong();
     }
+}
 
-    intrusive_ptr<Accumulator> AccumulatorAvg::create() {
-        return new AccumulatorAvg();
+intrusive_ptr<Accumulator> AccumulatorAvg::create() {
+    return new AccumulatorAvg();
+}
+
+Value AccumulatorAvg::getValue(bool toBeMerged) const {
+    if (!toBeMerged) {
+        if (_count == 0)
+            return Value(0.0);
+
+        return Value(_total / static_cast<double>(_count));
+    } else {
+        return Value(DOC(subTotalName << _total << countName << _count));
     }
+}
 
-    Value AccumulatorAvg::getValue(bool toBeMerged) const {
-        if (!toBeMerged) {
-            if (_count == 0)
-                return Value(0.0);
+AccumulatorAvg::AccumulatorAvg() : _total(0), _count(0) {
+    // This is a fixed size Accumulator so we never need to update this
+    _memUsageBytes = sizeof(*this);
+}
 
-            return Value(_total / static_cast<double>(_count));
-        }
-        else {
-            return Value(DOC(subTotalName << _total
-                          << countName << _count));
-        }
-    }
+void AccumulatorAvg::reset() {
+    _total = 0;
+    _count = 0;
+}
 
-    AccumulatorAvg::AccumulatorAvg()
-        : _total(0)
-        , _count(0)
-    {
-        // This is a fixed size Accumulator so we never need to update this
-        _memUsageBytes = sizeof(*this);
-    }
-
-    void AccumulatorAvg::reset() {
-        _total = 0;
-        _count = 0;
-    }
-
-    const char *AccumulatorAvg::getOpName() const {
-        return "$avg";
-    }
+const char* AccumulatorAvg::getOpName() const {
+    return "$avg";
+}
 }

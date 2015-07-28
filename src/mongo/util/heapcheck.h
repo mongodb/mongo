@@ -34,12 +34,12 @@
 
 #include <google/heap-checker.h>
 
-#define IGNORE_OBJECT( a ) HeapLeakChecker::IgnoreObject( a )
-#define UNIGNORE_OBJECT( a ) HeapLeakChecker::UnIgnoreObject( a )
+#define IGNORE_OBJECT(a) HeapLeakChecker::IgnoreObject(a)
+#define UNIGNORE_OBJECT(a) HeapLeakChecker::UnIgnoreObject(a)
 
 #else
 
-#define IGNORE_OBJECT( a )
-#define UNIGNORE_OBJECT( a )
+#define IGNORE_OBJECT(a)
+#define UNIGNORE_OBJECT(a)
 
 #endif

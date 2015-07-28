@@ -39,46 +39,49 @@
 namespace mongo {
 namespace repl {
 
-    struct Target {
-        Target(std::string hostport) : toHost(hostport), ok(false) { }
-        //Target() : ok(false) { }
-        const std::string toHost;
-        bool ok;
-        BSONObj result;
-    };
+struct Target {
+    Target(std::string hostport) : toHost(hostport), ok(false) {}
+    // Target() : ok(false) { }
+    const std::string toHost;
+    bool ok;
+    BSONObj result;
+};
 
-    /** send a command to several servers in parallel.  waits for all to complete before 
-        returning.  
-        
-        in: Target::toHost
-        out: Target::result and Target::ok
-    */
-    void multiCommand(BSONObj cmd, std::list<Target>& L);
+/** send a command to several servers in parallel.  waits for all to complete before
+    returning.
 
-    class _MultiCommandJob : public BackgroundJob {
-    public:
-        BSONObj& cmd;
-        Target& d;
-        _MultiCommandJob(BSONObj& _cmd, Target& _d) : cmd(_cmd), d(_d) { }
+    in: Target::toHost
+    out: Target::result and Target::ok
+*/
+void multiCommand(BSONObj cmd, std::list<Target>& L);
 
-    private:
-        std::string name() const { return "MultiCommandJob"; }
-        void run();
-    };
+class _MultiCommandJob : public BackgroundJob {
+public:
+    BSONObj& cmd;
+    Target& d;
+    _MultiCommandJob(BSONObj& _cmd, Target& _d) : cmd(_cmd), d(_d) {}
 
-    inline void multiCommand(BSONObj cmd, std::list<Target>& L) {
-        std::list< boost::shared_ptr<BackgroundJob> > jobs;
-
-        for( std::list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
-            Target& d = *i;
-            _MultiCommandJob *j = new _MultiCommandJob(cmd, d);
-            jobs.push_back( boost::shared_ptr<BackgroundJob>(j) );
-            j->go();
-        }
-
-        for( std::list< boost::shared_ptr<BackgroundJob> >::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
-            (*i)->wait();
-        }
+private:
+    std::string name() const {
+        return "MultiCommandJob";
     }
-} // namespace repl
-} // namespace mongo
+    void run();
+};
+
+inline void multiCommand(BSONObj cmd, std::list<Target>& L) {
+    std::list<boost::shared_ptr<BackgroundJob>> jobs;
+
+    for (std::list<Target>::iterator i = L.begin(); i != L.end(); i++) {
+        Target& d = *i;
+        _MultiCommandJob* j = new _MultiCommandJob(cmd, d);
+        jobs.push_back(boost::shared_ptr<BackgroundJob>(j));
+        j->go();
+    }
+
+    for (std::list<boost::shared_ptr<BackgroundJob>>::iterator i = jobs.begin(); i != jobs.end();
+         i++) {
+        (*i)->wait();
+    }
+}
+}  // namespace repl
+}  // namespace mongo

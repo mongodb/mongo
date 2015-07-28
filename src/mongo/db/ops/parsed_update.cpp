@@ -35,103 +35,98 @@
 
 namespace mongo {
 
-    ParsedUpdate::ParsedUpdate(OperationContext* txn, const UpdateRequest* request) :
-        _txn(txn),
-        _request(request),
-        _driver(UpdateDriver::Options()),
-        _canonicalQuery() { }
+ParsedUpdate::ParsedUpdate(OperationContext* txn, const UpdateRequest* request)
+    : _txn(txn), _request(request), _driver(UpdateDriver::Options()), _canonicalQuery() {}
 
-    Status ParsedUpdate::parseRequest() {
-        // It is invalid to request that the update plan stores a copy of the resulting document
-        // if it is a multi-update.
-        invariant(!(_request->shouldStoreResultDoc() && _request->isMulti()));
+Status ParsedUpdate::parseRequest() {
+    // It is invalid to request that the update plan stores a copy of the resulting document
+    // if it is a multi-update.
+    invariant(!(_request->shouldStoreResultDoc() && _request->isMulti()));
 
-        // We parse the update portion before the query portion because the dispostion of the update
-        // may determine whether or not we need to produce a CanonicalQuery at all.  For example, if
-        // the update involves the positional-dollar operator, we must have a CanonicalQuery even if
-        // it isn't required for query execution.
-        Status status = parseUpdate();
-        if (!status.isOK())
-            return status;
-        status = parseQuery();
-        if (!status.isOK())
-            return status;
+    // We parse the update portion before the query portion because the dispostion of the update
+    // may determine whether or not we need to produce a CanonicalQuery at all.  For example, if
+    // the update involves the positional-dollar operator, we must have a CanonicalQuery even if
+    // it isn't required for query execution.
+    Status status = parseUpdate();
+    if (!status.isOK())
+        return status;
+    status = parseQuery();
+    if (!status.isOK())
+        return status;
+    return Status::OK();
+}
+
+Status ParsedUpdate::parseQuery() {
+    dassert(!_canonicalQuery.get());
+
+    if (!_driver.needMatchDetails() && CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
         return Status::OK();
     }
 
-    Status ParsedUpdate::parseQuery() {
-        dassert(!_canonicalQuery.get());
+    return parseQueryToCQ();
+}
 
-        if (!_driver.needMatchDetails() && CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
-            return Status::OK();
-        }
+Status ParsedUpdate::parseQueryToCQ() {
+    dassert(!_canonicalQuery.get());
 
-        return parseQueryToCQ();
+    CanonicalQuery* cqRaw;
+    const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
+
+    Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
+                                                 _request->getQuery(),
+                                                 _request->isExplain(),
+                                                 &cqRaw,
+                                                 whereCallback);
+    if (status.isOK()) {
+        _canonicalQuery.reset(cqRaw);
     }
 
-    Status ParsedUpdate::parseQueryToCQ() {
-        dassert(!_canonicalQuery.get());
+    return status;
+}
 
-        CanonicalQuery* cqRaw;
-        const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
+Status ParsedUpdate::parseUpdate() {
+    const NamespaceString& ns(_request->getNamespaceString());
 
-        Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
-                                                     _request->getQuery(),
-                                                     _request->isExplain(),
-                                                     &cqRaw,
-                                                     whereCallback);
-        if (status.isOK()) {
-            _canonicalQuery.reset(cqRaw);
-        }
+    // Should the modifiers validate their embedded docs via okForStorage
+    // Only user updates should be checked. Any system or replication stuff should pass through.
+    // Config db docs shouldn't get checked for valid field names since the shard key can have
+    // a dot (".") in it.
+    const bool shouldValidate =
+        !(_request->isFromReplication() || ns.isConfigDB() || _request->isFromMigration());
 
-        return status;
-    }
+    _driver.setLogOp(true);
+    _driver.setModOptions(
+        ModifierInterface::Options(_request->isFromReplication(), shouldValidate));
 
-    Status ParsedUpdate::parseUpdate() {
-        const NamespaceString& ns(_request->getNamespaceString());
+    return _driver.parse(_request->getUpdates(), _request->isMulti());
+}
 
-        // Should the modifiers validate their embedded docs via okForStorage
-        // Only user updates should be checked. Any system or replication stuff should pass through.
-        // Config db docs shouldn't get checked for valid field names since the shard key can have
-        // a dot (".") in it.
-        const bool shouldValidate = !(_request->isFromReplication() ||
-                                      ns.isConfigDB() ||
-                                      _request->isFromMigration());
+bool ParsedUpdate::canYield() const {
+    return !_request->isGod() && PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() &&
+        !isIsolated();
+}
 
-        _driver.setLogOp(true);
-        _driver.setModOptions(ModifierInterface::Options(_request->isFromReplication(),
-                                                         shouldValidate));
+bool ParsedUpdate::isIsolated() const {
+    return _canonicalQuery.get()
+        ? QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC)
+        : LiteParsedQuery::isQueryIsolated(_request->getQuery());
+}
 
-        return _driver.parse(_request->getUpdates(), _request->isMulti());
-    }
+bool ParsedUpdate::hasParsedQuery() const {
+    return _canonicalQuery.get() != NULL;
+}
 
-    bool ParsedUpdate::canYield() const {
-        return !_request->isGod() &&
-            PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() &&
-            !isIsolated();
-    }
+CanonicalQuery* ParsedUpdate::releaseParsedQuery() {
+    invariant(_canonicalQuery.get() != NULL);
+    return _canonicalQuery.release();
+}
 
-    bool ParsedUpdate::isIsolated() const {
-        return _canonicalQuery.get()
-            ? QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC)
-            : LiteParsedQuery::isQueryIsolated(_request->getQuery());
-    }
+const UpdateRequest* ParsedUpdate::getRequest() const {
+    return _request;
+}
 
-    bool ParsedUpdate::hasParsedQuery() const {
-        return _canonicalQuery.get() != NULL;
-    }
-
-    CanonicalQuery* ParsedUpdate::releaseParsedQuery() {
-        invariant(_canonicalQuery.get() != NULL);
-        return _canonicalQuery.release();
-    }
-
-    const UpdateRequest* ParsedUpdate::getRequest() const {
-        return _request;
-    }
-
-    UpdateDriver* ParsedUpdate::getDriver() {
-        return &_driver;
-    }
+UpdateDriver* ParsedUpdate::getDriver() {
+    return &_driver;
+}
 
 }  // namespace mongo

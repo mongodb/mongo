@@ -45,13 +45,12 @@
 
 namespace mongo {
 
-    void quickExit(int code) {
-
+void quickExit(int code) {
 #if __has_feature(address_sanitizer)
-        __lsan_do_leak_check();
+    __lsan_do_leak_check();
 #endif
 
-        ::_exit(code);
-    }
+    ::_exit(code);
+}
 
-} // namespace mongo
+}  // namespace mongo

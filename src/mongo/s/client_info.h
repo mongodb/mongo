@@ -42,132 +42,146 @@
 
 namespace mongo {
 
-    class AbstractMessagingPort;
+class AbstractMessagingPort;
+
+/**
+ * holds information about a client connected to a mongos
+ * 1 per client socket
+ * currently implemented with a thread local
+ */
+class ClientInfo : public ClientBasic {
+public:
+    ClientInfo(AbstractMessagingPort* messagingPort);
+    ~ClientInfo();
+
+    /** new request on behalf of a client, adjusts internal state */
+    void newPeerRequest(const HostAndPort& peer);
+
+    /** new request not associated (yet or ever) with a client */
+    void newRequest();
+
+
+    /** client disconnected */
+    void disconnect();
+
+    bool hasRemote() const {
+        return true;
+    }
 
     /**
-     * holds information about a client connected to a mongos
-     * 1 per client socket
-     * currently implemented with a thread local
+     * @return remote socket address of the client
      */
-    class ClientInfo : public ClientBasic {
-    public:
-        ClientInfo(AbstractMessagingPort* messagingPort);
-        ~ClientInfo();
+    HostAndPort getRemote() const {
+        return _remote;
+    }
 
-        /** new request on behalf of a client, adjusts internal state */
-        void newPeerRequest( const HostAndPort& peer );
+    /**
+     * notes that this client use this shard
+     * keeps track of all shards accessed this request
+     */
+    void addShardHost(const std::string& shardHost);
 
-        /** new request not associated (yet or ever) with a client */
-        void newRequest();
+    /**
+     * Notes that this client wrote to these particular hosts with write commands.
+     */
+    void addHostOpTime(ConnectionString connstr, HostOpTime stat);
+    void addHostOpTimes(const HostOpTimeMap& hostOpTimes);
+
+    /**
+     * gets shards used on the previous request
+     */
+    std::set<std::string>* getPrevShardHosts() const {
+        return &_prev->shardHostsWritten;
+    }
+
+    /**
+     * Gets the shards, hosts, and opTimes the client last wrote to with write commands.
+     */
+    const HostOpTimeMap& getPrevHostOpTimes() const {
+        return _prev->hostOpTimes;
+    }
+
+    /**
+     * gets all shards we've accessed since the last time we called clearSinceLastGetError
+     */
+    const std::set<std::string>& sinceLastGetError() const {
+        return _sinceLastGetError;
+    }
+
+    /**
+     * clears list of shards we've talked to
+     */
+    void clearSinceLastGetError() {
+        _sinceLastGetError.clear();
+    }
 
 
-        /** client disconnected */
-        void disconnect();
+    /**
+     * resets the information stored for the current request
+     */
+    void clearRequestInfo() {
+        _cur->clear();
+    }
 
-        bool hasRemote() const { return true; }
+    void disableForCommand();
 
-        /**
-         * @return remote socket address of the client
-         */
-        HostAndPort getRemote() const { return _remote; }
+    /** @return if its ok to auto split from this client */
+    bool autoSplitOk() const {
+        return _autoSplitOk && Chunk::ShouldAutoSplit;
+    }
 
-        /**
-         * notes that this client use this shard
-         * keeps track of all shards accessed this request
-         */
-        void addShardHost( const std::string& shardHost );
+    void noAutoSplit() {
+        _autoSplitOk = false;
+    }
 
-        /**
-         * Notes that this client wrote to these particular hosts with write commands.
-         */
-        void addHostOpTime(ConnectionString connstr, HostOpTime stat);
-        void addHostOpTimes( const HostOpTimeMap& hostOpTimes );
+    // Returns whether or not a ClientInfo for this thread has already been created and stored
+    // in _tlInfo.
+    static bool exists();
+    // Gets the ClientInfo object for this thread from _tlInfo. If no ClientInfo object exists
+    // yet for this thread, it creates one.
+    static ClientInfo* get(AbstractMessagingPort* messagingPort = NULL);
+    // Creates a ClientInfo and stores it in _tlInfo
+    static ClientInfo* create(AbstractMessagingPort* messagingPort);
 
-        /**
-         * gets shards used on the previous request
-         */
-        std::set<std::string>* getPrevShardHosts() const { return &_prev->shardHostsWritten; }
+private:
+    int _id;              // unique client id
+    HostAndPort _remote;  // server:port of remote socket end
 
-        /**
-         * Gets the shards, hosts, and opTimes the client last wrote to with write commands.
-         */
-        const HostOpTimeMap& getPrevHostOpTimes() const {
-            return _prev->hostOpTimes;
+    struct RequestInfo {
+        void clear() {
+            shardHostsWritten.clear();
+            hostOpTimes.clear();
         }
 
-        /**
-         * gets all shards we've accessed since the last time we called clearSinceLastGetError
-         */
-        const std::set<std::string>& sinceLastGetError() const { return _sinceLastGetError; }
-
-        /**
-         * clears list of shards we've talked to
-         */
-        void clearSinceLastGetError() { _sinceLastGetError.clear(); }
-
-
-        /**
-         * resets the information stored for the current request
-         */
-        void clearRequestInfo(){ _cur->clear(); }
-
-        void disableForCommand();
-
-        /** @return if its ok to auto split from this client */
-        bool autoSplitOk() const { return _autoSplitOk && Chunk::ShouldAutoSplit; }
-
-        void noAutoSplit() { _autoSplitOk = false; }
-
-        // Returns whether or not a ClientInfo for this thread has already been created and stored
-        // in _tlInfo.
-        static bool exists();
-        // Gets the ClientInfo object for this thread from _tlInfo. If no ClientInfo object exists
-        // yet for this thread, it creates one.
-        static ClientInfo * get(AbstractMessagingPort* messagingPort = NULL);
-        // Creates a ClientInfo and stores it in _tlInfo
-        static ClientInfo* create(AbstractMessagingPort* messagingPort);
-
-    private:
-
-        int _id; // unique client id
-        HostAndPort _remote; // server:port of remote socket end
-
-        struct RequestInfo {
-
-            void clear() {
-                shardHostsWritten.clear();
-                hostOpTimes.clear();
-            }
-
-            std::set<std::string> shardHostsWritten;
-            HostOpTimeMap hostOpTimes;
-        };
-
-        // we use _a and _b to store info from the current request and the previous request
-        // we use 2 so we can flip for getLastError type operations
-
-        RequestInfo _a; // actual set for _cur or _prev
-        RequestInfo _b; //   "
-
-        RequestInfo* _cur; // pointer to _a or _b depending on state
-        RequestInfo* _prev; //  ""
-
-
-        std::set<std::string> _sinceLastGetError; // all shards accessed since last getLastError
-
-        int _lastAccess;
-        bool _autoSplitOk;
-
-        static boost::thread_specific_ptr<ClientInfo> _tlInfo;
+        std::set<std::string> shardHostsWritten;
+        HostOpTimeMap hostOpTimes;
     };
 
-    /* Look for $gleStats in a command response, and fill in ClientInfo with the data,
-     * if found.
-     * This data will be used by subsequent GLE calls, to ensure we look for the correct
-     * write on the correct PRIMARY.
-     * result: the result from calling runCommand
-     * conn: the std::string name of the hostAndPort where the command ran. This can be a replica set
-     *       seed list.
-     */
-    void saveGLEStats(const BSONObj& result, const std::string& conn);
+    // we use _a and _b to store info from the current request and the previous request
+    // we use 2 so we can flip for getLastError type operations
+
+    RequestInfo _a;  // actual set for _cur or _prev
+    RequestInfo _b;  //   "
+
+    RequestInfo* _cur;   // pointer to _a or _b depending on state
+    RequestInfo* _prev;  //  ""
+
+
+    std::set<std::string> _sinceLastGetError;  // all shards accessed since last getLastError
+
+    int _lastAccess;
+    bool _autoSplitOk;
+
+    static boost::thread_specific_ptr<ClientInfo> _tlInfo;
+};
+
+/* Look for $gleStats in a command response, and fill in ClientInfo with the data,
+ * if found.
+ * This data will be used by subsequent GLE calls, to ensure we look for the correct
+ * write on the correct PRIMARY.
+ * result: the result from calling runCommand
+ * conn: the std::string name of the hostAndPort where the command ran. This can be a replica set
+ *       seed list.
+ */
+void saveGLEStats(const BSONObj& result, const std::string& conn);
 }

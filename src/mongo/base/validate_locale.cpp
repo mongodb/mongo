@@ -33,22 +33,20 @@
 
 namespace mongo {
 
-MONGO_INITIALIZER_GENERAL(ValidateLocale,
-        MONGO_NO_PREREQUISITES,
-        MONGO_DEFAULT_PREREQUISITES)
-        (InitializerContext*) {
-        try {
-            // Validate that boost can correctly load the user's locale
-            boost::filesystem::path("/").has_root_directory();
-        }
-        catch (const std::runtime_error&) {
-           return Status(ErrorCodes::BadValue, "Invalid or no user locale set."
+MONGO_INITIALIZER_GENERAL(ValidateLocale, MONGO_NO_PREREQUISITES, MONGO_DEFAULT_PREREQUISITES)
+(InitializerContext*) {
+    try {
+        // Validate that boost can correctly load the user's locale
+        boost::filesystem::path("/").has_root_directory();
+    } catch (const std::runtime_error&) {
+        return Status(ErrorCodes::BadValue,
+                      "Invalid or no user locale set."
 #ifndef _WIN32
-                " Please ensure LANG and/or LC_* environment variables are set correctly."
+                      " Please ensure LANG and/or LC_* environment variables are set correctly."
 #endif
-                );
-        }
-        return Status::OK();
+                      );
     }
+    return Status::OK();
+}
 
 }  // namespace mongo

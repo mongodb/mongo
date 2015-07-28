@@ -46,152 +46,147 @@
 
 namespace mongo {
 
-    using std::stringstream;
+using std::stringstream;
 
-    void inProgCmd(OperationContext* txn, Message &message, DbResponse &dbresponse) {
-        DbMessage d(message);
-        QueryMessage q(d);
+void inProgCmd(OperationContext* txn, Message& message, DbResponse& dbresponse) {
+    DbMessage d(message);
+    QueryMessage q(d);
 
-        const bool isAuthorized =
-                txn->getClient()->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                                                            ResourcePattern::forClusterResource(),
-                                                            ActionType::inprog);
-        audit::logInProgAuthzCheck(txn->getClient(),
-                                   q.query,
-                                   isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+    const bool isAuthorized =
+        txn->getClient()->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(), ActionType::inprog);
+    audit::logInProgAuthzCheck(
+        txn->getClient(), q.query, isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
 
-        BSONObjBuilder retVal;
+    BSONObjBuilder retVal;
 
-        if (!isAuthorized) {
-            retVal.append("err", "unauthorized");
-            replyToQuery(0, message, dbresponse, retVal.obj());
-            return;
-        }
-
-        const bool includeAll = q.query["$all"].trueValue();
-
-        // Filter the output
-        BSONObj filter;
-        {
-            BSONObjBuilder b;
-            BSONObjIterator i(q.query);
-            while (i.more()) {
-                BSONElement e = i.next();
-                if (str::equals("$all", e.fieldName())) {
-                    continue;
-                }
-
-                b.append(e);
-            }
-            filter = b.obj();
-        }
-
-        const NamespaceString nss(d.getns());
-        const WhereCallbackReal whereCallback(txn, nss.db());
-        const Matcher matcher(filter, whereCallback);
-
-        BSONArrayBuilder inprogBuilder(retVal.subarrayStart("inprog"));
-
-        boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
-
-        ClientSet::const_iterator it = Client::clients.begin();
-        for ( ; it != Client::clients.end(); it++) {
-            Client* client = *it;
-            invariant(client);
-
-            boost::unique_lock<Client> uniqueLock(*client);
-            const OperationContext* opCtx = client->getOperationContext();
-
-            if (!includeAll) {
-                // Skip over inactive connections.
-                if (!opCtx || !opCtx->getCurOp() || !opCtx->getCurOp()->active()) {
-                    continue;
-                }
-            }
-
-            BSONObjBuilder infoBuilder;
-
-            // The client information
-            client->reportState(infoBuilder);
-
-            // Operation context specific information
-            if (opCtx) {
-                // CurOp
-                if (opCtx->getCurOp()) {
-                    opCtx->getCurOp()->reportState(&infoBuilder);
-                }
-
-                // LockState
-                Locker::LockerInfo lockerInfo;
-                client->getOperationContext()->lockState()->getLockerInfo(&lockerInfo);
-                fillLockerInfo(lockerInfo, infoBuilder);
-            }
-            else {
-                // If no operation context, mark the operation as inactive
-                infoBuilder.append("active", false);
-            }
-
-            infoBuilder.done();
-
-            const BSONObj info = infoBuilder.obj();
-
-            if (includeAll || matcher.matches(info)) {
-                inprogBuilder.append(info);
-            }
-        }
-
-        inprogBuilder.done();
-
-        if (lockedForWriting()) {
-            retVal.append("fsyncLock", true);
-            retVal.append("info",
-                          "use db.fsyncUnlock() to terminate the fsync write/snapshot lock");
-        }
-
+    if (!isAuthorized) {
+        retVal.append("err", "unauthorized");
         replyToQuery(0, message, dbresponse, retVal.obj());
+        return;
     }
 
+    const bool includeAll = q.query["$all"].trueValue();
 
-    void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder) {
-        // "locks" section
-        BSONObjBuilder locks(infoBuilder.subobjStart("locks"));
-        const size_t locksSize = lockerInfo.locks.size();
-
-        // Only add the last lock of each type, and use the largest mode encountered
-        LockMode modeForType[ResourceTypesCount] = { }; // default initialize to zero (min value)
-        for (size_t i = 0; i < locksSize; i++) {
-            const Locker::OneLock& lock = lockerInfo.locks[i];
-            const ResourceType lockType = lock.resourceId.getType();
-            const LockMode lockMode =  std::max(lock.mode, modeForType[lockType]);
-
-            // Check that lockerInfo is sorted on resource type
-            invariant(i == 0 || lockType >= lockerInfo.locks[i - 1].resourceId.getType());
-
-            if (lock.resourceId == resourceIdLocalDB) {
-                locks.append("local", legacyModeName(lock.mode));
+    // Filter the output
+    BSONObj filter;
+    {
+        BSONObjBuilder b;
+        BSONObjIterator i(q.query);
+        while (i.more()) {
+            BSONElement e = i.next();
+            if (str::equals("$all", e.fieldName())) {
                 continue;
             }
 
-            modeForType[lockType] = lockMode;
+            b.append(e);
+        }
+        filter = b.obj();
+    }
 
-            if (i + 1 < locksSize && lockerInfo.locks[i + 1].resourceId.getType() == lockType) {
-                continue; // skip this lock as it is not the last one of its type
-            }
-            else {
-                locks.append(resourceTypeName(lockType), legacyModeName(lockMode));
+    const NamespaceString nss(d.getns());
+    const WhereCallbackReal whereCallback(txn, nss.db());
+    const Matcher matcher(filter, whereCallback);
+
+    BSONArrayBuilder inprogBuilder(retVal.subarrayStart("inprog"));
+
+    boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+
+    ClientSet::const_iterator it = Client::clients.begin();
+    for (; it != Client::clients.end(); it++) {
+        Client* client = *it;
+        invariant(client);
+
+        boost::unique_lock<Client> uniqueLock(*client);
+        const OperationContext* opCtx = client->getOperationContext();
+
+        if (!includeAll) {
+            // Skip over inactive connections.
+            if (!opCtx || !opCtx->getCurOp() || !opCtx->getCurOp()->active()) {
+                continue;
             }
         }
-        locks.done();
 
-        // "waitingForLock" section
-        infoBuilder.append("waitingForLock", lockerInfo.waitingResource.isValid());
+        BSONObjBuilder infoBuilder;
 
-        // "lockStats" section
-        {
-            BSONObjBuilder lockStats(infoBuilder.subobjStart("lockStats"));
-            lockerInfo.stats.report(&lockStats);
-            lockStats.done();
+        // The client information
+        client->reportState(infoBuilder);
+
+        // Operation context specific information
+        if (opCtx) {
+            // CurOp
+            if (opCtx->getCurOp()) {
+                opCtx->getCurOp()->reportState(&infoBuilder);
+            }
+
+            // LockState
+            Locker::LockerInfo lockerInfo;
+            client->getOperationContext()->lockState()->getLockerInfo(&lockerInfo);
+            fillLockerInfo(lockerInfo, infoBuilder);
+        } else {
+            // If no operation context, mark the operation as inactive
+            infoBuilder.append("active", false);
+        }
+
+        infoBuilder.done();
+
+        const BSONObj info = infoBuilder.obj();
+
+        if (includeAll || matcher.matches(info)) {
+            inprogBuilder.append(info);
         }
     }
 
-} // namespace mongo
+    inprogBuilder.done();
+
+    if (lockedForWriting()) {
+        retVal.append("fsyncLock", true);
+        retVal.append("info", "use db.fsyncUnlock() to terminate the fsync write/snapshot lock");
+    }
+
+    replyToQuery(0, message, dbresponse, retVal.obj());
+}
+
+
+void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder) {
+    // "locks" section
+    BSONObjBuilder locks(infoBuilder.subobjStart("locks"));
+    const size_t locksSize = lockerInfo.locks.size();
+
+    // Only add the last lock of each type, and use the largest mode encountered
+    LockMode modeForType[ResourceTypesCount] = {};  // default initialize to zero (min value)
+    for (size_t i = 0; i < locksSize; i++) {
+        const Locker::OneLock& lock = lockerInfo.locks[i];
+        const ResourceType lockType = lock.resourceId.getType();
+        const LockMode lockMode = std::max(lock.mode, modeForType[lockType]);
+
+        // Check that lockerInfo is sorted on resource type
+        invariant(i == 0 || lockType >= lockerInfo.locks[i - 1].resourceId.getType());
+
+        if (lock.resourceId == resourceIdLocalDB) {
+            locks.append("local", legacyModeName(lock.mode));
+            continue;
+        }
+
+        modeForType[lockType] = lockMode;
+
+        if (i + 1 < locksSize && lockerInfo.locks[i + 1].resourceId.getType() == lockType) {
+            continue;  // skip this lock as it is not the last one of its type
+        } else {
+            locks.append(resourceTypeName(lockType), legacyModeName(lockMode));
+        }
+    }
+    locks.done();
+
+    // "waitingForLock" section
+    infoBuilder.append("waitingForLock", lockerInfo.waitingResource.isValid());
+
+    // "lockStats" section
+    {
+        BSONObjBuilder lockStats(infoBuilder.subobjStart("lockStats"));
+        lockerInfo.stats.report(&lockStats);
+        lockStats.done();
+    }
+}
+
+}  // namespace mongo

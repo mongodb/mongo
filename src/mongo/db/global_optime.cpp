@@ -33,48 +33,46 @@
 #include "mongo/util/log.h"
 
 namespace {
-    mongo::mutex globalOptimeMutex("globalOptime");
-    mongo::OpTime globalOpTime(0, 0);
+mongo::mutex globalOptimeMutex("globalOptime");
+mongo::OpTime globalOpTime(0, 0);
 
-    bool skewed(const mongo::OpTime& val) {
-        if (val.getInc() & 0x80000000) {
-            mongo::warning() << "clock skew detected  prev: " << val.getSecs()
-                             << " now: " << (unsigned) time(0) << std::endl;
-            return true;
-        }
-
-        return false;
+bool skewed(const mongo::OpTime& val) {
+    if (val.getInc() & 0x80000000) {
+        mongo::warning() << "clock skew detected  prev: " << val.getSecs()
+                         << " now: " << (unsigned)time(0) << std::endl;
+        return true;
     }
+
+    return false;
+}
 }
 
 namespace mongo {
-    void setGlobalOptime(const OpTime& newTime) {
-        mutex::scoped_lock lk(globalOptimeMutex);
-        globalOpTime = newTime;
+void setGlobalOptime(const OpTime& newTime) {
+    mutex::scoped_lock lk(globalOptimeMutex);
+    globalOpTime = newTime;
+}
+
+OpTime getLastSetOptime() {
+    mutex::scoped_lock lk(globalOptimeMutex);
+    return globalOpTime;
+}
+
+OpTime getNextGlobalOptime() {
+    mutex::scoped_lock lk(globalOptimeMutex);
+
+    const unsigned now = (unsigned)time(0);
+    const unsigned globalSecs = globalOpTime.getSecs();
+    if (globalSecs == now) {
+        globalOpTime = OpTime(globalSecs, globalOpTime.getInc() + 1);
+    } else if (now < globalSecs) {
+        globalOpTime = OpTime(globalSecs, globalOpTime.getInc() + 1);
+        // separate function to keep out of the hot code path
+        fassert(17449, !skewed(globalOpTime));
+    } else {
+        globalOpTime = OpTime(now, 1);
     }
 
-    OpTime getLastSetOptime() {
-        mutex::scoped_lock lk(globalOptimeMutex);
-        return globalOpTime;
-    }
-
-    OpTime getNextGlobalOptime() {
-        mutex::scoped_lock lk(globalOptimeMutex);
-
-        const unsigned now = (unsigned) time(0);
-        const unsigned globalSecs = globalOpTime.getSecs();
-        if ( globalSecs == now ) {
-            globalOpTime = OpTime(globalSecs, globalOpTime.getInc() + 1);
-        }
-        else if ( now < globalSecs ) {
-            globalOpTime = OpTime(globalSecs, globalOpTime.getInc() + 1);
-            // separate function to keep out of the hot code path
-            fassert(17449, !skewed(globalOpTime));
-        }
-        else {
-            globalOpTime = OpTime(now, 1);
-        }
-
-        return globalOpTime;
-    }
+    return globalOpTime;
+}
 }

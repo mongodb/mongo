@@ -34,23 +34,25 @@
 
 namespace mongo {
 
-    class Locker;
+class Locker;
 
 namespace repl {
 
-    /**
-     * Mock implementation of OperationContext that can be used with real instances of LockManager.
-     */
-    class OperationContextReplMock : public OperationContextNoop {
-    public:
-        OperationContextReplMock();
-        virtual ~OperationContextReplMock();
+/**
+ * Mock implementation of OperationContext that can be used with real instances of LockManager.
+ */
+class OperationContextReplMock : public OperationContextNoop {
+public:
+    OperationContextReplMock();
+    virtual ~OperationContextReplMock();
 
-        virtual Locker* lockState() const { return _lockState.get(); }
+    virtual Locker* lockState() const {
+        return _lockState.get();
+    }
 
-    private:
-        boost::scoped_ptr<Locker> _lockState;
-    };
+private:
+    boost::scoped_ptr<Locker> _lockState;
+};
 
 }  // namespace repl
 }  // namespace mongo

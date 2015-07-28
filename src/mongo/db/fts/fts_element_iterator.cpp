@@ -37,152 +37,149 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        using std::string;
+using std::string;
 
-        extern const double DEFAULT_WEIGHT;
-        extern const double MAX_WEIGHT;
+extern const double DEFAULT_WEIGHT;
+extern const double MAX_WEIGHT;
 
-        std::ostream& operator<<( std::ostream& os, FTSElementIterator::FTSIteratorFrame& frame ) {
-            BSONObjIterator it = frame._it;
-            return os << "FTSIteratorFrame["
-                " element=" << (*it).toString() <<
-                ", _language=" << frame._language->str() <<
-                ", _parentPath=" << frame._parentPath <<
-                ", _isArray=" << frame._isArray << "]";
+std::ostream& operator<<(std::ostream& os, FTSElementIterator::FTSIteratorFrame& frame) {
+    BSONObjIterator it = frame._it;
+    return os << "FTSIteratorFrame["
+                 " element=" << (*it).toString() << ", _language=" << frame._language->str()
+              << ", _parentPath=" << frame._parentPath << ", _isArray=" << frame._isArray << "]";
+}
+
+FTSElementIterator::FTSElementIterator(const FTSSpec& spec, const BSONObj& obj)
+    : _frame(obj, spec, &spec.defaultLanguage(), "", false),
+      _spec(spec),
+      _currentValue(advance()) {}
+
+namespace {
+/**  Check for exact match or path prefix match.  */
+inline bool _matchPrefix(const string& dottedName, const string& weight) {
+    if (weight == dottedName) {
+        return true;
+    }
+    return mongoutils::str::startsWith(weight, dottedName + '.');
+}
+}
+
+bool FTSElementIterator::more() {
+    //_currentValue = advance();
+    return _currentValue.valid();
+}
+
+FTSIteratorValue FTSElementIterator::next() {
+    FTSIteratorValue result = _currentValue;
+    _currentValue = advance();
+    return result;
+}
+
+/**
+ *  Helper method:
+ *      if (current object iterator not exhausted) return true;
+ *      while (frame stack not empty) {
+ *          resume object iterator popped from stack;
+ *          if (resumed iterator not exhausted) return true;
+ *      }
+ *      return false;
+ */
+bool FTSElementIterator::moreFrames() {
+    if (_frame._it.more())
+        return true;
+    while (!_frameStack.empty()) {
+        _frame = _frameStack.top();
+        _frameStack.pop();
+        if (_frame._it.more()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+FTSIteratorValue FTSElementIterator::advance() {
+    while (moreFrames()) {
+        BSONElement elem = _frame._it.next();
+        string fieldName = elem.fieldName();
+
+        // Skip "language" specifier fields if wildcard.
+        if (_spec.wildcard() && _spec.languageOverrideField() == fieldName) {
+            continue;
         }
 
-        FTSElementIterator::FTSElementIterator( const FTSSpec& spec, const BSONObj& obj )
-            : _frame( obj, spec, &spec.defaultLanguage(), "", false ),
-              _spec( spec ),
-              _currentValue( advance() )
-        { }
+        // Compose the dotted name of the current field:
+        // 1. parent path empty (top level): use the current field name
+        // 2. parent path non-empty and obj is an array: use the parent path
+        // 3. parent path non-empty and obj is a sub-doc: append field name to parent path
+        string dottedName = (_frame._parentPath.empty() ? fieldName : _frame._isArray
+                                     ? _frame._parentPath
+                                     : _frame._parentPath + '.' + fieldName);
 
-        namespace {
-            /**  Check for exact match or path prefix match.  */
-            inline bool _matchPrefix( const string& dottedName, const string& weight ) {
-                if ( weight == dottedName ) {
-                    return true;
-                }
-                return mongoutils::str::startsWith( weight, dottedName + '.' );
+        // Find lower bound of dottedName in _weights.  lower_bound leaves us at the first
+        // weight that could possibly match or be a prefix of dottedName.  And if this
+        // element fails to match, then no subsequent weight can match, since the weights
+        // are lexicographically ordered.
+        Weights::const_iterator i =
+            _spec.weights().lower_bound(elem.type() == Object ? dottedName + '.' : dottedName);
+
+        // possibleWeightMatch is set if the weight map contains either a match or some item
+        // lexicographically larger than fieldName.  This boolean acts as a guard on
+        // dereferences of iterator 'i'.
+        bool possibleWeightMatch = (i != _spec.weights().end());
+
+        // Optimize away two cases, when not wildcard:
+        // 1. lower_bound seeks to end(): no prefix match possible
+        // 2. lower_bound seeks to a name which is not a prefix
+        if (!_spec.wildcard()) {
+            if (!possibleWeightMatch) {
+                continue;
+            } else if (!_matchPrefix(dottedName, i->first)) {
+                continue;
             }
         }
 
-        bool FTSElementIterator::more() {
-            //_currentValue = advance();
-            return _currentValue.valid();
-        }
+        // Is the current field an exact match on a weight?
+        bool exactMatch = (possibleWeightMatch && i->first == dottedName);
+        double weight = (possibleWeightMatch ? i->second : DEFAULT_WEIGHT);
 
-        FTSIteratorValue FTSElementIterator::next() {
-            FTSIteratorValue result = _currentValue;
-            _currentValue = advance();
-            return result;
-        }
-
-        /**
-         *  Helper method:
-         *      if (current object iterator not exhausted) return true;
-         *      while (frame stack not empty) {
-         *          resume object iterator popped from stack;
-         *          if (resumed iterator not exhausted) return true;
-         *      }
-         *      return false;
-         */
-        bool FTSElementIterator::moreFrames() {
-            if (_frame._it.more()) return true;
-            while (!_frameStack.empty()) {
-                _frame = _frameStack.top();
-                _frameStack.pop();
-                if (_frame._it.more()) {
-                    return true;
+        switch (elem.type()) {
+            case String:
+                // Only index strings on exact match or wildcard.
+                if (exactMatch || _spec.wildcard()) {
+                    return FTSIteratorValue(elem.valuestr(), _frame._language, weight);
                 }
-            }
-            return false;
+                break;
+
+            case Object:
+                // Only descend into a sub-document on proper prefix or wildcard.  Note that
+                // !exactMatch is a sufficient test for proper prefix match, because of
+                //   if ( !matchPrefix( dottedName, i->first ) ) continue;
+                // block above.
+                if (!exactMatch || _spec.wildcard()) {
+                    _frameStack.push(_frame);
+                    _frame =
+                        FTSIteratorFrame(elem.Obj(), _spec, _frame._language, dottedName, false);
+                }
+                break;
+
+            case Array:
+                // Only descend into arrays from non-array parents or on wildcard.
+                if (!_frame._isArray || _spec.wildcard()) {
+                    _frameStack.push(_frame);
+                    _frame =
+                        FTSIteratorFrame(elem.Obj(), _spec, _frame._language, dottedName, true);
+                }
+                break;
+
+            default:
+                // Skip over all other BSON types.
+                break;
         }
+    }
+    return FTSIteratorValue();  // valid()==false
+}
 
-        FTSIteratorValue FTSElementIterator::advance() {
-            while ( moreFrames() ) {
-
-                BSONElement elem = _frame._it.next();
-                string fieldName = elem.fieldName();
-
-                // Skip "language" specifier fields if wildcard.
-                if ( _spec.wildcard() && _spec.languageOverrideField() == fieldName ) {
-                    continue;
-                }
-
-                // Compose the dotted name of the current field:
-                // 1. parent path empty (top level): use the current field name
-                // 2. parent path non-empty and obj is an array: use the parent path
-                // 3. parent path non-empty and obj is a sub-doc: append field name to parent path
-                string dottedName = ( _frame._parentPath.empty() ? fieldName
-                                          : _frame._isArray ? _frame._parentPath
-                                          : _frame._parentPath + '.' + fieldName );
-                
-                // Find lower bound of dottedName in _weights.  lower_bound leaves us at the first
-                // weight that could possibly match or be a prefix of dottedName.  And if this
-                // element fails to match, then no subsequent weight can match, since the weights
-                // are lexicographically ordered.
-                Weights::const_iterator i = _spec.weights().lower_bound( elem.type() == Object
-                                                                         ? dottedName + '.'
-                                                                         : dottedName );
-
-                // possibleWeightMatch is set if the weight map contains either a match or some item
-                // lexicographically larger than fieldName.  This boolean acts as a guard on
-                // dereferences of iterator 'i'.
-                bool possibleWeightMatch = ( i != _spec.weights().end() );
-
-                // Optimize away two cases, when not wildcard:
-                // 1. lower_bound seeks to end(): no prefix match possible
-                // 2. lower_bound seeks to a name which is not a prefix
-                if ( !_spec.wildcard() ) {
-                    if ( !possibleWeightMatch ) {
-                        continue;
-                    }
-                    else if ( !_matchPrefix( dottedName, i->first ) ) {
-                        continue;
-                    }
-                }
-
-                // Is the current field an exact match on a weight?
-                bool exactMatch = ( possibleWeightMatch && i->first == dottedName );
-                double weight = ( possibleWeightMatch ? i->second : DEFAULT_WEIGHT );
-
-                switch ( elem.type() ) {
-                case String:
-                    // Only index strings on exact match or wildcard.
-                    if ( exactMatch || _spec.wildcard() ) {
-                        return FTSIteratorValue( elem.valuestr(), _frame._language, weight );
-                    }
-                    break;
-
-                case Object:
-                    // Only descend into a sub-document on proper prefix or wildcard.  Note that
-                    // !exactMatch is a sufficient test for proper prefix match, because of
-                    //   if ( !matchPrefix( dottedName, i->first ) ) continue;
-                    // block above.
-                    if ( !exactMatch || _spec.wildcard() ) {
-                        _frameStack.push( _frame );
-                        _frame = FTSIteratorFrame( elem.Obj(), _spec, _frame._language, dottedName, false );
-                    }
-                    break;
-
-                case Array:
-                    // Only descend into arrays from non-array parents or on wildcard.
-                    if ( !_frame._isArray || _spec.wildcard() ) {
-                        _frameStack.push( _frame );
-                        _frame = FTSIteratorFrame( elem.Obj(), _spec, _frame._language, dottedName, true );
-                    }
-                    break;
-
-                default:
-                    // Skip over all other BSON types.
-                    break;
-                }
-            }
-            return FTSIteratorValue();  // valid()==false
-        }
-
-    }   // namespace fts
-}   // namespace mongo
+}  // namespace fts
+}  // namespace mongo

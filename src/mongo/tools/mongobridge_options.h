@@ -36,35 +36,35 @@
 
 namespace mongo {
 
-    namespace optionenvironment {
-        class OptionSection;
-        class Environment;
-    } // namespace optionenvironment
+namespace optionenvironment {
+class OptionSection;
+class Environment;
+}  // namespace optionenvironment
 
-    namespace moe = mongo::optionenvironment;
+namespace moe = mongo::optionenvironment;
 
-    struct MongoBridgeGlobalParams {
-        int port;
-        int delay;
-        int connectTimeoutSec;
-        std::string destUri;
+struct MongoBridgeGlobalParams {
+    int port;
+    int delay;
+    int connectTimeoutSec;
+    std::string destUri;
 
-        MongoBridgeGlobalParams() : port(0), delay(0), connectTimeoutSec(15) {}
-    };
+    MongoBridgeGlobalParams() : port(0), delay(0), connectTimeoutSec(15) {}
+};
 
-    extern MongoBridgeGlobalParams mongoBridgeGlobalParams;
+extern MongoBridgeGlobalParams mongoBridgeGlobalParams;
 
-    Status addMongoBridgeOptions(moe::OptionSection* options);
+Status addMongoBridgeOptions(moe::OptionSection* options);
 
-    void printMongoBridgeHelp(std::ostream* out);
+void printMongoBridgeHelp(std::ostream* out);
 
-    /**
-     * Handle options that should come before validation, such as "help".
-     *
-     * Returns false if an option was found that implies we should prematurely exit with success.
-     */
-    bool handlePreValidationMongoBridgeOptions(const moe::Environment& params);
+/**
+ * Handle options that should come before validation, such as "help".
+ *
+ * Returns false if an option was found that implies we should prematurely exit with success.
+ */
+bool handlePreValidationMongoBridgeOptions(const moe::Environment& params);
 
-    Status storeMongoBridgeOptions(const moe::Environment& params,
-                                   const std::vector<std::string>& args);
+Status storeMongoBridgeOptions(const moe::Environment& params,
+                               const std::vector<std::string>& args);
 }

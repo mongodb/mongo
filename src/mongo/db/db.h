@@ -38,9 +38,9 @@
 namespace mongo {
 
 namespace repl {
-    class ReplSettings;
-} // namespace repl
+class ReplSettings;
+}  // namespace repl
 
-    extern void (*snmpInit)();
+extern void (*snmpInit)();
 
-} // namespace mongo
+}  // namespace mongo

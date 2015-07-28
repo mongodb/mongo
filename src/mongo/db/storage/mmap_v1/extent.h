@@ -39,45 +39,50 @@
 
 namespace mongo {
 
-    /* extents are datafile regions where all the records within the region
-       belong to the same namespace.
+/* extents are datafile regions where all the records within the region
+   belong to the same namespace.
 
-    (11:12:35 AM) dm10gen: when the extent is allocated, all its empty space is stuck into one big DeletedRecord
-    (11:12:55 AM) dm10gen: and that is placed on the free list
-    */
+(11:12:35 AM) dm10gen: when the extent is allocated, all its empty space is stuck into one big DeletedRecord
+(11:12:55 AM) dm10gen: and that is placed on the free list
+*/
 #pragma pack(1)
-    struct Extent {
-        enum { extentSignature = 0x41424344 };
-        unsigned magic;
-        DiskLoc myLoc;
+struct Extent {
+    enum { extentSignature = 0x41424344 };
+    unsigned magic;
+    DiskLoc myLoc;
 
-        /* next/prev extent for this namespace */
-        DiskLoc xnext;
-        DiskLoc xprev;
+    /* next/prev extent for this namespace */
+    DiskLoc xnext;
+    DiskLoc xprev;
 
-        /* which namespace this extent is for.  this is just for troubleshooting really
-           and won't even be correct if the collection were renamed!
-        */
-        Namespace nsDiagnostic;
+    /* which namespace this extent is for.  this is just for troubleshooting really
+       and won't even be correct if the collection were renamed!
+    */
+    Namespace nsDiagnostic;
 
-        int length;   /* size of the extent, including these fields */
-        DiskLoc firstRecord;
-        DiskLoc lastRecord;
-        char _extentData[4];
+    int length; /* size of the extent, including these fields */
+    DiskLoc firstRecord;
+    DiskLoc lastRecord;
+    char _extentData[4];
 
-        // -----
+    // -----
 
-        bool validates(const DiskLoc diskLoc, std::vector<std::string>* errors = NULL) const;
+    bool validates(const DiskLoc diskLoc, std::vector<std::string>* errors = NULL) const;
 
-        BSONObj dump() const;
+    BSONObj dump() const;
 
-        void dump(std::iostream& s) const;
+    void dump(std::iostream& s) const;
 
-        bool isOk() const { return magic == extentSignature; }
-        void assertOk() const { verify(isOk()); }
+    bool isOk() const {
+        return magic == extentSignature;
+    }
+    void assertOk() const {
+        verify(isOk());
+    }
 
-        static int HeaderSize() { return sizeof(Extent)-4; }
-    };
+    static int HeaderSize() {
+        return sizeof(Extent) - 4;
+    }
+};
 #pragma pack()
-
 }

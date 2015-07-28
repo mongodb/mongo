@@ -33,27 +33,24 @@
 
 namespace mongo {
 
-    namespace moe = mongo::optionenvironment;
+namespace moe = mongo::optionenvironment;
 
-    class RocksGlobalOptions {
-    public:
-        RocksGlobalOptions()
-            : cacheSizeGB(0),
-              maxWriteMBPerSec(1024),
-              compression("snappy"),
-              crashSafeCounters(false) {}
+class RocksGlobalOptions {
+public:
+    RocksGlobalOptions()
+        : cacheSizeGB(0), maxWriteMBPerSec(1024), compression("snappy"), crashSafeCounters(false) {}
 
-        Status add(moe::OptionSection* options);
-        Status store(const moe::Environment& params, const std::vector<std::string>& args);
+    Status add(moe::OptionSection* options);
+    Status store(const moe::Environment& params, const std::vector<std::string>& args);
 
-        size_t cacheSizeGB;
-        int maxWriteMBPerSec;
+    size_t cacheSizeGB;
+    int maxWriteMBPerSec;
 
-        std::string compression;
-        std::string configString;
+    std::string compression;
+    std::string configString;
 
-        bool crashSafeCounters;
-    };
+    bool crashSafeCounters;
+};
 
-    extern RocksGlobalOptions rocksGlobalOptions;
+extern RocksGlobalOptions rocksGlobalOptions;
 }

@@ -33,9 +33,9 @@
 
 namespace mongo {
 
-    // static
-    bool RocksEngine::initRsOplogBackgroundThread(StringData ns) {
-        return false;
-    }
+// static
+bool RocksEngine::initRsOplogBackgroundThread(StringData ns) {
+    return false;
+}
 
 }  // namespace mongo

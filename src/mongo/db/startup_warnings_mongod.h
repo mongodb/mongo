@@ -31,30 +31,28 @@
 
 namespace mongo {
 
-    struct StorageGlobalParams;
+struct StorageGlobalParams;
 
-    class StartupWarningsMongod {
-    private:
-        StartupWarningsMongod();
+class StartupWarningsMongod {
+private:
+    StartupWarningsMongod();
 
-    public:
-        /**
-         * Reads Transparent HugePages kernel parameter in sysfs directory.
-         * Linux only.
-         */
-        static StatusWith<std::string> readTransparentHugePagesParameter(
-            const std::string& parameter);
+public:
+    /**
+     * Reads Transparent HugePages kernel parameter in sysfs directory.
+     * Linux only.
+     */
+    static StatusWith<std::string> readTransparentHugePagesParameter(const std::string& parameter);
 
-        /**
-         * For testing only.
-         * Supports alternate directory for transparent huge pages files.
-         */
-        static StatusWith<std::string> readTransparentHugePagesParameter(
-            const std::string& parameter,
-            const std::string& directory);
-    };
+    /**
+     * For testing only.
+     * Supports alternate directory for transparent huge pages files.
+     */
+    static StatusWith<std::string> readTransparentHugePagesParameter(const std::string& parameter,
+                                                                     const std::string& directory);
+};
 
-    // Checks various startup conditions and logs any necessary warnings that
-    // are specific to the mongod process.
-    void logMongodStartupWarnings(const StorageGlobalParams& params);
-} // namespace mongo
+// Checks various startup conditions and logs any necessary warnings that
+// are specific to the mongod process.
+void logMongodStartupWarnings(const StorageGlobalParams& params);
+}  // namespace mongo

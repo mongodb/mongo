@@ -33,30 +33,30 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
-    /**
-     * Merges a chunks in the specified [minKey, maxKey) range of the specified namespace.
-     * Updates the local and remote metadata by expanding the bounds of the first chunk in the
-     * range, dropping the others, and incrementing the minor version of the shard to the next
-     * higher version.  Returns true on success.
-     *
-     * Fails with errMsg if the 'epoch' was set and has changed (indicating the range is no longer
-     * valid), or if the range does not exactly start and stop on chunks owned by this shard, or
-     * if the chunks in this range are not contiguous.
-     *
-     * WARNING: On network failure, it is possible that the chunks in our local metadata may not
-     * match the remote metadata, however the key ranges protected will be the same.  All metadata
-     * operations are responsible for updating the metadata before performing any actions.
-     *
-     * Locking note:
-     *     + Takes a distributed lock over the namespace
-     *     + Cannot be called with any other locks held
-     */
-    bool mergeChunks( OperationContext* txn,
-                      const NamespaceString& nss,
-                      const BSONObj& minKey,
-                      const BSONObj& maxKey,
-                      const OID& epoch,
-                      std::string* errMsg );
+/**
+ * Merges a chunks in the specified [minKey, maxKey) range of the specified namespace.
+ * Updates the local and remote metadata by expanding the bounds of the first chunk in the
+ * range, dropping the others, and incrementing the minor version of the shard to the next
+ * higher version.  Returns true on success.
+ *
+ * Fails with errMsg if the 'epoch' was set and has changed (indicating the range is no longer
+ * valid), or if the range does not exactly start and stop on chunks owned by this shard, or
+ * if the chunks in this range are not contiguous.
+ *
+ * WARNING: On network failure, it is possible that the chunks in our local metadata may not
+ * match the remote metadata, however the key ranges protected will be the same.  All metadata
+ * operations are responsible for updating the metadata before performing any actions.
+ *
+ * Locking note:
+ *     + Takes a distributed lock over the namespace
+ *     + Cannot be called with any other locks held
+ */
+bool mergeChunks(OperationContext* txn,
+                 const NamespaceString& nss,
+                 const BSONObj& minKey,
+                 const BSONObj& maxKey,
+                 const OID& epoch,
+                 std::string* errMsg);
 }

@@ -36,36 +36,35 @@
 
 namespace mongo {
 
-    typedef uint64_t fileofs;
+typedef uint64_t fileofs;
 
-    // NOTE: not thread-safe. (at least the windows implementation isn't)
+// NOTE: not thread-safe. (at least the windows implementation isn't)
 
-    class File {
+class File {
+public:
+    File();
+    ~File();
 
-    public:
-        File();
-        ~File();
+    bool bad() const {
+        return _bad;
+    }
+    void fsync() const;
+    bool is_open() const;
+    fileofs len();
+    void open(const char* filename, bool readOnly = false, bool direct = false);
+    void read(fileofs o, char* data, unsigned len);
+    void truncate(fileofs size);
+    void write(fileofs o, const char* data, unsigned len);
 
-        bool bad() const { return _bad; }
-        void fsync() const;
-        bool is_open() const;
-        fileofs len();
-        void open(const char* filename, bool readOnly = false, bool direct = false);
-        void read(fileofs o, char* data, unsigned len);
-        void truncate(fileofs size);
-        void write(fileofs o, const char* data, unsigned len);
+    static intmax_t freeSpace(const std::string& path);
 
-        static intmax_t freeSpace(const std::string& path);
-
-    private:
-        bool _bad;
+private:
+    bool _bad;
 #ifdef _WIN32
-        HANDLE _handle;
+    HANDLE _handle;
 #else
-        int _fd;
+    int _fd;
 #endif
-        std::string _name;
-
-    };
-
+    std::string _name;
+};
 }

@@ -35,63 +35,57 @@
 
 namespace mongo {
 
+/**
+ * This iterator will go over the collection twice - once going forward (first extent -> last
+ * extent) and once backwards in an attempt to salvage potentially corrupted or unreachable
+ * records. It is used by the mongodump --repair option.
+ */
+class RecordStoreV1RepairIterator : public RecordIterator {
+public:
+    RecordStoreV1RepairIterator(OperationContext* txn, const RecordStoreV1Base* recordStore);
+    virtual ~RecordStoreV1RepairIterator() {}
+
+    virtual bool isEOF();
+    virtual RecordId getNext();
+    virtual RecordId curr();
+
+    virtual void invalidate(const RecordId& dl);
+    virtual void saveState() {}
+    virtual bool restoreState(OperationContext* txn) {
+        _txn = txn;
+        return true;
+    }
+
+    virtual RecordData dataFor(const RecordId& loc) const;
+
+private:
     /**
-     * This iterator will go over the collection twice - once going forward (first extent -> last
-     * extent) and once backwards in an attempt to salvage potentially corrupted or unreachable 
-     * records. It is used by the mongodump --repair option.
+     * Based on the direction of scan, finds the next valid (un-corrupted) extent in the chain
+     * and sets _currExtent to point to that.
+     *
+     * @return true if valid extent was found (_currExtent will not be null)
+     *         false otherwise and _currExtent will be null
      */
-    class RecordStoreV1RepairIterator : public RecordIterator {
-    public:
-        RecordStoreV1RepairIterator(OperationContext* txn,
-                                    const RecordStoreV1Base* recordStore);
-        virtual ~RecordStoreV1RepairIterator() { }
+    bool _advanceToNextValidExtent();
 
-        virtual bool isEOF();
-        virtual RecordId getNext();
-        virtual RecordId curr();
+    // transactional context for read locks. Not owned by us
+    OperationContext* _txn;
 
-        virtual void invalidate(const RecordId& dl);
-        virtual void saveState() { }
-        virtual bool restoreState(OperationContext* txn) {
-            _txn = txn;
-            return true;
-        }
+    // Reference to the owning RecordStore. The store must not be deleted while there are
+    // active iterators on it.
+    //
+    const RecordStoreV1Base* _recordStore;
 
-        virtual RecordData dataFor( const RecordId& loc ) const;
+    DiskLoc _currExtent;
+    DiskLoc _currRecord;
 
-    private:
+    enum Stage { FORWARD_SCAN = 0, BACKWARD_SCAN = 1, DONE = 2 };
 
-        /**
-         * Based on the direction of scan, finds the next valid (un-corrupted) extent in the chain
-         * and sets _currExtent to point to that.
-         *
-         * @return true if valid extent was found (_currExtent will not be null)
-         *         false otherwise and _currExtent will be null
-         */
-        bool _advanceToNextValidExtent();
+    Stage _stage;
 
-        // transactional context for read locks. Not owned by us
-        OperationContext* _txn;
-
-        // Reference to the owning RecordStore. The store must not be deleted while there are 
-        // active iterators on it.
-        //
-        const RecordStoreV1Base* _recordStore;
-
-        DiskLoc _currExtent;
-        DiskLoc _currRecord;
-
-        enum Stage {
-            FORWARD_SCAN = 0,
-            BACKWARD_SCAN = 1,
-            DONE = 2
-        };
-
-        Stage _stage;
-
-        // Used to find cycles within an extent. Cleared after each extent has been processed.
-        //
-        std::set<DiskLoc> _seenInCurrentExtent;
-    };
+    // Used to find cycles within an extent. Cleared after each extent has been processed.
+    //
+    std::set<DiskLoc> _seenInCurrentExtent;
+};
 
 }  // namespace mongo

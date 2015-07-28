@@ -34,67 +34,67 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    static ClusterExplainCmd cmdExplainCluster;
+static ClusterExplainCmd cmdExplainCluster;
 
-    Status ClusterExplainCmd::checkAuthForCommand(ClientBasic* client,
-                                                  const std::string& dbname,
-                                                  const BSONObj& cmdObj) {
-        if (Object != cmdObj.firstElement().type()) {
-            return Status(ErrorCodes::BadValue, "explain command requires a nested object");
-        }
-
-        BSONObj explainObj = cmdObj.firstElement().Obj();
-
-        Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
-        if (NULL == commToExplain) {
-            mongoutils::str::stream ss;
-            ss << "unknown command: " << explainObj.firstElementFieldName();
-            return Status(ErrorCodes::CommandNotFound, ss);
-        }
-
-        return commToExplain->checkAuthForCommand(client, dbname, explainObj);
+Status ClusterExplainCmd::checkAuthForCommand(ClientBasic* client,
+                                              const std::string& dbname,
+                                              const BSONObj& cmdObj) {
+    if (Object != cmdObj.firstElement().type()) {
+        return Status(ErrorCodes::BadValue, "explain command requires a nested object");
     }
 
-    bool ClusterExplainCmd::run(OperationContext* txn, const string& dbName,
-                                BSONObj& cmdObj,
-                                int options,
-                                string& errmsg,
-                                BSONObjBuilder& result,
-                                bool fromRepl) {
-        // Should never get explain commands issued from replication.
-        if (fromRepl) {
-            Status commandStat(ErrorCodes::IllegalOperation,
-                               "explain command should not be from repl");
-            return appendCommandStatus(result, commandStat);
-        }
+    BSONObj explainObj = cmdObj.firstElement().Obj();
 
-        ExplainCommon::Verbosity verbosity;
-        Status parseStatus = ExplainCommon::parseCmdBSON(cmdObj, &verbosity);
-        if (!parseStatus.isOK()) {
-            return appendCommandStatus(result, parseStatus);
-        }
-
-        // This is the nested command which we are explaining.
-        BSONObj explainObj = cmdObj.firstElement().Obj();
-
-        const std::string cmdName = explainObj.firstElementFieldName();
-        Command* commToExplain = Command::findCommand(cmdName);
-        if (NULL == commToExplain) {
-            mongoutils::str::stream ss;
-            ss << "Explain failed due to unknown command: " << cmdName;
-            Status explainStatus(ErrorCodes::CommandNotFound, ss);
-            return appendCommandStatus(result, explainStatus);
-        }
-
-        // Actually call the nested command's explain(...) method.
-        Status explainStatus = commToExplain->explain(txn, dbName, explainObj, verbosity, &result);
-        if (!explainStatus.isOK()) {
-            return appendCommandStatus(result, explainStatus);
-        }
-
-        return true;
+    Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
+    if (NULL == commToExplain) {
+        mongoutils::str::stream ss;
+        ss << "unknown command: " << explainObj.firstElementFieldName();
+        return Status(ErrorCodes::CommandNotFound, ss);
     }
 
-} // namespace mongo
+    return commToExplain->checkAuthForCommand(client, dbname, explainObj);
+}
+
+bool ClusterExplainCmd::run(OperationContext* txn,
+                            const string& dbName,
+                            BSONObj& cmdObj,
+                            int options,
+                            string& errmsg,
+                            BSONObjBuilder& result,
+                            bool fromRepl) {
+    // Should never get explain commands issued from replication.
+    if (fromRepl) {
+        Status commandStat(ErrorCodes::IllegalOperation, "explain command should not be from repl");
+        return appendCommandStatus(result, commandStat);
+    }
+
+    ExplainCommon::Verbosity verbosity;
+    Status parseStatus = ExplainCommon::parseCmdBSON(cmdObj, &verbosity);
+    if (!parseStatus.isOK()) {
+        return appendCommandStatus(result, parseStatus);
+    }
+
+    // This is the nested command which we are explaining.
+    BSONObj explainObj = cmdObj.firstElement().Obj();
+
+    const std::string cmdName = explainObj.firstElementFieldName();
+    Command* commToExplain = Command::findCommand(cmdName);
+    if (NULL == commToExplain) {
+        mongoutils::str::stream ss;
+        ss << "Explain failed due to unknown command: " << cmdName;
+        Status explainStatus(ErrorCodes::CommandNotFound, ss);
+        return appendCommandStatus(result, explainStatus);
+    }
+
+    // Actually call the nested command's explain(...) method.
+    Status explainStatus = commToExplain->explain(txn, dbName, explainObj, verbosity, &result);
+    if (!explainStatus.isOK()) {
+        return appendCommandStatus(result, explainStatus);
+    }
+
+    return true;
+}
+
+}  // namespace mongo

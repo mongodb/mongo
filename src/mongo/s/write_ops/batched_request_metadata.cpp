@@ -32,144 +32,145 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
-    using std::string;
+using std::auto_ptr;
+using std::string;
 
-    const BSONField<string> BatchedRequestMetadata::shardName("shardName");
-    const BSONField<ChunkVersion> BatchedRequestMetadata::shardVersion("shardVersion");
-    const BSONField<long long> BatchedRequestMetadata::session("session");
+const BSONField<string> BatchedRequestMetadata::shardName("shardName");
+const BSONField<ChunkVersion> BatchedRequestMetadata::shardVersion("shardVersion");
+const BSONField<long long> BatchedRequestMetadata::session("session");
 
-    BatchedRequestMetadata::BatchedRequestMetadata():
-            _isShardNameSet(false),
-            _session(0),
-            _isSessionSet(false) {
+BatchedRequestMetadata::BatchedRequestMetadata()
+    : _isShardNameSet(false), _session(0), _isSessionSet(false) {}
+
+BatchedRequestMetadata::~BatchedRequestMetadata() {}
+
+bool BatchedRequestMetadata::isValid(string* errMsg) const {
+    // all fields are mandatory.
+    return true;
+}
+
+BSONObj BatchedRequestMetadata::toBSON() const {
+    BSONObjBuilder metadataBuilder;
+
+    if (_isShardNameSet)
+        metadataBuilder << shardName(_shardName);
+
+    if (_shardVersion.get()) {
+        // ChunkVersion wants to be an array.
+        metadataBuilder.append(shardVersion(), static_cast<BSONArray>(_shardVersion->toBSON()));
     }
 
-    BatchedRequestMetadata::~BatchedRequestMetadata() {
+    if (_isSessionSet)
+        metadataBuilder << session(_session);
 
-    }
+    return metadataBuilder.obj();
+}
 
-    bool BatchedRequestMetadata::isValid(string* errMsg) const {
-        // all fields are mandatory.
-        return true;
-    }
+bool BatchedRequestMetadata::parseBSON(const BSONObj& source, string* errMsg) {
+    clear();
 
-    BSONObj BatchedRequestMetadata::toBSON() const {
-        BSONObjBuilder metadataBuilder;
+    string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-        if (_isShardNameSet) metadataBuilder << shardName(_shardName);
+    FieldParser::FieldState fieldState;
+    fieldState = FieldParser::extract(source, shardName, &_shardName, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isShardNameSet = fieldState == FieldParser::FIELD_SET;
 
-        if (_shardVersion.get()) {
-            // ChunkVersion wants to be an array.
-            metadataBuilder.append(shardVersion(),
-                                   static_cast<BSONArray>(_shardVersion->toBSON()));
-        }
+    ChunkVersion* tempChunkVersion = NULL;
+    fieldState = FieldParser::extract(source, shardVersion, &tempChunkVersion, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    if (fieldState == FieldParser::FIELD_SET)
+        _shardVersion.reset(tempChunkVersion);
 
-        if (_isSessionSet) metadataBuilder << session(_session);
+    fieldState = FieldParser::extract(source, session, &_session, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isSessionSet = fieldState == FieldParser::FIELD_SET;
 
-        return metadataBuilder.obj();
-    }
+    return true;
+}
 
-    bool BatchedRequestMetadata::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
+void BatchedRequestMetadata::clear() {
+    _shardName.clear();
+    _isShardNameSet = false;
 
-        string dummy;
-        if (!errMsg) errMsg = &dummy;
+    _shardVersion.reset();
 
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, shardName, &_shardName, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isShardNameSet = fieldState == FieldParser::FIELD_SET;
+    _session = 0;
+    _isSessionSet = false;
+}
 
-        ChunkVersion* tempChunkVersion = NULL;
-        fieldState = FieldParser::extract(source, shardVersion,
-                                          &tempChunkVersion, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        if (fieldState == FieldParser::FIELD_SET) _shardVersion.reset(tempChunkVersion);
+string BatchedRequestMetadata::toString() const {
+    return toBSON().toString();
+}
 
-        fieldState = FieldParser::extract(source, session, &_session, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isSessionSet = fieldState == FieldParser::FIELD_SET;
+void BatchedRequestMetadata::cloneTo(BatchedRequestMetadata* other) const {
+    other->_shardName = _shardName;
+    other->_isShardNameSet = _isShardNameSet;
 
-        return true;
-    }
+    if (other->_shardVersion.get())
+        _shardVersion->cloneTo(other->_shardVersion.get());
 
-    void BatchedRequestMetadata::clear() {
-        _shardName.clear();
-        _isShardNameSet = false;
+    other->_session = _session;
+    other->_isSessionSet = _isSessionSet;
+}
 
-        _shardVersion.reset();
+void BatchedRequestMetadata::setShardName(const StringData& shardName) {
+    _shardName = shardName.toString();
+    _isShardNameSet = true;
+}
 
-        _session = 0;
-        _isSessionSet = false;
-    }
+void BatchedRequestMetadata::unsetShardName() {
+    _isShardNameSet = false;
+}
 
-    string BatchedRequestMetadata::toString() const {
-        return toBSON().toString();
-    }
+bool BatchedRequestMetadata::isShardNameSet() const {
+    return _isShardNameSet;
+}
 
-    void BatchedRequestMetadata::cloneTo(BatchedRequestMetadata* other) const {
-        other->_shardName = _shardName;
-        other->_isShardNameSet = _isShardNameSet;
+const string& BatchedRequestMetadata::getShardName() const {
+    dassert(_isShardNameSet);
+    return _shardName;
+}
 
-        if (other->_shardVersion.get()) _shardVersion->cloneTo(other->_shardVersion.get());
+void BatchedRequestMetadata::setShardVersion(const ChunkVersion& shardVersion) {
+    auto_ptr<ChunkVersion> temp(new ChunkVersion);
+    shardVersion.cloneTo(temp.get());
+    _shardVersion.reset(temp.release());
+}
 
-        other->_session = _session;
-        other->_isSessionSet = _isSessionSet;
-    }
+void BatchedRequestMetadata::unsetShardVersion() {
+    _shardVersion.reset();
+}
 
-    void BatchedRequestMetadata::setShardName( const StringData& shardName ) {
-        _shardName = shardName.toString();
-        _isShardNameSet = true;
-    }
+bool BatchedRequestMetadata::isShardVersionSet() const {
+    return _shardVersion.get() != NULL;
+}
 
-    void BatchedRequestMetadata::unsetShardName() {
-        _isShardNameSet = false;
-    }
+const ChunkVersion& BatchedRequestMetadata::getShardVersion() const {
+    dassert(_shardVersion.get());
+    return *_shardVersion;
+}
 
-    bool BatchedRequestMetadata::isShardNameSet() const {
-        return _isShardNameSet;
-    }
+void BatchedRequestMetadata::setSession(long long session) {
+    _session = session;
+    _isSessionSet = true;
+}
 
-    const string& BatchedRequestMetadata::getShardName() const {
-        dassert( _isShardNameSet );
-        return _shardName;
-    }
+void BatchedRequestMetadata::unsetSession() {
+    _isSessionSet = false;
+}
 
-    void BatchedRequestMetadata::setShardVersion(const ChunkVersion& shardVersion) {
-        auto_ptr<ChunkVersion> temp(new ChunkVersion);
-        shardVersion.cloneTo(temp.get());
-        _shardVersion.reset(temp.release());
-    }
+bool BatchedRequestMetadata::isSessionSet() const {
+    return _isSessionSet;
+}
 
-    void BatchedRequestMetadata::unsetShardVersion() {
-        _shardVersion.reset();
-     }
-
-    bool BatchedRequestMetadata::isShardVersionSet() const {
-        return _shardVersion.get() != NULL;
-    }
-
-    const ChunkVersion& BatchedRequestMetadata::getShardVersion() const {
-        dassert(_shardVersion.get());
-        return *_shardVersion;
-    }
-
-    void BatchedRequestMetadata::setSession(long long session) {
-        _session = session;
-        _isSessionSet = true;
-    }
-
-    void BatchedRequestMetadata::unsetSession() {
-         _isSessionSet = false;
-     }
-
-    bool BatchedRequestMetadata::isSessionSet() const {
-         return _isSessionSet;
-    }
-
-    long long BatchedRequestMetadata::getSession() const {
-        dassert(_isSessionSet);
-        return _session;
-    }
+long long BatchedRequestMetadata::getSession() const {
+    dassert(_isSessionSet);
+    return _session;
+}
 }

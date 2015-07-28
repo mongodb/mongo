@@ -45,693 +45,687 @@
 
 namespace {
 
-    using boost::scoped_ptr;
-    using mongo::BSONObj;
-    using mongo::BSONArray;
-    using mongo::BSONObjBuilder;
-    using mongo::BSONObjIterator;
-    using mongo::ChunkType;
-    using mongo::ChunkVersion;
-    using mongo::CollectionMetadata;
-    using mongo::CollectionType;
-    using mongo::ConnectionString;
-    using mongo::Date_t;
-    using mongo::ErrorCodes;
-    using mongo::HostAndPort;
-    using mongo::MAXKEY;
-    using mongo::MINKEY;
-    using mongo::MetadataLoader;
-    using mongo::OID;
-    using mongo::OwnedPointerVector;
-    using mongo::MockConnRegistry;
-    using mongo::MockRemoteDBServer;
-    using mongo::ScopedDbConnection;
-    using mongo::Status;
-    using std::auto_ptr;
-    using std::string;
-    using std::vector;
+using boost::scoped_ptr;
+using mongo::BSONObj;
+using mongo::BSONArray;
+using mongo::BSONObjBuilder;
+using mongo::BSONObjIterator;
+using mongo::ChunkType;
+using mongo::ChunkVersion;
+using mongo::CollectionMetadata;
+using mongo::CollectionType;
+using mongo::ConnectionString;
+using mongo::Date_t;
+using mongo::ErrorCodes;
+using mongo::HostAndPort;
+using mongo::MAXKEY;
+using mongo::MINKEY;
+using mongo::MetadataLoader;
+using mongo::OID;
+using mongo::OwnedPointerVector;
+using mongo::MockConnRegistry;
+using mongo::MockRemoteDBServer;
+using mongo::ScopedDbConnection;
+using mongo::Status;
+using std::auto_ptr;
+using std::string;
+using std::vector;
 
-    const std::string CONFIG_HOST_PORT = "$dummy_config:27017";
-    const ConnectionString CONFIG_LOC((HostAndPort(CONFIG_HOST_PORT)));
+const std::string CONFIG_HOST_PORT = "$dummy_config:27017";
+const ConnectionString CONFIG_LOC((HostAndPort(CONFIG_HOST_PORT)));
 
-    // TODO: Test config server down
-    // TODO: Test read of chunks with new epoch
-    // TODO: Test that you can properly load config using format with deprecated fields?
+// TODO: Test config server down
+// TODO: Test read of chunks with new epoch
+// TODO: Test that you can properly load config using format with deprecated fields?
 
-    TEST(MetadataLoader, DroppedColl) {
+TEST(MetadataLoader, DroppedColl) {
+    MockRemoteDBServer dummyConfig(CONFIG_HOST_PORT);
+    mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+    MockConnRegistry::get()->addServer(&dummyConfig);
 
-        MockRemoteDBServer dummyConfig( CONFIG_HOST_PORT );
-        mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
-        MockConnRegistry::get()->addServer( &dummyConfig );
+    CollectionType collInfo;
+    collInfo.setNS("test.foo");
+    collInfo.setUpdatedAt(0);
+    collInfo.setEpoch(OID());
+    collInfo.setDropped(true);
 
-        CollectionType collInfo;
-        collInfo.setNS( "test.foo" );
-        collInfo.setUpdatedAt( 0 );
-        collInfo.setEpoch( OID() );
-        collInfo.setDropped( true );
+    string errMsg;
+    ASSERT(collInfo.isValid(&errMsg));
+
+    dummyConfig.insert(CollectionType::ConfigNS, collInfo.toBSON());
+
+    MetadataLoader loader(CONFIG_LOC);
+
+    string errmsg;
+    CollectionMetadata metadata;
+    Status status = loader.makeCollectionMetadata("test.foo",  // br
+                                                  "shard0000",
+                                                  NULL, /* no old metadata */
+                                                  &metadata);
+
+    ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
+
+    MockConnRegistry::get()->clear();
+    ScopedDbConnection::clearPool();
+}
+
+TEST(MetadataLoader, EmptyColl) {
+    MockRemoteDBServer dummyConfig(CONFIG_HOST_PORT);
+    mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+    MockConnRegistry::get()->addServer(&dummyConfig);
+
+    MetadataLoader loader(CONFIG_LOC);
+
+    string errmsg;
+    CollectionMetadata metadata;
+    Status status = loader.makeCollectionMetadata("test.foo",  // br
+                                                  "shard0000",
+                                                  NULL, /* no old metadata */
+                                                  &metadata);
+
+    ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
+
+    MockConnRegistry::get()->clear();
+    ScopedDbConnection::clearPool();
+}
+
+TEST(MetadataLoader, BadColl) {
+    MockRemoteDBServer dummyConfig(CONFIG_HOST_PORT);
+    mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+    MockConnRegistry::get()->addServer(&dummyConfig);
+
+    dummyConfig.insert(CollectionType::ConfigNS, BSON(CollectionType::ns("test.foo")));
+
+    MetadataLoader loader(CONFIG_LOC);
+
+    string errmsg;
+    CollectionMetadata metadata;
+    Status status = loader.makeCollectionMetadata("test.foo",  // br
+                                                  "shard0000",
+                                                  NULL, /* no old metadata */
+                                                  &metadata);
+
+    ASSERT_EQUALS(status.code(), ErrorCodes::FailedToParse);
+
+    MockConnRegistry::get()->clear();
+    ScopedDbConnection::clearPool();
+}
+
+TEST(MetadataLoader, BadChunk) {
+    MockRemoteDBServer dummyConfig(CONFIG_HOST_PORT);
+    mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+    MockConnRegistry::get()->addServer(&dummyConfig);
+
+    CollectionType collInfo;
+    collInfo.setNS("test.foo");
+    collInfo.setUpdatedAt(0);
+    collInfo.setKeyPattern(BSON("a" << 1));
+    collInfo.setEpoch(OID::gen());
+
+    string errMsg;
+    ASSERT(collInfo.isValid(&errMsg));
+
+    dummyConfig.insert(CollectionType::ConfigNS, collInfo.toBSON());
+
+    ChunkType chunkInfo;
+    chunkInfo.setNS("test.foo");
+    chunkInfo.setVersion(ChunkVersion(1, 0, collInfo.getEpoch()));
+    ASSERT(!chunkInfo.isValid(&errMsg));
+
+    dummyConfig.insert(ChunkType::ConfigNS, chunkInfo.toBSON());
+
+    MetadataLoader loader(CONFIG_LOC);
+
+    string errmsg;
+    CollectionMetadata metadata;
+    Status status = loader.makeCollectionMetadata("test.foo",  // br
+                                                  "shard0000",
+                                                  NULL, /* no old metadata */
+                                                  &metadata);
+
+    // For now, since the differ doesn't have parsing errors, we get this kind of status
+    // NamespaceNotFound since we aren't refreshing off known metadata
+    // TODO: Make the differ do parse errors
+    ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
+
+    MockConnRegistry::get()->clear();
+    ScopedDbConnection::clearPool();
+}
+
+class NoChunkFixture : public mongo::unittest::Test {
+protected:
+    void setUp() {
+        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
+        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+        MockConnRegistry::get()->addServer(_dummyConfig.get());
+
+        OID epoch = OID::gen();
+        BSONObj collFoo =
+            BSON(CollectionType::ns("test.foo")
+                 << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(false)
+                 << CollectionType::updatedAt(1ULL) << CollectionType::epoch(epoch));
+
+        _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
+    }
+
+    void tearDown() {
+        MockConnRegistry::get()->clear();
+        ScopedDbConnection::clearPool();
+    }
+
+private:
+    scoped_ptr<MockRemoteDBServer> _dummyConfig;
+};
+
+TEST_F(NoChunkFixture, NoChunksIsDropped) {
+    MetadataLoader loader(CONFIG_LOC);
+
+    CollectionMetadata metadata;
+    Status status = loader.makeCollectionMetadata("test.foo",  // br
+                                                  "shard0000",
+                                                  NULL, /* no old metadata */
+                                                  &metadata);
+
+    // This is interpreted as a dropped ns, since we drop the chunks first
+    ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
+}
+
+class NoChunkHereFixture : public mongo::unittest::Test {
+protected:
+    void setUp() {
+        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
+        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+        MockConnRegistry::get()->addServer(_dummyConfig.get());
+
+        OID epoch = OID::gen();
+
+        CollectionType collType;
+        collType.setNS("test.foo");
+        collType.setKeyPattern(BSON("a" << 1));
+        collType.setUnique(false);
+        collType.setUpdatedAt(1ULL);
+        collType.setEpoch(epoch);
+        string errMsg;
+        ASSERT(collType.isValid(&errMsg));
+
+        _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
+
+        // Need a chunk on another shard, otherwise the chunks are invalid in general and we
+        // can't load metadata
+        ChunkType chunkType;
+        chunkType.setNS("test.foo");
+        chunkType.setShard("shard0001");
+        chunkType.setMin(BSON("a" << MINKEY));
+        chunkType.setMax(BSON("a" << MAXKEY));
+        chunkType.setVersion(ChunkVersion(1, 0, epoch));
+        chunkType.setName(OID::gen().toString());
+        ASSERT(chunkType.isValid(&errMsg));
+
+        _dummyConfig->insert(ChunkType::ConfigNS, chunkType.toBSON());
+    }
+
+    MockRemoteDBServer* getDummyConfig() {
+        return _dummyConfig.get();
+    }
+
+    void tearDown() {
+        MockConnRegistry::get()->clear();
+        ScopedDbConnection::clearPool();
+    }
+
+private:
+    scoped_ptr<MockRemoteDBServer> _dummyConfig;
+};
+
+TEST_F(NoChunkHereFixture, CheckNumChunk) {
+    ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
+    ConnectionString configLoc(confServerStr);
+    MetadataLoader loader(configLoc);
+
+    CollectionMetadata metadata;
+    Status status = loader.makeCollectionMetadata("test.foo",  // br
+                                                  "shard0000",
+                                                  NULL, /* no old metadata */
+                                                  &metadata);
+
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(0U, metadata.getNumChunks());
+    ASSERT_EQUALS(1, metadata.getCollVersion().majorVersion());
+    ASSERT_EQUALS(0, metadata.getShardVersion().majorVersion());
+    ASSERT_NOT_EQUALS(OID(), metadata.getCollVersion().epoch());
+    ASSERT_NOT_EQUALS(OID(), metadata.getShardVersion().epoch());
+}
+
+TEST_F(NoChunkHereFixture, BadChunkNotDropped) {
+    MetadataLoader loader(CONFIG_LOC);
+
+    CollectionMetadata metadata;
+    Status status = loader.makeCollectionMetadata("test.foo",  // br
+                                                  "shard0000",
+                                                  NULL, /* no old metadata */
+                                                  &metadata);
+
+    ASSERT(status.isOK());
+
+    ChunkType chunkInfo;
+    chunkInfo.setNS("test.foo");
+    chunkInfo.setVersion(ChunkVersion(1, 0, OID()));
+    string errMsg;
+    ASSERT(!chunkInfo.isValid(&errMsg));
+
+    // Replace the chunk with a bad chunk
+    getDummyConfig()->remove(ChunkType::ConfigNS, BSONObj());
+    getDummyConfig()->insert(ChunkType::ConfigNS, chunkInfo.toBSON());
+
+    CollectionMetadata nextMetadata;
+    status = loader.makeCollectionMetadata("test.foo",  // br
+                                           "shard0000",
+                                           &metadata, /* using old metadata */
+                                           &nextMetadata);
+
+    // Remote change error, since there's not an epoch change and we reloaded no chunks
+    ASSERT_EQUALS(status.code(), ErrorCodes::RemoteChangeDetected);
+
+    MockConnRegistry::get()->clear();
+    ScopedDbConnection::clearPool();
+}
+
+class ConfigServerFixture : public mongo::unittest::Test {
+protected:
+    void setUp() {
+        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
+        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+        MockConnRegistry::get()->addServer(_dummyConfig.get());
+
+        OID epoch = OID::gen();
+        _maxCollVersion = ChunkVersion(1, 0, epoch);
+
+        BSONObj collFoo =
+            BSON(CollectionType::ns("test.foo")
+                 << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(false)
+                 << CollectionType::updatedAt(1ULL) << CollectionType::epoch(epoch));
+        _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
+
+        BSONObj fooSingle =
+            BSON(ChunkType::name("test.foo-a_MinKey")
+                 << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << MINKEY))
+                 << ChunkType::max(BSON("a" << MAXKEY))
+                 << ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong())
+                 << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000"));
+        _dummyConfig->insert(ChunkType::ConfigNS, fooSingle);
+    }
+
+    void tearDown() {
+        MockConnRegistry::get()->clear();
+    }
+
+    ChunkVersion getMaxCollVersion() const {
+        return _maxCollVersion;
+    }
+
+    ChunkVersion getMaxShardVersion() const {
+        return _maxCollVersion;
+    }
+
+    MockRemoteDBServer* getConfigServer() const {
+        return _dummyConfig.get();
+    }
+
+private:
+    scoped_ptr<MockRemoteDBServer> _dummyConfig;
+    ChunkVersion _maxCollVersion;
+};
+
+TEST_F(ConfigServerFixture, SingleChunkCheckNumChunk) {
+    // Load from mock server.
+    ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
+    ConnectionString configLoc(confServerStr);
+    MetadataLoader loader(configLoc);
+    CollectionMetadata metadata;
+    Status status = loader.makeCollectionMetadata("test.foo",  // br
+                                                  "shard0000",
+                                                  NULL, /* no old metadata */
+                                                  &metadata);
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(1U, metadata.getNumChunks());
+}
+
+TEST_F(ConfigServerFixture, SingleChunkGetNext) {
+    ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
+    ConnectionString configLoc(confServerStr);
+    MetadataLoader loader(configLoc);
+    CollectionMetadata metadata;
+    loader.makeCollectionMetadata("test.foo",
+                                  "shard0000",
+                                  NULL, /* no old metadata */
+                                  &metadata);
+    ChunkType chunkInfo;
+    ASSERT_TRUE(metadata.getNextChunk(metadata.getMinKey(), &chunkInfo));
+}
+
+TEST_F(ConfigServerFixture, SingleChunkGetShardKey) {
+    ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
+    ConnectionString configLoc(confServerStr);
+    MetadataLoader loader(configLoc);
+    CollectionMetadata metadata;
+    loader.makeCollectionMetadata("test.foo",
+                                  "shard0000",
+                                  NULL, /* no old metadata */
+                                  &metadata);
+    ASSERT_TRUE(metadata.getKeyPattern().equal(BSON("a" << 1)));
+}
+
+TEST_F(ConfigServerFixture, SingleChunkGetMaxCollVersion) {
+    ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
+    ConnectionString configLoc(confServerStr);
+    MetadataLoader loader(configLoc);
+    CollectionMetadata metadata;
+    loader.makeCollectionMetadata("test.foo",
+                                  "shard0000",
+                                  NULL, /* no old metadata */
+                                  &metadata);
+
+    ASSERT_TRUE(getMaxCollVersion().equals(metadata.getCollVersion()));
+}
+
+TEST_F(ConfigServerFixture, SingleChunkGetMaxShardVersion) {
+    ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
+    ConnectionString configLoc(confServerStr);
+    MetadataLoader loader(configLoc);
+    CollectionMetadata metadata;
+    loader.makeCollectionMetadata("test.foo",
+                                  "shard0000",
+                                  NULL, /* no old metadata */
+                                  &metadata);
+
+    ASSERT_TRUE(getMaxShardVersion().equals(metadata.getShardVersion()));
+}
+
+TEST_F(ConfigServerFixture, NoChunks) {
+    getConfigServer()->remove(ChunkType::ConfigNS, BSONObj());
+
+    ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
+    ConnectionString configLoc(confServerStr);
+    MetadataLoader loader(configLoc);
+    CollectionMetadata metadata;
+    Status status = loader.makeCollectionMetadata("test.foo",  // br
+                                                  "shard0000",
+                                                  NULL, /* no old metadata */
+                                                  &metadata);
+
+    // NSNotFound because we're reloading with no old metadata
+    ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
+}
+
+class MultipleMetadataFixture : public mongo::unittest::Test {
+protected:
+    void setUp() {
+        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
+        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+        MockConnRegistry::get()->addServer(_dummyConfig.get());
+
+        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
+        ConnectionString configLoc(confServerStr);
+        _loader.reset(new MetadataLoader(configLoc));
+    }
+
+    MetadataLoader& loader() {
+        return *_loader;
+    }
+
+    void getMetadataFor(const OwnedPointerVector<ChunkType>& chunks, CollectionMetadata* metadata) {
+        // Infer namespace, shard, epoch, keypattern from first chunk
+        const ChunkType* firstChunk = *(chunks.vector().begin());
+        string ns = firstChunk->isNSSet() ? firstChunk->getNS() : "foo.bar";
+        string shardName = firstChunk->isShardSet() ? firstChunk->getShard() : "shard0000";
+        OID epoch = firstChunk->getVersion().epoch();
+
+        BSONObjBuilder keyPatternB;
+        BSONObjIterator keyPatternIt(firstChunk->getMin());
+        while (keyPatternIt.more())
+            keyPatternB.append(keyPatternIt.next().fieldName(), 1);
+        BSONObj keyPattern = keyPatternB.obj();
+
+        _dummyConfig->remove(CollectionType::ConfigNS, BSONObj());
+        _dummyConfig->remove(ChunkType::ConfigNS, BSONObj());
+
+        CollectionType coll;
+        coll.setNS(ns);
+        coll.setKeyPattern(BSON("a" << 1));
+        coll.setUpdatedAt(1ULL);
+        coll.setEpoch(epoch);
 
         string errMsg;
-        ASSERT( collInfo.isValid( &errMsg ) );
-
-        dummyConfig.insert( CollectionType::ConfigNS, collInfo.toBSON() );
-
-        MetadataLoader loader( CONFIG_LOC );
-
-        string errmsg;
-        CollectionMetadata metadata;
-        Status status = loader.makeCollectionMetadata( "test.foo", // br
-                                                       "shard0000",
-                                                       NULL, /* no old metadata */
-                                                       &metadata );
-
-        ASSERT_EQUALS( status.code(), ErrorCodes::NamespaceNotFound );
-
-        MockConnRegistry::get()->clear();
-        ScopedDbConnection::clearPool();
-    }
-
-    TEST(MetadataLoader, EmptyColl) {
-
-        MockRemoteDBServer dummyConfig( CONFIG_HOST_PORT );
-        mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
-        MockConnRegistry::get()->addServer( &dummyConfig );
-
-        MetadataLoader loader( CONFIG_LOC );
-
-        string errmsg;
-        CollectionMetadata metadata;
-        Status status = loader.makeCollectionMetadata( "test.foo", // br
-                                                       "shard0000",
-                                                       NULL, /* no old metadata */
-                                                       &metadata );
-
-        ASSERT_EQUALS( status.code(), ErrorCodes::NamespaceNotFound );
-
-        MockConnRegistry::get()->clear();
-        ScopedDbConnection::clearPool();
-    }
-
-    TEST(MetadataLoader, BadColl) {
-
-        MockRemoteDBServer dummyConfig( CONFIG_HOST_PORT );
-        mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
-        MockConnRegistry::get()->addServer( &dummyConfig );
-
-        dummyConfig.insert( CollectionType::ConfigNS, BSON( CollectionType::ns("test.foo") ) );
-
-        MetadataLoader loader( CONFIG_LOC );
-
-        string errmsg;
-        CollectionMetadata metadata;
-        Status status = loader.makeCollectionMetadata( "test.foo", // br
-                                                       "shard0000",
-                                                       NULL, /* no old metadata */
-                                                       &metadata );
-
-        ASSERT_EQUALS( status.code(), ErrorCodes::FailedToParse );
-
-        MockConnRegistry::get()->clear();
-        ScopedDbConnection::clearPool();
-    }
-
-    TEST(MetadataLoader, BadChunk) {
-
-        MockRemoteDBServer dummyConfig( CONFIG_HOST_PORT );
-        mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
-        MockConnRegistry::get()->addServer( &dummyConfig );
-
-        CollectionType collInfo;
-        collInfo.setNS( "test.foo" );
-        collInfo.setUpdatedAt( 0 );
-        collInfo.setKeyPattern( BSON("a" << 1) );
-        collInfo.setEpoch( OID::gen() );
-
-        string errMsg;
-        ASSERT( collInfo.isValid( &errMsg ) );
-
-        dummyConfig.insert( CollectionType::ConfigNS, collInfo.toBSON() );
-
-        ChunkType chunkInfo;
-        chunkInfo.setNS( "test.foo" );
-        chunkInfo.setVersion( ChunkVersion( 1, 0, collInfo.getEpoch() ) );
-        ASSERT( !chunkInfo.isValid( &errMsg ) );
-
-        dummyConfig.insert( ChunkType::ConfigNS, chunkInfo.toBSON() );
-
-        MetadataLoader loader( CONFIG_LOC );
-
-        string errmsg;
-        CollectionMetadata metadata;
-        Status status = loader.makeCollectionMetadata( "test.foo", // br
-                                                       "shard0000",
-                                                       NULL, /* no old metadata */
-                                                       &metadata );
-
-        // For now, since the differ doesn't have parsing errors, we get this kind of status
-        // NamespaceNotFound since we aren't refreshing off known metadata
-        // TODO: Make the differ do parse errors
-        ASSERT_EQUALS( status.code(), ErrorCodes::NamespaceNotFound );
-
-        MockConnRegistry::get()->clear();
-        ScopedDbConnection::clearPool();
-    }
-
-    class NoChunkFixture : public mongo::unittest::Test {
-    protected:
-        void setUp() {
-            _dummyConfig.reset( new MockRemoteDBServer( CONFIG_HOST_PORT ) );
-            mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
-            MockConnRegistry::get()->addServer( _dummyConfig.get() );
-
-            OID epoch = OID::gen();
-            BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                    CollectionType::keyPattern(BSON("a" << 1)) <<
-                    CollectionType::unique(false) <<
-                    CollectionType::updatedAt(1ULL) <<
-                    CollectionType::epoch(epoch));
-
-            _dummyConfig->insert( CollectionType::ConfigNS, collFoo );
-        }
-
-        void tearDown() {
-            MockConnRegistry::get()->clear();
-            ScopedDbConnection::clearPool();
-        }
-
-    private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
-    };
-
-    TEST_F(NoChunkFixture, NoChunksIsDropped) {
-
-        MetadataLoader loader( CONFIG_LOC );
-
-        CollectionMetadata metadata;
-        Status status = loader.makeCollectionMetadata( "test.foo", // br
-                                                       "shard0000",
-                                                       NULL, /* no old metadata */
-                                                       &metadata );
-
-        // This is interpreted as a dropped ns, since we drop the chunks first
-        ASSERT_EQUALS( status.code(), ErrorCodes::NamespaceNotFound );
-    }
-
-    class NoChunkHereFixture : public mongo::unittest::Test {
-    protected:
-        void setUp() {
-            _dummyConfig.reset( new MockRemoteDBServer( CONFIG_HOST_PORT ) );
-            mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
-            MockConnRegistry::get()->addServer( _dummyConfig.get() );
-
-            OID epoch = OID::gen();
-
-            CollectionType collType;
-            collType.setNS( "test.foo" );
-            collType.setKeyPattern( BSON("a" << 1) );
-            collType.setUnique( false );
-            collType.setUpdatedAt( 1ULL );
-            collType.setEpoch( epoch );
-            string errMsg;
-            ASSERT( collType.isValid( &errMsg ) );
-
-            _dummyConfig->insert( CollectionType::ConfigNS, collType.toBSON() );
-
-            // Need a chunk on another shard, otherwise the chunks are invalid in general and we
-            // can't load metadata
-            ChunkType chunkType;
-            chunkType.setNS( "test.foo" );
-            chunkType.setShard( "shard0001" );
-            chunkType.setMin( BSON( "a" << MINKEY ) );
-            chunkType.setMax( BSON( "a" << MAXKEY ) );
-            chunkType.setVersion( ChunkVersion( 1, 0, epoch ) );
-            chunkType.setName( OID::gen().toString() );
-            ASSERT( chunkType.isValid( &errMsg ) );
-
-            _dummyConfig->insert( ChunkType::ConfigNS, chunkType.toBSON() );
-        }
-
-        MockRemoteDBServer* getDummyConfig() {
-            return _dummyConfig.get();
-        }
-
-        void tearDown() {
-            MockConnRegistry::get()->clear();
-            ScopedDbConnection::clearPool();
-        }
-
-    private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
-    };
-
-    TEST_F(NoChunkHereFixture, CheckNumChunk) {
-        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
-        ConnectionString configLoc( confServerStr );
-        MetadataLoader loader( configLoc );
-
-        CollectionMetadata metadata;
-        Status status = loader.makeCollectionMetadata( "test.foo", // br
-                                                       "shard0000",
-                                                       NULL, /* no old metadata */
-                                                       &metadata );
-
-        ASSERT( status.isOK() );
-        ASSERT_EQUALS( 0U, metadata.getNumChunks() );
-        ASSERT_EQUALS( 1, metadata.getCollVersion().majorVersion() );
-        ASSERT_EQUALS( 0, metadata.getShardVersion().majorVersion() );
-        ASSERT_NOT_EQUALS( OID(), metadata.getCollVersion().epoch() );
-        ASSERT_NOT_EQUALS( OID(), metadata.getShardVersion().epoch() );
-    }
-
-    TEST_F(NoChunkHereFixture, BadChunkNotDropped) {
-
-        MetadataLoader loader( CONFIG_LOC );
-
-        CollectionMetadata metadata;
-        Status status = loader.makeCollectionMetadata( "test.foo", // br
-                                                       "shard0000",
-                                                       NULL, /* no old metadata */
-                                                       &metadata );
-
-        ASSERT( status.isOK() );
-
-        ChunkType chunkInfo;
-        chunkInfo.setNS( "test.foo" );
-        chunkInfo.setVersion( ChunkVersion( 1, 0, OID() ) );
-        string errMsg;
-        ASSERT( !chunkInfo.isValid( &errMsg ) );
-
-        // Replace the chunk with a bad chunk
-        getDummyConfig()->remove( ChunkType::ConfigNS, BSONObj() );
-        getDummyConfig()->insert( ChunkType::ConfigNS, chunkInfo.toBSON() );
-
-        CollectionMetadata nextMetadata;
-        status = loader.makeCollectionMetadata( "test.foo", // br
-                                                "shard0000",
-                                                &metadata, /* using old metadata */
-                                                &nextMetadata );
-
-        // Remote change error, since there's not an epoch change and we reloaded no chunks
-        ASSERT_EQUALS( status.code(), ErrorCodes::RemoteChangeDetected );
-
-        MockConnRegistry::get()->clear();
-        ScopedDbConnection::clearPool();
-    }
-
-    class ConfigServerFixture : public mongo::unittest::Test {
-    protected:
-        void setUp() {
-            _dummyConfig.reset( new MockRemoteDBServer( CONFIG_HOST_PORT ) );
-            mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
-            MockConnRegistry::get()->addServer( _dummyConfig.get() );
-
-            OID epoch = OID::gen();
-            _maxCollVersion = ChunkVersion( 1, 0, epoch );
-
-            BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                    CollectionType::keyPattern(BSON("a" << 1)) <<
-                    CollectionType::unique(false) <<
-                    CollectionType::updatedAt(1ULL) <<
-                    CollectionType::epoch(epoch));
-            _dummyConfig->insert( CollectionType::ConfigNS, collFoo );
-
-            BSONObj fooSingle = BSON(ChunkType::name("test.foo-a_MinKey") <<
-                    ChunkType::ns("test.foo") <<
-                    ChunkType::min(BSON("a" << MINKEY)) <<
-                    ChunkType::max(BSON("a" << MAXKEY)) <<
-                    ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
-                    ChunkType::DEPRECATED_epoch(epoch) <<
-                    ChunkType::shard("shard0000"));
-            _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
-        }
-
-        void tearDown() {
-            MockConnRegistry::get()->clear();
-        }
-
-        ChunkVersion getMaxCollVersion() const {
-            return _maxCollVersion;
-        }
-
-        ChunkVersion getMaxShardVersion() const {
-            return _maxCollVersion;
-        }
-
-        MockRemoteDBServer* getConfigServer() const {
-            return _dummyConfig.get();
-        }
-
-    private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
-        ChunkVersion _maxCollVersion;
-    };
-
-    TEST_F(ConfigServerFixture, SingleChunkCheckNumChunk) {
-        // Load from mock server.
-        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
-        ConnectionString configLoc( confServerStr );
-        MetadataLoader loader( configLoc );
-        CollectionMetadata metadata;
-        Status status = loader.makeCollectionMetadata( "test.foo", // br
-                                                       "shard0000",
-                                                       NULL, /* no old metadata */
-                                                       &metadata );
-        ASSERT( status.isOK() );
-        ASSERT_EQUALS( 1U, metadata.getNumChunks() );
-    }
-
-    TEST_F(ConfigServerFixture, SingleChunkGetNext) {
-        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
-        ConnectionString configLoc( confServerStr );
-        MetadataLoader loader( configLoc );
-        CollectionMetadata metadata;
-        loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
-                                       &metadata );
-        ChunkType chunkInfo;
-        ASSERT_TRUE( metadata.getNextChunk( metadata.getMinKey(), &chunkInfo) );
-    }
-
-    TEST_F(ConfigServerFixture, SingleChunkGetShardKey) {
-        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
-        ConnectionString configLoc( confServerStr );
-        MetadataLoader loader( configLoc );
-        CollectionMetadata metadata;
-        loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
-                                       &metadata );
-        ASSERT_TRUE( metadata.getKeyPattern().equal(BSON("a" << 1)) );
-    }
-
-    TEST_F(ConfigServerFixture, SingleChunkGetMaxCollVersion) {
-        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
-        ConnectionString configLoc( confServerStr );
-        MetadataLoader loader( configLoc );
-        CollectionMetadata metadata;
-        loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
-                                       &metadata );
-
-        ASSERT_TRUE( getMaxCollVersion().equals( metadata.getCollVersion() ) );
-    }
-
-    TEST_F(ConfigServerFixture, SingleChunkGetMaxShardVersion) {
-        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
-        ConnectionString configLoc( confServerStr );
-        MetadataLoader loader( configLoc );
-        CollectionMetadata metadata;
-        loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
-                                       &metadata );
-
-        ASSERT_TRUE( getMaxShardVersion().equals( metadata.getShardVersion() ) );
-    }
-
-    TEST_F(ConfigServerFixture, NoChunks) {
-        getConfigServer()->remove( ChunkType::ConfigNS, BSONObj() );
-
-        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
-        ConnectionString configLoc( confServerStr );
-        MetadataLoader loader( configLoc );
-        CollectionMetadata metadata;
-        Status status = loader.makeCollectionMetadata( "test.foo", // br
-                                                       "shard0000",
-                                                       NULL, /* no old metadata */
-                                                       &metadata );
-
-        // NSNotFound because we're reloading with no old metadata
-        ASSERT_EQUALS( status.code(), ErrorCodes::NamespaceNotFound );
-    }
-
-    class MultipleMetadataFixture : public mongo::unittest::Test {
-    protected:
-        void setUp() {
-            _dummyConfig.reset( new MockRemoteDBServer( CONFIG_HOST_PORT ) );
-            mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
-            MockConnRegistry::get()->addServer( _dummyConfig.get() );
-
-            ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
-            ConnectionString configLoc( confServerStr );
-            _loader.reset( new MetadataLoader( configLoc ) );
-        }
-
-        MetadataLoader& loader() {
-            return *_loader;
-        }
-
-        void getMetadataFor( const OwnedPointerVector<ChunkType>& chunks,
-                             CollectionMetadata* metadata ) {
-
-            // Infer namespace, shard, epoch, keypattern from first chunk
-            const ChunkType* firstChunk = *( chunks.vector().begin() );
-            string ns = firstChunk->isNSSet() ? firstChunk->getNS() : "foo.bar";
-            string shardName = firstChunk->isShardSet() ? firstChunk->getShard() : "shard0000";
-            OID epoch = firstChunk->getVersion().epoch();
-
-            BSONObjBuilder keyPatternB;
-            BSONObjIterator keyPatternIt( firstChunk->getMin() );
-            while ( keyPatternIt.more() )
-                keyPatternB.append( keyPatternIt.next().fieldName(), 1 );
-            BSONObj keyPattern = keyPatternB.obj();
-
-            _dummyConfig->remove( CollectionType::ConfigNS, BSONObj() );
-            _dummyConfig->remove( ChunkType::ConfigNS, BSONObj() );
-
-            CollectionType coll;
-            coll.setNS( ns );
-            coll.setKeyPattern( BSON( "a" << 1 ) );
-            coll.setUpdatedAt( 1ULL );
-            coll.setEpoch( epoch );
-
-            string errMsg;
-            ASSERT( coll.isValid( &errMsg ) );
-            _dummyConfig->insert( CollectionType::ConfigNS, coll.toBSON() );
-
-            ChunkVersion version( 1, 0, epoch );
-            for ( vector<ChunkType*>::const_iterator it = chunks.vector().begin();
-                    it != chunks.vector().end(); ++it ) {
-
-                ChunkType chunk;
-                ( *it )->cloneTo( &chunk );
-                chunk.setName( OID::gen().toString() );
-                if ( !chunk.isShardSet() ) chunk.setShard( shardName );
-                if ( !chunk.isNSSet() ) chunk.setNS( ns );
-                if ( !chunk.isVersionSet() ) {
-                    chunk.setVersion( version );
-                    version.incMajor();
-                }
-
-                ASSERT( chunk.isValid( &errMsg ) );
-
-                _dummyConfig->insert( ChunkType::ConfigNS, chunk.toBSON() );
+        ASSERT(coll.isValid(&errMsg));
+        _dummyConfig->insert(CollectionType::ConfigNS, coll.toBSON());
+
+        ChunkVersion version(1, 0, epoch);
+        for (vector<ChunkType*>::const_iterator it = chunks.vector().begin();
+             it != chunks.vector().end();
+             ++it) {
+            ChunkType chunk;
+            (*it)->cloneTo(&chunk);
+            chunk.setName(OID::gen().toString());
+            if (!chunk.isShardSet())
+                chunk.setShard(shardName);
+            if (!chunk.isNSSet())
+                chunk.setNS(ns);
+            if (!chunk.isVersionSet()) {
+                chunk.setVersion(version);
+                version.incMajor();
             }
 
-            Status status = loader().makeCollectionMetadata( ns, shardName, NULL, metadata );
-            ASSERT( status.isOK() );
+            ASSERT(chunk.isValid(&errMsg));
+
+            _dummyConfig->insert(ChunkType::ConfigNS, chunk.toBSON());
         }
 
-        void tearDown() {
-            MockConnRegistry::get()->clear();
-        }
-
-    private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
-        scoped_ptr<MetadataLoader> _loader;
-    };
-
-    TEST_F(MultipleMetadataFixture, PromotePendingNA) {
-
-        auto_ptr<ChunkType> chunk( new ChunkType() );
-        chunk->setMin( BSON( "x" << MINKEY ) );
-        chunk->setMax( BSON( "x" << 0 ) );
-        chunk->setVersion( ChunkVersion( 1, 0, OID::gen() ) );
-
-        OwnedPointerVector<ChunkType> chunks;
-        chunks.mutableVector().push_back( chunk.release() );
-
-        CollectionMetadata afterMetadata;
-        getMetadataFor( chunks, &afterMetadata );
-
-        // Metadata of different epoch
-        ( *chunks.vector().begin() )->setVersion( ChunkVersion( 1, 0, OID::gen() ) );
-
-        CollectionMetadata remoteMetadata;
-        getMetadataFor( chunks, &remoteMetadata );
-
-        Status status = loader().promotePendingChunks( &afterMetadata, &remoteMetadata );
-        ASSERT( status.isOK() );
-
-        string errMsg;
-        ChunkType pending;
-        pending.setMin( BSON( "x" << 0 ) );
-        pending.setMax( BSON( "x" << 10 ) );
-
-        scoped_ptr<CollectionMetadata> cloned( afterMetadata.clonePlusPending( pending, &errMsg ) );
-        ASSERT( cloned != NULL );
-
-        status = loader().promotePendingChunks( cloned.get(), &remoteMetadata );
-        ASSERT( status.isOK() );
-        ASSERT_EQUALS( remoteMetadata.getNumPending(), 0u );
+        Status status = loader().makeCollectionMetadata(ns, shardName, NULL, metadata);
+        ASSERT(status.isOK());
     }
 
-    TEST_F(MultipleMetadataFixture, PromotePendingNAVersion) {
-
-        OID epoch = OID::gen();
-        auto_ptr<ChunkType> chunk( new ChunkType() );
-        chunk->setMin( BSON( "x" << MINKEY ) );
-        chunk->setMax( BSON( "x" << 0 ) );
-        chunk->setVersion( ChunkVersion( 1, 1, epoch ) );
-
-        OwnedPointerVector<ChunkType> chunks;
-        chunks.mutableVector().push_back( chunk.release() );
-
-        CollectionMetadata afterMetadata;
-        getMetadataFor( chunks, &afterMetadata );
-
-        // Metadata of same epoch, but lower version
-        ( *chunks.vector().begin() )->setVersion( ChunkVersion( 1, 0, epoch ) );
-
-        CollectionMetadata remoteMetadata;
-        getMetadataFor( chunks, &remoteMetadata );
-
-        Status status = loader().promotePendingChunks( &afterMetadata, &remoteMetadata );
-        ASSERT( status.isOK() );
-
-        string errMsg;
-        ChunkType pending;
-        pending.setMin( BSON( "x" << 0 ) );
-        pending.setMax( BSON( "x" << 10 ) );
-
-        scoped_ptr<CollectionMetadata> cloned( afterMetadata.clonePlusPending( pending, &errMsg ) );
-        ASSERT( cloned != NULL );
-
-        status = loader().promotePendingChunks( cloned.get(), &remoteMetadata );
-        ASSERT( status.isOK() );
-        ASSERT_EQUALS( remoteMetadata.getNumPending(), 0u );
-
+    void tearDown() {
+        MockConnRegistry::get()->clear();
     }
 
-    TEST_F(MultipleMetadataFixture, PromotePendingGoodOverlap) {
+private:
+    scoped_ptr<MockRemoteDBServer> _dummyConfig;
+    scoped_ptr<MetadataLoader> _loader;
+};
 
-        OID epoch = OID::gen();
+TEST_F(MultipleMetadataFixture, PromotePendingNA) {
+    auto_ptr<ChunkType> chunk(new ChunkType());
+    chunk->setMin(BSON("x" << MINKEY));
+    chunk->setMax(BSON("x" << 0));
+    chunk->setVersion(ChunkVersion(1, 0, OID::gen()));
 
-        //
-        // Setup chunk range for remote metadata
-        //
+    OwnedPointerVector<ChunkType> chunks;
+    chunks.mutableVector().push_back(chunk.release());
 
-        OwnedPointerVector<ChunkType> chunks;
+    CollectionMetadata afterMetadata;
+    getMetadataFor(chunks, &afterMetadata);
 
-        auto_ptr<ChunkType> chunk( new ChunkType() );
-        chunk->setMin( BSON( "x" << MINKEY ) );
-        chunk->setMax( BSON( "x" << 0 ) );
-        chunk->setVersion( ChunkVersion( 1, 0, epoch ) );
-        chunks.mutableVector().push_back( chunk.release() );
+    // Metadata of different epoch
+    (*chunks.vector().begin())->setVersion(ChunkVersion(1, 0, OID::gen()));
 
-        chunk.reset( new ChunkType() );
-        chunk->setMin( BSON( "x" << 10 ) );
-        chunk->setMax( BSON( "x" << 20 ) );
-        chunks.mutableVector().push_back( chunk.release() );
+    CollectionMetadata remoteMetadata;
+    getMetadataFor(chunks, &remoteMetadata);
 
-        chunk.reset( new ChunkType() );
-        chunk->setMin( BSON( "x" << 30 ) );
-        chunk->setMax( BSON( "x" << MAXKEY ) );\
-        chunks.mutableVector().push_back( chunk.release() );
+    Status status = loader().promotePendingChunks(&afterMetadata, &remoteMetadata);
+    ASSERT(status.isOK());
 
-        CollectionMetadata remoteMetadata;
-        getMetadataFor( chunks, &remoteMetadata );
+    string errMsg;
+    ChunkType pending;
+    pending.setMin(BSON("x" << 0));
+    pending.setMax(BSON("x" << 10));
 
-        //
-        // Setup chunk and pending range for afterMetadata
-        //
+    scoped_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending, &errMsg));
+    ASSERT(cloned != NULL);
 
-        chunks.clear();
-        chunk.reset( new ChunkType() );
-        chunk->setMin( BSON( "x" << 0 ) );
-        chunk->setMax( BSON( "x" << 10 ) );
-        chunk->setVersion( ChunkVersion( 1, 0, epoch ) );
+    status = loader().promotePendingChunks(cloned.get(), &remoteMetadata);
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(remoteMetadata.getNumPending(), 0u);
+}
 
-        chunks.mutableVector().push_back( chunk.release() );
+TEST_F(MultipleMetadataFixture, PromotePendingNAVersion) {
+    OID epoch = OID::gen();
+    auto_ptr<ChunkType> chunk(new ChunkType());
+    chunk->setMin(BSON("x" << MINKEY));
+    chunk->setMax(BSON("x" << 0));
+    chunk->setVersion(ChunkVersion(1, 1, epoch));
 
-        CollectionMetadata afterMetadata;
-        getMetadataFor( chunks, &afterMetadata );
+    OwnedPointerVector<ChunkType> chunks;
+    chunks.mutableVector().push_back(chunk.release());
 
-        string errMsg;
-        ChunkType pending;
-        pending.setMin( BSON( "x" << MINKEY ) );
-        pending.setMax( BSON( "x" << 0 ) );
+    CollectionMetadata afterMetadata;
+    getMetadataFor(chunks, &afterMetadata);
 
-        scoped_ptr<CollectionMetadata> cloned( afterMetadata.clonePlusPending( pending, &errMsg ) );
-        ASSERT( cloned != NULL );
+    // Metadata of same epoch, but lower version
+    (*chunks.vector().begin())->setVersion(ChunkVersion(1, 0, epoch));
 
-        pending.setMin( BSON( "x" << 10 ) );
-        pending.setMax( BSON( "x" << 20 ) );
+    CollectionMetadata remoteMetadata;
+    getMetadataFor(chunks, &remoteMetadata);
 
-        cloned.reset( cloned->clonePlusPending( pending, &errMsg ) );
-        ASSERT( cloned != NULL );
+    Status status = loader().promotePendingChunks(&afterMetadata, &remoteMetadata);
+    ASSERT(status.isOK());
 
-        pending.setMin( BSON( "x" << 20 ) );
-        pending.setMax( BSON( "x" << 30 ) );
+    string errMsg;
+    ChunkType pending;
+    pending.setMin(BSON("x" << 0));
+    pending.setMax(BSON("x" << 10));
 
-        cloned.reset( cloned->clonePlusPending( pending, &errMsg ) );
-        ASSERT( cloned != NULL );
+    scoped_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending, &errMsg));
+    ASSERT(cloned != NULL);
 
-        pending.setMin( BSON( "x" << 30 ) );
-        pending.setMax( BSON( "x" << MAXKEY ) );
+    status = loader().promotePendingChunks(cloned.get(), &remoteMetadata);
+    ASSERT(status.isOK());
+    ASSERT_EQUALS(remoteMetadata.getNumPending(), 0u);
+}
 
-        cloned.reset( cloned->clonePlusPending( pending, &errMsg ) );
-        ASSERT( cloned != NULL );
+TEST_F(MultipleMetadataFixture, PromotePendingGoodOverlap) {
+    OID epoch = OID::gen();
 
-        Status status = loader().promotePendingChunks( cloned.get(), &remoteMetadata );
-        ASSERT( status.isOK() );
+    //
+    // Setup chunk range for remote metadata
+    //
 
-        ASSERT_EQUALS( remoteMetadata.getNumPending(), 1u );
-        ASSERT( remoteMetadata.keyIsPending( BSON( "x" << 25 ) ) );
-    }
+    OwnedPointerVector<ChunkType> chunks;
 
-    TEST_F(MultipleMetadataFixture, PromotePendingBadOverlap) {
+    auto_ptr<ChunkType> chunk(new ChunkType());
+    chunk->setMin(BSON("x" << MINKEY));
+    chunk->setMax(BSON("x" << 0));
+    chunk->setVersion(ChunkVersion(1, 0, epoch));
+    chunks.mutableVector().push_back(chunk.release());
 
-        OID epoch = OID::gen();
+    chunk.reset(new ChunkType());
+    chunk->setMin(BSON("x" << 10));
+    chunk->setMax(BSON("x" << 20));
+    chunks.mutableVector().push_back(chunk.release());
 
-        //
-        // Setup chunk range for remote metadata
-        //
+    chunk.reset(new ChunkType());
+    chunk->setMin(BSON("x" << 30));
+    chunk->setMax(BSON("x" << MAXKEY));
+    chunks.mutableVector().push_back(chunk.release());
 
-        OwnedPointerVector<ChunkType> chunks;
+    CollectionMetadata remoteMetadata;
+    getMetadataFor(chunks, &remoteMetadata);
 
-        auto_ptr<ChunkType> chunk( new ChunkType() );
-        chunk->setMin( BSON( "x" << MINKEY ) );
-        chunk->setMax( BSON( "x" << 0 ) );
-        chunk->setVersion( ChunkVersion( 1, 0, epoch ) );
+    //
+    // Setup chunk and pending range for afterMetadata
+    //
 
-        chunks.mutableVector().push_back( chunk.release() );
+    chunks.clear();
+    chunk.reset(new ChunkType());
+    chunk->setMin(BSON("x" << 0));
+    chunk->setMax(BSON("x" << 10));
+    chunk->setVersion(ChunkVersion(1, 0, epoch));
 
-        CollectionMetadata remoteMetadata;
-        getMetadataFor( chunks, &remoteMetadata );
+    chunks.mutableVector().push_back(chunk.release());
 
-        //
-        // Setup chunk and pending range for afterMetadata
-        //
+    CollectionMetadata afterMetadata;
+    getMetadataFor(chunks, &afterMetadata);
 
-        chunks.clear();
-        chunk.reset( new ChunkType() );
-        chunk->setMin( BSON( "x" << 15 ) );
-        chunk->setMax( BSON( "x" << MAXKEY ) );
-        chunk->setVersion( ChunkVersion( 1, 0, epoch ) );
+    string errMsg;
+    ChunkType pending;
+    pending.setMin(BSON("x" << MINKEY));
+    pending.setMax(BSON("x" << 0));
 
-        chunks.mutableVector().push_back( chunk.release() );
+    scoped_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending, &errMsg));
+    ASSERT(cloned != NULL);
 
-        CollectionMetadata afterMetadata;
-        getMetadataFor( chunks, &afterMetadata );
+    pending.setMin(BSON("x" << 10));
+    pending.setMax(BSON("x" << 20));
 
-        string errMsg;
-        ChunkType pending;
-        pending.setMin( BSON( "x" << MINKEY ) );
-        pending.setMax( BSON( "x" << 1 ) );
+    cloned.reset(cloned->clonePlusPending(pending, &errMsg));
+    ASSERT(cloned != NULL);
 
-        scoped_ptr<CollectionMetadata> cloned( afterMetadata.clonePlusPending( pending, &errMsg ) );
-        ASSERT( cloned != NULL );
+    pending.setMin(BSON("x" << 20));
+    pending.setMax(BSON("x" << 30));
 
-        cloned.reset( cloned->clonePlusPending( pending, &errMsg ) );
-        ASSERT( cloned != NULL );
+    cloned.reset(cloned->clonePlusPending(pending, &errMsg));
+    ASSERT(cloned != NULL);
 
-        Status status = loader().promotePendingChunks( cloned.get(), &remoteMetadata );
-        ASSERT_EQUALS( status.code(), ErrorCodes::RemoteChangeDetected );
-    }
+    pending.setMin(BSON("x" << 30));
+    pending.setMax(BSON("x" << MAXKEY));
+
+    cloned.reset(cloned->clonePlusPending(pending, &errMsg));
+    ASSERT(cloned != NULL);
+
+    Status status = loader().promotePendingChunks(cloned.get(), &remoteMetadata);
+    ASSERT(status.isOK());
+
+    ASSERT_EQUALS(remoteMetadata.getNumPending(), 1u);
+    ASSERT(remoteMetadata.keyIsPending(BSON("x" << 25)));
+}
+
+TEST_F(MultipleMetadataFixture, PromotePendingBadOverlap) {
+    OID epoch = OID::gen();
+
+    //
+    // Setup chunk range for remote metadata
+    //
+
+    OwnedPointerVector<ChunkType> chunks;
+
+    auto_ptr<ChunkType> chunk(new ChunkType());
+    chunk->setMin(BSON("x" << MINKEY));
+    chunk->setMax(BSON("x" << 0));
+    chunk->setVersion(ChunkVersion(1, 0, epoch));
+
+    chunks.mutableVector().push_back(chunk.release());
+
+    CollectionMetadata remoteMetadata;
+    getMetadataFor(chunks, &remoteMetadata);
+
+    //
+    // Setup chunk and pending range for afterMetadata
+    //
+
+    chunks.clear();
+    chunk.reset(new ChunkType());
+    chunk->setMin(BSON("x" << 15));
+    chunk->setMax(BSON("x" << MAXKEY));
+    chunk->setVersion(ChunkVersion(1, 0, epoch));
+
+    chunks.mutableVector().push_back(chunk.release());
+
+    CollectionMetadata afterMetadata;
+    getMetadataFor(chunks, &afterMetadata);
+
+    string errMsg;
+    ChunkType pending;
+    pending.setMin(BSON("x" << MINKEY));
+    pending.setMax(BSON("x" << 1));
+
+    scoped_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending, &errMsg));
+    ASSERT(cloned != NULL);
+
+    cloned.reset(cloned->clonePlusPending(pending, &errMsg));
+    ASSERT(cloned != NULL);
+
+    Status status = loader().promotePendingChunks(cloned.get(), &remoteMetadata);
+    ASSERT_EQUALS(status.code(), ErrorCodes::RemoteChangeDetected);
+}
 
 #if 0
     // TODO: MockServer functionality does not support selective query - consider

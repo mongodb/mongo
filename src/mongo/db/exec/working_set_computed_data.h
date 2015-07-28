@@ -32,68 +32,72 @@
 
 namespace mongo {
 
-    class TextScoreComputedData : public WorkingSetComputedData {
-    public:
-        TextScoreComputedData(double score)
-            : WorkingSetComputedData(WSM_COMPUTED_TEXT_SCORE),
-              _score(score) { }
+class TextScoreComputedData : public WorkingSetComputedData {
+public:
+    TextScoreComputedData(double score)
+        : WorkingSetComputedData(WSM_COMPUTED_TEXT_SCORE), _score(score) {}
 
-        double getScore() const { return _score; }
+    double getScore() const {
+        return _score;
+    }
 
-        virtual TextScoreComputedData* clone() const {
-            return new TextScoreComputedData(_score);
-        }
+    virtual TextScoreComputedData* clone() const {
+        return new TextScoreComputedData(_score);
+    }
 
-    private:
-        double _score;
-    };
+private:
+    double _score;
+};
 
-    class GeoDistanceComputedData : public WorkingSetComputedData {
-    public:
-        GeoDistanceComputedData(double dist)
-            : WorkingSetComputedData(WSM_COMPUTED_GEO_DISTANCE),
-              _dist(dist) { }
+class GeoDistanceComputedData : public WorkingSetComputedData {
+public:
+    GeoDistanceComputedData(double dist)
+        : WorkingSetComputedData(WSM_COMPUTED_GEO_DISTANCE), _dist(dist) {}
 
-        double getDist() const { return _dist; }
+    double getDist() const {
+        return _dist;
+    }
 
-        virtual GeoDistanceComputedData* clone() const {
-            return new GeoDistanceComputedData(_dist);
-        }
+    virtual GeoDistanceComputedData* clone() const {
+        return new GeoDistanceComputedData(_dist);
+    }
 
-    private:
-        double _dist;
-    };
+private:
+    double _dist;
+};
 
-    class IndexKeyComputedData : public WorkingSetComputedData {
-    public:
-        IndexKeyComputedData(BSONObj key)
-            : WorkingSetComputedData(WSM_INDEX_KEY),
-              _key(key.getOwned()) { }
+class IndexKeyComputedData : public WorkingSetComputedData {
+public:
+    IndexKeyComputedData(BSONObj key)
+        : WorkingSetComputedData(WSM_INDEX_KEY), _key(key.getOwned()) {}
 
-        BSONObj getKey() const { return _key; }
+    BSONObj getKey() const {
+        return _key;
+    }
 
-        virtual IndexKeyComputedData* clone() const {
-            return new IndexKeyComputedData(_key);
-        }
+    virtual IndexKeyComputedData* clone() const {
+        return new IndexKeyComputedData(_key);
+    }
 
-    private:
-        BSONObj _key;
-    };
+private:
+    BSONObj _key;
+};
 
-    class GeoNearPointComputedData : public WorkingSetComputedData {
-    public:
-        GeoNearPointComputedData(BSONObj point)
-            : WorkingSetComputedData(WSM_GEO_NEAR_POINT),
-              _point(point.getOwned()) { }
+class GeoNearPointComputedData : public WorkingSetComputedData {
+public:
+    GeoNearPointComputedData(BSONObj point)
+        : WorkingSetComputedData(WSM_GEO_NEAR_POINT), _point(point.getOwned()) {}
 
-        BSONObj getPoint() const { return _point; }
+    BSONObj getPoint() const {
+        return _point;
+    }
 
-        virtual GeoNearPointComputedData* clone() const {
-            return new GeoNearPointComputedData(_point);
-        }
+    virtual GeoNearPointComputedData* clone() const {
+        return new GeoNearPointComputedData(_point);
+    }
 
-    private:
-        BSONObj _point;
-    };
+private:
+    BSONObj _point;
+};
 
 }  // namespace mongo

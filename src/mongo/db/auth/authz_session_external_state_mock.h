@@ -35,43 +35,45 @@
 
 namespace mongo {
 
-    /**
-     * Mock of the AuthzSessionExternalState class used only for testing.
-     */
-    class AuthzSessionExternalStateMock : public AuthzSessionExternalState {
-        MONGO_DISALLOW_COPYING(AuthzSessionExternalStateMock);
+/**
+ * Mock of the AuthzSessionExternalState class used only for testing.
+ */
+class AuthzSessionExternalStateMock : public AuthzSessionExternalState {
+    MONGO_DISALLOW_COPYING(AuthzSessionExternalStateMock);
 
-    public:
-        AuthzSessionExternalStateMock(AuthorizationManager* authzManager) :
-            AuthzSessionExternalState(authzManager), _ignoreAuthChecksReturnValue(false),
-            _allowLocalhostReturnValue(false), _serverIsArbiterReturnValue(false) {}
+public:
+    AuthzSessionExternalStateMock(AuthorizationManager* authzManager)
+        : AuthzSessionExternalState(authzManager),
+          _ignoreAuthChecksReturnValue(false),
+          _allowLocalhostReturnValue(false),
+          _serverIsArbiterReturnValue(false) {}
 
-        virtual bool shouldIgnoreAuthChecks() const {
-            return _ignoreAuthChecksReturnValue;
-        }
+    virtual bool shouldIgnoreAuthChecks() const {
+        return _ignoreAuthChecksReturnValue;
+    }
 
-        virtual bool shouldAllowLocalhost() const {
-            return _allowLocalhostReturnValue;
-        }
+    virtual bool shouldAllowLocalhost() const {
+        return _allowLocalhostReturnValue;
+    }
 
-        virtual bool serverIsArbiter() const {
-            return _serverIsArbiterReturnValue;
-        }
+    virtual bool serverIsArbiter() const {
+        return _serverIsArbiterReturnValue;
+    }
 
-        void setReturnValueForShouldIgnoreAuthChecks(bool returnValue) {
-            _ignoreAuthChecksReturnValue = returnValue;
-        }
+    void setReturnValueForShouldIgnoreAuthChecks(bool returnValue) {
+        _ignoreAuthChecksReturnValue = returnValue;
+    }
 
-        void setReturnValueForShouldAllowLocalhost(bool returnValue) {
-            _allowLocalhostReturnValue = returnValue;
-        }
+    void setReturnValueForShouldAllowLocalhost(bool returnValue) {
+        _allowLocalhostReturnValue = returnValue;
+    }
 
-        virtual void startRequest(OperationContext* txn) {}
+    virtual void startRequest(OperationContext* txn) {}
 
-    private:
-        bool _ignoreAuthChecksReturnValue;
-        bool _allowLocalhostReturnValue;
-        bool _serverIsArbiterReturnValue;
-    };
+private:
+    bool _ignoreAuthChecksReturnValue;
+    bool _allowLocalhostReturnValue;
+    bool _serverIsArbiterReturnValue;
+};
 
-} // namespace mongo
+}  // namespace mongo

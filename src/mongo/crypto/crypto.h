@@ -32,22 +32,20 @@
 
 namespace mongo {
 namespace crypto {
-    /*
-     * Computes a SHA-1 hash of 'input'.
-     */
-    bool sha1(const unsigned char* input,
+/*
+ * Computes a SHA-1 hash of 'input'.
+ */
+bool sha1(const unsigned char* input, const size_t inputLen, unsigned char* output);
+
+/*
+ * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'
+ */
+bool hmacSha1(const unsigned char* key,
+              const size_t keyLen,
+              const unsigned char* input,
               const size_t inputLen,
-              unsigned char* output);
+              unsigned char* output,
+              unsigned int* outputLen);
 
-    /*
-     * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'
-     */
-    bool hmacSha1(const unsigned char* key,
-                  const size_t keyLen,
-                  const unsigned char* input,
-                  const size_t inputLen,
-                  unsigned char* output,
-                  unsigned int* outputLen);
-
-} // namespace crypto
-} // namespace mongo
+}  // namespace crypto
+}  // namespace mongo

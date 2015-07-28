@@ -41,146 +41,148 @@
 
 namespace mongo {
 
-    typedef boost::posix_time::milliseconds Milliseconds;
-    typedef boost::posix_time::seconds Seconds;
+typedef boost::posix_time::milliseconds Milliseconds;
+typedef boost::posix_time::seconds Seconds;
 
-    void time_t_to_Struct(time_t t, struct tm * buf , bool local = false );
-    std::string time_t_to_String(time_t t);
-    std::string time_t_to_String_short(time_t t);
+void time_t_to_Struct(time_t t, struct tm* buf, bool local = false);
+std::string time_t_to_String(time_t t);
+std::string time_t_to_String_short(time_t t);
 
-    struct Date_t {
-        // TODO: make signed (and look for related TODO's)
-        unsigned long long millis;
-        Date_t(): millis(0) {}
-        Date_t(unsigned long long m): millis(m) {}
-        operator unsigned long long&() { return millis; }
-        operator const unsigned long long&() const { return millis; }
-        void toTm (tm *buf);
-        std::string toString() const;
-        time_t toTimeT() const;
-        int64_t asInt64() const {
-            return static_cast<int64_t>(millis);
-        }
-        bool isFormatable() const;
-    };
+struct Date_t {
+    // TODO: make signed (and look for related TODO's)
+    unsigned long long millis;
+    Date_t() : millis(0) {}
+    Date_t(unsigned long long m) : millis(m) {}
+    operator unsigned long long&() {
+        return millis;
+    }
+    operator const unsigned long long&() const {
+        return millis;
+    }
+    void toTm(tm* buf);
+    std::string toString() const;
+    time_t toTimeT() const;
+    int64_t asInt64() const {
+        return static_cast<int64_t>(millis);
+    }
+    bool isFormatable() const;
+};
 
-    // uses ISO 8601 dates without trailing Z
-    // colonsOk should be false when creating filenames
-    std::string terseCurrentTime(bool colonsOk=true);
+// uses ISO 8601 dates without trailing Z
+// colonsOk should be false when creating filenames
+std::string terseCurrentTime(bool colonsOk = true);
+
+/**
+ * Formats "time" according to the ISO 8601 extended form standard, including date,
+ * and time, in the UTC timezone.
+ *
+ * Sample format: "2013-07-23T18:42:14Z"
+ */
+std::string timeToISOString(time_t time);
+
+/**
+ * Formats "date" according to the ISO 8601 extended form standard, including date,
+ * and time with milliseconds decimal component, in the UTC timezone.
+ *
+ * Sample format: "2013-07-23T18:42:14.072Z"
+ */
+std::string dateToISOStringUTC(Date_t date);
+
+/**
+ * Formats "date" according to the ISO 8601 extended form standard, including date,
+ * and time with milliseconds decimal component, in the local timezone.
+ *
+ * Sample format: "2013-07-23T18:42:14.072-05:00"
+ */
+std::string dateToISOStringLocal(Date_t date);
+
+/**
+ * Formats "date" in fixed width in the local time zone.
+ *
+ * Sample format: "Wed Oct 31 13:34:47.996"
+ */
+std::string dateToCtimeString(Date_t date);
+
+/**
+ * Parses a Date_t from an ISO 8601 std::string representation.
+ *
+ * Sample formats: "2013-07-23T18:42:14.072-05:00"
+ *                 "2013-07-23T18:42:14.072Z"
+ *
+ * Local times are currently not supported.
+ */
+StatusWith<Date_t> dateFromISOString(const StringData& dateString);
+
+/**
+ * Like dateToISOStringUTC, except outputs to a std::ostream.
+ */
+void outputDateAsISOStringUTC(std::ostream& os, Date_t date);
+
+/**
+ * Like dateToISOStringLocal, except outputs to a std::ostream.
+ */
+void outputDateAsISOStringLocal(std::ostream& os, Date_t date);
+
+/**
+ * Like dateToCtimeString, except outputs to a std::ostream.
+ */
+void outputDateAsCtime(std::ostream& os, Date_t date);
+
+boost::gregorian::date currentDate();
+
+// parses time of day in "hh:mm" format assuming 'hh' is 00-23
+bool toPointInTime(const std::string& str, boost::posix_time::ptime* timeOfDay);
+
+MONGO_CLIENT_API void sleepsecs(int s);
+MONGO_CLIENT_API void sleepmillis(long long ms);
+MONGO_CLIENT_API void sleepmicros(long long micros);
+
+class Backoff {
+public:
+    Backoff(int maxSleepMillis, int resetAfter)
+        : _maxSleepMillis(maxSleepMillis),
+          _resetAfterMillis(maxSleepMillis + resetAfter),  // Don't reset < the max sleep
+          _lastSleepMillis(0),
+          _lastErrorTimeMillis(0) {}
+
+    void nextSleepMillis();
 
     /**
-     * Formats "time" according to the ISO 8601 extended form standard, including date,
-     * and time, in the UTC timezone.
-     *
-     * Sample format: "2013-07-23T18:42:14Z"
+     * testing-only function. used in dbtests/basictests.cpp
      */
-    std::string timeToISOString(time_t time);
+    int getNextSleepMillis(int lastSleepMillis,
+                           unsigned long long currTimeMillis,
+                           unsigned long long lastErrorTimeMillis) const;
 
-    /**
-     * Formats "date" according to the ISO 8601 extended form standard, including date,
-     * and time with milliseconds decimal component, in the UTC timezone.
-     *
-     * Sample format: "2013-07-23T18:42:14.072Z"
-     */
-    std::string dateToISOStringUTC(Date_t date);
+private:
+    // Parameters
+    int _maxSleepMillis;
+    int _resetAfterMillis;
 
-    /**
-     * Formats "date" according to the ISO 8601 extended form standard, including date,
-     * and time with milliseconds decimal component, in the local timezone.
-     *
-     * Sample format: "2013-07-23T18:42:14.072-05:00"
-     */
-    std::string dateToISOStringLocal(Date_t date);
+    // Last sleep information
+    int _lastSleepMillis;
+    unsigned long long _lastErrorTimeMillis;
+};
 
-    /**
-     * Formats "date" in fixed width in the local time zone.
-     *
-     * Sample format: "Wed Oct 31 13:34:47.996"
-     */
-    std::string dateToCtimeString(Date_t date);
+// DO NOT TOUCH except for testing
+void jsTimeVirtualSkew(long long skew);
 
-    /**
-     * Parses a Date_t from an ISO 8601 std::string representation.
-     *
-     * Sample formats: "2013-07-23T18:42:14.072-05:00"
-     *                 "2013-07-23T18:42:14.072Z"
-     *
-     * Local times are currently not supported.
-     */
-    StatusWith<Date_t> dateFromISOString(const StringData& dateString);
+void jsTimeVirtualThreadSkew(long long skew);
+long long getJSTimeVirtualThreadSkew();
 
-    /**
-     * Like dateToISOStringUTC, except outputs to a std::ostream.
-     */
-    void outputDateAsISOStringUTC(std::ostream& os, Date_t date);
+/** Date_t is milliseconds since epoch */
+Date_t jsTime();
 
-    /**
-     * Like dateToISOStringLocal, except outputs to a std::ostream.
-     */
-    void outputDateAsISOStringLocal(std::ostream& os, Date_t date);
+/** warning this will wrap */
+unsigned curTimeMicros();
+unsigned long long curTimeMicros64();
+unsigned long long curTimeMillis64();
 
-    /**
-     * Like dateToCtimeString, except outputs to a std::ostream.
-     */
-    void outputDateAsCtime(std::ostream& os, Date_t date);
-
-    boost::gregorian::date currentDate();
-
-    // parses time of day in "hh:mm" format assuming 'hh' is 00-23
-    bool toPointInTime( const std::string& str , boost::posix_time::ptime* timeOfDay );
-
-    MONGO_CLIENT_API void sleepsecs(int s);
-    MONGO_CLIENT_API void sleepmillis(long long ms);
-    MONGO_CLIENT_API void sleepmicros(long long micros);
-
-    class Backoff {
-    public:
-
-        Backoff( int maxSleepMillis, int resetAfter ) :
-            _maxSleepMillis( maxSleepMillis ),
-            _resetAfterMillis( maxSleepMillis + resetAfter ), // Don't reset < the max sleep
-            _lastSleepMillis( 0 ),
-            _lastErrorTimeMillis( 0 )
-        {}
-
-        void nextSleepMillis();
-
-        /**
-         * testing-only function. used in dbtests/basictests.cpp
-         */
-        int getNextSleepMillis(int lastSleepMillis, unsigned long long currTimeMillis,
-                               unsigned long long lastErrorTimeMillis) const;
-
-    private:
-
-        // Parameters
-        int _maxSleepMillis;
-        int _resetAfterMillis;
-
-        // Last sleep information
-        int _lastSleepMillis;
-        unsigned long long _lastErrorTimeMillis;
-    };
-
-    // DO NOT TOUCH except for testing
-    void jsTimeVirtualSkew( long long skew );
-
-    void jsTimeVirtualThreadSkew( long long skew );
-    long long getJSTimeVirtualThreadSkew();
-
-    /** Date_t is milliseconds since epoch */
-     Date_t jsTime();
-
-    /** warning this will wrap */
-    unsigned curTimeMicros();
-    unsigned long long curTimeMicros64();
-    unsigned long long curTimeMillis64();
-
-    // these are so that if you use one of them compilation will fail
-    char *asctime(const struct tm *tm);
-    char *ctime(const time_t *timep);
-    struct tm *gmtime(const time_t *timep);
-    struct tm *localtime(const time_t *timep);
+// these are so that if you use one of them compilation will fail
+char* asctime(const struct tm* tm);
+char* ctime(const time_t* timep);
+struct tm* gmtime(const time_t* timep);
+struct tm* localtime(const time_t* timep);
 
 #if defined(MONGO_BOOST_TIME_UTC_HACK) || (BOOST_VERSION >= 105000)
 #define MONGO_BOOST_TIME_UTC boost::TIME_UTC_
@@ -189,4 +191,3 @@ namespace mongo {
 #endif
 
 }  // namespace mongo
-

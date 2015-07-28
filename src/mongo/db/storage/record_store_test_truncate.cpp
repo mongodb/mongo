@@ -41,78 +41,76 @@ using std::stringstream;
 
 namespace mongo {
 
-    // Verify that calling truncate() on an already empty collection returns an OK status.
-    TEST( RecordStoreTestHarness, TruncateEmpty ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+// Verify that calling truncate() on an already empty collection returns an OK status.
+TEST(RecordStoreTestHarness, TruncateEmpty) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( rs->truncate( opCtx.get() ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(rs->truncate(opCtx.get()));
+            uow.commit();
         }
     }
 
-    // Insert multiple records, and verify that calling truncate() on a nonempty collection
-    // removes all of them and returns an OK status.
-    TEST( RecordStoreTestHarness, TruncateNonEmpty ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+}
 
+// Insert multiple records, and verify that calling truncate() on a nonempty collection
+// removes all of them and returns an OK status.
+TEST(RecordStoreTestHarness, TruncateNonEmpty) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
+            stringstream ss;
+            ss << "record " << i;
+            string data = ss.str();
 
-        int nToInsert = 10;
-        for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                stringstream ss;
-                ss << "record " << i;
-                string data = ss.str();
-
-                WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
-                                                            false );
-                ASSERT_OK( res.getStatus() );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( rs->truncate( opCtx.get() ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+            ASSERT_OK(res.getStatus());
+            uow.commit();
         }
     }
 
-} // namespace mongo
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(rs->truncate(opCtx.get()));
+            uow.commit();
+        }
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+    }
+}
+
+}  // namespace mongo

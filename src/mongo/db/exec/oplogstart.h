@@ -39,102 +39,117 @@
 
 namespace mongo {
 
-    /**
-     * OplogStart walks a collection backwards to find the first object in the collection that
-     * matches the query.  It's used by replication to efficiently find where the oplog should be
-     * replayed from.
-     *
-     * The oplog is always a capped collection.  In capped collections, documents are oriented on
-     * disk according to insertion order.  The oplog inserts documents with increasing timestamps.
-     * Queries on the oplog look for entries that are after a certain time.  Therefore if we
-     * navigate backwards, the last document we encounter that satisfies our query (over the
-     * timestamp) is the first document we must scan from to answer the query.
-     *
-     * Why isn't this a normal reverse table scan, you may ask?  We could be correct if we used a
-     * normal reverse collection scan.  However, that's not fast enough.  Since we know all
-     * documents are oriented on disk in insertion order, we know all documents in one extent were
-     * inserted before documents in a subsequent extent.  As such we can skip through entire extents
-     * looking only at the first document.
-     *
-     * Why is this a stage?  Because we want to yield, and we want to be notified of RecordId
-     * invalidations.  :(
-     */
-    class OplogStart : public PlanStage {
-    public:
-        // Does not take ownership.
-        OplogStart(OperationContext* txn,
-                   const Collection* collection,
-                   MatchExpression* filter,
-                   WorkingSet* ws);
-        virtual ~OplogStart();
+/**
+ * OplogStart walks a collection backwards to find the first object in the collection that
+ * matches the query.  It's used by replication to efficiently find where the oplog should be
+ * replayed from.
+ *
+ * The oplog is always a capped collection.  In capped collections, documents are oriented on
+ * disk according to insertion order.  The oplog inserts documents with increasing timestamps.
+ * Queries on the oplog look for entries that are after a certain time.  Therefore if we
+ * navigate backwards, the last document we encounter that satisfies our query (over the
+ * timestamp) is the first document we must scan from to answer the query.
+ *
+ * Why isn't this a normal reverse table scan, you may ask?  We could be correct if we used a
+ * normal reverse collection scan.  However, that's not fast enough.  Since we know all
+ * documents are oriented on disk in insertion order, we know all documents in one extent were
+ * inserted before documents in a subsequent extent.  As such we can skip through entire extents
+ * looking only at the first document.
+ *
+ * Why is this a stage?  Because we want to yield, and we want to be notified of RecordId
+ * invalidations.  :(
+ */
+class OplogStart : public PlanStage {
+public:
+    // Does not take ownership.
+    OplogStart(OperationContext* txn,
+               const Collection* collection,
+               MatchExpression* filter,
+               WorkingSet* ws);
+    virtual ~OplogStart();
 
-        virtual StageState work(WorkingSetID* out);
-        virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
+    virtual bool isEOF();
 
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    virtual std::vector<PlanStage*> getChildren() const;
 
-        //
-        // Exec stats -- do not call these for the oplog start stage.
-        //
+    //
+    // Exec stats -- do not call these for the oplog start stage.
+    //
 
-        virtual PlanStageStats* getStats() { return NULL; }
+    virtual PlanStageStats* getStats() {
+        return NULL;
+    }
 
-        virtual const CommonStats* getCommonStats() { return NULL; }
+    virtual const CommonStats* getCommonStats() {
+        return NULL;
+    }
 
-        virtual const SpecificStats* getSpecificStats() { return NULL; }
+    virtual const SpecificStats* getSpecificStats() {
+        return NULL;
+    }
 
-        virtual StageType stageType() const { return STAGE_OPLOG_START; }
+    virtual StageType stageType() const {
+        return STAGE_OPLOG_START;
+    }
 
-        // For testing only.
-        void setBackwardsScanTime(int newTime) { _backwardsScanTime = newTime; }
-        bool isExtentHopping() { return _extentHopping; }
-        bool isBackwardsScanning() { return _backwardsScanning; }
-    private:
-        StageState workBackwardsScan(WorkingSetID* out);
+    // For testing only.
+    void setBackwardsScanTime(int newTime) {
+        _backwardsScanTime = newTime;
+    }
+    bool isExtentHopping() {
+        return _extentHopping;
+    }
+    bool isBackwardsScanning() {
+        return _backwardsScanning;
+    }
 
-        void switchToExtentHopping();
+private:
+    StageState workBackwardsScan(WorkingSetID* out);
 
-        StageState workExtentHopping(WorkingSetID* out);
+    void switchToExtentHopping();
 
-        // transactional context for read locks. Not owned by us
-        OperationContext* _txn;
+    StageState workExtentHopping(WorkingSetID* out);
 
-        // If we're backwards scanning we just punt to a collscan.
-        boost::scoped_ptr<CollectionScan> _cs;
+    // transactional context for read locks. Not owned by us
+    OperationContext* _txn;
 
-        // This is only used for the extent hopping scan.
-        typedef OwnedPointerVector<RecordIterator> SubIterators;
-        SubIterators _subIterators;
+    // If we're backwards scanning we just punt to a collscan.
+    boost::scoped_ptr<CollectionScan> _cs;
 
-        // Have we done our heavy init yet?
-        bool _needInit;
+    // This is only used for the extent hopping scan.
+    typedef OwnedPointerVector<RecordIterator> SubIterators;
+    SubIterators _subIterators;
 
-        // Our first state: going backwards via a collscan.
-        bool _backwardsScanning;
+    // Have we done our heavy init yet?
+    bool _needInit;
 
-        // Our second state: hopping backwards extent by extent.
-        bool _extentHopping;
+    // Our first state: going backwards via a collscan.
+    bool _backwardsScanning;
 
-        // Our final state: done.
-        bool _done;
+    // Our second state: hopping backwards extent by extent.
+    bool _extentHopping;
 
-        const Collection* _collection;
+    // Our final state: done.
+    bool _done;
 
-        // We only go backwards via a collscan for a few seconds.
-        Timer _timer;
+    const Collection* _collection;
 
-        // WorkingSet is not owned by us.
-        WorkingSet* _workingSet;
+    // We only go backwards via a collscan for a few seconds.
+    Timer _timer;
 
-        std::string _ns;
+    // WorkingSet is not owned by us.
+    WorkingSet* _workingSet;
 
-        MatchExpression* _filter;
+    std::string _ns;
 
-        static int _backwardsScanTime;
-    };
+    MatchExpression* _filter;
+
+    static int _backwardsScanTime;
+};
 
 }  // namespace mongo

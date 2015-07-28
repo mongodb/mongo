@@ -37,445 +37,445 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+using boost::scoped_ptr;
 
-    // Verify that two forward cursors positioned at EOF are considered
-    // to point to the same place.
-    TEST( SortedDataInterface, CursorsPointToSamePlaceIfEOF ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+// Verify that two forward cursors positioned at EOF are considered
+// to point to the same place.
+TEST(SortedDataInterface, CursorsPointToSamePlaceIfEOF) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor1(sorted->newCursor(opCtx.get(), 1));
+        scoped_ptr<SortedDataInterface::Cursor> cursor2(sorted->newCursor(opCtx.get(), 1));
+
+        ASSERT(!cursor1->locate(minKey, RecordId::min()));
+        ASSERT(!cursor2->locate(minKey, RecordId::min()));
+        ASSERT(cursor1->isEOF());
+        ASSERT(cursor2->isEOF());
+        ASSERT(cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(cursor2->pointsToSamePlaceAs(*cursor1));
+    }
+}
+
+// Verify that two reverse cursors positioned at EOF are considered
+// to point to the same place.
+TEST(SortedDataInterface, CursorsPointToSamePlaceIfEOFReversed) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor1(sorted->newCursor(opCtx.get(), -1));
+        scoped_ptr<SortedDataInterface::Cursor> cursor2(sorted->newCursor(opCtx.get(), -1));
+
+        ASSERT(!cursor1->locate(maxKey, RecordId::max()));
+        ASSERT(!cursor2->locate(maxKey, RecordId::max()));
+        ASSERT(cursor1->isEOF());
+        ASSERT(cursor2->isEOF());
+        ASSERT(cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(cursor2->pointsToSamePlaceAs(*cursor1));
+    }
+}
+
+// Iterate two forward cursors simultaneously and verify they are considered
+// to point to the same place.
+TEST(SortedDataInterface, CursorsPointToSamePlace) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), 1 ) );
-            scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), 1 ) );
-
-            ASSERT( !cursor1->locate( minKey, RecordId::min() ) );
-            ASSERT( !cursor2->locate( minKey, RecordId::min() ) );
-            ASSERT( cursor1->isEOF() );
-            ASSERT( cursor2->isEOF() );
-            ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, false));
+            uow.commit();
         }
     }
 
-    // Verify that two reverse cursors positioned at EOF are considered
-    // to point to the same place.
-    TEST( SortedDataInterface, CursorsPointToSamePlaceIfEOFReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor1(sorted->newCursor(opCtx.get(), 1));
+        scoped_ptr<SortedDataInterface::Cursor> cursor2(sorted->newCursor(opCtx.get(), 1));
+
+        ASSERT(cursor1->locate(key1, loc1));
+        ASSERT(cursor2->locate(key1, loc1));
+        ASSERT(cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(cursor2->pointsToSamePlaceAs(*cursor1));
+
+        cursor1->advance();
+        cursor2->advance();
+        ASSERT(cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(cursor2->pointsToSamePlaceAs(*cursor1));
+
+        cursor1->advance();
+        cursor2->advance();
+        ASSERT(cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(cursor2->pointsToSamePlaceAs(*cursor1));
+    }
+}
+
+// Iterate two reverse cursors simultaneously and verify they are considered
+// to point to the same place.
+TEST(SortedDataInterface, CursorsPointToSamePlaceReversed) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), -1 ) );
-            scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), -1 ) );
-
-            ASSERT( !cursor1->locate( maxKey, RecordId::max() ) );
-            ASSERT( !cursor2->locate( maxKey, RecordId::max() ) );
-            ASSERT( cursor1->isEOF() );
-            ASSERT( cursor2->isEOF() );
-            ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, true));
+            uow.commit();
         }
     }
 
-    // Iterate two forward cursors simultaneously and verify they are considered
-    // to point to the same place.
-    TEST( SortedDataInterface, CursorsPointToSamePlace ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor1(sorted->newCursor(opCtx.get(), -1));
+        scoped_ptr<SortedDataInterface::Cursor> cursor2(sorted->newCursor(opCtx.get(), -1));
+
+        ASSERT(cursor1->locate(key2, loc2));
+        ASSERT(cursor2->locate(key2, loc2));
+        ASSERT(cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(cursor2->pointsToSamePlaceAs(*cursor1));
+
+        cursor1->advance();
+        cursor2->advance();
+        ASSERT(cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(cursor2->pointsToSamePlaceAs(*cursor1));
+
+        cursor1->advance();
+        cursor2->advance();
+        ASSERT(cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(cursor2->pointsToSamePlaceAs(*cursor1));
+    }
+}
+
+// Verify that two forward cursors positioned at different keys are not considered
+// to point to the same place.
+TEST(SortedDataInterface, CursorsPointToDifferentKeys) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, false ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), 1 ) );
-            scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), 1 ) );
-
-            ASSERT( cursor1->locate( key1, loc1 ) );
-            ASSERT( cursor2->locate( key1, loc1 ) );
-            ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( cursor2->pointsToSamePlaceAs( *cursor1 ) );
-
-            cursor1->advance();
-            cursor2->advance();
-            ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( cursor2->pointsToSamePlaceAs( *cursor1 ) );
-
-            cursor1->advance();
-            cursor2->advance();
-            ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, true));
+            uow.commit();
         }
     }
 
-    // Iterate two reverse cursors simultaneously and verify they are considered
-    // to point to the same place.
-    TEST( SortedDataInterface, CursorsPointToSamePlaceReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor1(sorted->newCursor(opCtx.get(), 1));
+        scoped_ptr<SortedDataInterface::Cursor> cursor2(sorted->newCursor(opCtx.get(), 1));
+
+        ASSERT(cursor1->locate(key1, loc1));
+        ASSERT(cursor2->locate(key2, loc2));
+        ASSERT(!cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(!cursor2->pointsToSamePlaceAs(*cursor1));
+    }
+}
+
+// Verify that two reverse cursors positioned at different keys are not considered
+// to point to the same place.
+TEST(SortedDataInterface, CursorsPointToDifferentKeysReversed) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), -1 ) );
-            scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), -1 ) );
-
-            ASSERT( cursor1->locate( key2, loc2 ) );
-            ASSERT( cursor2->locate( key2, loc2 ) );
-            ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( cursor2->pointsToSamePlaceAs( *cursor1 ) );
-
-            cursor1->advance();
-            cursor2->advance();
-            ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( cursor2->pointsToSamePlaceAs( *cursor1 ) );
-
-            cursor1->advance();
-            cursor2->advance();
-            ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, true));
+            uow.commit();
         }
     }
 
-    // Verify that two forward cursors positioned at different keys are not considered
-    // to point to the same place.
-    TEST( SortedDataInterface, CursorsPointToDifferentKeys ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor1(sorted->newCursor(opCtx.get(), -1));
+        scoped_ptr<SortedDataInterface::Cursor> cursor2(sorted->newCursor(opCtx.get(), -1));
+
+        ASSERT(cursor1->locate(key1, loc1));
+        ASSERT(cursor2->locate(key2, loc2));
+        ASSERT(!cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(!cursor2->pointsToSamePlaceAs(*cursor1));
+    }
+}
+
+// Verify that two forward cursors positioned at a duplicate key, but with
+// different RecordIds are not considered to point to the same place.
+TEST(SortedDataInterface, CursorsPointToDifferentDiskLocs) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), 1 ) );
-            scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), 1 ) );
-
-            ASSERT( cursor1->locate( key1, loc1 ) );
-            ASSERT( cursor2->locate( key2, loc2 ) );
-            ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc2, true /* allow duplicates */));
+            uow.commit();
         }
     }
 
-    // Verify that two reverse cursors positioned at different keys are not considered
-    // to point to the same place.
-    TEST( SortedDataInterface, CursorsPointToDifferentKeysReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor1(sorted->newCursor(opCtx.get(), 1));
+        scoped_ptr<SortedDataInterface::Cursor> cursor2(sorted->newCursor(opCtx.get(), 1));
+
+        ASSERT(cursor1->locate(key1, loc1));
+        ASSERT(cursor2->locate(key1, loc2));
+        ASSERT(!cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(!cursor2->pointsToSamePlaceAs(*cursor1));
+    }
+}
+
+// Verify that two reverse cursors positioned at a duplicate key, but with
+// different RecordIds are not considered to point to the same place.
+TEST(SortedDataInterface, CursorsPointToDifferentDiskLocsReversed) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), -1 ) );
-            scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), -1 ) );
-
-            ASSERT( cursor1->locate( key1, loc1 ) );
-            ASSERT( cursor2->locate( key2, loc2 ) );
-            ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc2, true /* allow duplicates */));
+            uow.commit();
         }
     }
 
-    // Verify that two forward cursors positioned at a duplicate key, but with
-    // different RecordIds are not considered to point to the same place.
-    TEST( SortedDataInterface, CursorsPointToDifferentDiskLocs ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor1(sorted->newCursor(opCtx.get(), -1));
+        scoped_ptr<SortedDataInterface::Cursor> cursor2(sorted->newCursor(opCtx.get(), -1));
+
+        ASSERT(cursor1->locate(key1, loc1));
+        ASSERT(cursor2->locate(key1, loc2));
+        ASSERT(!cursor1->pointsToSamePlaceAs(*cursor2));
+        ASSERT(!cursor2->pointsToSamePlaceAs(*cursor1));
+    }
+}
+
+// Verify that a forward cursor and a reverse cursor positioned at the same key
+// are considered to point to the same place.
+TEST(SortedDataInterface, CursorPointsToSamePlaceRegardlessOfDirection) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc2, true /* allow duplicates */ ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), 1 ) );
-            scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), 1 ) );
-
-            ASSERT( cursor1->locate( key1, loc1 ) );
-            ASSERT( cursor2->locate( key1, loc2 ) );
-            ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc3, false));
+            uow.commit();
         }
     }
 
-    // Verify that two reverse cursors positioned at a duplicate key, but with
-    // different RecordIds are not considered to point to the same place.
-    TEST( SortedDataInterface, CursorsPointToDifferentDiskLocsReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
+    }
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor1(sorted->newCursor(opCtx.get(), 1));
+        scoped_ptr<SortedDataInterface::Cursor> cursor2(sorted->newCursor(opCtx.get(), -1));
+
+        ASSERT(cursor1->locate(key1, loc1));
+        ASSERT(cursor2->locate(key3, loc3));
+        // SERVER-15480 the reverse cursor is incorrectly casted to a
+        //              cursor of type InMemoryBtreeImpl::ForwardCursor
+        // ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
+        // SERVER-15480 the forward cursor is incorrectly casted to a
+        //              cursor of type InMemoryBtreeImpl::ReverseCursor
+        // ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
+
+        cursor1->advance();
+        cursor2->advance();
+        // SERVER-15480 the reverse cursor is incorrectly casted to a
+        //              cursor of type InMemoryBtreeImpl::ForwardCursor
+        // ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
+        // SERVER-15480 the forward cursor is incorrectly casted to a
+        //              cursor of type InMemoryBtreeImpl::ReverseCursor
+        // ASSERT( cursor2->pointsToSamePlaceAs( *cursor1 ) );
+
+        cursor1->advance();
+        cursor2->advance();
+        // SERVER-15480 the reverse cursor is incorrectly casted to a
+        //              cursor of type InMemoryBtreeImpl::ForwardCursor
+        // ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
+        // SERVER-15480 the forward cursor is incorrectly casted to a
+        //              cursor of type InMemoryBtreeImpl::ReverseCursor
+        // ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
+    }
+}
+
+// Verify that a forward cursor always points to the same place as itself.
+TEST(SortedDataInterface, CursorPointsToSamePlaceAsItself) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc2, true /* allow duplicates */ ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), -1 ) );
-            scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), -1 ) );
-
-            ASSERT( cursor1->locate( key1, loc1 ) );
-            ASSERT( cursor2->locate( key1, loc2 ) );
-            ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            WriteUnitOfWork uow(opCtx.get());
+            BSONObj key = BSON("" << i);
+            RecordId loc(42, i * 2);
+            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+            uow.commit();
         }
     }
 
-    // Verify that a forward cursor and a reverse cursor positioned at the same key
-    // are considered to point to the same place.
-    TEST( SortedDataInterface, CursorPointsToSamePlaceRegardlessOfDirection ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+    }
 
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), 1));
+        ASSERT(!cursor->locate(minKey, RecordId::min()));
+        for (int i = 0; i < nToInsert; i++) {
+            ASSERT(!cursor->isEOF());
+            ASSERT(cursor->pointsToSamePlaceAs(*cursor));
+            cursor->advance();
         }
+        ASSERT(cursor->isEOF());
+    }
+}
 
+// Verify that a reverse cursor always points to the same place as itself.
+TEST(SortedDataInterface, CursorPointsToSamePlaceAsItselfReversed) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc3, false ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), 1 ) );
-            scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), -1 ) );
-
-            ASSERT( cursor1->locate( key1, loc1 ) );
-            ASSERT( cursor2->locate( key3, loc3 ) );
-            // SERVER-15480 the reverse cursor is incorrectly casted to a
-            //              cursor of type InMemoryBtreeImpl::ForwardCursor
-            // ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            // SERVER-15480 the forward cursor is incorrectly casted to a
-            //              cursor of type InMemoryBtreeImpl::ReverseCursor
-            // ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
-
-            cursor1->advance();
-            cursor2->advance();
-            // SERVER-15480 the reverse cursor is incorrectly casted to a
-            //              cursor of type InMemoryBtreeImpl::ForwardCursor
-            // ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            // SERVER-15480 the forward cursor is incorrectly casted to a
-            //              cursor of type InMemoryBtreeImpl::ReverseCursor
-            // ASSERT( cursor2->pointsToSamePlaceAs( *cursor1 ) );
-
-            cursor1->advance();
-            cursor2->advance();
-            // SERVER-15480 the reverse cursor is incorrectly casted to a
-            //              cursor of type InMemoryBtreeImpl::ForwardCursor
-            // ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            // SERVER-15480 the forward cursor is incorrectly casted to a
-            //              cursor of type InMemoryBtreeImpl::ReverseCursor
-            // ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            WriteUnitOfWork uow(opCtx.get());
+            BSONObj key = BSON("" << i);
+            RecordId loc(42, i * 2);
+            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+            uow.commit();
         }
     }
 
-    // Verify that a forward cursor always points to the same place as itself.
-    TEST( SortedDataInterface, CursorPointsToSamePlaceAsItself ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        int nToInsert = 10;
-        for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                BSONObj key = BSON( "" << i );
-                RecordId loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( minKey, RecordId::min() ) );
-            for ( int i = 0; i < nToInsert; i++ ) {
-                ASSERT( !cursor->isEOF() );
-                ASSERT( cursor->pointsToSamePlaceAs( *cursor ) );
-                cursor->advance();
-            }
-            ASSERT( cursor->isEOF() );
-        }
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
-    // Verify that a reverse cursor always points to the same place as itself.
-    TEST( SortedDataInterface, CursorPointsToSamePlaceAsItselfReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        scoped_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), -1));
+        ASSERT(!cursor->locate(maxKey, RecordId::max()));
+        for (int i = nToInsert - 1; i >= 0; i--) {
+            ASSERT(!cursor->isEOF());
+            ASSERT(cursor->pointsToSamePlaceAs(*cursor));
+            cursor->advance();
         }
-
-        int nToInsert = 10;
-        for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                BSONObj key = BSON( "" << i );
-                RecordId loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( nToInsert, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-            ASSERT( !cursor->locate( maxKey, RecordId::max() ) );
-            for ( int i = nToInsert - 1; i >= 0; i-- ) {
-                ASSERT( !cursor->isEOF() );
-                ASSERT( cursor->pointsToSamePlaceAs( *cursor ) );
-                cursor->advance();
-            }
-            ASSERT( cursor->isEOF() );
-        }
+        ASSERT(cursor->isEOF());
     }
+}
 
-} // namespace mongo
+}  // namespace mongo

@@ -32,11 +32,11 @@
 
 namespace {
 
-    using namespace mongo;
+using namespace mongo;
 
-    TEST(DBClientMultiCommandTest, Basic) {
-        DBClientMultiCommand();
-        ASSERT( true );
-    }
+TEST(DBClientMultiCommandTest, Basic) {
+    DBClientMultiCommand();
+    ASSERT(true);
+}
 
-} // end namespace
+}  // end namespace

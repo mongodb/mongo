@@ -36,22 +36,21 @@ namespace mongo {
 // TODO: Does this belong here?
 namespace {
 
-        class StorageSSS : public ServerStatusSection {
-        public:
-            StorageSSS() : ServerStatusSection( "storageEngine" ) {
-            }
+class StorageSSS : public ServerStatusSection {
+public:
+    StorageSSS() : ServerStatusSection("storageEngine") {}
 
-            virtual ~StorageSSS() {}
+    virtual ~StorageSSS() {}
 
-            virtual bool includeByDefault() const { return true; }
+    virtual bool includeByDefault() const {
+        return true;
+    }
 
-            virtual BSONObj generateSection(OperationContext* txn,
-                                            const BSONElement& configElement) const {
+    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+        return BSON("name" << storageGlobalParams.engine);
+    }
 
-                return BSON( "name" << storageGlobalParams.engine );
-            }
-
-        } storageSSS;
+} storageSSS;
 
 }  // namespace
 }  // namespace mongo

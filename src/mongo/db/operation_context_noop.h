@@ -37,76 +37,68 @@
 
 namespace mongo {
 
-    class OperationContextNoop : public OperationContext {
-    public:
-        OperationContextNoop(RecoveryUnit* ru)
-            : _recoveryUnit(ru),
-              _locker(new LockerNoop()) {
+class OperationContextNoop : public OperationContext {
+public:
+    OperationContextNoop(RecoveryUnit* ru) : _recoveryUnit(ru), _locker(new LockerNoop()) {}
 
-        }
+    OperationContextNoop() : _recoveryUnit(new RecoveryUnitNoop()), _locker(new LockerNoop()) {}
 
-        OperationContextNoop()
-            : _recoveryUnit(new RecoveryUnitNoop()),
-              _locker(new LockerNoop()) {
+    virtual ~OperationContextNoop() {}
 
-        }
+    virtual Client* getClient() const {
+        invariant(false);
+        return NULL;
+    }
 
-        virtual ~OperationContextNoop() { }
+    virtual CurOp* getCurOp() const {
+        invariant(false);
+        return NULL;
+    }
 
-        virtual Client* getClient() const {
-            invariant(false);
-            return NULL;
-        }
+    virtual RecoveryUnit* recoveryUnit() const {
+        return _recoveryUnit.get();
+    }
 
-        virtual CurOp* getCurOp() const {
-            invariant(false);
-            return NULL;
-        }
+    virtual RecoveryUnit* releaseRecoveryUnit() {
+        return _recoveryUnit.release();
+    }
 
-        virtual RecoveryUnit* recoveryUnit() const {
-            return _recoveryUnit.get();
-        }
+    virtual void setRecoveryUnit(RecoveryUnit* unit) {
+        _recoveryUnit.reset(unit);
+    }
 
-        virtual RecoveryUnit* releaseRecoveryUnit() {
-            return _recoveryUnit.release();
-        }
+    virtual Locker* lockState() const {
+        return _locker.get();
+    }
 
-        virtual void setRecoveryUnit(RecoveryUnit* unit) {
-            _recoveryUnit.reset(unit);
-        }
+    virtual ProgressMeter* setMessage(const char* msg,
+                                      const std::string& name,
+                                      unsigned long long progressMeterTotal,
+                                      int secondsBetween) {
+        return &_pm;
+    }
 
-        virtual Locker* lockState() const {
-            return _locker.get();
-        }
+    virtual void checkForInterrupt() const {}
+    virtual Status checkForInterruptNoAssert() const {
+        return Status::OK();
+    }
 
-        virtual ProgressMeter* setMessage(const char * msg,
-                                          const std::string &name,
-                                          unsigned long long progressMeterTotal,
-                                          int secondsBetween) {
-            return &_pm;
-        }
+    virtual bool isPrimaryFor(const StringData& ns) {
+        return true;
+    }
 
-        virtual void checkForInterrupt() const { }
-        virtual Status checkForInterruptNoAssert() const {
-            return Status::OK();
-        }
-
-        virtual bool isPrimaryFor( const StringData& ns ) {
-            return true;
-        }
-
-        virtual std::string getNS() const {
-            return std::string();
-        };
-
-        virtual unsigned int getOpID() const {
-            return 0;
-        }
-
-    private:
-        std::auto_ptr<RecoveryUnit> _recoveryUnit;
-        boost::scoped_ptr<Locker> _locker;
-        ProgressMeter _pm;
+    virtual std::string getNS() const {
+        return std::string();
     };
+
+    virtual unsigned int getOpID() const {
+        return 0;
+    }
+
+private:
+    std::auto_ptr<RecoveryUnit> _recoveryUnit;
+    boost::scoped_ptr<Locker> _locker;
+    ProgressMeter _pm;
+};
 
 }  // namespace mongo

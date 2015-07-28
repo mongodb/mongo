@@ -33,75 +33,72 @@
 
 namespace {
 
-    using std::string;
-    using mongo::ShardType;
-    using mongo::BSONObj;
+using std::string;
+using mongo::ShardType;
+using mongo::BSONObj;
 
-    TEST(Validity, Empty) {
-        ShardType shard;
-        BSONObj emptyObj = BSONObj();
-        string errMsg;
-        ASSERT(shard.parseBSON(emptyObj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(shard.isValid(NULL));
-    }
+TEST(Validity, Empty) {
+    ShardType shard;
+    BSONObj emptyObj = BSONObj();
+    string errMsg;
+    ASSERT(shard.parseBSON(emptyObj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(shard.isValid(NULL));
+}
 
-    TEST(Validity, MissingName) {
-        ShardType shard;
-        BSONObj obj = BSON(ShardType::host("localhost:27017"));
-        string errMsg;
-        ASSERT(shard.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(shard.isValid(NULL));
-    }
+TEST(Validity, MissingName) {
+    ShardType shard;
+    BSONObj obj = BSON(ShardType::host("localhost:27017"));
+    string errMsg;
+    ASSERT(shard.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(shard.isValid(NULL));
+}
 
-    TEST(Validity, MissingHost) {
-        ShardType shard;
-        BSONObj obj = BSON(ShardType::name("shard0000"));
-        string errMsg;
-        ASSERT(shard.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(shard.isValid(NULL));
-    }
+TEST(Validity, MissingHost) {
+    ShardType shard;
+    BSONObj obj = BSON(ShardType::name("shard0000"));
+    string errMsg;
+    ASSERT(shard.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_FALSE(shard.isValid(NULL));
+}
 
-    TEST(Validity, OnlyMandatory) {
-        ShardType shard;
-        BSONObj obj = BSON(ShardType::name("shard0000") <<
-                           ShardType::host("localhost:27017"));
-        string errMsg;
-        ASSERT(shard.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_TRUE(shard.isValid(NULL));
-    }
+TEST(Validity, OnlyMandatory) {
+    ShardType shard;
+    BSONObj obj = BSON(ShardType::name("shard0000") << ShardType::host("localhost:27017"));
+    string errMsg;
+    ASSERT(shard.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_TRUE(shard.isValid(NULL));
+}
 
-    TEST(Validity, AllOptionalsPresent) {
-        ShardType shard;
-        BSONObj obj = BSON(ShardType::name("shard0000") <<
-                           ShardType::host("localhost:27017") <<
-                           ShardType::draining(true) <<
-                           ShardType::maxSize(100));
-        string errMsg;
-        ASSERT(shard.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_TRUE(shard.isValid(NULL));
-    }
+TEST(Validity, AllOptionalsPresent) {
+    ShardType shard;
+    BSONObj obj =
+        BSON(ShardType::name("shard0000") << ShardType::host("localhost:27017")
+                                          << ShardType::draining(true) << ShardType::maxSize(100));
+    string errMsg;
+    ASSERT(shard.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_TRUE(shard.isValid(NULL));
+}
 
-    TEST(Validity, MaxSizeAsFloat) {
-        ShardType shard;
-        BSONObj obj = BSON(ShardType::name("shard0000") <<
-                           ShardType::host("localhost:27017") <<
-                           ShardType::maxSize() << 100.0);
-        string errMsg;
-        ASSERT(shard.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_TRUE(shard.isValid(NULL));
-    }
+TEST(Validity, MaxSizeAsFloat) {
+    ShardType shard;
+    BSONObj obj = BSON(ShardType::name("shard0000") << ShardType::host("localhost:27017")
+                                                    << ShardType::maxSize() << 100.0);
+    string errMsg;
+    ASSERT(shard.parseBSON(obj, &errMsg));
+    ASSERT_EQUALS(errMsg, "");
+    ASSERT_TRUE(shard.isValid(NULL));
+}
 
-    TEST(Validity, BadType) {
-        ShardType shard;
-        BSONObj obj = BSON(ShardType::name() << 0);
-        string errMsg;
-        ASSERT((!shard.parseBSON(obj, &errMsg)) && (errMsg != ""));
-    }
+TEST(Validity, BadType) {
+    ShardType shard;
+    BSONObj obj = BSON(ShardType::name() << 0);
+    string errMsg;
+    ASSERT((!shard.parseBSON(obj, &errMsg)) && (errMsg != ""));
+}
 
 }  // unnamed namespace

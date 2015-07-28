@@ -38,74 +38,76 @@
 
 namespace mongo {
 
-    RocksGlobalOptions rocksGlobalOptions;
+RocksGlobalOptions rocksGlobalOptions;
 
-    Status RocksGlobalOptions::add(moe::OptionSection* options) {
-        moe::OptionSection rocksOptions("RocksDB options");
+Status RocksGlobalOptions::add(moe::OptionSection* options) {
+    moe::OptionSection rocksOptions("RocksDB options");
 
-        rocksOptions.addOptionChaining("storage.rocksdb.cacheSizeGB", "rocksdbCacheSizeGB",
-                                       moe::Int,
-                                       "maximum amount of memory to allocate for cache; "
-                                       "defaults to 1/2 of physical RAM").validRange(1, 10000);
-        rocksOptions.addOptionChaining("storage.rocksdb.compression", "rocksdbCompression",
-                                       moe::String,
-                                       "block compression algorithm for collection data "
-                                       "[none|snappy|zlib]")
-            .format("(:?none)|(:?snappy)|(:?zlib)", "(none/snappy/zlib)")
-            .setDefault(moe::Value(std::string("snappy")));
-        rocksOptions
-            .addOptionChaining(
-                 "storage.rocksdb.maxWriteMBPerSec", "rocksdbMaxWriteMBPerSec", moe::Int,
-                 "Maximum speed that RocksDB will write to storage. Reducing this can "
-                 "help reduce read latency spikes during compactions. However, reducing this "
-                 "below a certain point might slow down writes. Defaults to 1GB/sec")
-            .validRange(1, 1024)
-            .setDefault(moe::Value(1024));
-        rocksOptions.addOptionChaining("storage.rocksdb.configString", "rocksdbConfigString",
-                                       moe::String,
-                                       "RocksDB storage engine custom "
-                                       "configuration settings").hidden();
-        rocksOptions.addOptionChaining("storage.rocksdb.crashSafeCounters",
-                                       "rocksdbCrashSafeCounters", moe::Bool,
-                                       "If true, numRecord and dataSize counter will be consistent "
-                                       "even after power failure. If false, numRecord and dataSize "
-                                       "might be a bit inconsistent after power failure, but "
-                                       "should be correct under normal conditions. Setting this to "
-                                       "true will make database inserts a bit slower.")
-            .setDefault(moe::Value(false))
-            .hidden();
+    rocksOptions.addOptionChaining("storage.rocksdb.cacheSizeGB",
+                                   "rocksdbCacheSizeGB",
+                                   moe::Int,
+                                   "maximum amount of memory to allocate for cache; "
+                                   "defaults to 1/2 of physical RAM").validRange(1, 10000);
+    rocksOptions.addOptionChaining("storage.rocksdb.compression",
+                                   "rocksdbCompression",
+                                   moe::String,
+                                   "block compression algorithm for collection data "
+                                   "[none|snappy|zlib]")
+        .format("(:?none)|(:?snappy)|(:?zlib)", "(none/snappy/zlib)")
+        .setDefault(moe::Value(std::string("snappy")));
+    rocksOptions.addOptionChaining(
+                     "storage.rocksdb.maxWriteMBPerSec",
+                     "rocksdbMaxWriteMBPerSec",
+                     moe::Int,
+                     "Maximum speed that RocksDB will write to storage. Reducing this can "
+                     "help reduce read latency spikes during compactions. However, reducing this "
+                     "below a certain point might slow down writes. Defaults to 1GB/sec")
+        .validRange(1, 1024)
+        .setDefault(moe::Value(1024));
+    rocksOptions.addOptionChaining("storage.rocksdb.configString",
+                                   "rocksdbConfigString",
+                                   moe::String,
+                                   "RocksDB storage engine custom "
+                                   "configuration settings").hidden();
+    rocksOptions.addOptionChaining("storage.rocksdb.crashSafeCounters",
+                                   "rocksdbCrashSafeCounters",
+                                   moe::Bool,
+                                   "If true, numRecord and dataSize counter will be consistent "
+                                   "even after power failure. If false, numRecord and dataSize "
+                                   "might be a bit inconsistent after power failure, but "
+                                   "should be correct under normal conditions. Setting this to "
+                                   "true will make database inserts a bit slower.")
+        .setDefault(moe::Value(false))
+        .hidden();
 
-        return options->addSection(rocksOptions);
+    return options->addSection(rocksOptions);
+}
+
+Status RocksGlobalOptions::store(const moe::Environment& params,
+                                 const std::vector<std::string>& args) {
+    if (params.count("storage.rocksdb.cacheSizeGB")) {
+        rocksGlobalOptions.cacheSizeGB = params["storage.rocksdb.cacheSizeGB"].as<int>();
+        log() << "Block Cache Size GB: " << rocksGlobalOptions.cacheSizeGB;
+    }
+    if (params.count("storage.rocksdb.compression")) {
+        rocksGlobalOptions.compression = params["storage.rocksdb.compression"].as<std::string>();
+        log() << "Compression: " << rocksGlobalOptions.compression;
+    }
+    if (params.count("storage.rocksdb.maxWriteMBPerSec")) {
+        rocksGlobalOptions.maxWriteMBPerSec = params["storage.rocksdb.maxWriteMBPerSec"].as<int>();
+        log() << "MaxWriteMBPerSec: " << rocksGlobalOptions.maxWriteMBPerSec;
+    }
+    if (params.count("storage.rocksdb.configString")) {
+        rocksGlobalOptions.configString = params["storage.rocksdb.configString"].as<std::string>();
+        log() << "Engine custom option: " << rocksGlobalOptions.configString;
+    }
+    if (params.count("storage.rocksdb.crashSafeCounters")) {
+        rocksGlobalOptions.crashSafeCounters =
+            params["storage.rocksdb.crashSafeCounters"].as<bool>();
+        log() << "Crash safe counters: " << rocksGlobalOptions.crashSafeCounters;
     }
 
-    Status RocksGlobalOptions::store(const moe::Environment& params,
-                                     const std::vector<std::string>& args) {
-        if (params.count("storage.rocksdb.cacheSizeGB")) {
-            rocksGlobalOptions.cacheSizeGB = params["storage.rocksdb.cacheSizeGB"].as<int>();
-            log() << "Block Cache Size GB: " << rocksGlobalOptions.cacheSizeGB;
-        }
-        if (params.count("storage.rocksdb.compression")) {
-            rocksGlobalOptions.compression =
-                params["storage.rocksdb.compression"].as<std::string>();
-            log() << "Compression: " << rocksGlobalOptions.compression;
-        }
-        if (params.count("storage.rocksdb.maxWriteMBPerSec")) {
-            rocksGlobalOptions.maxWriteMBPerSec =
-                params["storage.rocksdb.maxWriteMBPerSec"].as<int>();
-            log() << "MaxWriteMBPerSec: " << rocksGlobalOptions.maxWriteMBPerSec;
-        }
-        if (params.count("storage.rocksdb.configString")) {
-            rocksGlobalOptions.configString =
-                params["storage.rocksdb.configString"].as<std::string>();
-            log() << "Engine custom option: " << rocksGlobalOptions.configString;
-        }
-        if (params.count("storage.rocksdb.crashSafeCounters")) {
-            rocksGlobalOptions.crashSafeCounters =
-                params["storage.rocksdb.crashSafeCounters"].as<bool>();
-            log() << "Crash safe counters: " << rocksGlobalOptions.crashSafeCounters;
-        }
-
-        return Status::OK();
-    }
+    return Status::OK();
+}
 
 }  // namespace mongo

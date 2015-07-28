@@ -35,40 +35,32 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+using std::auto_ptr;
 
-    class MyHarnessHelper : public HarnessHelper {
-    public:
-        MyHarnessHelper()
-            : _recordStore("a.b"),
-              _order(Ordering::make(BSONObj())) {
-        }
+class MyHarnessHelper : public HarnessHelper {
+public:
+    MyHarnessHelper() : _recordStore("a.b"), _order(Ordering::make(BSONObj())) {}
 
-        virtual SortedDataInterface* newSortedDataInterface(bool unique) {
-            auto_ptr<SortedDataInterface> sorted(getMMAPV1Interface(&_headManager,
-                                                                    &_recordStore,
-                                                                    &_cursorRegistry,
-                                                                    _order,
-                                                                    "a_1",
-                                                                    1));
-            OperationContextNoop op;
-            massertStatusOK(sorted->initAsEmpty(&op));
-            return sorted.release();
-        }
-
-        virtual RecoveryUnit* newRecoveryUnit() {
-            return new HeapRecordStoreBtreeRecoveryUnit();
-        }
-
-    private:
-        TestHeadManager _headManager;
-        HeapRecordStoreBtree _recordStore;
-        SavedCursorRegistry _cursorRegistry;
-        Ordering _order;
-    };
-
-    HarnessHelper* newHarnessHelper() {
-        return new MyHarnessHelper();
+    virtual SortedDataInterface* newSortedDataInterface(bool unique) {
+        auto_ptr<SortedDataInterface> sorted(
+            getMMAPV1Interface(&_headManager, &_recordStore, &_cursorRegistry, _order, "a_1", 1));
+        OperationContextNoop op;
+        massertStatusOK(sorted->initAsEmpty(&op));
+        return sorted.release();
     }
 
+    virtual RecoveryUnit* newRecoveryUnit() {
+        return new HeapRecordStoreBtreeRecoveryUnit();
+    }
+
+private:
+    TestHeadManager _headManager;
+    HeapRecordStoreBtree _recordStore;
+    SavedCursorRegistry _cursorRegistry;
+    Ordering _order;
+};
+
+HarnessHelper* newHarnessHelper() {
+    return new MyHarnessHelper();
+}
 }

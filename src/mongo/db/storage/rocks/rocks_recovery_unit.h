@@ -50,116 +50,129 @@
 #include "rocks_counter_manager.h"
 
 namespace rocksdb {
-    class DB;
-    class Snapshot;
-    class WriteBatchWithIndex;
-    class Comparator;
-    class Status;
-    class Slice;
-    class Iterator;
+class DB;
+class Snapshot;
+class WriteBatchWithIndex;
+class Comparator;
+class Status;
+class Slice;
+class Iterator;
 }
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
-    class RocksRecoveryUnit : public RecoveryUnit {
-        MONGO_DISALLOW_COPYING(RocksRecoveryUnit);
-    public:
-        RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db,
-                          RocksCounterManager* counterManager,
-                          RocksCompactionScheduler* compactionScheduler, bool durable);
-        virtual ~RocksRecoveryUnit();
+class RocksRecoveryUnit : public RecoveryUnit {
+    MONGO_DISALLOW_COPYING(RocksRecoveryUnit);
 
-        virtual void beginUnitOfWork(OperationContext* opCtx);
-        virtual void commitUnitOfWork();
+public:
+    RocksRecoveryUnit(RocksTransactionEngine* transactionEngine,
+                      rocksdb::DB* db,
+                      RocksCounterManager* counterManager,
+                      RocksCompactionScheduler* compactionScheduler,
+                      bool durable);
+    virtual ~RocksRecoveryUnit();
 
-        virtual void endUnitOfWork();
+    virtual void beginUnitOfWork(OperationContext* opCtx);
+    virtual void commitUnitOfWork();
 
-        virtual bool awaitCommit();
+    virtual void endUnitOfWork();
 
-        virtual void commitAndRestart();
+    virtual bool awaitCommit();
 
-        virtual void* writingPtr(void* data, size_t len) { invariant(!"don't call writingPtr"); }
+    virtual void commitAndRestart();
 
-        virtual void registerChange(Change* change);
+    virtual void* writingPtr(void* data, size_t len) {
+        invariant(!"don't call writingPtr");
+    }
 
-        virtual void setRollbackWritesDisabled() {}
+    virtual void registerChange(Change* change);
 
-        virtual SnapshotId getSnapshotId() const;
+    virtual void setRollbackWritesDisabled() {}
 
-        // local api
+    virtual SnapshotId getSnapshotId() const;
 
-        rocksdb::WriteBatchWithIndex* writeBatch();
+    // local api
 
-        const rocksdb::Snapshot* snapshot();
-        bool hasSnapshot() { return _snapshot != nullptr; }
+    rocksdb::WriteBatchWithIndex* writeBatch();
 
-        RocksTransaction* transaction() { return &_transaction; }
+    const rocksdb::Snapshot* snapshot();
+    bool hasSnapshot() {
+        return _snapshot != nullptr;
+    }
 
-        rocksdb::Status Get(const rocksdb::Slice& key, std::string* value);
+    RocksTransaction* transaction() {
+        return &_transaction;
+    }
 
-        rocksdb::Iterator* NewIterator(std::string prefix, bool isOplog = false);
+    rocksdb::Status Get(const rocksdb::Slice& key, std::string* value);
 
-        static rocksdb::Iterator* NewIteratorNoSnapshot(rocksdb::DB* db, std::string prefix);
+    rocksdb::Iterator* NewIterator(std::string prefix, bool isOplog = false);
 
-        void incrementCounter(const rocksdb::Slice& counterKey,
-                              std::atomic<long long>* counter, long long delta);
+    static rocksdb::Iterator* NewIteratorNoSnapshot(rocksdb::DB* db, std::string prefix);
 
-        long long getDeltaCounter(const rocksdb::Slice& counterKey);
+    void incrementCounter(const rocksdb::Slice& counterKey,
+                          std::atomic<long long>* counter,
+                          long long delta);
 
-        void setOplogReadTill(const RecordId& loc);
-        RecordId getOplogReadTill() const { return _oplogReadTill; }
+    long long getDeltaCounter(const rocksdb::Slice& counterKey);
 
-        RocksRecoveryUnit* newRocksRecoveryUnit() {
-            return new RocksRecoveryUnit(_transactionEngine, _db, _counterManager,
-                                         _compactionScheduler, _durable);
-        }
+    void setOplogReadTill(const RecordId& loc);
+    RecordId getOplogReadTill() const {
+        return _oplogReadTill;
+    }
 
-        struct Counter {
-            std::atomic<long long>* _value;
-            long long _delta;
-            Counter() : Counter(nullptr, 0) {}
-            Counter(std::atomic<long long>* value, long long delta) : _value(value), _delta(delta) {}
-        };
+    RocksRecoveryUnit* newRocksRecoveryUnit() {
+        return new RocksRecoveryUnit(
+            _transactionEngine, _db, _counterManager, _compactionScheduler, _durable);
+    }
 
-        typedef std::unordered_map<std::string, Counter> CounterMap;
-
-        static RocksRecoveryUnit* getRocksRecoveryUnit(OperationContext* opCtx);
-
-        static int getTotalLiveRecoveryUnits() { return _totalLiveRecoveryUnits.load(); }
-
-    private:
-        void _releaseSnapshot();
-
-        void _commit();
-
-        void _abort();
-        RocksTransactionEngine* _transactionEngine;      // not owned
-        rocksdb::DB* _db;                                // not owned
-        RocksCounterManager* _counterManager;            // not owned
-        RocksCompactionScheduler* _compactionScheduler;  // not owned
-
-        const bool _durable;
-
-        RocksTransaction _transaction;
-
-        boost::scoped_ptr<rocksdb::WriteBatchWithIndex> _writeBatch; // owned
-
-        // bare because we need to call ReleaseSnapshot when we're done with this
-        const rocksdb::Snapshot* _snapshot; // owned
-
-        CounterMap _deltaCounters;
-
-        typedef OwnedPointerVector<Change> Changes;
-        Changes _changes;
-
-        int _depth;
-        uint64_t _myTransactionCount;
-
-        RecordId _oplogReadTill;
-
-        static std::atomic<int> _totalLiveRecoveryUnits;
+    struct Counter {
+        std::atomic<long long>* _value;
+        long long _delta;
+        Counter() : Counter(nullptr, 0) {}
+        Counter(std::atomic<long long>* value, long long delta) : _value(value), _delta(delta) {}
     };
 
+    typedef std::unordered_map<std::string, Counter> CounterMap;
+
+    static RocksRecoveryUnit* getRocksRecoveryUnit(OperationContext* opCtx);
+
+    static int getTotalLiveRecoveryUnits() {
+        return _totalLiveRecoveryUnits.load();
+    }
+
+private:
+    void _releaseSnapshot();
+
+    void _commit();
+
+    void _abort();
+    RocksTransactionEngine* _transactionEngine;      // not owned
+    rocksdb::DB* _db;                                // not owned
+    RocksCounterManager* _counterManager;            // not owned
+    RocksCompactionScheduler* _compactionScheduler;  // not owned
+
+    const bool _durable;
+
+    RocksTransaction _transaction;
+
+    boost::scoped_ptr<rocksdb::WriteBatchWithIndex> _writeBatch;  // owned
+
+    // bare because we need to call ReleaseSnapshot when we're done with this
+    const rocksdb::Snapshot* _snapshot;  // owned
+
+    CounterMap _deltaCounters;
+
+    typedef OwnedPointerVector<Change> Changes;
+    Changes _changes;
+
+    int _depth;
+    uint64_t _myTransactionCount;
+
+    RecordId _oplogReadTill;
+
+    static std::atomic<int> _totalLiveRecoveryUnits;
+};
 }

@@ -38,321 +38,321 @@
 
 namespace mongo {
 
-    class ShardConnection;
-    class ShardStatus;
+class ShardConnection;
+class ShardStatus;
 
-    /*
-     * A "shard" one partition of the overall database (and a replica set typically).
+/*
+ * A "shard" one partition of the overall database (and a replica set typically).
+ */
+
+class Shard {
+public:
+    Shard() : _name(""), _addr(""), _maxSizeMB(0), _isDraining(false) {}
+
+    Shard(const std::string& name, const std::string& addr, long long maxSizeMB, bool isDraining);
+
+    Shard(const std::string& name,
+          const ConnectionString& connStr,
+          long long maxSizeMB,
+          bool isDraining);
+
+    Shard(const std::string& ident) {
+        reset(ident);
+    }
+
+    Shard(const Shard& other)
+        : _name(other._name),
+          _addr(other._addr),
+          _cs(other._cs),
+          _maxSizeMB(other._maxSizeMB),
+          _isDraining(other._isDraining) {}
+
+    static Shard make(const std::string& ident) {
+        Shard s;
+        s.reset(ident);
+        return s;
+    }
+
+    static Shard findIfExists(const std::string& shardName);
+
+    /**
+     * @param ident either name or address
      */
-
-    class Shard {
-    public:
-        Shard()
-            : _name("") , _addr("") , _maxSizeMB(0) , _isDraining(false) {
-        }
-
-        Shard(const std::string& name,
-              const std::string& addr,
-              long long maxSizeMB,
-              bool isDraining);
-
-        Shard(const std::string& name,
-              const ConnectionString& connStr,
-              long long maxSizeMB,
-              bool isDraining);
-
-        Shard( const std::string& ident ) {
-            reset( ident );
-        }
-
-        Shard(const Shard& other):
-            _name(other._name),
-            _addr(other._addr),
-            _cs(other._cs),
-            _maxSizeMB(other._maxSizeMB),
-            _isDraining(other._isDraining) {
-        }
-
-        static Shard make( const std::string& ident ) {
-            Shard s;
-            s.reset( ident );
-            return s;
-        }
-
-        static Shard findIfExists( const std::string& shardName );
-
-        /**
-         * @param ident either name or address
-         */
-        void reset( const std::string& ident );
-
-        ConnectionString getAddress() const { return _cs; }
-
-        std::string getName() const {
-            verify( _name.size() );
-            return _name;
-        }
-
-        std::string getConnString() const {
-            verify( _addr.size() );
-            return _addr;
-        }
-
-        long long getMaxSizeMB() const {
-            return _maxSizeMB;
-        }
-
-        bool isDraining() const {
-            return _isDraining;
-        }
-
-        std::string toString() const {
-            return _name + ":" + _addr;
-        }
-
-        friend std::ostream& operator << (std::ostream& out, const Shard& s) {
-            return (out << s.toString());
-        }
-
-        bool operator==( const Shard& s ) const {
-            if ( _name != s._name )
-                return false;
-            return _cs.sameLogicalEndpoint( s._cs );
-        }
-
-        bool operator!=( const Shard& s ) const {
-            return ! ( *this == s );
-        }
-
-        bool operator==( const std::string& s ) const {
-            return _name == s || _addr == s;
-        }
-
-        bool operator!=( const std::string& s ) const {
-            return _name != s && _addr != s;
-        }
-
-        bool operator<(const Shard& o) const {
-            return _name < o._name;
-        }
-
-        bool ok() const { return _addr.size() > 0; }
-
-        // Set internal to true to run the command with internal authentication privileges.
-        BSONObj runCommand( const std::string& db , const std::string& simple ) const {
-            return runCommand( db , BSON( simple << 1 ) );
-        }
-        BSONObj runCommand( const std::string& db , const BSONObj& cmd ) const ;
-
-        /**
-         * Returns the version string from the shard based from the serverStatus command result.
-         */
-        static std::string getShardMongoVersion(const std::string& shardHost);
-
-        /**
-         * Returns the total data size in bytes the shard is currently using.
-         */
-        static long long getShardDataSizeBytes(const std::string& shardHost);
-
-        /**
-         * Returns metadata and stats for this shard.
-         */
-        ShardStatus getStatus() const ;
-
-        /**
-         * mostly for replica set
-         * retursn true if node is the shard 
-         * of if the replica set contains node
-         */
-        bool containsNode( const std::string& node ) const;
-
-        static void getAllShards( std::vector<Shard>& all );
-        static void printShardInfo( std::ostream& out );
-        static Shard lookupRSName( const std::string& name);
-        
-        /**
-         * @parm current - shard where the chunk/database currently lives in
-         * @return the currently emptiest shard, if best then current, or EMPTY
-         */
-        static Shard pick( const Shard& current = EMPTY );
-
-        static void reloadShardInfo();
-
-        static void removeShard( const std::string& name );
-
-        static bool isAShardNode( const std::string& ident );
-
-        static Shard EMPTY;
-        
-        static void installShard(const std::string& name, const Shard& shard);
-
-    private:
-
-        void _setAddr( const std::string& addr );
-
-        std::string    _name;
-        std::string    _addr;
-        ConnectionString _cs;
-        long long _maxSizeMB;    // in MBytes, 0 is unlimited
-        bool      _isDraining; // shard is currently being removed
-    };
-    typedef boost::shared_ptr<Shard> ShardPtr;
-
-    class ShardStatus {
-    public:
-
-        ShardStatus(const Shard& shard, long long dataSizeBytes, const std::string& version);
-
-        friend std::ostream& operator << (std::ostream& out, const ShardStatus& s) {
-            out << s.toString();
-            return out;
-        }
-
-        std::string toString() const {
-            std::stringstream ss;
-            ss << "shard: " << _shard
-               << " dataSizeBytes: " << _dataSizeBytes
-               << " version: " << _mongoVersion;
-            return ss.str();
-        }
-
-        bool operator<( const ShardStatus& other ) const {
-            return _dataSizeBytes < other._dataSizeBytes;
-        }
-
-        Shard shard() const {
-            return _shard;
-        }
-
-        long long dataSizeBytes() const {
-            return _dataSizeBytes;
-        }
-
-        std::string mongoVersion() const {
-            return _mongoVersion;
-        }
-
-    private:
-        Shard _shard;
-        long long _dataSizeBytes;
-        std::string _mongoVersion;
-    };
-
-    class ChunkManager;
-    typedef boost::shared_ptr<const ChunkManager> ChunkManagerPtr;
-
-    class ShardConnection : public AScopedConnection {
-    public:
-        ShardConnection( const Shard * s , const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
-        ShardConnection( const Shard& s , const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
-        ShardConnection( const std::string& addr , const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
-
-        ~ShardConnection();
-
-        void done();
-        void kill();
-
-        DBClientBase& conn() {
-            _finishInit();
-            verify( _conn );
-            return *_conn;
-        }
-
-        DBClientBase* operator->() {
-            _finishInit();
-            verify( _conn );
-            return _conn;
-        }
-
-        DBClientBase* get() {
-            _finishInit();
-            verify( _conn );
-            return _conn;
-        }
-
-        /**
-         * @return the connection object underneath without setting the shard version.
-         * @throws AssertionException if _conn is uninitialized.
-         */
-        DBClientBase* getRawConn() const {
-            verify( _conn );
-            return _conn;
-        }
-
-        std::string getHost() const {
-            return _addr;
-        }
-
-        std::string getNS() const {
-            return _ns;
-        }
-
-        ChunkManagerPtr getManager() const {
-            return _manager;
-        }
-
-        bool setVersion() {
-            _finishInit();
-            return _setVersion;
-        }
-
-        static void sync();
-
-        void donotCheckVersion() {
-            _setVersion = false;
-            _finishedInit = true;
-        }
-        
-        bool ok() const { return _conn != NULL; }
-
-        /** checks all of my thread local connections for the version of this ns */
-        static void checkMyConnectionVersions( const std::string & ns );
-
-        /**
-         * Returns all the current sharded connections to the pool.
-         * Note: This is *dangerous* if we have GLE state.
-         */
-        static void releaseMyConnections();
-
-        /**
-         * Clears all connections in the sharded pool, including connections in the
-         * thread local storage pool of the current thread.
-         */
-        static void clearPool();
-
-        /**
-         * Forgets a namespace to prevent future versioning.
-         */
-        static void forgetNS( const std::string& ns );
-
-    private:
-        void _init();
-        void _finishInit();
-
-        bool _finishedInit;
-
-        std::string _addr;
-        std::string _ns;
-        ChunkManagerPtr _manager;
-
-        DBClientBase* _conn;
-        bool _setVersion;
-    };
-
-
-    extern DBConnectionPool shardConnectionPool;
-
-    class ShardingConnectionHook : public DBConnectionHook {
-    public:
-
-        ShardingConnectionHook( bool shardedConnections )
-            : _shardedConnections( shardedConnections ) {
-        }
-
-        virtual void onCreate( DBClientBase * conn );
-        virtual void onDestroy( DBClientBase * conn );
-        virtual void onRelease(DBClientBase* conn);
-
-        bool _shardedConnections;
-    };
+    void reset(const std::string& ident);
+
+    ConnectionString getAddress() const {
+        return _cs;
+    }
+
+    std::string getName() const {
+        verify(_name.size());
+        return _name;
+    }
+
+    std::string getConnString() const {
+        verify(_addr.size());
+        return _addr;
+    }
+
+    long long getMaxSizeMB() const {
+        return _maxSizeMB;
+    }
+
+    bool isDraining() const {
+        return _isDraining;
+    }
+
+    std::string toString() const {
+        return _name + ":" + _addr;
+    }
+
+    friend std::ostream& operator<<(std::ostream& out, const Shard& s) {
+        return (out << s.toString());
+    }
+
+    bool operator==(const Shard& s) const {
+        if (_name != s._name)
+            return false;
+        return _cs.sameLogicalEndpoint(s._cs);
+    }
+
+    bool operator!=(const Shard& s) const {
+        return !(*this == s);
+    }
+
+    bool operator==(const std::string& s) const {
+        return _name == s || _addr == s;
+    }
+
+    bool operator!=(const std::string& s) const {
+        return _name != s && _addr != s;
+    }
+
+    bool operator<(const Shard& o) const {
+        return _name < o._name;
+    }
+
+    bool ok() const {
+        return _addr.size() > 0;
+    }
+
+    // Set internal to true to run the command with internal authentication privileges.
+    BSONObj runCommand(const std::string& db, const std::string& simple) const {
+        return runCommand(db, BSON(simple << 1));
+    }
+    BSONObj runCommand(const std::string& db, const BSONObj& cmd) const;
+
+    /**
+     * Returns the version string from the shard based from the serverStatus command result.
+     */
+    static std::string getShardMongoVersion(const std::string& shardHost);
+
+    /**
+     * Returns the total data size in bytes the shard is currently using.
+     */
+    static long long getShardDataSizeBytes(const std::string& shardHost);
+
+    /**
+     * Returns metadata and stats for this shard.
+     */
+    ShardStatus getStatus() const;
+
+    /**
+     * mostly for replica set
+     * retursn true if node is the shard
+     * of if the replica set contains node
+     */
+    bool containsNode(const std::string& node) const;
+
+    static void getAllShards(std::vector<Shard>& all);
+    static void printShardInfo(std::ostream& out);
+    static Shard lookupRSName(const std::string& name);
+
+    /**
+     * @parm current - shard where the chunk/database currently lives in
+     * @return the currently emptiest shard, if best then current, or EMPTY
+     */
+    static Shard pick(const Shard& current = EMPTY);
+
+    static void reloadShardInfo();
+
+    static void removeShard(const std::string& name);
+
+    static bool isAShardNode(const std::string& ident);
+
+    static Shard EMPTY;
+
+    static void installShard(const std::string& name, const Shard& shard);
+
+private:
+    void _setAddr(const std::string& addr);
+
+    std::string _name;
+    std::string _addr;
+    ConnectionString _cs;
+    long long _maxSizeMB;  // in MBytes, 0 is unlimited
+    bool _isDraining;      // shard is currently being removed
+};
+typedef boost::shared_ptr<Shard> ShardPtr;
+
+class ShardStatus {
+public:
+    ShardStatus(const Shard& shard, long long dataSizeBytes, const std::string& version);
+
+    friend std::ostream& operator<<(std::ostream& out, const ShardStatus& s) {
+        out << s.toString();
+        return out;
+    }
+
+    std::string toString() const {
+        std::stringstream ss;
+        ss << "shard: " << _shard << " dataSizeBytes: " << _dataSizeBytes
+           << " version: " << _mongoVersion;
+        return ss.str();
+    }
+
+    bool operator<(const ShardStatus& other) const {
+        return _dataSizeBytes < other._dataSizeBytes;
+    }
+
+    Shard shard() const {
+        return _shard;
+    }
+
+    long long dataSizeBytes() const {
+        return _dataSizeBytes;
+    }
+
+    std::string mongoVersion() const {
+        return _mongoVersion;
+    }
+
+private:
+    Shard _shard;
+    long long _dataSizeBytes;
+    std::string _mongoVersion;
+};
+
+class ChunkManager;
+typedef boost::shared_ptr<const ChunkManager> ChunkManagerPtr;
+
+class ShardConnection : public AScopedConnection {
+public:
+    ShardConnection(const Shard* s,
+                    const std::string& ns,
+                    ChunkManagerPtr manager = ChunkManagerPtr());
+    ShardConnection(const Shard& s,
+                    const std::string& ns,
+                    ChunkManagerPtr manager = ChunkManagerPtr());
+    ShardConnection(const std::string& addr,
+                    const std::string& ns,
+                    ChunkManagerPtr manager = ChunkManagerPtr());
+
+    ~ShardConnection();
+
+    void done();
+    void kill();
+
+    DBClientBase& conn() {
+        _finishInit();
+        verify(_conn);
+        return *_conn;
+    }
+
+    DBClientBase* operator->() {
+        _finishInit();
+        verify(_conn);
+        return _conn;
+    }
+
+    DBClientBase* get() {
+        _finishInit();
+        verify(_conn);
+        return _conn;
+    }
+
+    /**
+     * @return the connection object underneath without setting the shard version.
+     * @throws AssertionException if _conn is uninitialized.
+     */
+    DBClientBase* getRawConn() const {
+        verify(_conn);
+        return _conn;
+    }
+
+    std::string getHost() const {
+        return _addr;
+    }
+
+    std::string getNS() const {
+        return _ns;
+    }
+
+    ChunkManagerPtr getManager() const {
+        return _manager;
+    }
+
+    bool setVersion() {
+        _finishInit();
+        return _setVersion;
+    }
+
+    static void sync();
+
+    void donotCheckVersion() {
+        _setVersion = false;
+        _finishedInit = true;
+    }
+
+    bool ok() const {
+        return _conn != NULL;
+    }
+
+    /** checks all of my thread local connections for the version of this ns */
+    static void checkMyConnectionVersions(const std::string& ns);
+
+    /**
+     * Returns all the current sharded connections to the pool.
+     * Note: This is *dangerous* if we have GLE state.
+     */
+    static void releaseMyConnections();
+
+    /**
+     * Clears all connections in the sharded pool, including connections in the
+     * thread local storage pool of the current thread.
+     */
+    static void clearPool();
+
+    /**
+     * Forgets a namespace to prevent future versioning.
+     */
+    static void forgetNS(const std::string& ns);
+
+private:
+    void _init();
+    void _finishInit();
+
+    bool _finishedInit;
+
+    std::string _addr;
+    std::string _ns;
+    ChunkManagerPtr _manager;
+
+    DBClientBase* _conn;
+    bool _setVersion;
+};
+
+
+extern DBConnectionPool shardConnectionPool;
+
+class ShardingConnectionHook : public DBConnectionHook {
+public:
+    ShardingConnectionHook(bool shardedConnections) : _shardedConnections(shardedConnections) {}
+
+    virtual void onCreate(DBClientBase* conn);
+    virtual void onDestroy(DBClientBase* conn);
+    virtual void onRelease(DBClientBase* conn);
+
+    bool _shardedConnections;
+};
 }

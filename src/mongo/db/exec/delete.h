@@ -35,98 +35,101 @@
 
 namespace mongo {
 
-    class CanonicalQuery;
-    class OperationContext;
-    class PlanExecutor;
+class CanonicalQuery;
+class OperationContext;
+class PlanExecutor;
 
-    struct DeleteStageParams {
-        DeleteStageParams() :
-            isMulti(false),
-            shouldCallLogOp(false),
-            fromMigrate(false),
-            isExplain(false),
-            canonicalQuery(NULL) { }
+struct DeleteStageParams {
+    DeleteStageParams()
+        : isMulti(false),
+          shouldCallLogOp(false),
+          fromMigrate(false),
+          isExplain(false),
+          canonicalQuery(NULL) {}
 
-        // Should we delete all documents returned from the child (a "multi delete"), or at most one
-        // (a "single delete")?
-        bool isMulti;
+    // Should we delete all documents returned from the child (a "multi delete"), or at most one
+    // (a "single delete")?
+    bool isMulti;
 
-        // Should we write each delete to the oplog?
-        bool shouldCallLogOp;
+    // Should we write each delete to the oplog?
+    bool shouldCallLogOp;
 
-        // Is this delete part of a migrate operation that is essentially like a no-op
-        // when the cluster is observed by an external client.
-        bool fromMigrate;
+    // Is this delete part of a migrate operation that is essentially like a no-op
+    // when the cluster is observed by an external client.
+    bool fromMigrate;
 
-        // Are we explaining a delete command rather than actually executing it?
-        bool isExplain;
+    // Are we explaining a delete command rather than actually executing it?
+    bool isExplain;
 
-        // The parsed query predicate for this delete. Not owned here.
-        CanonicalQuery* canonicalQuery;
-    };
+    // The parsed query predicate for this delete. Not owned here.
+    CanonicalQuery* canonicalQuery;
+};
+
+/**
+ * This stage delete documents by RecordId that are returned from its child.  NEED_TIME
+ * is returned after deleting a document.
+ *
+ * Callers of work() must be holding a write lock (and, for shouldCallLogOp=true deletes,
+ * callers must have had the replication coordinator approve the write).
+ */
+class DeleteStage : public PlanStage {
+    MONGO_DISALLOW_COPYING(DeleteStage);
+
+public:
+    DeleteStage(OperationContext* txn,
+                const DeleteStageParams& params,
+                WorkingSet* ws,
+                Collection* collection,
+                PlanStage* child);
+    virtual ~DeleteStage();
+
+    virtual bool isEOF();
+    virtual StageState work(WorkingSetID* out);
+
+    virtual void saveState();
+    virtual void restoreState(OperationContext* opCtx);
+    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+
+    virtual std::vector<PlanStage*> getChildren() const;
+
+    virtual StageType stageType() const {
+        return STAGE_DELETE;
+    }
+
+    virtual PlanStageStats* getStats();
+
+    virtual const CommonStats* getCommonStats();
+
+    virtual const SpecificStats* getSpecificStats();
+
+    static const char* kStageType;
 
     /**
-     * This stage delete documents by RecordId that are returned from its child.  NEED_TIME
-     * is returned after deleting a document.
+     * Extracts the number of documents deleted by the update plan 'exec'.
      *
-     * Callers of work() must be holding a write lock (and, for shouldCallLogOp=true deletes,
-     * callers must have had the replication coordinator approve the write).
+     * Should only be called if the root plan stage of 'exec' is UPDATE and if 'exec' is EOF.
      */
-    class DeleteStage : public PlanStage {
-        MONGO_DISALLOW_COPYING(DeleteStage);
-    public:
-        DeleteStage(OperationContext* txn,
-                    const DeleteStageParams& params,
-                    WorkingSet* ws,
-                    Collection* collection,
-                    PlanStage* child);
-        virtual ~DeleteStage();
+    static long long getNumDeleted(PlanExecutor* exec);
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+private:
+    // Transactional context.  Not owned by us.
+    OperationContext* _txn;
 
-        virtual void saveState();
-        virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    DeleteStageParams _params;
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    // Not owned by us.
+    WorkingSet* _ws;
 
-        virtual StageType stageType() const { return STAGE_DELETE; }
+    // Collection to operate on.  Not owned by us.  Can be NULL (if NULL, isEOF() will always
+    // return true).  If non-NULL, the lifetime of the collection must supersede that of the
+    // stage.
+    Collection* _collection;
 
-        virtual PlanStageStats* getStats();
+    boost::scoped_ptr<PlanStage> _child;
 
-        virtual const CommonStats* getCommonStats();
-
-        virtual const SpecificStats* getSpecificStats();
-
-        static const char* kStageType;
-
-        /**
-         * Extracts the number of documents deleted by the update plan 'exec'.
-         *
-         * Should only be called if the root plan stage of 'exec' is UPDATE and if 'exec' is EOF.
-         */
-        static long long getNumDeleted(PlanExecutor* exec);
-
-    private:
-        // Transactional context.  Not owned by us.
-        OperationContext* _txn;
-
-        DeleteStageParams _params;
-
-        // Not owned by us.
-        WorkingSet* _ws;
-
-        // Collection to operate on.  Not owned by us.  Can be NULL (if NULL, isEOF() will always
-        // return true).  If non-NULL, the lifetime of the collection must supersede that of the
-        // stage.
-        Collection* _collection;
-
-        boost::scoped_ptr<PlanStage> _child;
-
-        // Stats
-        CommonStats _commonStats;
-        DeleteStats _specificStats;
-    };
+    // Stats
+    CommonStats _commonStats;
+    DeleteStats _specificStats;
+};
 
 }  // namespace mongo

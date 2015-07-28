@@ -50,105 +50,107 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
-    using boost::shared_ptr;
-    using std::string;
+using boost::scoped_ptr;
+using boost::shared_ptr;
+using std::string;
 
-    class RocksIndexHarness : public HarnessHelper {
-    public:
-        RocksIndexHarness() : _order(Ordering::make(BSONObj())), _tempDir(_testNamespace) {
-            boost::filesystem::remove_all(_tempDir.path());
-            rocksdb::DB* db;
-            rocksdb::Options options;
-            options.create_if_missing = true;
-            auto s = rocksdb::DB::Open(options, _tempDir.path(), &db);
-            ASSERT(s.ok());
-            _db.reset(db);
-            _counterManager.reset(new RocksCounterManager(_db.get(), true));
-        }
+class RocksIndexHarness : public HarnessHelper {
+public:
+    RocksIndexHarness() : _order(Ordering::make(BSONObj())), _tempDir(_testNamespace) {
+        boost::filesystem::remove_all(_tempDir.path());
+        rocksdb::DB* db;
+        rocksdb::Options options;
+        options.create_if_missing = true;
+        auto s = rocksdb::DB::Open(options, _tempDir.path(), &db);
+        ASSERT(s.ok());
+        _db.reset(db);
+        _counterManager.reset(new RocksCounterManager(_db.get(), true));
+    }
 
-        virtual SortedDataInterface* newSortedDataInterface(bool unique) {
-            if (unique) {
-                return new RocksUniqueIndex(_db.get(), "prefix", "ident", _order);
-            } else {
-                return new RocksStandardIndex(_db.get(), "prefix", "ident", _order);
-            }
-        }
-
-        virtual RecoveryUnit* newRecoveryUnit() {
-            return new RocksRecoveryUnit(&_transactionEngine, _db.get(), _counterManager.get(),
-                                         nullptr, true);
-        }
-
-    private:
-        Ordering _order;
-        string _testNamespace = "mongo-rocks-sorted-data-test";
-        unittest::TempDir _tempDir;
-        scoped_ptr<rocksdb::DB> _db;
-        RocksTransactionEngine _transactionEngine;
-        scoped_ptr<RocksCounterManager> _counterManager;
-    };
-
-    HarnessHelper* newHarnessHelper() { return new RocksIndexHarness(); }
-
-    TEST(RocksIndexTest, Isolation) {
-        scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
-        scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
-
-        {
-            scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-            ASSERT(sorted->isEmpty(opCtx.get()));
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-            {
-                WriteUnitOfWork uow(opCtx.get());
-
-                ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
-                ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, false));
-
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> t1(harnessHelper->newOperationContext());
-            scoped_ptr<OperationContext> t2(harnessHelper->newOperationContext());
-
-            scoped_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
-            scoped_ptr<WriteUnitOfWork> w2(new WriteUnitOfWork(t2.get()));
-
-            ASSERT_OK(sorted->insert(t1.get(), key3, loc3, false));
-            ASSERT_OK(sorted->insert(t2.get(), key4, loc4, false));
-
-            // this should throw
-            ASSERT_THROWS(sorted->insert(t2.get(), key3, loc5, false), WriteConflictException);
-
-            w1->commit();  // this should succeed
-        }
-
-        {
-            scoped_ptr<OperationContext> t1(harnessHelper->newOperationContext());
-            scoped_ptr<OperationContext> t2(harnessHelper->newOperationContext());
-
-            scoped_ptr<WriteUnitOfWork> w2(new WriteUnitOfWork(t2.get()));
-            // ensure we start w2 transaction
-            ASSERT_OK(sorted->insert(t2.get(), key4, loc4, false));
-
-            {
-                scoped_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
-
-                {
-                    WriteUnitOfWork w(t1.get());
-                    ASSERT_OK(sorted->insert(t1.get(), key5, loc3, false));
-                    w.commit();
-                }
-                w1->commit();
-            }
-
-            // this should throw
-            ASSERT_THROWS(sorted->insert(t2.get(), key5, loc3, false), WriteConflictException);
+    virtual SortedDataInterface* newSortedDataInterface(bool unique) {
+        if (unique) {
+            return new RocksUniqueIndex(_db.get(), "prefix", "ident", _order);
+        } else {
+            return new RocksStandardIndex(_db.get(), "prefix", "ident", _order);
         }
     }
+
+    virtual RecoveryUnit* newRecoveryUnit() {
+        return new RocksRecoveryUnit(
+            &_transactionEngine, _db.get(), _counterManager.get(), nullptr, true);
+    }
+
+private:
+    Ordering _order;
+    string _testNamespace = "mongo-rocks-sorted-data-test";
+    unittest::TempDir _tempDir;
+    scoped_ptr<rocksdb::DB> _db;
+    RocksTransactionEngine _transactionEngine;
+    scoped_ptr<RocksCounterManager> _counterManager;
+};
+
+HarnessHelper* newHarnessHelper() {
+    return new RocksIndexHarness();
+}
+
+TEST(RocksIndexTest, Isolation) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, false));
+
+            uow.commit();
+        }
+    }
+
+    {
+        scoped_ptr<OperationContext> t1(harnessHelper->newOperationContext());
+        scoped_ptr<OperationContext> t2(harnessHelper->newOperationContext());
+
+        scoped_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
+        scoped_ptr<WriteUnitOfWork> w2(new WriteUnitOfWork(t2.get()));
+
+        ASSERT_OK(sorted->insert(t1.get(), key3, loc3, false));
+        ASSERT_OK(sorted->insert(t2.get(), key4, loc4, false));
+
+        // this should throw
+        ASSERT_THROWS(sorted->insert(t2.get(), key3, loc5, false), WriteConflictException);
+
+        w1->commit();  // this should succeed
+    }
+
+    {
+        scoped_ptr<OperationContext> t1(harnessHelper->newOperationContext());
+        scoped_ptr<OperationContext> t2(harnessHelper->newOperationContext());
+
+        scoped_ptr<WriteUnitOfWork> w2(new WriteUnitOfWork(t2.get()));
+        // ensure we start w2 transaction
+        ASSERT_OK(sorted->insert(t2.get(), key4, loc4, false));
+
+        {
+            scoped_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
+
+            {
+                WriteUnitOfWork w(t1.get());
+                ASSERT_OK(sorted->insert(t1.get(), key5, loc3, false));
+                w.commit();
+            }
+            w1->commit();
+        }
+
+        // this should throw
+        ASSERT_THROWS(sorted->insert(t2.get(), key5, loc3, false), WriteConflictException);
+    }
+}
 }

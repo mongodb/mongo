@@ -41,31 +41,31 @@
 
 namespace mongo {
 
-    /**
-     * Authentication session data for the server side of SASL authentication.
-     */
-    class NativeSaslAuthenticationSession : public SaslAuthenticationSession {
-        MONGO_DISALLOW_COPYING(NativeSaslAuthenticationSession);
-    public:
+/**
+ * Authentication session data for the server side of SASL authentication.
+ */
+class NativeSaslAuthenticationSession : public SaslAuthenticationSession {
+    MONGO_DISALLOW_COPYING(NativeSaslAuthenticationSession);
 
-        explicit NativeSaslAuthenticationSession(AuthorizationSession* authSession);
-        virtual ~NativeSaslAuthenticationSession();
+public:
+    explicit NativeSaslAuthenticationSession(AuthorizationSession* authSession);
+    virtual ~NativeSaslAuthenticationSession();
 
-        virtual Status start(const StringData& authenticationDatabase,
-                             const StringData& mechanism,
-                             const StringData& serviceName,
-                             const StringData& serviceHostname,
-                             int64_t conversationId,
-                             bool autoAuthorize);
+    virtual Status start(const StringData& authenticationDatabase,
+                         const StringData& mechanism,
+                         const StringData& serviceName,
+                         const StringData& serviceHostname,
+                         int64_t conversationId,
+                         bool autoAuthorize);
 
-        virtual Status step(const StringData& inputData, std::string* outputData);
+    virtual Status step(const StringData& inputData, std::string* outputData);
 
-        virtual std::string getPrincipalId() const;
+    virtual std::string getPrincipalId() const;
 
-        virtual const char* getMechanism() const;
+    virtual const char* getMechanism() const;
 
-    private:
-        std::string _mechanism;
-        boost::scoped_ptr<SaslServerConversation> _saslConversation;
-    };
+private:
+    std::string _mechanism;
+    boost::scoped_ptr<SaslServerConversation> _saslConversation;
+};
 }  // namespace mongo

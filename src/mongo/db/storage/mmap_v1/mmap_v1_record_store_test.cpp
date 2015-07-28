@@ -41,58 +41,41 @@
 
 namespace mongo {
 
-    class MyHarnessHelper : public HarnessHelper {
-    public:
-        MyHarnessHelper() {
-        }
+class MyHarnessHelper : public HarnessHelper {
+public:
+    MyHarnessHelper() {}
 
-        virtual RecordStore* newNonCappedRecordStore() {
-            OperationContextNoop txn;
-            DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
-            md->setUserFlag( &txn, CollectionOptions::Flag_NoPadding );
-            SimpleRecordStoreV1* rs = new SimpleRecordStoreV1( &txn,
-                                                               "a.b",
-                                                               md,
-                                                               &_em,
-                                                               false );
-            return rs;
-        }
-
-        virtual RecordStore* newCappedRecordStore( int64_t cappedMaxSize,
-                                                   int64_t cappedMaxDocs ) {
-            OperationContextNoop txn;
-            DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
-            CappedRecordStoreV1* rs = new CappedRecordStoreV1( &txn,
-                                                               NULL,
-                                                               "a.b",
-                                                               md,
-                                                               &_em,
-                                                               false );
-
-            LocAndSize records[] = {
-                {}
-            };
-            LocAndSize drecs[] = {
-                {DiskLoc(0, 1000), 1000},
-                {}
-            };
-            md->setCapExtent(&txn, DiskLoc(0, 0));
-            md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-            initializeV1RS(&txn, records, drecs, NULL, &_em, md);
-
-            return rs;
-        }
-
-        virtual RecoveryUnit* newRecoveryUnit() {
-            return new RecoveryUnitNoop();
-        }
-
-    private:
-        DummyExtentManager _em;
-    };
-
-    HarnessHelper* newHarnessHelper() {
-        return new MyHarnessHelper();
+    virtual RecordStore* newNonCappedRecordStore() {
+        OperationContextNoop txn;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
+        md->setUserFlag(&txn, CollectionOptions::Flag_NoPadding);
+        SimpleRecordStoreV1* rs = new SimpleRecordStoreV1(&txn, "a.b", md, &_em, false);
+        return rs;
     }
 
+    virtual RecordStore* newCappedRecordStore(int64_t cappedMaxSize, int64_t cappedMaxDocs) {
+        OperationContextNoop txn;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
+        CappedRecordStoreV1* rs = new CappedRecordStoreV1(&txn, NULL, "a.b", md, &_em, false);
+
+        LocAndSize records[] = {{}};
+        LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};
+        md->setCapExtent(&txn, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
+        initializeV1RS(&txn, records, drecs, NULL, &_em, md);
+
+        return rs;
+    }
+
+    virtual RecoveryUnit* newRecoveryUnit() {
+        return new RecoveryUnitNoop();
+    }
+
+private:
+    DummyExtentManager _em;
+};
+
+HarnessHelper* newHarnessHelper() {
+    return new MyHarnessHelper();
+}
 }

@@ -35,89 +35,86 @@
 
 namespace mongo {
 
-    using std::vector;
+using std::vector;
 
-    MultiIteratorStage::MultiIteratorStage(OperationContext* txn,
-                                           WorkingSet* ws,
-                                           Collection* collection)
-        : _txn(txn),
-          _collection(collection),
-          _ws(ws),
-          _wsidForFetch(_ws->allocate()) {
-        // We pre-allocate a WSM and use it to pass up fetch requests. This should never be used
-        // for anything other than passing up NEED_FETCH. We use the loc and owned obj state, but
-        // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
-        WorkingSetMember* member = _ws->get(_wsidForFetch);
-        member->state = WorkingSetMember::LOC_AND_OBJ;
-    }
+MultiIteratorStage::MultiIteratorStage(OperationContext* txn,
+                                       WorkingSet* ws,
+                                       Collection* collection)
+    : _txn(txn), _collection(collection), _ws(ws), _wsidForFetch(_ws->allocate()) {
+    // We pre-allocate a WSM and use it to pass up fetch requests. This should never be used
+    // for anything other than passing up NEED_FETCH. We use the loc and owned obj state, but
+    // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
+    WorkingSetMember* member = _ws->get(_wsidForFetch);
+    member->state = WorkingSetMember::LOC_AND_OBJ;
+}
 
-    void MultiIteratorStage::addIterator(RecordIterator* it) {
-        _iterators.push_back(it);
-    }
+void MultiIteratorStage::addIterator(RecordIterator* it) {
+    _iterators.push_back(it);
+}
 
-    PlanStage::StageState MultiIteratorStage::work(WorkingSetID* out) {
-        if ( _collection == NULL )
-            return PlanStage::DEAD;
+PlanStage::StageState MultiIteratorStage::work(WorkingSetID* out) {
+    if (_collection == NULL)
+        return PlanStage::DEAD;
 
-        // The RecordId we're about to look at it might not be in memory. In this case
-        // we request a yield while we fetch the document.
-        if (!_iterators.empty()) {
-            RecordId curr = _iterators.back()->curr();
-            if (!curr.isNull()) {
-                std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn, curr));
-                if (NULL != fetcher.get()) {
-                    WorkingSetMember* member = _ws->get(_wsidForFetch);
-                    member->loc = curr;
-                    // Pass the RecordFetcher off to the WSM on which we're performing the fetch.
-                    member->setFetcher(fetcher.release());
-                    *out = _wsidForFetch;
-                    return NEED_FETCH;
-                }
-            }
-        }
-
-        RecordId next = _advance();
-        if (next.isNull())
-            return PlanStage::IS_EOF;
-
-        *out = _ws->allocate();
-        WorkingSetMember* member = _ws->get(*out);
-        member->loc = next;
-        member->obj = _collection->docFor(_txn, next);
-        member->state = WorkingSetMember::LOC_AND_OBJ;
-        return PlanStage::ADVANCED;
-    }
-
-    bool MultiIteratorStage::isEOF() {
-        return _collection == NULL || _iterators.empty();
-    }
-
-    void MultiIteratorStage::kill() {
-        _collection = NULL;
-        _iterators.clear();
-    }
-
-    void MultiIteratorStage::saveState() {
-        _txn = NULL;
-        for (size_t i = 0; i < _iterators.size(); i++) {
-            _iterators[i]->saveState();
-        }
-    }
-
-    void MultiIteratorStage::restoreState(OperationContext* opCtx) {
-        invariant(_txn == NULL);
-        _txn = opCtx;
-        for (size_t i = 0; i < _iterators.size(); i++) {
-            if (!_iterators[i]->restoreState(opCtx)) {
-                kill();
+    // The RecordId we're about to look at it might not be in memory. In this case
+    // we request a yield while we fetch the document.
+    if (!_iterators.empty()) {
+        RecordId curr = _iterators.back()->curr();
+        if (!curr.isNull()) {
+            std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn, curr));
+            if (NULL != fetcher.get()) {
+                WorkingSetMember* member = _ws->get(_wsidForFetch);
+                member->loc = curr;
+                // Pass the RecordFetcher off to the WSM on which we're performing the fetch.
+                member->setFetcher(fetcher.release());
+                *out = _wsidForFetch;
+                return NEED_FETCH;
             }
         }
     }
 
-    void MultiIteratorStage::invalidate(OperationContext* txn,
-                                        const RecordId& dl,
-                                        InvalidationType type) {
-        switch ( type ) {
+    RecordId next = _advance();
+    if (next.isNull())
+        return PlanStage::IS_EOF;
+
+    *out = _ws->allocate();
+    WorkingSetMember* member = _ws->get(*out);
+    member->loc = next;
+    member->obj = _collection->docFor(_txn, next);
+    member->state = WorkingSetMember::LOC_AND_OBJ;
+    return PlanStage::ADVANCED;
+}
+
+bool MultiIteratorStage::isEOF() {
+    return _collection == NULL || _iterators.empty();
+}
+
+void MultiIteratorStage::kill() {
+    _collection = NULL;
+    _iterators.clear();
+}
+
+void MultiIteratorStage::saveState() {
+    _txn = NULL;
+    for (size_t i = 0; i < _iterators.size(); i++) {
+        _iterators[i]->saveState();
+    }
+}
+
+void MultiIteratorStage::restoreState(OperationContext* opCtx) {
+    invariant(_txn == NULL);
+    _txn = opCtx;
+    for (size_t i = 0; i < _iterators.size(); i++) {
+        if (!_iterators[i]->restoreState(opCtx)) {
+            kill();
+        }
+    }
+}
+
+void MultiIteratorStage::invalidate(OperationContext* txn,
+                                    const RecordId& dl,
+                                    InvalidationType type) {
+    switch (type) {
         case INVALIDATION_DELETION:
             for (size_t i = 0; i < _iterators.size(); i++) {
                 _iterators[i]->invalidate(dl);
@@ -126,24 +123,24 @@ namespace mongo {
         case INVALIDATION_MUTATION:
             // no-op
             break;
-        }
+    }
+}
+
+vector<PlanStage*> MultiIteratorStage::getChildren() const {
+    vector<PlanStage*> empty;
+    return empty;
+}
+
+RecordId MultiIteratorStage::_advance() {
+    while (!_iterators.empty()) {
+        RecordId out = _iterators.back()->getNext();
+        if (!out.isNull())
+            return out;
+
+        _iterators.popAndDeleteBack();
     }
 
-    vector<PlanStage*> MultiIteratorStage::getChildren() const {
-        vector<PlanStage*> empty;
-        return empty;
-    }
+    return RecordId();
+}
 
-    RecordId MultiIteratorStage::_advance() {
-        while (!_iterators.empty()) {
-            RecordId out = _iterators.back()->getNext();
-            if (!out.isNull())
-                return out;
-
-            _iterators.popAndDeleteBack();
-        }
-
-        return RecordId();
-    }
-
-} // namespace mongo
+}  // namespace mongo

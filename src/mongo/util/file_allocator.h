@@ -38,72 +38,70 @@
 
 namespace mongo {
 
+/*
+ * Handles allocation of contiguous files on disk.  Allocation may be
+ * requested asynchronously or synchronously.
+ * singleton
+ */
+class FileAllocator : boost::noncopyable {
     /*
-     * Handles allocation of contiguous files on disk.  Allocation may be
-     * requested asynchronously or synchronously.
-     * singleton
+     * The public functions may not be called concurrently.  The allocation
+     * functions may be called multiple times per file, but only the first
+     * size specified per file will be used.
+    */
+public:
+    void start();
+
+    /**
+     * May be called if file exists. If file exists, or its allocation has
+     *  been requested, size is updated to match existing file size.
      */
-    class FileAllocator : boost::noncopyable {
-        /*
-         * The public functions may not be called concurrently.  The allocation
-         * functions may be called multiple times per file, but only the first
-         * size specified per file will be used.
-        */
-    public:
-        void start();
-
-        /**
-         * May be called if file exists. If file exists, or its allocation has
-         *  been requested, size is updated to match existing file size.
-         */
-        void requestAllocation( const std::string &name, long &size );
+    void requestAllocation(const std::string& name, long& size);
 
 
-        /**
-         * Returns when file has been allocated.  If file exists, size is
-         * updated to match existing file size.
-         */
-        void allocateAsap( const std::string &name, unsigned long long &size );
+    /**
+     * Returns when file has been allocated.  If file exists, size is
+     * updated to match existing file size.
+     */
+    void allocateAsap(const std::string& name, unsigned long long& size);
 
-        void waitUntilFinished() const;
+    void waitUntilFinished() const;
 
-        static void ensureLength(int fd, long size);
+    static void ensureLength(int fd, long size);
 
-        /** @return the singleton */
-        static FileAllocator * get();
-        
-    private:
+    /** @return the singleton */
+    static FileAllocator* get();
 
-        FileAllocator();
+private:
+    FileAllocator();
 
-        void checkFailure();
+    void checkFailure();
 
-        // caller must hold pendingMutex_ lock.  Returns size if allocated or
-        // allocation requested, -1 otherwise.
-        long prevSize( const std::string &name ) const;
+    // caller must hold pendingMutex_ lock.  Returns size if allocated or
+    // allocation requested, -1 otherwise.
+    long prevSize(const std::string& name) const;
 
-        // caller must hold pendingMutex_ lock.
-        bool inProgress( const std::string &name ) const;
+    // caller must hold pendingMutex_ lock.
+    bool inProgress(const std::string& name) const;
 
-        /** called from the worked thread */
-        static void run( FileAllocator * fa );
+    /** called from the worked thread */
+    static void run(FileAllocator* fa);
 
-        // generate a unique name for temporary files
-        std::string makeTempFileName( boost::filesystem::path root );
+    // generate a unique name for temporary files
+    std::string makeTempFileName(boost::filesystem::path root);
 
-        mutable mongo::mutex _pendingMutex;
-        mutable boost::condition _pendingUpdated;
+    mutable mongo::mutex _pendingMutex;
+    mutable boost::condition _pendingUpdated;
 
-        std::list< std::string > _pending;
-        mutable std::map< std::string, long > _pendingSize;
+    std::list<std::string> _pending;
+    mutable std::map<std::string, long> _pendingSize;
 
-        // unique number for temporary files
-        static unsigned long long _uniqueNumber;
+    // unique number for temporary files
+    static unsigned long long _uniqueNumber;
 
-        bool _failed;
+    bool _failed;
 
-        static FileAllocator* _instance;
+    static FileAllocator* _instance;
+};
 
-    };
-
-} // namespace mongo
+}  // namespace mongo

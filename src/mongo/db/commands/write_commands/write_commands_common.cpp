@@ -41,59 +41,51 @@
 namespace mongo {
 namespace auth {
 
-    using std::string;
-    using std::vector;
+using std::string;
+using std::vector;
 
-    Status checkAuthForWriteCommand( AuthorizationSession* authzSession,
-                                     BatchedCommandRequest::BatchType cmdType,
-                                     const NamespaceString& cmdNSS,
-                                     const BSONObj& cmdObj ) {
+Status checkAuthForWriteCommand(AuthorizationSession* authzSession,
+                                BatchedCommandRequest::BatchType cmdType,
+                                const NamespaceString& cmdNSS,
+                                const BSONObj& cmdObj) {
+    vector<Privilege> privileges;
 
-        vector<Privilege> privileges;
-
-        if ( cmdType == BatchedCommandRequest::BatchType_Insert ) {
-
-            if ( !cmdNSS.isSystemDotIndexes() ) {
-                privileges.push_back( Privilege( ResourcePattern::forExactNamespace( cmdNSS ),
-                                                 ActionType::insert ) );
-            }
-            else {
-                // Special-case indexes until we have a command
-                string nsToIndex, errMsg;
-                if ( !BatchedCommandRequest::getIndexedNS( cmdObj, &nsToIndex, &errMsg ) ) {
-                    return Status( ErrorCodes::FailedToParse, errMsg );
-                }
-
-                NamespaceString nssToIndex( nsToIndex );
-                privileges.push_back( Privilege( ResourcePattern::forExactNamespace( nssToIndex ),
-                                                 ActionType::createIndex ) );
-            }
-        }
-        else if ( cmdType == BatchedCommandRequest::BatchType_Update ) {
-
-            ActionSet actions;
-            actions.addAction( ActionType::update );
-
-            // Upsert also requires insert privs
-            if ( BatchedCommandRequest::containsUpserts( cmdObj ) ) {
-                actions.addAction( ActionType::insert );
+    if (cmdType == BatchedCommandRequest::BatchType_Insert) {
+        if (!cmdNSS.isSystemDotIndexes()) {
+            privileges.push_back(
+                Privilege(ResourcePattern::forExactNamespace(cmdNSS), ActionType::insert));
+        } else {
+            // Special-case indexes until we have a command
+            string nsToIndex, errMsg;
+            if (!BatchedCommandRequest::getIndexedNS(cmdObj, &nsToIndex, &errMsg)) {
+                return Status(ErrorCodes::FailedToParse, errMsg);
             }
 
-            privileges.push_back( Privilege( ResourcePattern::forExactNamespace( cmdNSS ),
-                                             actions ) );
-
+            NamespaceString nssToIndex(nsToIndex);
+            privileges.push_back(
+                Privilege(ResourcePattern::forExactNamespace(nssToIndex), ActionType::createIndex));
         }
-        else {
-            fassert( 17251, cmdType == BatchedCommandRequest::BatchType_Delete );
-            privileges.push_back( Privilege( ResourcePattern::forExactNamespace( cmdNSS ),
-                                             ActionType::remove ) );
+    } else if (cmdType == BatchedCommandRequest::BatchType_Update) {
+        ActionSet actions;
+        actions.addAction(ActionType::update);
+
+        // Upsert also requires insert privs
+        if (BatchedCommandRequest::containsUpserts(cmdObj)) {
+            actions.addAction(ActionType::insert);
         }
 
-        if ( authzSession->isAuthorizedForPrivileges( privileges ) )
-            return Status::OK();
+        privileges.push_back(Privilege(ResourcePattern::forExactNamespace(cmdNSS), actions));
 
-        return Status( ErrorCodes::Unauthorized, "unauthorized" );
+    } else {
+        fassert(17251, cmdType == BatchedCommandRequest::BatchType_Delete);
+        privileges.push_back(
+            Privilege(ResourcePattern::forExactNamespace(cmdNSS), ActionType::remove));
     }
 
+    if (authzSession->isAuthorizedForPrivileges(privileges))
+        return Status::OK();
+
+    return Status(ErrorCodes::Unauthorized, "unauthorized");
+}
 }
 }

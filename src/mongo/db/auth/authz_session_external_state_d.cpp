@@ -43,29 +43,28 @@
 
 namespace mongo {
 
-    AuthzSessionExternalStateMongod::AuthzSessionExternalStateMongod(
-            AuthorizationManager* authzManager) :
-                AuthzSessionExternalStateServerCommon(authzManager) {}
-    AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
+AuthzSessionExternalStateMongod::AuthzSessionExternalStateMongod(AuthorizationManager* authzManager)
+    : AuthzSessionExternalStateServerCommon(authzManager) {}
+AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
 
-    void AuthzSessionExternalStateMongod::startRequest(OperationContext* txn) {
-        // No locks should be held as this happens before any database accesses occur
-        dassert(!txn->lockState()->isLocked());
+void AuthzSessionExternalStateMongod::startRequest(OperationContext* txn) {
+    // No locks should be held as this happens before any database accesses occur
+    dassert(!txn->lockState()->isLocked());
 
-        _checkShouldAllowLocalhost(txn);
-    }
+    _checkShouldAllowLocalhost(txn);
+}
 
-    bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
-        // TODO(spencer): get "isInDirectClient" from OperationContext
-        return cc().isInDirectClient() ||
-               AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
-    }
+bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
+    // TODO(spencer): get "isInDirectClient" from OperationContext
+    return cc().isInDirectClient() ||
+        AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
+}
 
-    bool AuthzSessionExternalStateMongod::serverIsArbiter() const {
-        // Arbiters have access to extra privileges under localhost. See SERVER-5479.
-        return (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+bool AuthzSessionExternalStateMongod::serverIsArbiter() const {
+    // Arbiters have access to extra privileges under localhost. See SERVER-5479.
+    return (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet &&
-                repl::getGlobalReplicationCoordinator()->getMemberState().arbiter());
-    }
+            repl::getGlobalReplicationCoordinator()->getMemberState().arbiter());
+}
 
-} // namespace mongo
+}  // namespace mongo

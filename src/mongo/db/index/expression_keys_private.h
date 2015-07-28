@@ -36,95 +36,94 @@
 
 namespace mongo {
 
-    struct TwoDIndexingParams;
-    struct S2IndexingParams;
+struct TwoDIndexingParams;
+struct S2IndexingParams;
 
-    namespace fts {
+namespace fts {
 
-        class FTSSpec;
+class FTSSpec;
 
-    }  // namespace fts
+}  // namespace fts
+
+/**
+ * Do not use this class or any of its methods directly.  The key generation of btree-indexed
+ * expression indices is kept outside of the access method for testing and for upgrade
+ * compatibility checking.
+ */
+class ExpressionKeysPrivate {
+public:
+    //
+    // 2d
+    //
+
+    static void get2DKeys(const BSONObj& obj,
+                          const TwoDIndexingParams& params,
+                          BSONObjSet* keys,
+                          std::vector<BSONObj>* locs);
+
+    //
+    // FTS
+    //
+
+    static void getFTSKeys(const BSONObj& obj, const fts::FTSSpec& ftsSpec, BSONObjSet* keys);
+
+    //
+    // Hash
+    //
 
     /**
-     * Do not use this class or any of its methods directly.  The key generation of btree-indexed
-     * expression indices is kept outside of the access method for testing and for upgrade
-     * compatibility checking.
+     * Generates keys for hash access method.
      */
-    class ExpressionKeysPrivate {
-    public:
+    static void getHashKeys(const BSONObj& obj,
+                            const std::string& hashedField,
+                            HashSeed seed,
+                            int hashVersion,
+                            bool isSparse,
+                            BSONObjSet* keys);
 
-        //
-        // 2d
-        //
+    /**
+     * Hashing function used by both getHashKeys and the cursors we create.
+     * Exposed for testing in dbtests/namespacetests.cpp and
+     * so mongo/db/index_legacy.cpp can use it.
+     */
+    static long long int makeSingleHashKey(const BSONElement& e, HashSeed seed, int v);
 
-        static void get2DKeys(const BSONObj &obj,
-                              const TwoDIndexingParams& params,
-                              BSONObjSet* keys,
-                              std::vector<BSONObj>* locs);
+    //
+    // Haystack
+    //
 
-        //
-        // FTS
-        //
-
-        static void getFTSKeys(const BSONObj &obj, const fts::FTSSpec& ftsSpec, BSONObjSet* keys);
-
-        //
-        // Hash
-        //
-
-        /**
-         * Generates keys for hash access method.
-         */
-        static void getHashKeys(const BSONObj& obj,
-                                const std::string& hashedField,
-                                HashSeed seed,
-                                int hashVersion,
-                                bool isSparse,
+    /**
+     * Generates keys for haystack access method.
+     */
+    static void getHaystackKeys(const BSONObj& obj,
+                                const std::string& geoField,
+                                const std::vector<std::string>& otherFields,
+                                double bucketSize,
                                 BSONObjSet* keys);
 
-        /**
-         * Hashing function used by both getHashKeys and the cursors we create.
-         * Exposed for testing in dbtests/namespacetests.cpp and
-         * so mongo/db/index_legacy.cpp can use it.
-         */
-        static long long int makeSingleHashKey(const BSONElement& e, HashSeed seed, int v);
+    /**
+     * Returns a hash of a BSON element.
+     * Used by getHaystackKeys and HaystackAccessMethod::searchCommand.
+     */
+    static int hashHaystackElement(const BSONElement& e, double bucketSize);
 
-        //
-        // Haystack
-        //
+    /**
+     * Joins two strings using underscore as separator.
+     * Used by getHaystackKeys and HaystackAccessMethod::searchCommand.
+     */
+    static std::string makeHaystackString(int hashedX, int hashedY);
 
-        /**
-         * Generates keys for haystack access method.
-         */
-        static void getHaystackKeys(const BSONObj& obj,
-                                    const std::string& geoField,
-                                    const std::vector<std::string>& otherFields,
-                                    double bucketSize,
-                                    BSONObjSet* keys);
+    //
+    // S2
+    //
 
-        /**
-         * Returns a hash of a BSON element.
-         * Used by getHaystackKeys and HaystackAccessMethod::searchCommand.
-         */
-        static int hashHaystackElement(const BSONElement& e, double bucketSize);
-
-        /**
-         * Joins two strings using underscore as separator.
-         * Used by getHaystackKeys and HaystackAccessMethod::searchCommand.
-         */
-        static std::string makeHaystackString(int hashedX, int hashedY);
-
-        //
-        // S2
-        //
-
-        /**
-         * Generates keys for S2 access method.
-         */
-        static void getS2Keys(const BSONObj& obj,
-                              const BSONObj& keyPattern,
-                              const S2IndexingParams& params,
-                              BSONObjSet* keys);
-    };
+    /**
+     * Generates keys for S2 access method.
+     */
+    static void getS2Keys(const BSONObj& obj,
+                          const BSONObj& keyPattern,
+                          const S2IndexingParams& params,
+                          BSONObjSet* keys);
+};
 
 }  // namespace mongo

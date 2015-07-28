@@ -51,123 +51,123 @@
  */
 namespace mongo {
 
-    using std::endl;
-    using std::string;
-    using std::stringstream;
+using std::endl;
+using std::string;
+using std::stringstream;
 
-    void* remapPrivateView(void *oldPrivateAddr) {
-        log() << "remapPrivateView called in mongos, aborting" << endl;
-        fassertFailed(16462);
+void* remapPrivateView(void* oldPrivateAddr) {
+    log() << "remapPrivateView called in mongos, aborting" << endl;
+    fassertFailed(16462);
+}
+
+/** When this callback is run, we record a shard that we've used for useful work
+ *  in an operation to be read later by getLastError()
+*/
+void usingAShardConnection(const string& addr) {
+    ClientInfo::get()->addShardHost(addr);
+}
+
+TSP_DEFINE(Client, currentClient)
+
+Client::Client(const string& desc, AbstractMessagingPort* p)
+    : ClientBasic(p),
+      _desc(desc),
+      _connectionId(),
+      _inDirectClient(false),
+      _lastOp(0),
+      _shutdown(false) {}
+Client::~Client() {}
+bool Client::shutdown() {
+    return true;
+}
+
+void Client::initThread(const char* desc, AbstractMessagingPort* mp) {
+    // mp is non-null only for client connections, and mongos uses ClientInfo for those
+    massert(16478, "Client being used for incoming connection thread in mongos", mp == NULL);
+
+    verify(currentClient.get() == 0);
+
+    string fullDesc = desc;
+    if (str::equals("conn", desc) && mp != NULL)
+        fullDesc = str::stream() << desc << mp->connectionId();
+
+    setThreadName(fullDesc.c_str());
+
+    Client* c = new Client(fullDesc, mp);
+    currentClient.reset(c);
+    mongo::lastError.initThread();
+    c->setAuthorizationSession(new AuthorizationSession(
+        new AuthzSessionExternalStateMongos(getGlobalAuthorizationManager())));
+}
+
+string Client::clientAddress(bool includePort) const {
+    ClientInfo* ci = ClientInfo::get();
+    if (ci)
+        return ci->getRemote().toString();
+    return "";
+}
+
+// Need a version that takes a Client to match the mongod interface so the web server can call
+// execCommand and not need to worry if it's in a mongod or mongos.
+void Command::execCommand(OperationContext* txn,
+                          Command* c,
+                          int queryOptions,
+                          const char* ns,
+                          BSONObj& cmdObj,
+                          BSONObjBuilder& result,
+                          bool fromRepl) {
+    execCommandClientBasic(txn, c, *txn->getClient(), queryOptions, ns, cmdObj, result, fromRepl);
+}
+
+void Command::execCommandClientBasic(OperationContext* txn,
+                                     Command* c,
+                                     ClientBasic& client,
+                                     int queryOptions,
+                                     const char* ns,
+                                     BSONObj& cmdObj,
+                                     BSONObjBuilder& result,
+                                     bool fromRepl) {
+    std::string dbname = nsToDatabase(ns);
+
+    if (cmdObj.getBoolField("help")) {
+        stringstream help;
+        help << "help for: " << c->name << " ";
+        c->help(help);
+        result.append("help", help.str());
+        result.append("lockType", c->isWriteCommandForConfigServer() ? 1 : 0);
+        appendCommandStatus(result, true, "");
+        return;
     }
 
-    /** When this callback is run, we record a shard that we've used for useful work
-     *  in an operation to be read later by getLastError()
-    */
-    void usingAShardConnection( const string& addr ) {
-        ClientInfo::get()->addShardHost( addr );
+    Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
+    if (!status.isOK()) {
+        appendCommandStatus(result, status);
+        return;
     }
 
-    TSP_DEFINE(Client,currentClient)
+    c->_commandsExecuted.increment();
 
-    Client::Client(const string& desc, AbstractMessagingPort *p) :
-        ClientBasic(p),
-        _desc(desc),
-        _connectionId(),
-        _inDirectClient(false),
-        _lastOp(0),
-        _shutdown(false) {
-    }
-    Client::~Client() {}
-    bool Client::shutdown() { return true; }
-
-    void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-        // mp is non-null only for client connections, and mongos uses ClientInfo for those
-        massert(16478, "Client being used for incoming connection thread in mongos", mp == NULL);
-
-        verify( currentClient.get() == 0 );
-
-        string fullDesc = desc;
-        if ( str::equals( "conn" , desc ) && mp != NULL )
-            fullDesc = str::stream() << desc << mp->connectionId();
-
-        setThreadName( fullDesc.c_str() );
-
-        Client *c = new Client( fullDesc, mp );
-        currentClient.reset(c);
-        mongo::lastError.initThread();
-        c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongos(
-                getGlobalAuthorizationManager())));
-    }
-
-    string Client::clientAddress(bool includePort) const {
-        ClientInfo * ci = ClientInfo::get();
-        if ( ci )
-            return ci->getRemote().toString();
-        return "";
-    }
-
-    // Need a version that takes a Client to match the mongod interface so the web server can call
-    // execCommand and not need to worry if it's in a mongod or mongos.
-    void Command::execCommand(OperationContext* txn,
-                              Command * c,
-                              int queryOptions,
-                              const char *ns,
-                              BSONObj& cmdObj,
-                              BSONObjBuilder& result,
-                              bool fromRepl ) {
-        execCommandClientBasic(txn, c, *txn->getClient(), queryOptions, ns, cmdObj, result, fromRepl);
-    }
-
-    void Command::execCommandClientBasic(OperationContext* txn,
-                                         Command * c ,
-                                         ClientBasic& client,
-                                         int queryOptions,
-                                         const char *ns,
-                                         BSONObj& cmdObj,
-                                         BSONObjBuilder& result,
-                                         bool fromRepl ) {
-        std::string dbname = nsToDatabase(ns);
-
-        if (cmdObj.getBoolField("help")) {
-            stringstream help;
-            help << "help for: " << c->name << " ";
-            c->help( help );
-            result.append( "help" , help.str() );
-            result.append("lockType", c->isWriteCommandForConfigServer() ? 1 : 0);
-            appendCommandStatus(result, true, "");
-            return;
+    std::string errmsg;
+    bool ok;
+    try {
+        ok = c->run(txn, dbname, cmdObj, queryOptions, errmsg, result, false);
+    } catch (DBException& e) {
+        ok = false;
+        int code = e.getCode();
+        if (code == RecvStaleConfigCode) {  // code for StaleConfigException
+            throw;
         }
 
-        Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
-        if (!status.isOK()) {
-            appendCommandStatus(result, status);
-            return;
-        }
-
-        c->_commandsExecuted.increment();
-
-        std::string errmsg;
-        bool ok;
-        try {
-            ok = c->run( txn, dbname , cmdObj, queryOptions, errmsg, result, false );
-        }
-        catch (DBException& e) {
-            ok = false;
-            int code = e.getCode();
-            if (code == RecvStaleConfigCode) { // code for StaleConfigException
-                throw;
-            }
-
-            stringstream ss;
-            ss << "exception: " << e.what();
-            errmsg = ss.str();
-            result.append( "code" , code );
-        }
-
-        if ( !ok ) {
-            c->_commandsFailed.increment();
-        }
-
-        appendCommandStatus(result, ok, errmsg);
+        stringstream ss;
+        ss << "exception: " << e.what();
+        errmsg = ss.str();
+        result.append("code", code);
     }
+
+    if (!ok) {
+        c->_commandsFailed.increment();
+    }
+
+    appendCommandStatus(result, ok, errmsg);
+}
 }

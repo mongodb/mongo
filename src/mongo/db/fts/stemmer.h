@@ -39,22 +39,22 @@
 
 namespace mongo {
 
-    namespace fts {
+namespace fts {
 
-        /**
-         * maintains case
-         * but works
-         * running/Running -> run/Run
-         */
-        class Stemmer {
-        public:
-            Stemmer( const FTSLanguage& language );
-            ~Stemmer();
+/**
+ * maintains case
+ * but works
+ * running/Running -> run/Run
+ */
+class Stemmer {
+public:
+    Stemmer(const FTSLanguage& language);
+    ~Stemmer();
 
-            std::string stem( const StringData& word ) const;
-        private:
-            struct sb_stemmer* _stemmer;
-        };
-    }
+    std::string stem(const StringData& word) const;
+
+private:
+    struct sb_stemmer* _stemmer;
+};
 }
-
+}

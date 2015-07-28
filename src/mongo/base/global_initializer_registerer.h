@@ -36,21 +36,21 @@
 
 namespace mongo {
 
-    /**
-     * Type representing the act of registering a process-global intialization function.
-     *
-     * Create a module-global instance of this type to register a new initializer, to be run by a
-     * call to a variant of mongo::runGlobalInitializers().  See mongo/base/initializer.h,
-     * mongo/base/init.h and mongo/base/initializer_dependency_graph.h for details.
-     */
-    class GlobalInitializerRegisterer {
-        MONGO_DISALLOW_COPYING(GlobalInitializerRegisterer);
+/**
+ * Type representing the act of registering a process-global intialization function.
+ *
+ * Create a module-global instance of this type to register a new initializer, to be run by a
+ * call to a variant of mongo::runGlobalInitializers().  See mongo/base/initializer.h,
+ * mongo/base/init.h and mongo/base/initializer_dependency_graph.h for details.
+ */
+class GlobalInitializerRegisterer {
+    MONGO_DISALLOW_COPYING(GlobalInitializerRegisterer);
 
-    public:
-        GlobalInitializerRegisterer(const std::string& name,
-                                    const InitializerFunction& fn,
-                                    const std::vector<std::string>& prerequisites,
-                                    const std::vector<std::string>& dependents);
-    };
+public:
+    GlobalInitializerRegisterer(const std::string& name,
+                                const InitializerFunction& fn,
+                                const std::vector<std::string>& prerequisites,
+                                const std::vector<std::string>& dependents);
+};
 
 }  // namespace mongo

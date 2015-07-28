@@ -33,47 +33,46 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-    void V8CpuProfiler::start(v8::Isolate* isolate, const StringData name) {
-        isolate->GetCpuProfiler()->StartCpuProfiling(
-            v8::String::NewFromUtf8(isolate, name.toString().c_str()));
-    }
+void V8CpuProfiler::start(v8::Isolate* isolate, const StringData name) {
+    isolate->GetCpuProfiler()->StartCpuProfiling(
+        v8::String::NewFromUtf8(isolate, name.toString().c_str()));
+}
 
-    void V8CpuProfiler::stop(v8::Isolate* isolate, const StringData name) {
-        _cpuProfiles.insert(make_pair(name.toString(),
-            isolate->GetCpuProfiler()->StopCpuProfiling(
-                v8::String::NewFromUtf8(isolate, name.toString().c_str(),
-                                        v8::String::kNormalString, name.size()))));
-    }
+void V8CpuProfiler::stop(v8::Isolate* isolate, const StringData name) {
+    _cpuProfiles.insert(
+        make_pair(name.toString(),
+                  isolate->GetCpuProfiler()->StopCpuProfiling(v8::String::NewFromUtf8(
+                      isolate, name.toString().c_str(), v8::String::kNormalString, name.size()))));
+}
 
-    void V8CpuProfiler::traverseDepthFirst(const v8::CpuProfileNode* cpuProfileNode,
-                                           BSONArrayBuilder& arrayBuilder) {
-        if (cpuProfileNode == NULL)
-            return;
-        BSONObjBuilder frameObjBuilder;
-        frameObjBuilder.append("Function",
-                               *v8::String::Utf8Value(cpuProfileNode->GetFunctionName()));
-        frameObjBuilder.append("Source",
-                               *v8::String::Utf8Value(cpuProfileNode->GetScriptResourceName()));
-        frameObjBuilder.appendNumber("Line", cpuProfileNode->GetLineNumber());
-        if (cpuProfileNode->GetChildrenCount()) {
-            BSONArrayBuilder subArrayBuilder(frameObjBuilder.subarrayStart("Children"));
-            for (int i = 0; i < cpuProfileNode->GetChildrenCount(); ++i) {
-                traverseDepthFirst(cpuProfileNode->GetChild(i), subArrayBuilder);
-            }
-            subArrayBuilder.done();
+void V8CpuProfiler::traverseDepthFirst(const v8::CpuProfileNode* cpuProfileNode,
+                                       BSONArrayBuilder& arrayBuilder) {
+    if (cpuProfileNode == NULL)
+        return;
+    BSONObjBuilder frameObjBuilder;
+    frameObjBuilder.append("Function", *v8::String::Utf8Value(cpuProfileNode->GetFunctionName()));
+    frameObjBuilder.append("Source",
+                           *v8::String::Utf8Value(cpuProfileNode->GetScriptResourceName()));
+    frameObjBuilder.appendNumber("Line", cpuProfileNode->GetLineNumber());
+    if (cpuProfileNode->GetChildrenCount()) {
+        BSONArrayBuilder subArrayBuilder(frameObjBuilder.subarrayStart("Children"));
+        for (int i = 0; i < cpuProfileNode->GetChildrenCount(); ++i) {
+            traverseDepthFirst(cpuProfileNode->GetChild(i), subArrayBuilder);
         }
-        arrayBuilder << frameObjBuilder.obj();
+        subArrayBuilder.done();
     }
+    arrayBuilder << frameObjBuilder.obj();
+}
 
-    const BSONArray V8CpuProfiler::fetch(const StringData name) {
-        BSONArrayBuilder arrayBuilder;
-        CpuProfileMap::const_iterator iProf = _cpuProfiles.find(name.toString());
-        if (iProf == _cpuProfiles.end())
-            return arrayBuilder.arr();
-        const v8::CpuProfile* cpuProfile = iProf->second;
-        if (cpuProfile == NULL)
-            return arrayBuilder.arr();
-        traverseDepthFirst(cpuProfile->GetTopDownRoot(), arrayBuilder);
+const BSONArray V8CpuProfiler::fetch(const StringData name) {
+    BSONArrayBuilder arrayBuilder;
+    CpuProfileMap::const_iterator iProf = _cpuProfiles.find(name.toString());
+    if (iProf == _cpuProfiles.end())
         return arrayBuilder.arr();
-    }
+    const v8::CpuProfile* cpuProfile = iProf->second;
+    if (cpuProfile == NULL)
+        return arrayBuilder.arr();
+    traverseDepthFirst(cpuProfile->GetTopDownRoot(), arrayBuilder);
+    return arrayBuilder.arr();
+}
 }

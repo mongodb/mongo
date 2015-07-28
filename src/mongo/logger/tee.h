@@ -32,16 +32,16 @@
 namespace mongo {
 namespace logger {
 
-    class Tee {
-    public:
-        virtual ~Tee() {}
+class Tee {
+public:
+    virtual ~Tee() {}
 
-        /**
-         * Implementations of Tee::write must handle their own synchronization.  Callers may assume
-         * it is safe to call this method at any time from any thread.
-         */
-        virtual void write(const std::string& str) = 0;
-    };
+    /**
+     * Implementations of Tee::write must handle their own synchronization.  Callers may assume
+     * it is safe to call this method at any time from any thread.
+     */
+    virtual void write(const std::string& str) = 0;
+};
 
 }  // namespace logger
 }  // namespace mongo

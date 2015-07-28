@@ -34,53 +34,53 @@
 
 namespace mongo {
 
+/**
+ * Methods used by several parts of the planning process.
+ */
+class QueryPlannerCommon {
+public:
     /**
-     * Methods used by several parts of the planning process.
+     * Does the tree rooted at 'root' have a node with matchType 'type'?
+     *
+     * If 'out' is not NULL, sets 'out' to the first node of type 'type' encountered.
      */
-    class QueryPlannerCommon {
-    public:
-        /**
-         * Does the tree rooted at 'root' have a node with matchType 'type'?
-         *
-         * If 'out' is not NULL, sets 'out' to the first node of type 'type' encountered.
-         */
-        static bool hasNode(MatchExpression* root, MatchExpression::MatchType type,
-                            MatchExpression** out = NULL) {
-            if (type == root->matchType()) {
-                if (NULL != out) {
-                    *out = root;
-                }
+    static bool hasNode(MatchExpression* root,
+                        MatchExpression::MatchType type,
+                        MatchExpression** out = NULL) {
+        if (type == root->matchType()) {
+            if (NULL != out) {
+                *out = root;
+            }
+            return true;
+        }
+
+        for (size_t i = 0; i < root->numChildren(); ++i) {
+            if (hasNode(root->getChild(i), type, out)) {
                 return true;
             }
-
-            for (size_t i = 0; i < root->numChildren(); ++i) {
-                if (hasNode(root->getChild(i), type, out)) {
-                    return true;
-                }
-            }
-            return false;
         }
+        return false;
+    }
 
-        /**
-         * Assumes the provided BSONObj is of the form {field1: -+1, ..., field2: -+1}
-         * Returns a BSONObj with the values negated.
-         */
-        static BSONObj reverseSortObj(const BSONObj& sortObj) {
-            BSONObjBuilder reverseBob;
-            BSONObjIterator it(sortObj);
-            while (it.more()) {
-                BSONElement elt = it.next();
-                reverseBob.append(elt.fieldName(), elt.numberInt() * -1);
-            }
-            return reverseBob.obj();
+    /**
+     * Assumes the provided BSONObj is of the form {field1: -+1, ..., field2: -+1}
+     * Returns a BSONObj with the values negated.
+     */
+    static BSONObj reverseSortObj(const BSONObj& sortObj) {
+        BSONObjBuilder reverseBob;
+        BSONObjIterator it(sortObj);
+        while (it.more()) {
+            BSONElement elt = it.next();
+            reverseBob.append(elt.fieldName(), elt.numberInt() * -1);
         }
+        return reverseBob.obj();
+    }
 
-        /**
-         * Traverses the tree rooted at 'node'.  For every STAGE_IXSCAN encountered, reverse
-         * the scan direction and index bounds.
-         */
-        static void reverseScans(QuerySolutionNode* node);
-
-    };
+    /**
+     * Traverses the tree rooted at 'node'.  For every STAGE_IXSCAN encountered, reverse
+     * the scan direction and index bounds.
+     */
+    static void reverseScans(QuerySolutionNode* node);
+};
 
 }  // namespace mongo

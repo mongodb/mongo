@@ -36,108 +36,112 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
 namespace repl {
-    class BackgroundSyncInterface;
-    class ReplicationCoordinator;
+class BackgroundSyncInterface;
+class ReplicationCoordinator;
+
+/**
+ * "Normal" replica set syncing
+ */
+class SyncTail : public Sync {
+    typedef void (*MultiSyncApplyFunc)(const std::vector<BSONObj>& ops, SyncTail* st);
+
+public:
+    SyncTail(BackgroundSyncInterface* q, MultiSyncApplyFunc func);
+    virtual ~SyncTail();
+    virtual bool syncApply(OperationContext* txn,
+                           const BSONObj& o,
+                           bool convertUpdateToUpsert = false);
 
     /**
-     * "Normal" replica set syncing
+     * Runs _applyOplogUntil(stopOpTime)
      */
-    class SyncTail : public Sync {
-        typedef void (*MultiSyncApplyFunc)(const std::vector<BSONObj>& ops, SyncTail* st);
+    virtual void oplogApplication(OperationContext* txn, const OpTime& stopOpTime);
+
+    void oplogApplication();
+    bool peek(BSONObj* obj);
+
+    class OpQueue {
     public:
-        SyncTail(BackgroundSyncInterface *q, MultiSyncApplyFunc func);
-        virtual ~SyncTail();
-        virtual bool syncApply(OperationContext* txn,
-                               const BSONObj &o,
-                               bool convertUpdateToUpsert = false);
+        OpQueue() : _size(0) {}
+        size_t getSize() {
+            return _size;
+        }
+        std::deque<BSONObj>& getDeque() {
+            return _deque;
+        }
+        void push_back(BSONObj& op) {
+            _deque.push_back(op);
+            _size += op.objsize();
+        }
+        bool empty() {
+            return _deque.empty();
+        }
 
-        /**
-         * Runs _applyOplogUntil(stopOpTime)
-         */
-        virtual void oplogApplication(OperationContext* txn, const OpTime& stopOpTime);
-
-        void oplogApplication();
-        bool peek(BSONObj* obj);
-
-        class OpQueue {
-        public:
-            OpQueue() : _size(0) {}
-            size_t getSize() { return _size; }
-            std::deque<BSONObj>& getDeque() { return _deque; }
-            void push_back(BSONObj& op) {
-                _deque.push_back(op);
-                _size += op.objsize();
-            }
-            bool empty() {
-                return _deque.empty();
-            }
-
-            BSONObj back() {
-                verify(!_deque.empty());
-                return _deque.back();
-            }
-
-        private:
-            std::deque<BSONObj> _deque;
-            size_t _size;
-        };
-
-        // returns true if we should continue waiting for BSONObjs, false if we should
-        // stop waiting and apply the queue we have.  Only returns false if !ops.empty().
-        bool tryPopAndWaitForMore(OperationContext* txn,
-                                  OpQueue* ops,
-                                  ReplicationCoordinator* replCoord);
-
-    protected:
-        // Cap the batches using the limit on journal commits.
-        // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
-        static const unsigned int replBatchLimitBytes = dur::UncommittedBytesLimit;
-        static const int replBatchLimitSeconds = 1;
-        static const unsigned int replBatchLimitOperations = 5000;
-
-        // Prefetch and write a deque of operations, using the supplied function.
-        // Initial Sync and Sync Tail each use a different function.
-        // Returns the last OpTime applied.
-        OpTime multiApply(OperationContext* txn, std::deque<BSONObj>& ops);
-
-        /**
-         * Applies oplog entries until reaching "endOpTime".
-         *
-         * NOTE:Will not transition or check states
-         */
-        void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
+        BSONObj back() {
+            verify(!_deque.empty());
+            return _deque.back();
+        }
 
     private:
-        BackgroundSyncInterface* _networkQueue;
-
-        // Function to use during applyOps
-        MultiSyncApplyFunc _applyFunc;
-
-        // Doles out all the work to the reader pool threads and waits for them to complete
-        void prefetchOps(const std::deque<BSONObj>& ops);
-        // Used by the thread pool readers to prefetch an op
-        static void prefetchOp(const BSONObj& op);
-
-        // Doles out all the work to the writer pool threads and waits for them to complete
-        void applyOps(const std::vector< std::vector<BSONObj> >& writerVectors);
-
-        void fillWriterVectors(const std::deque<BSONObj>& ops, 
-                               std::vector< std::vector<BSONObj> >* writerVectors);
-        void handleSlaveDelay(const BSONObj& op);
-
-        // persistent pool of worker threads for writing ops to the databases
-        threadpool::ThreadPool _writerPool;
-        // persistent pool of worker threads for prefetching
-        threadpool::ThreadPool _prefetcherPool;
-
+        std::deque<BSONObj> _deque;
+        size_t _size;
     };
 
-    // These free functions are used by the thread pool workers to write ops to the db.
-    void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
-    void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
+    // returns true if we should continue waiting for BSONObjs, false if we should
+    // stop waiting and apply the queue we have.  Only returns false if !ops.empty().
+    bool tryPopAndWaitForMore(OperationContext* txn,
+                              OpQueue* ops,
+                              ReplicationCoordinator* replCoord);
 
-} // namespace repl
-} // namespace mongo
+protected:
+    // Cap the batches using the limit on journal commits.
+    // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
+    static const unsigned int replBatchLimitBytes = dur::UncommittedBytesLimit;
+    static const int replBatchLimitSeconds = 1;
+    static const unsigned int replBatchLimitOperations = 5000;
+
+    // Prefetch and write a deque of operations, using the supplied function.
+    // Initial Sync and Sync Tail each use a different function.
+    // Returns the last OpTime applied.
+    OpTime multiApply(OperationContext* txn, std::deque<BSONObj>& ops);
+
+    /**
+     * Applies oplog entries until reaching "endOpTime".
+     *
+     * NOTE:Will not transition or check states
+     */
+    void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
+
+private:
+    BackgroundSyncInterface* _networkQueue;
+
+    // Function to use during applyOps
+    MultiSyncApplyFunc _applyFunc;
+
+    // Doles out all the work to the reader pool threads and waits for them to complete
+    void prefetchOps(const std::deque<BSONObj>& ops);
+    // Used by the thread pool readers to prefetch an op
+    static void prefetchOp(const BSONObj& op);
+
+    // Doles out all the work to the writer pool threads and waits for them to complete
+    void applyOps(const std::vector<std::vector<BSONObj>>& writerVectors);
+
+    void fillWriterVectors(const std::deque<BSONObj>& ops,
+                           std::vector<std::vector<BSONObj>>* writerVectors);
+    void handleSlaveDelay(const BSONObj& op);
+
+    // persistent pool of worker threads for writing ops to the databases
+    threadpool::ThreadPool _writerPool;
+    // persistent pool of worker threads for prefetching
+    threadpool::ThreadPool _prefetcherPool;
+};
+
+// These free functions are used by the thread pool workers to write ops to the db.
+void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
+void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
+
+}  // namespace repl
+}  // namespace mongo

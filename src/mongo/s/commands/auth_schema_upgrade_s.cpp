@@ -50,134 +50,121 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
+using std::endl;
+using std::string;
 
 namespace {
 
-    /**
-     * Returns the ConnectionStrings identifying all of the shards.
-     */
-    std::vector<ConnectionString> getShardConnectionStrings() {
-        std::vector<Shard> allShards;
-        Shard::getAllShards(allShards);
+/**
+ * Returns the ConnectionStrings identifying all of the shards.
+ */
+std::vector<ConnectionString> getShardConnectionStrings() {
+    std::vector<Shard> allShards;
+    Shard::getAllShards(allShards);
 
-        std::vector<ConnectionString> result;
-        for (size_t i = 0; i < allShards.size(); ++i) {
-            result.push_back(allShards[i].getAddress());
-        }
-        return result;
+    std::vector<ConnectionString> result;
+    for (size_t i = 0; i < allShards.size(); ++i) {
+        result.push_back(allShards[i].getAddress());
     }
+    return result;
+}
 
-    /**
-     * Runs the authSchemaUpgrade command on the given connection, with the supplied maxSteps
-     * and writeConcern parameters.
-     *
-     * Used to upgrade individual shards.
-     */
-    Status runUpgradeOnConnection(DBClientBase* conn, int maxSteps, const BSONObj& writeConcern) {
+/**
+ * Runs the authSchemaUpgrade command on the given connection, with the supplied maxSteps
+ * and writeConcern parameters.
+ *
+ * Used to upgrade individual shards.
+ */
+Status runUpgradeOnConnection(DBClientBase* conn, int maxSteps, const BSONObj& writeConcern) {
+    std::string errorMessage;
+    BSONObj result;
+    BSONObjBuilder cmdObjBuilder;
+    cmdObjBuilder << "authSchemaUpgrade" << 1 << "maxSteps" << maxSteps;
+    if (!writeConcern.isEmpty()) {
+        cmdObjBuilder << "writeConcern" << writeConcern;
+    }
+    try {
+        conn->runCommand("admin", cmdObjBuilder.done(), result);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+    return Command::getStatusFromCommandResult(result);
+}
+
+/**
+ * Runs the authSchemaUpgrade on all shards, with the given maxSteps and writeConcern
+ * parameters.
+ *
+ * Upgrades each shard serially, and stops on first failure.  Returned error indicates that
+ * failure.
+ */
+Status runUpgradeOnAllShards(int maxSteps, const BSONObj& writeConcern) {
+    std::vector<ConnectionString> shardServers;
+    try {
+        shardServers = getShardConnectionStrings();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+    // Upgrade each shard in turn, stopping on first failure.
+    for (size_t i = 0; i < shardServers.size(); ++i) {
         std::string errorMessage;
-        BSONObj result;
-        BSONObjBuilder cmdObjBuilder;
-        cmdObjBuilder << "authSchemaUpgrade" << 1 << "maxSteps" << maxSteps;
-        if (!writeConcern.isEmpty()) {
-            cmdObjBuilder << "writeConcern" << writeConcern;
+        ScopedDbConnection shardConn(shardServers[i]);
+        Status status = runUpgradeOnConnection(shardConn.get(), maxSteps, writeConcern);
+        if (!status.isOK()) {
+            return Status(status.code(),
+                          mongoutils::str::stream() << status.reason() << " on shard "
+                                                    << shardServers[i].toString());
         }
-        try {
-            conn->runCommand(
-                    "admin",
-                    cmdObjBuilder.done(),
-                    result);
-        }
-        catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-        return Command::getStatusFromCommandResult(result);
+        shardConn.done();
     }
+    return Status::OK();
+}
 
-    /**
-     * Runs the authSchemaUpgrade on all shards, with the given maxSteps and writeConcern
-     * parameters.
-     *
-     * Upgrades each shard serially, and stops on first failure.  Returned error indicates that
-     * failure.
-     */
-    Status runUpgradeOnAllShards(int maxSteps, const BSONObj& writeConcern) {
-        std::vector<ConnectionString> shardServers;
-        try {
-            shardServers = getShardConnectionStrings();
+class CmdAuthSchemaUpgradeS : public CmdAuthSchemaUpgrade {
+    virtual bool run(OperationContext* txn,
+                     const string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     string& errmsg,
+                     BSONObjBuilder& result,
+                     bool fromRepl) {
+        int maxSteps;
+        bool upgradeShardServers;
+        BSONObj writeConcern;
+        Status status = auth::parseAuthSchemaUpgradeStepCommand(
+            cmdObj, dbname, &maxSteps, &upgradeShardServers, &writeConcern);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
         }
-        catch (const DBException& ex) {
-            return ex.toStatus();
+
+        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+
+        AuthzDocumentsUpdateGuard updateGuard(authzManager);
+        if (!updateGuard.tryLock("auth schema upgrade")) {
+            return appendCommandStatus(
+                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
         }
-        // Upgrade each shard in turn, stopping on first failure.
-        for (size_t i = 0; i < shardServers.size(); ++i) {
-            std::string errorMessage;
-            ScopedDbConnection shardConn(shardServers[i]);
-            Status status = runUpgradeOnConnection(shardConn.get(), maxSteps, writeConcern);
-            if (!status.isOK()) {
-                return Status(
-                        status.code(),
-                        mongoutils::str::stream() << status.reason() << " on shard " <<
-                        shardServers[i].toString());
-            }
-            shardConn.done();
+
+        status = checkClusterMongoVersions(configServer.getConnectionString(), "2.7.6");
+        if (!status.isOK()) {
+            log() << "Auth schema upgrade failed: " << status << endl;
+            return appendCommandStatus(result, status);
         }
-        return Status::OK();
-    }
 
-    class CmdAuthSchemaUpgradeS : public CmdAuthSchemaUpgrade {
-        virtual bool run(
-                OperationContext* txn,
-                const string& dbname,
-                BSONObj& cmdObj,
-                int options,
-                string& errmsg,
-                BSONObjBuilder& result,
-                bool fromRepl) {
+        status = authzManager->upgradeSchema(txn, maxSteps, writeConcern);
+        if (!status.isOK())
+            return appendCommandStatus(result, status);
 
-            int maxSteps;
-            bool upgradeShardServers;
-            BSONObj writeConcern;
-            Status status = auth::parseAuthSchemaUpgradeStepCommand(
-                    cmdObj,
-                    dbname,
-                    &maxSteps,
-                    &upgradeShardServers,
-                    &writeConcern);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("auth schema upgrade")) {
-                return appendCommandStatus(
-                        result,
-                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-            }
-
-            status = checkClusterMongoVersions(configServer.getConnectionString(), "2.7.6");
-            if (!status.isOK()) {
-                log() << "Auth schema upgrade failed: " << status << endl;
-                return appendCommandStatus(result, status);
-            }
-
-            status = authzManager->upgradeSchema(txn, maxSteps, writeConcern);
+        if (upgradeShardServers) {
+            status = runUpgradeOnAllShards(maxSteps, writeConcern);
             if (!status.isOK())
                 return appendCommandStatus(result, status);
-
-            if (upgradeShardServers) {
-                status = runUpgradeOnAllShards(maxSteps, writeConcern);
-                if (!status.isOK())
-                    return appendCommandStatus(result, status);
-            }
-            result.append("done", true);
-            return true;
         }
+        result.append("done", true);
+        return true;
+    }
 
-    } cmdAuthSchemaUpgradeStep;
+} cmdAuthSchemaUpgradeStep;
 
 }  // namespace
 }  // namespace mongo

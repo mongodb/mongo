@@ -30,11 +30,11 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
-    /**
-     * Restarts building indexes that were in progress during shutdown.
-     * Only call this at startup before taking requests.
-     */
-    void restartInProgressIndexesFromLastShutdown(OperationContext* txn);
+/**
+ * Restarts building indexes that were in progress during shutdown.
+ * Only call this at startup before taking requests.
+ */
+void restartInProgressIndexesFromLastShutdown(OperationContext* txn);
 }

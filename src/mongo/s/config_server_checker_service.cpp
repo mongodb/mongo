@@ -36,40 +36,39 @@
 
 namespace mongo {
 
-    namespace {
+namespace {
 
-        // Thread that runs dbHash on config servers for checking data consistency.
-        boost::scoped_ptr<boost::thread> _checkerThread;
+// Thread that runs dbHash on config servers for checking data consistency.
+boost::scoped_ptr<boost::thread> _checkerThread;
 
-        // Protects _isConsistentFromLastCheck.
-        mutex _isConsistentMutex( "ConfigServerConsistent" );
-        bool _isConsistentFromLastCheck = true;
+// Protects _isConsistentFromLastCheck.
+mutex _isConsistentMutex("ConfigServerConsistent");
+bool _isConsistentFromLastCheck = true;
 
-        void checkConfigConsistency() {
-            while ( !inShutdown() ) {
-                bool isConsistent = configServer.ok( true );
+void checkConfigConsistency() {
+    while (!inShutdown()) {
+        bool isConsistent = configServer.ok(true);
 
-                {
-                    scoped_lock sl( _isConsistentMutex );
-                    _isConsistentFromLastCheck = isConsistent;
-                }
-
-                sleepsecs( 60 );
-            }
-        }
-    }
-
-    bool isConfigServerConsistent() {
-        scoped_lock sl( _isConsistentMutex );
-        return _isConsistentFromLastCheck;
-    }
-
-    bool startConfigServerChecker() {
-        if ( _checkerThread == NULL ) {
-            _checkerThread.reset( new boost::thread( checkConfigConsistency ));
+        {
+            scoped_lock sl(_isConsistentMutex);
+            _isConsistentFromLastCheck = isConsistent;
         }
 
-        return _checkerThread != NULL;
+        sleepsecs(60);
     }
 }
+}
 
+bool isConfigServerConsistent() {
+    scoped_lock sl(_isConsistentMutex);
+    return _isConsistentFromLastCheck;
+}
+
+bool startConfigServerChecker() {
+    if (_checkerThread == NULL) {
+        _checkerThread.reset(new boost::thread(checkConfigConsistency));
+    }
+
+    return _checkerThread != NULL;
+}
+}

@@ -36,41 +36,41 @@
 
 namespace mongo {
 
-    PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec)
-        : _elapsedTracker(internalQueryExecYieldIterations, internalQueryExecYieldPeriodMS),
-          _planYielding(exec) { }
+PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec)
+    : _elapsedTracker(internalQueryExecYieldIterations, internalQueryExecYieldPeriodMS),
+      _planYielding(exec) {}
 
-    bool PlanYieldPolicy::shouldYield() {
-        invariant(!_planYielding->getOpCtx()->lockState()->inAWriteUnitOfWork());
-        return _elapsedTracker.intervalHasElapsed();
+bool PlanYieldPolicy::shouldYield() {
+    invariant(!_planYielding->getOpCtx()->lockState()->inAWriteUnitOfWork());
+    return _elapsedTracker.intervalHasElapsed();
+}
+
+void PlanYieldPolicy::resetTimer() {
+    _elapsedTracker.resetLastTime();
+}
+
+bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
+    invariant(_planYielding);
+
+    OperationContext* opCtx = _planYielding->getOpCtx();
+    invariant(opCtx);
+
+    // All YIELD_AUTO plans will get here eventually when the elapsed tracker triggers that
+    // it's time to yield. Whether or not we will actually yield, we need to check if this
+    // operation has been interrupted. Throws if the interrupt flag is set.
+    opCtx->checkForInterrupt();
+
+    // No need to yield if the collection is NULL.
+    if (NULL == _planYielding->collection()) {
+        return true;
     }
 
-    void PlanYieldPolicy::resetTimer() {
-        _elapsedTracker.resetLastTime();
-    }
+    _planYielding->saveState();
 
-    bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
-        invariant(_planYielding);
+    // Release and reacquire locks.
+    QueryYield::yieldAllLocks(opCtx, fetcher);
 
-        OperationContext* opCtx = _planYielding->getOpCtx();
-        invariant(opCtx);
+    return _planYielding->restoreState(opCtx);
+}
 
-        // All YIELD_AUTO plans will get here eventually when the elapsed tracker triggers that
-        // it's time to yield. Whether or not we will actually yield, we need to check if this
-        // operation has been interrupted. Throws if the interrupt flag is set.
-        opCtx->checkForInterrupt();
-
-        // No need to yield if the collection is NULL.
-        if (NULL == _planYielding->collection()) {
-            return true;
-        }
-
-        _planYielding->saveState();
-
-        // Release and reacquire locks.
-        QueryYield::yieldAllLocks(opCtx, fetcher);
-
-        return _planYielding->restoreState(opCtx);
-    }
-
-} // namespace mongo
+}  // namespace mongo

@@ -40,90 +40,100 @@
 #pragma once
 
 namespace rocksdb {
-    class DB;
+class DB;
 }
 
 namespace mongo {
 
-    class RocksRecoveryUnit;
+class RocksRecoveryUnit;
 
-    class RocksIndexBase : public SortedDataInterface {
-        MONGO_DISALLOW_COPYING(RocksIndexBase);
+class RocksIndexBase : public SortedDataInterface {
+    MONGO_DISALLOW_COPYING(RocksIndexBase);
 
-    public:
-        RocksIndexBase(rocksdb::DB* db, std::string prefix, std::string ident, Ordering order);
+public:
+    RocksIndexBase(rocksdb::DB* db, std::string prefix, std::string ident, Ordering order);
 
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
-                                                           bool dupsAllowed) = 0;
+    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) = 0;
 
-        virtual void fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
-                                  BSONObjBuilder* output) const;
+    virtual void fullValidate(OperationContext* txn,
+                              bool full,
+                              long long* numKeysOut,
+                              BSONObjBuilder* output) const;
 
-        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output,
-                                       double scale) const {
-            // nothing to say here, really
-            return false;
-        }
+    virtual bool appendCustomStats(OperationContext* txn,
+                                   BSONObjBuilder* output,
+                                   double scale) const {
+        // nothing to say here, really
+        return false;
+    }
 
-        virtual bool isEmpty(OperationContext* txn);
+    virtual bool isEmpty(OperationContext* txn);
 
-        virtual Status initAsEmpty(OperationContext* txn);
+    virtual Status initAsEmpty(OperationContext* txn);
 
-        virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
+    virtual long long getSpaceUsedBytes(OperationContext* txn) const;
 
-    protected:
-        static std::string _makePrefixedKey(const std::string& prefix, const KeyString& encodedKey);
+protected:
+    static std::string _makePrefixedKey(const std::string& prefix, const KeyString& encodedKey);
 
-        rocksdb::DB* _db; // not owned
+    rocksdb::DB* _db;  // not owned
 
-        // Each key in the index is prefixed with _prefix
-        std::string _prefix;
-        std::string _ident;
+    // Each key in the index is prefixed with _prefix
+    std::string _prefix;
+    std::string _ident;
 
-        // very approximate index storage size
-        std::atomic<long long> _indexStorageSize;
+    // very approximate index storage size
+    std::atomic<long long> _indexStorageSize;
 
-        // used to construct RocksCursors
-        const Ordering _order;
+    // used to construct RocksCursors
+    const Ordering _order;
 
-        class StandardBulkBuilder;
-        class UniqueBulkBuilder;
-        friend class UniqueBulkBuilder;
-    };
+    class StandardBulkBuilder;
+    class UniqueBulkBuilder;
+    friend class UniqueBulkBuilder;
+};
 
-    class RocksUniqueIndex : public RocksIndexBase {
-    public:
-        RocksUniqueIndex(rocksdb::DB* db, std::string prefix, std::string ident, Ordering order);
+class RocksUniqueIndex : public RocksIndexBase {
+public:
+    RocksUniqueIndex(rocksdb::DB* db, std::string prefix, std::string ident, Ordering order);
 
-        virtual Status insert(OperationContext* txn, const BSONObj& key, const RecordId& loc,
-                              bool dupsAllowed);
-        virtual void unindex(OperationContext* txn, const BSONObj& key, const RecordId& loc,
-                             bool dupsAllowed);
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
+    virtual Status insert(OperationContext* txn,
+                          const BSONObj& key,
+                          const RecordId& loc,
+                          bool dupsAllowed);
+    virtual void unindex(OperationContext* txn,
+                         const BSONObj& key,
+                         const RecordId& loc,
+                         bool dupsAllowed);
+    virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
 
-        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
+    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
 
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
-                                                           bool dupsAllowed) override;
-    };
+    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
+                                                       bool dupsAllowed) override;
+};
 
-    class RocksStandardIndex : public RocksIndexBase {
-    public:
-        RocksStandardIndex(rocksdb::DB* db, std::string prefix, std::string ident, Ordering order);
+class RocksStandardIndex : public RocksIndexBase {
+public:
+    RocksStandardIndex(rocksdb::DB* db, std::string prefix, std::string ident, Ordering order);
 
-        virtual Status insert(OperationContext* txn, const BSONObj& key, const RecordId& loc,
-                              bool dupsAllowed);
-        virtual void unindex(OperationContext* txn, const BSONObj& key, const RecordId& loc,
-                             bool dupsAllowed);
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
+    virtual Status insert(OperationContext* txn,
+                          const BSONObj& key,
+                          const RecordId& loc,
+                          bool dupsAllowed);
+    virtual void unindex(OperationContext* txn,
+                         const BSONObj& key,
+                         const RecordId& loc,
+                         bool dupsAllowed);
+    virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
 
-        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) {
-            // dupKeyCheck shouldn't be called for non-unique indexes
-            invariant(false);
-        }
+    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) {
+        // dupKeyCheck shouldn't be called for non-unique indexes
+        invariant(false);
+    }
 
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
-                                                           bool dupsAllowed) override;
-    };
+    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
+                                                       bool dupsAllowed) override;
+};
 
-} // namespace mongo
+}  // namespace mongo

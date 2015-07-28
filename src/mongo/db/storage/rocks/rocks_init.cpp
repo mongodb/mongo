@@ -41,93 +41,89 @@
 #include "rocks_parameters.h"
 
 namespace mongo {
-    const std::string kRocksDBEngineName = "rocksdb";
+const std::string kRocksDBEngineName = "rocksdb";
 
-    namespace {
+namespace {
 
-        class RocksFactory : public StorageEngine::Factory {
-        public:
-            virtual ~RocksFactory(){}
-            virtual StorageEngine* create(const StorageGlobalParams& params,
-                                          const StorageEngineLockFile& lockFile) const {
-                KVStorageEngineOptions options;
-                options.directoryPerDB = params.directoryperdb;
-                options.forRepair = params.repair;
-                // Mongo keeps some files in params.dbpath. To avoid collision, put out files under
-                // db/ directory
-                auto engine = new RocksEngine(params.dbpath + "/db", params.dur);
-                // Intentionally leaked.
-                auto leaked __attribute__((unused)) = new RocksServerStatusSection(engine);
-                auto leaked2 __attribute__((unused)) = new RocksRateLimiterServerParameter(engine);
-                auto leaked3 __attribute__((unused)) = new RocksBackupServerParameter(engine);
-                auto leaked4 __attribute__((unused)) = new RocksCompactServerParameter(engine);
-                auto leaked5 __attribute__((unused)) = new RocksCacheSizeParameter(engine);
+class RocksFactory : public StorageEngine::Factory {
+public:
+    virtual ~RocksFactory() {}
+    virtual StorageEngine* create(const StorageGlobalParams& params,
+                                  const StorageEngineLockFile& lockFile) const {
+        KVStorageEngineOptions options;
+        options.directoryPerDB = params.directoryperdb;
+        options.forRepair = params.repair;
+        // Mongo keeps some files in params.dbpath. To avoid collision, put out files under
+        // db/ directory
+        auto engine = new RocksEngine(params.dbpath + "/db", params.dur);
+        // Intentionally leaked.
+        auto leaked __attribute__((unused)) = new RocksServerStatusSection(engine);
+        auto leaked2 __attribute__((unused)) = new RocksRateLimiterServerParameter(engine);
+        auto leaked3 __attribute__((unused)) = new RocksBackupServerParameter(engine);
+        auto leaked4 __attribute__((unused)) = new RocksCompactServerParameter(engine);
+        auto leaked5 __attribute__((unused)) = new RocksCacheSizeParameter(engine);
 
-                return new KVStorageEngine(engine, options);
-            }
+        return new KVStorageEngine(engine, options);
+    }
 
-            virtual StringData getCanonicalName() const {
-                return kRocksDBEngineName;
-            }
+    virtual StringData getCanonicalName() const {
+        return kRocksDBEngineName;
+    }
 
-            virtual Status validateCollectionStorageOptions(const BSONObj& options) const {
-                return Status::OK();
-            }
-
-            virtual Status validateIndexStorageOptions(const BSONObj& options) const {
-                return Status::OK();
-            }
-
-            virtual Status validateMetadata(const StorageEngineMetadata& metadata,
-                                            const StorageGlobalParams& params) const {
-                const BSONObj& options = metadata.getStorageEngineOptions();
-                BSONElement element = options.getField(kRocksFormatVersionString);
-                if (element.eoo() || !element.isNumber()) {
-                    return Status(ErrorCodes::UnsupportedFormat,
-                                  "Storage engine metadata format not recognized. If you created "
-                                  "this database with older version of mongo, please reload the "
-                                  "database using mongodump and mongorestore");
-                }
-                if (element.numberInt() != kRocksFormatVersion) {
-                    return Status(
-                        ErrorCodes::UnsupportedFormat,
-                        str::stream()
-                            << "Database created with format version " << element.numberInt()
-                            << " and this version only supports format version "
-                            << kRocksFormatVersion
-                            << ". Please reload the database using mongodump and mongorestore");
-                }
-                return Status::OK();
-            }
-
-            virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const {
-                BSONObjBuilder builder;
-                builder.append(kRocksFormatVersionString, kRocksFormatVersion);
-                return builder.obj();
-            }
-
-        private:
-            // Current disk format. We bump this number when we change the disk format. MongoDB will
-            // fail to start if the versions don't match. In that case a user needs to run mongodump
-            // and mongorestore.
-            // * Version 1 was the format with many column families -- one column family for each
-            // collection and index
-            // * Version 2 keeps all collections and indexes in a single column family
-            // * Version 3 (current) reserves two prefixes for oplog. one prefix keeps the oplog
-            // documents and another only keeps keys. That way, we can cleanup the oplog without
-            // reading full documents
-            // oplog cleanup
-            const int kRocksFormatVersion = 2;
-            const std::string kRocksFormatVersionString = "rocksFormatVersion";
-        };
-    } // namespace
-
-    MONGO_INITIALIZER_WITH_PREREQUISITES(RocksEngineInit,
-                                         ("SetGlobalEnvironment"))
-                                         (InitializerContext* context) {
-
-        getGlobalEnvironment()->registerStorageEngine(kRocksDBEngineName, new RocksFactory());
+    virtual Status validateCollectionStorageOptions(const BSONObj& options) const {
         return Status::OK();
     }
 
+    virtual Status validateIndexStorageOptions(const BSONObj& options) const {
+        return Status::OK();
+    }
+
+    virtual Status validateMetadata(const StorageEngineMetadata& metadata,
+                                    const StorageGlobalParams& params) const {
+        const BSONObj& options = metadata.getStorageEngineOptions();
+        BSONElement element = options.getField(kRocksFormatVersionString);
+        if (element.eoo() || !element.isNumber()) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "Storage engine metadata format not recognized. If you created "
+                          "this database with older version of mongo, please reload the "
+                          "database using mongodump and mongorestore");
+        }
+        if (element.numberInt() != kRocksFormatVersion) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          str::stream()
+                              << "Database created with format version " << element.numberInt()
+                              << " and this version only supports format version "
+                              << kRocksFormatVersion
+                              << ". Please reload the database using mongodump and mongorestore");
+        }
+        return Status::OK();
+    }
+
+    virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const {
+        BSONObjBuilder builder;
+        builder.append(kRocksFormatVersionString, kRocksFormatVersion);
+        return builder.obj();
+    }
+
+private:
+    // Current disk format. We bump this number when we change the disk format. MongoDB will
+    // fail to start if the versions don't match. In that case a user needs to run mongodump
+    // and mongorestore.
+    // * Version 1 was the format with many column families -- one column family for each
+    // collection and index
+    // * Version 2 keeps all collections and indexes in a single column family
+    // * Version 3 (current) reserves two prefixes for oplog. one prefix keeps the oplog
+    // documents and another only keeps keys. That way, we can cleanup the oplog without
+    // reading full documents
+    // oplog cleanup
+    const int kRocksFormatVersion = 2;
+    const std::string kRocksFormatVersionString = "rocksFormatVersion";
+};
+}  // namespace
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(RocksEngineInit, ("SetGlobalEnvironment"))
+(InitializerContext* context) {
+    getGlobalEnvironment()->registerStorageEngine(kRocksDBEngineName, new RocksFactory());
+    return Status::OK();
+}
 }

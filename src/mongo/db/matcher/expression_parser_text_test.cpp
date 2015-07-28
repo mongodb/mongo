@@ -39,25 +39,25 @@
 
 namespace mongo {
 
-    TEST( MatchExpressionParserText, Parse1 ) {
-        BSONObj query = fromjson( "{$text:{$search:\"awesome\", $language:\"english\"}}" );
+TEST(MatchExpressionParserText, Parse1) {
+    BSONObj query = fromjson("{$text:{$search:\"awesome\", $language:\"english\"}}");
 
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_TRUE( result.isOK() );
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_TRUE(result.isOK());
 
-        MatchExpression* exp = result.getValue();
-        ASSERT_EQUALS( MatchExpression::TEXT, exp->matchType() );
+    MatchExpression* exp = result.getValue();
+    ASSERT_EQUALS(MatchExpression::TEXT, exp->matchType());
 
-        TextMatchExpression* textExp = static_cast<TextMatchExpression*>( exp );
-        ASSERT_EQUALS( textExp->getQuery(), "awesome" );
-        ASSERT_EQUALS( textExp->getLanguage(), "english" );
-        delete exp;
-    }
+    TextMatchExpression* textExp = static_cast<TextMatchExpression*>(exp);
+    ASSERT_EQUALS(textExp->getQuery(), "awesome");
+    ASSERT_EQUALS(textExp->getLanguage(), "english");
+    delete exp;
+}
 
-    TEST( MatchExpressionParserText, Parse2 ) {
-        BSONObj query = fromjson( "{$text:{$search:\"awesome\", $language:\"spanglish\"}}" );
+TEST(MatchExpressionParserText, Parse2) {
+    BSONObj query = fromjson("{$text:{$search:\"awesome\", $language:\"spanglish\"}}");
 
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    ASSERT_FALSE(result.isOK());
+}
 }

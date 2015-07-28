@@ -38,28 +38,27 @@
 
 namespace mongo {
 
-    class IndexCursor;
-    class IndexDescriptor;
+class IndexCursor;
+class IndexDescriptor;
 
-    /**
-     * The IndexAccessMethod for a Btree index.
-     * Any index created with {field: 1} or {field: -1} uses this.
-     */
-    class BtreeAccessMethod : public BtreeBasedAccessMethod {
-    public:
-        // Every Btree-based index needs these.  We put them in the BtreeBasedAccessMethod
-        // superclass and subclasses (like this) can use them.
-        using BtreeBasedAccessMethod::_descriptor;
+/**
+ * The IndexAccessMethod for a Btree index.
+ * Any index created with {field: 1} or {field: -1} uses this.
+ */
+class BtreeAccessMethod : public BtreeBasedAccessMethod {
+public:
+    // Every Btree-based index needs these.  We put them in the BtreeBasedAccessMethod
+    // superclass and subclasses (like this) can use them.
+    using BtreeBasedAccessMethod::_descriptor;
 
-        BtreeAccessMethod(IndexCatalogEntry* btreeState,
-                          SortedDataInterface* btree );
-        virtual ~BtreeAccessMethod() { }
+    BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
+    virtual ~BtreeAccessMethod() {}
 
-    private:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+private:
+    virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
-        // Our keys differ for V0 and V1.
-        boost::scoped_ptr<BtreeKeyGenerator> _keyGenerator;
-    };
+    // Our keys differ for V0 and V1.
+    boost::scoped_ptr<BtreeKeyGenerator> _keyGenerator;
+};
 
 }  // namespace mongo

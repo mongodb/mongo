@@ -35,12 +35,10 @@
 
 namespace mongo {
 
-    class ClientBasic;
+class ClientBasic;
 
-    Status checkAuthForListCollectionsCommand(ClientBasic* client,
-                                              const std::string& dbname,
-                                              const BSONObj& cmdObj);
+Status checkAuthForListCollectionsCommand(ClientBasic* client,
+                                          const std::string& dbname,
+                                          const BSONObj& cmdObj);
 
-} // namespace mongo
-
-
+}  // namespace mongo

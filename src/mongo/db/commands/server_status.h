@@ -38,60 +38,61 @@
 
 namespace mongo {
 
-    class ServerStatusSection {
-    public:
-        ServerStatusSection( const std::string& sectionName );
-        virtual ~ServerStatusSection(){}
+class ServerStatusSection {
+public:
+    ServerStatusSection(const std::string& sectionName);
+    virtual ~ServerStatusSection() {}
 
-        const std::string& getSectionName() const { return _sectionName; }
+    const std::string& getSectionName() const {
+        return _sectionName;
+    }
 
-        /**
-         * if this returns true, if the user doesn't mention this section
-         * it will be included in the result
-         * if they do : 1, it will be included
-         * if they do : 0, it will not
-         * 
-         * examples (section 'foo')
-         *  includeByDefault returning true
-         *     foo : 0 = not included
-         *     foo : 1 = included
-         *     foo missing = included
-         *  includeByDefault returning false
-         *     foo : 0 = not included
-         *     foo : 1 = included
-         *     foo missing = false
-         */
-        virtual bool includeByDefault() const = 0;
-        
-        /**
-         * Adds the privileges that are required to view this section
-         * TODO: Remove this empty default implementation and implement for every section.
-         */
-        virtual void addRequiredPrivileges(std::vector<Privilege>* out) {};
+    /**
+     * if this returns true, if the user doesn't mention this section
+     * it will be included in the result
+     * if they do : 1, it will be included
+     * if they do : 0, it will not
+     *
+     * examples (section 'foo')
+     *  includeByDefault returning true
+     *     foo : 0 = not included
+     *     foo : 1 = included
+     *     foo missing = included
+     *  includeByDefault returning false
+     *     foo : 0 = not included
+     *     foo : 1 = included
+     *     foo missing = false
+     */
+    virtual bool includeByDefault() const = 0;
 
-        /**
-         * actually generate the result
-         * @param configElement the element from the actual command related to this section
-         *                      so if the section is 'foo', this is cmdObj['foo']
-         */
-        virtual BSONObj generateSection(OperationContext* txn,
-                                        const BSONElement& configElement) const = 0;
+    /**
+     * Adds the privileges that are required to view this section
+     * TODO: Remove this empty default implementation and implement for every section.
+     */
+    virtual void addRequiredPrivileges(std::vector<Privilege>* out){};
 
-    private:
-        const std::string _sectionName;
-    };
+    /**
+     * actually generate the result
+     * @param configElement the element from the actual command related to this section
+     *                      so if the section is 'foo', this is cmdObj['foo']
+     */
+    virtual BSONObj generateSection(OperationContext* txn,
+                                    const BSONElement& configElement) const = 0;
 
-    class OpCounterServerStatusSection : public ServerStatusSection {
-    public:
-        OpCounterServerStatusSection( const std::string& sectionName, OpCounters* counters );
-        virtual bool includeByDefault() const { return true; }
-        
-        virtual BSONObj generateSection(OperationContext* txn,
-                                        const BSONElement& configElement) const;
+private:
+    const std::string _sectionName;
+};
 
-    private:
-        const OpCounters* _counters;
-    };
+class OpCounterServerStatusSection : public ServerStatusSection {
+public:
+    OpCounterServerStatusSection(const std::string& sectionName, OpCounters* counters);
+    virtual bool includeByDefault() const {
+        return true;
+    }
 
+    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const;
+
+private:
+    const OpCounters* _counters;
+};
 }
-

@@ -39,136 +39,135 @@
 
 namespace mongo {
 
-    /**
-     * given a document and a projection specification
-     * can transform the document
-     * currently supports specifying which fields and $slice
-     */
-    class Projection {
+/**
+ * given a document and a projection specification
+ * can transform the document
+ * currently supports specifying which fields and $slice
+ */
+class Projection {
+public:
+    class KeyOnly {
     public:
+        KeyOnly() : _stringSize(0) {}
 
-        class KeyOnly {
-        public:
+        BSONObj hydrate(const BSONObj& key) const;
 
-            KeyOnly() : _stringSize(0) {}
-
-            BSONObj hydrate( const BSONObj& key ) const;
-
-            void addNo() { _add( false , "" ); }
-            void addYes( const std::string& name ) { _add( true , name ); }
-
-        private:
-
-            void _add( bool b , const std::string& name ) {
-                _include.push_back( b );
-                _names.push_back( name );
-                _stringSize += name.size();
-            }
-
-            std::vector<bool> _include; // one entry per field in key.  true iff should be in output
-            std::vector<std::string> _names; // name of field since key doesn't have names
-
-            int _stringSize;
-        };
-
-        enum ArrayOpType {
-            ARRAY_OP_NORMAL = 0,
-            ARRAY_OP_ELEM_MATCH,
-            ARRAY_OP_POSITIONAL
-        };
-
-        Projection() :
-            _include(true) ,
-            _special(false) ,
-            _includeID(true) ,
-            _skip(0) ,
-            _limit(-1) ,
-            _arrayOpType(ARRAY_OP_NORMAL),
-            _hasNonSimple(false) {
+        void addNo() {
+            _add(false, "");
+        }
+        void addYes(const std::string& name) {
+            _add(true, name);
         }
 
-        /**
-         * called once per lifetime
-         * e.g. { "x" : 1 , "a.y" : 1 }
-         */
-        void init(const BSONObj& spec, const MatchExpressionParser::WhereCallback& whereCallback);
-
-        /**
-         * @return the spec init was called with
-         */
-        BSONObj getSpec() const { return _source; }
-
-        /**
-         * transforms in according to spec
-         */
-        BSONObj transform( const BSONObj& in, const MatchDetails* details = NULL ) const;
-
-
-        /**
-         * transforms in according to spec
-         */
-        void transform( const BSONObj& in , BSONObjBuilder& b, const MatchDetails* details = NULL ) const;
-
-
-        /**
-         * @return if the keyPattern has all the information needed to return then
-         *         return a new KeyOnly otherwise null
-         *         NOTE: a key may have modified the actual data
-         *               which has to be handled above this (arrays, geo)
-         */
-        KeyOnly* checkKey( const BSONObj& keyPattern ) const;
-
-        bool includeID() const { return _includeID; }
-
-        /**
-         *  get the type of array operator for the projection
-         *  @return     ARRAY_OP_NORMAL if no array projection modifier,
-         *              ARRAY_OP_ELEM_MATCH if one or more $elemMatch specifier,
-         *              ARRAY_OP_POSITIONAL if one '.$' projection specified
-         */
-        ArrayOpType getArrayOpType() const;
-
-        /**
-         * Validate the given query satisfies this projection's positional operator.
-         * NOTE: this function is only used to validate projections with a positional operator.
-         * @param   query       User-supplied query specifier
-         * @return  Field name if found, empty std::string otherwise.
-         */
-        void validateQuery( const BSONObj query ) const;
-
     private:
+        void _add(bool b, const std::string& name) {
+            _include.push_back(b);
+            _names.push_back(name);
+            _stringSize += name.size();
+        }
 
-        /**
-         * appends e to b if user wants it
-         * will descend into e if needed
-         */
-        void append( BSONObjBuilder& b , const BSONElement& e, const MatchDetails* details = NULL,
-                     const ArrayOpType arrayOpType = ARRAY_OP_NORMAL ) const;
+        std::vector<bool> _include;  // one entry per field in key.  true iff should be in output
+        std::vector<std::string> _names;  // name of field since key doesn't have names
 
-        void add( const std::string& field, bool include );
-        void add( const std::string& field, int skip, int limit );
-        void appendArray( BSONObjBuilder& b , const BSONObj& a , bool nested=false) const;
-
-        bool _include; // true if default at this level is to include
-        bool _special; // true if this level can't be skipped or included without recursing
-
-        //TODO: benchmark std::vector<pair> vs map
-        typedef StringMap<boost::shared_ptr<Projection> > FieldMap;
-        FieldMap _fields;
-        BSONObj _source;
-        bool _includeID;
-
-        // used for $slice operator
-        int _skip;
-        int _limit;
-
-        // used for $elemMatch and positional operator ($)
-        typedef StringMap<boost::shared_ptr<Matcher> > Matchers;
-        Matchers _matchers;
-        ArrayOpType _arrayOpType;
-
-        bool _hasNonSimple;
+        int _stringSize;
     };
 
+    enum ArrayOpType { ARRAY_OP_NORMAL = 0, ARRAY_OP_ELEM_MATCH, ARRAY_OP_POSITIONAL };
 
+    Projection()
+        : _include(true),
+          _special(false),
+          _includeID(true),
+          _skip(0),
+          _limit(-1),
+          _arrayOpType(ARRAY_OP_NORMAL),
+          _hasNonSimple(false) {}
+
+    /**
+     * called once per lifetime
+     * e.g. { "x" : 1 , "a.y" : 1 }
+     */
+    void init(const BSONObj& spec, const MatchExpressionParser::WhereCallback& whereCallback);
+
+    /**
+     * @return the spec init was called with
+     */
+    BSONObj getSpec() const {
+        return _source;
+    }
+
+    /**
+     * transforms in according to spec
+     */
+    BSONObj transform(const BSONObj& in, const MatchDetails* details = NULL) const;
+
+
+    /**
+     * transforms in according to spec
+     */
+    void transform(const BSONObj& in, BSONObjBuilder& b, const MatchDetails* details = NULL) const;
+
+
+    /**
+     * @return if the keyPattern has all the information needed to return then
+     *         return a new KeyOnly otherwise null
+     *         NOTE: a key may have modified the actual data
+     *               which has to be handled above this (arrays, geo)
+     */
+    KeyOnly* checkKey(const BSONObj& keyPattern) const;
+
+    bool includeID() const {
+        return _includeID;
+    }
+
+    /**
+     *  get the type of array operator for the projection
+     *  @return     ARRAY_OP_NORMAL if no array projection modifier,
+     *              ARRAY_OP_ELEM_MATCH if one or more $elemMatch specifier,
+     *              ARRAY_OP_POSITIONAL if one '.$' projection specified
+     */
+    ArrayOpType getArrayOpType() const;
+
+    /**
+     * Validate the given query satisfies this projection's positional operator.
+     * NOTE: this function is only used to validate projections with a positional operator.
+     * @param   query       User-supplied query specifier
+     * @return  Field name if found, empty std::string otherwise.
+     */
+    void validateQuery(const BSONObj query) const;
+
+private:
+    /**
+     * appends e to b if user wants it
+     * will descend into e if needed
+     */
+    void append(BSONObjBuilder& b,
+                const BSONElement& e,
+                const MatchDetails* details = NULL,
+                const ArrayOpType arrayOpType = ARRAY_OP_NORMAL) const;
+
+    void add(const std::string& field, bool include);
+    void add(const std::string& field, int skip, int limit);
+    void appendArray(BSONObjBuilder& b, const BSONObj& a, bool nested = false) const;
+
+    bool _include;  // true if default at this level is to include
+    bool _special;  // true if this level can't be skipped or included without recursing
+
+    // TODO: benchmark std::vector<pair> vs map
+    typedef StringMap<boost::shared_ptr<Projection>> FieldMap;
+    FieldMap _fields;
+    BSONObj _source;
+    bool _includeID;
+
+    // used for $slice operator
+    int _skip;
+    int _limit;
+
+    // used for $elemMatch and positional operator ($)
+    typedef StringMap<boost::shared_ptr<Matcher>> Matchers;
+    Matchers _matchers;
+    ArrayOpType _arrayOpType;
+
+    bool _hasNonSimple;
+};
 }

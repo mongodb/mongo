@@ -37,121 +37,121 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+using boost::scoped_ptr;
 
-    // Insert multiple keys and verify that omitting the commit()
-    // on the WriteUnitOfWork causes the changes to not become visible.
-    TEST( SortedDataInterface, InsertWithoutCommit ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
+// Insert multiple keys and verify that omitting the commit()
+// on the WriteUnitOfWork causes the changes to not become visible.
+TEST(SortedDataInterface, InsertWithoutCommit) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                // no commit
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, false ) );
-                // no commit
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
+            // no commit
         }
     }
 
-    // Insert multiple keys, then unindex those same keys and verify that
-    // omitting the commit() on the WriteUnitOfWork causes the changes to
-    // not become visible.
-    TEST( SortedDataInterface, UnindexWithoutCommit ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
 
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                sorted->unindex( opCtx.get(), key2, loc2, true );
-                ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
-                // no commit
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc3, true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                sorted->unindex( opCtx.get(), key1, loc1, true );
-                ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
-                sorted->unindex( opCtx.get(), key3, loc3, true );
-                ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
-                // no commit
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc2, false));
+            // no commit
         }
     }
 
-} // namespace mongo
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+}
+
+// Insert multiple keys, then unindex those same keys and verify that
+// omitting the commit() on the WriteUnitOfWork causes the changes to
+// not become visible.
+TEST(SortedDataInterface, UnindexWithoutCommit) {
+    scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+            ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, true));
+            uow.commit();
+        }
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            sorted->unindex(opCtx.get(), key2, loc2, true);
+            ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+            // no commit
+        }
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), key3, loc3, true));
+            uow.commit();
+        }
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            sorted->unindex(opCtx.get(), key1, loc1, true);
+            ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+            sorted->unindex(opCtx.get(), key3, loc3, true);
+            ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+            // no commit
+        }
+    }
+
+    {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
+    }
+}
+
+}  // namespace mongo

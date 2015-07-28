@@ -37,21 +37,20 @@
 
 namespace mongo {
 
-    class ServerStatusMetric;
+class ServerStatusMetric;
 
-    class MetricTree {
-    public:
-        void add( ServerStatusMetric* metric );
+class MetricTree {
+public:
+    void add(ServerStatusMetric* metric);
 
-        void appendTo( BSONObjBuilder& b ) const;
+    void appendTo(BSONObjBuilder& b) const;
 
-        static MetricTree* theMetricTree;
-    private:
+    static MetricTree* theMetricTree;
 
-        void _add( const std::string& path, ServerStatusMetric* metric );
+private:
+    void _add(const std::string& path, ServerStatusMetric* metric);
 
-        std::map<std::string, MetricTree*> _subtrees;
-        std::map<std::string, ServerStatusMetric*> _metrics;
-    };
-
+    std::map<std::string, MetricTree*> _subtrees;
+    std::map<std::string, ServerStatusMetric*> _metrics;
+};
 }

@@ -35,17 +35,17 @@
 
 namespace mongo {
 
-    /**
-     * The implementation of AuthzSessionExternalState functionality for mongos.
-     */
-    class AuthzSessionExternalStateMongos : public AuthzSessionExternalStateServerCommon {
-        MONGO_DISALLOW_COPYING(AuthzSessionExternalStateMongos);
+/**
+ * The implementation of AuthzSessionExternalState functionality for mongos.
+ */
+class AuthzSessionExternalStateMongos : public AuthzSessionExternalStateServerCommon {
+    MONGO_DISALLOW_COPYING(AuthzSessionExternalStateMongos);
 
-    public:
-        AuthzSessionExternalStateMongos(AuthorizationManager* authzManager);
-        virtual ~AuthzSessionExternalStateMongos();
+public:
+    AuthzSessionExternalStateMongos(AuthorizationManager* authzManager);
+    virtual ~AuthzSessionExternalStateMongos();
 
-        virtual void startRequest(OperationContext* txn);
-    };
+    virtual void startRequest(OperationContext* txn);
+};
 
-} // namespace mongo
+}  // namespace mongo

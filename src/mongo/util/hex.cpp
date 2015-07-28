@@ -35,51 +35,67 @@
 
 namespace mongo {
 
-    template<typename T>
-    std::string integerToHexDef(T inInt) {
-        if(!inInt) 
-            return "0";
+template <typename T>
+std::string integerToHexDef(T inInt) {
+    if (!inInt)
+        return "0";
 
-        static const char hexchars[] = "0123456789ABCDEF";
+    static const char hexchars[] = "0123456789ABCDEF";
 
-        static const size_t outbufSize = sizeof(T) * 2 + 1;
-        char outbuf[outbufSize];
-        outbuf[outbufSize - 1] = '\0';
+    static const size_t outbufSize = sizeof(T) * 2 + 1;
+    char outbuf[outbufSize];
+    outbuf[outbufSize - 1] = '\0';
 
-        char c;
-        int lastSeenNumber = 0;
-        for (int j = int(outbufSize) - 2; j >= 0; j--) {
-            c = hexchars[inInt & 0xF];
-            if(c != '0')
-                lastSeenNumber = j;
-            outbuf[j] = c;
-            inInt = inInt >> 4;
-        }
-        char *bufPtr = outbuf;
-        bufPtr += lastSeenNumber;
-
-        return std::string(bufPtr);
+    char c;
+    int lastSeenNumber = 0;
+    for (int j = int(outbufSize) - 2; j >= 0; j--) {
+        c = hexchars[inInt & 0xF];
+        if (c != '0')
+            lastSeenNumber = j;
+        outbuf[j] = c;
+        inInt = inInt >> 4;
     }
+    char* bufPtr = outbuf;
+    bufPtr += lastSeenNumber;
 
-    template<> std::string integerToHex<int>(int val) { return integerToHexDef(val); }
-    template<> std::string integerToHex<unsigned int>(unsigned int val) { 
-        return integerToHexDef(val); }
-    template<> std::string integerToHex<long>(long val) { return integerToHexDef(val); }
-    template<> std::string integerToHex<unsigned long>(unsigned long val) { return integerToHexDef(val); }
-    template<> std::string integerToHex<long long>(long long val) { return integerToHexDef(val); }
-    template<> std::string integerToHex<unsigned long long>(unsigned long long val) { return integerToHexDef(val); }
+    return std::string(bufPtr);
+}
+
+template <>
+std::string integerToHex<int>(int val) {
+    return integerToHexDef(val);
+}
+template <>
+std::string integerToHex<unsigned int>(unsigned int val) {
+    return integerToHexDef(val);
+}
+template <>
+std::string integerToHex<long>(long val) {
+    return integerToHexDef(val);
+}
+template <>
+std::string integerToHex<unsigned long>(unsigned long val) {
+    return integerToHexDef(val);
+}
+template <>
+std::string integerToHex<long long>(long long val) {
+    return integerToHexDef(val);
+}
+template <>
+std::string integerToHex<unsigned long long>(unsigned long long val) {
+    return integerToHexDef(val);
+}
 
 
-    std::string hexdump(const char *data, unsigned len) {
-        verify( len < 1000000 );
-        const unsigned char *p = (const unsigned char *) data;
-        std::stringstream ss;
-        ss << std::hex << std::setw(2) << std::setfill('0');
-        for( unsigned i = 0; i < len; i++ ) {
-            ss << static_cast<unsigned>(p[i]) << ' ';
-        }
-        std::string s = ss.str();
-        return s;
+std::string hexdump(const char* data, unsigned len) {
+    verify(len < 1000000);
+    const unsigned char* p = (const unsigned char*)data;
+    std::stringstream ss;
+    ss << std::hex << std::setw(2) << std::setfill('0');
+    for (unsigned i = 0; i < len; i++) {
+        ss << static_cast<unsigned>(p[i]) << ' ';
     }
-
+    std::string s = ss.str();
+    return s;
+}
 }

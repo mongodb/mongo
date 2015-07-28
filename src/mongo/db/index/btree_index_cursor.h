@@ -40,67 +40,67 @@
 
 namespace mongo {
 
-    class BtreeIndexCursor : public IndexCursor {
-    public:
-        bool isEOF() const;
+class BtreeIndexCursor : public IndexCursor {
+public:
+    bool isEOF() const;
 
-        virtual Status seek(const BSONObj& position);
+    virtual Status seek(const BSONObj& position);
 
-        // Btree-specific seeking functions.
-        Status seek(const std::vector<const BSONElement*>& position,
-                    const std::vector<bool>& inclusive);
+    // Btree-specific seeking functions.
+    Status seek(const std::vector<const BSONElement*>& position,
+                const std::vector<bool>& inclusive);
 
-        /**
-         * Seek to the key 'position'.  If 'afterKey' is true, seeks to the first
-         * key that is oriented after 'position'.
-         *
-         * Btree-specific.
-         */
-        void seek(const BSONObj& position, bool afterKey);
+    /**
+     * Seek to the key 'position'.  If 'afterKey' is true, seeks to the first
+     * key that is oriented after 'position'.
+     *
+     * Btree-specific.
+     */
+    void seek(const BSONObj& position, bool afterKey);
 
-        Status skip(const BSONObj& keyBegin,
-                    int keyBeginLen,
-                    bool afterKey,
-                    const std::vector<const BSONElement*>& keyEnd,
-                    const std::vector<bool>& keyEndInclusive);
+    Status skip(const BSONObj& keyBegin,
+                int keyBeginLen,
+                bool afterKey,
+                const std::vector<const BSONElement*>& keyEnd,
+                const std::vector<bool>& keyEndInclusive);
 
-        virtual BSONObj getKey() const;
-        virtual RecordId getValue() const;
-        virtual void next();
+    virtual BSONObj getKey() const;
+    virtual RecordId getValue() const;
+    virtual void next();
 
-        /**
-         * BtreeIndexCursor-only.
-         * Returns true if 'this' points at the same exact key as 'other'.
-         * Returns false otherwise.
-         */
-        bool pointsAt(const BtreeIndexCursor& other);
+    /**
+     * BtreeIndexCursor-only.
+     * Returns true if 'this' points at the same exact key as 'other'.
+     * Returns false otherwise.
+     */
+    bool pointsAt(const BtreeIndexCursor& other);
 
-        virtual Status savePosition();
+    virtual Status savePosition();
 
-        virtual Status restorePosition(OperationContext* txn);
+    virtual Status restorePosition(OperationContext* txn);
 
-        virtual std::string toString();
+    virtual std::string toString();
 
-    private:
-        // We keep the constructor private and only allow the AM to create us.
-        friend class BtreeBasedAccessMethod;
+private:
+    // We keep the constructor private and only allow the AM to create us.
+    friend class BtreeBasedAccessMethod;
 
-        /**
-         * interface is an abstraction to hide the fact that we have two types of Btrees.
-         *
-         * Intentionally private, we're friends with the only class allowed to call it.
-         */
-        BtreeIndexCursor(SortedDataInterface::Cursor* cursor);
+    /**
+     * interface is an abstraction to hide the fact that we have two types of Btrees.
+     *
+     * Intentionally private, we're friends with the only class allowed to call it.
+     */
+    BtreeIndexCursor(SortedDataInterface::Cursor* cursor);
 
-        bool isSavedPositionValid();
+    bool isSavedPositionValid();
 
-        /**
-         * Move to the next (or previous depending on the direction) key.  Used by normal getNext
-         * and also skipping unused keys.
-         */
-        void advance();
+    /**
+     * Move to the next (or previous depending on the direction) key.  Used by normal getNext
+     * and also skipping unused keys.
+     */
+    void advance();
 
-        boost::scoped_ptr<SortedDataInterface::Cursor> _cursor;
-    };
+    boost::scoped_ptr<SortedDataInterface::Cursor> _cursor;
+};
 
 }  // namespace mongo

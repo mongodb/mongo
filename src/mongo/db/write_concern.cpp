@@ -42,124 +42,116 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    static TimerStats gleWtimeStats;
-    static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime",
-                                                                 &gleWtimeStats );
+static TimerStats gleWtimeStats;
+static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime", &gleWtimeStats);
 
-    static Counter64 gleWtimeouts;
-    static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
-                                                                  &gleWtimeouts );
+static Counter64 gleWtimeouts;
+static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
+                                                              &gleWtimeouts);
 
-    Status validateWriteConcern( const WriteConcernOptions& writeConcern ) {
-        const bool isJournalEnabled = getGlobalEnvironment()->getGlobalStorageEngine()->isDurable();
+Status validateWriteConcern(const WriteConcernOptions& writeConcern) {
+    const bool isJournalEnabled = getGlobalEnvironment()->getGlobalStorageEngine()->isDurable();
 
-        if ( writeConcern.syncMode == WriteConcernOptions::JOURNAL && !isJournalEnabled ) {
-            return Status( ErrorCodes::BadValue,
-                           "cannot use 'j' option when a host does not have journaling enabled" );
-        }
-
-        const bool isConfigServer = serverGlobalParams.configsvr;
-        const repl::ReplicationCoordinator::Mode replMode =
-                repl::getGlobalReplicationCoordinator()->getReplicationMode();
-
-        if ( isConfigServer || replMode == repl::ReplicationCoordinator::modeNone ) {
-
-            // Note that config servers can be replicated (have an oplog), but we still don't allow
-            // w > 1
-
-            if ( writeConcern.wNumNodes > 1 ) {
-                return Status( ErrorCodes::BadValue,
-                               string( "cannot use 'w' > 1 " ) +
-                               ( isConfigServer ? "on a config server host" :
-                                                  "when a host is not replicated" ) );
-            }
-        }
-
-        if ( replMode != repl::ReplicationCoordinator::modeReplSet &&
-                !writeConcern.wMode.empty() &&
-                writeConcern.wMode != "majority" ) {
-            return Status( ErrorCodes::BadValue,
-                           string( "cannot use non-majority 'w' mode " ) + writeConcern.wMode
-                           + " when a host is not a member of a replica set" );
-        }
-
-        return Status::OK();
+    if (writeConcern.syncMode == WriteConcernOptions::JOURNAL && !isJournalEnabled) {
+        return Status(ErrorCodes::BadValue,
+                      "cannot use 'j' option when a host does not have journaling enabled");
     }
 
-    void WriteConcernResult::appendTo( const WriteConcernOptions& writeConcern,
-                                       BSONObjBuilder* result ) const {
+    const bool isConfigServer = serverGlobalParams.configsvr;
+    const repl::ReplicationCoordinator::Mode replMode =
+        repl::getGlobalReplicationCoordinator()->getReplicationMode();
 
-        if ( syncMillis >= 0 )
-            result->appendNumber( "syncMillis", syncMillis );
+    if (isConfigServer || replMode == repl::ReplicationCoordinator::modeNone) {
+        // Note that config servers can be replicated (have an oplog), but we still don't allow
+        // w > 1
 
-        if ( fsyncFiles >= 0 )
-            result->appendNumber( "fsyncFiles", fsyncFiles );
-
-        if ( wTime >= 0 ) {
-            if ( wTimedOut )
-                result->appendNumber( "waited", wTime );
-            else
-                result->appendNumber( "wtime", wTime );
+        if (writeConcern.wNumNodes > 1) {
+            return Status(ErrorCodes::BadValue,
+                          string("cannot use 'w' > 1 ") + (isConfigServer
+                                                               ? "on a config server host"
+                                                               : "when a host is not replicated"));
         }
+    }
 
-        if ( wTimedOut )
-            result->appendBool( "wtimeout", true );
+    if (replMode != repl::ReplicationCoordinator::modeReplSet && !writeConcern.wMode.empty() &&
+        writeConcern.wMode != "majority") {
+        return Status(ErrorCodes::BadValue,
+                      string("cannot use non-majority 'w' mode ") + writeConcern.wMode +
+                          " when a host is not a member of a replica set");
+    }
 
-        if (writtenTo.size()) {
-            BSONArrayBuilder hosts(result->subarrayStart("writtenTo"));
-            for (size_t i = 0; i < writtenTo.size(); ++i) {
-                hosts.append(writtenTo[i].toString());
-            }
-        }
-        else {
-            result->appendNull( "writtenTo" );
-        }
+    return Status::OK();
+}
 
-        if ( err.empty() )
-            result->appendNull( "err" );
+void WriteConcernResult::appendTo(const WriteConcernOptions& writeConcern,
+                                  BSONObjBuilder* result) const {
+    if (syncMillis >= 0)
+        result->appendNumber("syncMillis", syncMillis);
+
+    if (fsyncFiles >= 0)
+        result->appendNumber("fsyncFiles", fsyncFiles);
+
+    if (wTime >= 0) {
+        if (wTimedOut)
+            result->appendNumber("waited", wTime);
         else
-            result->append( "err", err );
-
-        // *** 2.4 SyncClusterConnection compatibility ***
-        // 2.4 expects either fsync'd files, or a "waited" field exist after running an fsync : true
-        // GLE, but with journaling we don't actually need to run the fsync (fsync command is
-        // preferred in 2.6).  So we add a "waited" field if one doesn't exist.
-
-        if ( writeConcern.syncMode == WriteConcernOptions::FSYNC ) {
-
-            if ( fsyncFiles < 0 && ( wTime < 0 || !wTimedOut ) ) {
-                dassert( result->asTempObj()["waited"].eoo() );
-                result->appendNumber( "waited", syncMillis );
-            }
-
-            dassert( result->asTempObj()["fsyncFiles"].numberInt() > 0 ||
-                     !result->asTempObj()["waited"].eoo() );
-        }
+            result->appendNumber("wtime", wTime);
     }
 
-    Status waitForWriteConcern( OperationContext* txn,
-                                const WriteConcernOptions& writeConcern,
-                                const OpTime& replOpTime,
-                                WriteConcernResult* result ) {
+    if (wTimedOut)
+        result->appendBool("wtimeout", true);
 
-        // We assume all options have been validated earlier, if not, programming error
-        dassert( validateWriteConcern( writeConcern ).isOK() );
+    if (writtenTo.size()) {
+        BSONArrayBuilder hosts(result->subarrayStart("writtenTo"));
+        for (size_t i = 0; i < writtenTo.size(); ++i) {
+            hosts.append(writtenTo[i].toString());
+        }
+    } else {
+        result->appendNull("writtenTo");
+    }
 
-        // Next handle blocking on disk
+    if (err.empty())
+        result->appendNull("err");
+    else
+        result->append("err", err);
 
-        Timer syncTimer;
+    // *** 2.4 SyncClusterConnection compatibility ***
+    // 2.4 expects either fsync'd files, or a "waited" field exist after running an fsync : true
+    // GLE, but with journaling we don't actually need to run the fsync (fsync command is
+    // preferred in 2.6).  So we add a "waited" field if one doesn't exist.
 
-        switch( writeConcern.syncMode ) {
+    if (writeConcern.syncMode == WriteConcernOptions::FSYNC) {
+        if (fsyncFiles < 0 && (wTime < 0 || !wTimedOut)) {
+            dassert(result->asTempObj()["waited"].eoo());
+            result->appendNumber("waited", syncMillis);
+        }
+
+        dassert(result->asTempObj()["fsyncFiles"].numberInt() > 0 ||
+                !result->asTempObj()["waited"].eoo());
+    }
+}
+
+Status waitForWriteConcern(OperationContext* txn,
+                           const WriteConcernOptions& writeConcern,
+                           const OpTime& replOpTime,
+                           WriteConcernResult* result) {
+    // We assume all options have been validated earlier, if not, programming error
+    dassert(validateWriteConcern(writeConcern).isOK());
+
+    // Next handle blocking on disk
+
+    Timer syncTimer;
+
+    switch (writeConcern.syncMode) {
         case WriteConcernOptions::NONE:
             break;
         case WriteConcernOptions::FSYNC: {
             StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-            if ( !storageEngine->isDurable() ) {
-                result->fsyncFiles = storageEngine->flushAllFiles( true );
-            }
-            else {
+            if (!storageEngine->isDurable()) {
+                result->fsyncFiles = storageEngine->flushAllFiles(true);
+            } else {
                 // We only need to commit the journal if we're durable
                 txn->recoveryUnit()->awaitCommit();
             }
@@ -168,42 +160,40 @@ namespace mongo {
         case WriteConcernOptions::JOURNAL:
             txn->recoveryUnit()->awaitCommit();
             break;
-        }
-
-        result->syncMillis = syncTimer.millis();
-
-        // Now wait for replication
-
-        if (replOpTime.isNull()) {
-            // no write happened for this client yet
-            return Status::OK();
-        }
-
-        // needed to avoid incrementing gleWtimeStats SERVER-9005
-        if (writeConcern.wNumNodes <= 1 && writeConcern.wMode.empty()) {
-            // no desired replication check
-            return Status::OK();
-        }
-
-        // Now we wait for replication
-        // Note that replica set stepdowns and gle mode changes are thrown as errors
-        repl::ReplicationCoordinator::StatusAndDuration replStatus =
-                repl::getGlobalReplicationCoordinator()->awaitReplication(txn,
-                                                                          replOpTime,
-                                                                          writeConcern);
-        if (replStatus.status == ErrorCodes::ExceededTimeLimit) {
-            gleWtimeouts.increment();
-            replStatus.status = Status(ErrorCodes::WriteConcernFailed,
-                                       "waiting for replication timed out");
-            result->err = "timeout";
-            result->wTimedOut = true;
-        }
-        // Add stats
-        result->writtenTo = repl::getGlobalReplicationCoordinator()->getHostsWrittenTo(replOpTime);
-        gleWtimeStats.recordMillis(replStatus.duration.total_milliseconds());
-        result->wTime = replStatus.duration.total_milliseconds();
-
-        return replStatus.status;
     }
 
-} // namespace mongo
+    result->syncMillis = syncTimer.millis();
+
+    // Now wait for replication
+
+    if (replOpTime.isNull()) {
+        // no write happened for this client yet
+        return Status::OK();
+    }
+
+    // needed to avoid incrementing gleWtimeStats SERVER-9005
+    if (writeConcern.wNumNodes <= 1 && writeConcern.wMode.empty()) {
+        // no desired replication check
+        return Status::OK();
+    }
+
+    // Now we wait for replication
+    // Note that replica set stepdowns and gle mode changes are thrown as errors
+    repl::ReplicationCoordinator::StatusAndDuration replStatus =
+        repl::getGlobalReplicationCoordinator()->awaitReplication(txn, replOpTime, writeConcern);
+    if (replStatus.status == ErrorCodes::ExceededTimeLimit) {
+        gleWtimeouts.increment();
+        replStatus.status =
+            Status(ErrorCodes::WriteConcernFailed, "waiting for replication timed out");
+        result->err = "timeout";
+        result->wTimedOut = true;
+    }
+    // Add stats
+    result->writtenTo = repl::getGlobalReplicationCoordinator()->getHostsWrittenTo(replOpTime);
+    gleWtimeStats.recordMillis(replStatus.duration.total_milliseconds());
+    result->wTime = replStatus.duration.total_milliseconds();
+
+    return replStatus.status;
+}
+
+}  // namespace mongo

@@ -30,14 +30,14 @@
 
 namespace mongo {
 
-    /** This function will call ::_exit and not return. Use this instead of calling ::_exit
-     *  directly:
-     *   - It offers a debugger hook to catch the process before leaving code under our control.
-     *   - For some builds (leak sanitizer) it gives us an opportunity to dump leaks.
-     *
-     *  The function is named differently than quick_exit so that we can distinguish it from
-     *  the C++11 function of the same name.
-     */
-    MONGO_COMPILER_NORETURN void quickExit(int);
+/** This function will call ::_exit and not return. Use this instead of calling ::_exit
+ *  directly:
+ *   - It offers a debugger hook to catch the process before leaving code under our control.
+ *   - For some builds (leak sanitizer) it gives us an opportunity to dump leaks.
+ *
+ *  The function is named differently than quick_exit so that we can distinguish it from
+ *  the C++11 function of the same name.
+ */
+MONGO_COMPILER_NORETURN void quickExit(int);
 
-} // namespace mongo
+}  // namespace mongo

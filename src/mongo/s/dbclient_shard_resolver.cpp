@@ -36,85 +36,79 @@
 
 namespace mongo {
 
-    using std::string;
+using std::string;
 
-    Status DBClientShardResolver::chooseWriteHost( const string& shardName,
-                                                   ConnectionString* shardHost ) const {
+Status DBClientShardResolver::chooseWriteHost(const string& shardName,
+                                              ConnectionString* shardHost) const {
+    // Declare up here for parsing later
+    string errMsg;
 
-        // Declare up here for parsing later
-        string errMsg;
-
-        // Special-case for config and admin
-        if ( shardName == "config" || shardName == "admin" ) {
-            *shardHost = ConnectionString::parse( configServer.modelServer(), errMsg );
-            dassert( errMsg == "" );
-            return Status::OK();
-        }
-
-        //
-        // First get the information about the shard from the shard cache
-        //
-
-        // Internally uses our shard cache, does no reload
-        Shard shard = Shard::findIfExists( shardName );
-        if ( shard.getName() == "" ) {
-            return Status( ErrorCodes::ShardNotFound,
-                           string("unknown shard name ") + shardName );
-        }
-        return findMaster(shard.getConnString(), shardHost);
+    // Special-case for config and admin
+    if (shardName == "config" || shardName == "admin") {
+        *shardHost = ConnectionString::parse(configServer.modelServer(), errMsg);
+        dassert(errMsg == "");
+        return Status::OK();
     }
 
-    Status DBClientShardResolver::findMaster( const std::string connString,
-                                              ConnectionString* resolvedHost ) {
-        std::string errMsg;
+    //
+    // First get the information about the shard from the shard cache
+    //
 
-        ConnectionString rawHost = ConnectionString::parse( connString, errMsg );
-        dassert( errMsg == "" );
-        dassert( rawHost.type() == ConnectionString::SET
-                 || rawHost.type() == ConnectionString::MASTER );
+    // Internally uses our shard cache, does no reload
+    Shard shard = Shard::findIfExists(shardName);
+    if (shard.getName() == "") {
+        return Status(ErrorCodes::ShardNotFound, string("unknown shard name ") + shardName);
+    }
+    return findMaster(shard.getConnString(), shardHost);
+}
 
-        if ( rawHost.type() == ConnectionString::MASTER ) {
-            *resolvedHost = rawHost;
-            return Status::OK();
-        }
+Status DBClientShardResolver::findMaster(const std::string connString,
+                                         ConnectionString* resolvedHost) {
+    std::string errMsg;
 
-        //
-        // If we need to, then get the particular node we're targeting in the replica set
-        //
+    ConnectionString rawHost = ConnectionString::parse(connString, errMsg);
+    dassert(errMsg == "");
+    dassert(rawHost.type() == ConnectionString::SET || rawHost.type() == ConnectionString::MASTER);
 
-        // Don't create the monitor unless we need to - fast path
-        ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(rawHost.getSetName(), false);
-
-        if (!replMonitor) {
-            // Slow path
-            std::set<HostAndPort> seedServers(rawHost.getServers().begin(),
-                                              rawHost.getServers().end());
-            ReplicaSetMonitor::createIfNeeded(rawHost.getSetName(), seedServers);
-            replMonitor = ReplicaSetMonitor::get(rawHost.getSetName(), true);
-        }
-
-        if (!replMonitor) {
-            return Status( ErrorCodes::ReplicaSetNotFound,
-                           string("unknown replica set ") + rawHost.getSetName() );
-        }
-
-        try {
-            // This can throw when we don't find a master!
-            HostAndPort masterHostAndPort = replMonitor->getMasterOrUassert();
-            *resolvedHost = ConnectionString::parse( masterHostAndPort.toString(), errMsg );
-            dassert( errMsg == "" );
-            return Status::OK();
-        }
-        catch ( const DBException& ) {
-            return Status( ErrorCodes::HostNotFound,
-                           string("could not contact primary for replica set ")
-                           + replMonitor->getName() );
-        }
-
-        // Unreachable
-        dassert( false );
-        return Status( ErrorCodes::UnknownError, "" );
+    if (rawHost.type() == ConnectionString::MASTER) {
+        *resolvedHost = rawHost;
+        return Status::OK();
     }
 
-} // namespace mongo
+    //
+    // If we need to, then get the particular node we're targeting in the replica set
+    //
 
+    // Don't create the monitor unless we need to - fast path
+    ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(rawHost.getSetName(), false);
+
+    if (!replMonitor) {
+        // Slow path
+        std::set<HostAndPort> seedServers(rawHost.getServers().begin(), rawHost.getServers().end());
+        ReplicaSetMonitor::createIfNeeded(rawHost.getSetName(), seedServers);
+        replMonitor = ReplicaSetMonitor::get(rawHost.getSetName(), true);
+    }
+
+    if (!replMonitor) {
+        return Status(ErrorCodes::ReplicaSetNotFound,
+                      string("unknown replica set ") + rawHost.getSetName());
+    }
+
+    try {
+        // This can throw when we don't find a master!
+        HostAndPort masterHostAndPort = replMonitor->getMasterOrUassert();
+        *resolvedHost = ConnectionString::parse(masterHostAndPort.toString(), errMsg);
+        dassert(errMsg == "");
+        return Status::OK();
+    } catch (const DBException&) {
+        return Status(ErrorCodes::HostNotFound,
+                      string("could not contact primary for replica set ") +
+                          replMonitor->getName());
+    }
+
+    // Unreachable
+    dassert(false);
+    return Status(ErrorCodes::UnknownError, "");
+}
+
+}  // namespace mongo

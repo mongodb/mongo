@@ -35,7 +35,8 @@
 using namespace mongo;
 
 TEST(ExtractBSON, ExtractField) {
-    BSONObj obj = BSON("a" << 1 << "b" << "hello");
+    BSONObj obj = BSON("a" << 1 << "b"
+                           << "hello");
     BSONElement element;
     ASSERT_OK(bsonExtractField(obj, "a", &element));
     ASSERT_EQUALS(1, element.Int());
@@ -45,7 +46,8 @@ TEST(ExtractBSON, ExtractField) {
 }
 
 TEST(ExtractBSON, ExtractTypedField) {
-    BSONObj obj = BSON("a" << 1 << "b" << "hello");
+    BSONObj obj = BSON("a" << 1 << "b"
+                           << "hello");
     BSONElement element;
     ASSERT_OK(bsonExtractTypedField(obj, "a", NumberInt, &element));
     ASSERT_EQUALS(1, element.Int());
@@ -53,12 +55,14 @@ TEST(ExtractBSON, ExtractTypedField) {
     ASSERT_EQUALS(std::string("hello"), element.str());
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractTypedField(obj, "c", String, &element));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractTypedField(obj, "a", String, &element));
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractTypedField(obj, "b", NumberDouble, &element));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch,
+                  bsonExtractTypedField(obj, "b", NumberDouble, &element));
 }
 
 
 TEST(ExtractBSON, ExtractStringField) {
-    BSONObj obj = BSON("a" << 1 << "b" << "hello");
+    BSONObj obj = BSON("a" << 1 << "b"
+                           << "hello");
     std::string s;
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractStringField(obj, "a", &s));
     ASSERT_OK(bsonExtractStringField(obj, "b", &s));
@@ -67,7 +71,8 @@ TEST(ExtractBSON, ExtractStringField) {
 }
 
 TEST(ExtractBSON, ExtractStringFieldWithDefault) {
-    BSONObj obj = BSON("a" << 1 << "b" << "hello");
+    BSONObj obj = BSON("a" << 1 << "b"
+                           << "hello");
     std::string s;
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   bsonExtractStringFieldWithDefault(obj, "a", "default", &s));
@@ -79,8 +84,12 @@ TEST(ExtractBSON, ExtractStringFieldWithDefault) {
 }
 
 TEST(ExtractBSON, ExtractBooleanFieldWithDefault) {
-    BSONObj obj1 = BSON("a" << 1 << "b" << "hello"  << "c" << true);
-    BSONObj obj2 = BSON("a" << 0 << "b" << "hello"  << "c" << false);
+    BSONObj obj1 = BSON("a" << 1 << "b"
+                            << "hello"
+                            << "c" << true);
+    BSONObj obj2 = BSON("a" << 0 << "b"
+                            << "hello"
+                            << "c" << false);
     bool b;
     b = false;
     ASSERT_OK(bsonExtractBooleanFieldWithDefault(obj1, "a", false, &b));
@@ -112,40 +121,18 @@ TEST(ExtractBSON, ExtractBooleanFieldWithDefault) {
 
 TEST(ExtractBSON, ExtractIntegerField) {
     long long v;
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractIntegerField(
-                          BSON("a" << 1),
-                          "b",
-                          &v));
-    ASSERT_OK(bsonExtractIntegerFieldWithDefault(
-                      BSON("a" << 1),
-                      "b",
-                      -1LL,
-                      &v));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractIntegerField(BSON("a" << 1), "b", &v));
+    ASSERT_OK(bsonExtractIntegerFieldWithDefault(BSON("a" << 1), "b", -1LL, &v));
     ASSERT_EQUALS(-1LL, v);
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractIntegerField(
-                          BSON("a" << false),
-                          "a",
-                          &v));
-    ASSERT_EQUALS(ErrorCodes::BadValue, bsonExtractIntegerField(
-                          BSON("a" << std::numeric_limits<float>::quiet_NaN()),
-                          "a",
-                          &v));
-    ASSERT_EQUALS(ErrorCodes::BadValue, bsonExtractIntegerField(
-                          BSON("a" << pow(2.0, 64)),
-                          "a",
-                          &v));
-    ASSERT_EQUALS(ErrorCodes::BadValue, bsonExtractIntegerField(
-                          BSON("a" << -1.5),
-                          "a",
-                          &v));
-    ASSERT_OK(bsonExtractIntegerField(
-                      BSON("a" << -pow(2.0, 55)),
-                      "a",
-                      &v));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractIntegerField(BSON("a" << false), "a", &v));
+    ASSERT_EQUALS(
+        ErrorCodes::BadValue,
+        bsonExtractIntegerField(BSON("a" << std::numeric_limits<float>::quiet_NaN()), "a", &v));
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  bsonExtractIntegerField(BSON("a" << pow(2.0, 64)), "a", &v));
+    ASSERT_EQUALS(ErrorCodes::BadValue, bsonExtractIntegerField(BSON("a" << -1.5), "a", &v));
+    ASSERT_OK(bsonExtractIntegerField(BSON("a" << -pow(2.0, 55)), "a", &v));
     ASSERT_EQUALS(-(1LL << 55), v);
-    ASSERT_OK(bsonExtractIntegerField(
-                      BSON("a" << 5178),
-                      "a",
-                      &v));
+    ASSERT_OK(bsonExtractIntegerField(BSON("a" << 5178), "a", &v));
     ASSERT_EQUALS(5178, v);
 }

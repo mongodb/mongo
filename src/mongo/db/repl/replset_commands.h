@@ -36,20 +36,28 @@
 namespace mongo {
 namespace repl {
 
-    extern unsigned replSetForceInitialSyncFailure;
+extern unsigned replSetForceInitialSyncFailure;
 
-    /**
-     * Base class for repl set commands.  Checks basic things such if we're in
-     * rs mode before the command does its real work.
-     */
-    class ReplSetCommand : public Command {
-    protected:
-        ReplSetCommand(const char * s, bool show=false) : Command(s, show) { }
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void help( std::stringstream &help ) const { help << "internal"; }
-    };
+/**
+ * Base class for repl set commands.  Checks basic things such if we're in
+ * rs mode before the command does its real work.
+ */
+class ReplSetCommand : public Command {
+protected:
+    ReplSetCommand(const char* s, bool show = false) : Command(s, show) {}
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual bool adminOnly() const {
+        return true;
+    }
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+    virtual void help(std::stringstream& help) const {
+        help << "internal";
+    }
+};
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

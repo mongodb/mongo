@@ -34,57 +34,61 @@
 namespace mongo {
 
 
-    /*
-     * StatusWith is used to return an error or a value
-     * this is designed to make exception code free cleaner by not needing as many out paramters
-     * example:
-      StatusWith<int> fib( int n ) {
-        if ( n < 0 ) return StatusWith<int>( ErrorCodes::BadValue, "paramter to fib has to be >= 0" );
-        if ( n <= 1 ) return StatusWith<int>( 1 );
-        StatusWith<int> a = fib( n - 1 );
-        StatusWith<int> b = fib( n - 2 );
-        if ( !a.isOK() ) return a;
-        if ( !b.isOK() ) return b;
-        return StatusWith<int>( a.getValue() + b.getValue() );
-      }
+/*
+ * StatusWith is used to return an error or a value
+ * this is designed to make exception code free cleaner by not needing as many out paramters
+ * example:
+  StatusWith<int> fib( int n ) {
+    if ( n < 0 ) return StatusWith<int>( ErrorCodes::BadValue, "paramter to fib has to be >= 0" );
+    if ( n <= 1 ) return StatusWith<int>( 1 );
+    StatusWith<int> a = fib( n - 1 );
+    StatusWith<int> b = fib( n - 2 );
+    if ( !a.isOK() ) return a;
+    if ( !b.isOK() ) return b;
+    return StatusWith<int>( a.getValue() + b.getValue() );
+  }
 
-      * Note: the value is copied in the current implementation, so should be small (int, int*)
-      *  not a vector
+  * Note: the value is copied in the current implementation, so should be small (int, int*)
+  *  not a vector
+ */
+template <typename T>
+class StatusWith {
+public:
+    /**
+     * for the error case
      */
-    template<typename T>
-    class StatusWith {
-    public:
-        /**
-         * for the error case
-         */
-        StatusWith( ErrorCodes::Error code, const std::string& reason, int location = 0 )
-            : _status( Status( code, reason, location ) ) {
-        }
+    StatusWith(ErrorCodes::Error code, const std::string& reason, int location = 0)
+        : _status(Status(code, reason, location)) {}
 
-        /**
-         * for the error case
-         */
-        explicit StatusWith( const Status& status )
-            : _status( status ) {
-            // verify(( !status.isOK() ); // TODO
-        }
+    /**
+     * for the error case
+     */
+    explicit StatusWith(const Status& status) : _status(status) {
+        // verify(( !status.isOK() ); // TODO
+    }
 
-        /**
-         * for the OK case
-         */
-        explicit StatusWith( const T& t )
-            : _status( Status::OK() ), _t( t ) {
-        }
+    /**
+     * for the OK case
+     */
+    explicit StatusWith(const T& t) : _status(Status::OK()), _t(t) {}
 
-        const T& getValue() const { /* verify( isOK() ); */ return _t; } // TODO
-        const Status& getStatus() const { return _status;}
+    const T& getValue() const { /* verify( isOK() ); */
+        return _t;
+    }  // TODO
+    const Status& getStatus() const {
+        return _status;
+    }
 
-        bool isOK() const { return _status.isOK(); }
+    bool isOK() const {
+        return _status.isOK();
+    }
 
-        std::string toString() const { return _status.toString(); }
-    private:
-        Status _status;
-        T _t;
-    };
+    std::string toString() const {
+        return _status.toString();
+    }
 
+private:
+    Status _status;
+    T _t;
+};
 }

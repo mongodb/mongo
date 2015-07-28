@@ -35,151 +35,155 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
 namespace dur {
 
-    // a smaller limit is likely better on 32 bit
-    const unsigned UncommittedBytesLimit = (sizeof(void*) == 4) ? 50 * 1024 * 1024 : 512 * 1024 * 1024;
+// a smaller limit is likely better on 32 bit
+const unsigned UncommittedBytesLimit = (sizeof(void*) == 4) ? 50 * 1024 * 1024 : 512 * 1024 * 1024;
 
 
-    class DurableInterface {
-        MONGO_DISALLOW_COPYING(DurableInterface);
-    public:
-        virtual ~DurableInterface();
+class DurableInterface {
+    MONGO_DISALLOW_COPYING(DurableInterface);
 
-        /**
-         * Declare that a file has been created. Normally writes are applied only after journaling
-         * for safety. But here the file is created first, and the journal will just replay the
-         * creation if the create didn't happen due to a crash.
-         */
-        virtual void createdFile(const std::string& filename, unsigned long long len) = 0;
-
-        // Declare write intents. Use these methods to declare "i'm about to write to x and it
-        // should be logged for redo."
-        //
-        // Failure to call writing...() is checked in _DEBUG mode by using a read only mapped view
-        // (i.e., you'll segfault if the code is covered in that situation).  The _DEBUG check
-        // doesn't verify that your length is correct though.
-
-        /**
-         * Declare intent to write to x for up to len.
-         *
-         * @return pointer where to write.
-         */
-        virtual void* writingPtr(void *x, unsigned len) = 0;
-
-        /**
-         * Declare write intent after write has been done.
-         */
-        virtual void declareWriteIntent(void *x, unsigned len) = 0;
-
-        /**
-         * Allows you to declare many write intents at once more efficiently than repeated calls
-         * to declareWriteIntent.
-         */
-        virtual void declareWriteIntents(
-            const std::vector<std::pair<void*, unsigned> >& intents) = 0;
-
-        /** Wait for acknowledgement of the next group commit.
-            @return true if --dur is on.  There will be delay.
-            @return false if --dur is off.
-            */
-        virtual bool awaitCommit() = 0;
-
-        /** Commit immediately.
-
-            Generally, you do not want to do this often, as highly granular committing may affect
-            performance.
-
-            Does not return until the commit is complete.
-
-            You must be at least read locked when you call this.  Ideally, you are not write locked
-            and then read operations can occur concurrently.
-
-            Do not use this. Use commitIfNeeded() instead.
-
-            @return true if --dur is on.
-            @return false if --dur is off. (in which case there is action)
-            */
-        virtual bool commitNow(OperationContext* txn) = 0;
-
-        /** Commit if enough bytes have been modified. Current threshold is 50MB
-
-            The idea is that long running write operations that don't yield
-            (like creating an index or update with $atomic) can call this
-            whenever the db is in a sane state and it will prevent commits
-            from growing too large.
-            @return true if commited
-            */
-        virtual bool commitIfNeeded() = 0;
-
-
-        /**
-         * Called when a DurableMappedFile is closing. Asserts that there are no unwritten changes,
-         * because that would mean journal replay on recovery would try to write to non-existent
-         * files and fail.
-         */
-        virtual void closingFileNotification() = 0;
-
-        /**
-            * Invoked at clean shutdown time. Performs one last commit/flush and terminates the
-            * flush thread.
-            *
-            * Must be called under the global X lock.
-            */
-        virtual void commitAndStopDurThread() = 0;
-
-        /**
-         * Commits pending changes, flushes all changes to main data files, then removes the
-         * journal.
-         *
-         * WARNING: Data *must* be in a crash-recoverable state when this is called and must
-         *          not be inside of a write unit of work.
-         *
-         * This is useful as a "barrier" to ensure that writes before this call will never go
-         * through recovery and be applied to files that have had changes made after this call
-         * applied.
-         */
-        virtual void syncDataAndTruncateJournal(OperationContext* txn) = 0;
-
-        virtual bool isDurable() const = 0;
-
-        /**
-         * Declare intent to write to x for sizeof(*x)
-         */
-        template <typename T>
-        T* writing(T *x) {
-            return static_cast<T*>(writingPtr(x, sizeof(T)));
-        }
-
-        static DurableInterface& getDur() { return *_impl; }
-
-    protected:
-         DurableInterface();
-
-    private:
-        friend void startup();
-
-        static DurableInterface* _impl;
-    };
-
+public:
+    virtual ~DurableInterface();
 
     /**
-     * Called during startup to startup the durability module.
-     * Does nothing if storageGlobalParams.dur is false
+     * Declare that a file has been created. Normally writes are applied only after journaling
+     * for safety. But here the file is created first, and the journal will just replay the
+     * creation if the create didn't happen due to a crash.
      */
-    void startup();
+    virtual void createdFile(const std::string& filename, unsigned long long len) = 0;
 
-} // namespace dur
-
+    // Declare write intents. Use these methods to declare "i'm about to write to x and it
+    // should be logged for redo."
+    //
+    // Failure to call writing...() is checked in _DEBUG mode by using a read only mapped view
+    // (i.e., you'll segfault if the code is covered in that situation).  The _DEBUG check
+    // doesn't verify that your length is correct though.
 
     /**
-     * Provides a reference to the active durability interface.
+     * Declare intent to write to x for up to len.
      *
-     * TODO: The only reason this is an inline function is that tests try to link it and fail if
-     *       the MMAP V1 engine is not included.
+     * @return pointer where to write.
      */
-    inline dur::DurableInterface& getDur() { return dur::DurableInterface::getDur(); }
+    virtual void* writingPtr(void* x, unsigned len) = 0;
 
-} // namespace mongo
+    /**
+     * Declare write intent after write has been done.
+     */
+    virtual void declareWriteIntent(void* x, unsigned len) = 0;
+
+    /**
+     * Allows you to declare many write intents at once more efficiently than repeated calls
+     * to declareWriteIntent.
+     */
+    virtual void declareWriteIntents(const std::vector<std::pair<void*, unsigned>>& intents) = 0;
+
+    /** Wait for acknowledgement of the next group commit.
+        @return true if --dur is on.  There will be delay.
+        @return false if --dur is off.
+        */
+    virtual bool awaitCommit() = 0;
+
+    /** Commit immediately.
+
+        Generally, you do not want to do this often, as highly granular committing may affect
+        performance.
+
+        Does not return until the commit is complete.
+
+        You must be at least read locked when you call this.  Ideally, you are not write locked
+        and then read operations can occur concurrently.
+
+        Do not use this. Use commitIfNeeded() instead.
+
+        @return true if --dur is on.
+        @return false if --dur is off. (in which case there is action)
+        */
+    virtual bool commitNow(OperationContext* txn) = 0;
+
+    /** Commit if enough bytes have been modified. Current threshold is 50MB
+
+        The idea is that long running write operations that don't yield
+        (like creating an index or update with $atomic) can call this
+        whenever the db is in a sane state and it will prevent commits
+        from growing too large.
+        @return true if commited
+        */
+    virtual bool commitIfNeeded() = 0;
+
+
+    /**
+     * Called when a DurableMappedFile is closing. Asserts that there are no unwritten changes,
+     * because that would mean journal replay on recovery would try to write to non-existent
+     * files and fail.
+     */
+    virtual void closingFileNotification() = 0;
+
+    /**
+        * Invoked at clean shutdown time. Performs one last commit/flush and terminates the
+        * flush thread.
+        *
+        * Must be called under the global X lock.
+        */
+    virtual void commitAndStopDurThread() = 0;
+
+    /**
+     * Commits pending changes, flushes all changes to main data files, then removes the
+     * journal.
+     *
+     * WARNING: Data *must* be in a crash-recoverable state when this is called and must
+     *          not be inside of a write unit of work.
+     *
+     * This is useful as a "barrier" to ensure that writes before this call will never go
+     * through recovery and be applied to files that have had changes made after this call
+     * applied.
+     */
+    virtual void syncDataAndTruncateJournal(OperationContext* txn) = 0;
+
+    virtual bool isDurable() const = 0;
+
+    /**
+     * Declare intent to write to x for sizeof(*x)
+     */
+    template <typename T>
+    T* writing(T* x) {
+        return static_cast<T*>(writingPtr(x, sizeof(T)));
+    }
+
+    static DurableInterface& getDur() {
+        return *_impl;
+    }
+
+protected:
+    DurableInterface();
+
+private:
+    friend void startup();
+
+    static DurableInterface* _impl;
+};
+
+
+/**
+ * Called during startup to startup the durability module.
+ * Does nothing if storageGlobalParams.dur is false
+ */
+void startup();
+
+}  // namespace dur
+
+
+/**
+ * Provides a reference to the active durability interface.
+ *
+ * TODO: The only reason this is an inline function is that tests try to link it and fail if
+ *       the MMAP V1 engine is not included.
+ */
+inline dur::DurableInterface& getDur() {
+    return dur::DurableInterface::getDur();
+}
+
+}  // namespace mongo

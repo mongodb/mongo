@@ -44,34 +44,36 @@
 
 namespace mongo {
 
-    class RocksCounterManager {
-    public:
-        RocksCounterManager(rocksdb::DB* db, bool crashSafe)
-            : _db(db), _crashSafe(crashSafe), _syncing(false), _syncCounter(0) {}
+class RocksCounterManager {
+public:
+    RocksCounterManager(rocksdb::DB* db, bool crashSafe)
+        : _db(db), _crashSafe(crashSafe), _syncing(false), _syncCounter(0) {}
 
-        long long loadCounter(const std::string& counterKey);
+    long long loadCounter(const std::string& counterKey);
 
-        void updateCounter(const std::string& counterKey, long long count,
-                           rocksdb::WriteBatch* writeBatch);
+    void updateCounter(const std::string& counterKey,
+                       long long count,
+                       rocksdb::WriteBatch* writeBatch);
 
-        void sync();
+    void sync();
 
-        bool crashSafe() const { return _crashSafe; }
+    bool crashSafe() const {
+        return _crashSafe;
+    }
 
-    private:
-        static rocksdb::Slice _encodeCounter(long long counter, int64_t* storage);
+private:
+    static rocksdb::Slice _encodeCounter(long long counter, int64_t* storage);
 
-        rocksdb::DB* _db; // not owned
-        const bool _crashSafe;
-        boost::mutex _lock;
-        // protected by _lock
-        bool _syncing;
-        // protected by _lock
-        std::unordered_map<std::string, long long> _counters;
-        // protected by _lock
-        int _syncCounter;
+    rocksdb::DB* _db;  // not owned
+    const bool _crashSafe;
+    boost::mutex _lock;
+    // protected by _lock
+    bool _syncing;
+    // protected by _lock
+    std::unordered_map<std::string, long long> _counters;
+    // protected by _lock
+    int _syncCounter;
 
-        static const int kSyncEvery = 10000;
-    };
-
+    static const int kSyncEvery = 10000;
+};
 }

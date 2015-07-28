@@ -38,43 +38,43 @@
 
 namespace mongo {
 
-    class OperationContext;
+class OperationContext;
 
-    /**
-     * Constructs a PlanExecutor for a query with the oplogReplay option set to true,
-     * for the query 'cq' over the collection 'collection'. The PlanExecutor will
-     * wrap a singleton OplogStart stage.
-     *
-     * The oplog start finding hack requires that 'cq' has a $gt or $gte predicate over
-     * a field named 'ts'.
-     *
-     * On success, caller takes ownership of *execOut.
-     */
-    Status getOplogStartHack(OperationContext* txn,
-                             Collection* collection,
-                             CanonicalQuery* cq,
-                             PlanExecutor** execOut);
+/**
+ * Constructs a PlanExecutor for a query with the oplogReplay option set to true,
+ * for the query 'cq' over the collection 'collection'. The PlanExecutor will
+ * wrap a singleton OplogStart stage.
+ *
+ * The oplog start finding hack requires that 'cq' has a $gt or $gte predicate over
+ * a field named 'ts'.
+ *
+ * On success, caller takes ownership of *execOut.
+ */
+Status getOplogStartHack(OperationContext* txn,
+                         Collection* collection,
+                         CanonicalQuery* cq,
+                         PlanExecutor** execOut);
 
-    /**
-     * Called from the getMore entry point in ops/query.cpp.
-     */
-    QueryResult::View getMore(OperationContext* txn,
-                              const char* ns,
-                              int ntoreturn,
-                              long long cursorid,
-                              CurOp& curop,
-                              int pass,
-                              bool& exhaust,
-                              bool* isCursorAuthorized);
+/**
+ * Called from the getMore entry point in ops/query.cpp.
+ */
+QueryResult::View getMore(OperationContext* txn,
+                          const char* ns,
+                          int ntoreturn,
+                          long long cursorid,
+                          CurOp& curop,
+                          int pass,
+                          bool& exhaust,
+                          bool* isCursorAuthorized);
 
-    /**
-     * Run the query 'q' and place the result in 'result'.
-     */
-    std::string runQuery(OperationContext* txn,
-                         Message& m,
-                         QueryMessage& q,
-                         const NamespaceString& ns,
-                         CurOp& curop,
-                         Message &result);
+/**
+ * Run the query 'q' and place the result in 'result'.
+ */
+std::string runQuery(OperationContext* txn,
+                     Message& m,
+                     QueryMessage& q,
+                     const NamespaceString& ns,
+                     CurOp& curop,
+                     Message& result);
 
 }  // namespace mongo

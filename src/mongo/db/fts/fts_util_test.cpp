@@ -34,15 +34,14 @@
 #include "mongo/db/fts/fts_util.h"
 
 namespace mongo {
-    namespace fts {
+namespace fts {
 
-        TEST( BSONElementMap, Simple1 ) {
-            BSONElementMap<double> m;
+TEST(BSONElementMap, Simple1) {
+    BSONElementMap<double> m;
 
-            BSONObj x = BSON( "x" << 5 );
-            m[x.firstElement()] = 5;
-            ASSERT_EQUALS( 5, m[x.firstElement()] );
-        }
-
-    }
+    BSONObj x = BSON("x" << 5);
+    m[x.firstElement()] = 5;
+    ASSERT_EQUALS(5, m[x.firstElement()]);
+}
+}
 }

@@ -34,101 +34,125 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class Status;
+class BSONObj;
+class Status;
 
 namespace repl {
 
+/**
+ * Arguments to the replSetHeartbeat command.
+ */
+class ReplSetHeartbeatArgs {
+public:
+    ReplSetHeartbeatArgs();
+
     /**
-     * Arguments to the replSetHeartbeat command.
+     * Initializes this ReplSetHeartbeatArgs from the contents of args.
      */
-    class ReplSetHeartbeatArgs {
-    public:
-        ReplSetHeartbeatArgs();
+    Status initialize(const BSONObj& argsObj);
 
-        /**
-         * Initializes this ReplSetHeartbeatArgs from the contents of args.
-         */
-        Status initialize(const BSONObj& argsObj);
+    /**
+     * Returns true if all required fields have been initialized.
+     */
+    bool isInitialized() const;
 
-        /**
-         * Returns true if all required fields have been initialized.
-         */
-        bool isInitialized() const;
+    /**
+     * Returns whether the sender would like to know whether the node is empty or not.
+     */
+    bool getCheckEmpty() const {
+        return _checkEmpty;
+    }
 
-        /**
-         * Returns whether the sender would like to know whether the node is empty or not.
-         */
-        bool getCheckEmpty() const { return _checkEmpty; }
+    /**
+     * Gets the version of the Heartbeat protocol being used by the sender.
+     */
+    long long getProtocolVersion() const {
+        return _protocolVersion;
+    }
 
-        /**
-         * Gets the version of the Heartbeat protocol being used by the sender.
-         */
-        long long getProtocolVersion() const { return _protocolVersion; }
+    /**
+     * Gets the ReplSetConfig version number of the sender.
+     */
+    long long getConfigVersion() const {
+        return _configVersion;
+    }
 
-        /**
-         * Gets the ReplSetConfig version number of the sender.
-         */ 
-        long long getConfigVersion() const { return _configVersion; }
+    /**
+     * Gets the _id of the sender in their ReplSetConfig.
+     */
+    long long getSenderId() const {
+        return _senderId;
+    }
 
-        /**
-         * Gets the _id of the sender in their ReplSetConfig.
-         */
-        long long getSenderId() const { return _senderId; }
+    /**
+     * Gets the replSet name of the sender's replica set.
+     */
+    std::string getSetName() const {
+        return _setName;
+    }
 
-        /**
-         * Gets the replSet name of the sender's replica set.
-         */
-        std::string getSetName() const { return _setName; }
+    /**
+     * Gets the HostAndPort of the sender.
+     */
+    HostAndPort getSenderHost() const {
+        return _senderHost;
+    }
 
-        /**
-         * Gets the HostAndPort of the sender.
-         */
-        HostAndPort getSenderHost() const { return _senderHost; }
+    /**
+     * The below methods check whether or not value in the method name has been set.
+     */
+    bool hasCheckEmpty() {
+        return _hasCheckEmpty;
+    }
+    bool hasProtocolVersion() {
+        return _hasProtocolVersion;
+    }
+    bool hasConfigVersion() {
+        return _hasConfigVersion;
+    }
+    bool hasSenderId() {
+        return _hasSenderId;
+    }
+    bool hasSetName() {
+        return _hasSetName;
+    }
+    bool hasSenderHost() {
+        return _hasSenderHost;
+    }
 
-        /**
-         * The below methods check whether or not value in the method name has been set.
-         */
-        bool hasCheckEmpty() { return _hasCheckEmpty; }
-        bool hasProtocolVersion() { return _hasProtocolVersion; }
-        bool hasConfigVersion() { return _hasConfigVersion; }
-        bool hasSenderId() { return _hasSenderId; }
-        bool hasSetName() { return _hasSetName; }
-        bool hasSenderHost() { return _hasSenderHost; }
+    /**
+     * The below methods set the value in the method name to 'newVal'.
+     */
+    void setCheckEmpty(bool newVal);
+    void setProtocolVersion(long long newVal);
+    void setConfigVersion(long long newVal);
+    void setSenderId(long long newVal);
+    void setSetName(std::string newVal);
+    void setSenderHost(HostAndPort newVal);
 
-        /**
-         * The below methods set the value in the method name to 'newVal'.
-         */
-        void setCheckEmpty(bool newVal);
-        void setProtocolVersion(long long newVal);
-        void setConfigVersion(long long newVal);
-        void setSenderId(long long newVal);
-        void setSetName(std::string newVal);
-        void setSenderHost(HostAndPort newVal);
+    /**
+     * Returns a BSONified version of the object.
+     * Should only be called if the mandatory fields have been set.
+     * Optional fields are only included if they have been set.
+     */
+    BSONObj toBSON() const;
 
-        /**
-         * Returns a BSONified version of the object.
-         * Should only be called if the mandatory fields have been set.
-         * Optional fields are only included if they have been set.
-         */
-        BSONObj toBSON() const;
+private:
+    bool _hasCheckEmpty;
+    bool _hasProtocolVersion;
+    bool _hasConfigVersion;
+    bool _hasSenderId;
+    bool _hasSetName;
+    bool _hasSenderHost;
 
-    private:
-        bool _hasCheckEmpty;
-        bool _hasProtocolVersion;
-        bool _hasConfigVersion;
-        bool _hasSenderId;
-        bool _hasSetName;
-        bool _hasSenderHost;
+    // look at the body of the isInitialized() function to see which fields are mandatory
+    bool _checkEmpty;
+    long long _protocolVersion;
+    long long _configVersion;
+    long long _senderId;
+    std::string _setName;
+    HostAndPort _senderHost;
+};
 
-        // look at the body of the isInitialized() function to see which fields are mandatory
-        bool _checkEmpty;
-        long long _protocolVersion;
-        long long _configVersion;
-        long long _senderId;
-        std::string _setName;
-        HostAndPort _senderHost;
-    };
-
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

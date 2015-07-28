@@ -39,81 +39,80 @@
 
 namespace mongo {
 
-    struct StorageGlobalParams {
+struct StorageGlobalParams {
+    // Default data directory for mongod when running in non-config server mode.
+    static const char* kDefaultDbPath;
 
-        // Default data directory for mongod when running in non-config server mode.
-        static const char* kDefaultDbPath;
+    // Default data directory for mongod when running as the config database of
+    // a sharded cluster.
+    static const char* kDefaultConfigDbPath;
 
-        // Default data directory for mongod when running as the config database of
-        // a sharded cluster.
-        static const char* kDefaultConfigDbPath;
-
-        StorageGlobalParams() :
-            engine("mmapv1"),
-            dbpath(kDefaultDbPath),
-            upgrade(false),
-            repair(false),
-            noTableScan(false),
-            directoryperdb(false),
-            syncdelay(60.0) {
-            dur = false;
+    StorageGlobalParams()
+        : engine("mmapv1"),
+          dbpath(kDefaultDbPath),
+          upgrade(false),
+          repair(false),
+          noTableScan(false),
+          directoryperdb(false),
+          syncdelay(60.0) {
+        dur = false;
 #if defined(_DURABLEDEFAULTON)
+        dur = true;
+#endif
+        if (sizeof(void*) == 8)
             dur = true;
-#endif
-            if (sizeof(void*) == 8)
-                dur = true;
 #if defined(_DURABLEDEFAULTOFF)
-            dur = false;
+        dur = false;
 #endif
-        }
+    }
 
-        // --storageEngine
-        // storage engine for this instance of mongod.
-        std::string engine;
+    // --storageEngine
+    // storage engine for this instance of mongod.
+    std::string engine;
 
-        // The directory where the mongod instance stores its data.
-        std::string dbpath;
+    // The directory where the mongod instance stores its data.
+    std::string dbpath;
 
-        // --upgrade
-        // Upgrades the on-disk data format of the files specified by the --dbpath to the
-        // latest version, if needed.
-        bool upgrade;
+    // --upgrade
+    // Upgrades the on-disk data format of the files specified by the --dbpath to the
+    // latest version, if needed.
+    bool upgrade;
 
-        // --repair
-        // Runs a repair routine on all databases. This is equivalent to shutting down and
-        // running the repairDatabase database command on all databases.
-        bool repair;
+    // --repair
+    // Runs a repair routine on all databases. This is equivalent to shutting down and
+    // running the repairDatabase database command on all databases.
+    bool repair;
 
-        // --repairpath
-        // Specifies the root directory containing MongoDB data files to use for the --repair
-        // operation.
-        // Default: A _tmp directory within the path specified by the dbPath option.
-        std::string repairpath;
+    // --repairpath
+    // Specifies the root directory containing MongoDB data files to use for the --repair
+    // operation.
+    // Default: A _tmp directory within the path specified by the dbPath option.
+    std::string repairpath;
 
-        bool dur;                       // --dur durability (now --journal)
+    bool dur;  // --dur durability (now --journal)
 
-        // --notablescan
-        // no table scans allowed
-        bool noTableScan;
+    // --notablescan
+    // no table scans allowed
+    bool noTableScan;
 
-        // --directoryperdb
-        // Stores each database’s files in its own folder in the data directory.
-        // When applied to an existing system, the directoryPerDB option alters
-        // the storage pattern of the data directory.
-        bool directoryperdb;
+    // --directoryperdb
+    // Stores each database’s files in its own folder in the data directory.
+    // When applied to an existing system, the directoryPerDB option alters
+    // the storage pattern of the data directory.
+    bool directoryperdb;
 
-        // --syncdelay
-        // Controls how much time can pass before MongoDB flushes data to the data files
-        // via an fsync operation.
-        // Do not set this value on production systems.
-        // In almost every situation, you should use the default setting.
-        double syncdelay;      // seconds between fsyncs
-    };
+    // --syncdelay
+    // Controls how much time can pass before MongoDB flushes data to the data files
+    // via an fsync operation.
+    // Do not set this value on production systems.
+    // In almost every situation, you should use the default setting.
+    double syncdelay;  // seconds between fsyncs
+};
 
-    extern StorageGlobalParams storageGlobalParams;
+extern StorageGlobalParams storageGlobalParams;
 
-    // This is not really related to persistence, but mongos and the other executables share code
-    // and we use this function to determine at runtime which executable we are in.
-    bool isMongos();
+// This is not really related to persistence, but mongos and the other executables share code
+// and we use this function to determine at runtime which executable we are in.
+bool isMongos();
 
-} // namespace mongo
+}  // namespace mongo
