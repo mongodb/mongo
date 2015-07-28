@@ -3366,6 +3366,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	return (__rec_split_finish(session, r));
 
 err:	CHILD_RELEASE(session, hazard, ref);
+	F_CLR_ATOMIC(page, WT_PAGE_SPLIT_LOCKED);
 	return (ret);
 }
 
@@ -4270,6 +4271,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	return (__rec_split_finish(session, r));
 
 err:	CHILD_RELEASE(session, hazard, ref);
+	F_CLR_ATOMIC(page, WT_PAGE_SPLIT_LOCKED);
 	return (ret);
 }
 
