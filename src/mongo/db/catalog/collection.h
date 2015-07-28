@@ -319,10 +319,10 @@ public:
     Status setValidator(OperationContext* txn, BSONObj validator);
 
     Status setValidationLevel(OperationContext* txn, StringData newLevel);
-    Status setValidationAction(OperationContext* txn, StringData newAction);
+    Status setValidationState(OperationContext* txn, StringData newState);
 
     StringData getValidationLevel() const;
-    StringData getValidationAction() const;
+    StringData getValidationState() const;
 
     // -----------
 
@@ -399,11 +399,11 @@ private:
     BSONObj _validatorDoc;
     // Points into _validatorDoc. Null means no filter.
     std::unique_ptr<MatchExpression> _validator;
-    enum ValidationAction { WARN, ERROR } _validationAction;
+    enum ValidationState { WARN, ENFORCE } _validationState;
     enum ValidationLevel { OFF, MODERATE, STRICT_V } _validationLevel;
 
     static StatusWith<ValidationLevel> _parseValidationLevel(StringData);
-    static StatusWith<ValidationAction> _parseValidationAction(StringData);
+    static StatusWith<ValidationState> _parseValidationState(StringData);
 
     // this is mutable because read only users of the Collection class
     // use it keep state.  This seems valid as const correctness of Collection

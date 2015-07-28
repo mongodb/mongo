@@ -100,7 +100,7 @@ struct CollectionOptions {
 
     // Always owned or empty.
     BSONObj validator;
-    std::string validationAction;
+    std::string validationState;
     std::string validationLevel;
 };
 }

@@ -23,7 +23,7 @@
 
     // check we can do a bad update in warn mode
     assert.commandWorked(t.runCommand("collMod",
-                                      {validationAction: "warn"}));
+                                      {validationState: "warn"}));
     t.update({}, {$set: {a:2}});
     assert.eq(1, t.find({a:2}).itcount());
 
@@ -31,11 +31,11 @@
 
     // make sure persisted
     var info = db.getCollectionInfos({name: t.getName()})[0];
-    assert.eq("warn", info.options.validationAction, tojson(info));
+    assert.eq("warn", info.options.validationState, tojson(info));
     
     // check we can go back to enforce strict
     assert.commandWorked(t.runCommand("collMod",
-                                      {validationAction: "error",
+                                      {validationState: "enforce",
                                        validationLevel: "strict"}));
     assertFailsValidation(t.update({}, {$set: {a:3}}));
     assert.eq(1, t.find({a:2}).itcount());
@@ -50,7 +50,7 @@
     t.drop();
     assert.commandWorked(db.createCollection(t.getName(),
                                              {validator: {a : 1},
-                                              validationAction: "warn"}));
+                                              validationState: "warn"}));
     
     t.insert({a:2});
     t.insert({a:1});

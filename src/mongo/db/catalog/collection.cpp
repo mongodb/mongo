@@ -152,8 +152,8 @@ Collection::Collection(OperationContext* txn,
       _indexCatalog(this),
       _validatorDoc(_details->getCollectionOptions(txn).validator.getOwned()),
       _validator(uassertStatusOK(parseValidator(_validatorDoc))),
-      _validationAction(uassertStatusOK(
-          _parseValidationAction(_details->getCollectionOptions(txn).validationAction))),
+      _validationState(uassertStatusOK(
+          _parseValidationState(_details->getCollectionOptions(txn).validationState))),
       _validationLevel(uassertStatusOK(
           _parseValidationLevel(_details->getCollectionOptions(txn).validationLevel))),
       _cursorManager(fullNS),
@@ -241,7 +241,7 @@ Status Collection::checkValidation(OperationContext* txn, const BSONObj& documen
     if (_validator->matchesBSON(document))
         return Status::OK();
 
-    if (_validationAction == WARN) {
+    if (_validationState == WARN) {
         warning() << "Document would fail validation"
                   << " collection: " << ns() << " doc: " << document;
         return Status::OK();
@@ -737,7 +737,7 @@ Status Collection::setValidator(OperationContext* txn, BSONObj validatorDoc) {
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 
-    _details->updateValidator(txn, validatorDoc, getValidationLevel(), getValidationAction());
+    _details->updateValidator(txn, validatorDoc, getValidationLevel(), getValidationState());
 
     _validator = std::move(statusWithMatcher.getValue());
     _validatorDoc = std::move(validatorDoc);
@@ -760,17 +760,17 @@ StatusWith<Collection::ValidationLevel> Collection::_parseValidationLevel(String
     }
 }
 
-StatusWith<Collection::ValidationAction> Collection::_parseValidationAction(StringData newAction) {
-    if (newAction == "") {
+StatusWith<Collection::ValidationState> Collection::_parseValidationState(StringData newState) {
+    if (newState == "") {
         // default
-        return ERROR;
-    } else if (newAction == "warn") {
+        return ENFORCE;
+    } else if (newState == "warn") {
         return WARN;
-    } else if (newAction == "error") {
-        return ERROR;
+    } else if (newState == "enforce") {
+        return ENFORCE;
     } else {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "invalid validation action: " << newAction);
+                      str::stream() << "invalid validation state: " << newState);
     }
 }
 
@@ -786,10 +786,10 @@ StringData Collection::getValidationLevel() const {
     MONGO_UNREACHABLE;
 }
 
-StringData Collection::getValidationAction() const {
-    switch (_validationAction) {
-        case ERROR:
-            return "error";
+StringData Collection::getValidationState() const {
+    switch (_validationState) {
+        case ENFORCE:
+            return "enforce";
         case WARN:
             return "warn";
     }
@@ -806,22 +806,22 @@ Status Collection::setValidationLevel(OperationContext* txn, StringData newLevel
 
     _validationLevel = status.getValue();
 
-    _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationAction());
+    _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationState());
 
     return Status::OK();
 }
 
-Status Collection::setValidationAction(OperationContext* txn, StringData newAction) {
+Status Collection::setValidationState(OperationContext* txn, StringData newState) {
     invariant(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
-    StatusWith<ValidationAction> status = _parseValidationAction(newAction);
+    StatusWith<ValidationState> status = _parseValidationState(newState);
     if (!status.isOK()) {
         return status.getStatus();
     }
 
-    _validationAction = status.getValue();
+    _validationState = status.getValue();
 
-    _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationAction());
+    _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationState());
 
     return Status::OK();
 }

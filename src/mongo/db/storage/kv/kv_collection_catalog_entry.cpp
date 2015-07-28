@@ -166,11 +166,11 @@ void KVCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) 
 void KVCollectionCatalogEntry::updateValidator(OperationContext* txn,
                                                const BSONObj& validator,
                                                StringData validationLevel,
-                                               StringData validationAction) {
+                                               StringData validationState) {
     MetaData md = _getMetaData(txn);
     md.options.validator = validator;
     md.options.validationLevel = validationLevel.toString();
-    md.options.validationAction = validationAction.toString();
+    md.options.validationState = validationState.toString();
     _catalog->putMetaData(txn, ns().toString(), md);
 }
 
