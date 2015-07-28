@@ -58,7 +58,7 @@ ThreadPoolMock::~ThreadPoolMock() {
 }
 
 void ThreadPoolMock::startup() {
-    log() << "Starting pool";
+    LOG(1) << "Starting pool";
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_started);
     invariant(!_worker.joinable());
@@ -102,7 +102,8 @@ Status ThreadPoolMock::schedule(Task task) {
 
 void ThreadPoolMock::consumeTasks(stdx::unique_lock<stdx::mutex>* lk) {
     using std::swap;
-    log() << "Starting to consume tasks";
+
+    LOG(1) << "Starting to consume tasks";
     while (!(_inShutdown && _tasks.empty())) {
         if (_tasks.empty()) {
             lk->unlock();
@@ -120,14 +121,17 @@ void ThreadPoolMock::consumeTasks(stdx::unique_lock<stdx::mutex>* lk) {
         fn();
         lk->lock();
     }
-    log() << "Done consuming tasks";
+    LOG(1) << "Done consuming tasks";
+
     invariant(_tasks.empty());
+
     while (!_joining) {
         lk->unlock();
         _net->waitForWork();
         lk->lock();
     }
-    log() << "Ready to join";
+
+    LOG(1) << "Ready to join";
 }
 
 }  // namespace executor
