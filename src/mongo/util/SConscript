@@ -250,9 +250,9 @@ if get_option('allocator') == 'tcmalloc':
             '$BUILD_DIR/mongo/db/server_parameters',
             '$BUILD_DIR/mongo/util/net/network',
         ],
-        LIBDEPS_DEPENDENTS=[
-            '$BUILD_DIR/mongo/${PROGPREFIX}mongod${PROGSUFFIX}',
-            '$BUILD_DIR/mongo/${PROGPREFIX}mongos${PROGSUFFIX}',
+        PROGDEPS_DEPENDENTS=[
+            '$BUILD_DIR/mongo/mongod',
+            '$BUILD_DIR/mongo/mongos',
         ],
     )
 

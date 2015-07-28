@@ -224,20 +224,17 @@ def libdeps_emitter(target, source, env):
     of the "target" list is made a prerequisite of the elements of LIBDEPS_DEPENDENTS.
     """
 
-    libdep_files = []
-    lib_suffix = env.subst('$LIBSUFFIX', target=target, source=source)
-    lib_prefix = env.subst('$LIBPREFIX', target=target, source=source)
-    for prereq in env.Flatten([env.get(libdeps_env_var, [])]):
-        full_path = env.subst(str(prereq), target=target, source=source)
-        dir_name = os.path.dirname(full_path)
-        file_name = os.path.basename(full_path)
-        if not file_name.startswith(lib_prefix):
-            file_name = '${LIBPREFIX}' + file_name
-        if not file_name.endswith(lib_suffix):
-            file_name += '${LIBSUFFIX}'
+    lib_builder = env['BUILDERS']['StaticLibrary']
+    lib_node_factory = lib_builder.target_factory or env.File
 
-        node_factory = env['BUILDERS']['StaticLibrary'].target_factory or env.File
-        libdep_files.append(node_factory(os.path.join(dir_name, file_name)))
+    prog_builder = env['BUILDERS']['Program']
+    prog_node_factory = prog_builder.target_factory or env.File
+
+    libdep_files = []
+    for prereq in env.Flatten([env.get(libdeps_env_var, [])]):
+        prereqWithIxes = SCons.Util.adjustixes(
+            prereq, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
+        libdep_files.append(lib_node_factory(prereqWithIxes))
 
     for t in target:
         # target[0] must be a Node and not a string, or else libdeps will fail to
@@ -245,7 +242,16 @@ def libdeps_emitter(target, source, env):
         __append_direct_libdeps(t, libdep_files)
 
     for dependent in env.Flatten([env.get('LIBDEPS_DEPENDENTS', [])]):
-        __append_direct_libdeps(env.File(dependent), [target[0]])
+        dependentWithIxes = SCons.Util.adjustixes(
+            dependent, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
+        dependentNode = lib_node_factory(dependentWithIxes)
+        __append_direct_libdeps(dependentNode, [target[0]])
+
+    for dependent in env.Flatten([env.get('PROGDEPS_DEPENDENTS', [])]):
+        dependentWithIxes = SCons.Util.adjustixes(
+            dependent, prog_builder.get_prefix(env), prog_builder.get_suffix(env))
+        dependentNode = prog_node_factory(dependentWithIxes)
+        __append_direct_libdeps(dependentNode, [target[0]])
 
     return target, source
 
@@ -267,20 +273,17 @@ def shlibdeps_emitter(target, source, env):
     of the "target" list is made a prerequisite of the elements of LIBDEPS_DEPENDENTS.
     """
 
-    libdep_files = []
-    lib_suffix = env.subst('$SHLIBSUFFIX', target=target, source=source)
-    lib_prefix = env.subst('$SHLIBPREFIX', target=target, source=source)
-    for prereq in env.Flatten([env.get(libdeps_env_var, [])]):
-        full_path = env.subst(str(prereq), target=target, source=source)
-        dir_name = os.path.dirname(full_path)
-        file_name = os.path.basename(full_path)
-        if not file_name.startswith(lib_prefix):
-            file_name = '${SHLIBPREFIX}' + file_name
-        if not file_name.endswith(lib_suffix):
-            file_name += '${SHLIBSUFFIX}'
+    lib_builder = env['BUILDERS']['SharedLibrary']
+    lib_node_factory = lib_builder.target_factory or env.File
 
-        node_factory = env['BUILDERS']['SharedLibrary'].target_factory or env.File
-        libdep_files.append(node_factory(os.path.join(dir_name, file_name)))
+    prog_builder = env['BUILDERS']['Program']
+    prog_node_factory = prog_builder.target_factory or env.File
+
+    libdep_files = []
+    for prereq in env.Flatten([env.get(libdeps_env_var, [])]):
+        prereqWithIxes = SCons.Util.adjustixes(
+            prereq, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
+        libdep_files.append(lib_node_factory(prereqWithIxes))
 
     for t in target:
         # target[0] must be a Node and not a string, or else libdeps will fail to
@@ -288,7 +291,16 @@ def shlibdeps_emitter(target, source, env):
         __append_direct_libdeps(t, libdep_files)
 
     for dependent in env.Flatten([env.get('LIBDEPS_DEPENDENTS', [])]):
-        __append_direct_libdeps(env.File(dependent), [target[0]])
+        dependentWithIxes = SCons.Util.adjustixes(
+            dependent, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
+        dependentNode = lib_node_factory(dependentWithIxes)
+        __append_direct_libdeps(dependentNode, [target[0]])
+
+    for dependent in env.Flatten([env.get('PROGDEPS_DEPENDENTS', [])]):
+        dependentWithIxes = SCons.Util.adjustixes(
+            dependent, prog_builder.get_prefix(env), prog_builder.get_suffix(env))
+        dependentNode = prog_node_factory(dependentWithIxes)
+        __append_direct_libdeps(dependentNode, [target[0]])
 
     return target, source
 
