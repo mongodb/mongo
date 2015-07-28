@@ -343,11 +343,12 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
-	int locked;
+	int page_lock, scan_lock, split_lock;
 
 	conn = S2C(session);
 	page = ref->page;
 	mod = page->modify;
+	page_lock = scan_lock = split_lock = 0;
 
 	/* We're shouldn't get called with a clean page, that's an error. */
 	if (!__wt_page_is_modified(page))
@@ -386,22 +387,38 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 
 	/*
 	 * The compaction process looks at the page's modification information;
-	 * if compaction is running, lock the page down.
-	 *
-	 * Otherwise, flip on the scanning flag: obsolete updates cannot be
-	 * freed while reconciliation is in progress.
+	 * if compaction is running, acquire the page's lock.
 	 */
-	locked = 0;
 	if (conn->compact_in_memory_pass) {
-		locked = 1;
 		WT_PAGE_LOCK(session, page);
-	} else
+		page_lock = 1;
+	}
+
+	/*
+	 * Reconciliation reads the lists of updates, so obsolete updates cannot
+	 * be discarded while reconciliation is in progress.
+	 */
+	for (;;) {
+		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
+		if (ret == 0)
+			break;
+		__wt_yield();
+	}
+	scan_lock = 1;
+
+	/*
+	 * Mark internal pages as splitting to ensure we don't deadlock when
+	 * performing an in-memory split during a checkpoint.
+	 */
+	if (WT_PAGE_IS_INTERNAL(page)) {
 		for (;;) {
-			F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
+			F_CAS_ATOMIC(page, WT_PAGE_SPLIT_LOCKED, ret);
 			if (ret == 0)
 				break;
 			__wt_yield();
 		}
+		split_lock = 1;
+	}
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -434,11 +451,13 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	else
 		WT_TRET(__rec_write_wrapup_err(session, r, page));
 
-	/* Release the page lock if we're holding one. */
-	if (locked)
-		WT_PAGE_UNLOCK(session, page);
-	else
+	/* Release the locks we're holding. */
+	if (split_lock)
+		F_CLR_ATOMIC(page, WT_PAGE_SPLIT_LOCKED);
+	if (scan_lock)
 		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
+	if (page_lock)
+		WT_PAGE_UNLOCK(session, page);
 
 	/*
 	 * Clean up the boundary structures: some workloads result in millions
