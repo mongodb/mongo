@@ -428,6 +428,14 @@ Status addMongodOptions(moe::OptionSection* options) {
         .setSources(moe::SourceAllLegacy)
         .incompatibleWith("shardsvr");
 
+    sharding_options.addOptionChaining("sharding.configsvrMode",
+                                       "configsvrMode",
+                                       moe::String,
+                                       "Controls what config server protocol is in use. When set to"
+                                       " \"scc\" keeps server in legacy SyncClusterConnection mode "
+                                       "even when the service is running as a replSet")
+        .setSources(moe::SourceAllLegacy);
+
     sharding_options.addOptionChaining(
                          "shardsvr",
                          "shardsvr",
@@ -1189,6 +1197,9 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
     if (params.count("sharding.clusterRole") &&
         params["sharding.clusterRole"].as<std::string>() == "configsvr") {
         serverGlobalParams.configsvr = true;
+        serverGlobalParams.configsvrMode = replSettings.replSet.empty()
+            ? ServerGlobalParams::ConfigServerMode::SCC
+            : ServerGlobalParams::ConfigServerMode::CSRS;
         mmapv1GlobalOptions.smallfiles = true;  // config server implies small files
 
         // If we haven't explicitly specified a journal option, default journaling to true for
@@ -1203,6 +1214,20 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         replSettings.master = true;
         if (!params.count("replication.oplogSizeMB"))
             replSettings.oplogSize = 5 * 1024 * 1024;
+    }
+
+    if (params.count("sharding.configsvrMode")) {
+        if (!serverGlobalParams.configsvr) {
+            return Status(ErrorCodes::BadValue,
+                          "Cannot set \"sharding.configsvrMode\" without "
+                          "setting \"sharding.clusterRole\" to \"configsvr\"");
+        }
+        if (params["sharding.configsvrMode"].as<std::string>() != "scc") {
+            return Status(ErrorCodes::BadValue,
+                          "Bad value for sharding.configsvrMode.  "
+                          " Only supported value is \"scc\"");
+        }
+        serverGlobalParams.configsvrMode = ServerGlobalParams::ConfigServerMode::SCC;
     }
 
     if (params.count("sharding.archiveMovedChunks")) {
