@@ -29,16 +29,20 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 
 namespace mongo {
 class BSONObj;
 
+using RunCommandResultHandler = stdx::function<void(StatusWith<executor::RemoteCommandResponse>)>;
+using RunCommandHook =
+    stdx::function<void(executor::RemoteCommandRequest, RunCommandResultHandler)>;
+
 /**
  * Attempts to authenticate "client" using the SASL protocol.
  *
- * Do not use directly in client code.  Use the DBClientWithCommands::auth(const BSONObj&)
- * method, instead.
+ * Do not use directly in client code.  Use the auth::authenticateClient() method, instead.
  *
  * Test against NULL for availability.  Client driver must be compiled with SASL support _and_
  * client application must have successfully executed mongo::runGlobalInitializersOrDie() or its
@@ -66,7 +70,8 @@ class BSONObj;
  * rejected.  Other failures, all of which are tantamount to authentication failure, may also be
  * returned.
  */
-extern Status (*saslClientAuthenticate)(DBClientWithCommands* client,
+extern Status (*saslClientAuthenticate)(RunCommandHook runCommand,
+                                        StringData hostname,
                                         const BSONObj& saslParameters);
 
 /**

@@ -62,6 +62,7 @@
 #include "mongo/logger/syslog_appender.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"

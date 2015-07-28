@@ -925,24 +925,6 @@ protected:
 
     virtual void _auth(const BSONObj& params);
 
-    /**
-     * Use the MONGODB-CR protocol to authenticate as "username" against the database "dbname",
-     * with the given password.  If digestPassword is false, the password is assumed to be
-     * pre-digested.  Returns false on failure, and sets "errmsg".
-     */
-    bool _authMongoCR(const std::string& dbname,
-                      const std::string& username,
-                      const std::string& pwd,
-                      BSONObj* info,
-                      bool digestPassword);
-
-    /**
-     * Use the MONGODB-X509 protocol to authenticate as "username. The certificate details
-     * has already been communicated automatically as part of the connect call.
-     * Returns false on failure and set "errmsg".
-     */
-    bool _authX509(const std::string& dbname, const std::string& username, BSONObj* info);
-
     // should be set by subclasses during connection.
     void _setServerRPCProtocols(rpc::ProtocolSet serverProtocols);
 

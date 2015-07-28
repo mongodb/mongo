@@ -45,15 +45,17 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {
 
 using std::endl;
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 namespace {
 
@@ -114,8 +116,9 @@ Status extractPassword(const BSONObj& saslParameters,
  * Returns Status::OK() on success.
  */
 Status configureSession(SaslClientSession* session,
-                        DBClientWithCommands* client,
-                        const std::string& targetDatabase,
+                        RunCommandHook runCommand,
+                        StringData hostname,
+                        StringData targetDatabase,
                         const BSONObj& saslParameters) {
     std::string mechanism;
     Status status =
@@ -131,10 +134,8 @@ Status configureSession(SaslClientSession* session,
         return status;
     session->setParameter(SaslClientSession::parameterServiceName, value);
 
-    status = bsonExtractStringFieldWithDefault(saslParameters,
-                                               saslCommandServiceHostnameFieldName,
-                                               HostAndPort(client->getServerAddress()).host(),
-                                               &value);
+    status = bsonExtractStringFieldWithDefault(
+        saslParameters, saslCommandServiceHostnameFieldName, hostname, &value);
     if (!status.isOK())
         return status;
     session->setParameter(SaslClientSession::parameterServiceHostname, value);
@@ -167,7 +168,9 @@ Status configureSession(SaslClientSession* session,
  * Driver for the client side of a sasl authentication session, conducted synchronously over
  * "client".
  */
-Status saslClientAuthenticateImpl(DBClientWithCommands* client, const BSONObj& saslParameters) {
+Status saslClientAuthenticateImpl(RunCommandHook runCommand,
+                                  StringData hostname,
+                                  const BSONObj& saslParameters) {
     int saslLogLevel = getSaslClientLogLevel(saslParameters);
 
     std::string targetDatabase;
@@ -188,7 +191,7 @@ Status saslClientAuthenticateImpl(DBClientWithCommands* client, const BSONObj& s
     }
 
     std::unique_ptr<SaslClientSession> session(SaslClientSession::create(mechanism));
-    status = configureSession(session.get(), client, targetDatabase, saslParameters);
+    status = configureSession(session.get(), runCommand, hostname, targetDatabase, saslParameters);
 
     if (!status.isOK())
         return status;
@@ -232,7 +235,16 @@ Status saslClientAuthenticateImpl(DBClientWithCommands* client, const BSONObj& s
         // indicating a failure.  Subsequent versions should return "ok: 0" on failure with a
         // non-zero "code" field to indicate specific failure.  In all versions, ok: 1, code: >0
         // and ok: 0, code optional, indicate failure.
-        bool ok = client->runCommand(targetDatabase, commandBuilder.obj(), inputObj);
+        auto request = RemoteCommandRequest();
+        request.dbname = targetDatabase;
+        request.cmdObj = commandBuilder.obj();
+
+        runCommand(request,
+                   [&inputObj](StatusWith<RemoteCommandResponse> response) {
+                       inputObj = response.getValue().data.getOwned();
+                   });
+        bool ok = getStatusFromCommandResult(inputObj).isOK();
+
         ErrorCodes::Error code =
             ErrorCodes::fromInt(inputObj[saslCommandCodeFieldName].numberInt());
 

@@ -38,7 +38,8 @@ namespace mongo {
 
 using namespace mongoutils;
 
-Status (*saslClientAuthenticate)(DBClientWithCommands* client,
+Status (*saslClientAuthenticate)(RunCommandHook runCommand,
+                                 StringData hostname,
                                  const BSONObj& saslParameters) = NULL;
 
 const char* const saslStartCommandName = "saslStart";

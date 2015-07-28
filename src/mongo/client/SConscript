@@ -48,36 +48,90 @@ env.CppUnitTest(
     ]
 )
 
+saslClientEnv = env.Clone()
+saslLibs = []
+saslClientSource = [
+    'native_sasl_client_session.cpp',
+    'sasl_client_authenticate.cpp',
+    'sasl_client_authenticate_impl.cpp',
+    'sasl_client_conversation.cpp',
+    'sasl_client_session.cpp',
+    'sasl_plain_client_conversation.cpp',
+    'sasl_scramsha1_client_conversation.cpp',
+]
+
+# Add in actual sasl dependencies if sasl is enabled, otherwise
+# leave library empty so other targets can link to it unconditionally
+# without needing to first test MONGO_BUILD_SASL_CLIENT.
+if env['MONGO_BUILD_SASL_CLIENT']:
+    saslClientSource.extend([
+        'cyrus_sasl_client_session.cpp',
+        'sasl_sspi.cpp',
+    ])
+
+    saslLibs.extend(['sasl2'])
+    if env.TargetOSIs('windows'):
+        saslLibs.extend(['secur32'])
+
+saslClientEnv.Library(
+    target='sasl_client',
+    source=saslClientSource,
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/crypto/scramauth',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/util/foundation',
+    ],
+    SYSLIBDEPS=saslLibs
+)
+
+env.Library(
+    target='authentication',
+    source=[
+        'authenticate.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/executor/remote_command',
+        'sasl_client'
+    ]
+)
+
+env.CppUnitTest(
+    target=[
+        'authenticate_test',
+    ],
+    source=[
+        'authenticate_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/md5',
+        'authentication',
+    ]
+)
+
 env.Library(
     target='clientdriver',
     source=[
+        '$BUILD_DIR/mongo/db/dbmessage.cpp',
         'connection_string_connect.cpp',
         'connpool.cpp',
         'dbclient.cpp',
         'dbclient_rs.cpp',
         'dbclientcursor.cpp',
         'global_conn_pool.cpp',
-        'native_sasl_client_session.cpp',
         'replica_set_monitor.cpp',
         'replica_set_monitor_manager.cpp',
-        'sasl_client_authenticate.cpp',
-        'sasl_client_authenticate_impl.cpp',
-        'sasl_client_conversation.cpp',
-        'sasl_client_session.cpp',
-        'sasl_plain_client_conversation.cpp',
-        'sasl_scramsha1_client_conversation.cpp',
         'syncclusterconnection.cpp',
     ],
     LIBDEPS=[
-        'connection_string',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/crypto/scramauth',
-        '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/md5',
-        'cyrus_sasl_client_session',
+        'authentication',
+        'connection_string',
         'read_preference',
     ]
 )
@@ -149,31 +203,6 @@ env.CppUnitTest(
 env.CppUnitTest('dbclient_rs_test',
                 ['dbclient_rs_test.cpp'],
                 LIBDEPS=['clientdriver', '$BUILD_DIR/mongo/dbtests/mocklib'])
-
-if env['MONGO_BUILD_SASL_CLIENT']:
-    saslLibs = ['sasl2']
-    if env.TargetOSIs('windows'):
-        saslLibs.extend(['secur32'])
-
-    env.Library(
-        target='cyrus_sasl_client_session',
-        source=[
-            'cyrus_sasl_client_session.cpp',
-            'sasl_sspi.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/util/foundation',
-        ],
-        SYSLIBDEPS=saslLibs,
-    )
-else:
-    # Create a dummy sasl client library so that other targets can unconditionally
-    # link to it, without needing to first test MONGO_BUILD_SASL_CLIENT.
-    env.Library(
-        target='cyrus_sasl_client_session',
-        source=[],
-        LIBDEPS=[]
-    )
 
 env.CppUnitTest(
     target='scoped_db_conn_test',

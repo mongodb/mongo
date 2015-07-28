@@ -55,11 +55,6 @@ void setInternalUserAuthParams(const BSONObj& authParamsIn);
 BSONObj getInternalUserAuthParamsWithFallback();
 
 /**
- * Returns a copy of the fallback parameter portion of an internal auth parameter object
- **/
-BSONObj getFallbackAuthParams(BSONObj params);
-
-/**
 * Authenticates to another cluster member using appropriate authentication data.
 * Uses getInternalUserAuthParams() to retrive authentication parameters.
 * @return true if the authentication was succesful

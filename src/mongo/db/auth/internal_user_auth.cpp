@@ -87,13 +87,6 @@ BSONObj getInternalUserAuthParamsWithFallback() {
     return authParams.copy();
 }
 
-BSONObj getFallbackAuthParams(BSONObj params) {
-    if (params["fallbackParams"].type() != Object) {
-        return BSONObj();
-    }
-    return params["fallbackParams"].Obj();
-}
-
 bool authenticateInternalUser(DBClientWithCommands* conn) {
     if (!isInternalAuthSet()) {
         if (!serverGlobalParams.quiet) {
