@@ -159,6 +159,8 @@ typedef struct {
 
 	pthread_rwlock_t backup_lock;		/* Hot backup running */
 
+	WT_RAND_STATE rnd;			/* Global RNG state */
+
 	/*
 	 * We have a list of records that are appended, but not yet "resolved",
 	 * that is, we haven't yet incremented the g.rows value to reflect the
@@ -262,6 +264,8 @@ typedef struct {
 extern GLOBAL g;
 
 typedef struct {
+	WT_RAND_STATE rnd;			/* thread RNG state */
+
 	uint64_t search;			/* operations */
 	uint64_t insert;
 	uint64_t update;
@@ -299,15 +303,18 @@ void	 config_file(const char *);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
+void	 fclose_and_clear(FILE **);
+void	 key_gen(uint8_t *, size_t *, uint64_t);
+void	 key_gen_insert(WT_RAND_STATE *, uint8_t *, size_t *, uint64_t);
+void	 key_gen_setup(uint8_t **);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, size_t *, uint64_t, int);
 void	 path_setup(const char *);
-uint32_t rng(void);
-void	 rng_init(void);
+uint32_t rng(WT_RAND_STATE *);
 void	 track(const char *, uint64_t, TINFO *);
-void	 val_gen_setup(uint8_t **);
-void	 value_gen(uint8_t *, size_t *, uint64_t);
+void	 val_gen(WT_RAND_STATE *, uint8_t *, size_t *, uint64_t);
+void	 val_gen_setup(WT_RAND_STATE *, uint8_t **);
 void	 wts_close(void);
 void	 wts_create(void);
 void	 wts_dump(const char *, int);
@@ -324,3 +331,13 @@ void	 die(int, const char *, ...)
 __attribute__((__noreturn__))
 #endif
 ;
+
+/*
+ * mmrand --
+ *	Return a random value between a min/max pair.
+ */
+static inline uint32_t
+mmrand(WT_RAND_STATE *rnd, u_int min, u_int max)
+{
+	return (rng(rnd) % (((max) + 1) - (min)) + (min));
+}

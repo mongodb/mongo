@@ -109,7 +109,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	 * enough to trigger checkpoints.
 	 */
 	if (evict_chunk != NULL && flush_chunk != NULL) {
-		chunk = (__wt_random(session->rnd) & 1) ?
+		chunk = (__wt_random(&session->rnd) & 1) ?
 		    evict_chunk : flush_chunk;
 		WT_ERR(__wt_lsm_manager_push_entry(
 		    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));

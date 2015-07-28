@@ -29,19 +29,22 @@
 #include "wt_internal.h"
 
 #undef	M_W
-#define	M_W	(rnd)[0]
+#define	M_W(r)	r.x.w
 #undef	M_Z
-#define	M_Z	(rnd)[1]
+#define	M_Z(r)	r.x.z
 
 /*
  * __wt_random_init --
  *	Initialize return of a 32-bit pseudo-random number.
  */
 void
-__wt_random_init(uint32_t *rnd)
+__wt_random_init(WT_RAND_STATE volatile * rnd_state)
 {
-	M_W = 521288629;
-	M_Z = 362436069;
+	WT_RAND_STATE rnd;
+
+	M_W(rnd) = 521288629;
+	M_Z(rnd) = 362436069;
+	*rnd_state = rnd;
 }
 
 /*
@@ -60,11 +63,32 @@ __wt_random_init(uint32_t *rnd)
  * forever.  Take local copies of the shared values to avoid this.
  */
 uint32_t
-__wt_random(uint32_t *rnd)
+__wt_random(WT_RAND_STATE volatile * rnd_state)
 {
-	uint32_t w = M_W, z = M_Z;
+	WT_RAND_STATE rnd;
+	uint32_t w, z;
 
-	M_Z = z = 36969 * (z & 65535) + (z >> 16);
-	M_W = w = 18000 * (w & 65535) + (w >> 16);
-	return (z << 16) + (w & 65535);
+	/*
+	 * Take a copy of the random state so we can ensure that the
+	 * calculation operates on the state consistently regardless of
+	 * concurrent calls with the same random state.
+	 */
+	rnd = *rnd_state;
+	w = M_W(rnd);
+	z = M_Z(rnd);
+
+	/*
+	 * Check if the value goes to 0 (from which we won't recover), and reset
+	 * to the initial state. This has additional benefits if a caller fails
+	 * to initialize the state, or initializes with a seed that results in a
+	 * short period.
+	 */
+	if (z == 0 || w == 0)
+		__wt_random_init(rnd_state);
+
+	M_Z(rnd) = z = 36969 * (z & 65535) + (z >> 16);
+	M_W(rnd) = w = 18000 * (w & 65535) + (w >> 16);
+	*rnd_state = rnd;
+
+	return ((z << 16) + (w & 65535));
 }

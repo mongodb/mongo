@@ -1163,7 +1163,7 @@ __wt_skip_choose_depth(WT_SESSION_IMPL *session)
 	u_int d;
 
 	for (d = 1; d < WT_SKIP_MAXDEPTH &&
-	    __wt_random(session->rnd) < WT_SKIP_PROBABILITY; d++)
+	    __wt_random(&session->rnd) < WT_SKIP_PROBABILITY; d++)
 		;
 	return (d);
 }

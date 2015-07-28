@@ -191,7 +191,7 @@ wts_ops(int lastrun)
  *	Return the current session configuration.
  */
 static const char *
-ops_session_config(void)
+ops_session_config(WT_RAND_STATE *rnd)
 {
 	u_int v;
 

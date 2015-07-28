@@ -209,7 +209,7 @@ typedef struct {
 struct __config_thread {		/* Per-thread structure */
 	CONFIG *cfg;			/* Enclosing configuration */
 
-	uint32_t rnd[2];		/* Random number generation state */
+	WT_RAND_STATE rnd;		/* Random number generation state */
 
 	pthread_t handle;		/* Handle */
 

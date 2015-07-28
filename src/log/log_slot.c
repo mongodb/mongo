@@ -116,7 +116,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		return (ENOMEM);
 	}
 find_slot:
-	allocated_slot = __wt_random(session->rnd) % WT_SLOT_ACTIVE;
+	allocated_slot = __wt_random(&session->rnd) % WT_SLOT_ACTIVE;
 	slot = log->slot_array[allocated_slot];
 	old_state = slot->slot_state;
 join_slot:

@@ -34,6 +34,9 @@ static void *writer(void *);
 
 typedef struct {
 	char *name;				/* object name */
+	u_int nops;				/* Thread op count */
+
+	WT_RAND_STATE rnd;			/* RNG */
 
 	int remove;				/* cursor.remove */
 	int update;				/* cursor.update */

@@ -117,13 +117,13 @@ randomize_value(CONFIG_THREAD *thread, char *value_buf)
 	 * randomly chosen byte (other than the trailing NUL).
 	 * Make sure we don't write a NUL: keep the value the same length.
 	 */
-	i = __wt_random(thread->rnd) % (thread->cfg->value_sz - 1);
+	i = __wt_random(&thread->rnd) % (thread->cfg->value_sz - 1);
 	while (value_buf[i] == '\0' && i > 0)
 		--i;
 	if (i > 0) {
 		vb = (uint8_t *)value_buf;
-		vb[0] = (__wt_random(thread->rnd) % 255) + 1;
-		vb[i] = (__wt_random(thread->rnd) % 255) + 1;
+		vb[0] = (__wt_random(&thread->rnd) % 255) + 1;
+		vb[i] = (__wt_random(&thread->rnd) % 255) + 1;
 	}
 }
 
@@ -2155,13 +2155,11 @@ start_threads(CONFIG *cfg,
 		 * new RNG state further along in the sequence.
 		 */
 		if (i == 0)
-			__wt_random_init(thread->rnd);
-		else {
-			thread->rnd[0] = (thread - 1)->rnd[0];
-			thread->rnd[1] = (thread - 1)->rnd[1];
-		}
+			__wt_random_init(&thread->rnd);
+		else
+			thread->rnd = (thread - 1)->rnd;
 		for (j = 0; j < 1000; ++j)
-			(void)__wt_random(thread->rnd);
+			(void)__wt_random(&thread->rnd);
 
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
@@ -2283,7 +2281,7 @@ wtperf_rand(CONFIG_THREAD *thread)
 	 * Use WiredTiger's random number routine: it's lock-free and fairly
 	 * good.
 	 */
-	rval = (uint64_t)__wt_random(thread->rnd);
+	rval = (uint64_t)__wt_random(&thread->rnd);
 
 	/* Use Pareto distribution to give 80/20 hot/cold values. */
 	if (cfg->pareto) {

@@ -1630,7 +1630,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	session = conn->default_session = &conn->dummy_session;
 	session->iface.connection = &conn->iface;
 	session->name = "wiredtiger_open";
-	__wt_random_init(session->rnd);
+	__wt_random_init(&session->rnd);
 	__wt_event_handler_set(session, event_handler);
 
 	/* Remaining basic initialization of the connection structure. */
