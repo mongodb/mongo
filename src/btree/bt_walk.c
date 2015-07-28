@@ -81,11 +81,11 @@ __wt_tree_walk(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
-	int empty_page, prev, skip;
+	int empty_internal, prev, skip;
 	uint32_t slot;
 
 	btree = S2BT(session);
-	empty_page = 0;
+	empty_internal = 0;
 
 	/*
 	 * Tree walks are special: they look inside page structures that splits
@@ -176,9 +176,9 @@ ascend:	/*
 			 * If we got all the way through an internal page and
 			 * all of the child pages were deleted, evict it.
 			 */
-			if (empty_page) {
-				__wt_page_evict_soon(page);
-				empty_page = 0;
+			if (empty_internal) {
+				__wt_page_evict_soon(ref->page);
+				empty_internal = 0;
 			}
 
 			/* Optionally skip internal pages. */
@@ -241,7 +241,7 @@ ascend:	/*
 			 * page isn't empty.
 			 */
 			if (ref->state != WT_REF_DELETED)
-				empty_page = 0;
+				empty_internal = 0;
 
 			if (LF_ISSET(WT_READ_CACHE)) {
 				/*
@@ -355,11 +355,10 @@ ascend:	/*
 			 */
 descend:		couple = ref;
 			page = ref->page;
-			if (page->type == WT_PAGE_ROW_INT ||
-			    page->type == WT_PAGE_COL_INT) {
+			if (WT_PAGE_IS_INTERNAL(page)) {
 				WT_INTL_INDEX_GET(session, page, pindex);
 				slot = prev ? pindex->entries - 1 : 0;
-				empty_page = 1;
+				empty_internal = 1;
 			} else {
 				*refp = ref;
 				goto done;
