@@ -898,8 +898,7 @@ TEST(IndexBoundsBuilderTest, TranslateMod) {
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(
         Interval::INTERVAL_EQUALS,
-        oil.intervals[0].compare(Interval(BSON("" << NaN << "" << positiveInfinity),
-                                 true, true)));
+        oil.intervals[0].compare(Interval(BSON("" << NaN << "" << positiveInfinity), true, true)));
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
 }
 
