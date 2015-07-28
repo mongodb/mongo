@@ -462,7 +462,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	txn = &session->txn;
 	conn = S2C(session);
-	if (txn->mod_count > 0)
+	if (txn->mod_count !=0)
 		WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR));
 
 	if (!F_ISSET(txn, WT_TXN_RUNNING))

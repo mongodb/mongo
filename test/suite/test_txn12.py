@@ -31,10 +31,10 @@ from suite_subprocess import suite_subprocess
 from wiredtiger import stat
 from wtscenario import multiply_scenarios, number_scenarios
 
-# test_ro_rollback.py
+# test_txn12.py
 #    test of commit following failed op in a read only transaction.
-class test_ro_rollback(wttest.WiredTigerTestCase, suite_subprocess):
-    name = 'test_ro_rollback'
+class test_txn12(wttest.WiredTigerTestCase, suite_subprocess):
+    name = 'test_txn12'
     uri = 'table:' + name
 
     types = [
@@ -49,7 +49,7 @@ class test_ro_rollback(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = types
 
     # Test compaction.
-    def test_ro_rollback(self):
+    def test_txn12(self):
 
         # Setup the session and table.
         session = self.conn.open_session(None)
