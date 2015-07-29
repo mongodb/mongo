@@ -339,25 +339,37 @@ __log_file_server(void *arg)
 			 */
 			min_lsn = log->write_lsn;
 			/*
-			 * The sync LSN we asked for better be smaller than
-			 * the current written LSN.
+			 * We have to wait until the LSN we asked for is
+			 * written.  If it isn't signal the wrlsn thread
+			 * to get it written.
 			 */
-			WT_ASSERT(session,
-			    WT_LOG_CMP(&log->bg_sync_lsn, &min_lsn) <= 0);
-			WT_ERR(__wt_fsync(session, log->log_fh));
-			__wt_spin_lock(session, &log->log_sync_lock);
-			locked = 1;
-			/*
-			 * The sync LSN could have advanced while we were
-			 * writing to disk.
-			 */
-			if (WT_LOG_CMP(&log->sync_lsn, &min_lsn) <= 0) {
-				log->sync_lsn = min_lsn;
+			if (WT_LOG_CMP(&log->bg_sync_lsn, &min_lsn) <= 0) {
+				WT_ERR(__wt_fsync(session, log->log_fh));
+				__wt_spin_lock(session, &log->log_sync_lock);
+				locked = 1;
+				/*
+				 * The sync LSN could have advanced while we
+				 * were writing to disk.
+				 */
+				if (WT_LOG_CMP(&log->sync_lsn, &min_lsn) <= 0) {
+					log->sync_lsn = min_lsn;
+					WT_ERR(__wt_cond_signal(
+					    session, log->log_sync_cond));
+				}
+				locked = 0;
+				__wt_spin_unlock(session, &log->log_sync_lock);
+			} else {
 				WT_ERR(__wt_cond_signal(
-				    session, log->log_sync_cond));
+				    session, conn->log_wrlsn_cond));
+				/*
+				 * We do not want to wait potentially a second
+				 * to process this.  Yield to give the wrlsn
+				 * thread a chance to run and try again in
+				 * this case.
+				 */
+				__wt_yield();
+				continue;
 			}
-			locked = 0;
-			__wt_spin_unlock(session, &log->log_sync_lock);
 		}
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(
