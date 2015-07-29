@@ -585,9 +585,6 @@ bool Chunk::splitIfShould(long dataWritten) const {
 
         log() << "autosplitted " << _manager->getns() << " shard: " << toString() << " into "
               << (splitCount + 1) << " (splitThreshold " << splitThreshold << ")"
-#ifdef MONGO_CONFIG_DEBUG_BUILD
-              << " size: " << getPhysicalSize()  // slow - but can be useful when debugging
-#endif
               << (res["shouldMigrate"].eoo() ? "" : (string) " (migrate suggested" +
                           (shouldBalance ? ")" : ", but no migrations allowed)"));
 
