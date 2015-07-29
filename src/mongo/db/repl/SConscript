@@ -205,6 +205,7 @@ env.Library('topology_coordinator',
             ],
             LIBDEPS=[
                 'repl_coordinator_interface',
+                '$BUILD_DIR/mongo/rpc/metadata',
             ])
 
 env.Library('topology_coordinator_impl',
@@ -663,3 +664,4 @@ env.CppUnitTest(
         'roll_back_local_operations',
     ],
 )
+

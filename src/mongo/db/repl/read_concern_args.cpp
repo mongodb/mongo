@@ -41,6 +41,14 @@ using std::string;
 namespace mongo {
 namespace repl {
 
+namespace {
+
+const char kLocalReadConcernStr[] = "local";
+const char kMajorityReadConcernStr[] = "majority";
+const char kLinearizableReadConcernStr[] = "linearizable";
+
+}  // unnamed namespace
+
 const string ReadConcernArgs::kReadConcernFieldName("readConcern");
 const string ReadConcernArgs::kOpTimeFieldName("afterOpTime");
 const string ReadConcernArgs::kOpTimestampFieldName("ts");
@@ -53,7 +61,7 @@ ReadConcernArgs::ReadConcernArgs()
 ReadConcernArgs::ReadConcernArgs(OpTime opTime, ReadConcernLevel level)
     : _opTime(std::move(opTime)), _level(level) {}
 
-ReadConcernArgs::ReadConcernLevel ReadConcernArgs::getLevel() const {
+ReadConcernLevel ReadConcernArgs::getLevel() const {
     return _level;
 }
 
@@ -106,9 +114,9 @@ Status ReadConcernArgs::initialize(const BSONObj& cmdObj) {
     auto readCommittedStatus =
         bsonExtractStringField(readConcernObj, kLevelFieldName, &levelString);
     if (readCommittedStatus.isOK()) {
-        if (levelString == "local") {
+        if (levelString == kLocalReadConcernStr) {
             _level = ReadConcernLevel::kLocalReadConcern;
-        } else if (levelString == "majority") {
+        } else if (levelString == kMajorityReadConcernStr) {
             _level = ReadConcernLevel::kMajorityReadConcern;
         } else {
             return Status(ErrorCodes::FailedToParse,
@@ -122,6 +130,37 @@ Status ReadConcernArgs::initialize(const BSONObj& cmdObj) {
     }
 
     return Status::OK();
+}
+
+void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) {
+    BSONObjBuilder rcBuilder(builder->subobjStart(kReadConcernFieldName));
+
+    string levelName;
+    switch (_level) {
+        case ReadConcernLevel::kLocalReadConcern:
+            levelName = kLocalReadConcernStr;
+            break;
+
+        case ReadConcernLevel::kMajorityReadConcern:
+            levelName = kMajorityReadConcernStr;
+            break;
+
+        case ReadConcernLevel::kLinearizableReadConcern:
+            levelName = kLinearizableReadConcernStr;
+            break;
+
+        default:
+            fassert(28754, false);
+    }
+
+    rcBuilder.append(kLevelFieldName, levelName);
+
+    BSONObjBuilder afterBuilder(rcBuilder.subobjStart(kOpTimeFieldName));
+    afterBuilder.append(kOpTimestampFieldName, _opTime.getTimestamp());
+    afterBuilder.append(kOpTermFieldName, _opTime.getTerm());
+    afterBuilder.done();
+
+    rcBuilder.done();
 }
 
 }  // namespace repl

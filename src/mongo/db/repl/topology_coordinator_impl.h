@@ -45,6 +45,10 @@ namespace mongo {
 
 class OperationContext;
 
+namespace rpc {
+class ReplSetMetadata;
+}  // namespace rpc
+
 namespace repl {
 
 /**
@@ -202,7 +206,7 @@ public:
     virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied);
     virtual bool stepDownIfPending();
     virtual Date_t getStepDownTime() const;
-    virtual void prepareReplResponseMetadata(BSONObjBuilder* objBuilder,
+    virtual void prepareReplResponseMetadata(rpc::ReplSetMetadata* metadata,
                                              const OpTime& lastCommitttedOpTime) const;
     Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
                                                long long* responseTerm);

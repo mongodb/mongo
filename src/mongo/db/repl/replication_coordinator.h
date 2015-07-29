@@ -50,6 +50,13 @@ class SnapshotName;
 class Timestamp;
 struct WriteConcernOptions;
 
+namespace rpc {
+
+class ReplSetMetadata;
+class RequestInterface;
+
+}  // namespace rpc
+
 namespace repl {
 
 class BackgroundSync;
@@ -607,9 +614,10 @@ public:
                                                        long long* responseTerm) = 0;
 
     /**
-     * Prepares a BSONObj describing the current term, primary, and lastOp information.
+     * Prepares a metadata object describing the current term, primary, and lastOp information.
      */
-    virtual void prepareReplResponseMetadata(BSONObjBuilder* objBuilder) = 0;
+    virtual void prepareReplResponseMetadata(const rpc::RequestInterface& request,
+                                             BSONObjBuilder* builder) = 0;
 
     /**
      * Returns true if the V1 election protocol is being used and false otherwise.

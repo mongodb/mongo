@@ -45,7 +45,7 @@ TEST(ReadAfterParse, BasicFullSpecification) {
 
     ASSERT_EQ(Timestamp(20, 30), readAfterOpTime.getOpTime().getTimestamp());
     ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
-    ASSERT(ReadConcernArgs::ReadConcernLevel::kLocalReadConcern == readAfterOpTime.getLevel());
+    ASSERT(ReadConcernLevel::kLocalReadConcern == readAfterOpTime.getLevel());
 }
 
 TEST(ReadAfterParse, ReadCommittedFullSpecification) {
@@ -60,7 +60,7 @@ TEST(ReadAfterParse, ReadCommittedFullSpecification) {
 
     ASSERT_EQ(Timestamp(20, 30), readAfterOpTime.getOpTime().getTimestamp());
     ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
-    ASSERT(ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern == readAfterOpTime.getLevel());
+    ASSERT(ReadConcernLevel::kMajorityReadConcern == readAfterOpTime.getLevel());
 }
 
 TEST(ReadAfterParse, Empty) {

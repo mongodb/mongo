@@ -28,57 +28,47 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/base/status.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class BSONObj;
+class BSONObjBuilder;
 
-namespace repl {
+namespace rpc {
 
-enum class ReadConcernLevel { kLocalReadConcern, kMajorityReadConcern, kLinearizableReadConcern };
-
-// TODO: make this reflect the fact that level and afterOpTime are in fact optional.
-class ReadConcernArgs {
+/**
+ * Represents the metadata information for $replData.
+ */
+class ReplSetMetadata {
 public:
-    static const std::string kReadConcernFieldName;
-    static const std::string kOpTermFieldName;
-    static const std::string kOpTimeFieldName;
-    static const std::string kOpTimestampFieldName;
-    static const std::string kLevelFieldName;
-
-    ReadConcernArgs();
-    ReadConcernArgs(OpTime opTime, ReadConcernLevel level);
+    ReplSetMetadata();
+    ReplSetMetadata(long long term,
+                    repl::OpTime committedOpTime,
+                    long long configVersion,
+                    int currentPrimaryIndex);
 
     /**
-     * Format:
+     * format:
      * {
-     *    find: “coll”,
-     *    filter: <Query Object>,
-     *    readConcern: { // optional
-     *      level: "[majority|local|linearizable]",
-     *      afterOpTime: { ts: <timestamp>, term: <NumberLong> },
-     *    }
+     *     term: 0,
+     *     lastOpCommittedTimestamp: 0,
+     *     lastOpCommittedTerm: 0,
+     *     configVersion: 0,
+     *     primaryIndex: 0
      * }
      */
-    Status initialize(const BSONObj& cmdObj);
+    static StatusWith<ReplSetMetadata> readFromMetadata(const BSONObj& doc);
+    Status writeToMetadata(BSONObjBuilder* builder) const;
 
-    /**
-     * Appends level and afterOpTime.
-     */
-    void appendInfo(BSONObjBuilder* builder);
-
-    ReadConcernLevel getLevel() const;
-    const OpTime& getOpTime() const;
+    const repl::OpTime& getLastCommittedOptime() const;
 
 private:
-    OpTime _opTime;
-    ReadConcernLevel _level;
+    long long _currentTerm = 0;
+    repl::OpTime _committedOpTime;
+    long long _configVersion = 0;
+    int _currentPrimaryIndex = 0;
 };
 
-}  // namespace repl
+}  // namespace rpc
 }  // namespace mongo

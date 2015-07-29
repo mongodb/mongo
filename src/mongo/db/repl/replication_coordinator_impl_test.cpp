@@ -2066,9 +2066,7 @@ TEST_F(ReplCoordTest, CantUseReadAfterIfNotReplSet) {
     init(ReplSettings());
     OperationContextNoop txn;
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn,
-        ReadConcernArgs(OpTimeWithTermZero(50, 0),
-                        ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
+        &txn, ReadConcernArgs(OpTimeWithTermZero(50, 0), ReadConcernLevel::kLocalReadConcern));
 
     ASSERT_FALSE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::NotAReplicaSet, result.getStatus());
@@ -2088,9 +2086,7 @@ TEST_F(ReplCoordTest, ReadAfterWhileShutdown) {
     shutdown();
 
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn,
-        ReadConcernArgs(OpTimeWithTermZero(50, 0),
-                        ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
+        &txn, ReadConcernArgs(OpTimeWithTermZero(50, 0), ReadConcernLevel::kLocalReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result.getStatus());
@@ -2110,9 +2106,7 @@ TEST_F(ReplCoordTest, ReadAfterInterrupted) {
     txn.setCheckForInterruptStatus(Status(ErrorCodes::Interrupted, "test"));
 
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn,
-        ReadConcernArgs(OpTimeWithTermZero(50, 0),
-                        ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
+        &txn, ReadConcernArgs(OpTimeWithTermZero(50, 0), ReadConcernLevel::kLocalReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::Interrupted, result.getStatus());
@@ -2144,9 +2138,7 @@ TEST_F(ReplCoordTest, ReadAfterGreaterOpTime) {
 
     getReplCoord()->setMyLastOptime(OpTimeWithTermZero(100, 0));
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn,
-        ReadConcernArgs(OpTimeWithTermZero(50, 0),
-                        ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
+        &txn, ReadConcernArgs(OpTimeWithTermZero(50, 0), ReadConcernLevel::kLocalReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_OK(result.getStatus());
@@ -2165,7 +2157,7 @@ TEST_F(ReplCoordTest, ReadAfterEqualOpTime) {
     OpTimeWithTermZero time(100, 0);
     getReplCoord()->setMyLastOptime(time);
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn, ReadConcernArgs(time, ReadConcernArgs::ReadConcernLevel::kLocalReadConcern));
+        &txn, ReadConcernArgs(time, ReadConcernLevel::kLocalReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_OK(result.getStatus());
@@ -2175,9 +2167,7 @@ TEST_F(ReplCoordTest, CantUseReadAfterCommittedIfNotReplSet) {
     init(ReplSettings());
     OperationContextNoop txn;
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn,
-        ReadConcernArgs(OpTime(Timestamp(50, 0), 0),
-                        ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
+        &txn, ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_FALSE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::NotAReplicaSet, result.getStatus());
@@ -2198,9 +2188,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedWhileShutdown) {
     shutdown();
 
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn,
-        ReadConcernArgs(OpTime(Timestamp(50, 0), 0),
-                        ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
+        &txn, ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result.getStatus());
@@ -2221,9 +2209,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedInterrupted) {
     txn.setCheckForInterruptStatus(Status(ErrorCodes::Interrupted, "test"));
 
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn,
-        ReadConcernArgs(OpTime(Timestamp(50, 0), 0),
-                        ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
+        &txn, ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::Interrupted, result.getStatus());
@@ -2242,9 +2228,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedGreaterOpTime) {
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
     getReplCoord()->onSnapshotCreate(OpTime(Timestamp(100, 0), 0), SnapshotName(1));
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn,
-        ReadConcernArgs(OpTime(Timestamp(50, 0), 0),
-                        ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
+        &txn, ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_OK(result.getStatus());
@@ -2265,7 +2249,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedEqualOpTime) {
     getReplCoord()->setMyLastOptime(time);
     getReplCoord()->onSnapshotCreate(time, SnapshotName(1));
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn, ReadConcernArgs(time, ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
+        &txn, ReadConcernArgs(time, ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_TRUE(result.didWait());
     ASSERT_OK(result.getStatus());
@@ -2293,8 +2277,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
 
     auto result = getReplCoord()->waitUntilOpTime(
         &txn,
-        ReadConcernArgs(OpTime(Timestamp(100, 0), 0),
-                        ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
+        ReadConcernArgs(OpTime(Timestamp(100, 0), 0), ReadConcernLevel::kMajorityReadConcern));
     pseudoLogOp.get();
 
     ASSERT_TRUE(result.didWait());
@@ -2324,8 +2307,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
                     });
 
     auto result = getReplCoord()->waitUntilOpTime(
-        &txn,
-        ReadConcernArgs(opTimeToWait, ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
+        &txn, ReadConcernArgs(opTimeToWait, ReadConcernLevel::kMajorityReadConcern));
     pseudoLogOp.get();
 
     ASSERT_TRUE(result.didWait());

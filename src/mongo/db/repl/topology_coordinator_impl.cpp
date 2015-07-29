@@ -47,6 +47,7 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -2130,13 +2131,10 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
     return false;
 }
 
-void TopologyCoordinatorImpl::prepareReplResponseMetadata(BSONObjBuilder* objBuilder,
+void TopologyCoordinatorImpl::prepareReplResponseMetadata(rpc::ReplSetMetadata* metadata,
                                                           const OpTime& lastCommittedOpTime) const {
-    objBuilder->append("term", _term);
-    objBuilder->append("lastOpCommittedTimestamp", lastCommittedOpTime.getTimestamp());
-    objBuilder->append("lastOpCommittedTerm", lastCommittedOpTime.getTerm());
-    objBuilder->append("configVersion", _rsConfig.getConfigVersion());
-    objBuilder->append("primaryIndex", _currentPrimaryIndex);
+    *metadata = rpc::ReplSetMetadata(
+        _term, lastCommittedOpTime, _rsConfig.getConfigVersion(), _currentPrimaryIndex);
 }
 
 void TopologyCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {

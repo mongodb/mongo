@@ -26,59 +26,45 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <string>
-
-#include "mongo/base/status.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/util/time_support.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace rpc {
+namespace {
 
-class BSONObj;
+using repl::OpTime;
 
-namespace repl {
+TEST(ReplResponseMetadataTest, Roundtrip) {
+    OpTime opTime(Timestamp(1234, 100), 5);
+    ReplSetMetadata metadata(3, opTime, 6, 12);
 
-enum class ReadConcernLevel { kLocalReadConcern, kMajorityReadConcern, kLinearizableReadConcern };
+    ASSERT_EQ(opTime, metadata.getLastCommittedOptime());
 
-// TODO: make this reflect the fact that level and afterOpTime are in fact optional.
-class ReadConcernArgs {
-public:
-    static const std::string kReadConcernFieldName;
-    static const std::string kOpTermFieldName;
-    static const std::string kOpTimeFieldName;
-    static const std::string kOpTimestampFieldName;
-    static const std::string kLevelFieldName;
+    BSONObjBuilder builder;
+    metadata.writeToMetadata(&builder);
 
-    ReadConcernArgs();
-    ReadConcernArgs(OpTime opTime, ReadConcernLevel level);
+    BSONObj expectedObj(BSON("term" << 3 << "lastOpCommittedTimestamp" << opTime.getTimestamp()
+                                    << "lastOpCommittedTerm" << opTime.getTerm() << "configVersion"
+                                    << 6 << "primaryIndex" << 12));
 
-    /**
-     * Format:
-     * {
-     *    find: “coll”,
-     *    filter: <Query Object>,
-     *    readConcern: { // optional
-     *      level: "[majority|local|linearizable]",
-     *      afterOpTime: { ts: <timestamp>, term: <NumberLong> },
-     *    }
-     * }
-     */
-    Status initialize(const BSONObj& cmdObj);
+    BSONObj serializedObj = builder.obj();
+    ASSERT_EQ(expectedObj, serializedObj);
 
-    /**
-     * Appends level and afterOpTime.
-     */
-    void appendInfo(BSONObjBuilder* builder);
+    auto cloneStatus = ReplSetMetadata::readFromMetadata(serializedObj);
+    ASSERT_OK(cloneStatus.getStatus());
 
-    ReadConcernLevel getLevel() const;
-    const OpTime& getOpTime() const;
+    const auto& clonedMetadata = cloneStatus.getValue();
+    ASSERT_EQ(opTime, clonedMetadata.getLastCommittedOptime());
 
-private:
-    OpTime _opTime;
-    ReadConcernLevel _level;
-};
+    BSONObjBuilder clonedBuilder;
+    clonedMetadata.writeToMetadata(&clonedBuilder);
 
-}  // namespace repl
+    BSONObj clonedSerializedObj = clonedBuilder.obj();
+    ASSERT_EQ(expectedObj, clonedSerializedObj);
+}
+
+}  // unnamed namespace
+}  // namespace rpc
 }  // namespace mongo

@@ -128,9 +128,13 @@ env.Library(
         'metadata/audit_metadata.cpp',
         'metadata/server_selection_metadata.cpp',
         'metadata/sharding_metadata.cpp',
+        'metadata/repl_set_metadata.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/util/decorable',
     ],
 )
@@ -166,3 +170,12 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/client/clientdriver'
     ],
 )
+
+env.CppUnitTest(
+    target='repl_set_metadata_test',
+    source=[
+        'metadata/repl_set_metadata_test.cpp',
+    ],
+    LIBDEPS=['metadata']
+)
+

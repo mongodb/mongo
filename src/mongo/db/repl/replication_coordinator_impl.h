@@ -57,6 +57,10 @@ class Timer;
 template <typename T>
 class StatusWith;
 
+namespace rpc {
+class ReplSetMetadata;
+}  // namespace rpc
+
 namespace repl {
 
 class ElectCmdRunner;
@@ -254,7 +258,8 @@ public:
     virtual Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
                                                        long long* responseTerm) override;
 
-    virtual void prepareReplResponseMetadata(BSONObjBuilder* objBuilder);
+    void prepareReplResponseMetadata(const rpc::RequestInterface&,
+                                     BSONObjBuilder* builder) override;
 
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                       ReplSetHeartbeatResponse* response) override;
@@ -524,7 +529,7 @@ private:
      * Bottom half of prepareReplResponseMetadata.
      */
     void _prepareReplResponseMetadata_finish(const ReplicationExecutor::CallbackArgs& cbData,
-                                             BSONObjBuilder* objBuilder);
+                                             rpc::ReplSetMetadata* metadata);
     /**
      * Scheduled to cause the ReplicationCoordinator to reconsider any state that might
      * need to change as a result of time passing - for instance becoming PRIMARY when a single

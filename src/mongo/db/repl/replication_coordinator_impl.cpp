@@ -66,6 +66,8 @@
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/request_interface.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -810,8 +812,7 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
 
     Timer timer;
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    bool isMajorityReadConcern =
-        settings.getLevel() == ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern;
+    bool isMajorityReadConcern = settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
     auto loopCondition = [this, isMajorityReadConcern, ts] {
         return isMajorityReadConcern
             ? !_currentCommittedSnapshot || ts > _currentCommittedSnapshot->opTime
@@ -2705,24 +2706,34 @@ void ReplicationCoordinatorImpl::_processReplSetDeclareElectionWinner_finish(
     *result = _topCoord->processReplSetDeclareElectionWinner(args, responseTerm);
 }
 
-void ReplicationCoordinatorImpl::prepareReplResponseMetadata(BSONObjBuilder* objBuilder) {
-    if (getReplicationMode() == modeReplSet && isV1ElectionProtocol()) {
+void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestInterface& request,
+                                                             BSONObjBuilder* builder) {
+    if (request.getMetadata().hasField(rpc::kReplicationMetadataFieldName)) {
+        rpc::ReplSetMetadata metadata;
+
         CBHStatus cbh = _replExecutor.scheduleWork(
             stdx::bind(&ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish,
                        this,
                        stdx::placeholders::_1,
-                       objBuilder));
+                       &metadata));
+
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return;
         }
+
         fassert(28709, cbh.getStatus());
+
+        BSONObjBuilder metadataBuilder(builder->subobjStart(rpc::kReplicationMetadataFieldName));
+        metadata.writeToMetadata(builder);
+        metadataBuilder.doneFast();
+
         _replExecutor.wait(cbh.getValue());
     }
 }
 
 void ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish(
-    const ReplicationExecutor::CallbackArgs& cbData, BSONObjBuilder* objBuilder) {
-    _topCoord->prepareReplResponseMetadata(objBuilder, getLastCommittedOpTime());
+    const ReplicationExecutor::CallbackArgs& cbData, rpc::ReplSetMetadata* metadata) {
+    _topCoord->prepareReplResponseMetadata(metadata, getLastCommittedOpTime());
 }
 
 bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {

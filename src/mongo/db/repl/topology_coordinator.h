@@ -390,7 +390,7 @@ public:
     /**
      * Prepares a BSONObj describing the current term, primary, and lastOp information.
      */
-    virtual void prepareReplResponseMetadata(BSONObjBuilder* objBuilder,
+    virtual void prepareReplResponseMetadata(rpc::ReplSetMetadata* metadata,
                                              const OpTime& lastCommittedOpTime) const = 0;
 
     /**

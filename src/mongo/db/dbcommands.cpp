@@ -1282,8 +1282,7 @@ bool Command::run(OperationContext* txn,
             // Only return an error if a non-nullish readConcern was parsed, but do not process
             // readConcern regardless.
             if (!readConcern.getOpTime().isNull() ||
-                readConcern.getLevel() !=
-                    repl::ReadConcernArgs::ReadConcernLevel::kLocalReadConcern) {
+                readConcern.getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
                 replyBuilder->setMetadata(rpc::makeEmptyMetadata())
                     .setCommandReply({ErrorCodes::InvalidOptions,
                                       str::stream()
@@ -1300,8 +1299,7 @@ bool Command::run(OperationContext* txn,
                     .setCommandReply(readConcernResult.getStatus(), replyBuilderBob.done());
                 return false;
             }
-            if (readConcern.getLevel() ==
-                repl::ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern) {
+            if (readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
                 Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
                 if (!status.isOK()) {
                     replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
@@ -1334,10 +1332,8 @@ bool Command::run(OperationContext* txn,
             replCoord->getElectionId()).writeToMetadata(&metadataBob);
     }
 
-    const auto& metadata = request.getMetadata();
-    if (isReplSet && metadata.hasField(rpc::kReplicationMetadataFieldName)) {
-        BSONObjBuilder replInfoBob(metadataBob.subobjStart(rpc::kReplicationMetadataFieldName));
-        replCoord->prepareReplResponseMetadata(&replInfoBob);
+    if (isReplSet) {
+        replCoord->prepareReplResponseMetadata(request, &metadataBob);
     }
 
     auto cmdResponse = replyBuilderBob.done();
