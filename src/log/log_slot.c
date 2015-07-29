@@ -59,9 +59,10 @@ retry:
 				if (WT_LOG_SLOT_CLOSED(old_state))
 					return (0);
 				/*
-				 * Close this slot.  If we lose the race return.
+				 * Close this slot.  If we lose the race retry.
 				 */
-				if (!WT_ATOMIC_CAS8(current->slot_state, old_state, new_state))
+				if (!WT_ATOMIC_CAS8(
+				    current->slot_state, old_state, new_state))
 					goto retry;
 				/*
 				 * Set the end LSN.  Then check for file change.

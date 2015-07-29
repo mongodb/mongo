@@ -67,25 +67,31 @@
  *
  * The slot state is divided into two 32 bit sizes.  One half is the
  * amount joined and the other is the amount released.  Since we use
- * a few special states, reserve the top 4 bits for state.  That leaves
- * us with a maximum log record size of 28 bits less the buffered amount
- * or just under 256 MB.
+ * a few special states, reserve the top few bits for state.
  */
 #define	WT_LOG_SLOT_BUF_SIZE		(256 * 1024)
 #define	WT_LOG_SLOT_BUF_MAX		((uint32_t)log->slot_buf_size / 2)
-#define	WT_LOG_SLOT_MAXIMUM		(uint32_t)			\
-    ((2 ^ 28) - WT_LOG_SLOT_BUF_SIZE)
 
 /*
  * The high bit is reserved for the special states.
  */
 #define	WT_LOG_SLOT_FREE	-1	/* Not in use */
 #define	WT_LOG_SLOT_WRITTEN	-2	/* Slot data written, not processed */
-#define	WT_LOG_SLOT_CLOSE	0x1000000000000000	/* Force slot close */
-/* This leaves two bits for future use. */
+
+/*
+ * If new slot states are added, adjust WT_LOG_SLOT_BITS accordingly for
+ * how much of the top 32 bits we are using.
+ */
+#define	WT_LOG_SLOT_BITS	2
+#define	WT_LOG_SLOT_CLOSE	0x4000000000000000	/* Force slot close */
 #define	WT_LOG_SLOT_RESERVED	0x8000000000000000	/* Reserved states */
-#define	WT_LOG_SLOT_MASK_OFF	0x0fffffffffffffff	/* Mask */
+
+#define	WT_LOG_SLOT_MAXBITS	(32 - WT_LOG_SLOT_BITS)
+#define	WT_LOG_SLOT_MASK_OFF	0x3fffffffffffffff
 #define	WT_LOG_SLOT_MASK_ON	~(WT_LOG_SLOT_MASK_OFF)
+
+#define	WT_LOG_SLOT_MAXIMUM		(uint32_t)			\
+    ((2 ^ WT_LOG_SLOT_MAXBITS) - WT_LOG_SLOT_BUF_SIZE)
 
 #define	WT_LOG_SLOT_FLAGS(state)	((state) & WT_LOG_SLOT_MASK_ON)
 #define	WT_LOG_SLOT_JOINED(state)	(((state) & WT_LOG_SLOT_MASK_OFF) >> 32)
@@ -109,14 +115,9 @@
     !FLD64_ISSET((state), WT_LOG_SLOT_CLOSE) &&			\
      WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_BUF_MAX)
 
-#if 0
-    (WT_LOG_SLOT_JOINED(state) >= WT_LOG_SLOT_BUF_MAX) &&
-#endif
-
 typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	volatile int64_t slot_state;	/* Slot state */
 	int64_t	 slot_unbuffered;	/* Unbuffered data in this slot */
-	uint64_t slot_group_size;	/* Group size */
 	int32_t	 slot_error;		/* Error value */
 	wt_off_t slot_start_offset;	/* Starting file offset */
 	WT_LSN	slot_release_lsn;	/* Slot release LSN */
@@ -124,7 +125,6 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	WT_LSN	slot_end_lsn;		/* Slot ending LSN */
 	WT_FH	*slot_fh;		/* File handle for this group */
 	WT_ITEM slot_buf;		/* Buffer for grouped writes */
-	int32_t	slot_churn;		/* Active slots are scarce. */
 
 #define	WT_SLOT_BUFFERED	0x01		/* Buffer writes */
 #define	WT_SLOT_CLOSEFH		0x02		/* Close old fh on release */

@@ -1099,8 +1099,9 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	if (F_ISSET(slot, WT_SLOT_BUFFERED)) {
 		write_size = (size_t)release_bytes - slot->slot_unbuffered;
 		if (write_size != 0) {
-			WT_ERR(__wt_write(session, slot->slot_fh,
-			    slot->slot_start_offset, write_size, slot->slot_buf.mem));
+			WT_ERR(__wt_write(session,
+			    slot->slot_fh, slot->slot_start_offset,
+			    write_size, slot->slot_buf.mem));
 			WT_ASSERT(session, slot != log->active_slot);
 		}
 	}
@@ -1286,7 +1287,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 */
 	if (create_log) {
 		log->prep_missed++;
-		WT_ERR(ret = __wt_log_allocfile(
+		WT_ERR(__wt_log_allocfile(
 		    session, log->fileid, WT_LOG_FILENAME, 1));
 	}
 	WT_ERR(__log_openfile(session,
@@ -1313,7 +1314,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 		*created = create_log;
 err:	if (locked)
 		__wt_spin_unlock(session, &log->log_slot_lock);
-	return (0);
+	return (ret);
 }
 
 /*
