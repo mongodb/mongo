@@ -5444,7 +5444,7 @@ err:			__wt_scr_free(session, &tkey);
 		/*
 		 * Track the tree's maximum transaction ID (used to decide if
 		 * it's safe to discard the tree). Reconciliation for eviction
-		 is multi-threaded, only update the tree's maximum transaction
+		 * is multi-threaded, only update the tree's maximum transaction
 		 * ID when doing a checkpoint. That's sufficient, we only care
 		 * about the maximum transaction ID of current updates in the
 		 * tree, and checkpoint visits every dirty page in the tree.
