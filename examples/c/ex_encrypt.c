@@ -466,6 +466,11 @@ main(void)
 	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
 	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
 	    "The quick brown fox jumps over the lazy dog ");
+	/*
+	 * Log record are buffered in memory.  Give the server thread a
+	 * chance to write it out before reading it back in.
+	 */
+	sleep(2);
 	ret = simple_walk_log(session);
 
 	/*

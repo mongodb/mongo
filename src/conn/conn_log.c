@@ -287,7 +287,7 @@ __log_file_server(void *arg)
 	WT_DECL_RET;
 	WT_FH *close_fh;
 	WT_LOG *log;
-	WT_LSN close_end_lsn, close_lsn, min_lsn;
+	WT_LSN close_end_lsn, min_lsn;
 	WT_SESSION_IMPL *session;
 	int locked;
 
@@ -301,9 +301,7 @@ __log_file_server(void *arg)
 		 * write operations have completed, then fsync and close it.
 		 */
 		if ((close_fh = log->log_close_fh) != NULL &&
-		    (ret = __wt_log_extract_lognum(session, close_fh->name,
-		    &close_lsn.file)) == 0 &&
-		    close_lsn.file < log->write_lsn.file) {
+		    WT_LOG_CMP(&log->write_lsn, &log->log_close_lsn) >= 0) {
 			/*
 			 * We've copied the file handle, clear out the one in
 			 * log structure to allow it to be set again.
@@ -317,9 +315,9 @@ __log_file_server(void *arg)
 			 * next one to move the sync_lsn into the next file for
 			 * later syncs.
 			 */
-			close_lsn.offset = 0;
-			close_end_lsn = close_lsn;
+			close_end_lsn = log->log_close_lsn;
 			close_end_lsn.file++;
+			close_end_lsn.offset = 0;
 			WT_ERR(__wt_fsync(session, close_fh));
 			__wt_spin_lock(session, &log->log_sync_lock);
 			locked = 1;
@@ -430,6 +428,7 @@ restart:
 			*free_i = save_i;
 		if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 			continue;
+		WT_ASSERT(session, slot != log->active_slot);
 		written[written_i].slot_index = save_i;
 		written[written_i++].lsn = slot->slot_release_lsn;
 	}
@@ -461,6 +460,8 @@ restart:
 			 * are the same, free it and continue.
 			 */
 			if (WT_LOG_CMP(&slot->slot_start_lsn,
+			    &slot->slot_release_lsn) == 0 &&
+			    WT_LOG_CMP(&slot->slot_start_lsn,
 			    &slot->slot_end_lsn) == 0) {
 				WT_RET(__wt_log_slot_free(session, slot));
 				if (free_i != NULL && *free_i == WT_SLOT_POOL &&
@@ -543,24 +544,14 @@ __wt_log_force_write(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_MYSLOT myslot;
-	int64_t len, release_size;
+	int64_t release_size;
 	int free_slot;
 
 	conn = S2C(session);
 	log = conn->log;
-	len = WT_LOG_SLOT_BUF_MAX;
-	/*
-	 * This is not a great way to force the write as it may confuse
-	 * the maintenance of alloc_lsn.
-	 */
-	WT_RET(__wt_log_slot_join(session, len, 0, &myslot));
-	/*
-	 * We don't want this len accounted for, adjust the end offset.
-	 */
-	myslot.end_offset -= len;
+	WT_RET(__wt_log_slot_join(session, 0, 0, &myslot));
 	WT_RET(__wt_log_slot_switch(session, (wt_off_t)myslot.end_offset));
-	myslot.slot->slot_unbuffered = len;
-	release_size = __wt_log_slot_release(myslot.slot, len);
+	release_size = __wt_log_slot_release(myslot.slot, 0);
 	if (WT_LOG_SLOT_DONE(release_size)) {
 		WT_RET(__wt_log_release(session, myslot.slot, &free_slot));
 		if (free_slot)

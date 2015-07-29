@@ -67,39 +67,51 @@
  *
  * The slot state is divided into two 32 bit sizes.  One half is the
  * amount joined and the other is the amount released.  Since we use
- * negative values for other states, that leaves 31 bits, 2 GB for
- * accounting.
+ * a few special states, reserve the top 4 bits for state.  That leaves
+ * us with a maximum log record size of 28 bits less the buffered amount
+ * or just under 256 MB.
  */
 #define	WT_LOG_SLOT_BUF_SIZE		(256 * 1024)
 #define	WT_LOG_SLOT_BUF_MAX		((uint32_t)log->slot_buf_size / 2)
 #define	WT_LOG_SLOT_MAXIMUM		(uint32_t)			\
-    ((2 ^ 31) - WT_LOG_SLOT_BUF_SIZE)
+    ((2 ^ 28) - WT_LOG_SLOT_BUF_SIZE)
 
-#define	WT_LOG_SLOT_JOINED(state)	((state) >> 32)
-#define	WT_LOG_SLOT_JOIN_REL(j, r)	(((j) << 32) + (r))
-#define	WT_LOG_SLOT_RELEASED(state)	((int64_t)(int32_t)(state))
-
+/*
+ * The high bit is reserved for the special states.
+ */
 #define	WT_LOG_SLOT_FREE	-1	/* Not in use */
 #define	WT_LOG_SLOT_WRITTEN	-2	/* Slot data written, not processed */
+#define	WT_LOG_SLOT_CLOSE	0x1000000000000000	/* Force slot close */
+/* This leaves two bits for future use. */
+#define	WT_LOG_SLOT_RESERVED	0x8000000000000000	/* Reserved states */
+#define	WT_LOG_SLOT_MASK_OFF	0x0fffffffffffffff	/* Mask */
+#define	WT_LOG_SLOT_MASK_ON	~(WT_LOG_SLOT_MASK_OFF)
+
+#define	WT_LOG_SLOT_FLAGS(state)	((state) & WT_LOG_SLOT_MASK_ON)
+#define	WT_LOG_SLOT_JOINED(state)	(((state) & WT_LOG_SLOT_MASK_OFF) >> 32)
+#define	WT_LOG_SLOT_JOIN_REL(j, r, s)	(((j) << 32) + (r) + (s))
+#define	WT_LOG_SLOT_RELEASED(state)	((int64_t)(int32_t)(state))
 
 /* Slot is in use */
 #define	WT_LOG_SLOT_ACTIVE(state)	(WT_LOG_SLOT_JOINED(state) >= 0)
 /* Slot is in use, no longer able to be joined */
 #define	WT_LOG_SLOT_CLOSED(state)					\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
-     WT_LOG_SLOT_JOINED(state) >= WT_LOG_SLOT_BUF_MAX)
+    (FLD64_ISSET(state, WT_LOG_SLOT_CLOSE) &&			\
+    !FLD64_ISSET(state, WT_LOG_SLOT_RESERVED)))
 /* Slot is in use, all data copied into buffer */
 #define	WT_LOG_SLOT_DONE(state)						\
     (WT_LOG_SLOT_CLOSED(state) &&					\
-     WT_LOG_SLOT_RELEASED(state) == WT_LOG_SLOT_JOINED(state))
-/* Slot is in use, copying into the buffer */
-#define	WT_LOG_SLOT_FILLING(state)					\
-    (WT_LOG_SLOT_CLOSED(state) &&					\
-     WT_LOG_SLOT_RELEASED(state) < WT_LOG_SLOT_JOINED(state))
+    (WT_LOG_SLOT_RELEASED(state) == WT_LOG_SLOT_JOINED(state)))
 /* Slot is in use, more threads may join this slot */
 #define	WT_LOG_SLOT_OPEN(state)						\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
+    !FLD64_ISSET((state), WT_LOG_SLOT_CLOSE) &&			\
      WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_BUF_MAX)
+
+#if 0
+    (WT_LOG_SLOT_JOINED(state) >= WT_LOG_SLOT_BUF_MAX) &&
+#endif
 
 typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	volatile int64_t slot_state;	/* Slot state */
@@ -143,8 +155,9 @@ typedef struct {
 	uint32_t	 tmp_fileid;	/* Temporary file number */
 	uint32_t	 prep_missed;	/* Pre-allocated file misses */
 	WT_FH           *log_fh;	/* Logging file handle */
-	WT_FH           *log_close_fh;	/* Logging file handle to close */
 	WT_FH           *log_dir_fh;	/* Log directory file handle */
+	WT_FH           *log_close_fh;	/* Logging file handle to close */
+	WT_LSN		 log_close_lsn;	/* LSN needed to close */
 
 	/*
 	 * System LSNs

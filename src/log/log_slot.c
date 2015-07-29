@@ -30,8 +30,9 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset)
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *current, *slot;
+	int64_t new_state, old_state;
 	int32_t i;
-	int created_log;
+	int close_slot, created_log;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -45,9 +46,23 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset)
 		 * For now just restart at 0.  We could use log->pool_index
 		 * if that is inefficient.
 		 */
+retry:
 		for (i = 0; i < WT_SLOT_POOL; i++) {
 			slot = &log->slot_pool[i];
 			if (slot->slot_state == WT_LOG_SLOT_FREE) {
+				old_state = current->slot_state;
+				/*
+				 * If someone else is switching out this slot
+				 * we lost.  Nothing to do but return.
+				 */
+				new_state = (old_state | WT_LOG_SLOT_CLOSE);
+				if (WT_LOG_SLOT_CLOSED(old_state))
+					return (0);
+				/*
+				 * Close this slot.  If we lose the race return.
+				 */
+				if (!WT_ATOMIC_CAS8(current->slot_state, old_state, new_state))
+					goto retry;
 				/*
 				 * Set the end LSN.  Then check for file change.
 				 */
@@ -55,7 +70,9 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset)
 				current->slot_end_lsn.offset += new_offset;
 				log->alloc_lsn = current->slot_end_lsn;
 				WT_RET(__wt_log_acquire(session,
-				    WT_LOG_SLOT_BUF_SIZE, slot));
+				    WT_LOG_SLOT_BUF_SIZE, slot, &close_slot));
+				if (close_slot)
+					F_SET(current, WT_SLOT_CLOSEFH);
 				/*
 				 * We have a new, free slot to use.  Initialize.
 				 */
@@ -101,7 +118,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	 * extra space.
 	 */
 	log->slot_buf_size = (uint32_t)WT_MIN(
-	    (size_t)conn->log_file_max * 2, WT_LOG_SLOT_BUF_SIZE);
+	    (size_t)conn->log_file_max, WT_LOG_SLOT_BUF_SIZE);
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		WT_ERR(__wt_buf_init(session,
 		    &log->slot_pool[i].slot_buf, log->slot_buf_size));
@@ -159,7 +176,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int64_t new_state, old_state;
+	int64_t flag_state, new_state, old_state;
 	int32_t join_offset, new_join, released;
 
 	conn = S2C(session);
@@ -180,10 +197,12 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		WT_BARRIER();
 		slot = log->active_slot;
 		old_state = slot->slot_state;
+		flag_state = WT_LOG_SLOT_FLAGS(old_state);
 		released = WT_LOG_SLOT_RELEASED(old_state);
 		join_offset = WT_LOG_SLOT_JOINED(old_state);
 		new_join = join_offset + (int32_t)mysize;
-		new_state = WT_LOG_SLOT_JOIN_REL((uint64_t)new_join, released);
+		new_state = WT_LOG_SLOT_JOIN_REL(
+		    (uint64_t)new_join, released, flag_state);
 
 		/*
 		 * Check if the slot is open for joining and we are able to
@@ -203,7 +222,8 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	 * We joined this slot.  Fill in our information to return to
 	 * the caller.
 	 */
-	WT_STAT_FAST_CONN_INCR(session, log_slot_joins);
+	if (mysize != 0)
+		WT_STAT_FAST_CONN_INCR(session, log_slot_joins);
 	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC))
 		F_SET(slot, WT_SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FSYNC))
@@ -227,7 +247,7 @@ __wt_log_slot_release(WT_LOGSLOT *slot, int64_t size)
 	/*
 	 * Add my size into the state and return the new size.
 	 */
-	my_size = WT_LOG_SLOT_JOIN_REL((uint64_t)0, size);
+	my_size = WT_LOG_SLOT_JOIN_REL((uint64_t)0, size, 0);
 	newsize = WT_ATOMIC_ADD8(slot->slot_state, my_size);
 	return (newsize);
 }
@@ -240,7 +260,11 @@ int
 __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 
-	WT_UNUSED(session);
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
 	/*
 	 * Make sure flags don't get retained between uses.
 	 * We have to reset them them here because multiple threads may
@@ -249,5 +273,6 @@ __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	slot->flags = WT_SLOT_INIT_FLAGS;
 	slot->slot_error = 0;
 	slot->slot_state = WT_LOG_SLOT_FREE;
+	WT_ASSERT(session, slot != log->active_slot);
 	return (0);
 }

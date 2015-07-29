@@ -130,6 +130,7 @@
 
 #define	FLD_CLR(field, mask)	((field) &= ~((uint32_t)(mask)))
 #define	FLD_ISSET(field, mask)	((field) & ((uint32_t)(mask)))
+#define	FLD64_ISSET(field, mask)	((field) & ((uint64_t)(mask)))
 #define	FLD_SET(field, mask)	((field) |= ((uint32_t)(mask)))
 
 /*
