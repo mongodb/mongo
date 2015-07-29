@@ -1,6 +1,8 @@
 #######################################
 #    Tools Driver Config for MCI      #
 #######################################
+# default command type
+command_type: system
 
 # run the same task in the previous revision if the current task fails
 stepback: true
@@ -209,6 +211,7 @@ functions:
 
   "build tool":
     command: shell.exec
+    type: test
     params:
       working_dir: src
       script: |
@@ -261,6 +264,7 @@ functions:
 
   "generate coverage html + text":
     command: shell.exec
+    type: test
     params:
       working_dir: src
       script: |
@@ -292,6 +296,7 @@ functions:
 
   "run unit test":
     command: shell.exec 
+    type: test
     params:
       working_dir: src
       script: |
@@ -335,6 +340,7 @@ functions:
 
   "run tool unit tests":
     command: shell.exec
+    type: test
     params:
       working_dir: src
       script: |
@@ -365,6 +371,7 @@ functions:
 
   "run tool integration tests":
     command: shell.exec
+    type: test
     params:
       working_dir: src
       script: |
@@ -402,6 +409,7 @@ functions:
 
   "create coverage reports":
     command: shell.exec
+    type: test
     params:
       working_dir: src
       script: |
@@ -779,6 +787,7 @@ tasks:
       vars:
         tool: mongofiles
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -825,6 +834,7 @@ tasks:
       vars:
         tool: mongofiles
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -871,6 +881,7 @@ tasks:
       vars:
         tool: mongofiles
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -920,6 +931,7 @@ tasks:
       vars:
         tool: mongofiles
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -938,6 +950,7 @@ tasks:
       params:
         directory: src
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1019,6 +1032,7 @@ tasks:
       vars:
         tool: bsondump
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1056,6 +1070,7 @@ tasks:
       vars:
         tool: mongorestore
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1113,6 +1128,7 @@ tasks:
       vars:
         tool: bsondump
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1224,6 +1240,7 @@ tasks:
       params:
         directory: src
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
