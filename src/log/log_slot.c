@@ -32,7 +32,7 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset)
 	WT_LOGSLOT *current, *slot;
 	int64_t new_state, old_state;
 	int32_t i;
-	int close_slot, created_log;
+	int created_log;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -71,9 +71,7 @@ retry:
 				current->slot_end_lsn.offset += new_offset;
 				log->alloc_lsn = current->slot_end_lsn;
 				WT_RET(__wt_log_acquire(session,
-				    WT_LOG_SLOT_BUF_SIZE, slot, &close_slot));
-				if (close_slot)
-					F_SET(current, WT_SLOT_CLOSEFH);
+				    WT_LOG_SLOT_BUF_SIZE, slot));
 				/*
 				 * We have a new, free slot to use.  Initialize.
 				 */

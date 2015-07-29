@@ -368,7 +368,7 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
  *	from __wt_log_newfile when we change log files.
  */
 int
-__wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot, int *closep)
+__wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -377,8 +377,6 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot, i
 	conn = S2C(session);
 	log = conn->log;
 	created_log = 1;
-	if (closep != NULL)
-		*closep = 0;
 	/*
 	 * Add recsize to alloc_lsn.  Save our starting LSN
 	 * where the previous allocation finished for the release LSN.
@@ -388,11 +386,8 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot, i
 	slot->slot_release_lsn = log->alloc_lsn;
 	if (!__log_size_fit(session, &log->alloc_lsn, recsize)) {
 		WT_RET(__wt_log_newfile(session, 0, &created_log));
-		if (log->log_close_fh != NULL) {
+		if (log->log_close_fh != NULL)
 			F_SET(slot, WT_SLOT_CLOSEFH);
-			if (closep != NULL)
-				*closep = 1;
-		}
 	}
 
 	/*
@@ -584,7 +579,7 @@ __log_file_header(
 		tmp.slot_fh = fh;
 	} else {
 		WT_ASSERT(session, fh == NULL);
-		WT_ERR(__wt_log_acquire(session, logrec->len, &tmp, NULL));
+		WT_ERR(__wt_log_acquire(session, logrec->len, &tmp));
 	}
 	WT_ERR(__log_fill(session, &myslot, 1, buf, NULL));
 	/*
@@ -1625,7 +1620,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		F_SET(&tmp, WT_SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(&tmp, WT_SLOT_SYNC);
-	WT_ERR(__wt_log_acquire(session, record->size, &tmp, NULL));
+	WT_ERR(__wt_log_acquire(session, record->size, &tmp));
 	__wt_spin_unlock(session, &log->log_slot_lock);
 	locked = 0;
 	WT_ERR(__log_fill(session, &myslot, 1, record, lsnp));
