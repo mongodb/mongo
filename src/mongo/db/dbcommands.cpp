@@ -1282,29 +1282,6 @@ bool Command::run(OperationContext* txn,
                 return false;
             }
         } else {
-            if (readConcern.getLevel() ==
-                repl::ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern) {
-                // wait for a committed snapshot to exist
-                Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-                while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
-                    WriteConcernOptions writeConcern;
-                    writeConcern.wMode = WriteConcernOptions::kMajority;
-                    // must be a non-null OpTime that is from before any write
-                    repl::ReplicationCoordinator::StatusAndDuration awaitStatus =
-                        replCoord->awaitReplication(
-                            txn, repl::OpTime(Timestamp(1, 0), -1), writeConcern);
-                    if (!awaitStatus.status.isOK()) {
-                        replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
-                        return false;
-                    }
-                    status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-                }
-                if (!status.isOK()) {
-                    replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
-                    return false;
-                }
-            }  // end of readConcernMajority specific work
-
             // wait for readConcern to be satisfied
             auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcern);
             readConcernResult.appendInfo(&replyBuilderBob);
@@ -1312,6 +1289,14 @@ bool Command::run(OperationContext* txn,
                 replyBuilder->setMetadata(rpc::makeEmptyMetadata())
                     .setCommandReply(readConcernResult.getStatus(), replyBuilderBob.done());
                 return false;
+            }
+            if (readConcern.getLevel() ==
+                repl::ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern) {
+                Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+                if (!status.isOK()) {
+                    replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
+                    return false;
+                }
             }
         }
     }

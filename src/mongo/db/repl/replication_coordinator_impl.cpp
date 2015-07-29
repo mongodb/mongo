@@ -774,6 +774,9 @@ OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
 ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext* txn,
                                                                 const ReadConcernArgs& settings) {
     const auto& ts = settings.getOpTime();
+    // Note that if 'settings' has no explicit after-optime, 'ts' will be the earliest
+    // possible optime, which means the comparisons with 'ts' below are always false.  This is
+    // intentional.
 
     if (getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
         // For master/slave and standalone nodes, readAfterOpTime is not supported, so we return
@@ -782,7 +785,7 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
         if (!ts.isNull()) {
             return ReadConcernResponse(
                 Status(ErrorCodes::NotAReplicaSet,
-                       "node needs to be a replica set member to use read after opTime"));
+                       "node needs to be a replica set member to use read concern"));
 
         } else {
             return ReadConcernResponse(Status::OK(), Milliseconds(0));
