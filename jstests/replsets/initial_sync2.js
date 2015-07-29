@@ -147,27 +147,7 @@ for (var i=0; i<10000; i++) {
 
 
 print("12. Everyone happy eventually");
-// if 3 is master...
-if (master+"" != origMaster+"") {
-  print("3 is master");
-  slave2 = origMaster;
-}
-
-wait(function() {
-    var op1 = getLatestOp(master);
-    var op2 = getLatestOp(slave1);
-    var op3 = getLatestOp(slave2);
-
-    occasionally(function() {
-        print("latest ops:");
-        printjson(op1);
-        printjson(op2);
-        printjson(op3);
-      });
-    
-    return friendlyEqual(getLatestOp(master), getLatestOp(slave1)) &&
-      friendlyEqual(getLatestOp(master), getLatestOp(slave2));
-  });
+replTest.awaitReplication();
 
 replTest.stopSet();
 };

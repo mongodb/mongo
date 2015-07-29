@@ -2,7 +2,10 @@
 
 var replTest = new ReplSetTest( {name: 'unicomplex', nodes: 2} );
 var conns = replTest.startSet({ verbose: 1 });
-replTest.initiate();
+var config = replTest.getReplSetConfig();
+config.members[0].priority = 2;
+replTest.initiate(config);
+replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60000);
 
 // Make sure we have a master
 var master = replTest.getMaster();

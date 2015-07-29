@@ -1891,7 +1891,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
     if (args.force) {
         newConfigObj = incrementConfigVersionByRandom(newConfigObj);
     }
-    Status status = newConfig.initialize(newConfigObj);
+    Status status = newConfig.initialize(newConfigObj, oldConfig.getProtocolVersion() == 1);
     if (!status.isOK()) {
         error() << "replSetReconfig got " << status << " while parsing " << newConfigObj;
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
@@ -2003,11 +2003,10 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
     }
 
     ReplicaSetConfig newConfig;
-    Status status = newConfig.initialize(configObj);
+    Status status = newConfig.initialize(configObj, true);
     if (!status.isOK()) {
         error() << "replSet initiate got " << status << " while parsing " << configObj;
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
-        ;
     }
     if (replEnabled && newConfig.getReplSetName() != _settings.ourSetName()) {
         str::stream errmsg;

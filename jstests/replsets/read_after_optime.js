@@ -14,15 +14,15 @@ var runTest = function(testDB, primaryConn) {
 
     var localDB = primaryConn.getDB('local');
 
-    var oplogTS = localDB.oplog.rs.find().sort({ $natural: -1 }).limit(1).next().ts;
-    var twoSecTS = new Timestamp(oplogTS.getTime() + 2, 0);
+    var oplogTS = localDB.oplog.rs.find().sort({ $natural: -1 }).limit(1).next();
+    var twoSecTS = new Timestamp(oplogTS.ts.getTime() + 2, 0);
 
     // Test timeout with maxTimeMS
     var res = assert.commandFailed(testDB.runCommand({
         find: 'user',
         filter: { x: 1 },
         readConcern: {
-            afterOpTime: { ts: twoSecTS, t: 0 }
+            afterOpTime: { ts: twoSecTS, t: oplogTS.t }
         },
         maxTimeMS: 1000
     }));
@@ -40,7 +40,7 @@ var runTest = function(testDB, primaryConn) {
         find: 'user',
         filter: { x: 1 },
         readConcern: {
-            afterOpTime: { ts: twoSecTS, t: 0 },
+            afterOpTime: { ts: twoSecTS, t: oplogTS.t },
             maxTimeMS: 10 * 1000
         }
     }));

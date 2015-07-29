@@ -612,7 +612,8 @@ function doMultiThreadedWork(primary, numThreads) {
     // Make sure everyone is syncing from the primary, to ensure we have all combinations of
     // primary/secondary syncing.
     config.settings = {chainingAllowed: false};
-    replTest.initiate();
+    config.protocolVersion = 0;
+    replTest.initiate(config);
     // Ensure all are synced.
     replTest.awaitSecondaryNodes(120000);
     var primary = replTest.getPrimary();

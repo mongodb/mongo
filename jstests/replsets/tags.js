@@ -164,6 +164,9 @@ replTest.partition(2, 0);
 replTest.partition(2, 1);
 replTest.stop(2);
 
+// Node 1 with slightly higher priority will take over.
+replTest.waitForState(nodes[1], replTest.PRIMARY, 60 * 1000);
+
 myprint("1 must become primary here because otherwise the other members will take too long " +
         "timing out their old sync threads");
 master = replTest.getMaster();

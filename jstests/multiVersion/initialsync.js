@@ -14,7 +14,12 @@ var multitest = function(replSetVersion, newNodeVersion) {
     print("Start up a two-node " + replSetVersion + " replica set.");
     var rst = new ReplSetTest({name: name, nodes: nodes});
     rst.startSet();
-    rst.initiate();
+    var config = rst.getReplSetConfig();
+    // Set protocol version to 0 for 3.2 replset.
+    if (replSetVersion == newVersion) {
+        config.protocolVersion = 0;
+    }
+    rst.initiate(config);
 
     // Wait for a primary node.
     var primary = rst.getPrimary();

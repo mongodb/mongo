@@ -132,7 +132,8 @@ var doTest = function( signal ) {
     printjson(result);
     var lastOp = result.lastOp;
     var lastOplogOp = master.getDB("local").oplog.rs.find().sort({$natural : -1}).limit(1).next();
-    assert.eq(lastOplogOp['ts'], lastOp);
+    assert.eq(lastOplogOp['ts'], lastOp['ts']);
+    assert.eq(lastOplogOp['t'], lastOp['t']);
 
     ts.forEach( function(z){ assert.eq( 2 , z.getIndexKeys().length , "A " + z.getMongo() ); } );
 
