@@ -60,6 +60,9 @@ public:
     void expectActionLogCreate(const BSONObj& response) {
         onCommand([&response](const RemoteCommandRequest& request) {
             ASSERT_EQUALS("config", request.dbname);
+
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
             BSONObj expectedCreateCmd = BSON("create" << ActionLogType::ConfigNS << "capped" << true
                                                       << "size" << 1024 * 1024 * 2);
             ASSERT_EQUALS(expectedCreateCmd, request.cmdObj);
@@ -71,6 +74,8 @@ public:
     void expectActionLogInsert(const ActionLogType& expectedActionLog) {
         onCommand([&expectedActionLog](const RemoteCommandRequest& request) {
             ASSERT_EQUALS("config", request.dbname);
+
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
             BatchedInsertRequest actualBatchedInsert;
             std::string errmsg;

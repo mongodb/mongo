@@ -38,6 +38,7 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
@@ -64,6 +65,7 @@ using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using executor::TaskExecutor;
+using rpc::ReplSetMetadata;
 using std::string;
 using std::vector;
 using stdx::chrono::milliseconds;
@@ -482,8 +484,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommand) {
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        bool ok =
-            catalogManager()->runReadCommand("test", BSON("usersInfo" << 1), &responseBuilder);
+        bool ok = catalogManager()->runUserManagementReadCommand(
+            "test", BSON("usersInfo" << 1), &responseBuilder);
         ASSERT_TRUE(ok);
 
         BSONObj response = responseBuilder.obj();
@@ -493,6 +495,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommand) {
     });
 
     onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
         ASSERT_EQUALS("test", request.dbname);
         ASSERT_EQUALS(BSON("usersInfo" << 1), request.cmdObj);
 
@@ -508,7 +512,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommandUnsatisfiedReadPre
         Status(ErrorCodes::FailedToSatisfyReadPreference, "no nodes up"));
 
     BSONObjBuilder responseBuilder;
-    bool ok = catalogManager()->runReadCommand("test", BSON("usersInfo" << 1), &responseBuilder);
+    bool ok = catalogManager()->runUserManagementReadCommand(
+        "test", BSON("usersInfo" << 1), &responseBuilder);
     ASSERT_FALSE(ok);
 
     Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
@@ -570,6 +575,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandSuccess) {
         ASSERT_EQUALS(BSON("dropUser"
                            << "test"),
                       request.cmdObj);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         BSONObjBuilder responseBuilder;
         Command::appendCommandStatus(responseBuilder,
@@ -668,6 +675,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMasterRetrySuc
         ASSERT_EQUALS(BSON("dropUser"
                            << "test"),
                       request.cmdObj);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         return BSON("ok" << 1);
     });
@@ -1212,6 +1221,8 @@ TEST_F(CatalogManagerReplSetTest, UpdateDatabase) {
     onCommand([dbt](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("config", request.dbname);
 
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
         ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
@@ -1284,6 +1295,9 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecated) {
 
     onCommand([updateOps, preCondition](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("config", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
         ASSERT_EQUALS(updateOps, request.cmdObj["applyOps"].Obj());
         ASSERT_EQUALS(preCondition, request.cmdObj["preCondition"].Obj());
 
@@ -1315,6 +1329,8 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedCommandFailed) {
         ASSERT_EQUALS("config", request.dbname);
         ASSERT_EQUALS(updateOps, request.cmdObj["applyOps"].Obj());
         ASSERT_EQUALS(preCondition, request.cmdObj["preCondition"].Obj());
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         BSONObjBuilder responseBuilder;
         Command::appendCommandStatus(responseBuilder,
@@ -1399,6 +1415,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
         string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
 
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+
         return BSON("ok" << 1 << "totalSize" << 10);
     });
 
@@ -1408,6 +1426,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
         ASSERT_EQUALS("admin", request.dbname);
         string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
+
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
 
         return BSON("ok" << 1 << "totalSize" << 1);
     });
@@ -1419,6 +1439,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
         string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
 
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+
         return BSON("ok" << 1 << "totalSize" << 100);
     });
 
@@ -1426,6 +1448,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         BatchedInsertRequest actualBatchedInsert;
         std::string errmsg;
@@ -1657,6 +1681,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
         string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
 
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+
         return BSON("ok" << 1 << "totalSize" << 10);
     });
 
@@ -1666,6 +1692,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
         ASSERT_EQUALS("admin", request.dbname);
         string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
+
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
 
         return BSON("ok" << 1 << "totalSize" << 1);
     });
@@ -1677,6 +1705,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
         string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
 
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+
         return BSON("ok" << 1 << "totalSize" << 100);
     });
 
@@ -1684,6 +1714,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         BatchedInsertRequest actualBatchedInsert;
         std::string errmsg;
@@ -1765,6 +1797,8 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
         ASSERT_EQ("admin", request.dbname);
         ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
 
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+
         return fromjson(R"({
                 databases: [],
                 totalSize: 1,
@@ -1775,6 +1809,8 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         BSONObj expectedCmd(fromjson(R"({
             update: "databases",
@@ -1871,6 +1907,8 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExists) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
 
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
         BSONObj expectedCmd(fromjson(R"({
             update: "databases",
             updates: [{
@@ -1946,6 +1984,129 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExistsNoShards) {
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
     future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTest, BasicReadAfterOpTime) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    repl::OpTime lastOpTime;
+    for (int x = 0; x < 3; x++) {
+        auto future = launchAsync([this] {
+            BSONObjBuilder responseBuilder;
+            ASSERT_TRUE(
+                catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
+        });
+
+        const repl::OpTime newOpTime(Timestamp(x + 2, x + 6), x + 5);
+
+        onCommandWithMetadata([this, &newOpTime, &lastOpTime](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS("test", request.dbname);
+
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
+            ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
+            checkReadConcern(request.cmdObj, lastOpTime.getTimestamp(), lastOpTime.getTerm());
+
+            ReplSetMetadata metadata(12, newOpTime, 100, 3);
+            BSONObjBuilder builder;
+            BSONObjBuilder replBuilder(builder.subobjStart(rpc::kReplicationMetadataFieldName));
+            metadata.writeToMetadata(&replBuilder);
+            replBuilder.done();
+
+            return RemoteCommandResponse(BSON("ok" << 1), builder.obj(), Milliseconds(1));
+        });
+
+        // Now wait for the runReadCommand call to return
+        future.timed_get(kFutureTimeout);
+
+        lastOpTime = newOpTime;
+    }
+}
+
+TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    // Initialize the internal config OpTime
+    auto future1 = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
+    });
+
+    repl::OpTime highestOpTime;
+    const repl::OpTime newOpTime(Timestamp(7, 6), 5);
+
+    onCommandWithMetadata([this, &newOpTime, &highestOpTime](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS("test", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
+        ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
+        checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
+
+        ReplSetMetadata metadata(12, newOpTime, 100, 3);
+        BSONObjBuilder builder;
+        BSONObjBuilder replBuilder(builder.subobjStart(rpc::kReplicationMetadataFieldName));
+        metadata.writeToMetadata(&replBuilder);
+        replBuilder.done();
+
+        return RemoteCommandResponse(BSON("ok" << 1), builder.obj(), Milliseconds(1));
+    });
+
+    future1.timed_get(kFutureTimeout);
+
+    highestOpTime = newOpTime;
+
+    // Return an older OpTime
+    auto future2 = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
+    });
+
+    const repl::OpTime oldOpTime(Timestamp(3, 10), 5);
+
+    onCommandWithMetadata([this, &oldOpTime, &highestOpTime](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS("test", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
+        ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
+        checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
+
+        ReplSetMetadata metadata(12, oldOpTime, 100, 3);
+        BSONObjBuilder builder;
+        BSONObjBuilder replBuilder(builder.subobjStart(rpc::kReplicationMetadataFieldName));
+        metadata.writeToMetadata(&replBuilder);
+        replBuilder.done();
+
+        return RemoteCommandResponse(BSON("ok" << 1), builder.obj(), Milliseconds(1));
+    });
+
+    future2.timed_get(kFutureTimeout);
+
+    // Check that older OpTime does not override highest OpTime
+    auto future3 = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
+    });
+
+    onCommandWithMetadata([this, &oldOpTime, &highestOpTime](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS("test", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
+        ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
+        checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
+
+        ReplSetMetadata metadata(12, oldOpTime, 100, 3);
+        BSONObjBuilder builder;
+        BSONObjBuilder replBuilder(builder.subobjStart(rpc::kReplicationMetadataFieldName));
+        metadata.writeToMetadata(&replBuilder);
+        replBuilder.done();
+
+        return RemoteCommandResponse(BSON("ok" << 1), builder.obj(), Milliseconds(1));
+    });
+
+    future3.timed_get(kFutureTimeout);
 }
 
 }  // namespace

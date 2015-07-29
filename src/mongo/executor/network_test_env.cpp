@@ -64,6 +64,17 @@ void NetworkTestEnv::onCommand(OnCommandFunction func) {
     _mockNetwork->exitNetwork();
 }
 
+void NetworkTestEnv::onCommandWithMetadata(OnCommandWithMetadataFunction func) {
+    _mockNetwork->enterNetwork();
+
+    const NetworkInterfaceMock::NetworkOperationIterator noi = _mockNetwork->getNextReadyRequest();
+    const RemoteCommandRequest& request = noi->getRequest();
+    _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), func(request));
+    _mockNetwork->runReadyNetworkOperations();
+
+    _mockNetwork->exitNetwork();
+}
+
 void NetworkTestEnv::onFindCommand(OnFindCommandFunction func) {
     onCommand([&func](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         const auto& resultStatus = func(request);

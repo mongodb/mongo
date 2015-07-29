@@ -78,6 +78,8 @@ protected:
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_EQ(request.cmdObj, BSON("isdbgrid" << 1));
 
+            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+
             BSONObjBuilder responseBuilder;
             Command::appendCommandStatus(
                 responseBuilder, Status(ErrorCodes::CommandNotFound, "isdbgrid command not found"));
@@ -90,6 +92,8 @@ protected:
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_EQ(request.cmdObj, BSON("isMaster" << 1));
 
+            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+
             return BSON("ismaster" << true);
         });
 
@@ -97,6 +101,8 @@ protected:
             ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_EQ(request.cmdObj, BSON("replSetGetStatus" << 1));
+
+            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
 
             BSONObjBuilder responseBuilder;
             Command::appendCommandStatus(
@@ -115,6 +121,8 @@ protected:
         onCommand([&dbtExpected](const RemoteCommandRequest& request) {
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), DatabaseType::ConfigNS);
+
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
             BatchedUpdateRequest actualBatchedUpdate;
             std::string errmsg;
@@ -184,6 +192,8 @@ TEST_F(AddShardTest, AddShardStandalone) {
             ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_EQ(request.cmdObj, BSON("listDatabases" << 1));
+
+            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
 
             BSONArrayBuilder arr;
 
@@ -289,6 +299,8 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
             ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_EQ(request.cmdObj, BSON("listDatabases" << 1));
+
+            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
 
             BSONArrayBuilder arr;
 

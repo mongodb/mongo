@@ -34,6 +34,8 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/mutex.h"
 
@@ -65,6 +67,11 @@ class ShardRegistry {
     MONGO_DISALLOW_COPYING(ShardRegistry);
 
 public:
+    struct CommandResponse {
+        BSONObj response;
+        repl::OpTime opTime;
+    };
+
     /**
      * Instantiates a new shard registry.
      *
@@ -153,6 +160,14 @@ public:
      * Runs a command against the specified host and returns the result.  It is the responsibility
      * of the caller to check the returned BSON for command-specific failures.
      */
+    StatusWith<CommandResponse> runCommandWithMetadata(const HostAndPort& host,
+                                                       const std::string& dbName,
+                                                       const BSONObj& cmdObj,
+                                                       const BSONObj& metadata);
+
+    /**
+     * Runs a command against the specified host and returns the result.
+     */
     StatusWith<BSONObj> runCommand(const HostAndPort& host,
                                    const std::string& dbName,
                                    const BSONObj& cmdObj);
@@ -171,6 +186,11 @@ public:
     StatusWith<BSONObj> runCommandWithNotMasterRetries(const ShardId& shard,
                                                        const std::string& dbname,
                                                        const BSONObj& cmdObj);
+
+    StatusWith<CommandResponse> runCommandWithNotMasterRetries(const ShardId& shardId,
+                                                               const std::string& dbname,
+                                                               const BSONObj& cmdObj,
+                                                               const BSONObj& metadata);
 
 private:
     typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;

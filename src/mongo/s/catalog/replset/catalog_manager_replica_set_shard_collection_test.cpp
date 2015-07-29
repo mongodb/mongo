@@ -105,6 +105,8 @@ public:
             ASSERT_EQUALS(configHost, request.target);
             ASSERT_EQUALS("config", request.dbname);
 
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
             BatchedUpdateRequest actualBatchedUpdate;
             std::string errmsg;
             ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
@@ -172,6 +174,8 @@ public:
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
             ASSERT_EQUALS("config", request.dbname);
+
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
             BatchedUpdateRequest actualBatchedUpdate;
             std::string errmsg;
@@ -728,6 +732,8 @@ TEST_F(ShardCollectionTest, withInitialData) {
         ASSERT_EQUALS(Chunk::MaxChunkSize, request.cmdObj["maxChunkSizeBytes"].numberLong());
         ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
         ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
+
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
 
         return BSON("ok" << 1 << "splitKeys"
                          << BSON_ARRAY(splitPoint0 << splitPoint1 << splitPoint2 << splitPoint3));

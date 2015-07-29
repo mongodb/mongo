@@ -39,6 +39,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
@@ -322,10 +323,24 @@ StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort
 StatusWith<BSONObj> ShardRegistry::runCommand(const HostAndPort& host,
                                               const std::string& dbName,
                                               const BSONObj& cmdObj) {
+    auto status = runCommandWithMetadata(host, dbName, cmdObj, rpc::makeEmptyMetadata());
+
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
+
+    return status.getValue().response;
+}
+
+StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithMetadata(
+    const HostAndPort& host,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    const BSONObj& metadata) {
     StatusWith<executor::RemoteCommandResponse> responseStatus =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
-    executor::RemoteCommandRequest request(host, dbName, cmdObj, kConfigCommandTimeout);
+    executor::RemoteCommandRequest request(host, dbName, cmdObj, metadata, kConfigCommandTimeout);
     auto callStatus =
         _executor->scheduleRemoteCommand(request,
                                          [&responseStatus](const RemoteCommandCallbackArgs& args) {
@@ -342,12 +357,42 @@ StatusWith<BSONObj> ShardRegistry::runCommand(const HostAndPort& host,
         return responseStatus.getStatus();
     }
 
-    return responseStatus.getValue().data;
+    auto response = responseStatus.getValue();
+
+    CommandResponse cmdResponse;
+    cmdResponse.response = response.data;
+
+    if (auto replField = response.metadata[rpc::kReplicationMetadataFieldName]) {
+        auto replParseStatus = rpc::ReplSetMetadata::readFromMetadata(replField.Obj());
+
+        if (!replParseStatus.isOK()) {
+            return replParseStatus.getStatus();
+        }
+
+        // TODO: SERVER-19734 use config server snapshot time.
+        cmdResponse.opTime = replParseStatus.getValue().getLastCommittedOptime();
+    }
+
+    return cmdResponse;
 }
 
 StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(const ShardId& shardId,
                                                                   const std::string& dbname,
                                                                   const BSONObj& cmdObj) {
+    auto status = runCommandWithNotMasterRetries(shardId, dbname, cmdObj, rpc::makeEmptyMetadata());
+
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
+
+    return status.getValue().response;
+}
+
+StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithNotMasterRetries(
+    const ShardId& shardId,
+    const std::string& dbname,
+    const BSONObj& cmdObj,
+    const BSONObj& metadata) {
     auto targeter = getShard(shardId)->getTargeter();
     const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet{});
 
@@ -365,12 +410,12 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(const ShardId&
             return target.getStatus();
         }
 
-        auto response = runCommand(target.getValue(), dbname, cmdObj);
+        auto response = runCommandWithMetadata(target.getValue(), dbname, cmdObj, metadata);
         if (!response.isOK()) {
             return response.getStatus();
         }
 
-        Status commandStatus = getStatusFromCommandResult(response.getValue());
+        Status commandStatus = getStatusFromCommandResult(response.getValue().response);
         if (ErrorCodes::NotMaster == commandStatus ||
             ErrorCodes::NotMasterNoSlaveOkCode == commandStatus) {
             targeter->markHostNotMaster(target.getValue());

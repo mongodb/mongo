@@ -40,6 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -179,6 +180,11 @@ void CatalogManagerReplSetTestFixture::onCommand(NetworkTestEnv::OnCommandFuncti
     _networkTestEnv->onCommand(func);
 }
 
+void CatalogManagerReplSetTestFixture::onCommandWithMetadata(
+    NetworkTestEnv::OnCommandWithMetadataFunction func) {
+    _networkTestEnv->onCommandWithMetadata(func);
+}
+
 void CatalogManagerReplSetTestFixture::onFindCommand(NetworkTestEnv::OnFindCommandFunction func) {
     _networkTestEnv->onFindCommand(func);
 }
@@ -312,6 +318,7 @@ void CatalogManagerReplSetTestFixture::expectUpdateCollection(const HostAndPort&
                                                               const CollectionType& coll) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(expectedHost, request.target);
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
         ASSERT_EQUALS("config", request.dbname);
 
         BatchedUpdateRequest actualBatchedUpdate;
@@ -342,6 +349,7 @@ void CatalogManagerReplSetTestFixture::expectSetShardVersion(
     const ChunkVersion& expectedChunkVersion) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(expectedHost, request.target);
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
 
         SetShardVersionRequest ssv =
             assertGet(SetShardVersionRequest::parseFromBSON(request.cmdObj));
@@ -379,10 +387,32 @@ void CatalogManagerReplSetTestFixture::expectCount(const HostAndPort& configHost
             return BSON("ok" << 1 << "n" << response.getValue());
         }
 
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+
         BSONObjBuilder responseBuilder;
         Command::appendCommandStatus(responseBuilder, response.getStatus());
         return responseBuilder.obj();
     });
+}
+
+void CatalogManagerReplSetTestFixture::checkReadConcern(const BSONObj& cmdObj,
+                                                        const Timestamp& expectedTS,
+                                                        long long expectedTerm) const {
+    auto readConcernElem = cmdObj[repl::ReadConcernArgs::kReadConcernFieldName];
+    ASSERT_EQ(Object, readConcernElem.type());
+
+    auto readConcernObj = readConcernElem.Obj();
+    ASSERT_EQ("majority", readConcernObj[repl::ReadConcernArgs::kLevelFieldName].str());
+
+    auto afterElem = readConcernObj[repl::ReadConcernArgs::kOpTimeFieldName];
+    ASSERT_EQ(Object, afterElem.type());
+
+    auto afterObj = afterElem.Obj();
+
+    ASSERT_TRUE(afterObj.hasField(repl::ReadConcernArgs::kOpTimestampFieldName));
+    ASSERT_EQ(expectedTS, afterObj[repl::ReadConcernArgs::kOpTimestampFieldName].timestamp());
+    ASSERT_TRUE(afterObj.hasField(repl::ReadConcernArgs::kOpTermFieldName));
+    ASSERT_EQ(expectedTerm, afterObj[repl::ReadConcernArgs::kOpTermFieldName].numberLong());
 }
 
 }  // namespace mongo

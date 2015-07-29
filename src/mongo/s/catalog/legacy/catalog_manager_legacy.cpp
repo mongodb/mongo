@@ -879,7 +879,13 @@ bool CatalogManagerLegacy::runUserManagementWriteCommand(const string& commandNa
     return Command::appendCommandStatus(*result, status);
 }
 
-bool CatalogManagerLegacy::runReadCommand(const string& dbname,
+bool CatalogManagerLegacy::runUserManagementReadCommand(const string& dbname,
+                                                        const BSONObj& cmdObj,
+                                                        BSONObjBuilder* result) {
+    return runReadCommand(dbname, cmdObj, result);
+}
+
+bool CatalogManagerLegacy::runReadCommand(const std::string& dbname,
                                           const BSONObj& cmdObj,
                                           BSONObjBuilder* result) {
     try {

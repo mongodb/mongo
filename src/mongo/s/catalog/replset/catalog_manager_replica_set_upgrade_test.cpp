@@ -151,6 +151,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
         ASSERT_EQ("admin", request.dbname);
         ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
 
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
         return fromjson(R"({
                     databases: [
                         { name: "local" }
@@ -163,6 +165,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
@@ -210,6 +214,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfigWithAdmin
         ASSERT_EQ("admin", request.dbname);
         ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
 
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
         return fromjson(R"({
                     databases: [
                         { name: "local" },
@@ -223,6 +229,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfigWithAdmin
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
@@ -254,6 +262,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeWriteError) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("admin", request.dbname);
         ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         return fromjson(R"({
                     databases: [
@@ -295,6 +305,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocNonEmptyConfigServer
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("admin", request.dbname);
         ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         return fromjson(R"({
                     databases: [

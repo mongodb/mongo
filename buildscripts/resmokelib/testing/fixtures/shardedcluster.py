@@ -4,6 +4,7 @@ Sharded cluster fixture for executing JSTests against.
 
 from __future__ import absolute_import
 
+import copy
 import os.path
 import time
 
@@ -171,10 +172,11 @@ class ShardedClusterFixture(interface.Fixture):
         logger_name = "%s:configsvr" % (self.logger.name)
         mongod_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
 
-        mongod_options = self.mongod_options.copy()
+        mongod_options = copy.deepcopy(self.mongod_options)
         mongod_options["configsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
         mongod_options["replSet"] = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
+        mongod_options["set_parameters"]["enableReplSnapshotThread"] = 1
 
         return replicaset.ReplicaSetFixture(mongod_logger,
                                             self.job_num,
@@ -193,7 +195,7 @@ class ShardedClusterFixture(interface.Fixture):
         logger_name = "%s:shard%d" % (self.logger.name, index)
         mongod_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
 
-        mongod_options = self.mongod_options.copy()
+        mongod_options = copy.deepcopy(self.mongod_options)
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard%d" % (index))
 
         return standalone.MongoDFixture(mongod_logger,
@@ -211,7 +213,7 @@ class ShardedClusterFixture(interface.Fixture):
         logger_name = "%s:mongos" % (self.logger.name)
         mongos_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
 
-        mongos_options = self.mongos_options.copy()
+        mongos_options = copy.deepcopy(self.mongos_options)
         if self.separate_configsvr:
             configdb_replset = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
             configdb_port = self.configsvr.port

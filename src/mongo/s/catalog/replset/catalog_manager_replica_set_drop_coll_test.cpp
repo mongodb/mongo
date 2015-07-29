@@ -92,14 +92,19 @@ public:
             ASSERT_EQ(_dropNS.db(), request.dbname);
             ASSERT_EQ(BSON("drop" << _dropNS.coll()), request.cmdObj);
 
+            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+
             return BSON("ns" << _dropNS.ns() << "ok" << 1);
         });
     }
 
     void expectRemoveChunksAndMarkCollectionDropped() {
         onCommand([this](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
             ASSERT_EQ(_configHost, request.target);
             ASSERT_EQ("config", request.dbname);
+
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
             BSONObj expectedCmd(fromjson(R"({
                 delete: "chunks",
@@ -131,6 +136,8 @@ public:
             ASSERT_EQ(HostAndPort(shard.getHost()), request.target);
             ASSERT_EQ("admin", request.dbname);
             ASSERT_EQ(BSON("unsetSharding" << 1), request.cmdObj);
+
+            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
 
             return BSON("n" << 1 << "ok" << 1);
         });
@@ -219,6 +226,8 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
         ASSERT_EQ(dropNS().db(), request.dbname);
         ASSERT_EQ(BSON("drop" << dropNS().coll()), request.cmdObj);
 
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+
         return BSON("ok" << 0 << "code" << ErrorCodes::NamespaceNotFound);
     });
 
@@ -226,6 +235,8 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
         ASSERT_EQ(HostAndPort(shard2().getHost()), request.target);
         ASSERT_EQ(dropNS().db(), request.dbname);
         ASSERT_EQ(BSON("drop" << dropNS().coll()), request.cmdObj);
+
+        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
 
         return BSON("ok" << 0 << "code" << ErrorCodes::NamespaceNotFound);
     });

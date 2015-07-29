@@ -133,9 +133,15 @@ bool CatalogManagerMock::runUserManagementWriteCommand(const string& commandName
     return true;
 }
 
-bool CatalogManagerMock::runReadCommand(const string& dbname,
+bool CatalogManagerMock::runReadCommand(const std::string& dbname,
                                         const BSONObj& cmdObj,
                                         BSONObjBuilder* result) {
+    return true;
+}
+
+bool CatalogManagerMock::runUserManagementReadCommand(const string& dbname,
+                                                      const BSONObj& cmdObj,
+                                                      BSONObjBuilder* result) {
     return true;
 }
 

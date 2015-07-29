@@ -274,11 +274,18 @@ public:
                                                BSONObjBuilder* result) = 0;
 
     /**
-     * Runs a read-only command on a single config server.
+     * Runs a read-only command on a config server.
      */
     virtual bool runReadCommand(const std::string& dbname,
                                 const BSONObj& cmdObj,
                                 BSONObjBuilder* result) = 0;
+
+    /**
+     * Runs a user management related read-only command on a config server.
+     */
+    virtual bool runUserManagementReadCommand(const std::string& dbname,
+                                              const BSONObj& cmdObj,
+                                              BSONObjBuilder* result) = 0;
 
     /**
      * Applies oplog entries to the config servers.

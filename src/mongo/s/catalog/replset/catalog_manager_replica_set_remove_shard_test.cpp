@@ -146,6 +146,8 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
         ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
@@ -317,6 +319,8 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         BatchedDeleteRequest actualBatchedDelete;
         std::string errmsg;

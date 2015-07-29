@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/client/connection_string.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/stdx/mutex.h"
@@ -36,6 +37,7 @@
 namespace mongo {
 
 class NamespaceString;
+struct ReadPreferenceSetting;
 class VersionType;
 
 /**
@@ -102,6 +104,10 @@ public:
                         const BSONObj& cmdObj,
                         BSONObjBuilder* result) override;
 
+    bool runUserManagementReadCommand(const std::string& dbname,
+                                      const BSONObj& cmdObj,
+                                      BSONObjBuilder* result) override;
+
     Status applyChunkOpsDeprecated(const BSONArray& updateOps,
                                    const BSONArray& preCondition) override;
 
@@ -126,36 +132,74 @@ private:
 
     StatusWith<std::string> _generateNewShardName() const override;
 
+    bool _runReadCommand(const std::string& dbname,
+                         const BSONObj& cmdObj,
+                         const ReadPreferenceSetting& settings,
+                         BSONObjBuilder* result);
+
     /**
      * Helper method for running a count command against a given target server with appropriate
      * error handling.
      */
-    StatusWith<long long> _runCountCommand(const HostAndPort& target,
-                                           const NamespaceString& ns,
-                                           BSONObj query);
+    StatusWith<long long> _runCountCommandOnConfig(const HostAndPort& target,
+                                                   const NamespaceString& ns,
+                                                   BSONObj query);
+
+    StatusWith<BSONObj> _runCommandOnConfig(const HostAndPort& target,
+                                            const std::string& dbName,
+                                            BSONObj cmdObj);
+
+    StatusWith<BSONObj> _runCommandOnConfigWithNotMasterRetries(const std::string& dbName,
+                                                                BSONObj cmdObj);
+
+    /**
+     * Appends a read committed read concern to the request object.
+     */
+    void _appendReadConcern(BSONObjBuilder* builder);
 
     /**
      * Returns the current cluster schema/protocol version.
      */
     StatusWith<VersionType> _getConfigVersion();
 
-    // Config server connection string
-    ConnectionString _configServerConnectionString;
+    /**
+     * Returns the highest last known config server opTime.
+     */
+    repl::OpTime _getConfigOpTime();
 
-    // Distribted lock manager singleton.
-    std::unique_ptr<DistLockManager> _distLockManager;
+    /**
+     * Updates the last known config server opTime if the given opTime is newer.
+     */
+    void _updateLastSeenConfigOpTime(const repl::OpTime& optime);
 
-    // Whether the logAction call should attempt to create the actionlog collection
-    AtomicInt32 _actionLogCollectionCreated;
+    //
+    // All member variables are labeled with one of the following codes indicating the
+    // synchronization rules for accessing them.
+    //
+    // (F) Self synchronizing.
+    // (M) Must hold _mutex for access.
+    // (R) Read only, can only be written during initialization.
+    //
 
-    // Whether the logChange call should attempt to create the changelog collection
-    AtomicInt32 _changeLogCollectionCreated;
-
-    // protects _inShutdown
     stdx::mutex _mutex;
 
+    // Config server connection string
+    ConnectionString _configServerConnectionString;  // (R)
+
+    // Distribted lock manager singleton.
+    std::unique_ptr<DistLockManager> _distLockManager;  // (R)
+
+    // Whether the logAction call should attempt to create the actionlog collection
+    AtomicInt32 _actionLogCollectionCreated;  // (F)
+
+    // Whether the logChange call should attempt to create the changelog collection
+    AtomicInt32 _changeLogCollectionCreated;  // (F)
+
     // True if shutDown() has been called. False, otherwise.
-    bool _inShutdown = false;
+    bool _inShutdown = false;  // (M)
+
+    // Last known highest opTime from the config server.
+    repl::OpTime _configOpTime;  // (M)
 };
 
 }  // namespace mongo

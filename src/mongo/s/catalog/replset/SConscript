@@ -35,6 +35,7 @@ env.Library(
         'catalog_manager_replica_set.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/s/catalog/catalog_manager',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
         '$BUILD_DIR/mongo/s/client/sharding_client',
@@ -58,6 +59,7 @@ env.CppUnitTest(
         'catalog_manager_replica_set',
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
