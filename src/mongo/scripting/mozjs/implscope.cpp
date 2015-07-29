@@ -231,6 +231,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _bsonProto(_context),
       _countDownLatchProto(_context),
       _cursorProto(_context),
+      _cursorHandleProto(_context),
       _dbCollectionProto(_context),
       _dbPointerProto(_context),
       _dbQueryProto(_context),
@@ -672,6 +673,7 @@ void MozJSImplScope::installBSONTypes() {
 
 void MozJSImplScope::installDBAccess() {
     _cursorProto.install(_global);
+    _cursorHandleProto.install(_global);
     _dbProto.install(_global);
     _dbQueryProto.install(_global);
     _dbCollectionProto.install(_global);

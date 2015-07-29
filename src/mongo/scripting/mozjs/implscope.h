@@ -35,6 +35,7 @@
 #include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/countdownlatch.h"
 #include "mongo/scripting/mozjs/cursor.h"
+#include "mongo/scripting/mozjs/cursor_handle.h"
 #include "mongo/scripting/mozjs/db.h"
 #include "mongo/scripting/mozjs/dbcollection.h"
 #include "mongo/scripting/mozjs/dbpointer.h"
@@ -157,6 +158,10 @@ public:
 
     WrapType<CursorInfo>& getCursorProto() {
         return _cursorProto;
+    }
+
+    WrapType<CursorHandleInfo>& getCursorHandleProto() {
+        return _cursorHandleProto;
     }
 
     WrapType<DBCollectionInfo>& getDbCollectionProto() {
@@ -306,6 +311,7 @@ private:
     WrapType<BSONInfo> _bsonProto;
     WrapType<CountDownLatchInfo> _countDownLatchProto;
     WrapType<CursorInfo> _cursorProto;
+    WrapType<CursorHandleInfo> _cursorHandleProto;
     WrapType<DBCollectionInfo> _dbCollectionProto;
     WrapType<DBPointerInfo> _dbPointerProto;
     WrapType<DBQueryInfo> _dbQueryProto;

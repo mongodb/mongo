@@ -28,63 +28,44 @@
 
 #pragma once
 
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {
 namespace mozjs {
 
 /**
- * Shared code for the "Mongo" javascript object.
+ * Wraps a DBClientCursor in javascript.
  *
- * The idea here is that there is a lot of shared functionality between the
- * "Mongo" we see in the shell and the "Mongo" in dbeval.  So we provide one
- * info type with common code and differentiate with varying constructors.
+ * Note that the install is private, so this class should only be constructible from C++. Current
+ * callers are all via the Mongo object.
  */
-struct MongoBase : public BaseInfo {
+struct CursorHandleInfo : public BaseInfo {
+    static void construct(JSContext* cx, JS::CallArgs args);
     static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(auth);
-        MONGO_DEFINE_JS_FUNCTION(copyDatabaseWithSCRAM);
-        MONGO_DEFINE_JS_FUNCTION(cursorFromId);
-        MONGO_DEFINE_JS_FUNCTION(cursorHandleFromId);
-        MONGO_DEFINE_JS_FUNCTION(find);
-        MONGO_DEFINE_JS_FUNCTION(getClientRPCProtocols);
-        MONGO_DEFINE_JS_FUNCTION(getServerRPCProtocols);
-        MONGO_DEFINE_JS_FUNCTION(insert);
-        MONGO_DEFINE_JS_FUNCTION(logout);
-        MONGO_DEFINE_JS_FUNCTION(remove);
-        MONGO_DEFINE_JS_FUNCTION(runCommand);
-        MONGO_DEFINE_JS_FUNCTION(runCommandWithMetadata);
-        MONGO_DEFINE_JS_FUNCTION(setClientRPCProtocols);
-        MONGO_DEFINE_JS_FUNCTION(update);
+        MONGO_DEFINE_JS_FUNCTION(zeroCursorId);
     };
 
-    static const JSFunctionSpec methods[15];
+    static const JSFunctionSpec methods[2];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
-};
+    static const InstallType installType = InstallType::Private;
 
-/**
- * The dbeval variant of "Mongo"
- */
-struct MongoLocalInfo : public MongoBase {
-    static void construct(JSContext* cx, JS::CallArgs args);
-};
+    /**
+     * We need this because the DBClientBase can go out of scope before all of its children (as
+     * in global shutdown). So we have to manage object lifetimes in C++ land.
+     */
+    struct CursorTracker {
+        CursorTracker(long long curId, std::shared_ptr<DBClientBase> client)
+            : client(std::move(client)), cursorId(curId) {}
 
-/**
- * The shell variant of "Mongo"
- */
-struct MongoExternalInfo : public MongoBase {
-    static void construct(JSContext* cx, JS::CallArgs args);
-
-    struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(load);
-        MONGO_DEFINE_JS_FUNCTION(quit);
+        std::shared_ptr<DBClientBase> client;
+        long long cursorId;
     };
-
-    static const JSFunctionSpec freeFunctions[3];
 };
 
 }  // namespace mozjs

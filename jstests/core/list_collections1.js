@@ -214,10 +214,9 @@
 
     //
     // Test killCursors against a listCollections cursor.
-    // TODO: re-enable after implementing SERVER-19570.
     //
 
-    /*assert.commandWorked(mydb.dropDatabase());
+    assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
     assert.commandWorked(mydb.createCollection("bar"));
     assert.commandWorked(mydb.createCollection("baz"));
@@ -228,5 +227,5 @@
     cursor = null;
     gc(); // Shell will send a killCursors message when cleaning up underlying cursor.
     cursor = new DBCommandCursor(mydb.getMongo(), res, 2);
-    assert.throws(function() { cursor.hasNext(); });*/
+    assert.throws(function() { cursor.hasNext(); });
 }());

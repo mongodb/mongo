@@ -49,6 +49,7 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_FUNCTION(auth),
     MONGO_ATTACH_JS_FUNCTION(copyDatabaseWithSCRAM),
     MONGO_ATTACH_JS_FUNCTION(cursorFromId),
+    MONGO_ATTACH_JS_FUNCTION(cursorHandleFromId),
     MONGO_ATTACH_JS_FUNCTION(find),
     MONGO_ATTACH_JS_FUNCTION(getClientRPCProtocols),
     MONGO_ATTACH_JS_FUNCTION(getServerRPCProtocols),
@@ -82,6 +83,14 @@ void setCursor(JS::HandleObject target,
 
     // Copy the client shared pointer to up the refcount
     JS_SetPrivate(target, new CursorInfo::CursorHolder(std::move(cursor), *client));
+}
+
+void setCursorHandle(JS::HandleObject target, long long cursorId, JS::CallArgs& args) {
+    auto client =
+        static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
+
+    // Copy the client shared pointer to up the refcount.
+    JS_SetPrivate(target, new CursorHandleInfo::CursorTracker(cursorId, *client));
 }
 }  // namespace
 
@@ -395,6 +404,26 @@ void MongoBase::Functions::cursorFromId(JSContext* cx, JS::CallArgs args) {
     scope->getCursorProto().newInstance(&c);
 
     setCursor(c, std::move(cursor), args);
+
+    args.rval().setObjectOrNull(c);
+}
+
+void MongoBase::Functions::cursorHandleFromId(JSContext* cx, JS::CallArgs args) {
+    auto scope = getScope(cx);
+
+    if (args.length() != 1) {
+        uasserted(ErrorCodes::BadValue, "cursorHandleFromId needs 1 arg");
+    }
+    if (!scope->getNumberLongProto().instanceOf(args.get(0))) {
+        uasserted(ErrorCodes::BadValue, "1st arg must be a NumberLong");
+    }
+
+    long long cursorId = NumberLongInfo::ToNumberLong(cx, args.get(0));
+
+    JS::RootedObject c(cx);
+    scope->getCursorHandleProto().newInstance(&c);
+
+    setCursorHandle(c, cursorId, args);
 
     args.rval().setObjectOrNull(c);
 }

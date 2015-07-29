@@ -648,8 +648,13 @@ function DBCommandCursor(mongo, cmdResult, batchSize) {
         this._ns = cmdResult.cursor.ns;
         this._db = mongo.getDB(this._ns.substr(0, this._ns.indexOf(".")));
         this._collName = this._ns.substr(this._ns.indexOf(".") + 1);
-    }
-    else {
+
+        if (cmdResult.cursor.id) {
+            // Note that setting this._cursorid to 0 should be accompanied by
+            // this._cursorHandle.zeroCursorId().
+            this._cursorHandle = mongo.cursorHandleFromId(cmdResult.cursor.id);
+        }
+    } else {
         this._cursor = mongo.cursorFromId(cmdResult.cursor.ns, cmdResult.cursor.id, batchSize);
     }
 }
@@ -683,6 +688,7 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
     }
 
     if (!cmdRes.cursor.id.compare(NumberLong("0"))) {
+        this._cursorHandle.zeroCursorId();
         this._cursorid = NumberLong("0");
     }
     else if (this._cursorid.compare(cmdRes.cursor.id)) {

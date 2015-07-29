@@ -116,6 +116,7 @@ elif usemozjs:
             'mozjs/bson.cpp',
             'mozjs/countdownlatch.cpp',
             'mozjs/cursor.cpp',
+            'mozjs/cursor_handle.cpp',
             'mozjs/dbcollection.cpp',
             'mozjs/db.cpp',
             'mozjs/dbpointer.cpp',
