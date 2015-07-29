@@ -85,9 +85,6 @@ func (f *realBSONFile) Open() (err error) {
 	}
 
 	fileName := f.intent.BSONPath
-	if f.gzip {
-		fileName += ".gz"
-	}
 	file, err := os.Create(fileName)
 	if err != nil {
 		return fmt.Errorf("error creating BSON file %v: %v", fileName, err)
@@ -149,9 +146,6 @@ func (f *realMetadataFile) Open() (err error) {
 	}
 
 	fileName := f.intent.MetadataPath
-	if f.gzip {
-		fileName += ".gz"
-	}
 	f.WriteCloser, err = os.Create(fileName)
 	if err != nil {
 		return fmt.Errorf("error creating metadata file %v: %v", fileName, err)
@@ -231,7 +225,9 @@ func (dump *MongoDump) NewIntent(dbName, colName string) (*intents.Intent, error
 		C:        colName,
 		BSONPath: dump.outputPath(dbName, colName) + ".bson",
 	}
-
+	if dump.OutputOptions.Gzip {
+		intent.BSONPath += ".gz"
+	}
 	if dump.OutputOptions.Out == "-" {
 		intent.BSONFile = &stdoutFile{Writer: dump.stdout}
 	} else {
@@ -247,6 +243,9 @@ func (dump *MongoDump) NewIntent(dbName, colName string) (*intents.Intent, error
 		}
 		if !intent.IsSystemIndexes() {
 			intent.MetadataPath = dump.outputPath(dbName, colName+".metadata.json")
+			if dump.OutputOptions.Gzip {
+				intent.MetadataPath += ".gz"
+			}
 			if dump.OutputOptions.Archive != "" {
 				intent.MetadataFile = &archive.MetadataFile{
 					Intent: intent,
