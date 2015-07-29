@@ -291,15 +291,22 @@ main(void)
 		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
 		return (ret);
 	}
+	printf("Create connection dir %s\n", home1);
+	fflush(stdout);
 	if ((ret = wiredtiger_open(home1, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home1, wiredtiger_strerror(ret));
 		return (ret);
 	}
 
+	printf("Open session\n");
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
+	printf("Create table %s\n", uri);
+	fflush(stdout);
 	ret = session->create(session, uri, "key_format=S,value_format=S");
 	RETCHK("Create");
+	printf("Open cursor to uri %s\n",uri);
+	fflush(stdout);
 
 	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
 	RETCHK("open_cursor");
