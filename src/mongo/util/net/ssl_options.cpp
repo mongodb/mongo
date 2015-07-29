@@ -162,8 +162,7 @@ Status addSSLClientOptions(moe::OptionSection* options) {
         .requires("ssl");
 
     options->addOptionChaining(
-                 "ssl.FIPSMode", "sslFIPSMode", moe::Switch, "activate FIPS 140-2 mode at startup")
-        .requires("ssl");
+        "ssl.FIPSMode", "sslFIPSMode", moe::Switch, "activate FIPS 140-2 mode at startup");
 
     return Status::OK();
 }
@@ -332,7 +331,7 @@ Status storeSSLServerOptions(const moe::Environment& params) {
                sslGlobalParams.sslCAFile.size() || sslGlobalParams.sslCRLFile.size() ||
                sslGlobalParams.sslCipherConfig.size() ||
                sslGlobalParams.sslDisabledProtocols.size() ||
-               sslGlobalParams.sslWeakCertificateValidation || sslGlobalParams.sslFIPSMode) {
+               sslGlobalParams.sslWeakCertificateValidation) {
         return Status(ErrorCodes::BadValue,
                       "need to enable SSL via the sslMode flag when "
                       "using SSL configuration parameters");
