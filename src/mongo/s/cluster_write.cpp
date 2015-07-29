@@ -126,7 +126,7 @@ void splitIfNeeded(const NamespaceString& nss, const TargeterStats& stats) {
     shared_ptr<DBConfig> config = status.getValue();
 
     ChunkManagerPtr chunkManager;
-    ShardPtr dummyShard;
+    shared_ptr<Shard> dummyShard;
     config->getChunkManagerOrPrimary(nss.ns(), chunkManager, dummyShard);
 
     if (!chunkManager) {

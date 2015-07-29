@@ -49,7 +49,6 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -238,27 +237,6 @@ public:
         });
     }
 
-    void expectSetShardVersion(const HostAndPort& expectedTargetHost,
-                               const string& expectedNs,
-                               const ChunkVersion& expectedChunkVersion) {
-        onCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQ(expectedTargetHost, request.target);
-
-            SetShardVersionRequest ssv =
-                assertGet(SetShardVersionRequest::parseFromBSON(request.cmdObj));
-
-            ASSERT(!ssv.isInit());
-            ASSERT(ssv.isAuthoritative());
-            ASSERT_EQ(catalogManager()->connectionString().toString(),
-                      ssv.getConfigServer().toString());
-            ASSERT_EQ(expectedTargetHost.toString(), ssv.getShardConnectionString().toString());
-            ASSERT_EQ(expectedNs, ssv.getNS().ns());
-            ASSERT_EQ(expectedChunkVersion.toString(), ssv.getNSVersion().toString());
-
-            return BSON("ok" << true);
-        });
-    }
-
 protected:
     const HostAndPort configHost{"configHost1"};
     const HostAndPort clientHost{"clientHost1"};
@@ -426,16 +404,14 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     expectReloadChunks(ns, {expectedChunk});
     expectLoadNewestChunk(ns, expectedChunk);
 
-    // Expect the set shard version for that namespace
-    expectSetShardVersion(shardHost, ns, actualVersion);
-
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
                           clientHost.toString(),
                           network()->now(),
                           "shardCollection",
                           ns,
-                          BSON("version" << actualVersion.toString()));
+                          BSON("version"
+                               << ""));
 
     future.timed_get(kFutureTimeout);
 }
@@ -445,7 +421,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     const HostAndPort shard0Host{"shardHost0"};
     const HostAndPort shard1Host{"shardHost1"};
     const HostAndPort shard2Host{"shardHost2"};
-
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost(shard0Host.toString());
@@ -606,16 +581,14 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectReloadChunks(ns, expectedChunks);
     expectLoadNewestChunk(ns, expectedChunks[4]);
 
-    // Expect the set shard version for that namespace
-    expectSetShardVersion(shard0Host, ns, expectedChunks[4].getVersion());
-
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
                           clientHost.toString(),
                           network()->now(),
                           "shardCollection",
                           ns,
-                          BSON("version" << expectedChunks[4].getVersion().toString()));
+                          BSON("version"
+                               << ""));
 
     future.timed_get(kFutureTimeout);
 }
@@ -786,16 +759,14 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectReloadChunks(ns, expectedChunks);
     expectLoadNewestChunk(ns, expectedChunks[4]);
 
-    // Expect the set shard version for that namespace
-    expectSetShardVersion(shardHost, ns, expectedChunks[4].getVersion());
-
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
                           clientHost.toString(),
                           network()->now(),
                           "shardCollection",
                           ns,
-                          BSON("version" << expectedChunks[4].getVersion().toString()));
+                          BSON("version"
+                               << ""));
 
     future.timed_get(kFutureTimeout);
 }

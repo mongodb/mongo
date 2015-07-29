@@ -63,7 +63,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -212,28 +211,13 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
     collInfo.save(ns);
     manager->reload(true);
 
-    // Tell the primary mongod to refresh its data
-    // TODO:  Think the real fix here is for mongos to just
-    //        assume that all collections are sharded, when we get there
-    SetShardVersionRequest ssv =
-        SetShardVersionRequest::makeForVersioning(_configServerConnectionString,
-                                                  dbPrimaryShardId,
-                                                  primaryShard->getConnString(),
-                                                  NamespaceString(ns),
-                                                  manager->getVersion(),
-                                                  true);
+    // TODO(spencer) SERVER-19319: Send setShardVersion to primary shard so it knows to start
+    // rejecting unversioned writes.
 
-    auto ssvStatus = grid.shardRegistry()->runCommandWithNotMasterRetries(
-        dbPrimaryShardId, "admin", ssv.toBSON());
-    if (!ssvStatus.isOK()) {
-        warning() << "could not update initial version of " << ns << " on shard primary "
-                  << dbPrimaryShardId << ssvStatus.getStatus();
-    }
+    BSONObj finishDetail = BSON("version"
+                                << "");  // TODO(spencer) SERVER-19319 Report actual version used
 
-    logChange(txn->getClient()->clientAddress(true),
-              "shardCollection",
-              ns,
-              BSON("version" << manager->getVersion().toString()));
+    logChange(txn->getClient()->clientAddress(true), "shardCollection", ns, finishDetail);
 
     return Status::OK();
 }

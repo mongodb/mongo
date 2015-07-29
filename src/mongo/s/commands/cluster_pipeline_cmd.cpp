@@ -247,7 +247,10 @@ private:
     // returned cursors with mongos's cursorCache.
     BSONObj aggRunCommand(DBClientBase* conn, const string& db, BSONObj cmd, int queryOptions);
 
-    bool aggPassthrough(DBConfigPtr conf, BSONObj cmd, BSONObjBuilder& result, int queryOptions);
+    bool aggPassthrough(shared_ptr<DBConfig> conf,
+                        BSONObj cmd,
+                        BSONObjBuilder& result,
+                        int queryOptions);
 } clusterPipelineCmd;
 
 DocumentSourceMergeCursors::CursorIds PipelineCommand::parseCursors(
@@ -381,7 +384,7 @@ BSONObj PipelineCommand::aggRunCommand(DBClientBase* conn,
     return result;
 }
 
-bool PipelineCommand::aggPassthrough(DBConfigPtr conf,
+bool PipelineCommand::aggPassthrough(shared_ptr<DBConfig> conf,
                                      BSONObj cmd,
                                      BSONObjBuilder& out,
                                      int queryOptions) {

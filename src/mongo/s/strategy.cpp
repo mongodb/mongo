@@ -67,7 +67,6 @@ namespace mongo {
 
 using std::unique_ptr;
 using std::shared_ptr;
-using std::endl;
 using std::set;
 using std::string;
 using std::stringstream;
@@ -157,7 +156,7 @@ void Strategy::queryOp(Request& r) {
     uassertStatusOK(status);
 
     LOG(3) << "query: " << q.ns << " " << q.query << " ntoreturn: " << q.ntoreturn
-           << " options: " << q.queryOptions << endl;
+           << " options: " << q.queryOptions;
 
     if (q.ntoreturn == 1 && strstr(q.ns, ".$cmd"))
         throw UserException(8010, "something is wrong, shouldn't see a command here");
@@ -216,7 +215,7 @@ void Strategy::queryOp(Request& r) {
         bool hasMore = cc->sendNextBatch(q.ntoreturn, buffer, docCount);
 
         if (hasMore) {
-            LOG(5) << "storing cursor : " << cc->getId() << endl;
+            LOG(5) << "storing cursor : " << cc->getId();
 
             int cursorLeftoverMillis = maxTimeMS.getValue() - queryTimer.millis();
             if (maxTimeMS.getValue() == 0) {  // 0 represents "no limit".
@@ -258,7 +257,7 @@ void Strategy::clientCommandOp(Request& r) {
     QueryMessage q(r.d());
 
     LOG(3) << "command: " << q.ns << " " << q.query << " ntoreturn: " << q.ntoreturn
-           << " options: " << q.queryOptions << endl;
+           << " options: " << q.queryOptions;
 
     if (q.queryOptions & QueryOption_Exhaust) {
         uasserted(18527,
@@ -313,7 +312,7 @@ void Strategy::clientCommandOp(Request& r) {
                 throw e;
 
             loops--;
-            log() << "retrying command: " << q.query << endl;
+            log() << "retrying command: " << q.query;
 
             // For legacy reasons, ns may not actually be set in the exception :-(
             string staleNS = e.getns();
@@ -359,7 +358,7 @@ bool Strategy::handleSpecialNamespaces(Request& r, QueryMessage& q) {
     } else if (strcmp(ns, "unlock") == 0) {
         reply.append("err", "can't do unlock through mongos");
     } else {
-        warning() << "unknown sys command [" << ns << "]" << endl;
+        warning() << "unknown sys command [" << ns << "]";
         return false;
     }
 
@@ -490,7 +489,7 @@ void Strategy::getMore(Request& r) {
     uassertStatusOK(status);
 
     if (!host.empty()) {
-        LOG(3) << "single getmore: " << ns << endl;
+        LOG(3) << "single getmore: " << ns;
 
         // we used ScopedDbConnection because we don't get about config versions
         // not deleting data is handled elsewhere
@@ -549,7 +548,7 @@ void Strategy::getMore(Request& r) {
                      hasMore ? cursor->getId() : 0);
         return;
     } else {
-        LOG(3) << "could not find cursor " << id << " in cache for " << ns << endl;
+        LOG(3) << "could not find cursor " << id << " in cache for " << ns;
 
         replyToQuery(ResultFlag_CursorNotFound, r.p(), r.m(), 0, 0, 0);
         return;

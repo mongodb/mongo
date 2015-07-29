@@ -42,8 +42,6 @@ class DatabaseType;
 class DBConfig;
 class OperationContext;
 
-typedef std::shared_ptr<DBConfig> DBConfigPtr;
-
 struct CollectionInfo {
     CollectionInfo() {
         _dirty = false;
@@ -118,7 +116,7 @@ public:
         return _primaryId;
     }
 
-    void enableSharding(bool save = true);
+    void enableSharding();
 
     /**
        @return true if there was sharding info to remove
@@ -161,21 +159,14 @@ public:
 protected:
     typedef std::map<std::string, CollectionInfo> CollectionInfoMap;
 
-
-    /**
-        lockless
-    */
-    bool _isSharded(const std::string& ns);
-
     bool _dropShardedCollections(OperationContext* txn,
                                  int& num,
                                  std::set<ShardId>& shardIds,
                                  std::string& errmsg);
 
     bool _load();
-    bool _reload();
-    void _save(bool db = true, bool coll = true);
 
+    void _save(bool db = true, bool coll = true);
 
     // Name of the database which this entry caches
     const std::string _name;

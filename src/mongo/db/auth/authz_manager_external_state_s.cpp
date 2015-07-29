@@ -42,7 +42,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"

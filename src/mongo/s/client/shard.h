@@ -77,8 +77,6 @@ public:
      */
     std::string toString() const;
 
-    static ShardPtr lookupRSName(const std::string& name);
-
     static void reloadShardInfo();
 
 private:

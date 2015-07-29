@@ -174,6 +174,7 @@ public:
             const auto shard = grid.shardRegistry()->getShard(config->getPrimaryId());
             shardConnString = shard->getConnString();
         }
+
         ScopedDbConnection conn(shardConnString);
 
         // check that collection is not capped

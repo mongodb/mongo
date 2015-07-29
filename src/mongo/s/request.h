@@ -27,7 +27,6 @@
  *    then also delete it in the license file.
  */
 
-
 #pragma once
 
 #include "mongo/db/dbmessage.h"

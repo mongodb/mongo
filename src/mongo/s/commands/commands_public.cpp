@@ -99,21 +99,26 @@ public:
     }
 
 protected:
-    bool passthrough(DBConfigPtr conf, const BSONObj& cmdObj, BSONObjBuilder& result) {
+    bool passthrough(shared_ptr<DBConfig> conf, const BSONObj& cmdObj, BSONObjBuilder& result) {
         return _passthrough(conf->name(), conf, cmdObj, 0, result);
     }
 
-    bool adminPassthrough(DBConfigPtr conf, const BSONObj& cmdObj, BSONObjBuilder& result) {
+    bool adminPassthrough(shared_ptr<DBConfig> conf,
+                          const BSONObj& cmdObj,
+                          BSONObjBuilder& result) {
         return _passthrough("admin", conf, cmdObj, 0, result);
     }
 
-    bool passthrough(DBConfigPtr conf, const BSONObj& cmdObj, int options, BSONObjBuilder& result) {
+    bool passthrough(shared_ptr<DBConfig> conf,
+                     const BSONObj& cmdObj,
+                     int options,
+                     BSONObjBuilder& result) {
         return _passthrough(conf->name(), conf, cmdObj, options, result);
     }
 
 private:
     bool _passthrough(const string& db,
-                      DBConfigPtr conf,
+                      shared_ptr<DBConfig> conf,
                       const BSONObj& cmdObj,
                       int options,
                       BSONObjBuilder& result) {

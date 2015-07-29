@@ -57,7 +57,6 @@
 
 namespace mongo {
 
-using std::endl;
 using std::set;
 using std::string;
 using std::unique_ptr;
@@ -144,13 +143,12 @@ DBConfig::DBConfig(std::string name, const DatabaseType& dbt) : _name(name) {
 DBConfig::~DBConfig() = default;
 
 bool DBConfig::isSharded(const string& ns) {
-    if (!_shardingEnabled)
+    if (!_shardingEnabled) {
         return false;
-    stdx::lock_guard<stdx::mutex> lk(_lock);
-    return _isSharded(ns);
-}
+    }
 
-bool DBConfig::_isSharded(const string& ns) {
+    stdx::lock_guard<stdx::mutex> lk(_lock);
+
     if (!_shardingEnabled) {
         return false;
     }
@@ -170,22 +168,22 @@ const ShardId& DBConfig::getShardId(const string& ns) {
     return _primaryId;
 }
 
-void DBConfig::enableSharding(bool save) {
-    if (_shardingEnabled)
-        return;
-
+void DBConfig::enableSharding() {
     verify(_name != "config");
 
     stdx::lock_guard<stdx::mutex> lk(_lock);
+    if (_shardingEnabled) {
+        return;
+    }
+
     _shardingEnabled = true;
-    if (save)
-        _save();
+    _save();
 }
 
 bool DBConfig::removeSharding(const string& ns) {
     if (!_shardingEnabled) {
         warning() << "could not remove sharding for collection " << ns
-                  << ", sharding not enabled for db" << endl;
+                  << ", sharding not enabled for db";
         return false;
     }
 
@@ -199,7 +197,7 @@ bool DBConfig::removeSharding(const string& ns) {
     CollectionInfo& ci = _collections[ns];
     if (!ci.isSharded()) {
         warning() << "could not remove sharding for collection " << ns
-                  << ", no sharding information found" << endl;
+                  << ", no sharding information found";
         return false;
     }
 
@@ -275,7 +273,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(const string& ns,
         bool earlyReload = !_collections[ns].isSharded() && (shouldReload || forceReload);
         if (earlyReload) {
             // This is to catch cases where there this is a new sharded collection
-            _reload();
+            _load();
         }
 
         CollectionInfo& ci = _collections[ns];
@@ -480,7 +478,7 @@ bool DBConfig::reload() {
 
     {
         stdx::lock_guard<stdx::mutex> lk(_lock);
-        successful = _reload();
+        successful = _load();
     }
 
     // If we aren't successful loading the database entry, we don't want to keep the stale
@@ -492,11 +490,6 @@ bool DBConfig::reload() {
     return successful;
 }
 
-bool DBConfig::_reload() {
-    // TODO: i don't think is 100% correct
-    return _load();
-}
-
 bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
     /**
      * 1) update config server
@@ -505,7 +498,7 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
      * 4) drop everywhere to clean up loose ends
      */
 
-    log() << "DBConfig::dropDatabase: " << _name << endl;
+    log() << "DBConfig::dropDatabase: " << _name;
     grid.catalogManager()->logChange(
         txn->getClient()->clientAddress(true), "dropDatabase.start", _name, BSONObj());
 
@@ -516,11 +509,11 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
         DatabaseType::ConfigNS, BSON(DatabaseType::name(_name)), 0, NULL);
     if (!result.isOK()) {
         errmsg = result.reason();
-        log() << "could not drop '" << _name << "': " << errmsg << endl;
+        log() << "could not drop '" << _name << "': " << errmsg;
         return false;
     }
 
-    LOG(1) << "\t removed entry from config server for: " << _name << endl;
+    LOG(1) << "\t removed entry from config server for: " << _name;
 
     set<ShardId> shardIds;
 
@@ -566,7 +559,7 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
         conn.done();
     }
 
-    LOG(1) << "\t dropped primary db for: " << _name << endl;
+    LOG(1) << "\t dropped primary db for: " << _name;
 
     grid.catalogManager()->logChange(
         txn->getClient()->clientAddress(true), "dropDatabase", _name, BSONObj());
@@ -583,13 +576,14 @@ bool DBConfig::_dropShardedCollections(OperationContext* txn,
     while (true) {
         CollectionInfoMap::iterator i = _collections.begin();
         for (; i != _collections.end(); ++i) {
-            // log() << "coll : " << i->first << " and " << i->second.isSharded() << endl;
-            if (i->second.isSharded())
+            if (i->second.isSharded()) {
                 break;
+            }
         }
 
-        if (i == _collections.end())
+        if (i == _collections.end()) {
             break;
+        }
 
         if (seen.count(i->first)) {
             errmsg = "seen a collection twice!";
@@ -597,7 +591,7 @@ bool DBConfig::_dropShardedCollections(OperationContext* txn,
         }
 
         seen.insert(i->first);
-        LOG(1) << "\t dropping sharded collection: " << i->first << endl;
+        LOG(1) << "\t dropping sharded collection: " << i->first;
 
         i->second.getCM()->getAllShardIds(&shardIds);
 
@@ -608,12 +602,12 @@ bool DBConfig::_dropShardedCollections(OperationContext* txn,
         if (!removeSharding(i->first)) {
             warning() << "collection " << i->first
                       << " was reloaded as unsharded before drop completed"
-                      << " during drop of all collections" << endl;
+                      << " during drop of all collections";
         }
 
         num++;
         uassert(10184, "_dropShardedCollections too many collections - bailing", num < 100000);
-        LOG(2) << "\t\t dropped " << num << " so far" << endl;
+        LOG(2) << "\t\t dropped " << num << " so far";
     }
 
     return true;
@@ -637,7 +631,7 @@ void DBConfig::getAllShardedCollections(set<string>& namespaces) {
     stdx::lock_guard<stdx::mutex> lk(_lock);
 
     for (CollectionInfoMap::const_iterator i = _collections.begin(); i != _collections.end(); i++) {
-        log() << "Coll : " << i->first << " sharded? " << i->second.isSharded() << endl;
+        log() << "Coll : " << i->first << " sharded? " << i->second.isSharded();
         if (i->second.isSharded())
             namespaces.insert(i->first);
     }
@@ -748,7 +742,7 @@ void ConfigServer::replicaSetChange(const string& setName, const string& newConn
     Client::initThread("replSetChange");
 
     try {
-        ShardPtr s = Shard::lookupRSName(setName);
+        std::shared_ptr<Shard> s = grid.shardRegistry()->lookupRSName(setName);
         if (!s) {
             LOG(1) << "shard not found for set: " << newConnectionString;
             return;
