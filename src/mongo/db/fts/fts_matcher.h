@@ -32,6 +32,7 @@
 
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/tokenizer.h"
 
 namespace mongo {
@@ -81,7 +82,7 @@ private:
      * check.
      */
     bool canSkipPositiveTermCheck() const {
-        return !_query.getCaseSensitive();
+        return !_query.getCaseSensitive() && !_query.getDiacriticSensitive();
     }
 
     /**
@@ -100,6 +101,12 @@ private:
      * Returns whether 'obj' contains the exact string 'phrase' in any indexed fields.
      */
     bool _phraseMatch(const std::string& phrase, const BSONObj& obj) const;
+
+    /**
+     * Helper method that returns the tokenizer options that this matcher should use, based on the
+     * the query options.
+     */
+    FTSTokenizer::Options _getTokenizerOptions() const;
 
     // TODO These should be unowned pointers instead of owned copies.
     const FTSQuery _query;

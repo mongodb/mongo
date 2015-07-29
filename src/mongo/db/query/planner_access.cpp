@@ -200,6 +200,7 @@ QuerySolutionNode* QueryPlannerAccess::makeLeafNode(
         ret->query = textExpr->getQuery();
         ret->language = textExpr->getLanguage();
         ret->caseSensitive = textExpr->getCaseSensitive();
+        ret->diacriticSensitive = textExpr->getDiacriticSensitive();
         return ret;
     } else {
         // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path()

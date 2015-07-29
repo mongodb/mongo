@@ -41,7 +41,10 @@ public:
     TextMatchExpression() : LeafMatchExpression(TEXT) {}
     virtual ~TextMatchExpression() {}
 
-    Status init(const std::string& query, const std::string& language, bool caseSensitive);
+    Status init(const std::string& query,
+                const std::string& language,
+                bool caseSensitive,
+                bool diacriticSensitive);
 
     virtual bool matchesSingleElement(const BSONElement& e) const;
 
@@ -62,11 +65,15 @@ public:
     bool getCaseSensitive() const {
         return _caseSensitive;
     }
+    bool getDiacriticSensitive() const {
+        return _diacriticSensitive;
+    }
 
 private:
     std::string _query;
     std::string _language;
     bool _caseSensitive;
+    bool _diacriticSensitive;
 };
 
 }  // namespace mongo

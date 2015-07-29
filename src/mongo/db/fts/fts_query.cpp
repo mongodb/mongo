@@ -50,10 +50,12 @@ using std::stringstream;
 using std::vector;
 
 const bool FTSQuery::caseSensitiveDefault = false;
+const bool FTSQuery::diacriticSensitiveDefault = false;
 
 Status FTSQuery::parse(const string& query,
                        StringData language,
                        bool caseSensitive,
+                       bool diacriticSensitive,
                        TextIndexVersion textIndexVersion) {
     StatusWithFTSLanguage swl = FTSLanguage::make(language, textIndexVersion);
     if (!swl.getStatus().isOK()) {
@@ -61,6 +63,7 @@ Status FTSQuery::parse(const string& query,
     }
     _language = swl.getValue();
     _caseSensitive = caseSensitive;
+    _diacriticSensitive = diacriticSensitive;
 
     // Build a space delimited list of words to have the FtsTokenizer tokenize
     string positiveTermSentence;
@@ -148,21 +151,29 @@ void FTSQuery::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bool n
         }
 
         // Compute the string corresponding to 'token' that will be used for the matcher.
-        // For case-insensitive queries, this is the same string as 'boundsTerm' computed
-        // above.
-        if (!_caseSensitive) {
+        // For case and diacritic insensitive queries, this is the same string as 'boundsTerm'
+        // computed above.
+        if (!_caseSensitive && !_diacriticSensitive) {
             activeTerms.insert(word);
         }
     }
 
-    if (!_caseSensitive) {
+    if (!_caseSensitive && !_diacriticSensitive) {
         return;
     }
 
-    tokenizer->reset(sentence.c_str(),
-                     FTSTokenizer::kFilterStopWords | FTSTokenizer::kGenerateCaseSensitiveTokens);
+    FTSTokenizer::Options newOptions = FTSTokenizer::kFilterStopWords;
 
-    // If we want case-sensitivity, get the case-sensitive token
+    if (_caseSensitive) {
+        newOptions |= FTSTokenizer::kGenerateCaseSensitiveTokens;
+    }
+    if (_diacriticSensitive) {
+        newOptions |= FTSTokenizer::kGenerateDiacriticSensitiveTokens;
+    }
+
+    tokenizer->reset(sentence.c_str(), newOptions);
+
+    // If we want case-sensitivity or diacritic sensitivity, get the correct token.
     while (tokenizer->moveNext()) {
         string word = tokenizer->get().toString();
 

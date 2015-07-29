@@ -37,6 +37,50 @@ namespace mongo {
 
 namespace fts {
 
+// Positive tests for FTSLanguage::make() with TEXT_INDEX_VERSION_3.
+
+TEST(FTSLanguageV3, ExactLanguage) {
+    StatusWithFTSLanguage swl = FTSLanguage::make("spanish", TEXT_INDEX_VERSION_3);
+    ASSERT(swl.getStatus().isOK());
+    ASSERT_EQUALS(swl.getValue()->str(), "spanish");
+}
+
+TEST(FTSLanguageV3, ExactCode) {
+    StatusWithFTSLanguage swl = FTSLanguage::make("es", TEXT_INDEX_VERSION_3);
+    ASSERT(swl.getStatus().isOK());
+    ASSERT_EQUALS(swl.getValue()->str(), "spanish");
+}
+
+TEST(FTSLanguageV3, UpperCaseLanguage) {
+    StatusWithFTSLanguage swl = FTSLanguage::make("SPANISH", TEXT_INDEX_VERSION_3);
+    ASSERT(swl.getStatus().isOK());
+    ASSERT_EQUALS(swl.getValue()->str(), "spanish");
+}
+
+TEST(FTSLanguageV3, UpperCaseCode) {
+    StatusWithFTSLanguage swl = FTSLanguage::make("ES", TEXT_INDEX_VERSION_3);
+    ASSERT(swl.getStatus().isOK());
+    ASSERT_EQUALS(swl.getValue()->str(), "spanish");
+}
+
+TEST(FTSLanguageV3, NoneLanguage) {
+    StatusWithFTSLanguage swl = FTSLanguage::make("none", TEXT_INDEX_VERSION_3);
+    ASSERT(swl.getStatus().isOK());
+    ASSERT_EQUALS(swl.getValue()->str(), "none");
+}
+
+// Negative tests for FTSLanguage::make() with TEXT_INDEX_VERSION_3.
+
+TEST(FTSLanguageV3, Empty) {
+    StatusWithFTSLanguage swl = FTSLanguage::make("", TEXT_INDEX_VERSION_3);
+    ASSERT(!swl.getStatus().isOK());
+}
+
+TEST(FTSLanguageV3, Unknown) {
+    StatusWithFTSLanguage swl = FTSLanguage::make("spanglish", TEXT_INDEX_VERSION_3);
+    ASSERT(!swl.getStatus().isOK());
+}
+
 // Positive tests for FTSLanguage::make() with TEXT_INDEX_VERSION_2.
 
 TEST(FTSLanguageV2, ExactLanguage) {

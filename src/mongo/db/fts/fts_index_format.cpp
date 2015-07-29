@@ -64,14 +64,14 @@ const size_t termKeyLength = termKeyPrefixLength + termKeySuffixLength;
 /**
  * Returns size of buffer required to store term in index key.
  * In version 1, terms are stored verbatim in key.
- * In version 2, terms longer than 32 characters are hashed and combined
+ * In version 2 and above, terms longer than 32 characters are hashed and combined
  * with a prefix.
  */
 int guessTermSize(const std::string& term, TextIndexVersion textIndexVersion) {
     if (TEXT_INDEX_VERSION_1 == textIndexVersion) {
         return term.size();
     } else {
-        invariant(TEXT_INDEX_VERSION_2 == textIndexVersion);
+        invariant(TEXT_INDEX_VERSION_2 <= textIndexVersion);
         if (term.size() <= termKeyPrefixLength) {
             return term.size();
         }
@@ -184,9 +184,9 @@ void FTSIndexFormat::_appendIndexKey(BSONObjBuilder& b,
         b.append("", weight);
     }
     // See comments at the top of file for termKeyPrefixLength.
-    // Apply hash for text index version 2 to long terms (longer than 32 characters).
+    // Apply hash for text index version 2 and above to long terms (longer than 32 characters).
     else {
-        invariant(TEXT_INDEX_VERSION_2 == textIndexVersion);
+        invariant(TEXT_INDEX_VERSION_2 <= textIndexVersion);
         if (term.size() <= termKeyPrefixLength) {
             b.append("", term);
         } else {

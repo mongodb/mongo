@@ -79,12 +79,23 @@ StatusWithMatchExpression expressionParserTextCallbackReal(const BSONObj& queryO
         caseSensitive = caseSensitiveElt.trueValue();
     }
 
+    BSONElement diacriticSensitiveElt = queryObj["$diacriticSensitive"];
+    bool diacriticSensitive = fts::FTSQuery::diacriticSensitiveDefault;
+    if (!diacriticSensitiveElt.eoo()) {
+        expectedFieldCount++;
+        if (mongo::Bool != diacriticSensitiveElt.type()) {
+            return StatusWithMatchExpression(ErrorCodes::TypeMismatch,
+                                             "$diacriticSensitive requires a boolean value");
+        }
+        diacriticSensitive = diacriticSensitiveElt.trueValue();
+    }
+
     if (queryObj.nFields() != expectedFieldCount) {
         return StatusWithMatchExpression(ErrorCodes::BadValue, "extra fields in $text");
     }
 
     unique_ptr<TextMatchExpression> e(new TextMatchExpression());
-    Status s = e->init(query, language, caseSensitive);
+    Status s = e->init(query, language, caseSensitive, diacriticSensitive);
     if (!s.isOK()) {
         return StatusWithMatchExpression(s);
     }

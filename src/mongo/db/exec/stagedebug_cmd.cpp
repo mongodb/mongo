@@ -447,6 +447,7 @@ public:
             if (!params.query.parse(search,
                                     fam->getSpec().defaultLanguage().str().c_str(),
                                     fts::FTSQuery::caseSensitiveDefault,
+                                    fts::FTSQuery::diacriticSensitiveDefault,
                                     fam->getSpec().getTextIndexVersion()).isOK()) {
                 return NULL;
             }

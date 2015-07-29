@@ -316,6 +316,13 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             }
         }
 
+        BSONElement diacriticSensitiveElt = textObj["diacriticSensitive"];
+        if (!diacriticSensitiveElt.eoo()) {
+            if (diacriticSensitiveElt.trueValue() != node->diacriticSensitive) {
+                return false;
+            }
+        }
+
         BSONElement indexPrefix = textObj["prefix"];
         if (!indexPrefix.eoo()) {
             if (!indexPrefix.isABSONObj()) {

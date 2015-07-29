@@ -79,6 +79,8 @@ void TextNode::appendToString(mongoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "caseSensitive= " << caseSensitive << '\n';
     addIndent(ss, indent + 1);
+    *ss << "diacriticSensitive= " << diacriticSensitive << '\n';
+    addIndent(ss, indent + 1);
     *ss << "indexPrefix = " << indexPrefix.toString() << '\n';
     if (NULL != filter) {
         addIndent(ss, indent + 1);
@@ -96,6 +98,7 @@ QuerySolutionNode* TextNode::clone() const {
     copy->query = this->query;
     copy->language = this->language;
     copy->caseSensitive = this->caseSensitive;
+    copy->diacriticSensitive = this->diacriticSensitive;
     copy->indexPrefix = this->indexPrefix;
 
     return copy;

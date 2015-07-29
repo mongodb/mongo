@@ -32,6 +32,7 @@
 
 #include "mongo/db/fts/fts_basic_phrase_matcher.h"
 #include "mongo/db/fts/fts_phrase_matcher.h"
+#include "mongo/db/fts/fts_unicode_phrase_matcher.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/base/status_with.h"
 
@@ -43,6 +44,7 @@ namespace fts {
 
 class FTSTokenizer;
 
+// Legacy language initialization.
 #define MONGO_FTS_LANGUAGE_DECLARE(language, name, version)                                    \
     BasicFTSLanguage language;                                                                 \
     MONGO_INITIALIZER_GENERAL(language, MONGO_NO_PREREQUISITES, ("FTSAllLanguagesRegistered")) \
@@ -57,7 +59,7 @@ class FTSTokenizer;
  *
  * Recommended usage:
  *
- *     StatusWithFTSLanguage swl = FTSLanguage::make( "en", TEXT_INDEX_VERSION_2 );
+ *     StatusWithFTSLanguage swl = FTSLanguage::make( "en", TEXT_INDEX_VERSION_3 );
  *     if ( !swl.getStatus().isOK() ) {
  *         // Error.
  *     }
@@ -84,7 +86,7 @@ public:
 
     /**
      * Returns a new FTSTokenizer instance for this language.
-     * Lifetime is scoped to FTSLanguage (which are currently all process lifetime)
+     * Lifetime is scoped to FTSLanguage (which are currently all process lifetime).
      */
     virtual std::unique_ptr<FTSTokenizer> createTokenizer() const = 0;
 
@@ -94,10 +96,9 @@ public:
     virtual const FTSPhraseMatcher& getPhraseMatcher() const = 0;
 
     /**
-     * Register std::string 'languageName' as a new language with text index version
+     * Register std::string 'languageName' as a new language with the text index version
      * 'textIndexVersion'.  Saves the resulting language to out-argument 'languageOut'.
-     * Subsequent calls to FTSLanguage::make() will recognize the newly-registered language
-     * string.
+     * Subsequent calls to FTSLanguage::make() will recognize the newly-registered language string.
      */
     static void registerLanguage(StringData languageName,
                                  TextIndexVersion textIndexVersion,
@@ -113,15 +114,15 @@ public:
                                       TextIndexVersion textIndexVersion);
 
     /**
-     * Return the FTSLanguage associated with the given language string.  Returns an error
-     * Status if an invalid language std::string is passed.
+     * Return the FTSLanguage associated with the given language string and the given text index
+     * version.  Returns an error Status if an invalid language std::string is passed.
      *
-     * For textIndexVersion=TEXT_INDEX_VERSION_2, language strings are
+     * For textIndexVersion >= TEXT_INDEX_VERSION_2, language strings are
      * case-insensitive, and need to be in one of the two following forms:
      * - English name, like "spanish".
      * - Two-letter code, like "es".
      *
-     * For textIndexVersion=TEXT_INDEX_VERSION_1, no validation or normalization of
+     * For textIndexVersion == TEXT_INDEX_VERSION_1, no validation or normalization of
      * language strings is performed.  This is necessary to preserve indexing behavior for
      * documents with language strings like "en": for compatibility, text data in these
      * documents needs to be processed with the English stemmer and the empty stopword list
@@ -137,7 +138,10 @@ private:
 
 typedef StatusWith<const FTSLanguage*> StatusWithFTSLanguage;
 
-
+/**
+ * FTSLanguage implementation that returns a BasicFTSTokenizer and BasicFTSPhraseMatcher for ASCII
+ * aware case folding in FTS.
+ */
 class BasicFTSLanguage : public FTSLanguage {
 public:
     std::unique_ptr<FTSTokenizer> createTokenizer() const final;
@@ -145,6 +149,20 @@ public:
 
 private:
     BasicFTSPhraseMatcher _basicPhraseMatcher;
+};
+
+/**
+ * FTSLanguage implementation that returns a UnicodeFTSTokenizer and UnicodeFTSPhraseMatcher for
+ * Unicode aware case folding and diacritic removal in FTS.
+ */
+class UnicodeFTSLanguage : public FTSLanguage {
+public:
+    UnicodeFTSLanguage(const std::string& languageName) : _unicodePhraseMatcher(languageName) {}
+    std::unique_ptr<FTSTokenizer> createTokenizer() const final;
+    const FTSPhraseMatcher& getPhraseMatcher() const final;
+
+private:
+    UnicodeFTSPhraseMatcher _unicodePhraseMatcher;
 };
 
 extern BasicFTSLanguage languagePorterV1;

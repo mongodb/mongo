@@ -48,10 +48,12 @@ public:
     // index version, since a query which doesn't specify a language and is against a
     // version 1 text index with a version 1 default language string needs to be parsed as
     // version 1 (see fts_language.cpp for a list of language strings specific to version
-    // 1).
+    // 1). Note that the diacritic sensitive option has no effect on FTS queries below index version
+    // 3.
     Status parse(const std::string& query,
                  StringData language,
                  bool caseSensitive,
+                 bool diacriticSensitive,
                  TextIndexVersion textIndexVersion);
 
     const std::set<std::string>& getPositiveTerms() const {
@@ -77,6 +79,9 @@ public:
     bool getCaseSensitive() const {
         return _caseSensitive;
     }
+    bool getDiacriticSensitive() const {
+        return _diacriticSensitive;
+    }
 
     std::string toString() const;
 
@@ -85,12 +90,14 @@ public:
     BSONObj toBSON() const;
 
     static const bool caseSensitiveDefault;
+    static const bool diacriticSensitiveDefault;
 
 private:
     void _addTerms(FTSTokenizer* tokenizer, const std::string& tokens, bool negated);
 
     const FTSLanguage* _language;
     bool _caseSensitive;
+    bool _diacriticSensitive;
 
     // Positive terms.
     std::set<std::string> _positiveTerms;

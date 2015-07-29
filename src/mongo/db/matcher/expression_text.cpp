@@ -38,10 +38,14 @@ using std::string;
 using std::unique_ptr;
 using stdx::make_unique;
 
-Status TextMatchExpression::init(const string& query, const string& language, bool caseSensitive) {
+Status TextMatchExpression::init(const string& query,
+                                 const string& language,
+                                 bool caseSensitive,
+                                 bool diacriticSensitive) {
     _query = query;
     _language = language;
     _caseSensitive = caseSensitive;
+    _diacriticSensitive = diacriticSensitive;
     return initPath("_fts");
 }
 
@@ -55,7 +59,8 @@ bool TextMatchExpression::matchesSingleElement(const BSONElement& e) const {
 void TextMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
     debug << "TEXT : query=" << _query << ", language=" << _language
-          << ", caseSensitive=" << _caseSensitive << ", tag=";
+          << ", caseSensitive=" << _caseSensitive << ", diacriticSensitive=" << _diacriticSensitive
+          << ", tag=";
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {
         td->debugString(&debug);
@@ -68,7 +73,7 @@ void TextMatchExpression::debugString(StringBuilder& debug, int level) const {
 void TextMatchExpression::toBSON(BSONObjBuilder* out) const {
     out->append("$text",
                 BSON("$search" << _query << "$language" << _language << "$caseSensitive"
-                               << _caseSensitive));
+                               << _caseSensitive << "$diacriticSensitive" << _diacriticSensitive));
 }
 
 bool TextMatchExpression::equivalent(const MatchExpression* other) const {
@@ -88,12 +93,15 @@ bool TextMatchExpression::equivalent(const MatchExpression* other) const {
     if (realOther->getCaseSensitive() != _caseSensitive) {
         return false;
     }
+    if (realOther->getDiacriticSensitive() != _diacriticSensitive) {
+        return false;
+    }
     return true;
 }
 
 unique_ptr<MatchExpression> TextMatchExpression::shallowClone() const {
     unique_ptr<TextMatchExpression> next = make_unique<TextMatchExpression>();
-    next->init(_query, _language, _caseSensitive);
+    next->init(_query, _language, _caseSensitive, _diacriticSensitive);
     if (getTag()) {
         next->setTag(getTag()->clone());
     }

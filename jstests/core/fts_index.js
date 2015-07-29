@@ -90,12 +90,16 @@ assert.commandWorked(coll.ensureIndex({a: "text"}, {textIndexVersion: 1}));
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.ensureIndex({a: "text"}, {textIndexVersion: 2}));
 assert.eq(2, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({a: "text"}, {textIndexVersion: 3}));
+assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.ensureIndex({a: "text"}));
 assert.eq(2, coll.getIndexes().length);
 coll.drop();
 
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
 assert.eq(1, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({a: "text"}, {textIndexVersion: 3}));
+assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.ensureIndex({a: "text"}, {textIndexVersion: 2}));
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.ensureIndex({a: "text"}, {textIndexVersion: 1}));

@@ -174,8 +174,11 @@ TEST(FTSSpec, FixTextIndexVersion1) {
     assertFixSuccess("{key: {a: 'text'}, textIndexVersion: 2.0}}");
     assertFixSuccess("{key: {a: 'text'}, textIndexVersion: NumberInt(2)}}");
     assertFixSuccess("{key: {a: 'text'}, textIndexVersion: NumberLong(2)}}");
+    assertFixSuccess("{key: {a: 'text'}, textIndexVersion: 3.0}");
+    assertFixSuccess("{key: {a: 'text'}, textIndexVersion: NumberInt(3)}}");
+    assertFixSuccess("{key: {a: 'text'}, textIndexVersion: NumberLong(3)}}");
 
-    assertFixFailure("{key: {a: 'text'}, textIndexVersion: 3}");
+    assertFixFailure("{key: {a: 'text'}, textIndexVersion: 4}");
     assertFixFailure("{key: {a: 'text'}, textIndexVersion: '2'}");
     assertFixFailure("{key: {a: 'text'}, textIndexVersion: {}}");
 }
