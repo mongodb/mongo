@@ -20,6 +20,7 @@ def _detect(env):
         abidw = env['ABIDW']
         if not abidw:
             return None
+        return abidw
     except KeyError:
         pass
 
