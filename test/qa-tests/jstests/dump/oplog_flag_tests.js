@@ -54,7 +54,7 @@ if (typeof getToolTest === 'undefined') {
     assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
       'mongorestore should succeed');
     assert.gte(db.bar.count(), countBeforeMongodump);
-    assert.lt(db.bar.count(), 2000);
+    assert.lt(db.bar.count(), 10000);
   } else {
     // If we're running against a standalone or sharded cluster, mongodump
     // --oplog should fail immediately, without dumping any data
